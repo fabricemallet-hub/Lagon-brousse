@@ -125,15 +125,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </SidebarFooter>
       </Sidebar>
       <main className="flex-1">
-        <header className="flex h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30">
+        <header className="flex h-auto min-h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30 py-2">
           <SidebarTrigger className="shrink-0 md:hidden" />
-          <div className="w-full flex-1 flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="w-full flex-1 flex items-center justify-between flex-wrap gap-y-2">
+            <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
               <Select
                 value={selectedLocation}
                 onValueChange={setSelectedLocation}
               >
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-[150px] sm:w-[180px]">
                   <SelectValue placeholder="Choisir une commune" />
                 </SelectTrigger>
                 <SelectContent>
@@ -145,7 +145,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </SelectContent>
               </Select>
               {showDayNavigator && (
-                <div className="flex items-center gap-1 rounded-md border p-1">
+                <div className="flex items-center gap-1 rounded-md border bg-background p-1">
                   <Button
                     variant="ghost"
                     size="icon"
@@ -158,7 +158,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <PopoverTrigger asChild>
                       <Button
                         variant={'outline'}
-                        className="w-[180px] justify-start text-left font-normal h-8"
+                        className="w-[150px] sm:w-[180px] justify-start text-left font-normal h-8"
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {format(selectedDate, 'PPP', { locale: fr })}

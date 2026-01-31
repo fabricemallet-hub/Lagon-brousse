@@ -152,7 +152,7 @@ function DayCell({
     <div
       onClick={() => onDateSelect(day)}
       className={cn(
-        'h-32 border-t border-l p-1 flex flex-col cursor-pointer hover:bg-accent/50 relative group',
+        'h-28 md:h-32 border-t border-l p-1 flex flex-col cursor-pointer hover:bg-accent/50 relative group',
         !isCurrentMonth && 'bg-muted/30 text-muted-foreground',
         isSelected && 'ring-2 ring-primary z-10',
         (getDay(day) + 6) % 7 === 0 && 'border-l-0'
@@ -271,7 +271,7 @@ export function LunarCalendar() {
           {weekdays.map((day) => (
             <div
               key={day}
-              className="text-center text-sm font-medium text-muted-foreground p-2 border-l first:border-l-0"
+              className="text-center text-xs sm:text-sm font-medium text-muted-foreground p-1 sm:p-2 border-l first:border-l-0"
             >
               {day.substring(0, 3)}
             </div>

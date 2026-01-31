@@ -146,7 +146,7 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
           </Button>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 items-center">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
           <div className="flex flex-col items-center justify-center text-center">
             <WeatherConditionIcon
               condition={selectedForecast.condition}
@@ -165,7 +165,7 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mt-6 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6 text-sm">
           <div className="flex items-center gap-2">
             <Thermometer className="size-5" />
             <div>
@@ -195,7 +195,7 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
             {weather.hourly.map((forecast, index) => (
               <CarouselItem
                 key={index}
-                className="basis-[22%] sm:basis-[18%] md:basis-[14%] lg:basis-[11%]"
+                className="basis-[28%] sm:basis-[22%] md:basis-[14%] lg:basis-[11%]"
               >
                 <div
                   onClick={() => api?.scrollTo(index)}

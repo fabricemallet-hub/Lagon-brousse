@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Ban, Check, Scale, BookOpen } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const calendarData = [
   {
@@ -74,21 +75,22 @@ export default function ReglementationPage() {
           {calendarData.map((item) => (
             <div key={item.name}>
               <h4 className="font-semibold text-lg mb-2">{item.name}</h4>
-              <div className="grid grid-cols-12 gap-1">
+              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-1">
                 {months.map((month, index) => (
                   <div
                     key={month}
-                    className={`flex flex-col items-center justify-center p-2 rounded-md h-16 text-center ${
+                    className={cn(
+                      'flex flex-col items-center justify-center rounded-md h-16 text-center p-1 sm:p-2',
                       item.forbidden.includes(index)
                         ? 'bg-destructive/10 text-destructive'
                         : 'bg-green-600/10 text-green-800'
-                    }`}
+                    )}
                   >
-                    <span className="text-xs font-bold">{month}</span>
+                    <span className="text-[10px] sm:text-xs font-bold">{month}</span>
                     {item.forbidden.includes(index) ? (
-                      <Ban className="h-5 w-5 mt-1" />
+                      <Ban className="h-4 w-4 sm:h-5 sm:w-5 mt-1" />
                     ) : (
-                      <Check className="h-5 w-5 mt-1 text-green-600" />
+                      <Check className="h-4 w-4 sm:h-5 sm:w-5 mt-1 text-green-600" />
                     )}
                   </div>
                 ))}
