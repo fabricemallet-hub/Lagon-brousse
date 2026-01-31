@@ -6,6 +6,7 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarProvider,
+  SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -312,9 +313,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             "flex h-auto min-h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30 py-2",
             status === 'limited' && 'mt-10'
           )}>
-            
+            <SidebarTrigger />
             <div className="w-full flex-1 flex items-center justify-between flex-wrap gap-y-2">
               <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+                
                 {status === 'trial' && <Badge variant="secondary">Version d'essai</Badge>}
                 {status === 'limited' && <Badge variant="destructive">Mode Limité</Badge>}
                 <Select
