@@ -32,12 +32,9 @@ export default function LoginPage() {
             Se connecter avec la biométrie
           </Button>
 
-          <p className="mt-4 text-center text-sm">
-            Pas encore de compte ?{' '}
-            <Link href="/signup" className="underline">
-              S'inscrire
-            </Link>
-          </p>
+          <Button variant="outline" className="w-full mt-4" asChild>
+            <Link href="/signup">Créer un compte</Link>
+          </Button>
         </CardContent>
       </Card>
     </div>
