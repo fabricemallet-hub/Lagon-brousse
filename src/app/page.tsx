@@ -52,7 +52,7 @@ export default function Home() {
             <div className="flex justify-between">
               <span className="text-muted-foreground">Vent</span>
               <span className="font-medium">
-                {weather.wind.speed} nœuds ({weather.wind.direction})
+                {weather.wind[0].speed} nœuds ({weather.wind[0].direction})
               </span>
             </div>
             <div className="flex justify-between">

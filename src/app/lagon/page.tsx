@@ -46,18 +46,24 @@ export default function LagonPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6 md:grid-cols-2">
-          <div className="space-y-4 rounded-lg border p-4 flex items-center justify-between bg-card">
-            <div>
-              <h3 className="font-semibold flex items-center gap-2 mb-2">
-                <Wind className="text-primary" /> Vent
-              </h3>
-              <p className="text-2xl font-bold">
-                {weather.wind.speed}{' '}
-                <span className="text-lg font-medium">nœuds</span>
-              </p>
-              <p className="text-muted-foreground">Direction {weather.wind.direction}</p>
+          <div className="space-y-4 rounded-lg border p-4 bg-card">
+            <h3 className="font-semibold flex items-center gap-2 mb-2">
+              <Wind className="text-primary" /> Vent
+            </h3>
+            <div className="space-y-3">
+              {weather.wind.map((forecast, index) => (
+                <div key={index} className="flex justify-between items-center border-b pb-2 last:border-b-0">
+                    <div>
+                        <p className="font-bold">{forecast.time}</p>
+                        <p className="text-sm text-muted-foreground">{forecast.stability}</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="font-semibold">{forecast.speed} nœuds</p>
+                        <p className="text-sm text-muted-foreground">{forecast.direction}</p>
+                    </div>
+                </div>
+              ))}
             </div>
-            <WindMap direction={weather.wind.direction} className="w-20 h-40" />
           </div>
           <div className="space-y-4 rounded-lg border p-4 bg-card">
             <h3 className="font-semibold flex items-center gap-2 mb-2">

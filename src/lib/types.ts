@@ -1,11 +1,14 @@
 export type WindDirection = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
 
+export interface WindForecast {
+  time: string;
+  speed: number;
+  direction: WindDirection;
+  stability: 'Stable' | 'Tournant';
+}
+
 export interface WeatherData {
-  wind: {
-    speed: number;
-    direction: WindDirection;
-    stability: 'Stable' | 'Tournant';
-  };
+  wind: WindForecast[];
   swell: {
     inside: string;
     outside: string;

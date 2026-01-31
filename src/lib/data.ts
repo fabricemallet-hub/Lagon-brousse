@@ -1,12 +1,12 @@
-import { LocationData, Tide, FishingSlot, FishRating, WindDirection, HuntingData } from './types';
+import { LocationData, Tide, FishingSlot, FishRating, WindDirection, HuntingData, WindForecast } from './types';
 
 const noumeaData: LocationData = {
   weather: {
-    wind: {
-      speed: 15,
-      direction: 'SE',
-      stability: 'Stable',
-    },
+    wind: [
+      { time: '06:00', speed: 15, direction: 'SE', stability: 'Stable' },
+      { time: '12:00', speed: 20, direction: 'S', stability: 'Stable' },
+      { time: '18:00', speed: 12, direction: 'SE', stability: 'Tournant' },
+    ],
     swell: {
       inside: '0.5m',
       outside: '1.2m',
@@ -125,11 +125,11 @@ const data: Record<string, LocationData> = {
     ...noumeaData,
     weather: {
       ...noumeaData.weather,
-      wind: {
-        speed: 18,
-        direction: 'S',
-        stability: 'Tournant',
-      },
+      wind: [
+        { time: '06:00', speed: 18, direction: 'S', stability: 'Tournant' },
+        { time: '12:00', speed: 22, direction: 'SW', stability: 'Tournant' },
+        { time: '18:00', speed: 15, direction: 'S', stability: 'Stable' },
+      ],
       swell: {
         inside: '0.6m',
         outside: '1.5m',
@@ -195,11 +195,11 @@ const data: Record<string, LocationData> = {
     ...noumeaData,
     weather: {
       ...noumeaData.weather,
-      wind: {
-        speed: 12,
-        direction: 'E',
-        stability: 'Stable',
-      },
+      wind: [
+        { time: '06:00', speed: 12, direction: 'E', stability: 'Stable' },
+        { time: '12:00', speed: 15, direction: 'E', stability: 'Stable' },
+        { time: '18:00', speed: 10, direction: 'NE', stability: 'Stable' },
+      ],
       swell: {
         inside: '0.4m',
         outside: '1.0m',
@@ -244,12 +244,14 @@ export function getDataForDate(location: string, date?: Date): LocationData {
   const dateSeed = dayOfMonth + month * 31 + year * 365.25;
 
   // Vary Wind
-  const windBaseSpeed = (data[location] || data['Nouméa']).weather.wind.speed;
-  locationData.weather.wind.speed = Math.max(0, Math.round(windBaseSpeed + Math.sin(dateSeed * 0.2 + locationSeed) * 10));
-  const directions: WindDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-  locationData.weather.wind.direction = directions[Math.floor(((dateSeed / 5) + locationSeed) % directions.length)];
-  const windStabilities: ('Stable' | 'Tournant')[] = ['Stable', 'Tournant'];
-  locationData.weather.wind.stability = windStabilities[Math.floor(((dateSeed / 2) + locationSeed) % windStabilities.length)];
+  locationData.weather.wind.forEach((forecast: WindForecast, index: number) => {
+    const baseForecast = (baseData.weather.wind[index] || baseData.weather.wind[0]);
+    forecast.speed = Math.max(0, Math.round(baseForecast.speed + Math.sin(dateSeed * 0.2 + locationSeed + index) * 10));
+    const directions: WindDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+    forecast.direction = directions[Math.floor(((dateSeed / 5) + locationSeed + index * 2) % directions.length)];
+    const windStabilities: ('Stable' | 'Tournant')[] = ['Stable', 'Tournant'];
+    forecast.stability = windStabilities[Math.floor(((dateSeed / 2) + locationSeed + index) % windStabilities.length)];
+  });
 
   // Vary Swell
   const swellBase = parseFloat((data[location] || data['Nouméa']).weather.swell.inside);
@@ -342,7 +344,8 @@ export function getDataForDate(location: string, date?: Date): LocationData {
       locationData.hunting.advice.rain = 'Temps sec, soyez particulièrement silencieux.';
   }
 
-  if (locationData.weather.wind.stability === 'Stable') {
+  const isWindUnstable = locationData.weather.wind.some(f => f.stability === 'Tournant');
+  if (!isWindUnstable) {
       locationData.hunting.advice.scent = 'Le vent stable vous permet de bien gérer votre odeur. Chassez face au vent.';
   } else {
       locationData.hunting.advice.scent = 'Le vent tournant rend la gestion des odeurs très difficile. Redoublez de prudence.';

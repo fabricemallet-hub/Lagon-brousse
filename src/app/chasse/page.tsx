@@ -65,28 +65,40 @@ export default function ChassePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Wind className="size-5 text-primary" />
-              Conditions Météo
+              Prévisions de Vent
+            </CardTitle>
+            <CardDescription>
+              Force et direction du vent au cours de la journée.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {weather.wind.map((forecast, index) => (
+              <div
+                key={index}
+                className="flex items-center justify-between rounded-lg border p-3"
+              >
+                <div>
+                  <p className="font-bold text-lg">{forecast.time}</p>
+                  <p className="text-muted-foreground">{forecast.stability}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xl font-bold">{forecast.speed} nœuds</p>
+                  <p className="text-muted-foreground">{forecast.direction}</p>
+                </div>
+                <WindMap direction={forecast.direction} className="w-16 h-24" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="size-5 text-primary" />
+              Conseils, Météo & Horaires
             </CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-6">
-            <div className="space-y-4 rounded-lg border p-4 flex items-center justify-between bg-card">
-              <div>
-                <h3 className="font-semibold flex items-center gap-2 mb-2">
-                  Vent
-                </h3>
-                <p className="text-2xl font-bold">
-                  {weather.wind.speed}{' '}
-                  <span className="text-lg font-medium">nœuds</span>
-                </p>
-                <p className="text-muted-foreground">
-                  Direction {weather.wind.direction} / {weather.wind.stability}
-                </p>
-              </div>
-              <WindMap
-                direction={weather.wind.direction}
-                className="w-20 h-40"
-              />
-            </div>
+          <CardContent className="space-y-6">
             <div className="space-y-2 rounded-lg border p-4 bg-card">
               <h3 className="font-semibold flex items-center gap-2 mb-2">
                 <Droplets className="text-primary" /> Pluie
@@ -96,17 +108,6 @@ export default function ChassePage() {
                 {hunting.advice.rain}
               </p>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="size-5 text-primary" />
-              Conseils & Horaires
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
             <div className="space-y-2">
               <h3 className="font-semibold">Gestion des Odeurs</h3>
               <p className="text-sm text-muted-foreground">
