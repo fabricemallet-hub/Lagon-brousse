@@ -118,9 +118,9 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
   const handleNext = () => api?.scrollNext();
 
   return (
-    <div className="rounded-lg border bg-card text-card-foreground shadow-sm">
+    <div className="rounded-lg border bg-card text-card-foreground shadow-sm overflow-hidden">
       <div className="bg-blue-600 text-white p-4 rounded-t-lg">
-        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2 mb-4">
+        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-1 sm:gap-x-2 mb-4">
           <Button
             onClick={handlePrev}
             variant="ghost"
@@ -130,7 +130,7 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
           >
             <ChevronLeft className="size-5" />
           </Button>
-          <h3 className="font-semibold text-sm sm:text-lg capitalize text-center">
+          <h3 className="font-semibold text-sm sm:text-base capitalize text-center truncate">
             {format(new Date(selectedForecast.date), "eeee dd MMMM 'à' HH'h'", {
               locale: fr,
             })}
@@ -146,7 +146,7 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+        <div className="grid grid-cols-2 gap-4 items-center">
           <div className="flex flex-col items-center justify-center text-center">
             <WeatherConditionIcon
               condition={selectedForecast.condition}
@@ -165,7 +165,7 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6 text-sm">
+        <div className="grid grid-cols-2 gap-4 mt-6 text-sm">
           <div className="flex items-center gap-2">
             <Thermometer className="size-5" />
             <div>
@@ -195,18 +195,18 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
             {weather.hourly.map((forecast, index) => (
               <CarouselItem
                 key={index}
-                className="basis-[20%] sm:basis-[16.66%] md:basis-[12.5%] lg:basis-[10%]"
+                className="basis-1/4 sm:basis-1/5 md:basis-[12.5%] lg:basis-[10%]"
               >
                 <div
                   onClick={() => api?.scrollTo(index)}
                   className={cn(
-                    'flex flex-col items-center justify-between p-2 border-r h-full min-h-[140px] cursor-pointer',
+                    'flex flex-col items-center justify-between p-1 sm:p-2 border-r h-full min-h-[130px] cursor-pointer',
                     selectedIndex === index
                       ? 'bg-blue-100'
                       : 'bg-card hover:bg-muted/50'
                   )}
                 >
-                  <p className="text-[10px] sm:text-xs uppercase text-muted-foreground text-center">
+                  <p className="text-[10px] uppercase text-muted-foreground text-center">
                     {format(new Date(forecast.date), 'eee', { locale: fr })}
                   </p>
                   <p className="text-sm font-bold">
@@ -215,11 +215,11 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
                   <WeatherConditionIcon
                     condition={forecast.condition}
                     isNight={forecast.isNight}
-                    className="my-2 size-7"
+                    className="my-1 sm:my-2 size-6 sm:size-7"
                   />
                   <div className="flex items-center flex-col gap-1 text-center">
                     <WindArrowIcon direction={forecast.windDirection} />
-                    <p className="text-xs font-semibold">{forecast.windSpeed} km/h</p>
+                    <p className="text-[10px] sm:text-xs font-semibold">{forecast.windSpeed} km/h</p>
                   </div>
                 </div>
               </CarouselItem>
