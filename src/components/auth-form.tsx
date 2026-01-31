@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, AuthError } from 'firebase/auth';
+import { ForgotPasswordDialog } from './forgot-password-dialog';
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Veuillez entrer une adresse email valide.' }),
@@ -104,7 +105,7 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col space-y-4">
         <FormField
           control={form.control}
           name="email"
@@ -131,6 +132,9 @@ export function AuthForm({ mode }: AuthFormProps) {
             </FormItem>
           )}
         />
+
+        {mode === 'login' && <ForgotPasswordDialog />}
+        
         <Button type="submit" className="w-full" disabled={isLoading}>
           {isLoading ? "Chargement..." : (mode === 'login' ? 'Se connecter' : "S'inscrire")}
         </Button>
