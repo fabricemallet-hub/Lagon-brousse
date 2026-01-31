@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 
 type DateContextType = {
   selectedDate: Date;
@@ -13,7 +13,16 @@ const DateContext = createContext<DateContextType | undefined>(
 );
 
 export function DateProvider({ children }: { children: ReactNode }) {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+
+  useEffect(() => {
+    setSelectedDate(new Date());
+  }, []);
+
+
+  if (!selectedDate) {
+    return null; // or a loading skeleton
+  }
 
   const value = {
     selectedDate,

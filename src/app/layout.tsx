@@ -6,12 +6,25 @@ import { LocationProvider } from '@/context/location-context';
 import { DateProvider } from '@/context/date-context';
 import { CalendarViewProvider } from '@/context/calendar-view-context';
 import './globals.css';
+import { Suspense } from 'react';
 
 export const metadata: Metadata = {
   title: 'Marées et Terroir Calédonien',
   description:
     'Votre guide pour la mer et la terre en Nouvelle-Calédonie.',
 };
+
+function AppContent({ children }: { children: React.ReactNode }) {
+  return (
+    <CalendarViewProvider>
+      <DateProvider>
+        <LocationProvider>
+          <AppShell>{children}</AppShell>
+        </LocationProvider>
+      </DateProvider>
+    </CalendarViewProvider>
+  )
+}
 
 export default function RootLayout({
   children,
@@ -33,13 +46,9 @@ export default function RootLayout({
         />
       </head>
       <body className={cn('font-body antialiased', 'min-h-screen bg-background font-sans')}>
-        <CalendarViewProvider>
-          <DateProvider>
-            <LocationProvider>
-              <AppShell>{children}</AppShell>
-            </LocationProvider>
-          </DateProvider>
-        </CalendarViewProvider>
+        <Suspense fallback={<div>Chargement...</div>}>
+         <AppContent>{children}</AppContent>
+        </Suspense>
         <Toaster />
       </body>
     </html>
