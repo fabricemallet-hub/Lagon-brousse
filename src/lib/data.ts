@@ -339,6 +339,12 @@ export function getDataForDate(location: string, date?: Date): LocationData {
   const phaseIndex = Math.floor((dayOfMonth / 30) * 8) % 8;
   locationData.weather.moon.phase = phases[phaseIndex];
 
+  // Vary farming data
+  locationData.farming.lunarPhase = dayOfMonth > 15 ? 'Lune Descendante' : 'Lune Montante';
+  const zodiacSigns = ['Fruits', 'Racines', 'Fleurs', 'Feuilles'];
+  locationData.farming.zodiac = zodiacSigns[Math.floor(dayOfMonth / 7) % 4];
+
+
   // Vary fishing rating
   locationData.fishing.forEach((slot: FishingSlot) => {
     slot.fish.forEach((f: FishRating) => {

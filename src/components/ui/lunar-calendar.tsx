@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader } from './card';
 import type { FishRating } from '@/lib/types';
 
-const MoonPhaseIcon = ({
+export const MoonPhaseIcon = ({
   phase,
   className,
 }: {
@@ -38,15 +38,35 @@ const MoonPhaseIcon = ({
     case 'Premier croissant':
       return <Moon className={baseClassName} />;
     case 'Premier quartier':
-      return <Circle className={cn(baseClassName, 'fill-current')} style={{ clipPath: 'inset(0 50% 0 0)' }} />;
+      return (
+        <Circle
+          className={cn(baseClassName, 'fill-current')}
+          style={{ clipPath: 'inset(0 50% 0 0)' }}
+        />
+      );
     case 'Lune gibbeuse croissante':
-      return <Circle className={cn(baseClassName, 'fill-current')} style={{ clipPath: 'inset(0 25% 0 0)' }} />;
+      return (
+        <Circle
+          className={cn(baseClassName, 'fill-current')}
+          style={{ clipPath: 'inset(0 25% 0 0)' }}
+        />
+      );
     case 'Pleine lune':
       return <Circle className={cn(baseClassName, 'fill-current')} />;
     case 'Lune gibbeuse décroissante':
-      return <Circle className={cn(baseClassName, 'fill-current')} style={{ clipPath: 'inset(0 0 0 25%)' }} />;
+      return (
+        <Circle
+          className={cn(baseClassName, 'fill-current')}
+          style={{ clipPath: 'inset(0 0 0 25%)' }}
+        />
+      );
     case 'Dernier quartier':
-      return <Circle className={cn(baseClassName, 'fill-current')} style={{ clipPath: 'inset(0 0 0 50%)' }} />;
+      return (
+        <Circle
+          className={cn(baseClassName, 'fill-current')}
+          style={{ clipPath: 'inset(0 0 0 50%)' }}
+        />
+      );
     case 'Dernier croissant':
       return <Moon className={cn(baseClassName, 'scale-x-[-1]')} />;
     default:
@@ -103,7 +123,7 @@ function DayCell({
       </div>
       <div className="grid grid-cols-2 gap-x-1 text-[10px] font-mono text-muted-foreground">
         {tides.map((tide, i) => (
-          <span key={i} className='text-center'>
+          <span key={i} className="text-center">
             {tide.type === 'haute' ? 'H' : 'B'}: {tide.height.toFixed(1)}m
           </span>
         ))}

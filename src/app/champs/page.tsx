@@ -9,18 +9,20 @@ import {
 } from '@/components/ui/card';
 import { getDataForDate } from '@/lib/data';
 import {
-  Moon,
   Spade,
   Scissors,
   Flower,
   Carrot,
   Leaf,
   RefreshCw,
-  Info
+  Info,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
 import { useLocation } from '@/context/location-context';
 import { useDate } from '@/context/date-context';
+import { MoonPhaseIcon } from '@/components/ui/lunar-calendar';
 
 const icons: { [key: string]: React.FC<LucideProps> } = {
   Spade,
@@ -34,8 +36,11 @@ const icons: { [key: string]: React.FC<LucideProps> } = {
 export default function ChampsPage() {
   const { selectedLocation } = useLocation();
   const { selectedDate } = useDate();
-  const { farming } = getDataForDate(selectedLocation, selectedDate);
-  const dateString = selectedDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+  const { farming, weather } = getDataForDate(selectedLocation, selectedDate);
+  const dateString = selectedDate.toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+  });
 
   return (
     <div className="space-y-6">
@@ -43,15 +48,30 @@ export default function ChampsPage() {
         <CardHeader>
           <CardTitle>Calendrier du Jardinier</CardTitle>
           <CardDescription>
-            Que faire au jardin à {selectedLocation} le {dateString} selon la lune ?
+            Que faire au jardin à {selectedLocation} le {dateString} selon la
+            lune ?
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-lg bg-muted/50">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-lg bg-muted/50">
             <div className="space-y-1">
-              <h3 className="font-semibold">Phase Actuelle</h3>
+              <h3 className="font-semibold">Phase Lunaire</h3>
               <p className="flex items-center gap-2 text-primary font-bold text-lg">
-                <Moon />
+                <MoonPhaseIcon
+                  phase={weather.moon.phase}
+                  className="size-5"
+                />
+                {weather.moon.phase}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <h3 className="font-semibold">Tendance</h3>
+              <p className="flex items-center gap-2 font-bold text-lg">
+                {farming.lunarPhase === 'Lune Montante' ? (
+                  <TrendingUp className="size-5" />
+                ) : (
+                  <TrendingDown className="size-5" />
+                )}
                 {farming.lunarPhase}
               </p>
             </div>
@@ -62,12 +82,10 @@ export default function ChampsPage() {
           </div>
           <div className="space-y-2 pt-4">
             <div className="flex items-center gap-2 text-lg font-semibold">
-                <Info className="size-5 text-accent" />
-                <span>Recommandation générale</span>
+              <Info className="size-5 text-accent" />
+              <span>Recommandation générale</span>
             </div>
-            <p className="text-muted-foreground">
-                {farming.recommendation}
-            </p>
+            <p className="text-muted-foreground">{farming.recommendation}</p>
           </div>
         </CardContent>
       </Card>
