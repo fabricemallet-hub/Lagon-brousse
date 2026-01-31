@@ -95,28 +95,28 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation'> = {
   },
   fishing: [
     {
-      timeOfDay: 'Aube (05:00 - 07:00)', tide: 'Marée basse', tideTime: '04:15', tideMovement: 'montante',
+      timeOfDay: 'Aube (05:00 - 07:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
         { name: 'Carangue', rating: 8, location: 'Lagon' }, { name: 'Mérou', rating: 7, location: 'Lagon' },
         { name: 'Bec de cane', rating: 9, location: 'Lagon' },
       ],
     },
     {
-      timeOfDay: 'Matinée (09:00 - 11:00)', tide: 'Marée haute', tideTime: '10:30', tideMovement: 'descendante',
+      timeOfDay: 'Matinée (09:00 - 11:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
         { name: 'Poisson perroquet', rating: 6, location: 'Lagon' }, { name: 'Wahoo', rating: 4, location: 'Large' },
         { name: 'Mahi-mahi', rating: 4, location: 'Large' },
       ],
     },
     {
-      timeOfDay: 'Après-midi (15:00 - 17:00)', tide: 'Marée basse', tideTime: '16:45', tideMovement: 'montante',
+      timeOfDay: 'Après-midi (15:00 - 17:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
         { name: 'Thon Jaune', rating: 4, location: 'Large' }, { name: 'Thazard', rating: 5, location: 'Mixte' },
         { name: 'Bonite', rating: 7, location: 'Mixte' },
       ],
     },
     {
-      timeOfDay: 'Crépuscule (17:30 - 19:00)', tide: 'Marée montante', tideTime: '19:00', tideMovement: 'montante',
+      timeOfDay: 'Crépuscule (17:30 - 19:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
         { name: 'Rouget', rating: 9, location: 'Lagon' }, { name: 'Vivaneau', rating: 8, location: 'Lagon' },
         { name: 'Thon dents de chien', rating: 7, location: 'Large' },
@@ -139,6 +139,17 @@ export function getDataForDate(location: string, date?: Date): LocationData {
   const month = effectiveDate.getMonth();
   const year = effectiveDate.getFullYear();
 
+  const locationSeed = location.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const dateSeed = dayOfMonth + month * 31 + year * 365.25;
+
+  const varyTime = (time: string, offset: number) => {
+    let [h, m] = time.split(':').map(Number);
+    m += Math.floor(Math.sin(dateSeed * 0.05 + locationSeed + offset) * 15);
+    if (m >= 60) { h = (h + 1) % 24; m %= 60; }
+    if (m < 0) { h = (h - 1 + 24) % 24; m += 60; }
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  }
+
   // 1. Determine tide station and get base tides
   const tideStation = communeToTideStationMap[location] || 'Nouméa';
   const stationTides = tideStations[tideStation as keyof typeof tideStations] || tideStations['Nouméa'];
@@ -150,8 +161,46 @@ export function getDataForDate(location: string, date?: Date): LocationData {
       tideStation: tideStation
   };
 
-  const locationSeed = location.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const dateSeed = dayOfMonth + month * 31 + year * 365.25;
+  // Vary tides slightly for realism
+  locationData.tides.forEach((tide: Tide, i: number) => {
+    const baseTide = stationTides.tides[i % stationTides.tides.length];
+    const variation = Math.sin((dateSeed * (1 + i * 0.1) + locationSeed * 0.2)) * (baseTide.height * 0.1); // Smaller variation
+    tide.height = parseFloat(Math.max(0.1, baseTide.height + variation).toFixed(2));
+    tide.time = varyTime(baseTide.time, i + 5);
+  });
+  
+  const timeToMinutes = (timeStr: string) => {
+      const [hours, minutes] = timeStr.split(':').map(Number);
+      return hours * 60 + minutes;
+  };
+
+  locationData.fishing.forEach(slot => {
+    const slotStartHour = parseInt(slot.timeOfDay.match(/(\d{2}):\d{2}/)![1]);
+    const slotStartMinutes = slotStartHour * 60;
+
+    let precedingTide: Tide | null = null;
+    let minDiff = Infinity;
+
+    locationData.tides.forEach(tide => {
+        const tideMinutes = timeToMinutes(tide.time);
+        let diff = slotStartMinutes - tideMinutes;
+        
+        if (diff < 0) {
+            diff += 24 * 60; 
+        }
+
+        if (diff < minDiff) {
+            minDiff = diff;
+            precedingTide = tide;
+        }
+    });
+
+    if (precedingTide) {
+        slot.tide = `Marée ${precedingTide.type}`;
+        slot.tideTime = precedingTide.time;
+        slot.tideMovement = precedingTide.type === 'basse' ? 'montante' : 'descendante';
+    }
+  });
 
   // Pelagic fish season logic
   const warmSeasonMonths = [8, 9, 10, 11, 0, 1, 2, 3]; // Sep to Apr
@@ -166,7 +215,7 @@ export function getDataForDate(location: string, date?: Date): LocationData {
 
   // Vary Wind
   locationData.weather.wind.forEach((forecast: WindForecast, index: number) => {
-    forecast.speed = Math.max(0, Math.round(forecast.speed + Math.sin(dateSeed * 0.2 + locationSeed + index) * 10));
+    forecast.speed = Math.max(0, Math.round(15 + Math.sin(dateSeed * 0.2 + locationSeed + index) * 10));
     const directions: WindDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
     forecast.direction = directions[Math.floor(((dateSeed / 5) + locationSeed + index * 2) % directions.length)];
     const windStabilities: ('Stable' | 'Tournant')[] = ['Stable', 'Tournant'];
@@ -174,11 +223,11 @@ export function getDataForDate(location: string, date?: Date): LocationData {
   });
 
   // Vary Swell
-  const swellBase = parseFloat(baseData.weather.swell.inside);
+  const swellBase = 0.5;
   locationData.weather.swell.inside = `${Math.max(0.1, swellBase + Math.sin(dateSeed * 0.3 + locationSeed * 0.1) * 0.5).toFixed(1)}m`;
-  const swellOutsideBase = parseFloat(baseData.weather.swell.outside);
+  const swellOutsideBase = 1.2;
   locationData.weather.swell.outside = `${Math.max(0.2, swellOutsideBase + Math.cos(dateSeed * 0.3 + locationSeed * 0.1) * 1).toFixed(1)}m`;
-  locationData.weather.swell.period = Math.max(4, Math.round(baseData.weather.swell.period + Math.sin(dateSeed * 0.1) * 3));
+  locationData.weather.swell.period = Math.max(4, Math.round(8 + Math.sin(dateSeed * 0.1) * 3));
 
   // Vary Rain
   const rainChance = (Math.sin(dateSeed * 0.4 + locationSeed * 0.2) + 1) / 2; // Normalize to 0-1
@@ -211,26 +260,10 @@ export function getDataForDate(location: string, date?: Date): LocationData {
 
 
   // Vary Sun/Moon times
-  const timeVariation = (offset: number) => Math.floor(Math.sin(dateSeed * 0.05 + locationSeed + offset) * 15);
-  const varyTime = (time: string, offset: number) => {
-    let [h, m] = time.split(':').map(Number);
-    m += timeVariation(offset);
-    if (m >= 60) { h = (h + 1) % 24; m %= 60; }
-    if (m < 0) { h = (h - 1 + 24) % 24; m += 60; }
-    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
-  }
   locationData.weather.sun.sunrise = varyTime(baseData.weather.sun.sunrise, 1);
   locationData.weather.sun.sunset = varyTime(baseData.weather.sun.sunset, 2);
   locationData.weather.moon.moonrise = varyTime(baseData.weather.moon.moonrise, 3);
   locationData.weather.moon.moonset = varyTime(baseData.weather.moon.moonset, 4);
-
-  // Vary tides slightly for realism
-  locationData.tides.forEach((tide: Tide, i: number) => {
-    const baseTide = stationTides.tides[i % stationTides.tides.length];
-    const variation = Math.sin((dateSeed * (1 + i * 0.1) + locationSeed * 0.2)) * (baseTide.height * 0.1); // Smaller variation
-    tide.height = parseFloat(Math.max(0.1, baseTide.height + variation).toFixed(2));
-    tide.time = varyTime(baseTide.time, i + 5);
-  });
 
   // Moon phase calculation
   const phases: string[] = ['Nouvelle lune', 'Premier croissant', 'Premier quartier', 'Lune gibbeuse croissante', 'Pleine lune', 'Lune gibbeuse décroissante', 'Dernier quartier', 'Dernier croissant'];
@@ -282,7 +315,8 @@ export function getDataForDate(location: string, date?: Date): LocationData {
       } else if (!isPelagicSeason && ['Mahi-mahi', 'Wahoo', 'Thon Jaune', 'Thazard'].includes(f.name)) {
           baseRating = 3; 
       }
-      const newRating = ((baseRating + dateSeed * 0.1 + locationSeed * 0.05 + f.name.length) % 8) + 2;
+      const fishNameSeed = f.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      const newRating = ((baseRating + dateSeed * 0.1 + locationSeed * 0.05 + fishNameSeed * 0.02) % 8) + 2;
       f.rating = Math.max(1, Math.min(10, Math.round(newRating)));
     });
   });
