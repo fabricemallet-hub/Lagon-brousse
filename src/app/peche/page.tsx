@@ -81,7 +81,7 @@ export default function PechePage() {
             <div>
               <div className="flex items-center gap-2">
                 <h4 className="font-semibold">Crabe de palétuvier</h4>
-                <Badge variant={crabAndLobster.crabStatus === 'Plein' ? 'default' : 'secondary'}>
+                <Badge variant={crabAndLobster.crabStatus === 'Plein' ? 'default' : crabAndLobster.crabStatus === 'Mout' ? 'destructive' : 'secondary'}>
                   {crabAndLobster.crabStatus}
                 </Badge>
               </div>

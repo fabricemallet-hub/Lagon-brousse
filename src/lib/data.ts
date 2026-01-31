@@ -178,27 +178,60 @@ export function getDataForDate(location: string, date?: Date): LocationData {
     const slotStartHour = parseInt(slot.timeOfDay.match(/(\d{2}):\d{2}/)![1]);
     const slotStartMinutes = slotStartHour * 60;
 
-    let precedingTide: Tide | null = null;
+    let closestTide: Tide | null = null;
     let minDiff = Infinity;
 
     locationData.tides.forEach(tide => {
         const tideMinutes = timeToMinutes(tide.time);
-        let diff = slotStartMinutes - tideMinutes;
-        
-        if (diff < 0) {
-            diff += 24 * 60; 
-        }
+        const diff = Math.abs(slotStartMinutes - tideMinutes);
 
         if (diff < minDiff) {
             minDiff = diff;
-            precedingTide = tide;
+            closestTide = tide;
         }
     });
 
-    if (precedingTide) {
-        slot.tide = `Marée ${precedingTide.type}`;
-        slot.tideTime = precedingTide.time;
-        slot.tideMovement = precedingTide.type === 'basse' ? 'montante' : 'descendante';
+    if (closestTide) {
+        slot.tide = `Marée ${closestTide.type}`;
+        slot.tideTime = closestTide.time;
+        // Determine tide movement based on the *next* tide
+        const slotEndMinutes = slotStartMinutes + 120; // 2 hour slot
+        let nextTide: Tide | null = null;
+        let minNextDiff = Infinity;
+
+        locationData.tides.forEach(tide => {
+             const tideMinutes = timeToMinutes(tide.time);
+             const diff = tideMinutes - slotEndMinutes;
+             if (diff > 0 && diff < minNextDiff) {
+                 minNextDiff = diff;
+                 nextTide = tide;
+             }
+        });
+        
+        // If no next tide found for the day, check from the beginning of next day's tides
+        if (!nextTide) {
+            let firstTideNextDay: Tide | null = null;
+            let minFirstDiff = Infinity;
+            locationData.tides.forEach(tide => {
+                const tideMinutes = timeToMinutes(tide.time) + 24*60;
+                const diff = tideMinutes - slotEndMinutes;
+                if(diff > 0 && diff < minFirstDiff){
+                    minFirstDiff = diff;
+                    firstTideNextDay = tide;
+                }
+            });
+            nextTide = firstTideNextDay;
+        }
+
+        if (nextTide) {
+            if (nextTide.type === 'haute') {
+                slot.tideMovement = 'montante';
+            } else {
+                slot.tideMovement = 'descendante';
+            }
+        } else {
+             slot.tideMovement = 'étale';
+        }
     }
   });
 
@@ -309,15 +342,32 @@ export function getDataForDate(location: string, date?: Date): LocationData {
   // Fishing rating
   locationData.fishing.forEach((slot) => {
     slot.fish.forEach((f) => {
-      let baseRating = f.rating;
-      if (isPelagicSeason && ['Mahi-mahi', 'Wahoo', 'Thon Jaune', 'Thazard'].includes(f.name)) {
-          baseRating = 8; 
-      } else if (!isPelagicSeason && ['Mahi-mahi', 'Wahoo', 'Thon Jaune', 'Thazard'].includes(f.name)) {
-          baseRating = 3; 
+      let baseRating = 5; // Start with a neutral rating
+      
+      // Adjust base rating based on pelagic season
+      const isPelagic = ['Mahi-mahi', 'Wahoo', 'Thon Jaune', 'Thazard', 'Bonite', 'Thon dents de chien'].includes(f.name);
+      if (isPelagic) {
+        baseRating = isPelagicSeason ? 8 : 2;
+      } else {
+        baseRating = 6; // Lagon fish have a generally good base rating
       }
+      
+      // Add variation based on moon phase
+      const moonFactor = (1 - Math.abs(dayInCycle - 14.76) / 14.76); // 1 at full/new moon, 0 at quarters
+      baseRating += moonFactor * 2;
+
+      // Add variation based on tide movement
+      if (slot.tideMovement !== 'étale') {
+        baseRating += 1.5;
+      }
+      
+      // Add deterministic random variation
       const fishNameSeed = f.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-      const newRating = ((baseRating + dateSeed * 0.1 + locationSeed * 0.05 + fishNameSeed * 0.02) % 8) + 2;
-      f.rating = Math.max(1, Math.min(10, Math.round(newRating)));
+      const randomFactor = Math.sin(dateSeed * 0.15 + locationSeed * 0.05 + fishNameSeed * 0.02 + slot.timeOfDay.length) * 1.5;
+      
+      const finalRating = baseRating + randomFactor;
+
+      f.rating = Math.max(1, Math.min(10, Math.round(finalRating)));
     });
   });
   
@@ -379,7 +429,7 @@ export function getDataForDate(location: string, date?: Date): LocationData {
     } else if (dayInCycle > 3 && dayInCycle < 12) {
         locationData.crabAndLobster = {...locationData.crabAndLobster, crabStatus: 'Vide', crabMessage: "Période de 'crabes vides' (en mue). Moins intéressant pour la pêche."};
     } else {
-        locationData.crabAndLobster = {...locationData.crabAndLobster, crabStatus: 'Mout', crabMessage: "Période de 'crabes mous'. La qualité de la chair peut être moindre."};
+        locationData.crabAndLobster = {...locationData.crabAndLobster, crabStatus: 'Mout', crabMessage: "Période de 'crabes mous' (en mue). Qualité de chair moindre et pêche interdite."};
     }
     if (illumination < 0.3) {
         locationData.crabAndLobster = {...locationData.crabAndLobster, lobsterActivity: 'Élevée', lobsterMessage: "Nuits sombres, activité élevée. Privilégiez l'intérieur du lagon et les platiers."};

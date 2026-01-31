@@ -594,7 +594,7 @@ function PecheDetailDialogContent({
                 <div>
                     <div className="flex items-center gap-2">
                         <h5 className="font-medium">Crabe</h5>
-                        <Badge variant={crabAndLobster.crabStatus === 'Plein' ? 'default' : 'secondary'} className="text-xs">
+                        <Badge variant={crabAndLobster.crabStatus === 'Plein' ? 'default' : crabAndLobster.crabStatus === 'Mout' ? 'destructive' : 'secondary'} className="text-xs">
                         {crabAndLobster.crabStatus}
                         </Badge>
                     </div>
