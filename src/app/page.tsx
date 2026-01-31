@@ -58,7 +58,7 @@ export default function Home() {
                   Marée {tide.type}
                 </span>
                 <span className="font-medium">
-                  {tide.time} ({tide.height.toFixed(1)}m)
+                  {tide.time} ({tide.height.toFixed(2)}m)
                 </span>
               </div>
             ))}

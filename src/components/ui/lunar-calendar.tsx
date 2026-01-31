@@ -247,7 +247,7 @@ function DayCell({
           <div className="grid grid-cols-2 gap-x-1 text-[10px] font-mono text-muted-foreground">
             {tides.map((tide, i) => (
               <span key={i} className="text-center">
-                {tide.type === 'haute' ? 'H' : 'B'}: {tide.height.toFixed(1)}m
+                {tide.type === 'haute' ? 'H' : 'B'}: {tide.height.toFixed(2)}m
               </span>
             ))}
           </div>
@@ -496,7 +496,7 @@ function PecheDetailDialogContent({
                     {tide.type === 'haute' ? 'Haute' : 'Basse'}:
                   </span>
                   <span className="font-mono font-medium">
-                    {tide.time} ({tide.height.toFixed(1)}m)
+                    {tide.time} ({tide.height.toFixed(2)}m)
                   </span>
                 </div>
               ))}
@@ -549,7 +549,7 @@ function PecheDetailDialogContent({
                       <RatingStars rating={f.rating} />
                       <Badge
                         variant="outline"
-                        className="w-10 justify-center"
+                        className="w-12 justify-center"
                       >
                         {f.rating}/10
                       </Badge>

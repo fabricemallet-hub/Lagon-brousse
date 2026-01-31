@@ -121,7 +121,7 @@ export default function LagonPage() {
                 <span className="capitalize text-muted-foreground">
                   {tide.type}
                 </span>
-                <span className="font-mono font-medium">{tide.time} ({tide.height.toFixed(1)}m)</span>
+                <span className="font-mono font-medium">{tide.time} ({tide.height.toFixed(2)}m)</span>
               </div>
             ))}
           </div>

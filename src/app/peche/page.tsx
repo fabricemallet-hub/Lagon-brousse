@@ -136,7 +136,7 @@ export default function PechePage() {
                     </div>
                     <div className="flex items-center gap-2">
                         <RatingStars rating={f.rating} />
-                        <Badge variant="outline" className="w-10 justify-center">{f.rating}/10</Badge>
+                        <Badge variant="outline" className="w-12 justify-center">{f.rating}/10</Badge>
                     </div>
                   </div>
                 ))}

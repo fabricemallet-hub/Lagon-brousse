@@ -31,10 +31,10 @@ const noumeaData: LocationData = {
     hourly: [],
   },
   tides: [
-    { type: 'basse', time: '04:15', height: 0.4, current: 'Modéré' },
-    { type: 'haute', time: '10:30', height: 1.6, current: 'Fort' },
-    { type: 'basse', time: '16:45', height: 0.5, current: 'Modéré' },
-    { type: 'haute', time: '23:00', height: 1.5, current: 'Fort' },
+    { type: 'basse', time: '01:19', height: 0.21, current: 'Modéré' },
+    { type: 'haute', time: '08:09', height: 1.55, current: 'Fort' },
+    { type: 'basse', time: '14:23', height: 0.58, current: 'Modéré' },
+    { type: 'haute', time: '19:53', height: 1.25, current: 'Fort' },
   ],
   farming: {
     lunarPhase: 'Lune Montante',
@@ -351,7 +351,7 @@ export function getDataForDate(location: string, date?: Date): LocationData {
   locationData.tides.forEach((tide: Tide, i: number) => {
     const baseTide = (data[location] || data['Nouméa']).tides[i];
     const variation = Math.sin((dateSeed * (1 + i * 0.1) + locationSeed * 0.2)) * (baseTide.height * 0.5);
-    tide.height = parseFloat(Math.max(0.2, baseTide.height + variation).toFixed(1));
+    tide.height = parseFloat(Math.max(0.2, baseTide.height + variation).toFixed(2));
     tide.time = varyTime(baseTide.time, i + 5);
   });
 
