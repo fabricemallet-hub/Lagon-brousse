@@ -31,10 +31,12 @@ import { useLocation } from '@/context/location-context';
 import { useCalendarView } from '@/context/calendar-view-context';
 import { Switch } from './ui/switch';
 import { Label } from './ui/label';
+import { usePathname } from 'next/navigation';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { locations, selectedLocation, setSelectedLocation } = useLocation();
   const { calendarView, setCalendarView } = useCalendarView();
+  const pathname = usePathname();
 
   return (
     <SidebarProvider>
@@ -116,15 +118,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 ))}
               </SelectContent>
             </Select>
-            <div className="flex items-center space-x-2">
-              <Label htmlFor="calendar-view" className="text-sm font-medium">Pêche</Label>
-              <Switch
-                id="calendar-view"
-                checked={calendarView === 'champs'}
-                onCheckedChange={(checked) => setCalendarView(checked ? 'champs' : 'peche')}
-              />
-              <Label htmlFor="calendar-view" className="text-sm font-medium">Champs</Label>
-            </div>
+            {pathname === '/calendrier' && (
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="calendar-view" className="text-sm font-medium">Pêche</Label>
+                <Switch
+                  id="calendar-view"
+                  checked={calendarView === 'champs'}
+                  onCheckedChange={(checked) => setCalendarView(checked ? 'champs' : 'peche')}
+                />
+                <Label htmlFor="calendar-view" className="text-sm font-medium">Champs</Label>
+              </div>
+            )}
           </div>
         </header>
         <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
