@@ -1,56 +1,132 @@
 import { LocationData } from './types';
 
+const noumeaData: LocationData = {
+  weather: {
+    wind: {
+      speed: 15,
+      direction: 'SE',
+    },
+    swell: {
+      inside: '0.5m',
+      outside: '1.2m',
+      period: 8,
+    },
+    sun: {
+      sunrise: '06:31',
+      sunset: '17:45',
+    },
+    moon: {
+      moonrise: '12:05',
+      moonset: '23:55',
+      phase: 'Premier quartier',
+    },
+  },
+  tides: [
+    { type: 'basse', time: '04:15', height: 0.4, current: 'Modéré' },
+    { type: 'haute', time: '10:30', height: 1.6, current: 'Fort' },
+    { type: 'basse', time: '16:45', height: 0.5, current: 'Modéré' },
+    { type: 'haute', time: '23:00', height: 1.5, current: 'Fort' },
+  ],
+  farming: {
+    lunarPhase: 'Lune Montante',
+    zodiac: 'Feuilles',
+    recommendation: 'Planter des légumes feuilles, bouturer.',
+    details: [
+      {
+        task: 'Plantation de légumes feuilles',
+        description: 'La sève monte, idéal pour les salades, brèdes et choux.',
+        icon: 'Leaf',
+      },
+      {
+        task: 'Bouturage',
+        description: 'Les boutures prennent plus facilement en lune montante.',
+        icon: 'RefreshCw',
+      },
+      {
+        task: 'Semis de fleurs',
+        description: 'Profitez de cette phase pour semer vos fleurs annuelles.',
+        icon: 'Flower',
+      },
+    ],
+  },
+};
+
 const data: Record<string, LocationData> = {
-  Nouméa: {
+  Bélep: noumeaData,
+  Boulouparis: noumeaData,
+  Bourail: noumeaData,
+  Canala: noumeaData,
+  Dumbéa: noumeaData,
+  Farino: noumeaData,
+  Hienghène: noumeaData,
+  Houaïlou: noumeaData,
+  "L'Île-des-Pins": noumeaData,
+  'Kaala-Gomen': noumeaData,
+  Koné: {
     weather: {
       wind: {
-        speed: 15,
-        direction: 'SE',
+        speed: 18,
+        direction: 'S',
       },
       swell: {
-        inside: '0.5m',
-        outside: '1.2m',
-        period: 8,
+        inside: '0.6m',
+        outside: '1.5m',
+        period: 7,
       },
       sun: {
-        sunrise: '06:31',
-        sunset: '17:45',
+        sunrise: '06:35',
+        sunset: '17:50',
       },
       moon: {
-        moonrise: '12:05',
-        moonset: '23:55',
+        moonrise: '12:10',
+        moonset: '00:01',
         phase: 'Premier quartier',
       },
     },
     tides: [
-      { type: 'basse', time: '04:15', height: 0.4, current: 'Modéré' },
-      { type: 'haute', time: '10:30', height: 1.6, current: 'Fort' },
-      { type: 'basse', time: '16:45', height: 0.5, current: 'Modéré' },
-      { type: 'haute', time: '23:00', height: 1.5, current: 'Fort' },
+      { type: 'basse', time: '04:30', height: 0.5, current: 'Modéré' },
+      { type: 'haute', time: '10:45', height: 1.7, current: 'Fort' },
+      { type: 'basse', time: '17:00', height: 0.6, current: 'Modéré' },
+      { type: 'haute', time: '23:15', height: 1.6, current: 'Fort' },
     ],
     farming: {
-      lunarPhase: 'Lune Montante',
-      zodiac: 'Feuilles',
-      recommendation: 'Planter des légumes feuilles, bouturer.',
+      lunarPhase: 'Lune Descendante',
+      zodiac: 'Racines',
+      recommendation: 'Planter des légumes racines, tailler et désherber.',
       details: [
         {
-          task: 'Plantation de légumes feuilles',
-          description: 'La sève monte, idéal pour les salades, brèdes et choux.',
-          icon: 'Leaf',
+          task: 'Plantation de légumes racines',
+          description:
+            'La sève descend, idéal pour ignames, manioc et carottes.',
+          icon: 'Carrot',
         },
         {
-          task: 'Bouturage',
-          description: 'Les boutures prennent plus facilement en lune montante.',
-          icon: 'RefreshCw',
-        },
-        {
-          task: 'Semis de fleurs',
-          description: 'Profitez de cette phase pour semer vos fleurs annuelles.',
-          icon: 'Flower',
+          task: 'Taille des arbres',
+          description:
+            'La sève basse limite les écoulements et favorise la cicatrisation.',
+          icon: 'Scissors',
         },
       ],
     },
   },
+  Kouaoua: noumeaData,
+  Koumac: noumeaData,
+  'La Foa': noumeaData,
+  'Le Mont-Dore': noumeaData,
+  Lifou: noumeaData,
+  Maré: noumeaData,
+  Moindou: noumeaData,
+  Nouméa: noumeaData,
+  Ouégoa: noumeaData,
+  Ouvéa: noumeaData,
+  Païta: noumeaData,
+  Poindimié: noumeaData,
+  Ponérihouen: noumeaData,
+  Pouébo: noumeaData,
+  Pouembout: noumeaData,
+  Poum: noumeaData,
+  Poya: noumeaData,
+  Sarraméa: noumeaData,
   Thio: {
     weather: {
       wind: {
@@ -96,51 +172,9 @@ const data: Record<string, LocationData> = {
       ],
     },
   },
-  Koné: {
-    weather: {
-      wind: {
-        speed: 18,
-        direction: 'S',
-      },
-      swell: {
-        inside: '0.6m',
-        outside: '1.5m',
-        period: 7,
-      },
-      sun: {
-        sunrise: '06:35',
-        sunset: '17:50',
-      },
-      moon: {
-        moonrise: '12:10',
-        moonset: '00:01',
-        phase: 'Premier quartier',
-      },
-    },
-    tides: [
-      { type: 'basse', time: '04:30', height: 0.5, current: 'Modéré' },
-      { type: 'haute', time: '10:45', height: 1.7, current: 'Fort' },
-      { type: 'basse', time: '17:00', height: 0.6, current: 'Modéré' },
-      { type: 'haute', time: '23:15', height: 1.6, current: 'Fort' },
-    ],
-    farming: {
-      lunarPhase: 'Lune Descendante',
-      zodiac: 'Racines',
-      recommendation: 'Planter des légumes racines, tailler et désherber.',
-      details: [
-        {
-          task: 'Plantation de légumes racines',
-          description: 'La sève descend, idéal pour ignames, manioc et carottes.',
-          icon: 'Carrot',
-        },
-        {
-          task: 'Taille des arbres',
-          description: 'La sève basse limite les écoulements et favorise la cicatrisation.',
-          icon: 'Scissors',
-        },
-      ],
-    },
-  },
+  Touho: noumeaData,
+  Voh: noumeaData,
+  Yaté: noumeaData,
 };
 
 export function getTodaysData(location: string): LocationData {
@@ -148,5 +182,5 @@ export function getTodaysData(location: string): LocationData {
 }
 
 export function getAvailableLocations(): string[] {
-  return Object.keys(data);
+  return Object.keys(data).sort();
 }
