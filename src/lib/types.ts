@@ -64,6 +64,11 @@ export interface FarmingData {
     description: string;
     icon: 'Spade' | 'Scissors' | 'Flower' | 'Carrot' | 'Leaf' | 'RefreshCw';
   }[];
+  isGoodForCuttings: boolean;
+  isGoodForPruning: boolean;
+  isGoodForMowing: boolean;
+  sow: string[];
+  harvest: string[];
 }
 
 export interface FishRating {

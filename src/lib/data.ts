@@ -57,6 +57,11 @@ const noumeaData: LocationData = {
         icon: 'Flower',
       },
     ],
+    isGoodForCuttings: false,
+    isGoodForPruning: false,
+    isGoodForMowing: false,
+    sow: [],
+    harvest: [],
   },
   fishing: [
     {
@@ -179,6 +184,11 @@ const data: Record<string, LocationData> = {
           icon: 'Scissors',
         },
       ],
+      isGoodForCuttings: false,
+      isGoodForPruning: false,
+      isGoodForMowing: false,
+      sow: [],
+      harvest: [],
     },
   },
   Kouaoua: noumeaData,
@@ -336,9 +346,60 @@ export function getDataForDate(location: string, date?: Date): LocationData {
   locationData.weather.moon.percentage = Math.round(illumination * 100);
 
   // Farming data
-  locationData.farming.lunarPhase = dayInCycle < 14.76 ? 'Lune Montante' : 'Lune Descendante';
+  const lunarPhase = dayInCycle < 14.76 ? 'Lune Montante' : 'Lune Descendante';
+  locationData.farming.lunarPhase = lunarPhase;
   const zodiacSigns = ['Fruits', 'Racines', 'Fleurs', 'Feuilles'];
-  locationData.farming.zodiac = zodiacSigns[Math.floor((dayInCycle / (27.3/4)) % 4)];
+  const zodiac = zodiacSigns[Math.floor((dayInCycle / (27.3/4)) % 4)] as 'Fruits' | 'Racines' | 'Fleurs' | 'Feuilles';
+  locationData.farming.zodiac = zodiac;
+
+  locationData.farming.isGoodForCuttings = lunarPhase === 'Lune Montante';
+  locationData.farming.isGoodForPruning = lunarPhase === 'Lune Descendante';
+  locationData.farming.isGoodForMowing = lunarPhase === 'Lune Descendante' && zodiac === 'Feuilles';
+  
+  const sow: string[] = [];
+  const harvest: string[] = [];
+
+  // Hot season (Oct - Mar)
+  if (month >= 9 || month <= 2) { // From October to March
+    if (zodiac === 'Fruits') {
+      sow.push('Tomates', 'Aubergines', 'Poivrons');
+      harvest.push('Melons', 'Pastèques');
+    }
+    if (zodiac === 'Racines') {
+      sow.push('Carottes', 'Radis');
+      harvest.push('Patates douces', 'Manioc');
+    }
+    if (zodiac === 'Feuilles') {
+      sow.push('Salades', 'Brèdes');
+      harvest.push('Choux de Chine');
+    }
+    if (zodiac === 'Fleurs') {
+        sow.push('Fleurs annuelles');
+        harvest.push('Artichauts');
+    }
+  } 
+  // Cool season (Apr - Sep)
+  else { // From April to September
+    if (zodiac === 'Fruits') {
+      sow.push('Pois', 'Haricots');
+      harvest.push('Citrouilles', 'Courgettes');
+    }
+    if (zodiac === 'Racines') {
+      sow.push('Oignons', 'Ail', 'Poireaux');
+      harvest.push('Carottes', 'Taro', 'Pommes de terre');
+    }
+    if (zodiac === 'Feuilles') {
+      sow.push('Choux', 'Épinards', 'Bettes');
+      harvest.push('Salades');
+    }
+     if (zodiac === 'Fleurs') {
+        sow.push('Brocolis', 'Choux-fleurs');
+    }
+  }
+
+  locationData.farming.sow = sow;
+  locationData.farming.harvest = harvest;
+
 
   // Fishing rating
   locationData.fishing.forEach((slot: FishingSlot) => {

@@ -29,6 +29,9 @@ import {
   Flower,
   Leaf,
   Scissors,
+  RefreshCw,
+  Seedling,
+  Wheat,
 } from 'lucide-react';
 import { Button } from './button';
 import { cn } from '@/lib/utils';
@@ -115,8 +118,15 @@ function DayCell({
   const tides = data.tides.slice(0, 4);
 
   // Gardening data
-  const { zodiac, lunarPhase } = data.farming;
-  const isGoodForMowing = lunarPhase === 'Lune Descendante' && zodiac === 'Feuilles';
+  const { 
+    zodiac, 
+    isGoodForCuttings, 
+    isGoodForPruning, 
+    isGoodForMowing,
+    sow,
+    harvest,
+  } = data.farming;
+  
   const GardeningIcon = {
     'Fruits': Spade,
     'Racines': Carrot,
@@ -152,7 +162,7 @@ function DayCell({
     <div
       onClick={() => onDateSelect(day)}
       className={cn(
-        'h-28 md:h-32 border-t border-l p-1 flex flex-col cursor-pointer hover:bg-accent/50 relative group',
+        'h-32 md:h-36 border-t border-l p-1 flex flex-col cursor-pointer hover:bg-accent/50 relative group',
         !isCurrentMonth && 'bg-muted/30 text-muted-foreground',
         isSelected && 'ring-2 ring-primary z-10',
         (getDay(day) + 6) % 7 === 0 && 'border-l-0'
@@ -186,15 +196,44 @@ function DayCell({
           </div>
         </>
       ) : (
-        <div className="flex-grow flex flex-col items-center justify-center gap-1 text-center">
-            {GardeningIcon && <GardeningIcon className="size-5 text-primary" />}
-            <p className="text-xs text-muted-foreground">{zodiac}</p>
-            {isGoodForMowing && (
-                <div className="flex items-center gap-1 text-green-600">
-                    <Scissors className="size-3" />
-                    <span className="text-[10px] font-semibold">Taille Gazon</span>
-                </div>
-            )}
+        <div className="flex-grow flex flex-col items-start justify-start gap-0.5 overflow-hidden w-full pt-1 px-1">
+            <div className="flex items-center gap-1">
+                {GardeningIcon && <GardeningIcon className="size-4 text-primary" />}
+                <p className="text-xs text-muted-foreground font-semibold">{zodiac}</p>
+            </div>
+            
+            <div className="space-y-0.5 text-[10px] font-semibold leading-tight self-stretch mt-1">
+                {isGoodForPruning && (
+                    <div className="flex items-center gap-1 text-orange-600" title="Taille des arbres et arbustes">
+                        <Scissors className="size-3 shrink-0" />
+                        <span>Taille</span>
+                    </div>
+                )}
+                {isGoodForCuttings && (
+                    <div className="flex items-center gap-1 text-pink-600" title="Bouturage">
+                        <RefreshCw className="size-3 shrink-0" />
+                        <span>Bouturage</span>
+                    </div>
+                )}
+                {isGoodForMowing && (
+                    <div className="flex items-center gap-1 text-green-600" title="Tonte du gazon">
+                        <Scissors className="size-3 shrink-0" />
+                        <span>Tonte</span>
+                    </div>
+                )}
+                {sow.length > 0 && (
+                    <div className="flex items-center gap-1 text-blue-600" title={`Semer: ${sow.join(', ')}`}>
+                        <Seedling className="size-3 shrink-0" />
+                        <span className="truncate">Semis: {sow[0]}</span>
+                    </div>
+                )}
+                 {harvest.length > 0 && (
+                    <div className="flex items-center gap-1 text-purple-600" title={`Récolter: ${harvest.join(', ')}`}>
+                        <Wheat className="size-3 shrink-0" />
+                        <span className="truncate">Récolte: {harvest[0]}</span>
+                    </div>
+                )}
+            </div>
         </div>
       )}
     </div>
@@ -203,20 +242,24 @@ function DayCell({
 
 function GardeningLegend() {
   const legendItems = [
-    { icon: Spade, label: 'Fruits' },
-    { icon: Carrot, label: 'Racines' },
-    { icon: Flower, label: 'Fleurs' },
-    { icon: Leaf, label: 'Feuilles' },
-    { icon: Scissors, label: 'Taille Gazon', color: 'text-green-600' },
+    { icon: Spade, label: 'Jours Fruits', color: 'text-primary' },
+    { icon: Carrot, label: 'Jours Racines', color: 'text-primary' },
+    { icon: Flower, label: 'Jours Fleurs', color: 'text-primary' },
+    { icon: Leaf, label: 'Jours Feuilles', color: 'text-primary' },
+    { icon: Scissors, label: 'Taille', color: 'text-orange-600' },
+    { icon: RefreshCw, label: 'Bouturage', color: 'text-pink-600' },
+    { icon: Scissors, label: 'Tonte', color: 'text-green-600' },
+    { icon: Seedling, label: 'Semis', color: 'text-blue-600' },
+    { icon: Wheat, label: 'Récolte', color: 'text-purple-600' },
   ];
 
   return (
     <div className="mt-4 p-2 border rounded-lg bg-muted/50">
       <h4 className="font-semibold mb-2 text-sm">Légende du Jardinier</h4>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-x-4 gap-y-2">
         {legendItems.map(item => (
           <div key={item.label} className="flex items-center gap-2 text-xs">
-            <item.icon className={cn("size-4", item.color || 'text-primary')} />
+            <item.icon className={cn("size-4", item.color)} />
             <span>{item.label}</span>
           </div>
         ))}
