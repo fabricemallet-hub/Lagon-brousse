@@ -25,19 +25,23 @@ export default function ComptePage() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
   const handleSubscribe = () => {
-    // The Stripe Payment Link should be stored in environment variables
-    const stripePaymentLink = process.env.NEXT_PUBLIC_STRIPE_PAYMENT_LINK;
+    if (!userDocRef) return;
+    
+    // Simulate subscription since a real payment gateway for NC is not available
+    const now = new Date();
+    const expiryDate = new Date(now);
+    expiryDate.setMonth(expiryDate.getMonth() + 1);
 
-    if (stripePaymentLink && stripePaymentLink !== 'https://buy.stripe.com/VOTRE_LIEN_DE_PAIEMENT') {
-      window.location.href = stripePaymentLink;
-    } else {
-      console.error('Stripe payment link is not configured.');
-      toast({
-        variant: 'destructive',
-        title: 'Erreur de configuration',
-        description: "La fonctionnalité de paiement n'est pas encore active.",
-      });
-    }
+    setDocumentNonBlocking(userDocRef, {
+        subscriptionStatus: 'active',
+        subscriptionStartDate: now.toISOString(),
+        subscriptionExpiryDate: expiryDate.toISOString(),
+    }, { merge: true });
+    
+    toast({
+        title: "Abonnement activé (simulation)",
+        description: "Vous avez maintenant accès à toutes les fonctionnalités.",
+    });
   };
 
   const handleCancel = () => {
@@ -45,7 +49,7 @@ export default function ComptePage() {
     setDocumentNonBlocking(userDocRef, {
         subscriptionStatus: 'inactive',
     }, { merge: true });
-    toast({ title: "Abonnement résilié", description: "Votre abonnement prendra fin à la date d'échéance.", variant: 'destructive' });
+    toast({ title: "Abonnement résilié", description: "Votre accès est maintenant limité. Vous pouvez vous réabonner à tout moment.", variant: 'destructive' });
   };
 
   const getStatusInfo = () => {
