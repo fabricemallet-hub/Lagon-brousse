@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { AppShell } from '@/components/app-shell';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
+import { LocationProvider } from '@/context/location-context';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -30,7 +31,9 @@ export default function RootLayout({
         />
       </head>
       <body className={cn('font-body antialiased', 'min-h-screen bg-background font-sans')}>
-        <AppShell>{children}</AppShell>
+        <LocationProvider>
+          <AppShell>{children}</AppShell>
+        </LocationProvider>
         <Toaster />
       </body>
     </html>

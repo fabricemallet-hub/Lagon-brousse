@@ -27,10 +27,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { getAvailableLocations } from '@/lib/data';
+import { useLocation } from '@/context/location-context';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const locations = getAvailableLocations();
+  const { locations, selectedLocation, setSelectedLocation } = useLocation();
 
   return (
     <SidebarProvider>
@@ -100,7 +100,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <header className="flex h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30">
           <SidebarTrigger className="shrink-0 md:hidden" />
           <div className="w-full flex-1">
-            <Select defaultValue="Nouméa">
+            <Select value={selectedLocation} onValueChange={setSelectedLocation}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Choisir une commune" />
               </SelectTrigger>

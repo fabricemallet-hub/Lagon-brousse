@@ -1,3 +1,5 @@
+'use client';
+
 import {
   Card,
   CardContent,
@@ -13,9 +15,11 @@ import {
   Spade,
   Moon,
 } from 'lucide-react';
+import { useLocation } from '@/context/location-context';
 
 export default function Home() {
-  const { weather, tides, farming } = getTodaysData('Nouméa');
+  const { selectedLocation } = useLocation();
+  const { weather, tides, farming } = getTodaysData(selectedLocation);
 
   return (
     <div className="flex flex-col gap-8">
@@ -24,7 +28,7 @@ export default function Home() {
           Bonjour!
         </h1>
         <p className="text-muted-foreground">
-          Voici le résumé pour Nouméa aujourd'hui.
+          Voici le résumé pour {selectedLocation} aujourd'hui.
         </p>
       </div>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

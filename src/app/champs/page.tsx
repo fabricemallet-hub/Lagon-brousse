@@ -1,3 +1,5 @@
+'use client';
+
 import {
   Card,
   CardContent,
@@ -17,6 +19,7 @@ import {
   Info
 } from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
+import { useLocation } from '@/context/location-context';
 
 const icons: { [key: string]: React.FC<LucideProps> } = {
   Spade,
@@ -28,7 +31,8 @@ const icons: { [key: string]: React.FC<LucideProps> } = {
 };
 
 export default function ChampsPage() {
-  const { farming } = getTodaysData('Koné');
+  const { selectedLocation } = useLocation();
+  const { farming } = getTodaysData(selectedLocation);
 
   return (
     <div className="space-y-6">
@@ -36,7 +40,7 @@ export default function ChampsPage() {
         <CardHeader>
           <CardTitle>Calendrier du Jardinier</CardTitle>
           <CardDescription>
-            Que faire au jardin aujourd'hui selon la lune ?
+            Que faire au jardin à {selectedLocation} aujourd'hui selon la lune ?
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

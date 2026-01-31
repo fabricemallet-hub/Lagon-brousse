@@ -1,3 +1,5 @@
+'use client';
+
 import {
   Card,
   CardContent,
@@ -18,9 +20,11 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { FishingPredictor } from '@/components/lagon/fishing-predictor';
 import { Progress } from '@/components/ui/progress';
+import { useLocation } from '@/context/location-context';
 
 export default function LagonPage() {
-  const { weather, tides } = getTodaysData('Nouméa');
+  const { selectedLocation } = useLocation();
+  const { weather, tides } = getTodaysData(selectedLocation);
 
   const currentStrength = {
     'Faible': 20,
@@ -35,7 +39,7 @@ export default function LagonPage() {
           <CardHeader>
             <CardTitle>Conditions en Mer</CardTitle>
             <CardDescription>
-              Informations détaillées sur la météo et la mer pour Nouméa.
+              Informations détaillées sur la météo et la mer pour {selectedLocation}.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-6 md:grid-cols-2">
