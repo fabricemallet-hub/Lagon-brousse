@@ -1,0 +1,120 @@
+{
+  "entities": {
+    "UserAccount": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserAccount",
+      "type": "object",
+      "description": "Represents a user account within the application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user account."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address.",
+          "format": "email"
+        },
+        "subscriptionStatus": {
+          "type": "string",
+          "description": "The current subscription status of the user (e.g., 'active', 'inactive', 'trial')."
+        },
+        "subscriptionStartDate": {
+          "type": "string",
+          "description": "The date when the user's subscription started.",
+          "format": "date-time"
+        },
+        "subscriptionExpiryDate": {
+          "type": "string",
+          "description": "The date when the user's subscription expires.",
+          "format": "date-time"
+        },
+        "favoriteLocationIds": {
+          "type": "array",
+          "description": "References to Location. (Relationship: UserAccount N:N Location)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "subscriptionStatus"
+      ]
+    },
+    "Location": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Location",
+      "type": "object",
+      "description": "Represents a location (commune) selected by the user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the location."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the location."
+        },
+        "latitude": {
+          "type": "number",
+          "description": "The latitude of the location."
+        },
+        "longitude": {
+          "type": "number",
+          "description": "The longitude of the location."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "latitude",
+        "longitude"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "UserAccount",
+          "schema": {
+            "$ref": "#/backend/entities/UserAccount"
+          },
+          "description": "Stores user account information.  The 'userId' path parameter is used to enforce path-based ownership for data privacy. Includes 'favoriteLocationIds' array.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user account."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/locations/{locationId}",
+        "definition": {
+          "entityName": "Location",
+          "schema": {
+            "$ref": "#/backend/entities/Location"
+          },
+          "description": "Stores location data (communes).",
+          "params": [
+            {
+              "name": "locationId",
+              "description": "The unique identifier for the location."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "This design prioritizes security and scalability for the Marées et Terroir Calédonien application, focusing on user authentication and location data. It leverages path-based ownership for user accounts and separates location data for efficient querying and management. The design emphasizes authorization independence by not relying on `get()` calls in security rules.\n\n**Authorization Independence:** User account data is stored under `/users/{userId}`, ensuring clear ownership and avoiding reliance on external document data for authorization. No data is denormalized as the only relationship is a N:N relationship between user and location and this handled within the user document as an array of IDs.\n\n**Structural Segregation:**  User account data is kept separate from location data, allowing for distinct security rules tailored to each data type.\n\n**QAPs (Query Across Partitions):** Because there are no list operations required for UserAccount collection and favoriteLocationIds only stores the references to existing locations, QAP is automatically supported. List operation on the location data is supported given there is no restriction on listing locations, thus no need to store the role in database."
+  }
+}

@@ -1,0 +1,122 @@
+/**
+ * Core Philosophy: This ruleset enforces a strict user-ownership model for private data, 
+ * while providing public read access to shared application data. The primary goal is to
+ * ensure that users can only access and manage their own information, preventing any
+ * cross-user data access or enumeration.
+ *
+ * Data Structure:
+ * - /users/{userId}: Contains private user account information. All access to documents
+ *   within this path is restricted to the authenticated user whose UID matches the {userId}.
+ * - /locations/{locationId}: Contains public location data that is readable by any client,
+ *   including unauthenticated ones. Writes to this collection are locked down to prevent
+ *   unauthorized modification, assuming this data is managed externally.
+ *
+ * Key Security Decisions:
+ * - User Isolation: A user can only interact with their own document at /users/{userId}.
+ * - No User Listing: Listing the entire /users collection is explicitly disallowed to 
+ *   protect user privacy and prevent data scraping.
+ * - Public Read-Only Data: The /locations collection is globally readable but not writable
+ *   by clients, making it suitable for shared, static application data.
+ * - Default Secure: The default security posture for any path not explicitly defined is to deny all access.
+ *
+ * Denormalization for Authorization:
+ * The security model relies on path-based authorization for user data, where the document ID
+ * `{userId}` is the user's authentication UID. To ensure integrity, the rules mandate that
+ * on creation, the user document must contain an `id` field that mirrors the `{userId}` in the path.
+ * This prevents data from being associated with the wrong user.
+ *
+ * Structural Segregation:
+ * The ruleset leverages separate top-level collections for private user data (`/users`) and
+ * public location data (`/locations`). This clear separation simplifies rule logic, improves
+ * query performance, and enhances security by preventing accidental data leakage.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ----------------------------------------------------------------------
+    // Helper Functions
+    // ----------------------------------------------------------------------
+
+    /**
+     * Checks if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the authenticated user's UID matches the provided userId.
+     * This is the foundation of the user ownership model.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    /**
+     * Checks for ownership on an existing document. Used for safe updates and deletes.
+     * Denies requests that target non-existent documents.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * Validates a new user account document on creation.
+     * - Ensures the creator is the owner.
+     * - Enforces path-data consistency by requiring the internal 'id' field
+     *   to match the document's {userId}.
+     */
+    function isCreatingOwnAccount(userId) {
+      return isOwner(userId) && request.resource.data.id == userId;
+    }
+
+    /**
+     * Validates a user account document on update.
+     * - Ensures the user is the owner of the existing document.
+     * - Enforces immutability of the 'id' field to prevent re-associating
+     *   the document with a different user.
+     */
+    function isMaintainingOwnAccount(userId) {
+      return isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+    }
+
+    // ----------------------------------------------------------------------
+    // Collection Rules
+    // ----------------------------------------------------------------------
+
+    /**
+     * @description Controls access to private user account documents.
+     * @path /users/{userId}
+     * @allow (get) An authenticated user reads their own document: GET /users/user_abc
+     * @allow (create) A new user creates their own account document: CREATE /users/user_abc with { id: "user_abc", ... }
+     * @deny (get) A user tries to read another user's document: GET /users/user_xyz
+     * @deny (list) Any user tries to list all user documents: LIST /users
+     * @principle Restricts access to a user's own data tree and enforces relational integrity between the path and document data.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isCreatingOwnAccount(userId);
+      allow update: if isMaintainingOwnAccount(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Controls access to the public collection of locations.
+     * @path /locations/{locationId}
+     * @allow (get) Any client (authenticated or not) can read a location: GET /locations/paris
+     * @allow (list) Any client (authenticated or not) can list all locations: LIST /locations
+     * @deny (create) Any user attempts to add a new location: CREATE /locations/london
+     * @deny (update) Any user attempts to modify an existing location: UPDATE /locations/paris
+     * @principle Provides public read access for shared application data while preventing all client-side writes, ensuring data integrity.
+     */
+    match /locations/{locationId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; // Only trusted server processes should write location data
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}
