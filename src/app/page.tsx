@@ -14,6 +14,10 @@ import {
   Sunset,
   Spade,
   Moon,
+  Sun,
+  Cloud,
+  CloudRain,
+  CloudSun,
 } from 'lucide-react';
 import { useLocation } from '@/context/location-context';
 import { useDate } from '@/context/date-context';
@@ -21,34 +25,62 @@ import { useDate } from '@/context/date-context';
 export default function Home() {
   const { selectedLocation } = useLocation();
   const { selectedDate } = useDate();
-  const { weather, tides, farming } = getDataForDate(selectedLocation, selectedDate);
-  
+  const { weather, tides, farming } = getDataForDate(
+    selectedLocation,
+    selectedDate
+  );
+
   const dateString = selectedDate.toLocaleDateString('fr-FR', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
   });
+
+  const WeatherTrendIcon = () => {
+    switch (weather.trend) {
+      case 'Ensoleillé':
+        return <Sun className="h-4 w-4" />;
+      case 'Nuageux':
+        return <Cloud className="h-4 w-4" />;
+      case 'Averses':
+        return <CloudRain className="h-4 w-4" />;
+      case 'Pluvieux':
+        return <CloudRain className="h-4 w-4" />;
+      default:
+        return <CloudSun className="h-4 w-4" />;
+    }
+  };
 
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">
-          Bonjour!
-        </h1>
+        <h1 className="text-3xl font-bold tracking-tight">Bonjour!</h1>
         <p className="text-muted-foreground">
-          Voici le résumé pour {selectedLocation} du <span className="font-semibold">{dateString}</span>.
+          Voici le résumé pour {selectedLocation} du{' '}
+          <span className="font-semibold">{dateString}</span>.
         </p>
       </div>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Wind className="size-5 text-primary" />
+              <CloudSun className="size-5 text-primary" />
               Météo du jour
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Tendance</span>
+              <span className="font-medium flex items-center gap-2">
+                {weather.trend}
+                <WeatherTrendIcon />
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Indice UV</span>
+              <span className="font-medium">{weather.uvIndex}</span>
+            </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Vent</span>
               <span className="font-medium">
@@ -102,7 +134,9 @@ export default function Home() {
               </span>
             </div>
             <div className="flex flex-col">
-              <span className="text-muted-foreground">Aujourd'hui est un bon jour pour :</span>
+              <span className="text-muted-foreground">
+                Aujourd'hui est un bon jour pour :
+              </span>
               <span className="font-medium">{farming.recommendation}</span>
             </div>
           </CardContent>
@@ -125,7 +159,9 @@ export default function Home() {
             <div className="flex items-center gap-2">
               <Sunset className="size-6 text-accent" />
               <div>
-                <p className="text-sm text-muted-foreground">Coucher du soleil</p>
+                <p className="text-sm text-muted-foreground">
+                  Coucher du soleil
+                </p>
                 <p className="font-medium">{weather.sun.sunset}</p>
               </div>
             </div>

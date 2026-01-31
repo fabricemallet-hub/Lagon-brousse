@@ -23,6 +23,8 @@ const noumeaData: LocationData = {
       percentage: 50,
     },
     rain: 'Aucune',
+    trend: 'Ensoleillé',
+    uvIndex: 7,
   },
   tides: [
     { type: 'basse', time: '04:15', height: 0.4, current: 'Modéré' },
@@ -146,6 +148,8 @@ const data: Record<string, LocationData> = {
         percentage: 50,
       },
       rain: 'Fine',
+      trend: 'Nuageux',
+      uvIndex: 5,
     },
     tides: [
       { type: 'basse', time: '04:30', height: 0.5, current: 'Modéré' },
@@ -216,6 +220,8 @@ const data: Record<string, LocationData> = {
         percentage: 50,
       },
       rain: 'Aucune',
+      trend: 'Ensoleillé',
+      uvIndex: 8,
     },
     tides: [
       { type: 'basse', time: '04:05', height: 0.3, current: 'Modéré' },
@@ -263,13 +269,33 @@ export function getDataForDate(location: string, date?: Date): LocationData {
   // Vary Rain
   const rainConditions: ('Aucune' | 'Fine' | 'Forte')[] = ['Aucune', 'Fine', 'Forte'];
   const rainChance = (Math.sin(dateSeed * 0.4 + locationSeed * 0.2) + 1) / 2; // Normalize to 0-1
-  if (rainChance < 0.5) {
+  if (rainChance < 0.6) {
       locationData.weather.rain = 'Aucune';
-  } else if (rainChance < 0.8) {
+  } else if (rainChance < 0.85) {
       locationData.weather.rain = 'Fine';
   } else {
       locationData.weather.rain = 'Forte';
   }
+
+  // Vary Trend and UV Index
+  const uvSeed = (Math.sin(dateSeed * 0.25 + locationSeed * 0.15) + 1) / 2;
+  locationData.weather.uvIndex = Math.round(1 + uvSeed * 10);
+
+  if (locationData.weather.rain === 'Forte') {
+      locationData.weather.trend = 'Pluvieux';
+      locationData.weather.uvIndex = Math.min(locationData.weather.uvIndex, 2);
+  } else if (locationData.weather.rain === 'Fine') {
+      locationData.weather.trend = 'Averses';
+      locationData.weather.uvIndex = Math.min(locationData.weather.uvIndex, 5);
+  } else { // No rain
+      if (locationData.weather.uvIndex > 7) {
+          locationData.weather.trend = 'Ensoleillé';
+      } else {
+          locationData.weather.trend = 'Nuageux';
+      }
+  }
+  locationData.weather.uvIndex = Math.max(1, Math.min(11, locationData.weather.uvIndex));
+
 
   // Vary Sun/Moon times
   const timeVariation = (offset: number) => Math.floor(Math.sin(dateSeed * 0.05 + locationSeed + offset) * 15);
@@ -288,7 +314,7 @@ export function getDataForDate(location: string, date?: Date): LocationData {
   // Vary tides
   locationData.tides.forEach((tide: Tide, i: number) => {
     const baseTide = (data[location] || data['Nouméa']).tides[i];
-    const variation = Math.sin((dateSeed + i) * 0.5 + locationSeed * 0.2) * 0.5;
+    const variation = Math.sin((dateSeed * (1 + i * 0.1) + locationSeed * 0.2)) * (baseTide.height * 0.5);
     tide.height = parseFloat(Math.max(0.2, baseTide.height + variation).toFixed(1));
     tide.time = varyTime(baseTide.time, i + 5);
   });

@@ -25,6 +25,8 @@ export interface WeatherData {
     percentage: number;
   };
   rain: 'Aucune' | 'Fine' | 'Forte';
+  trend: 'Ensoleillé' | 'Nuageux' | 'Averses' | 'Pluvieux';
+  uvIndex: number;
 }
 
 export interface Tide {
