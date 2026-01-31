@@ -12,11 +12,12 @@ import { useLocation } from '@/context/location-context';
 import { useDate } from '@/context/date-context';
 import { Clock, Waves, TrendingUp, TrendingDown, Fish, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function PechePage() {
   const { selectedLocation } = useLocation();
   const { selectedDate } = useDate();
-  const { fishing } = getDataForDate(selectedLocation, selectedDate);
+  const { fishing, pelagicInfo } = getDataForDate(selectedLocation, selectedDate);
   const dateString = selectedDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
 
   const getTideIcon = (movement: 'montante' | 'descendante' | 'étale') => {
@@ -57,6 +58,15 @@ export default function PechePage() {
           </CardDescription>
         </CardHeader>
       </Card>
+      
+      {pelagicInfo && pelagicInfo.inSeason && (
+        <Alert>
+          <Star className="h-4 w-4" />
+          <AlertTitle>Saison des Pélagiques Ouverte !</AlertTitle>
+          <AlertDescription>{pelagicInfo.message}</AlertDescription>
+        </Alert>
+      )}
+
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-2">
         {fishing.map((slot, index) => (
           <Card key={index}>
@@ -84,7 +94,10 @@ export default function PechePage() {
               <div className="space-y-3">
                 {slot.fish.map((f, i) => (
                   <div key={i} className="flex justify-between items-center">
-                    <span className="font-medium">{f.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{f.name}</span>
+                      {f.location && <Badge variant={f.location === 'Large' ? 'destructive' : 'secondary'} className="text-xs font-semibold">{f.location}</Badge>}
+                    </div>
                     <div className="flex items-center gap-2">
                         <RatingStars rating={f.rating} />
                         <Badge variant="outline" className="w-10 justify-center">{f.rating}/10</Badge>

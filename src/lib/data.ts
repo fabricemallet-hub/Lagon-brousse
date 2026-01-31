@@ -1,4 +1,4 @@
-import { LocationData, Tide, FishingSlot, FishRating, WindDirection, HuntingData, WindForecast, HourlyForecast } from './types';
+import { LocationData, Tide, FishingSlot, FishRating, WindDirection, HuntingData, WindForecast, HourlyForecast, PelagicInfo } from './types';
 
 const noumeaData: LocationData = {
   weather: {
@@ -70,9 +70,9 @@ const noumeaData: LocationData = {
       tideTime: '04:15',
       tideMovement: 'montante',
       fish: [
-        { name: 'Carangue', rating: 8 },
-        { name: 'Mérou', rating: 7 },
-        { name: 'Bec de cane', rating: 9 },
+        { name: 'Carangue', rating: 8, location: 'Lagon' },
+        { name: 'Mérou', rating: 7, location: 'Lagon' },
+        { name: 'Bec de cane', rating: 9, location: 'Lagon' },
       ],
     },
     {
@@ -81,9 +81,9 @@ const noumeaData: LocationData = {
       tideTime: '10:30',
       tideMovement: 'descendante',
       fish: [
-        { name: 'Poisson perroquet', rating: 6 },
-        { name: 'Mulet', rating: 7 },
-        { name: 'Loche', rating: 5 },
+        { name: 'Poisson perroquet', rating: 6, location: 'Lagon' },
+        { name: 'Wahoo', rating: 4, location: 'Large' },
+        { name: 'Mahi-mahi', rating: 4, location: 'Large' },
       ],
     },
     {
@@ -92,9 +92,9 @@ const noumeaData: LocationData = {
       tideTime: '16:45',
       tideMovement: 'montante',
       fish: [
-        { name: 'Dawa', rating: 8 },
-        { name: 'Picot', rating: 6 },
-        { name: 'Bonite', rating: 7 },
+        { name: 'Thon Jaune', rating: 4, location: 'Large' },
+        { name: 'Thazard', rating: 5, location: 'Mixte' },
+        { name: 'Bonite', rating: 7, location: 'Mixte' },
       ],
     },
     {
@@ -103,9 +103,9 @@ const noumeaData: LocationData = {
       tideTime: '19:00',
       tideMovement: 'montante',
       fish: [
-        { name: 'Rouget', rating: 9 },
-        { name: 'Vivaneau', rating: 8 },
-        { name: 'Thon dents de chien', rating: 7 },
+        { name: 'Rouget', rating: 9, location: 'Lagon' },
+        { name: 'Vivaneau', rating: 8, location: 'Lagon' },
+        { name: 'Thon dents de chien', rating: 7, location: 'Large' },
       ],
     },
   ],
@@ -259,6 +259,22 @@ export function getDataForDate(location: string, date?: Date): LocationData {
   const baseData = data[location] || data['Nouméa'];
   const locationData: LocationData = JSON.parse(JSON.stringify(baseData));
 
+  // Pelagic fish season logic
+  const warmSeasonMonths = [8, 9, 10, 11, 0, 1, 2, 3]; // Sep to Apr
+  const isPelagicSeason = warmSeasonMonths.includes(month);
+  
+  if (isPelagicSeason) {
+    locationData.pelagicInfo = {
+        inSeason: true,
+        message: 'La saison chaude bat son plein ! C\'est le meilleur moment pour cibler les pélagiques comme le thon, le mahi-mahi et le wahoo au large.'
+    };
+  } else {
+    locationData.pelagicInfo = {
+        inSeason: false,
+        message: 'Hors saison pour les grands pélagiques. Concentrez-vous sur les espèces de récif et de lagon.'
+    };
+  }
+
   // Deterministically vary data based on the day of the month and location for prototype purposes
   const locationSeed = location.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const dateSeed = dayOfMonth + month * 31 + year * 365.25;
@@ -404,7 +420,13 @@ export function getDataForDate(location: string, date?: Date): LocationData {
   // Fishing rating
   locationData.fishing.forEach((slot: FishingSlot) => {
     slot.fish.forEach((f: FishRating) => {
-      const newRating = ((f.rating + dateSeed * 0.1 + locationSeed * 0.05 + f.name.length) % 8) + 2;
+      let baseRating = f.rating;
+      if (isPelagicSeason && ['Mahi-mahi', 'Wahoo', 'Thon Jaune', 'Thazard'].includes(f.name)) {
+          baseRating = 8; // Boost rating in season
+      } else if (!isPelagicSeason && ['Mahi-mahi', 'Wahoo', 'Thon Jaune', 'Thazard'].includes(f.name)) {
+          baseRating = 3; // Lower rating off-season
+      }
+      const newRating = ((baseRating + dateSeed * 0.1 + locationSeed * 0.05 + f.name.length) % 8) + 2;
       f.rating = Math.max(1, Math.min(10, Math.round(newRating)));
     });
   });

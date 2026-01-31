@@ -238,6 +238,9 @@ function DayCell({
         <>
           <div className="flex-grow flex items-center justify-center gap-0.5">
             {fishIcons}
+            {data.pelagicInfo?.inSeason && (Math.sin(day.getDate()) + 1) / 2 > 0.7 && (
+                <Fish className="size-3 text-blue-500 glow" title="Bon pour les pélagiques" />
+            )}
           </div>
           <div className="grid grid-cols-2 gap-x-1 text-[10px] font-mono text-muted-foreground">
             {tides.map((tide, i) => (
@@ -456,7 +459,7 @@ function PecheDetailDialogContent({
 }) {
   const data = getDataForDate(location, day);
   const dateString = format(day, 'eeee d MMMM yyyy', { locale: fr });
-  const { fishing, weather, tides } = data;
+  const { fishing, weather, tides, pelagicInfo } = data;
 
   return (
     <>
@@ -499,6 +502,16 @@ function PecheDetailDialogContent({
           </div>
         </div>
 
+        {pelagicInfo && pelagicInfo.inSeason && (
+          <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 dark:bg-blue-950 dark:text-blue-200">
+              <h4 className="font-semibold flex items-center gap-2 mb-1">
+                  <Star className="size-4" />
+                  Saison des Pélagiques
+              </h4>
+              <p className="text-xs">{pelagicInfo.message}</p>
+          </div>
+        )}
+
         <div className="space-y-4">
           {fishing.map((slot, index) => (
             <div key={index} className="border-t pt-4">
@@ -526,7 +539,10 @@ function PecheDetailDialogContent({
                 </h5>
                 {slot.fish.map((f, i) => (
                   <div key={i} className="flex justify-between items-center">
-                    <span className="font-medium">{f.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{f.name}</span>
+                      {f.location && <Badge variant={f.location === 'Large' ? 'destructive' : 'secondary'} className="text-xs font-semibold">{f.location}</Badge>}
+                    </div>
                     <div className="flex items-center gap-2">
                       <RatingStars rating={f.rating} />
                       <Badge

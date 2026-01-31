@@ -74,6 +74,7 @@ export interface FarmingData {
 export interface FishRating {
   name: string;
   rating: number; // 1 to 10
+  location?: 'Lagon' | 'Large' | 'Mixte';
 }
 
 export interface FishingSlot {
@@ -99,10 +100,16 @@ export interface HuntingData {
   advice: HuntingAdvice;
 }
 
+export interface PelagicInfo {
+  inSeason: boolean;
+  message: string;
+}
+
 export interface LocationData {
   weather: WeatherData;
   tides: Tide[];
   farming: FarmingData;
   fishing: FishingSlot[];
   hunting: HuntingData;
+  pelagicInfo?: PelagicInfo;
 }
