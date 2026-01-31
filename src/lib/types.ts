@@ -4,6 +4,7 @@ export interface WeatherData {
   wind: {
     speed: number;
     direction: WindDirection;
+    stability: 'Stable' | 'Tournant';
   };
   swell: {
     inside: string;
@@ -20,6 +21,7 @@ export interface WeatherData {
     phase: string;
     percentage: number;
   };
+  rain: 'Aucune' | 'Fine' | 'Forte';
 }
 
 export interface Tide {
@@ -53,9 +55,25 @@ export interface FishingSlot {
   fish: FishRating[];
 }
 
+export interface HuntingPeriod {
+  name: 'Brame' | 'Chute des bois' | 'Normal';
+  description: string;
+}
+
+export interface HuntingAdvice {
+  rain: string;
+  scent: string;
+}
+
+export interface HuntingData {
+  period: HuntingPeriod;
+  advice: HuntingAdvice;
+}
+
 export interface LocationData {
   weather: WeatherData;
   tides: Tide[];
   farming: FarmingData;
   fishing: FishingSlot[];
+  hunting: HuntingData;
 }

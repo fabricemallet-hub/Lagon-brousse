@@ -6,13 +6,14 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
-import { Home, Waves, Leaf, Fish, Calendar, Scale } from 'lucide-react';
+import { Home, Waves, Leaf, Fish, Calendar, Scale, Crosshair } from 'lucide-react';
 import Link from 'next/link';
 
 const links = [
   { href: '/', label: 'Accueil', icon: Home },
   { href: '/lagon', label: 'Lagon', icon: Waves },
   { href: '/peche', label: 'Pêche', icon: Fish },
+  { href: '/chasse', label: 'Chasse', icon: Crosshair },
   { href: '/champs', label: 'Champs', icon: Leaf },
   { href: '/calendrier', label: 'Calendrier', icon: Calendar },
   { href: '/reglementation', label: 'Réglementation', icon: Scale },

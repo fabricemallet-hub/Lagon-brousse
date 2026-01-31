@@ -59,7 +59,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setSelectedDate(addDays(selectedDate, 1));
   };
 
-  const showDayNavigator = ['/lagon', '/peche', '/champs'].includes(pathname);
+  const showDayNavigator = ['/lagon', '/peche', '/champs', '/chasse'].includes(pathname);
 
   return (
     <SidebarProvider>
