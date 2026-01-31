@@ -13,11 +13,12 @@ import { useDate } from '@/context/date-context';
 import { Clock, Waves, TrendingUp, TrendingDown, Fish, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { CrabIcon, LobsterIcon } from '@/components/icons';
 
 export default function PechePage() {
   const { selectedLocation } = useLocation();
   const { selectedDate } = useDate();
-  const { fishing, pelagicInfo } = getDataForDate(selectedLocation, selectedDate);
+  const { fishing, pelagicInfo, crabAndLobster } = getDataForDate(selectedLocation, selectedDate);
   const dateString = selectedDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
 
   const getTideIcon = (movement: 'montante' | 'descendante' | 'étale') => {
@@ -66,6 +67,41 @@ export default function PechePage() {
           <AlertDescription>{pelagicInfo.message}</AlertDescription>
         </Alert>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Crabes & Langoustes</CardTitle>
+          <CardDescription>
+            Prévisions basées sur le cycle lunaire pour le {dateString}.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-6 md:grid-cols-2">
+          <div className="flex items-start gap-4">
+            <CrabIcon className="h-8 w-8 text-primary mt-1" />
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="font-semibold">Crabe de palétuvier</h4>
+                <Badge variant={crabAndLobster.crabStatus === 'Plein' ? 'default' : 'secondary'}>
+                  {crabAndLobster.crabStatus}
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">{crabAndLobster.crabMessage}</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-4">
+            <LobsterIcon className="h-8 w-8 text-primary mt-1" />
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="font-semibold">Langouste</h4>
+                  <Badge variant={crabAndLobster.lobsterActivity === 'Élevée' ? 'default' : 'secondary'}>
+                  {crabAndLobster.lobsterActivity}
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">{crabAndLobster.lobsterMessage}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-2">
         {fishing.map((slot, index) => (

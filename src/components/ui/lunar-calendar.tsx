@@ -51,6 +51,8 @@ import { cn } from '@/lib/utils';
 import { useCalendarView } from '@/context/calendar-view-context';
 import type { FishRating, LocationData } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
+import { CrabIcon, LobsterIcon } from '../icons';
+import { Separator } from './separator';
 
 export const MoonPhaseIcon = ({
   phase,
@@ -459,7 +461,7 @@ function PecheDetailDialogContent({
 }) {
   const data = getDataForDate(location, day);
   const dateString = format(day, 'eeee d MMMM yyyy', { locale: fr });
-  const { fishing, weather, tides, pelagicInfo } = data;
+  const { fishing, weather, tides, pelagicInfo, crabAndLobster } = data;
 
   return (
     <>
@@ -557,6 +559,34 @@ function PecheDetailDialogContent({
               </div>
             </div>
           ))}
+        </div>
+        <Separator />
+        <div className="space-y-4 pt-4">
+            <h4 className="font-semibold">Crabes & Langoustes</h4>
+            <div className="flex items-start gap-3">
+                <CrabIcon className="h-6 w-6 text-primary mt-1" />
+                <div>
+                    <div className="flex items-center gap-2">
+                        <h5 className="font-medium">Crabe</h5>
+                        <Badge variant={crabAndLobster.crabStatus === 'Plein' ? 'default' : 'secondary'} className="text-xs">
+                        {crabAndLobster.crabStatus}
+                        </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{crabAndLobster.crabMessage}</p>
+                </div>
+            </div>
+            <div className="flex items-start gap-3">
+                <LobsterIcon className="h-6 w-6 text-primary mt-1" />
+                <div>
+                    <div className="flex items-center gap-2">
+                        <h5 className="font-medium">Langouste</h5>
+                        <Badge variant={crabAndLobster.lobsterActivity === 'Élevée' ? 'default' : 'secondary'} className="text-xs">
+                        {crabAndLobster.lobsterActivity}
+                        </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{crabAndLobster.lobsterMessage}</p>
+                </div>
+            </div>
         </div>
       </div>
     </>

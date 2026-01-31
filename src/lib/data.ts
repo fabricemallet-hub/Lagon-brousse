@@ -1,4 +1,4 @@
-import { LocationData, Tide, FishingSlot, FishRating, WindDirection, HuntingData, WindForecast, HourlyForecast, PelagicInfo } from './types';
+import { LocationData, Tide, FishingSlot, FishRating, WindDirection, HuntingData, WindForecast, HourlyForecast, PelagicInfo, CrabLobsterData } from './types';
 
 const noumeaData: LocationData = {
   weather: {
@@ -118,6 +118,12 @@ const noumeaData: LocationData = {
         rain: 'Temps sec, avancez silencieusement.',
         scent: 'Le vent stable facilite la gestion des odeurs.'
     }
+  },
+  crabAndLobster: {
+    crabStatus: 'Plein',
+    crabMessage: '',
+    lobsterActivity: 'Moyenne',
+    lobsterMessage: ''
   }
 };
 
@@ -467,12 +473,12 @@ export function getDataForDate(location: string, date?: Date): LocationData {
     // Generate Hourly Forecasts
     locationData.weather.hourly = [];
     const startDate = new Date(effectiveDate);
-    startDate.setMinutes(0,0,0);
+    startDate.setHours(0, 0, 0, 0);
     
     const baseTempMin = 22 + (locationSeed % 5);
     const baseTempMax = baseTempMin + 8 + (locationSeed % 3);
 
-    for (let i = -2; i < 48; i++) { // next 48 hours
+    for (let i = 0; i < 48; i++) { // next 48 hours
         const forecastDate = new Date(startDate.getTime() + i * 60 * 60 * 1000);
         const hour = forecastDate.getHours();
         const isNight = hour < 6 || hour > 19;
@@ -507,10 +513,55 @@ export function getDataForDate(location: string, date?: Date): LocationData {
     }
 
     const currentHourForecast = locationData.weather.hourly.find(f => new Date(f.date).getHours() === effectiveDate.getHours());
-    locationData.weather.temp = currentHourForecast?.temp ?? baseData.weather.temp;
-    locationData.weather.tempMin = Math.min(...locationData.weather.hourly.slice(0,24).map(f => f.temp));
-    locationData.weather.tempMax = Math.max(...locationData.weather.hourly.slice(0,24).map(f => f.temp));
+    if (currentHourForecast) {
+      locationData.weather.temp = currentHourForecast.temp;
+    }
+    const dayForecasts = locationData.weather.hourly.slice(0, 24);
+    if (dayForecasts.length > 0) {
+      locationData.weather.tempMin = Math.min(...dayForecasts.map(f => f.temp));
+      locationData.weather.tempMax = Math.max(...dayForecasts.map(f => f.temp));
+    }
 
+
+    // Crab and Lobster Data
+    let crabStatus: 'Plein' | 'Mout' | 'Vide';
+    let crabMessage: string;
+    let lobsterActivity: 'Élevée' | 'Moyenne' | 'Faible';
+    let lobsterMessage: string;
+
+    // Crab logic based on moon cycle (approximate)
+    if (dayInCycle >= 27 || dayInCycle <= 3) { // Around New Moon
+        crabStatus = 'Plein';
+        crabMessage = "Bonne période (nouvelle lune). Les crabes sont généralement pleins.";
+    } else if (dayInCycle >= 12 && dayInCycle <= 18) { // Around Full Moon
+        crabStatus = 'Plein';
+        crabMessage = "Excellente période (pleine lune). Les crabes sont pleins et actifs.";
+    } else if (dayInCycle > 3 && dayInCycle < 12) { // Waxing moon (not full)
+        crabStatus = 'Vide';
+        crabMessage = "Période de 'crabes vides' (en mue). Moins intéressant pour la pêche.";
+    } else { // Waning moon (not new)
+        crabStatus = 'Mout';
+        crabMessage = "Période de 'crabes mous'. La qualité de la chair peut être moindre.";
+    }
+
+    // Lobster logic based on moon light
+    if (illumination < 0.3) { // Darkest nights
+        lobsterActivity = 'Élevée';
+        lobsterMessage = "Nuits sombres, activité élevée. Privilégiez l'intérieur du lagon et les platiers.";
+    } else if (illumination > 0.7) { // Brightest nights
+        lobsterActivity = 'Faible';
+        lobsterMessage = "Nuits claires, langoustes plus discrètes. Tentez votre chance à l'extérieur du récif ou plus en profondeur.";
+    } else {
+        lobsterActivity = 'Moyenne';
+        lobsterMessage = "Activité moyenne. Pêche possible à l'intérieur et à l'extérieur du lagon.";
+    }
+    
+    locationData.crabAndLobster = {
+        crabStatus,
+        crabMessage,
+        lobsterActivity,
+        lobsterMessage
+    };
 
   return locationData;
 }

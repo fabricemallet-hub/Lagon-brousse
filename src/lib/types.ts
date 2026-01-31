@@ -105,6 +105,13 @@ export interface PelagicInfo {
   message: string;
 }
 
+export interface CrabLobsterData {
+  crabStatus: 'Plein' | 'Mout' | 'Vide';
+  crabMessage: string;
+  lobsterActivity: 'Élevée' | 'Moyenne' | 'Faible';
+  lobsterMessage: string;
+}
+
 export interface LocationData {
   weather: WeatherData;
   tides: Tide[];
@@ -112,4 +119,5 @@ export interface LocationData {
   fishing: FishingSlot[];
   hunting: HuntingData;
   pelagicInfo?: PelagicInfo;
+  crabAndLobster: CrabLobsterData;
 }
