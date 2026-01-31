@@ -19,6 +19,13 @@ import { useDate } from '@/context/date-context';
 import { useLocation } from '@/context/location-context';
 import { getDataForDate } from '@/lib/data';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   Fish,
   Moon,
   Circle,
@@ -32,11 +39,14 @@ import {
   RefreshCw,
   Sprout,
   Wheat,
+  Info,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react';
 import { Button } from './button';
 import { cn } from '@/lib/utils';
 import { useCalendarView } from '@/context/calendar-view-context';
-import type { FishRating } from '@/lib/types';
+import type { FishRating, LocationData } from '@/lib/types';
 
 export const MoonPhaseIcon = ({
   phase,
@@ -118,22 +128,21 @@ function DayCell({
   const tides = data.tides.slice(0, 4);
 
   // Gardening data
-  const { 
-    zodiac, 
-    isGoodForCuttings, 
-    isGoodForPruning, 
+  const {
+    zodiac,
+    isGoodForCuttings,
+    isGoodForPruning,
     isGoodForMowing,
     sow,
     harvest,
   } = data.farming;
-  
-  const GardeningIcon = {
-    'Fruits': Spade,
-    'Racines': Carrot,
-    'Fleurs': Flower,
-    'Feuilles': Leaf,
-  }[zodiac];
 
+  const GardeningIcon = {
+    Fruits: Spade,
+    Racines: Carrot,
+    Fleurs: Flower,
+    Feuilles: Leaf,
+  }[zodiac];
 
   const prevDate = new Date(day);
   prevDate.setDate(day.getDate() - 1);
@@ -171,11 +180,13 @@ function DayCell({
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-1 text-muted-foreground">
           <MoonPhaseIcon phase={data.weather.moon.phase} />
-          <span className="text-[10px] font-mono">{data.weather.moon.percentage}%</span>
+          <span className="text-[10px] font-mono">
+            {data.weather.moon.percentage}%
+          </span>
         </div>
         <div className="font-semibold text-sm">{format(day, 'd')}</div>
       </div>
-      
+
       {eventTexts.length > 0 && (
         <div className="text-[10px] text-center text-accent font-semibold truncate leading-tight my-0.5">
           {eventTexts.join(' / ')}
@@ -197,43 +208,60 @@ function DayCell({
         </>
       ) : (
         <div className="flex-grow flex flex-col items-start justify-start gap-0.5 overflow-hidden w-full pt-1 px-1">
-            <div className="flex items-center gap-1">
-                {GardeningIcon && <GardeningIcon className="size-4 text-primary" />}
-                <p className="text-xs text-muted-foreground font-semibold">{zodiac}</p>
-            </div>
-            
-            <div className="space-y-0.5 text-[10px] font-semibold leading-tight self-stretch mt-1">
-                {isGoodForPruning && (
-                    <div className="flex items-center gap-1 text-orange-600" title="Taille des arbres et arbustes">
-                        <Scissors className="size-3 shrink-0" />
-                        <span>Taille</span>
-                    </div>
-                )}
-                {isGoodForCuttings && (
-                    <div className="flex items-center gap-1 text-pink-600" title="Bouturage">
-                        <RefreshCw className="size-3 shrink-0" />
-                        <span>Bouturage</span>
-                    </div>
-                )}
-                {isGoodForMowing && (
-                    <div className="flex items-center gap-1 text-green-600" title="Tonte du gazon">
-                        <Scissors className="size-3 shrink-0" />
-                        <span>Tonte</span>
-                    </div>
-                )}
-                {sow.length > 0 && (
-                    <div className="flex items-center gap-1 text-blue-600" title={`Semer: ${sow.join(', ')}`}>
-                        <Sprout className="size-3 shrink-0" />
-                        <span className="truncate">Semis: {sow[0]}</span>
-                    </div>
-                )}
-                 {harvest.length > 0 && (
-                    <div className="flex items-center gap-1 text-purple-600" title={`Récolter: ${harvest.join(', ')}`}>
-                        <Wheat className="size-3 shrink-0" />
-                        <span className="truncate">Récolte: {harvest[0]}</span>
-                    </div>
-                )}
-            </div>
+          <div className="flex items-center gap-1">
+            {GardeningIcon && <GardeningIcon className="size-4 text-primary" />}
+            <p className="text-xs text-muted-foreground font-semibold">
+              {zodiac}
+            </p>
+          </div>
+
+          <div className="space-y-0.5 text-[10px] font-semibold leading-tight self-stretch mt-1">
+            {isGoodForPruning && (
+              <div
+                className="flex items-center gap-1 text-orange-600"
+                title="Taille des arbres et arbustes"
+              >
+                <Scissors className="size-3 shrink-0" />
+                <span>Taille</span>
+              </div>
+            )}
+            {isGoodForCuttings && (
+              <div
+                className="flex items-center gap-1 text-pink-600"
+                title="Bouturage"
+              >
+                <RefreshCw className="size-3 shrink-0" />
+                <span>Bouturage</span>
+              </div>
+            )}
+            {isGoodForMowing && (
+              <div
+                className="flex items-center gap-1 text-green-600"
+                title="Tonte du gazon"
+              >
+                <Scissors className="size-3 shrink-0" />
+                <span>Tonte</span>
+              </div>
+            )}
+            {sow.length > 0 && (
+              <div
+                className="flex items-center gap-1 text-blue-600"
+                title={`Semer: ${sow.join(', ')}`}
+              >
+                <Sprout className="size-3 shrink-0" />
+                <span className="truncate">Semis: {sow[0]}</span>
+              </div>
+            )}
+            {harvest.length > 0 && (
+              <div
+                className="flex items-center gap-1 text-purple-600"
+                title={`Récolter: ${harvest.join(', ')}`}
+              >
+                <Wheat className="size-3 shrink-0" />
+                <span className="truncate">Récolte: {harvest[0]}</span>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -257,9 +285,9 @@ function GardeningLegend() {
     <div className="mt-4 p-2 border rounded-lg bg-muted/50">
       <h4 className="font-semibold mb-2 text-sm">Légende du Jardinier</h4>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-x-4 gap-y-2">
-        {legendItems.map(item => (
+        {legendItems.map((item) => (
           <div key={item.label} className="flex items-center gap-2 text-xs">
-            <item.icon className={cn("size-4", item.color)} />
+            <item.icon className={cn('size-4', item.color)} />
             <span>{item.label}</span>
           </div>
         ))}
@@ -268,10 +296,129 @@ function GardeningLegend() {
   );
 }
 
+function ChampsDetailDialogContent({
+  day,
+  location,
+}: {
+  day: Date;
+  location: string;
+}) {
+  const data = getDataForDate(location, day);
+  const dateString = format(day, 'eeee d MMMM yyyy', { locale: fr });
+  const { farming, weather } = data;
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>Détails du {dateString}</DialogTitle>
+        <DialogDescription>
+          Tâches de jardinage recommandées selon la lune.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-4 py-4 text-sm">
+        <div className="flex justify-between items-center bg-muted/50 p-2 rounded-lg">
+          <div className="flex items-center gap-2">
+            <MoonPhaseIcon
+              phase={weather.moon.phase}
+              className="size-5 text-primary"
+            />
+            <div>
+              <p className="font-semibold">{weather.moon.phase}</p>
+              <p className="text-xs text-muted-foreground">
+                Illumination à {weather.moon.percentage}%
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {farming.lunarPhase === 'Lune Montante' ? (
+              <TrendingUp className="size-5 text-primary" />
+            ) : (
+              <TrendingDown className="size-5 text-primary" />
+            )}
+            <p className="font-semibold">{farming.lunarPhase}</p>
+          </div>
+        </div>
+
+        <div className="text-center p-2 rounded-lg border">
+          <p className="text-xs text-muted-foreground">
+            Influence du zodiaque
+          </p>
+          <p className="font-bold text-lg">Jour {farming.zodiac}</p>
+        </div>
+
+        <div className="space-y-1">
+          <h4 className="font-semibold flex items-center gap-2">
+            <Info className="size-4 text-accent" />
+            <span>Recommandation générale</span>
+          </h4>
+          <p className="text-muted-foreground">{farming.recommendation}</p>
+        </div>
+
+        <div className="space-y-3">
+          <h4 className="font-semibold">Tâches spécifiques</h4>
+          <ul className="list-disc list-inside space-y-2 text-muted-foreground">
+            {farming.isGoodForPruning && (
+              <li>
+                <span className="text-orange-600 font-medium">Taille :</span>{' '}
+                Période favorable pour la taille des arbres et arbustes afin de
+                limiter la montée de sève.
+              </li>
+            )}
+            {farming.isGoodForCuttings && (
+              <li>
+                <span className="text-pink-600 font-medium">Bouturage :</span>{' '}
+                Les boutures ont plus de chances de prendre racine rapidement.
+              </li>
+            )}
+            {farming.isGoodForMowing && (
+              <li>
+                <span className="text-green-600 font-medium">Tonte :</span>{' '}
+                Idéal pour une repousse plus lente et un gazon plus dense.
+              </li>
+            )}
+          </ul>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {farming.sow.length > 0 && (
+            <div className="space-y-1">
+              <h4 className="font-semibold flex items-center gap-2">
+                <Sprout className="size-4 text-blue-600" />
+                Semis du jour
+              </h4>
+              <p className="text-muted-foreground">{farming.sow.join(', ')}</p>
+            </div>
+          )}
+          {farming.harvest.length > 0 && (
+            <div className="space-y-1">
+              <h4 className="font-semibold flex items-center gap-2">
+                <Wheat className="size-4 text-purple-600" />
+                Récolte du jour
+              </h4>
+              <p className="text-muted-foreground">
+                {farming.harvest.join(', ')}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
 export function LunarCalendar() {
   const { selectedDate, setSelectedDate } = useDate();
   const { calendarView } = useCalendarView();
+  const { selectedLocation } = useLocation();
   const [displayDate, setDisplayDate] = useState(startOfMonth(selectedDate));
+  const [detailedDay, setDetailedDay] = useState<Date | null>(null);
+
+  const handleDayClick = (day: Date) => {
+    setSelectedDate(day);
+    if (calendarView === 'champs') {
+      setDetailedDay(day);
+    }
+  };
 
   const handlePrevMonth = () => {
     setDisplayDate((d) => subMonths(d, 1));
@@ -327,12 +474,26 @@ export function LunarCalendar() {
               day={day}
               isCurrentMonth={isSameMonth(day, displayDate)}
               isSelected={isSameDay(day, selectedDate)}
-              onDateSelect={setSelectedDate}
+              onDateSelect={handleDayClick}
             />
           ))}
         </div>
       </div>
       {calendarView === 'champs' && <GardeningLegend />}
+
+      {detailedDay && (
+        <Dialog
+          open={!!detailedDay}
+          onOpenChange={(isOpen) => !isOpen && setDetailedDay(null)}
+        >
+          <DialogContent className="sm:max-w-md">
+            <ChampsDetailDialogContent
+              day={detailedDay}
+              location={selectedLocation}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
