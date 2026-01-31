@@ -6,7 +6,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
-import { Home, Waves, Leaf, Fish, Calendar } from 'lucide-react';
+import { Home, Waves, Leaf, Fish, Calendar, Scale } from 'lucide-react';
 import Link from 'next/link';
 
 const links = [
@@ -15,6 +15,7 @@ const links = [
   { href: '/peche', label: 'Pêche', icon: Fish },
   { href: '/champs', label: 'Champs', icon: Leaf },
   { href: '/calendrier', label: 'Calendrier', icon: Calendar },
+  { href: '/reglementation', label: 'Réglementation', icon: Scale },
 ];
 
 export function SidebarNav() {
