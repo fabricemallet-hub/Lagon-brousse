@@ -172,6 +172,9 @@ export default function SemisPage() {
                 <p className="text-sm text-muted-foreground">
                   En plus d'améliorer la structure du sol, la moutarde a une action "nettoyante". Elle aide à réduire la présence de certains champignons et nématodes (vers microscopiques) nuisibles dans le sol.
                 </p>
+                <p className="text-sm text-muted-foreground italic mt-2">
+                  <strong>Astuce Système D :</strong> Si vous ne trouvez pas de graines de moutarde, les <strong>œillets d'Inde (tagètes)</strong> sont une excellente alternative pour lutter contre les nématodes. Leurs racines sécrètent une substance qui les empoisonne.
+                </p>
               </div>
           </div>
         </CardContent>
