@@ -24,6 +24,7 @@ import { fr } from 'date-fns/locale';
 import type { WeatherData, HourlyForecast, WindDirection } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Button } from './button';
+import { Skeleton } from './skeleton';
 
 const WeatherConditionIcon = ({
   condition,
@@ -91,7 +92,12 @@ const WindArrowIcon = ({ direction }: { direction: WindDirection }) => {
 
 export function WeatherForecast({ weather }: { weather: WeatherData }) {
   const [api, setApi] = React.useState<CarouselApi>();
-  const [selectedIndex, setSelectedIndex] = useState(2); // Start with current time-ish
+  const [selectedIndex, setSelectedIndex] = useState(2);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   useEffect(() => {
     if (!api) {
@@ -108,10 +114,11 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
       api.off('select', onSelect);
     };
   }, [api, selectedIndex]);
-  
+
   const selectedForecast = weather.hourly[selectedIndex];
-  if (!selectedForecast) {
-    return null;
+
+  if (!isClient || !selectedForecast) {
+    return <Skeleton className="h-[380px] w-full rounded-lg" />;
   }
 
   const handlePrev = () => api?.scrollPrev();
