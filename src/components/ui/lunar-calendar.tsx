@@ -30,7 +30,7 @@ import {
   Leaf,
   Scissors,
   RefreshCw,
-  Seedling,
+  Sprout,
   Wheat,
 } from 'lucide-react';
 import { Button } from './button';
@@ -223,7 +223,7 @@ function DayCell({
                 )}
                 {sow.length > 0 && (
                     <div className="flex items-center gap-1 text-blue-600" title={`Semer: ${sow.join(', ')}`}>
-                        <Seedling className="size-3 shrink-0" />
+                        <Sprout className="size-3 shrink-0" />
                         <span className="truncate">Semis: {sow[0]}</span>
                     </div>
                 )}
@@ -249,7 +249,7 @@ function GardeningLegend() {
     { icon: Scissors, label: 'Taille', color: 'text-orange-600' },
     { icon: RefreshCw, label: 'Bouturage', color: 'text-pink-600' },
     { icon: Scissors, label: 'Tonte', color: 'text-green-600' },
-    { icon: Seedling, label: 'Semis', color: 'text-blue-600' },
+    { icon: Sprout, label: 'Semis', color: 'text-blue-600' },
     { icon: Wheat, label: 'Récolte', color: 'text-purple-600' },
   ];
 
