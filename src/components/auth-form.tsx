@@ -67,7 +67,6 @@ export function AuthForm({ mode }: AuthFormProps) {
       });
       router.push('/');
     } catch (error) {
-      console.error("Authentication Error:", error); // Log the full error for debugging
       const authError = error as AuthError;
       let errorMessage = "Une erreur est survenue lors de l'authentification.";
 
