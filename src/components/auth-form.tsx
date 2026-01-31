@@ -56,25 +56,29 @@ export function AuthForm({ mode }: AuthFormProps) {
       });
       router.push('/');
     } catch (error) {
+      console.error("Authentication Error:", error); // Log the full error for debugging
       const authError = error as AuthError;
-      let errorMessage = "Une erreur est survenue.";
+      let errorMessage = "Une erreur est survenue lors de l'authentification.";
+
+      // Handle specific Firebase Auth error codes
       switch (authError.code) {
+        case 'auth/invalid-credential':
         case 'auth/user-not-found':
         case 'auth/wrong-password':
-        case 'auth/invalid-credential':
-          errorMessage = 'Email ou mot de passe incorrect.';
+          errorMessage = 'Email ou mot de passe incorrect. Veuillez vérifier vos informations et réessayer.';
           break;
         case 'auth/email-already-in-use':
-          errorMessage = 'Cette adresse email est déjà utilisée.';
+          errorMessage = 'Cette adresse email est déjà utilisée par un autre compte.';
           break;
         case 'auth/weak-password':
-          errorMessage = 'Le mot de passe est trop faible.';
+          errorMessage = 'Le mot de passe est trop faible. Il doit contenir au moins 6 caractères.';
           break;
         default:
-          errorMessage = "Une erreur inconnue est survenue. Veuillez réessayer.";
-          console.error(authError.message);
+          // For other errors (network, config issues), show a general message
+          errorMessage = "Un problème est survenu. Veuillez réessayer plus tard ou contacter le support si le problème persiste.";
           break;
       }
+      
       toast({
         variant: "destructive",
         title: "Erreur d'authentification",
@@ -95,7 +99,7 @@ export function AuthForm({ mode }: AuthFormProps) {
             <FormItem>
               <FormLabel>Email</FormLabel>
               <FormControl>
-                <Input placeholder="votre@email.com" {...field} />
+                <Input placeholder="votre@email.com" {...field} autoComplete="email" />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -108,7 +112,7 @@ export function AuthForm({ mode }: AuthFormProps) {
             <FormItem>
               <FormLabel>Mot de passe</FormLabel>
               <FormControl>
-                <Input type="password" placeholder="********" {...field} />
+                <Input type="password" placeholder="********" {...field} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
               </FormControl>
               <FormMessage />
             </FormItem>
