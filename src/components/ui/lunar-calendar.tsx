@@ -42,11 +42,15 @@ import {
   Info,
   TrendingUp,
   TrendingDown,
+  Star,
+  Waves,
+  Clock,
 } from 'lucide-react';
 import { Button } from './button';
 import { cn } from '@/lib/utils';
 import { useCalendarView } from '@/context/calendar-view-context';
 import type { FishRating, LocationData } from '@/lib/types';
+import { Badge } from '@/components/ui/badge';
 
 export const MoonPhaseIcon = ({
   phase,
@@ -96,6 +100,43 @@ export const MoonPhaseIcon = ({
     default:
       return <Circle className={baseClassName} strokeWidth={1} />;
   }
+};
+
+const getTideIcon = (movement: 'montante' | 'descendante' | 'étale') => {
+  switch (movement) {
+    case 'montante':
+      return <TrendingUp className="h-4 w-4 text-green-500" />;
+    case 'descendante':
+      return <TrendingDown className="h-4 w-4 text-red-500" />;
+    default:
+      return null;
+  }
+};
+
+const RatingStars = ({ rating }: { rating: number }) => {
+  const fullStars = Math.floor(rating / 2);
+  const halfStar = rating % 2 === 1;
+  const emptyStars = 5 - fullStars - (halfStar ? 1 : 0);
+  return (
+    <div className="flex items-center">
+      {[...Array(fullStars)].map((_, i) => (
+        <Star
+          key={`full-${i}`}
+          className="h-4 w-4 fill-yellow-400 text-yellow-400"
+        />
+      ))}
+      {halfStar && (
+        <Star
+          key="half"
+          className="h-4 w-4 fill-yellow-400 text-yellow-400"
+          style={{ clipPath: 'polygon(0 0, 50% 0, 50% 100%, 0 100%)' }}
+        />
+      )}
+      {[...Array(emptyStars)].map((_, i) => (
+        <Star key={`empty-${i}`} className="h-4 w-4 text-gray-300" />
+      ))}
+    </div>
+  );
 };
 
 function DayCell({
@@ -315,7 +356,7 @@ function ChampsDetailDialogContent({
           Tâches de jardinage recommandées selon la lune.
         </DialogDescription>
       </DialogHeader>
-      <div className="space-y-4 py-4 text-sm">
+      <div className="space-y-4 py-4 text-sm max-h-[70vh] overflow-y-auto pr-4">
         <div className="flex justify-between items-center bg-muted/50 p-2 rounded-lg">
           <div className="flex items-center gap-2">
             <MoonPhaseIcon
@@ -406,6 +447,106 @@ function ChampsDetailDialogContent({
   );
 }
 
+function PecheDetailDialogContent({
+  day,
+  location,
+}: {
+  day: Date;
+  location: string;
+}) {
+  const data = getDataForDate(location, day);
+  const dateString = format(day, 'eeee d MMMM yyyy', { locale: fr });
+  const { fishing, weather, tides } = data;
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>Détails de Pêche du {dateString}</DialogTitle>
+        <DialogDescription>
+          Prévisions détaillées, marées et potentiel par espèce.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-6 py-4 text-sm max-h-[70vh] overflow-y-auto pr-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <h4 className="font-semibold text-muted-foreground">
+              Phase Lunaire
+            </h4>
+            <div className="flex items-center gap-2 font-bold">
+              <MoonPhaseIcon phase={weather.moon.phase} className="size-5" />
+              <span>{weather.moon.phase}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Illumination à {weather.moon.percentage}%
+            </p>
+          </div>
+          <div className="space-y-2">
+            <h4 className="font-semibold text-muted-foreground">
+              Marées du jour
+            </h4>
+            <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
+              {tides.map((tide, i) => (
+                <div key={i} className="flex justify-between">
+                  <span className="capitalize text-muted-foreground">
+                    {tide.type === 'haute' ? 'Haute' : 'Basse'}:
+                  </span>
+                  <span className="font-mono font-medium">
+                    {tide.time} ({tide.height.toFixed(1)}m)
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {fishing.map((slot, index) => (
+            <div key={index} className="border-t pt-4">
+              <h4 className="font-semibold flex items-center gap-2 text-base mb-2">
+                <Clock className="size-4" />
+                {slot.timeOfDay}
+              </h4>
+              <div className="text-xs text-muted-foreground flex items-center gap-4 mb-3">
+                <div className="flex items-center gap-1">
+                  <Waves className="h-4 w-4" />
+                  <span>
+                    Marée {slot.tide} à {slot.tideTime}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {getTideIcon(slot.tideMovement)}
+                  <span className="capitalize">{slot.tideMovement}</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h5 className="font-semibold flex items-center gap-2">
+                  <Fish className="h-4 w-4 text-primary" />
+                  Potentiel par espèce
+                </h5>
+                {slot.fish.map((f, i) => (
+                  <div key={i} className="flex justify-between items-center">
+                    <span className="font-medium">{f.name}</span>
+                    <div className="flex items-center gap-2">
+                      <RatingStars rating={f.rating} />
+                      <Badge
+                        variant="outline"
+                        className="w-10 justify-center"
+                      >
+                        {f.rating}/10
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
 export function LunarCalendar() {
   const { selectedDate, setSelectedDate } = useDate();
   const { calendarView } = useCalendarView();
@@ -415,9 +556,7 @@ export function LunarCalendar() {
 
   const handleDayClick = (day: Date) => {
     setSelectedDate(day);
-    if (calendarView === 'champs') {
-      setDetailedDay(day);
-    }
+    setDetailedDay(day);
   };
 
   const handlePrevMonth = () => {
@@ -486,11 +625,18 @@ export function LunarCalendar() {
           open={!!detailedDay}
           onOpenChange={(isOpen) => !isOpen && setDetailedDay(null)}
         >
-          <DialogContent className="sm:max-w-md">
-            <ChampsDetailDialogContent
-              day={detailedDay}
-              location={selectedLocation}
-            />
+          <DialogContent className="sm:max-w-lg">
+            {calendarView === 'peche' ? (
+              <PecheDetailDialogContent
+                day={detailedDay}
+                location={selectedLocation}
+              />
+            ) : (
+              <ChampsDetailDialogContent
+                day={detailedDay}
+                location={selectedLocation}
+              />
+            )}
           </DialogContent>
         </Dialog>
       )}
