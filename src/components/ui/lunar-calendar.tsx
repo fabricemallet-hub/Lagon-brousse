@@ -192,7 +192,7 @@ function DayCell({
             {isGoodForMowing && (
                 <div className="flex items-center gap-1 text-green-600">
                     <Scissors className="size-3" />
-                    <span className="text-[10px] font-semibold">Tonte</span>
+                    <span className="text-[10px] font-semibold">Taille Gazon</span>
                 </div>
             )}
         </div>
@@ -207,7 +207,7 @@ function GardeningLegend() {
     { icon: Carrot, label: 'Racines' },
     { icon: Flower, label: 'Fleurs' },
     { icon: Leaf, label: 'Feuilles' },
-    { icon: Scissors, label: 'Tonte Gazon', color: 'text-green-600' },
+    { icon: Scissors, label: 'Taille Gazon', color: 'text-green-600' },
   ];
 
   return (
