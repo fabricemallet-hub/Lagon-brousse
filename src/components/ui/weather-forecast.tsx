@@ -130,7 +130,7 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
           >
             <ChevronLeft className="size-5" />
           </Button>
-          <h3 className="font-semibold text-lg capitalize text-center">
+          <h3 className="font-semibold text-base sm:text-lg capitalize text-center">
             {format(new Date(selectedForecast.date), "eeee dd MMMM 'à' HH'h'", {
               locale: fr,
             })}
@@ -153,13 +153,13 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
               isNight={selectedForecast.isNight}
               className="size-16"
             />
-            <p className="font-medium text-lg mt-2">
+            <p className="font-medium text-base sm:text-lg mt-2">
               {selectedForecast.condition}
             </p>
           </div>
           <div className="flex flex-col items-center justify-center">
             <WindArrowIcon direction={selectedForecast.windDirection} />
-            <p className="font-bold text-xl mt-2">
+            <p className="font-bold text-lg sm:text-xl mt-2">
               {selectedForecast.windSpeed} km/h
             </p>
           </div>

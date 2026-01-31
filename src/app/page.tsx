@@ -34,7 +34,7 @@ export default function Home() {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Bonjour!</h1>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Bonjour!</h1>
         <p className="text-muted-foreground">
           Voici le résumé pour {selectedLocation} du{' '}
           <span className="font-semibold">{dateString}</span>.
@@ -46,7 +46,7 @@ export default function Home() {
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-xl md:text-2xl">
               <Waves className="size-5 text-primary" />
               Marées
             </CardTitle>
@@ -68,7 +68,7 @@ export default function Home() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-xl md:text-2xl">
               <Spade className="size-5 text-primary" />
               Conseil du Jardinier
             </CardTitle>
