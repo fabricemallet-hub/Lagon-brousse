@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, collection } from 'firebase/firestore';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 import type { UserAccount } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,12 +22,6 @@ export default function AdminPage() {
   const { toast } = useToast();
 
   const [newPrice, setNewPrice] = useState(SUBSCRIPTION_PRICE.toString());
-
-  const userDocRef = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return doc(firestore, 'users', user.uid);
-  }, [user, firestore]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
   const usersCollectionRef = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -52,13 +46,12 @@ export default function AdminPage() {
 
   }, [allUsers, areUsersLoading]);
 
-  // Route protection
+  // Route protection: Rely on the auth user's email, which is faster and more reliable than the Firestore document.
   useEffect(() => {
-    const isDataLoading = isUserLoading || isProfileLoading;
-    if (!isDataLoading && userProfile?.subscriptionStatus !== 'admin') {
+    if (!isUserLoading && user?.email !== 'f.mallet@gmail.com') {
       router.push('/compte'); // Redirect non-admins
     }
-  }, [userProfile, isUserLoading, isProfileLoading, router]);
+  }, [user, isUserLoading, router]);
 
   const handlePriceUpdate = () => {
     const priceValue = parseInt(newPrice, 10);
@@ -78,9 +71,12 @@ export default function AdminPage() {
     });
   };
 
-  const isLoading = isUserLoading || isProfileLoading || areUsersLoading;
+  const isLoading = isUserLoading || areUsersLoading;
+  const isAdminUser = user?.email === 'f.mallet@gmail.com';
 
-  if (isLoading || userProfile?.subscriptionStatus !== 'admin') {
+  // Show a loading skeleton while data is fetching or if the user is not an admin.
+  // The useEffect above will handle the redirection for non-admins.
+  if (isLoading || !isAdminUser) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-48 w-full" />
