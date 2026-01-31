@@ -121,54 +121,52 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   }, [user, isUserLoading, userProfile, isProfileLoading]);
 
+  // Effect to initialize and run the countdown timer.
   useEffect(() => {
     if (status !== 'limited' || !auth) return;
 
+    // Initialize timeLeft from localStorage.
     const today = new Date().toISOString().split('T')[0];
     const lastUsageDate = localStorage.getItem('lastUsageDate');
     let dailyUsage = parseInt(localStorage.getItem('dailyUsage') || '0', 10);
 
     if (lastUsageDate !== today) {
-        dailyUsage = 0;
-        localStorage.setItem('lastUsageDate', today);
-        localStorage.setItem('dailyUsage', '0');
+      dailyUsage = 0;
+      localStorage.setItem('lastUsageDate', today);
     }
     
     const remainingTime = USAGE_LIMIT_SECONDS - dailyUsage;
     setTimeLeft(remainingTime);
 
-    if (remainingTime <= 0) {
-        toast({
-            variant: "destructive",
-            title: "Limite quotidienne atteinte",
-            description: "Revenez demain ou passez à la version Full.",
-        });
-        signOut(auth);
-        return;
+    // Only start the interval if there's time left.
+    if (remainingTime > 0) {
+      const interval = setInterval(() => {
+        setTimeLeft(prev => prev - 1);
+      }, 1000);
+      return () => clearInterval(interval);
     }
+  }, [status, auth]);
 
-    const interval = setInterval(() => {
-        setTimeLeft(prev => {
-            const newTime = prev - 1;
-            const newUsage = USAGE_LIMIT_SECONDS - newTime;
-            localStorage.setItem('dailyUsage', String(newUsage));
+  // Effect to handle side-effects when timeLeft changes (logout, persist to localStorage).
+  useEffect(() => {
+    if (status !== 'limited' || !auth) return;
+    
+    // Persist usage to localStorage whenever timeLeft changes.
+    const newUsage = USAGE_LIMIT_SECONDS - timeLeft;
+    localStorage.setItem('dailyUsage', String(newUsage));
 
-            if (newTime <= 0) {
-                clearInterval(interval);
-                toast({
-                    variant: "destructive",
-                    title: "Limite quotidienne atteinte",
-                    description: "Revenez demain ou passez à la version Full.",
-                });
-                signOut(auth);
-            }
-            return newTime;
-        });
-    }, 1000);
-
-    return () => clearInterval(interval);
-
-  }, [status, auth, toast]);
+    // Handle logout when time runs out.
+    if (timeLeft <= 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Limite quotidienne atteinte',
+        description: 'Revenez demain ou passez à la version Full.',
+      });
+      if (auth.currentUser) {
+        signOut(auth);
+      }
+    }
+  }, [timeLeft, status, auth, toast]);
 
   const handleLogout = async () => {
     if (!auth) return;
