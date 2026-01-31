@@ -23,6 +23,7 @@ import {
   Calendar,
   Wheat,
   MapPin,
+  BookText,
 } from 'lucide-react';
 
 function AdviceDetail({
@@ -137,6 +138,42 @@ export default function SemisPage() {
               </AccordionItem>
             ))}
           </Accordion>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-3">
+            <BookText className="size-6 text-primary" />
+            Lexique du Jardinier
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div>
+            <h3 className="font-bold text-lg text-accent">Engrais Vert : Qu'est-ce que c'est ?</h3>
+            <p className="text-muted-foreground mt-1">
+              Un engrais vert est une culture que l'on ne récolte pas. On la fauche avant qu'elle ne monte en graine et on l'incorpore au sol pour l'enrichir naturellement. C'est le secret d'un sol vivant et fertile !
+            </p>
+          </div>
+          <div className="space-y-4">
+             <div className="space-y-1">
+                <h4 className="font-semibold">Les Légumineuses (Haricot, Pois, Fève, Crotalaire...)</h4>
+                <p className="text-sm text-muted-foreground">
+                  Ces plantes ont la capacité magique de capter l'azote de l'air et de le stocker dans leurs racines. En les laissant se décomposer dans le sol, vous offrez un festin d'azote à vos prochaines cultures. Le <strong>crotalaire</strong>, adapté au climat tropical, est très efficace pour régénérer les sols fatigués.
+                </p>
+              </div>
+              <div className="space-y-1">
+                <h4 className="font-semibold">La Phacélie</h4>
+                <p className="text-sm text-muted-foreground">
+                  C'est le couteau suisse du jardinier ! Elle pousse très vite, étouffe les mauvaises herbes, aère le sol en profondeur avec ses racines et ses fleurs violettes attirent les abeilles, un bonus pour la pollinisation.
+                </p>
+              </div>
+              <div className="space-y-1">
+                <h4 className="font-semibold">La Moutarde</h4>
+                <p className="text-sm text-muted-foreground">
+                  En plus d'améliorer la structure du sol, la moutarde a une action "nettoyante". Elle aide à réduire la présence de certains champignons et nématodes (vers microscopiques) nuisibles dans le sol.
+                </p>
+              </div>
+          </div>
         </CardContent>
       </Card>
     </div>
