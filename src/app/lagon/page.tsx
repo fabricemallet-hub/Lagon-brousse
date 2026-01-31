@@ -20,6 +20,8 @@ import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
 import { useLocation } from '@/context/location-context';
 import { useDate } from '@/context/date-context';
+import { WindMap } from '@/components/ui/wind-map';
+import type { WindDirection } from '@/lib/types';
 
 export default function LagonPage() {
   const { selectedLocation } = useLocation();
@@ -44,21 +46,24 @@ export default function LagonPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6 md:grid-cols-2">
-          <div className="space-y-4">
-            <h3 className="font-semibold flex items-center gap-2">
-              <Wind className="text-primary" /> Vent
-            </h3>
-            <p className="text-2xl font-bold">
-              {weather.wind.speed}{' '}
-              <span className="text-lg font-medium">nœuds</span>
-            </p>
-            <p className="text-muted-foreground">Direction {weather.wind.direction}</p>
+          <div className="space-y-4 rounded-lg border p-4 flex items-center justify-between bg-card">
+            <div>
+              <h3 className="font-semibold flex items-center gap-2 mb-2">
+                <Wind className="text-primary" /> Vent
+              </h3>
+              <p className="text-2xl font-bold">
+                {weather.wind.speed}{' '}
+                <span className="text-lg font-medium">nœuds</span>
+              </p>
+              <p className="text-muted-foreground">Direction {weather.wind.direction}</p>
+            </div>
+            <WindMap direction={weather.wind.direction} className="w-20 h-40" />
           </div>
-          <div className="space-y-4">
-            <h3 className="font-semibold flex items-center gap-2">
+          <div className="space-y-4 rounded-lg border p-4 bg-card">
+            <h3 className="font-semibold flex items-center gap-2 mb-2">
               <Waves className="text-primary" /> Houle
             </h3>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-4">
               <div>
                 <p className="font-bold text-xl">{weather.swell.inside}</p>
                 <p className="text-sm text-muted-foreground">

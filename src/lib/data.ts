@@ -1,4 +1,4 @@
-import { LocationData, Tide, FishingSlot, FishRating } from './types';
+import { LocationData, Tide, FishingSlot, FishRating, WindDirection } from './types';
 
 const noumeaData: LocationData = {
   weather: {
@@ -321,6 +321,8 @@ const data: Record<string, LocationData> = {
 export function getDataForDate(location: string, date?: Date): LocationData {
   const effectiveDate = date || new Date();
   const dayOfMonth = effectiveDate.getDate();
+  const month = effectiveDate.getMonth();
+  const year = effectiveDate.getFullYear();
 
   // Create a deep copy to avoid modifying the original data object
   const baseData = data[location] || data['Nouméa'];
@@ -328,36 +330,63 @@ export function getDataForDate(location: string, date?: Date): LocationData {
 
   // Deterministically vary data based on the day of the month and location for prototype purposes
   const locationSeed = location.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  
-  // Vary tides slightly
+  const dateSeed = dayOfMonth + month * 31 + year * 365.25;
+
+  // Vary Wind
+  const windBaseSpeed = (data[location] || data['Nouméa']).weather.wind.speed;
+  locationData.weather.wind.speed = Math.max(0, Math.round(windBaseSpeed + Math.sin(dateSeed * 0.2 + locationSeed) * 10));
+  const directions: WindDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  locationData.weather.wind.direction = directions[Math.floor(((dateSeed / 5) + locationSeed) % directions.length)];
+
+  // Vary Swell
+  const swellBase = parseFloat((data[location] || data['Nouméa']).weather.swell.inside);
+  locationData.weather.swell.inside = `${Math.max(0.1, swellBase + Math.sin(dateSeed * 0.3) * 0.5).toFixed(1)}m`;
+  const swellOutsideBase = parseFloat((data[location] || data['Nouméa']).weather.swell.outside);
+  locationData.weather.swell.outside = `${Math.max(0.2, swellOutsideBase + Math.cos(dateSeed * 0.3) * 1).toFixed(1)}m`;
+  locationData.weather.swell.period = Math.max(4, Math.round(baseData.weather.swell.period + Math.sin(dateSeed * 0.1) * 3));
+
+  // Vary Sun/Moon times
+  const timeVariation = (offset: number) => Math.floor(Math.sin(dateSeed * 0.05 + locationSeed + offset) * 15);
+  const varyTime = (time: string, offset: number) => {
+    let [h, m] = time.split(':').map(Number);
+    m += timeVariation(offset);
+    if (m >= 60) { h = (h + 1) % 24; m %= 60; }
+    if (m < 0) { h = (h - 1 + 24) % 24; m += 60; }
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  }
+  locationData.weather.sun.sunrise = varyTime(baseData.weather.sun.sunrise, 1);
+  locationData.weather.sun.sunset = varyTime(baseData.weather.sun.sunset, 2);
+  locationData.weather.moon.moonrise = varyTime(baseData.weather.moon.moonrise, 3);
+  locationData.weather.moon.moonset = varyTime(baseData.weather.moon.moonset, 4);
+
+  // Vary tides
   locationData.tides.forEach((tide: Tide, i: number) => {
-    const variation = Math.sin((dayOfMonth + i) * 0.5 + locationSeed) * 0.3;
+    const variation = Math.sin((dateSeed + i) * 0.5 + locationSeed) * 0.5;
     tide.height = parseFloat(Math.max(0.2, (data[location] || data['Nouméa']).tides[i].height + variation).toFixed(1));
-    const baseHour = parseInt((data[location] || data['Nouméa']).tides[i].time.split(':')[0]);
-    const newHour = (baseHour + Math.floor(Math.sin(dayOfMonth + i + locationSeed) * 2)) % 24;
-    tide.time = `${String(newHour < 0 ? 24 + newHour : newHour).padStart(2,'0')}:${tide.time.split(':')[1]}`;
+    tide.time = varyTime((data[location] || data['Nouméa']).tides[i].time, i + 5);
   });
 
-  // Vary moon phase
-  const phases = ['Nouvelle lune', 'Premier croissant', 'Premier quartier', 'Lune gibbeuse croissante', 'Pleine lune', 'Lune gibbeuse décroissante', 'Dernier quartier', 'Dernier croissant'];
-  const dayInCycle = (dayOfMonth - 1) % 30;
-  const phaseIndex = Math.floor((dayInCycle / 30) * 8) % 8;
+  // Moon phase calculation
+  const phases: string[] = ['Nouvelle lune', 'Premier croissant', 'Premier quartier', 'Lune gibbeuse croissante', 'Pleine lune', 'Lune gibbeuse décroissante', 'Dernier quartier', 'Dernier croissant'];
+  const knownNewMoon = new Date('2024-01-11T00:00:00Z');
+  const daysSinceKnownNewMoon = (effectiveDate.getTime() - knownNewMoon.getTime()) / (1000 * 3600 * 24);
+  const dayInCycle = daysSinceKnownNewMoon % 29.53;
+  
+  const phaseIndex = Math.floor((dayInCycle / 29.53) * 8 + 0.5) % 8;
   locationData.weather.moon.phase = phases[phaseIndex];
-
-  // Add percentage
-  const illumination = 0.5 * (1 - Math.cos((dayInCycle / 29.5) * 2 * Math.PI));
+  
+  const illumination = 0.5 * (1 - Math.cos((dayInCycle / 29.53) * 2 * Math.PI));
   locationData.weather.moon.percentage = Math.round(illumination * 100);
 
-  // Vary farming data
-  locationData.farming.lunarPhase = dayOfMonth > 15 ? 'Lune Descendante' : 'Lune Montante';
+  // Farming data
+  locationData.farming.lunarPhase = dayInCycle < 14.76 ? 'Lune Montante' : 'Lune Descendante';
   const zodiacSigns = ['Fruits', 'Racines', 'Fleurs', 'Feuilles'];
-  locationData.farming.zodiac = zodiacSigns[Math.floor(((dayOfMonth-1) + locationSeed) / 7) % 4];
+  locationData.farming.zodiac = zodiacSigns[Math.floor((dayInCycle % 27.3) / (27.3/4)) % 4];
 
-
-  // Vary fishing rating
+  // Fishing rating
   locationData.fishing.forEach((slot: FishingSlot) => {
     slot.fish.forEach((f: FishRating) => {
-      const newRating = ((f.rating + dayOfMonth * (f.name.length/5) + locationSeed/2) % 10) + 1;
+      const newRating = ((f.rating + dateSeed * 0.1 + locationSeed * 0.05 + f.name.length) % 8) + 2;
       f.rating = Math.max(1, Math.min(10, Math.round(newRating)));
     });
   });

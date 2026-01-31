@@ -1,7 +1,9 @@
+export type WindDirection = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
+
 export interface WeatherData {
   wind: {
     speed: number;
-    direction: string;
+    direction: WindDirection;
   };
   swell: {
     inside: string;
