@@ -191,16 +191,16 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
             startIndex: selectedIndex,
           }}
         >
-          <CarouselContent className="-ml-0">
+          <CarouselContent>
             {weather.hourly.map((forecast, index) => (
               <CarouselItem
                 key={index}
-                className="basis-1/5 sm:basis-1/6 md:basis-[12.5%] lg:basis-[10%]"
+                className="basis-1/3 sm:basis-1/4 md:basis-1/5 lg:basis-1/6"
               >
                 <div
                   onClick={() => api?.scrollTo(index)}
                   className={cn(
-                    'flex flex-col items-center justify-between p-1 sm:p-2 border-r h-full min-h-[130px] cursor-pointer',
+                    'flex flex-col items-center justify-between p-1 sm:p-2 h-full min-h-[130px] cursor-pointer rounded-md',
                     selectedIndex === index
                       ? 'bg-blue-100'
                       : 'bg-card hover:bg-muted/50'
