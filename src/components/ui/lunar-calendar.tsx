@@ -136,8 +136,9 @@ function DayCell({
       )}
     >
       <div className="flex justify-between items-center">
-        <div className="text-muted-foreground">
+        <div className="flex items-center gap-1 text-muted-foreground">
           <MoonPhaseIcon phase={data.weather.moon.phase} />
+          <span className="text-[10px] font-mono">{data.weather.moon.percentage}%</span>
         </div>
         <div className="font-semibold text-sm">{format(day, 'd')}</div>
       </div>

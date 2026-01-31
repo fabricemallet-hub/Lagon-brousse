@@ -16,6 +16,7 @@ export interface WeatherData {
     moonrise: string;
     moonset: string;
     phase: string;
+    percentage: number;
   };
 }
 

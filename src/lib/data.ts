@@ -19,6 +19,7 @@ const noumeaData: LocationData = {
       moonrise: '12:05',
       moonset: '23:55',
       phase: 'Premier quartier',
+      percentage: 50,
     },
   },
   tides: [
@@ -127,6 +128,7 @@ const data: Record<string, LocationData> = {
         moonrise: '12:10',
         moonset: '00:01',
         phase: 'Premier quartier',
+        percentage: 50,
       },
     },
     tides: [
@@ -238,6 +240,7 @@ const data: Record<string, LocationData> = {
         moonrise: '12:03',
         moonset: '23:53',
         phase: 'Premier quartier',
+        percentage: 50,
       },
     },
     tides: [
@@ -323,32 +326,39 @@ export function getDataForDate(location: string, date?: Date): LocationData {
   const baseData = data[location] || data['Nouméa'];
   const locationData = JSON.parse(JSON.stringify(baseData));
 
-  // Deterministically vary data based on the day of the month for prototype purposes
+  // Deterministically vary data based on the day of the month and location for prototype purposes
+  const locationSeed = location.length;
   
   // Vary tides slightly
   locationData.tides.forEach((tide: Tide, i: number) => {
-    const variation = Math.sin((dayOfMonth + i) * 0.5) * 0.3;
-    tide.height = parseFloat(Math.max(0.2, tide.height + variation).toFixed(1));
-    const baseHour = parseInt(tide.time.split(':')[0]);
-    const newHour = (baseHour + Math.floor(Math.sin(dayOfMonth + i) * 2)) % 24;
+    const variation = Math.sin((dayOfMonth + i) * 0.5 + locationSeed) * 0.3;
+    tide.height = parseFloat(Math.max(0.2, (data[location] || data['Nouméa']).tides[i].height + variation).toFixed(1));
+    const baseHour = parseInt((data[location] || data['Nouméa']).tides[i].time.split(':')[0]);
+    const newHour = (baseHour + Math.floor(Math.sin(dayOfMonth + i + locationSeed) * 2)) % 24;
     tide.time = `${String(newHour < 0 ? 24 + newHour : newHour).padStart(2,'0')}:${tide.time.split(':')[1]}`;
   });
 
   // Vary moon phase
   const phases = ['Nouvelle lune', 'Premier croissant', 'Premier quartier', 'Lune gibbeuse croissante', 'Pleine lune', 'Lune gibbeuse décroissante', 'Dernier quartier', 'Dernier croissant'];
-  const phaseIndex = Math.floor((dayOfMonth / 30) * 8) % 8;
+  const dayInCycle = (dayOfMonth - 1) % 30;
+  const phaseIndex = Math.floor((dayInCycle / 30) * 8) % 8;
   locationData.weather.moon.phase = phases[phaseIndex];
+
+  // Add percentage
+  const illumination = 0.5 * (1 - Math.cos((dayInCycle / 29.5) * 2 * Math.PI));
+  locationData.weather.moon.percentage = Math.round(illumination * 100);
 
   // Vary farming data
   locationData.farming.lunarPhase = dayOfMonth > 15 ? 'Lune Descendante' : 'Lune Montante';
   const zodiacSigns = ['Fruits', 'Racines', 'Fleurs', 'Feuilles'];
-  locationData.farming.zodiac = zodiacSigns[Math.floor(dayOfMonth / 7) % 4];
+  locationData.farming.zodiac = zodiacSigns[Math.floor(((dayOfMonth-1) + locationSeed) / 7) % 4];
 
 
   // Vary fishing rating
   locationData.fishing.forEach((slot: FishingSlot) => {
     slot.fish.forEach((f: FishRating) => {
-      f.rating = Math.max(1, Math.min(10, ((f.rating + dayOfMonth * f.name.length) % 10) + 1));
+      const newRating = ((f.rating + dayOfMonth * (f.name.length/5) + locationSeed/2) % 10) + 1;
+      f.rating = Math.max(1, Math.min(10, Math.round(newRating)));
     });
   });
 
