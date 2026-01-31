@@ -21,7 +21,6 @@ import {
   Sunset,
   Info,
 } from 'lucide-react';
-import { HuntingMapCard } from '@/components/ui/hunting-map-card';
 import { ShootingTableCard } from '@/components/ui/shooting-table-card';
 
 export default function ChassePage() {
@@ -133,7 +132,6 @@ export default function ChassePage() {
         </Card>
       </div>
       <ShootingTableCard />
-      <HuntingMapCard />
     </div>
   );
 }
