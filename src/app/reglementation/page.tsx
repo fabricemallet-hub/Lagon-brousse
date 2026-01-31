@@ -110,7 +110,7 @@ export default function ReglementationPage() {
                     <strong>Troca:</strong> Diamètre de base entre 9 et 12 cm.
                   </li>
                   <li>
-                    <strong>Huître:</strong> Taille > 6 cm, limité à 10
+                    <strong>Huître:</strong> Taille &gt; 6 cm, limité à 10
                     douzaines par bateau/sortie.
                   </li>
                   <li>
