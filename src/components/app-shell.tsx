@@ -77,6 +77,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const [status, setStatus] = useState<'loading' | 'admin' | 'active' | 'trial' | 'limited'>('loading');
   const [timeLeft, setTimeLeft] = useState(USAGE_LIMIT_SECONDS);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [trialEndDate, setTrialEndDate] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -156,7 +157,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     localStorage.setItem('dailyUsage', String(newUsage));
 
     // Handle logout when time runs out.
-    if (timeLeft <= 0) {
+    if (timeLeft <= 0 && !isLoggingOut) {
+      setIsLoggingOut(true);
       toast({
         variant: 'destructive',
         title: 'Limite quotidienne atteinte',
@@ -170,7 +172,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         router.push('/login');
       }
     }
-  }, [timeLeft, status, auth, toast, router]);
+  }, [timeLeft, status, auth, toast, router, isLoggingOut]);
 
   const handleLogout = async () => {
     if (!auth) return;
@@ -265,137 +267,138 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <SidebarProvider>
-      <Sidebar>
-        <SidebarHeader>
-          <div className="flex items-center gap-3 p-2">
-            <AppLogo className="size-8 text-primary" />
-            <h1 className="font-bold text-lg text-primary-foreground group-data-[collapsible=icon]:hidden">
-              Marées & Terroir
-            </h1>
-          </div>
-        </SidebarHeader>
+    <div className={cn(auth?.currentUser && status === 'limited' && timeLeft <= 0 && 'pointer-events-none opacity-50')}>
+      <SidebarProvider>
+        <Sidebar>
+          <SidebarHeader>
+            <div className="flex items-center gap-3 p-2">
+              <AppLogo className="size-8 text-primary" />
+              <h1 className="font-bold text-lg text-primary-foreground group-data-[collapsible=icon]:hidden">
+                Marées & Terroir
+              </h1>
+            </div>
+          </SidebarHeader>
 
-        <SidebarContent>
-          <SidebarNav />
-        </SidebarContent>
+          <SidebarContent>
+            <SidebarNav />
+          </SidebarContent>
 
-        <SidebarFooter>
-          {renderUserMenu()}
-        </SidebarFooter>
-      </Sidebar>
-      <main className="flex-1">
-        {status === 'limited' && (
-          <div className="fixed top-0 left-0 right-0 h-10 bg-destructive/90 text-destructive-foreground flex items-center justify-center text-sm font-bold z-50">
-              <AlertCircle className="size-4 mr-2" />
-              Mode Limité : {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')} restant.
-          </div>
-        )}
-        <header className={cn(
-          "flex h-auto min-h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30 py-2",
-          status === 'limited' && 'mt-10'
-        )}>
-          <SidebarTrigger className="shrink-0 md:hidden" />
-          <div className="w-full flex-1 flex items-center justify-between flex-wrap gap-y-2">
-            <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-               {status === 'trial' && <Badge variant="secondary">Version d'essai</Badge>}
-               {status === 'limited' && <Badge variant="destructive">Mode Limité</Badge>}
-              <Select
-                value={selectedLocation}
-                onValueChange={setSelectedLocation}
-              >
-                <SelectTrigger className="w-[150px] sm:w-[180px]">
-                  <SelectValue placeholder="Choisir une commune" />
-                </SelectTrigger>
-                <SelectContent>
-                  {locations.map((loc) => (
-                    <SelectItem key={loc} value={loc}>
-                      {loc}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {showDayNavigator && (
-                <div className="flex items-center gap-1 rounded-md border bg-background p-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={handlePrevDay}
+          <SidebarFooter>
+            {renderUserMenu()}
+          </SidebarFooter>
+        </Sidebar>
+        <main className="flex-1">
+          {status === 'limited' && (
+            <div className="fixed top-0 left-0 right-0 h-10 bg-destructive/90 text-destructive-foreground flex items-center justify-center text-sm font-bold z-50">
+                <AlertCircle className="size-4 mr-2" />
+                Mode Limité : {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')} restant.
+            </div>
+          )}
+          <header className={cn(
+            "flex h-auto min-h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30 py-2",
+            status === 'limited' && 'mt-10'
+          )}>
+            <SidebarTrigger className="shrink-0 md:hidden" />
+            <div className="w-full flex-1 flex items-center justify-between flex-wrap gap-y-2">
+              <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+                {status === 'trial' && <Badge variant="secondary">Version d'essai</Badge>}
+                {status === 'limited' && <Badge variant="destructive">Mode Limité</Badge>}
+                <Select
+                  value={selectedLocation}
+                  onValueChange={setSelectedLocation}
+                >
+                  <SelectTrigger className="w-[150px] sm:w-[180px]">
+                    <SelectValue placeholder="Choisir une commune" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations.map((loc) => (
+                      <SelectItem key={loc} value={loc}>
+                        {loc}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {showDayNavigator && (
+                  <div className="flex items-center gap-1 rounded-md border bg-background p-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={handlePrevDay}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={'outline'}
+                          className="w-[150px] sm:w-[180px] justify-start text-left font-normal h-8"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {format(selectedDate, 'PPP', { locale: fr })}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={(date) => date && setSelectedDate(date)}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={handleNextDay}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+                {pathname === '/calendrier' && calendarView === 'champs' && (
+                  <Button asChild variant="outline" size="sm">
+                      <Link href="/semis">
+                        <BookOpen className="mr-2 h-4 w-4" />
+                        Guide de Culture
+                      </Link>
+                    </Button>
+                )}
+              </div>
+
+              {pathname === '/calendrier' && (
+                <div className="flex items-center space-x-2">
+                  <Label
+                    htmlFor="calendar-view"
+                    className="text-sm font-medium"
                   >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={'outline'}
-                        className="w-[150px] sm:w-[180px] justify-start text-left font-normal h-8"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {format(selectedDate, 'PPP', { locale: fr })}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={selectedDate}
-                        onSelect={(date) => date && setSelectedDate(date)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={handleNextDay}
+                    Pêche
+                  </Label>
+                  <Switch
+                    id="calendar-view"
+                    checked={calendarView === 'champs'}
+                    onCheckedChange={(checked) =>
+                      setCalendarView(checked ? 'champs' : 'peche')
+                    }
+                  />
+                  <Label
+                    htmlFor="calendar-view"
+                    className="text-sm font-medium"
                   >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
+                    Champs
+                  </Label>
                 </div>
               )}
-               {pathname === '/calendrier' && calendarView === 'champs' && (
-                 <Button asChild variant="outline" size="sm">
-                    <Link href="/semis">
-                      <BookOpen className="mr-2 h-4 w-4" />
-                      Guide de Culture
-                    </Link>
-                  </Button>
-              )}
             </div>
-
-            {pathname === '/calendrier' && (
-              <div className="flex items-center space-x-2">
-                <Label
-                  htmlFor="calendar-view"
-                  className="text-sm font-medium"
-                >
-                  Pêche
-                </Label>
-                <Switch
-                  id="calendar-view"
-                  checked={calendarView === 'champs'}
-                  onCheckedChange={(checked) =>
-                    setCalendarView(checked ? 'champs' : 'peche')
-                  }
-                />
-                <Label
-                  htmlFor="calendar-view"
-                  className="text-sm font-medium"
-                >
-                  Champs
-                </Label>
-              </div>
-            )}
+          </header>
+          <div className={cn(
+            "flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6"
+          )}>
+            {children}
           </div>
-        </header>
-        <div className={cn(
-          "flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6",
-          status === 'limited' && 'pointer-events-none opacity-50'
-        )}>
-          {children}
-        </div>
-      </main>
-    </SidebarProvider>
+        </main>
+      </SidebarProvider>
+    </div>
   );
 }
