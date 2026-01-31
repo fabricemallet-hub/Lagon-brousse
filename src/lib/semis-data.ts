@@ -211,6 +211,26 @@ export const semisData: Vegetable[] = [
     }
   },
   {
+    name: 'Chouchoute (Chayote)',
+    icon: '🍈',
+    sowingSeasonWarm: 'Septembre à Novembre',
+    sowingSeasonCool: 'Mars à Mai',
+    harvestWarm: 'Janvier à Mai (récolte continue)',
+    harvestCool: 'Juin à Septembre (récolte continue)',
+    advice: {
+      plantingLocation:
+        'Planter le fruit entier, pointe vers le bas, à moitié enterré. Prévoir un support très solide (grillage, treille, pergola) car la plante est une liane vigoureuse.',
+      sunlight: 'Plein soleil à mi-ombre légère.',
+      watering:
+        'Arrosage régulier et abondant, surtout pendant les périodes sèches. Le paillage est fortement recommandé pour conserver l\'humidité.',
+      soilFertilizer:
+        'Sol riche en matière organique et bien drainé. Un bon apport de compost à la plantation est idéal.',
+      pests: 'Les mouches des fruits peuvent piquer les jeunes chouchoutes. Peu de maladies si bien aérée.',
+      grandmaRecipe:
+        'Pour protéger les fruits des mouches, on peut les ensacher quand ils sont jeunes. Une seule plante suffit souvent pour toute la famille !',
+    },
+  },
+  {
     name: 'Herbes Aromatiques',
     icon: '🌿',
     sowingSeasonWarm: 'Persil: toute l\'année. Thym: semis au frais ou bouturage.',
