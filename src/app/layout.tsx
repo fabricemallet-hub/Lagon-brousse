@@ -3,6 +3,7 @@ import { AppShell } from '@/components/app-shell';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import { LocationProvider } from '@/context/location-context';
+import { DateProvider } from '@/context/date-context';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -17,7 +18,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="fr" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
@@ -31,9 +32,11 @@ export default function RootLayout({
         />
       </head>
       <body className={cn('font-body antialiased', 'min-h-screen bg-background font-sans')}>
-        <LocationProvider>
-          <AppShell>{children}</AppShell>
-        </LocationProvider>
+        <DateProvider>
+          <LocationProvider>
+            <AppShell>{children}</AppShell>
+          </LocationProvider>
+        </DateProvider>
         <Toaster />
       </body>
     </html>

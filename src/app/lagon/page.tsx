@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { getTodaysData } from '@/lib/data';
+import { getDataForDate } from '@/lib/data';
 import {
   Waves,
   Wind,
@@ -19,10 +19,14 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
 import { useLocation } from '@/context/location-context';
+import { useDate } from '@/context/date-context';
 
 export default function LagonPage() {
   const { selectedLocation } = useLocation();
-  const { weather, tides } = getTodaysData(selectedLocation);
+  const { selectedDate } = useDate();
+  const { weather, tides } = getDataForDate(selectedLocation, selectedDate);
+  
+  const dateString = selectedDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
 
   const currentStrength = {
     'Faible': 20,
@@ -36,7 +40,7 @@ export default function LagonPage() {
         <CardHeader>
           <CardTitle>Conditions en Mer</CardTitle>
           <CardDescription>
-            Informations détaillées sur la météo et la mer pour {selectedLocation}.
+            Informations détaillées sur la météo et la mer pour {selectedLocation} le {dateString}.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6 md:grid-cols-2">

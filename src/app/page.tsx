@@ -6,7 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { getTodaysData } from '@/lib/data';
+import { getDataForDate } from '@/lib/data';
 import {
   Waves,
   Wind,
@@ -16,10 +16,19 @@ import {
   Moon,
 } from 'lucide-react';
 import { useLocation } from '@/context/location-context';
+import { useDate } from '@/context/date-context';
 
 export default function Home() {
   const { selectedLocation } = useLocation();
-  const { weather, tides, farming } = getTodaysData(selectedLocation);
+  const { selectedDate } = useDate();
+  const { weather, tides, farming } = getDataForDate(selectedLocation, selectedDate);
+  
+  const dateString = selectedDate.toLocaleDateString('fr-FR', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+  });
 
   return (
     <div className="flex flex-col gap-8">
@@ -28,7 +37,7 @@ export default function Home() {
           Bonjour!
         </h1>
         <p className="text-muted-foreground">
-          Voici le résumé pour {selectedLocation} aujourd'hui.
+          Voici le résumé pour {selectedLocation} du <span className="font-semibold">{dateString}</span>.
         </p>
       </div>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { getTodaysData } from '@/lib/data';
+import { getDataForDate } from '@/lib/data';
 import {
   Moon,
   Spade,
@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
 import { useLocation } from '@/context/location-context';
+import { useDate } from '@/context/date-context';
 
 const icons: { [key: string]: React.FC<LucideProps> } = {
   Spade,
@@ -32,7 +33,9 @@ const icons: { [key: string]: React.FC<LucideProps> } = {
 
 export default function ChampsPage() {
   const { selectedLocation } = useLocation();
-  const { farming } = getTodaysData(selectedLocation);
+  const { selectedDate } = useDate();
+  const { farming } = getDataForDate(selectedLocation, selectedDate);
+  const dateString = selectedDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
 
   return (
     <div className="space-y-6">
@@ -40,7 +43,7 @@ export default function ChampsPage() {
         <CardHeader>
           <CardTitle>Calendrier du Jardinier</CardTitle>
           <CardDescription>
-            Que faire au jardin à {selectedLocation} aujourd'hui selon la lune ?
+            Que faire au jardin à {selectedLocation} le {dateString} selon la lune ?
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

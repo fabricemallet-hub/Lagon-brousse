@@ -7,14 +7,17 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { getTodaysData } from '@/lib/data';
+import { getDataForDate } from '@/lib/data';
 import { useLocation } from '@/context/location-context';
+import { useDate } from '@/context/date-context';
 import { Clock, Waves, TrendingUp, TrendingDown, Fish, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 export default function PechePage() {
   const { selectedLocation } = useLocation();
-  const { fishing } = getTodaysData(selectedLocation);
+  const { selectedDate } = useDate();
+  const { fishing } = getDataForDate(selectedLocation, selectedDate);
+  const dateString = selectedDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
 
   const getTideIcon = (movement: 'montante' | 'descendante' | 'étale') => {
     switch (movement) {
@@ -50,7 +53,7 @@ export default function PechePage() {
         <CardHeader>
           <CardTitle>Prévisions de Pêche à la Ligne</CardTitle>
           <CardDescription>
-            Meilleurs moments et espèces à cibler pour la pêche à la ligne à {selectedLocation}.
+            Meilleurs moments et espèces à cibler pour la pêche à {selectedLocation} le {dateString}.
           </CardDescription>
         </CardHeader>
       </Card>

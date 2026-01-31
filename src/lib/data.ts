@@ -315,7 +315,9 @@ const data: Record<string, LocationData> = {
   Yaté: noumeaData,
 };
 
-export function getTodaysData(location: string): LocationData {
+export function getDataForDate(location: string, date?: Date): LocationData {
+  // NOTE: The date parameter is currently ignored. 
+  // In a real application, you would fetch or calculate data for the specific date.
   return data[location] || data['Nouméa'];
 }
 
