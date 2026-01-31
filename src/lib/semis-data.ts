@@ -29,7 +29,7 @@ export const semisData: Vegetable[] = [
       watering: 'Arrosage régulier pour maintenir un sol frais. Un manque d\'eau peut rendre les carottes fibreuses.',
       soilFertilizer: 'Sol très léger, sableux et profond, sans cailloux. Éviter le fumier frais qui fait fourcher les racines.',
       pests: 'Mouche de la carotte.',
-      grandmaRecipe: 'Associer la culture avec des poireaux, oignons ou de la ciboulette : leur odeur forte repousse la mouche de la carotte. Les radis et les laitues, à cycle court, peuvent être plantés entre les rangs pour optimiser l\'espace.'
+      grandmaRecipe: 'Associez-la avec des poireaux, oignons ou de la ciboulette : leur odeur forte repousse la mouche de la carotte. Après la récolte, enrichissez le sol en plantant des légumineuses (haricots, pois) qui fixeront l\'azote pour la culture suivante.'
     }
   },
   {
@@ -45,7 +45,7 @@ export const semisData: Vegetable[] = [
       watering: 'Arrosage très régulier pour garder le sol frais.',
       soilFertilizer: 'Sol riche en humus.',
       pests: 'Altises (petits coléoptères qui font des trous dans les feuilles), limaces.',
-      grandmaRecipe: 'Plantez-le à côté de la menthe, du romarin ou de l\'aneth pour aider à repousser les insectes. Sa croissance rapide en fait un bon choix pour occuper l\'espace entre des cultures plus lentes comme les tomates ou les aubergines.'
+      grandmaRecipe: 'Plantez-le à côté de la menthe ou du romarin pour aider à repousser les insectes. Sa croissance rapide en fait un bon choix pour occuper l\'espace entre des cultures plus lentes. Après récolte, aérez le sol et incorporez du compost avant de planter des légumes-racines.'
     }
   },
   {
@@ -65,7 +65,7 @@ export const semisData: Vegetable[] = [
         'Sol riche en matière organique et bien drainé. Un bon apport de compost à la plantation est idéal.',
       pests: 'Les mouches des fruits peuvent piquer les jeunes chouchoutes. Peu de maladies si bien aérée.',
       grandmaRecipe:
-        'Sa croissance est très vigoureuse, elle peut servir d\'ombrage à des cultures craignant le soleil direct. Le maïs peut lui servir de tuteur naturel et les haricots plantés à son pied enrichiront le sol en azote.',
+        'Le maïs peut lui servir de tuteur naturel et les haricots plantés à son pied enrichiront le sol en azote. Après la fin de sa production, coupez les tiges et laissez-les au sol comme paillis pour la saison suivante, après avoir bien amendé avec du compost car c\'est une plante gourmande.',
     },
   },
   {
@@ -81,7 +81,7 @@ export const semisData: Vegetable[] = [
       watering: 'Arrosage régulier pour une croissance rapide et des tiges tendres.',
       soilFertilizer: 'Sol frais et riche en humus.',
       pests: 'Généralement très résistant.',
-      grandmaRecipe: 'Excellent voisin pour les carottes, tomates et salades, il aide à éloigner certains nuisibles. Éviter de le planter près des haricots et des pois, car il peut inhiber leur croissance.'
+      grandmaRecipe: 'Excellent voisin pour les carottes et tomates, il aide à éloigner certains nuisibles. Comme c\'est une culture pérenne, il n\'est pas nécessaire de le remplacer, mais vous pouvez le diviser pour le replanter ailleurs et aérer le sol.'
     }
   },
   {
@@ -97,7 +97,7 @@ export const semisData: Vegetable[] = [
       watering: 'Arrosage très régulier au pied, le concombre est gourmand en eau. Pailler généreusement.',
       soilFertilizer: 'Sol riche, frais et bien fumé.',
       pests: 'Oïdium, mildiou, araignées rouges.',
-      grandmaRecipe: 'La fameuse association des "trois sœurs" avec le maïs (qui sert de tuteur) et les haricots (qui fixent l\'azote) est parfaite. Les soucis (tagètes) à proximité peuvent repousser les nématodes du sol.'
+      grandmaRecipe: 'Plantez des soucis (tagètes) à proximité pour repousser les nématodes. Le maïs peut lui servir de tuteur. Après cette culture gourmande, plantez un engrais vert comme la moutarde ou des légumineuses (pois, fèves) pour régénérer le sol.'
     }
   },
   {
@@ -117,7 +117,7 @@ export const semisData: Vegetable[] = [
         'Sol très riche en matière organique. Incorporer du compost ou du fumier bien décomposé à la plantation.',
       pests: 'Oïdium (poudre blanche sur les feuilles), pucerons.',
       grandmaRecipe:
-        'Plantez des capucines à proximité comme "plante piège", elles attireront les pucerons. L\'association "trois sœurs" (courge, maïs, haricot) est excellente : le maïs sert de tuteur au haricot qui fixe l\'azote pour la courgette qui couvre le sol.',
+        'Plantez des capucines à proximité comme "plante piège" pour les pucerons. L\'association avec le maïs et le haricot est excellente. Étant gourmande, il est bon de planter un engrais vert (phacélie, moutarde) après la culture pour reposer et nourrir la terre.',
     },
   },
   {
@@ -133,7 +133,7 @@ export const semisData: Vegetable[] = [
       watering: 'Arrosage régulier au pied sans mouiller le feuillage, surtout pendant la floraison et la formation des gousses.',
       soilFertilizer: 'Sol léger et bien réchauffé. Le haricot fixe l\'azote, donc pas besoin d\'un engrais trop riche en azote.',
       pests: 'Pucerons, araignées rouges, rouille.',
-      grandmaRecipe: 'En tant que légumineuse, il fixe l\'azote de l\'air dans le sol, ce qui en fait un excellent "engrais vert" pour les cultures gourmandes plantées après, ou à côté comme le maïs, les courges, et les fraises. Évitez l\'ail, l\'oignon et le fenouil.'
+      grandmaRecipe: 'Compagnon idéal des maïs, courges, et fraises. Après la récolte, coupez les pieds mais laissez les racines en terre. Elles se décomposeront et libéreront l\'azote qu\'elles ont stocké, un vrai cadeau pour votre prochaine culture de légumes-feuilles (salades, choux).'
     }
   },
   {
@@ -149,7 +149,7 @@ export const semisData: Vegetable[] = [
       watering: 'Persil: sol toujours frais. Thym: supporte la sécheresse, arrosage modéré.',
       soilFertilizer: 'Sol léger et bien drainé. Pas trop d\'engrais pour ne pas diluer les arômes.',
       pests: 'Pucerons sur le persil.',
-      grandmaRecipe: 'Utilisez-les comme des gardes du corps ! Le basilic près des tomates repousse les pucerons, la menthe près des choux éloigne la piéride, et le romarin près des haricots dissuade la mouche du haricot. Un véritable jardin protecteur.'
+      grandmaRecipe: 'Utilisez-les comme des gardes du corps ! Le basilic près des tomates repousse les pucerons, la menthe près des choux éloigne la piéride. La plupart étant des vivaces, elles structurent le jardin d\'année en année.'
     }
   },
   {
@@ -165,7 +165,7 @@ export const semisData: Vegetable[] = [
       watering: 'Besoins en eau réguliers, surtout en début de croissance. Le paillage est crucial pour maintenir l\'humidité.',
       soilFertilizer: 'Sol très riche en humus, profond et bien drainé. Un apport de compost à la préparation des buttes est essentiel.',
       pests: 'Nématodes, cochenilles. Pourriture si le sol est mal drainé.',
-      grandmaRecipe: 'La culture de l\'igname est un pilier de la culture Kanak. Elle peut être associée à des haricots grimpants qui utiliseront les tuteurs et enrichiront le sol en azote. La rotation des cultures reste la meilleure "recette" pour un sol sain.'
+      grandmaRecipe: 'La culture de l\'igname est un pilier de la culture Kanak. Pour ne pas épuiser le sol, pratiquez la rotation : après l\'igname, plantez des légumineuses comme le pois d\'Angole ou laissez la parcelle en jachère avec un couvert végétal.'
     }
   },
   {
@@ -185,7 +185,7 @@ export const semisData: Vegetable[] = [
         'S\'adapte à tous types de sols pauvres, mais préfère un sol léger et bien drainé. Pas d\'engrais nécessaire en général.',
       pests: 'Cochenilles, acariens.',
       grandmaRecipe:
-        'Associez-le avec des légumineuses à croissance rapide comme le haricot d\'Espagne ou le pois d\'Angole. Elles couvriront le sol pour limiter les mauvaises herbes et l\'enrichiront en azote, un engrais naturel gratuit.',
+        'Associez-le avec des légumineuses qui couvriront le sol et l\'enrichiront en azote. Le manioc peut rester en terre plusieurs années, mais lorsque vous changez de parcelle, plantez un engrais vert (comme le crotalaire) pour régénérer le sol qu\'il a occupé.',
     },
   },
   {
@@ -201,7 +201,7 @@ export const semisData: Vegetable[] = [
       watering: 'Arrosage modéré au début. Cesser l\'arrosage quand les feuilles commencent à jaunir pour permettre aux bulbes de sécher.',
       soilFertilizer: 'Sol bien drainé, sans fumure fraîche. Apprécie les sols ayant porté une culture gourmande l\'année précédente.',
       pests: 'Mildiou de l\'oignon, mouche de l\'oignon.',
-      grandmaRecipe: 'L\'association avec la carotte est classique : l\'un repousse la mouche de l\'autre. Les salades et les fraises sont aussi de bons compagnons. À l\'inverse, tenez-le éloigné des haricots, pois et fèves.'
+      grandmaRecipe: 'L\'association avec la carotte est classique. Après la récolte des oignons, le sol est propre. C\'est un bon emplacement pour semer des salades ou des épinards pour l\'hiver.'
     }
   },
   {
@@ -217,7 +217,7 @@ export const semisData: Vegetable[] = [
       watering: 'Arrosage abondant et régulier au pied. Cesser l\'arrosage 1 à 2 semaines avant la récolte pour concentrer les sucres dans le fruit.',
       soilFertilizer: 'Sol très riche et bien drainé.',
       pests: 'Mildiou, oïdium.',
-      grandmaRecipe: 'Les soucis (tagètes) et les capucines plantés à proximité attirent les pollinisateurs et peuvent repousser certains nuisibles. Elle apprécie la compagnie de l\'origan qui aide à éloigner les insectes.'
+      grandmaRecipe: 'Elle apprécie la compagnie de l\'origan. C\'est une culture très gourmande, ne replantez pas de cucurbitacées (melon, courgette) au même endroit. Préférez des haricots ou des fèves pour la saison suivante afin de nourrir la terre.'
     }
   },
   {
@@ -236,7 +236,7 @@ export const semisData: Vegetable[] = [
       soilFertilizer: 'Sol léger, sableux et bien drainé. N\'aime pas les excès d\'azote qui favorisent le feuillage au détriment des tubercules.',
       pests: 'Charançons de la patate douce, rats.',
       grandmaRecipe:
-        'Son feuillage dense est un excellent couvre-sol qui limite les mauvaises herbes. Plantez-la avec des haricots nains ou de l\'origan. Évitez la proximité des courges qui peuvent entrer en compétition avec elle.',
+        'Son feuillage dense est un excellent couvre-sol. Après la récolte, le sol est propre et ameubli. C\'est l\'occasion de planter des légumes-feuilles comme des salades ou des brèdes qui profiteront de la terre légère.',
     },
   },
   {
@@ -252,7 +252,7 @@ export const semisData: Vegetable[] = [
       watering: 'Arrosage modéré mais régulier. Laisser la terre sécher légèrement entre deux arrosages.',
       soilFertilizer: 'Sol bien drainé, pas trop riche. Un excès d\'engrais favorise le feuillage au détriment des fruits.',
       pests: 'Pucerons et aleurodes.',
-      grandmaRecipe: 'Le basilic planté à proximité peut améliorer la croissance et la saveur des piments, tout en repoussant pucerons et acariens. La consoude utilisée en paillage se décompose en un excellent fertilisant naturel, riche en potasse.'
+      grandmaRecipe: 'Le basilic près des piments peut améliorer leur saveur. Comme le piment peut rester en place plusieurs années, il n\'est pas nécessaire de faire une rotation immédiate, mais pensez à nourrir le sol avec du compost chaque année.'
     }
   },
   {
@@ -268,7 +268,7 @@ export const semisData: Vegetable[] = [
       watering: 'Arrosage régulier lors de la formation des tubercules, mais sans excès pour éviter les maladies.',
       soilFertilizer: 'Sol riche et bien ameubli. Apprécie un bon apport de compost.',
       pests: 'Mildiou, doryphores (moins présents en NC).',
-      grandmaRecipe: 'Les haricots nains plantés entre les rangs enrichissent le sol en azote. L\'œillet d\'Inde (tagète) est réputé pour éloigner les nématodes et doryphores. Évitez la proximité des tomates et des courges.'
+      grandmaRecipe: 'Associez-la avec des haricots nains. Après avoir récolté les pommes de terre, le sol est bien meuble. C\'est parfait pour semer ensuite des carottes, des radis ou des salades. Ne replantez pas de tomates ou d\'aubergines (même famille).'
     }
   },
   {
@@ -287,7 +287,7 @@ export const semisData: Vegetable[] = [
       soilFertilizer: 'Sol léger, humifère et frais. Un bon compost suffit.',
       pests: 'Limaces et escargots.',
       grandmaRecipe:
-        'Les radis semés à proximité ont un cycle court et seront récoltés avant que la salade ne prenne toute la place. Le souci et le basilic aident à éloigner les nuisibles, tandis que les haricots à proximité lui fourniront de l\'azote. Évitez le persil.',
+        'Les radis semés à proximité ont un cycle court et seront récoltés avant que la salade ne prenne toute la place. La salade est une culture "légère", elle peut être suivie par presque n\'importe quel légume. C\'est une bonne culture pour commencer un cycle de rotation.',
     },
   },
   {
@@ -303,7 +303,7 @@ export const semisData: Vegetable[] = [
       watering: 'Nécessite beaucoup d\'eau, le sol ne doit jamais sécher. L\'irrigation par inondation est parfois pratiquée.',
       soilFertilizer: 'Sol très riche en matière organique, vaseux. Apprécie un bon paillage de feuilles.',
       pests: 'Doryphores du taro, pourriture des tubercules en cas de mauvais drainage.',
-      grandmaRecipe: 'Le taro prospère dans un écosystème riche. Les plantes de berge comme les fougères aident à maintenir l\'humidité. La jacinthe d\'eau, si elle est contrôlée, peut servir d\'engrais vert en surface.'
+      grandmaRecipe: 'Le taro est une culture exigeante qui structure son environnement humide. Après une culture de taro, la parcelle est très riche en matière organique. Il est bon de laisser le sol se reposer ou de planter d\'autres plantes de milieu humide qui ne sont pas des tubercules.'
     }
   },
   {
@@ -323,7 +323,7 @@ export const semisData: Vegetable[] = [
         'Sol riche, profond et bien drainé. Enrichir avec du compost bien mûr et un engrais spécial tomates.',
       pests: 'Mildiou, pucerons, aleurodes (mouches blanches), vers.',
       grandmaRecipe:
-        'L\'association avec le basilic et l\'œillet d\'Inde (tagète) est un classique pour repousser les nuisibles (pucerons, nématodes). Plantez des carottes ou du céleri à proximité, mais évitez les pommes de terre qui partagent les mêmes maladies (mildiou).',
+        'L\'association avec le basilic et l\'œillet d\'Inde (tagète) est un classique. La tomate est très gourmande. Après la récolte, il est indispensable de nourrir le sol. Le mieux est de planter un engrais vert (légumineuses, phacélie) que vous faucherez avant qu\'il ne monte en graines.',
     },
   },
 ];
