@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   CloudMoon,
   CloudSun,
@@ -82,20 +82,36 @@ const WindArrowIcon = ({ direction }: { direction: WindDirection }) => {
 };
 
 export function WeatherForecast({ weather }: { weather: WeatherData }) {
-  const [selectedIndex, setSelectedIndex] = useState(2); // Start with a forecast a few hours ahead
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [isClient, setIsClient] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // When date changes from context, we might want to reset the view.
-  // The current implementation uses index 2. This might be out of bounds if weather.hourly is short.
   useEffect(() => {
-    if (selectedIndex >= weather.hourly.length) {
-      setSelectedIndex(Math.max(0, weather.hourly.length - 1));
-    }
-  }, [weather.hourly, selectedIndex]);
+    // When weather data changes, find the index for 12:00 PM.
+    const noonIndex = weather.hourly.findIndex(
+      (forecast) => new Date(forecast.date).getHours() === 12
+    );
+
+    const targetIndex = noonIndex !== -1 ? noonIndex : 0;
+    setSelectedIndex(targetIndex);
+
+    // Scroll to the selected index instantly
+    setTimeout(() => {
+      if (listRef.current) {
+        const itemElement = listRef.current.children[targetIndex] as HTMLElement;
+        if (itemElement) {
+          itemElement.scrollIntoView({
+            behavior: 'auto',
+            block: 'nearest',
+          });
+        }
+      }
+    }, 0);
+  }, [weather]); // Re-run when weather data (i.e., the selected day) changes.
 
   const selectedForecast = weather.hourly[selectedIndex];
 
@@ -151,7 +167,7 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
       </div>
 
       <div className="max-h-[260px] overflow-y-auto">
-        <div className="flex flex-col">
+        <div className="flex flex-col" ref={listRef}>
           {weather.hourly.slice(0, 24).map((forecast, index) => (
             <div
               key={index}
