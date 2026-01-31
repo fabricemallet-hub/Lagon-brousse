@@ -25,23 +25,22 @@ export default function ComptePage() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
   const handleSubscribe = () => {
-    if (!userDocRef) return;
-    
-    // Simulate subscription since a real payment gateway for NC is not available
-    const now = new Date();
-    const expiryDate = new Date(now);
-    expiryDate.setMonth(expiryDate.getMonth() + 1);
+    const paypalLink = process.env.NEXT_PUBLIC_PAYPAL_LINK;
 
-    setDocumentNonBlocking(userDocRef, {
-        subscriptionStatus: 'active',
-        subscriptionStartDate: now.toISOString(),
-        subscriptionExpiryDate: expiryDate.toISOString(),
-    }, { merge: true });
-    
-    toast({
-        title: "Abonnement activé (simulation)",
-        description: "Vous avez maintenant accès à toutes les fonctionnalités.",
-    });
+    if (paypalLink) {
+      toast({
+        title: 'Redirection vers PayPal',
+        description: "Vous allez être redirigé pour finaliser votre abonnement.",
+      });
+      window.location.href = paypalLink;
+    } else {
+      console.error("La variable d'environnement NEXT_PUBLIC_PAYPAL_LINK n'est pas définie.");
+      toast({
+        variant: "destructive",
+        title: "Configuration requise",
+        description: "Le lien de paiement n'est pas configuré. Veuillez contacter l'administrateur.",
+      });
+    }
   };
 
   const handleCancel = () => {
