@@ -80,6 +80,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [trialEndDate, setTrialEndDate] = useState<Date | null>(null);
 
+  const isAuthPage = pathname === '/login' || pathname === '/signup';
+
   useEffect(() => {
     if (isUserLoading || isProfileLoading) {
       setStatus('loading');
@@ -174,6 +176,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [timeLeft, status, auth, toast, router, isLoggingOut]);
 
+  if (isAuthPage) {
+    return <>{children}</>;
+  }
+  
   const handleLogout = async () => {
     if (!auth) return;
     await signOut(auth);
