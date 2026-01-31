@@ -102,7 +102,7 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
     // Scroll to the selected index instantly
     setTimeout(() => {
       if (listRef.current) {
-        const itemElement = listRef.current.children[targetIndex] as HTMLElement;
+        const itemElement = listRef.current.querySelector(`[data-index="${targetIndex}"]`) as HTMLElement;
         if (itemElement) {
           itemElement.scrollIntoView({
             behavior: 'auto',
@@ -168,40 +168,47 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
 
       <div className="max-h-[260px] overflow-y-auto">
         <div className="flex flex-col" ref={listRef}>
-          {weather.hourly.slice(0, 24).map((forecast, index) => (
-            <div
-              key={index}
-              onClick={() => setSelectedIndex(index)}
-              className={cn(
-                'flex items-center justify-between p-3 cursor-pointer border-b last:border-b-0',
-                selectedIndex === index
-                  ? 'bg-blue-100'
-                  : 'bg-card hover:bg-muted/50'
-              )}
-            >
-              <div className="flex items-center gap-3">
-                <WeatherConditionIcon
-                  condition={forecast.condition}
-                  isNight={forecast.isNight}
-                  className="size-6"
-                />
-                <p className="font-bold w-12">
-                  {format(new Date(forecast.date), "HH'h'", { locale: fr })}
-                </p>
-              </div>
-              <div className="flex items-center gap-4 text-sm">
-                <p className="font-semibold w-8 text-center">
-                  {forecast.temp}°
-                </p>
-                <div className="flex items-center gap-1 w-20 justify-end">
-                  <WindArrowIcon direction={forecast.windDirection} />
-                  <p className="text-xs font-semibold">
-                    {forecast.windSpeed} km/h
+          {weather.hourly.slice(0, 24).map((forecast, index) => {
+            const hour = new Date(forecast.date).getHours();
+            if (hour < 11 || hour > 14) {
+              return null;
+            }
+            return (
+              <div
+                key={index}
+                data-index={index}
+                onClick={() => setSelectedIndex(index)}
+                className={cn(
+                  'flex items-center justify-between p-3 cursor-pointer border-b last:border-b-0',
+                  selectedIndex === index
+                    ? 'bg-blue-100'
+                    : 'bg-card hover:bg-muted/50'
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <WeatherConditionIcon
+                    condition={forecast.condition}
+                    isNight={forecast.isNight}
+                    className="size-6"
+                  />
+                  <p className="font-bold w-12">
+                    {format(new Date(forecast.date), "HH'h'", { locale: fr })}
                   </p>
                 </div>
+                <div className="flex items-center gap-4 text-sm">
+                  <p className="font-semibold w-8 text-center">
+                    {forecast.temp}°
+                  </p>
+                  <div className="flex items-center gap-1 w-20 justify-end">
+                    <WindArrowIcon direction={forecast.windDirection} />
+                    <p className="text-xs font-semibold">
+                      {forecast.windSpeed} km/h
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
