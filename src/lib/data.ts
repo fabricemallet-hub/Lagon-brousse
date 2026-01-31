@@ -130,7 +130,15 @@ const noumeaData: LocationData = {
 const data: Record<string, LocationData> = {
   Bélep: noumeaData,
   Boulouparis: noumeaData,
-  Bourail: noumeaData,
+  Bourail: {
+    ...noumeaData,
+    tides: [
+      { type: 'basse', time: '02:05', height: 0.25, current: 'Modéré' },
+      { type: 'haute', time: '08:55', height: 1.62, current: 'Fort' },
+      { type: 'basse', time: '15:10', height: 0.59, current: 'Modéré' },
+      { type: 'haute', time: '20:40', height: 1.32, current: 'Fort' },
+    ],
+  },
   Canala: noumeaData,
   Dumbéa: noumeaData,
   Farino: noumeaData,
