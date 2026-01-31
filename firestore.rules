@@ -13,8 +13,9 @@
  *
  * Key Security Decisions:
  * - User Isolation: A user can only interact with their own document at /users/{userId}.
- * - No User Listing: Listing the entire /users collection is explicitly disallowed to 
+ * - No User Listing for non-admins: Listing the entire /users collection is explicitly disallowed for normal users to 
  *   protect user privacy and prevent data scraping.
+ * - Admin Listing: The administrator is allowed to list users for statistical purposes.
  * - Public Read-Only Data: The /locations collection is globally readable but not writable
  *   by clients, making it suitable for shared, static application data.
  * - Default Secure: The default security posture for any path not explicitly defined is to deny all access.
@@ -43,6 +44,14 @@ service cloud.firestore {
      */
     function isSignedIn() {
       return request.auth != null;
+    }
+    
+    /**
+     * Checks if the current authenticated user is an administrator.
+     * This is based on a hardcoded email address.
+     */
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == 'f.mallet@gmail.com';
     }
 
     /**
@@ -96,7 +105,7 @@ service cloud.firestore {
      */
     match /users/{userId} {
       allow get: if isOwner(userId);
-      allow list: if false;
+      allow list: if isAdmin();
       allow create: if isCreatingOwnAccount(userId);
       allow update: if isMaintainingOwnAccount(userId);
       allow delete: if isExistingOwner(userId);
