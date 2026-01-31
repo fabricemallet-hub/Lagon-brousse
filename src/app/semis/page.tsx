@@ -21,7 +21,7 @@ import {
   Bug,
   BookHeart,
   Calendar,
-  PackageHarvest,
+  Wheat,
   MapPin,
 } from 'lucide-react';
 
@@ -84,7 +84,7 @@ export default function SemisPage() {
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <PackageHarvest className="size-5 text-accent mt-1" />
+                      <Wheat className="size-5 text-accent mt-1" />
                        <div>
                         <h4 className="font-semibold">Périodes de Récolte</h4>
                         <ul className="text-sm text-muted-foreground list-disc pl-5">
