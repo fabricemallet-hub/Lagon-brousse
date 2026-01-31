@@ -103,10 +103,11 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       getDoc(userDocRef).then(docSnap => {
         if (!docSnap.exists()) {
           const { uid, email } = user;
+          const isAdmin = email === 'f.mallet@gmail.com';
           const newUserAccount: UserAccount = {
             id: uid,
             email: email || '',
-            subscriptionStatus: 'active',
+            subscriptionStatus: isAdmin ? 'admin' : 'active',
             favoriteLocationIds: [],
           };
           setDocumentNonBlocking(userDocRef, newUserAccount, { merge: false });

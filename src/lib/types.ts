@@ -126,7 +126,7 @@ export interface LocationData {
 export interface UserAccount {
   id: string;
   email: string;
-  subscriptionStatus: 'active' | 'inactive' | 'trial';
+  subscriptionStatus: 'active' | 'inactive' | 'trial' | 'admin';
   subscriptionStartDate?: string;
   subscriptionExpiryDate?: string;
   favoriteLocationIds: string[];

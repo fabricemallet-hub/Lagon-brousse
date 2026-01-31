@@ -17,7 +17,7 @@
         },
         "subscriptionStatus": {
           "type": "string",
-          "description": "The current subscription status of the user (e.g., 'active', 'inactive', 'trial')."
+          "description": "The current subscription status of the user (e.g., 'active', 'inactive', 'trial', 'admin')."
         },
         "subscriptionStartDate": {
           "type": "string",

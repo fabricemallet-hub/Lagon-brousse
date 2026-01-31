@@ -44,9 +44,12 @@ import { Calendar } from './ui/calendar';
 import { format, addDays, subDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import Link from 'next/link';
-import { useUser, useAuth } from '@/firebase';
+import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { Skeleton } from './ui/skeleton';
 import { signOut } from 'firebase/auth';
+import { doc } from 'firebase/firestore';
+import type { UserAccount } from '@/lib/types';
+
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { locations, selectedLocation, setSelectedLocation } = useLocation();
@@ -56,6 +59,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
+  const firestore = useFirestore();
+
+  const userDocRef = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [user, firestore]);
+
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
   const handleLogout = async () => {
     if (!auth) return;
@@ -75,7 +86,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     ['/', '/lagon', '/peche', '/champs', '/chasse'].includes(pathname);
 
   const renderUserMenu = () => {
-    if (isUserLoading) {
+    if (isUserLoading || (user && isProfileLoading)) {
       return (
         <div className="flex items-center gap-3 p-2">
           <Skeleton className="h-8 w-8 rounded-full" />
@@ -99,6 +110,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </Button>
       );
     }
+    
+    const userStatus = userProfile?.subscriptionStatus === 'admin' ? 'Admin' : 'Gratuit';
 
     return (
       <DropdownMenu>
@@ -116,7 +129,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Avatar>
             <div className="text-left group-data-[collapsible=icon]:hidden">
               <p className="font-medium text-sm truncate" title={user.email!}>{user.email}</p>
-              <p className="text-xs text-muted-foreground">Gratuit</p>
+              <p className="text-xs text-muted-foreground">{userStatus}</p>
             </div>
           </Button>
         </DropdownMenuTrigger>
