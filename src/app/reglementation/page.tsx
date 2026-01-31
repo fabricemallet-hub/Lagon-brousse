@@ -49,12 +49,12 @@ const huntingCalendarData = [
   {
     name: 'Notou',
     allowed: [3], // Avril
-    details: 'Chasse ouverte uniquement les week-ends d\'avril. Quota : 5/chasseur/jour. Vente interdite. Transport autorisé les week-ends de chasse jusqu\'au lundi midi.',
+    details: 'Chasse ouverte uniquement les week-ends d\'avril. Quota : 5/chasseur/jour.',
   },
   {
     name: 'Roussette',
-    allowed: [3, 4, 5], // Avril, Mai, Juin
-    details: 'Chasse autorisée les samedis et dimanches d\'avril à juin. Quota : 5/chasseur/jour. Vente interdite. Transport autorisé les week-ends de chasse jusqu\'au lundi midi.',
+    allowed: [3], // Avril
+    details: 'Chasse autorisée uniquement les week-ends du mois d\'avril. Quota : 5/chasseur/jour.',
   },
   {
     name: 'Gibier d\'eau (Canards, Sarcelle)',
