@@ -19,7 +19,14 @@ import {
 } from './ui/dropdown-menu';
 import { AppLogo } from './icons';
 import { SidebarNav } from './sidebar-nav';
-import { LogOut, Settings, Zap } from 'lucide-react';
+import {
+  LogOut,
+  Settings,
+  Zap,
+  ChevronLeft,
+  ChevronRight,
+  Calendar as CalendarIcon,
+} from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -32,11 +39,27 @@ import { useCalendarView } from '@/context/calendar-view-context';
 import { Switch } from './ui/switch';
 import { Label } from './ui/label';
 import { usePathname } from 'next/navigation';
+import { useDate } from '@/context/date-context';
+import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
+import { Calendar } from './ui/calendar';
+import { format, addDays, subDays } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { locations, selectedLocation, setSelectedLocation } = useLocation();
   const { calendarView, setCalendarView } = useCalendarView();
+  const { selectedDate, setSelectedDate } = useDate();
   const pathname = usePathname();
+
+  const handlePrevDay = () => {
+    setSelectedDate(subDays(selectedDate, 1));
+  };
+
+  const handleNextDay = () => {
+    setSelectedDate(addDays(selectedDate, 1));
+  };
+
+  const showDayNavigator = ['/lagon', '/peche', '/champs'].includes(pathname);
 
   return (
     <SidebarProvider>
@@ -62,23 +85,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 className="w-full justify-start h-12 p-2 gap-3"
               >
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src="https://picsum.photos/seed/123/40/40" data-ai-hint="person avatar" />
+                  <AvatarImage
+                    src="https://picsum.photos/seed/123/40/40"
+                    data-ai-hint="person avatar"
+                  />
                   <AvatarFallback>U</AvatarFallback>
                 </Avatar>
                 <div className="text-left group-data-[collapsible=icon]:hidden">
                   <p className="font-medium text-sm">Utilisateur</p>
-                  <p className="text-xs text-muted-foreground">
-                    Gratuit
-                  </p>
+                  <p className="text-xs text-muted-foreground">Gratuit</p>
                 </div>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="end" forceMount>
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">
-                    Compte
-                  </p>
+                  <p className="text-sm font-medium leading-none">Compte</p>
                   <p className="text-xs leading-none text-muted-foreground">
                     utilisateur@email.com
                   </p>
@@ -105,28 +127,85 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main className="flex-1">
         <header className="flex h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30">
           <SidebarTrigger className="shrink-0 md:hidden" />
-          <div className="w-full flex-1 flex items-center gap-4">
-            <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Choisir une commune" />
-              </SelectTrigger>
-              <SelectContent>
-                {locations.map((loc) => (
-                  <SelectItem key={loc} value={loc}>
-                    {loc}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="w-full flex-1 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Select
+                value={selectedLocation}
+                onValueChange={setSelectedLocation}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Choisir une commune" />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.map((loc) => (
+                    <SelectItem key={loc} value={loc}>
+                      {loc}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {showDayNavigator && (
+                <div className="flex items-center gap-1 rounded-md border p-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={handlePrevDay}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={'outline'}
+                        className="w-[180px] justify-start text-left font-normal h-8"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {format(selectedDate, 'PPP', { locale: fr })}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={(date) => date && setSelectedDate(date)}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={handleNextDay}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+
             {pathname === '/calendrier' && (
               <div className="flex items-center space-x-2">
-                <Label htmlFor="calendar-view" className="text-sm font-medium">Pêche</Label>
+                <Label
+                  htmlFor="calendar-view"
+                  className="text-sm font-medium"
+                >
+                  Pêche
+                </Label>
                 <Switch
                   id="calendar-view"
                   checked={calendarView === 'champs'}
-                  onCheckedChange={(checked) => setCalendarView(checked ? 'champs' : 'peche')}
+                  onCheckedChange={(checked) =>
+                    setCalendarView(checked ? 'champs' : 'peche')
+                  }
                 />
-                <Label htmlFor="calendar-view" className="text-sm font-medium">Champs</Label>
+                <Label
+                  htmlFor="calendar-view"
+                  className="text-sm font-medium"
+                >
+                  Champs
+                </Label>
               </div>
             )}
           </div>
