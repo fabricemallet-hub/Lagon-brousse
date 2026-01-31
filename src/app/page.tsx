@@ -9,18 +9,12 @@ import {
 import { getDataForDate } from '@/lib/data';
 import {
   Waves,
-  Wind,
-  Sunrise,
-  Sunset,
-  Spade,
   Moon,
-  Sun,
-  Cloud,
-  CloudRain,
-  CloudSun,
+  Spade,
 } from 'lucide-react';
 import { useLocation } from '@/context/location-context';
 import { useDate } from '@/context/date-context';
+import { WeatherForecast } from '@/components/ui/weather-forecast';
 
 export default function Home() {
   const { selectedLocation } = useLocation();
@@ -37,21 +31,6 @@ export default function Home() {
     day: 'numeric',
   });
 
-  const WeatherTrendIcon = () => {
-    switch (weather.trend) {
-      case 'Ensoleillé':
-        return <Sun className="h-4 w-4" />;
-      case 'Nuageux':
-        return <Cloud className="h-4 w-4" />;
-      case 'Averses':
-        return <CloudRain className="h-4 w-4" />;
-      case 'Pluvieux':
-        return <CloudRain className="h-4 w-4" />;
-      default:
-        return <CloudSun className="h-4 w-4" />;
-    }
-  };
-
   return (
     <div className="flex flex-col gap-8">
       <div>
@@ -61,42 +40,10 @@ export default function Home() {
           <span className="font-semibold">{dateString}</span>.
         </p>
       </div>
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CloudSun className="size-5 text-primary" />
-              Météo du jour
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Tendance</span>
-              <span className="font-medium flex items-center gap-2">
-                {weather.trend}
-                <WeatherTrendIcon />
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Indice UV</span>
-              <span className="font-medium">{weather.uvIndex}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Vent</span>
-              <span className="font-medium">
-                {weather.wind[0].speed} nœuds ({weather.wind[0].direction})
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Houle (lagon)</span>
-              <span className="font-medium">{weather.swell.inside}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Houle (extérieur)</span>
-              <span className="font-medium">{weather.swell.outside}</span>
-            </div>
-          </CardContent>
-        </Card>
+
+      <WeatherForecast weather={weather} />
+
+      <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -138,46 +85,6 @@ export default function Home() {
                 Aujourd'hui est un bon jour pour :
               </span>
               <span className="font-medium">{farming.recommendation}</span>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="col-span-1 md:col-span-2 lg:col-span-3">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sunrise className="size-5 text-primary" />
-              Éphéméride
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <div className="flex items-center gap-2">
-              <Sunrise className="size-6 text-accent" />
-              <div>
-                <p className="text-sm text-muted-foreground">Lever du soleil</p>
-                <p className="font-medium">{weather.sun.sunrise}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Sunset className="size-6 text-accent" />
-              <div>
-                <p className="text-sm text-muted-foreground">
-                  Coucher du soleil
-                </p>
-                <p className="font-medium">{weather.sun.sunset}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Moon className="size-6 text-blue-300" />
-              <div>
-                <p className="text-sm text-muted-foreground">Lever de lune</p>
-                <p className="font-medium">{weather.moon.moonrise}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Moon className="size-6 text-slate-400" />
-              <div>
-                <p className="text-sm text-muted-foreground">Coucher de lune</p>
-                <p className="font-medium">{weather.moon.moonset}</p>
-              </div>
             </div>
           </CardContent>
         </Card>

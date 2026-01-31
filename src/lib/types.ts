@@ -7,6 +7,21 @@ export interface WindForecast {
   stability: 'Stable' | 'Tournant';
 }
 
+export interface HourlyForecast {
+  date: string; // ISO string
+  condition:
+    | 'Peu nuageux'
+    | 'Ensoleillé'
+    | 'Nuageux'
+    | 'Averses'
+    | 'Pluvieux'
+    | 'Nuit claire';
+  windSpeed: number; // km/h
+  windDirection: WindDirection;
+  isNight: boolean;
+  temp: number;
+}
+
 export interface WeatherData {
   wind: WindForecast[];
   swell: {
@@ -27,6 +42,10 @@ export interface WeatherData {
   rain: 'Aucune' | 'Fine' | 'Forte';
   trend: 'Ensoleillé' | 'Nuageux' | 'Averses' | 'Pluvieux';
   uvIndex: number;
+  temp: number;
+  tempMin: number;
+  tempMax: number;
+  hourly: HourlyForecast[];
 }
 
 export interface Tide {

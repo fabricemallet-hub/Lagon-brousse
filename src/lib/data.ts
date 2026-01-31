@@ -1,4 +1,4 @@
-import { LocationData, Tide, FishingSlot, FishRating, WindDirection, HuntingData, WindForecast } from './types';
+import { LocationData, Tide, FishingSlot, FishRating, WindDirection, HuntingData, WindForecast, HourlyForecast } from './types';
 
 const noumeaData: LocationData = {
   weather: {
@@ -25,6 +25,10 @@ const noumeaData: LocationData = {
     rain: 'Aucune',
     trend: 'Ensoleillé',
     uvIndex: 7,
+    temp: 26,
+    tempMin: 23,
+    tempMax: 33,
+    hourly: [],
   },
   tides: [
     { type: 'basse', time: '04:15', height: 0.4, current: 'Modéré' },
@@ -376,6 +380,54 @@ export function getDataForDate(location: string, date?: Date): LocationData {
   } else {
       locationData.hunting.advice.scent = 'Le vent tournant rend la gestion des odeurs très difficile. Redoublez de prudence.';
   }
+
+    // Generate Hourly Forecasts
+    locationData.weather.hourly = [];
+    const startDate = new Date(effectiveDate);
+    startDate.setMinutes(0,0,0);
+    
+    const baseTempMin = 22 + (locationSeed % 5);
+    const baseTempMax = baseTempMin + 8 + (locationSeed % 3);
+
+    for (let i = -2; i < 48; i++) { // next 48 hours
+        const forecastDate = new Date(startDate.getTime() + i * 60 * 60 * 1000);
+        const hour = forecastDate.getHours();
+        const isNight = hour < 6 || hour > 19;
+        
+        const tempVariation = Math.sin((hour / 24) * Math.PI * 2 - Math.PI/2); // Sin wave for temp over 24h
+        const temp = Math.round(baseTempMin + ((baseTempMax - baseTempMin) / 2) * (1 + tempVariation) + Math.sin(dateSeed+i/2)*2);
+
+        const directions: WindDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+        const windDirection = directions[Math.floor((dateSeed/2 + hour/3 + locationSeed/100) % directions.length)];
+        const windSpeed = Math.round(5 + Math.abs(Math.sin(dateSeed + hour/4 + locationSeed/1000)) * 25);
+
+        let condition : HourlyForecast['condition'] = 'Ensoleillé';
+        const conditionSeed = (Math.cos(dateSeed * 0.5 + i * 0.2 + locationSeed) + 1) / 2;
+        if (isNight) {
+            condition = conditionSeed > 0.6 ? 'Nuit claire' : 'Peu nuageux';
+        } else {
+            if (conditionSeed > 0.8) condition = 'Ensoleillé';
+            else if (conditionSeed > 0.4) condition = 'Peu nuageux';
+            else if (conditionSeed > 0.2) condition = 'Nuageux';
+            else condition = 'Averses';
+        }
+
+
+        locationData.weather.hourly.push({
+            date: forecastDate.toISOString(),
+            condition: condition,
+            windSpeed: windSpeed,
+            windDirection: windDirection,
+            isNight: isNight,
+            temp: temp,
+        });
+    }
+
+    const currentHourForecast = locationData.weather.hourly.find(f => new Date(f.date).getHours() === effectiveDate.getHours());
+    locationData.weather.temp = currentHourForecast?.temp ?? baseData.weather.temp;
+    locationData.weather.tempMin = Math.min(...locationData.weather.hourly.slice(0,24).map(f => f.temp));
+    locationData.weather.tempMax = Math.max(...locationData.weather.hourly.slice(0,24).map(f => f.temp));
+
 
   return locationData;
 }
