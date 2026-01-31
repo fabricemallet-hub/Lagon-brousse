@@ -1,13 +1,13 @@
 {
-  "name": "Marées et Terroir Calédonien",
-  "short_name": "Lagon & Brousse",
-  "description": "Votre guide pour la mer et la terre en Nouvelle-Calédonie.",
+  "name": "Lagon & Brousse NC",
+  "short_name": "Lagon&Brousse",
   "start_url": "/",
+  "id": "/?source=pwa",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#3b82f6",
-  "orientation": "portrait-primary",
-  "id": "/?homescreen=1",
+  "background_color": "#228be6",
+  "theme_color": "#228be6",
+  "orientation": "any",
+  "description": "Votre guide complet pour la mer et la terre en Nouvelle-Calédonie : marées, pêche, chasse, et jardinage lunaire.",
   "icons": [
     {
       "src": "icon-192x192.png",
@@ -24,16 +24,18 @@
   ],
   "screenshots": [
     {
-      "src": "https://picsum.photos/seed/screenshot1/540/720",
+      "src": "https://picsum.photos/seed/screenshot1/1080/2340",
+      "sizes": "1080x2340",
       "type": "image/jpeg",
-      "sizes": "540x720",
-      "form_factor": "narrow"
+      "form_factor": "narrow",
+      "label": "Page d'accueil"
     },
     {
-      "src": "https://picsum.photos/seed/screenshot2/720/540",
+      "src": "https://picsum.photos/seed/screenshot2/1080/2340",
+      "sizes": "1080x2340",
       "type": "image/jpeg",
-      "sizes": "720x540",
-      "form_factor": "wide"
+      "form_factor": "narrow",
+      "label": "Calendrier de pêche"
     }
   ]
 }

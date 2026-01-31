@@ -214,21 +214,20 @@ function DayCell({
     <div
       onClick={() => onDateSelect(day)}
       className={cn(
-        'h-32 md:h-36 border-t border-l p-1 flex flex-col cursor-pointer hover:bg-accent/50 relative group',
+        'h-40 border-t border-l p-1 flex flex-col cursor-pointer hover:bg-accent/50 relative group min-w-24',
         !isCurrentMonth && 'bg-muted/30 text-muted-foreground',
         isSelected && 'ring-2 ring-primary z-10',
         (getDay(day) + 6) % 7 === 0 && 'border-l-0'
       )}
     >
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-1 text-muted-foreground">
-          <MoonPhaseIcon phase={data.weather.moon.phase} />
-          <span className="text-[10px] font-mono">
-            {data.weather.moon.percentage}%
-          </span>
+      <div className="flex justify-between items-start">
+        <div className="flex items-center gap-1 text-muted-foreground text-xs">
+          <MoonPhaseIcon phase={data.weather.moon.phase} className="size-3"/>
+          <span className="font-mono">{data.weather.moon.percentage}%</span>
         </div>
-        <div className="font-semibold text-sm">{format(day, 'd')}</div>
+        <div className="font-bold text-sm text-right">{format(day, 'd')}</div>
       </div>
+
 
       {eventTexts.length > 0 && (
         <div className="text-[10px] text-center text-accent font-semibold truncate leading-tight my-0.5">
@@ -237,74 +236,59 @@ function DayCell({
       )}
 
       {calendarView === 'peche' ? (
-        <>
+        <div className="flex-grow flex flex-col justify-between pt-1">
           <div className="flex-grow flex items-center justify-center gap-0.5">
             {fishIcons}
             {data.pelagicInfo?.inSeason && (Math.sin(day.getDate()) + 1) / 2 > 0.7 && (
                 <Fish className="size-3 text-accent glow" title="Bon pour les pélagiques" />
             )}
           </div>
-          <div className="grid grid-cols-2 gap-x-1 text-[10px] font-mono text-muted-foreground">
-            {tides.map((tide, i) => (
-              <span key={i} className="text-center">
-                {tide.type === 'haute' ? 'H' : 'B'}: {tide.height.toFixed(2)}m
-              </span>
+          <div className="space-y-0.5 text-[10px] font-mono text-muted-foreground text-center">
+            {tides.slice(0, 2).map((tide, i) => (
+                <div key={i}>
+                    <span>{tide.type === 'haute' ? 'H' : 'B'}: {tide.height.toFixed(2)}m</span>
+                </div>
             ))}
           </div>
-        </>
+        </div>
       ) : (
-        <div className="flex-grow flex flex-col items-start justify-start gap-0.5 overflow-hidden w-full pt-1 px-1">
-          <div className="flex items-center gap-1">
-            {GardeningIcon && <GardeningIcon className="size-4 text-primary" />}
+        <div className="flex-grow flex flex-col items-start justify-start gap-1 w-full pt-1 overflow-y-auto">
+          <div className="flex items-center gap-1.5">
+            {GardeningIcon && <GardeningIcon className="size-3.5 text-primary" />}
             <p className="text-xs text-muted-foreground font-semibold">
               {zodiac}
             </p>
           </div>
 
-          <div className="space-y-0.5 text-[10px] font-semibold leading-tight self-stretch mt-1">
+          <div className="space-y-1 text-xs font-semibold self-stretch">
             {isGoodForPruning && (
-              <div
-                className="flex items-center gap-1 text-orange-600"
-                title="Taille des arbres et arbustes"
-              >
+              <div className="flex items-center gap-1.5 text-orange-600" title="Taille des arbres et arbustes">
                 <Scissors className="size-3 shrink-0" />
                 <span>Taille</span>
               </div>
             )}
             {isGoodForCuttings && (
-              <div
-                className="flex items-center gap-1 text-pink-600"
-                title="Bouturage"
-              >
+              <div className="flex items-center gap-1.5 text-pink-600" title="Bouturage">
                 <RefreshCw className="size-3 shrink-0" />
-                <span>Bouturage</span>
+                <span>Bouture</span>
               </div>
             )}
             {isGoodForMowing && (
-              <div
-                className="flex items-center gap-1 text-green-600"
-                title="Tonte du gazon"
-              >
+              <div className="flex items-center gap-1.5 text-green-600" title="Tonte du gazon">
                 <Scissors className="size-3 shrink-0" />
                 <span>Tonte</span>
               </div>
             )}
             {sow.length > 0 && (
-              <div
-                className="flex items-center gap-1 text-blue-600"
-                title={`Semer: ${sow.join(', ')}`}
-              >
+              <div className="flex items-center gap-1.5 text-blue-600" title={`Semer: ${sow.join(', ')}`}>
                 <Sprout className="size-3 shrink-0" />
-                <span className="truncate">Semis: {sow[0]}</span>
+                <span className="truncate">Semis</span>
               </div>
             )}
             {harvest.length > 0 && (
-              <div
-                className="flex items-center gap-1 text-purple-600"
-                title={`Récolter: ${harvest.join(', ')}`}
-              >
+              <div className="flex items-center gap-1.5 text-purple-600" title={`Récolter: ${harvest.join(', ')}`}>
                 <Wheat className="size-3 shrink-0" />
-                <span className="truncate">Récolte: {harvest[0]}</span>
+                <span className="truncate">Récolte</span>
               </div>
             )}
           </div>
@@ -674,20 +658,23 @@ export function LunarCalendar() {
               key={day}
               className="text-center text-xs sm:text-sm font-medium text-muted-foreground p-1 sm:p-2 border-l first:border-l-0"
             >
-              {day.substring(0, 3)}
+              <span className="hidden sm:inline">{day}</span>
+              <span className="sm:hidden">{day.substring(0, 3)}</span>
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-7">
-          {days.map((day) => (
-            <DayCell
-              key={day.toString()}
-              day={day}
-              isCurrentMonth={isSameMonth(day, displayDate)}
-              isSelected={isSameDay(day, selectedDate)}
-              onDateSelect={handleDayClick}
-            />
-          ))}
+        <div className="overflow-x-auto">
+          <div className="grid grid-cols-7 min-w-[672px]">
+            {days.map((day) => (
+              <DayCell
+                key={day.toString()}
+                day={day}
+                isCurrentMonth={isSameMonth(day, displayDate)}
+                isSelected={isSameDay(day, selectedDate)}
+                onDateSelect={handleDayClick}
+              />
+            ))}
+          </div>
         </div>
       </div>
       {calendarView === 'champs' && <GardeningLegend />}
