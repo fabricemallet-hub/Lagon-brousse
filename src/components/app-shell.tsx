@@ -160,13 +160,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       toast({
         variant: 'destructive',
         title: 'Limite quotidienne atteinte',
-        description: 'Revenez demain ou passez à la version Full.',
+        description: 'Vous allez être déconnecté et redirigé.',
       });
       if (auth.currentUser) {
-        signOut(auth);
+        signOut(auth).then(() => {
+          router.push('/login');
+        });
+      } else {
+        router.push('/login');
       }
     }
-  }, [timeLeft, status, auth, toast]);
+  }, [timeLeft, status, auth, toast, router]);
 
   const handleLogout = async () => {
     if (!auth) return;
