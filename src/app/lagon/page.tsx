@@ -26,7 +26,7 @@ import type { WindDirection } from '@/lib/types';
 export default function LagonPage() {
   const { selectedLocation } = useLocation();
   const { selectedDate } = useDate();
-  const { weather, tides } = getDataForDate(selectedLocation, selectedDate);
+  const { weather, tides, tideStation } = getDataForDate(selectedLocation, selectedDate);
   
   const dateString = selectedDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
 
@@ -113,6 +113,9 @@ export default function LagonPage() {
       <Card>
         <CardHeader>
           <CardTitle>Marées et Courants</CardTitle>
+          <CardDescription>
+            Données de marée basées sur la station de {tideStation}.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-x-4 gap-y-2">

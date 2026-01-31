@@ -3,6 +3,7 @@
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -19,7 +20,7 @@ import { WeatherForecast } from '@/components/ui/weather-forecast';
 export default function Home() {
   const { selectedLocation } = useLocation();
   const { selectedDate } = useDate();
-  const { weather, tides, farming } = getDataForDate(
+  const { weather, tides, farming, tideStation } = getDataForDate(
     selectedLocation,
     selectedDate
   );
@@ -50,6 +51,9 @@ export default function Home() {
               <Waves className="size-5 text-primary" />
               Marées
             </CardTitle>
+            <CardDescription>
+              Données de marée de la station de {tideStation}.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {tides.map((tide, index) => (

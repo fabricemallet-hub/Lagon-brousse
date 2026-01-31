@@ -120,4 +120,5 @@ export interface LocationData {
   hunting: HuntingData;
   pelagicInfo?: PelagicInfo;
   crabAndLobster: CrabLobsterData;
+  tideStation: string;
 }
