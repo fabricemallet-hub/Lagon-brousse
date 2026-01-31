@@ -110,11 +110,16 @@ function DayCell({
 
   const currentPhase = data.weather.moon.phase;
   if (currentPhase !== prevData.weather.moon.phase) {
-    if (currentPhase === 'Premier quartier' || currentPhase === 'Dernier quartier') {
+    if (
+      currentPhase === 'Premier quartier' ||
+      currentPhase === 'Dernier quartier' ||
+      currentPhase === 'Pleine lune' ||
+      currentPhase === 'Nouvelle lune'
+    ) {
       eventTexts.push(currentPhase);
     }
   }
-  
+
   const currentTrend = data.farming.lunarPhase;
   if (currentTrend !== prevData.farming.lunarPhase) {
     eventTexts.push(currentTrend);
