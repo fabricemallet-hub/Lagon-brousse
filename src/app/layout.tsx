@@ -1,3 +1,4 @@
+
 import type { Metadata } from 'next';
 import { AppShell } from '@/components/app-shell';
 import { Toaster } from '@/components/ui/toaster';
@@ -47,6 +48,8 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap"
           rel="stylesheet"
         />
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#3b82f6" />
       </head>
       <body className={cn('font-body antialiased', 'min-h-screen bg-background font-sans')}>
         <Suspense fallback={<div>Chargement...</div>}>
