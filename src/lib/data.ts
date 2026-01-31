@@ -1,4 +1,4 @@
-import { LocationData } from './types';
+import { LocationData, Tide, FishingSlot, FishRating } from './types';
 
 const noumeaData: LocationData = {
   weather: {
@@ -316,9 +316,37 @@ const data: Record<string, LocationData> = {
 };
 
 export function getDataForDate(location: string, date?: Date): LocationData {
-  // NOTE: The date parameter is currently ignored. 
-  // In a real application, you would fetch or calculate data for the specific date.
-  return data[location] || data['Nouméa'];
+  const effectiveDate = date || new Date();
+  const dayOfMonth = effectiveDate.getDate();
+
+  // Create a deep copy to avoid modifying the original data object
+  const baseData = data[location] || data['Nouméa'];
+  const locationData = JSON.parse(JSON.stringify(baseData));
+
+  // Deterministically vary data based on the day of the month for prototype purposes
+  
+  // Vary tides slightly
+  locationData.tides.forEach((tide: Tide, i: number) => {
+    const variation = Math.sin((dayOfMonth + i) * 0.5) * 0.3;
+    tide.height = parseFloat(Math.max(0.2, tide.height + variation).toFixed(1));
+    const baseHour = parseInt(tide.time.split(':')[0]);
+    const newHour = (baseHour + Math.floor(Math.sin(dayOfMonth + i) * 2)) % 24;
+    tide.time = `${String(newHour < 0 ? 24 + newHour : newHour).padStart(2,'0')}:${tide.time.split(':')[1]}`;
+  });
+
+  // Vary moon phase
+  const phases = ['Nouvelle lune', 'Premier croissant', 'Premier quartier', 'Lune gibbeuse croissante', 'Pleine lune', 'Lune gibbeuse décroissante', 'Dernier quartier', 'Dernier croissant'];
+  const phaseIndex = Math.floor((dayOfMonth / 30) * 8) % 8;
+  locationData.weather.moon.phase = phases[phaseIndex];
+
+  // Vary fishing rating
+  locationData.fishing.forEach((slot: FishingSlot) => {
+    slot.fish.forEach((f: FishRating) => {
+      f.rating = Math.max(1, Math.min(10, ((f.rating + dayOfMonth * f.name.length) % 10) + 1));
+    });
+  });
+
+  return locationData;
 }
 
 export function getAvailableLocations(): string[] {
