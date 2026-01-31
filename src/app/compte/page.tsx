@@ -85,7 +85,7 @@ export default function ComptePage() {
       return <Button variant="destructive" onClick={handleCancel}>Résilier l'abonnement</Button>;
     }
     
-    return <Button onClick={handleSubscribe}>S'abonner pour 500 FCFP/mois</Button>;
+    return <Button onClick={handleSubscribe}>S'abonner pour 4.19 euro/mois</Button>;
   }
 
   if (isUserLoading || isProfileLoading) {
