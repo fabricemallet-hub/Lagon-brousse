@@ -1,29 +1,39 @@
 {
   "name": "Marées et Terroir Calédonien",
-  "short_name": "M&T Calédonien",
-  "description": "Votre guide pour la mer, la chasse et la terre en Nouvelle-Calédonie.",
-  "id": "/?source=pwa",
+  "short_name": "Lagon & Brousse",
+  "description": "Votre guide pour la mer et la terre en Nouvelle-Calédonie.",
   "start_url": "/",
   "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
   "orientation": "portrait-primary",
-  "background_color": "#f0f4f8",
-  "theme_color": "#2563eb",
+  "id": "/?homescreen=1",
   "icons": [
     {
-      "src": "/icon-192x192.png",
+      "src": "icon-192x192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
-      "src": "/icon-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    },
-    {
-      "src": "/icon-512x512.png",
+      "src": "icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "https://picsum.photos/seed/screenshot1/540/720",
+      "type": "image/jpeg",
+      "sizes": "540x720",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "https://picsum.photos/seed/screenshot2/720/540",
+      "type": "image/jpeg",
+      "sizes": "720x540",
+      "form_factor": "wide"
     }
   ]
 }

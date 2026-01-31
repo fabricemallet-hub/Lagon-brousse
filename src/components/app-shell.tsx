@@ -1,3 +1,4 @@
+
 'use client';
 import {
   Sidebar,
@@ -5,7 +6,6 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarProvider,
-  SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -26,6 +26,7 @@ import {
   Calendar as CalendarIcon,
   BookOpen,
   AlertCircle,
+  User,
 } from 'lucide-react';
 import {
   Select,
@@ -54,6 +55,7 @@ import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from './ui/badge';
 import { cn } from '@/lib/utils';
+import { BottomNav } from './bottom-nav';
 
 const USAGE_LIMIT_SECONDS = 60;
 
@@ -263,6 +265,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+           <DropdownMenuItem asChild>
+             <Link href="/compte" className="flex items-center w-full">
+              <User className="mr-2 h-4 w-4" />
+              <span>Gérer le compte</span>
+             </Link>
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={handleLogout}>
             <LogOut className="mr-2 h-4 w-4" />
             <span>Se déconnecter</span>
@@ -279,7 +287,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <SidebarHeader>
             <div className="flex items-center gap-3 p-2">
               <AppLogo className="size-8 text-primary" />
-              <h1 className="font-bold text-lg text-primary-foreground group-data-[collapsible=icon]:hidden">
+              <h1 className="font-bold text-lg group-data-[collapsible=icon]:hidden">
                 Lagon & Brousse
               </h1>
             </div>
@@ -304,7 +312,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             "flex h-auto min-h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30 py-2",
             status === 'limited' && 'mt-10'
           )}>
-            <SidebarTrigger className="shrink-0 md:hidden" />
+            
             <div className="w-full flex-1 flex items-center justify-between flex-wrap gap-y-2">
               <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
                 {status === 'trial' && <Badge variant="secondary">Version d'essai</Badge>}
@@ -399,10 +407,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </header>
           <div className={cn(
-            "flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6"
+            "flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 pb-24 md:pb-6"
           )}>
             {children}
           </div>
+          <BottomNav />
         </main>
       </SidebarProvider>
     </div>

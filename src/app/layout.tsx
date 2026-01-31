@@ -38,6 +38,7 @@ export default function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning>
       <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"
@@ -49,7 +50,8 @@ export default function RootLayout({
           rel="stylesheet"
         />
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#3b82f6" />
+        <meta name="theme-color" content="#3498db" />
+        <link rel="apple-touch-icon" href="/icon-192x192.png" />
       </head>
       <body className={cn('font-body antialiased', 'min-h-screen bg-background font-sans')}>
         <Suspense fallback={<div>Chargement...</div>}>
