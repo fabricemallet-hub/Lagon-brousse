@@ -2,20 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  type CarouselApi,
-} from '@/components/ui/carousel';
-import {
   CloudMoon,
   CloudSun,
   Sun,
   Thermometer,
   Cloud,
   CloudRain,
-  ChevronLeft,
-  ChevronRight,
   ArrowRight,
   Moon,
 } from 'lucide-react';
@@ -23,7 +15,6 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { WeatherData, HourlyForecast, WindDirection } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { Button } from './button';
 import { Skeleton } from './skeleton';
 
 const WeatherConditionIcon = ({
@@ -91,29 +82,20 @@ const WindArrowIcon = ({ direction }: { direction: WindDirection }) => {
 };
 
 export function WeatherForecast({ weather }: { weather: WeatherData }) {
-  const [api, setApi] = React.useState<CarouselApi>();
-  const [selectedIndex, setSelectedIndex] = useState(2);
+  const [selectedIndex, setSelectedIndex] = useState(2); // Start with a forecast a few hours ahead
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
+  // When date changes from context, we might want to reset the view.
+  // The current implementation uses index 2. This might be out of bounds if weather.hourly is short.
   useEffect(() => {
-    if (!api) {
-      return;
+    if (selectedIndex >= weather.hourly.length) {
+      setSelectedIndex(Math.max(0, weather.hourly.length - 1));
     }
-    const onSelect = (api: CarouselApi) => {
-      setSelectedIndex(api.selectedScrollSnap());
-    };
-    api.on('select', onSelect);
-    api.scrollTo(selectedIndex, true);
-    onSelect(api);
-
-    return () => {
-      api.off('select', onSelect);
-    };
-  }, [api, selectedIndex]);
+  }, [weather.hourly, selectedIndex]);
 
   const selectedForecast = weather.hourly[selectedIndex];
 
@@ -121,39 +103,18 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
     return <Skeleton className="h-[380px] w-full rounded-lg" />;
   }
 
-  const handlePrev = () => api?.scrollPrev();
-  const handleNext = () => api?.scrollNext();
-
   return (
     <div className="rounded-lg border bg-card text-card-foreground shadow-sm overflow-hidden">
       <div className="bg-blue-600 text-white p-4 rounded-t-lg">
-        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-1 sm:gap-x-2 mb-4">
-          <Button
-            onClick={handlePrev}
-            variant="ghost"
-            size="icon"
-            className="text-white hover:bg-white/20 h-8 w-8"
-            disabled={!api?.canScrollPrev()}
-          >
-            <ChevronLeft className="size-5" />
-          </Button>
-          <h3 className="font-semibold text-sm sm:text-base capitalize text-center truncate">
+        <div className="text-center mb-4">
+          <h3 className="font-semibold text-base sm:text-lg capitalize truncate">
             {format(new Date(selectedForecast.date), "eeee dd MMMM 'à' HH'h'", {
               locale: fr,
             })}
           </h3>
-          <Button
-            onClick={handleNext}
-            variant="ghost"
-            size="icon"
-            className="text-white hover:bg-white/20 h-8 w-8"
-            disabled={!api?.canScrollNext()}
-          >
-            <ChevronRight className="size-5" />
-          </Button>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 items-center">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
           <div className="flex flex-col items-center justify-center text-center">
             <WeatherConditionIcon
               condition={selectedForecast.condition}
@@ -164,23 +125,23 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
               {selectedForecast.condition}
             </p>
           </div>
-          <div className="flex flex-col items-center justify-center">
-            <WindArrowIcon direction={selectedForecast.windDirection} />
-            <p className="font-bold text-lg mt-2">
-              {selectedForecast.windSpeed} km/h
-            </p>
+          <div className="flex flex-col items-center justify-center text-center">
+            <p className="font-bold text-5xl">{selectedForecast.temp}°</p>
+            <div className="flex items-center gap-2 mt-2">
+              <WindArrowIcon direction={selectedForecast.windDirection} />
+              <p className="font-semibold">
+                {selectedForecast.windSpeed} km/h
+              </p>
+            </div>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4 mt-6 text-sm">
           <div className="flex items-center gap-2">
             <Thermometer className="size-5" />
-            <div>
-              <p>Température : {selectedForecast.temp}°</p>
-              <p className="text-xs">
-                min/max : {weather.tempMin}° / {weather.tempMax}°
-              </p>
-            </div>
+            <p>
+              min/max : {weather.tempMin}° / {weather.tempMax}°
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <Sun className="size-5" />
@@ -189,50 +150,43 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
         </div>
       </div>
 
-      <div>
-        <Carousel
-          setApi={setApi}
-          opts={{
-            align: 'start',
-            slidesToScroll: 'auto',
-            startIndex: selectedIndex,
-          }}
-        >
-          <CarouselContent>
-            {weather.hourly.map((forecast, index) => (
-              <CarouselItem
-                key={index}
-                className="basis-1/3 sm:basis-1/4 md:basis-1/5 lg:basis-1/6"
-              >
-                <div
-                  onClick={() => api?.scrollTo(index)}
-                  className={cn(
-                    'flex flex-col items-center justify-between p-1 sm:p-2 h-full min-h-[130px] cursor-pointer rounded-md',
-                    selectedIndex === index
-                      ? 'bg-blue-100'
-                      : 'bg-card hover:bg-muted/50'
-                  )}
-                >
-                  <p className="text-[10px] uppercase text-muted-foreground text-center">
-                    {format(new Date(forecast.date), 'eee', { locale: fr })}
+      <div className="max-h-[260px] overflow-y-auto">
+        <div className="flex flex-col">
+          {weather.hourly.slice(0, 24).map((forecast, index) => (
+            <div
+              key={index}
+              onClick={() => setSelectedIndex(index)}
+              className={cn(
+                'flex items-center justify-between p-3 cursor-pointer border-b last:border-b-0',
+                selectedIndex === index
+                  ? 'bg-blue-100'
+                  : 'bg-card hover:bg-muted/50'
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <WeatherConditionIcon
+                  condition={forecast.condition}
+                  isNight={forecast.isNight}
+                  className="size-6"
+                />
+                <p className="font-bold w-12">
+                  {format(new Date(forecast.date), "HH'h'", { locale: fr })}
+                </p>
+              </div>
+              <div className="flex items-center gap-4 text-sm">
+                <p className="font-semibold w-8 text-center">
+                  {forecast.temp}°
+                </p>
+                <div className="flex items-center gap-1 w-20 justify-end">
+                  <WindArrowIcon direction={forecast.windDirection} />
+                  <p className="text-xs font-semibold">
+                    {forecast.windSpeed} km/h
                   </p>
-                  <p className="text-sm font-bold">
-                    {format(new Date(forecast.date), "HH'h'", { locale: fr })}
-                  </p>
-                  <WeatherConditionIcon
-                    condition={forecast.condition}
-                    isNight={forecast.isNight}
-                    className="my-1 sm:my-2 size-6 sm:size-7"
-                  />
-                  <div className="flex items-center flex-col gap-1 text-center">
-                    <WindArrowIcon direction={forecast.windDirection} />
-                    <p className="text-[10px] sm:text-xs font-semibold">{forecast.windSpeed} km/h</p>
-                  </div>
                 </div>
-              </CarouselItem>
-            ))}
-          </CarouselContent>
-        </Carousel>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
