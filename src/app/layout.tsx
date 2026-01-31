@@ -7,6 +7,7 @@ import { DateProvider } from '@/context/date-context';
 import { CalendarViewProvider } from '@/context/calendar-view-context';
 import './globals.css';
 import { Suspense } from 'react';
+import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 export const metadata: Metadata = {
   title: 'Marées et Terroir Calédonien',
@@ -16,13 +17,15 @@ export const metadata: Metadata = {
 
 function AppContent({ children }: { children: React.ReactNode }) {
   return (
-    <CalendarViewProvider>
-      <DateProvider>
-        <LocationProvider>
-          <AppShell>{children}</AppShell>
-        </LocationProvider>
-      </DateProvider>
-    </CalendarViewProvider>
+    <FirebaseClientProvider>
+      <CalendarViewProvider>
+        <DateProvider>
+          <LocationProvider>
+            <AppShell>{children}</AppShell>
+          </LocationProvider>
+        </DateProvider>
+      </CalendarViewProvider>
+    </FirebaseClientProvider>
   )
 }
 

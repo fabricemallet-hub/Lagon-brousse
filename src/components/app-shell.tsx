@@ -39,19 +39,30 @@ import { useLocation } from '@/context/location-context';
 import { useCalendarView } from '@/context/calendar-view-context';
 import { Switch } from './ui/switch';
 import { Label } from './ui/label';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useDate } from '@/context/date-context';
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { format, addDays, subDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import Link from 'next/link';
+import { useUser, useAuth } from '@/firebase';
+import { Skeleton } from './ui/skeleton';
+import { signOut } from 'firebase/auth';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { locations, selectedLocation, setSelectedLocation } = useLocation();
   const { calendarView, setCalendarView } = useCalendarView();
   const { selectedDate, setSelectedDate } = useDate();
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, isUserLoading } = useUser();
+  const auth = useAuth();
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push('/login');
+  };
 
   const handlePrevDay = () => {
     setSelectedDate(subDays(selectedDate, 1));
@@ -63,6 +74,80 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const showDayNavigator =
     ['/', '/lagon', '/peche', '/champs', '/chasse'].includes(pathname);
+
+  const renderUserMenu = () => {
+    if (isUserLoading) {
+      return (
+        <div className="flex items-center gap-3 p-2">
+          <Skeleton className="h-8 w-8 rounded-full" />
+          <div className="flex flex-col gap-1 group-data-[collapsible=icon]:hidden">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-3 w-12" />
+          </div>
+        </div>
+      )
+    }
+
+    if (!user) {
+      return (
+        <Button asChild className="w-full justify-start h-12 p-2 gap-3" variant="ghost">
+          <Link href="/login">
+            <LogOut className="h-8 w-8" />
+            <div className="text-left group-data-[collapsible=icon]:hidden">
+              <p className="font-medium text-sm">Se connecter</p>
+            </div>
+          </Link>
+        </Button>
+      );
+    }
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            className="w-full justify-start h-12 p-2 gap-3"
+          >
+            <Avatar className="h-8 w-8">
+              <AvatarImage
+                src={user.photoURL ?? `https://picsum.photos/seed/${user.uid}/40/40`}
+                data-ai-hint="person avatar"
+              />
+              <AvatarFallback>{user.email?.[0].toUpperCase() ?? 'U'}</AvatarFallback>
+            </Avatar>
+            <div className="text-left group-data-[collapsible=icon]:hidden">
+              <p className="font-medium text-sm truncate" title={user.email!}>{user.email}</p>
+              <p className="text-xs text-muted-foreground">Gratuit</p>
+            </div>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-56" align="end" forceMount>
+          <DropdownMenuLabel className="font-normal">
+            <div className="flex flex-col space-y-1">
+              <p className="text-sm font-medium leading-none">Compte</p>
+              <p className="text-xs leading-none text-muted-foreground">
+                {user.email}
+              </p>
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem>
+            <Zap className="mr-2 h-4 w-4" />
+            <span>Passer Pro</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem>
+            <Settings className="mr-2 h-4 w-4" />
+            <span>Paramètres</span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleLogout}>
+            <LogOut className="mr-2 h-4 w-4" />
+            <span>Se déconnecter</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
 
   return (
     <SidebarProvider>
@@ -81,50 +166,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </SidebarContent>
 
         <SidebarFooter>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="w-full justify-start h-12 p-2 gap-3"
-              >
-                <Avatar className="h-8 w-8">
-                  <AvatarImage
-                    src="https://picsum.photos/seed/123/40/40"
-                    data-ai-hint="person avatar"
-                  />
-                  <AvatarFallback>U</AvatarFallback>
-                </Avatar>
-                <div className="text-left group-data-[collapsible=icon]:hidden">
-                  <p className="font-medium text-sm">Utilisateur</p>
-                  <p className="text-xs text-muted-foreground">Gratuit</p>
-                </div>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end" forceMount>
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">Compte</p>
-                  <p className="text-xs leading-none text-muted-foreground">
-                    utilisateur@email.com
-                  </p>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <Zap className="mr-2 h-4 w-4" />
-                <span>Passer Pro</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Paramètres</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Se déconnecter</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {renderUserMenu()}
         </SidebarFooter>
       </Sidebar>
       <main className="flex-1">

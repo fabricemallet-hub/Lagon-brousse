@@ -2,9 +2,14 @@
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
-import { Firestore } from 'firebase/firestore';
+import { Firestore, doc, getDoc } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
+import { setDocumentNonBlocking } from './non-blocking-updates';
+import { UserAccount } from '@/lib/types';
+import { FirestorePermissionError } from './errors';
+import { errorEmitter } from './error-emitter';
+
 
 interface FirebaseProviderProps {
   children: ReactNode;
@@ -88,6 +93,35 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     );
     return () => unsubscribe(); // Cleanup
   }, [auth]); // Depends on the auth instance
+
+  const { user, isUserLoading } = userAuthState;
+
+  // Effect to sync user document
+  useEffect(() => {
+    if (user && !isUserLoading && firestore) {
+      const userDocRef = doc(firestore, 'users', user.uid);
+      getDoc(userDocRef).then(docSnap => {
+        if (!docSnap.exists()) {
+          const { uid, email } = user;
+          const newUserAccount: UserAccount = {
+            id: uid,
+            email: email || '',
+            subscriptionStatus: 'active',
+            favoriteLocationIds: [],
+          };
+          setDocumentNonBlocking(userDocRef, newUserAccount, { merge: false });
+        }
+      }).catch(error => {
+        // Handle getDoc error.
+        console.error("Error checking for user document:", error);
+        const contextualError = new FirestorePermissionError({
+            path: userDocRef.path,
+            operation: 'get',
+        });
+        errorEmitter.emit('permission-error', contextualError);
+      });
+    }
+  }, [user, isUserLoading, firestore]);
 
   // Memoize the context value
   const contextValue = useMemo((): FirebaseContextState => {

@@ -122,3 +122,12 @@ export interface LocationData {
   crabAndLobster: CrabLobsterData;
   tideStation: string;
 }
+
+export interface UserAccount {
+  id: string;
+  email: string;
+  subscriptionStatus: 'active' | 'inactive' | 'trial';
+  subscriptionStartDate?: string;
+  subscriptionExpiryDate?: string;
+  favoriteLocationIds: string[];
+}
