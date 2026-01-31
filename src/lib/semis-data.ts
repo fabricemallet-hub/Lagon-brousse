@@ -17,6 +17,22 @@ export type Vegetable = {
 
 export const semisData: Vegetable[] = [
   {
+    name: 'Basilic',
+    icon: '🌿',
+    sowingSeasonWarm: 'Toute l\'année',
+    sowingSeasonCool: 'Toute l\'année, à l\'abri des coups de frais',
+    harvestWarm: 'Toute l\'année, feuille par feuille au besoin',
+    harvestCool: 'Toute l\'année, feuille par feuille au besoin',
+    advice: {
+      plantingLocation: 'En pot, jardinière ou en pleine terre. Idéal en bordure de potager, près des tomates.',
+      sunlight: 'Plein soleil à mi-ombre légère. Aime la chaleur.',
+      watering: 'Arrosage régulier à la base, sans mouiller le feuillage. Le sol doit rester frais mais bien drainé.',
+      soilFertilizer: 'Sol léger, riche en humus et bien drainé. Un bon compost est suffisant.',
+      pests: 'Pucerons, limaces. Attention au mildiou si le feuillage est trop humide.',
+      grandmaRecipe: 'Le meilleur ami de la tomate ! Plantez-le à proximité pour repousser les pucerons et améliorer leur croissance. Pincez régulièrement les têtes (les bouquets de fleurs) pour l\'empêcher de fleurir et l\'inciter à produire plus de feuilles. Étant annuel, vous pouvez simplement l\'arracher en fin de saison et enrichir le sol avec du compost avant la culture suivante.'
+    }
+  },
+  {
     name: 'Carotte',
     icon: '🥕',
     sowingSeasonWarm: 'Mars à Mai (préfère la fraîcheur)',
