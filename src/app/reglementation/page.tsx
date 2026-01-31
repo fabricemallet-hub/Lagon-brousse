@@ -20,17 +20,27 @@ const calendarData = [
   {
     name: 'Picot',
     forbidden: [8, 9, 10, 11, 0], // Sep, Oct, Nov, Dec, Jan
-    details: 'Interdiction du 1er septembre au 31 janvier.',
+    details: 'Pêche et vente interdites du 1er septembre au 31 janvier.',
   },
   {
     name: 'Crabe de palétuvier',
     forbidden: [11, 0], // Dec, Jan
-    details: 'Interdiction du 1er décembre au 31 janvier.',
+    details: 'Pêche et vente interdites du 1er décembre au 31 janvier.',
   },
   {
-    name: 'Huître de palétuvier',
+    name: 'Huître roche ou de palétuvier',
     forbidden: [8, 9, 10, 11, 0, 1, 2, 3], // Sep to Apr
-    details: 'Interdiction du 1er septembre au 30 avril.',
+    details: 'Pêche et vente interdites du 1er septembre au 30 avril.',
+  },
+  {
+    name: 'Espèces intégralement protégées',
+    forbidden: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+    details: 'Interdiction totale de pêche/capture pour : tricot rayé, tortue, dugong, cétacés, requin, napoléon, volute, toutoute, casque, nautile, oiseaux marins.',
+  },
+  {
+    name: 'Corail',
+    forbidden: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+    details: "Récolte des coraux vivants interdite toute l'année.",
   },
 ];
 
@@ -110,7 +120,7 @@ export default function ReglementationPage() {
                     <strong>Troca:</strong> Diamètre de base entre 9 et 12 cm.
                   </li>
                   <li>
-                    <strong>Huître:</strong> Taille &gt; 6 cm, limité à 10
+                    <strong>Huître roche ou de palétuvier:</strong> Taille &gt; 6 cm, limité à 10
                     douzaines par bateau/sortie.
                   </li>
                   <li>
