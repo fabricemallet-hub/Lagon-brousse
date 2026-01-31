@@ -120,7 +120,7 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
   return (
     <div className="rounded-lg border bg-card text-card-foreground shadow-sm">
       <div className="bg-blue-600 text-white p-4 rounded-t-lg">
-        <div className="flex justify-between items-center mb-4">
+        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2 mb-4">
           <Button
             onClick={handlePrev}
             variant="ghost"
@@ -130,7 +130,7 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
           >
             <ChevronLeft className="size-5" />
           </Button>
-          <h3 className="font-semibold text-base sm:text-lg capitalize text-center">
+          <h3 className="font-semibold text-sm sm:text-lg capitalize text-center">
             {format(new Date(selectedForecast.date), "eeee dd MMMM 'à' HH'h'", {
               locale: fr,
             })}
@@ -153,13 +153,13 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
               isNight={selectedForecast.isNight}
               className="size-16"
             />
-            <p className="font-medium text-base sm:text-lg mt-2">
+            <p className="font-medium text-base mt-2">
               {selectedForecast.condition}
             </p>
           </div>
           <div className="flex flex-col items-center justify-center">
             <WindArrowIcon direction={selectedForecast.windDirection} />
-            <p className="font-bold text-lg sm:text-xl mt-2">
+            <p className="font-bold text-lg mt-2">
               {selectedForecast.windSpeed} km/h
             </p>
           </div>
@@ -195,7 +195,7 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
             {weather.hourly.map((forecast, index) => (
               <CarouselItem
                 key={index}
-                className="basis-[28%] sm:basis-[22%] md:basis-[14%] lg:basis-[11%]"
+                className="basis-[20%] sm:basis-[16.66%] md:basis-[12.5%] lg:basis-[10%]"
               >
                 <div
                   onClick={() => api?.scrollTo(index)}
