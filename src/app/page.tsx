@@ -57,7 +57,9 @@ export default function Home() {
                 <span className="text-muted-foreground capitalize">
                   Marée {tide.type}
                 </span>
-                <span className="font-medium">{tide.time}</span>
+                <span className="font-medium">
+                  {tide.time} ({tide.height.toFixed(1)}m)
+                </span>
               </div>
             ))}
             <div className="flex justify-between">
