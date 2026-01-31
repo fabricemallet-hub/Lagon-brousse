@@ -241,7 +241,7 @@ function DayCell({
           <div className="flex-grow flex items-center justify-center gap-0.5">
             {fishIcons}
             {data.pelagicInfo?.inSeason && (Math.sin(day.getDate()) + 1) / 2 > 0.7 && (
-                <Fish className="size-3 text-blue-500 glow" title="Bon pour les pélagiques" />
+                <Fish className="size-3 text-accent glow" title="Bon pour les pélagiques" />
             )}
           </div>
           <div className="grid grid-cols-2 gap-x-1 text-[10px] font-mono text-muted-foreground">
@@ -337,6 +337,32 @@ function GardeningLegend() {
             <span>{item.label}</span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function PecheLegend() {
+  return (
+    <div className="mt-4 p-3 border rounded-lg bg-muted/50 text-sm">
+      <h4 className="font-semibold mb-2">Légende de Pêche</h4>
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
+            <Fish className="size-4 text-primary" />
+            <Fish className="size-4 text-primary" />
+            <Fish className="size-4 text-primary" />
+          </div>
+          <span>
+            Indique le potentiel de pêche général (de 1 à 5 poissons).
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <Fish className="size-4 text-accent glow" />
+          <span>
+            Signale une bonne opportunité pour la pêche des pélagiques.
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -665,6 +691,7 @@ export function LunarCalendar() {
         </div>
       </div>
       {calendarView === 'champs' && <GardeningLegend />}
+      {calendarView === 'peche' && <PecheLegend />}
 
       {detailedDay && (
         <Dialog
