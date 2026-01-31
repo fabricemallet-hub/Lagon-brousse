@@ -25,15 +25,19 @@ export default function ComptePage() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
   const handleSubscribe = () => {
-    if (!userDocRef) return;
-    const newExpiryDate = new Date();
-    newExpiryDate.setMonth(newExpiryDate.getMonth() + 1);
-    
-    setDocumentNonBlocking(userDocRef, {
-        subscriptionStatus: 'active',
-        subscriptionExpiryDate: newExpiryDate.toISOString(),
-    }, { merge: true });
-    toast({ title: "Abonnement activé !", description: "Merci pour votre soutien." });
+    // The Stripe Payment Link should be stored in environment variables
+    const stripePaymentLink = process.env.NEXT_PUBLIC_STRIPE_PAYMENT_LINK;
+
+    if (stripePaymentLink && stripePaymentLink !== 'https://buy.stripe.com/VOTRE_LIEN_DE_PAIEMENT') {
+      window.location.href = stripePaymentLink;
+    } else {
+      console.error('Stripe payment link is not configured.');
+      toast({
+        variant: 'destructive',
+        title: 'Erreur de configuration',
+        description: "La fonctionnalité de paiement n'est pas encore active.",
+      });
+    }
   };
 
   const handleCancel = () => {
