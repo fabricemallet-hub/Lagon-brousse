@@ -280,7 +280,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-3 p-2">
               <AppLogo className="size-8 text-primary" />
               <h1 className="font-bold text-lg text-primary-foreground group-data-[collapsible=icon]:hidden">
-                Marées & Terroir
+                Lagon & Brousse
               </h1>
             </div>
           </SidebarHeader>

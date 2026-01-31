@@ -10,7 +10,7 @@ import { Suspense } from 'react';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 export const metadata: Metadata = {
-  title: 'Marées et Terroir Calédonien',
+  title: 'Lagon & Brousse NC',
   description:
     'Votre guide pour la mer et la terre en Nouvelle-Calédonie.',
 };
