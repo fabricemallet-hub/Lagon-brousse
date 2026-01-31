@@ -153,6 +153,22 @@ export const semisData: Vegetable[] = [
     }
   },
   {
+    name: 'Igname',
+    icon: '🍠',
+    sowingSeasonWarm: 'Septembre à Novembre',
+    sowingSeasonCool: '-',
+    harvestWarm: 'Mai à Septembre (après 8-10 mois)',
+    harvestCool: 'Mai à Septembre (après 8-10 mois)',
+    advice: {
+      plantingLocation: 'Planter les tubercules (ou morceaux) sur des buttes de terre meuble et riche. Prévoir un tuteur solide pour la liane.',
+      sunlight: 'Plein soleil indispensable.',
+      watering: 'Besoins en eau réguliers, surtout en début de croissance. Le paillage est crucial pour maintenir l\'humidité.',
+      soilFertilizer: 'Sol très riche en humus, profond et bien drainé. Un apport de compost à la préparation des buttes est essentiel.',
+      pests: 'Nématodes, cochenilles. Pourriture si le sol est mal drainé.',
+      grandmaRecipe: 'La culture de l\'igname est un art et un pilier de la culture Kanak. La rotation des cultures est fondamentale pour éviter l\'épuisement du sol et les maladies.'
+    }
+  },
+  {
     name: 'Manioc',
     icon: '🪵',
     sowingSeasonWarm: 'Septembre à Novembre',
