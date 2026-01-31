@@ -38,15 +38,15 @@ const MoonPhaseIcon = ({
     case 'Premier croissant':
       return <Moon className={baseClassName} />;
     case 'Premier quartier':
-      return <Moon className={baseClassName} />; // Simplified
+      return <Circle className={cn(baseClassName, 'fill-current')} style={{ clipPath: 'inset(0 50% 0 0)' }} />;
     case 'Lune gibbeuse croissante':
-      return <Moon className={baseClassName} />; // Simplified
+      return <Circle className={cn(baseClassName, 'fill-current')} style={{ clipPath: 'inset(0 25% 0 0)' }} />;
     case 'Pleine lune':
       return <Circle className={cn(baseClassName, 'fill-current')} />;
     case 'Lune gibbeuse décroissante':
-      return <Moon className={cn(baseClassName, 'scale-x-[-1]')} />; // Simplified
+      return <Circle className={cn(baseClassName, 'fill-current')} style={{ clipPath: 'inset(0 0 0 25%)' }} />;
     case 'Dernier quartier':
-      return <Moon className={cn(baseClassName, 'scale-x-[-1]')} />; // Simplified
+      return <Circle className={cn(baseClassName, 'fill-current')} style={{ clipPath: 'inset(0 0 0 50%)' }} />;
     case 'Dernier croissant':
       return <Moon className={cn(baseClassName, 'scale-x-[-1]')} />;
     default:
@@ -80,10 +80,7 @@ function DayCell({
     <Fish key={i} className="size-3 text-primary" />
   ));
 
-  const highTides = data.tides
-    .filter((tide) => tide.type === 'haute')
-    .slice(0, 2)
-    .map((tide) => tide.height.toFixed(1) + 'm');
+  const tides = data.tides.slice(0, 4);
 
   return (
     <div
@@ -104,9 +101,11 @@ function DayCell({
       <div className="flex-grow flex items-center justify-center gap-0.5">
         {fishIcons}
       </div>
-      <div className="flex justify-around text-[10px] font-mono text-muted-foreground">
-        {highTides.map((tide, i) => (
-          <span key={i}>{tide}</span>
+      <div className="grid grid-cols-2 gap-x-1 text-[10px] font-mono text-muted-foreground">
+        {tides.map((tide, i) => (
+          <span key={i} className='text-center'>
+            {tide.type === 'haute' ? 'H' : 'B'}: {tide.height.toFixed(1)}m
+          </span>
         ))}
       </div>
     </div>
