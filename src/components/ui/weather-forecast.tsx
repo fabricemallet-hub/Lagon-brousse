@@ -195,7 +195,7 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
             {weather.hourly.map((forecast, index) => (
               <CarouselItem
                 key={index}
-                className="basis-1/4 sm:basis-1/5 md:basis-[12.5%] lg:basis-[10%]"
+                className="basis-1/5 sm:basis-1/6 md:basis-[12.5%] lg:basis-[10%]"
               >
                 <div
                   onClick={() => api?.scrollTo(index)}
