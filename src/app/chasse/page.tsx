@@ -21,6 +21,8 @@ import {
   Sunset,
   Info,
 } from 'lucide-react';
+import { HuntingMapCard } from '@/components/ui/hunting-map-card';
+import { ShootingTableCard } from '@/components/ui/shooting-table-card';
 
 export default function ChassePage() {
   const { selectedLocation } = useLocation();
@@ -127,18 +129,11 @@ export default function ChassePage() {
                 </div>
               </div>
             </div>
-            <Alert variant="default" className="mt-4">
-              <Info className="h-4 w-4" />
-              <AlertTitle>Fonctionnalités avancées</AlertTitle>
-              <AlertDescription>
-                Les fonctionnalités comme la carte hors-ligne et la table de tir
-                sont en cours de développement et seront disponibles
-                prochainement.
-              </AlertDescription>
-            </Alert>
           </CardContent>
         </Card>
       </div>
+      <ShootingTableCard />
+      <HuntingMapCard />
     </div>
   );
 }
