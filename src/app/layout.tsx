@@ -4,6 +4,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import { LocationProvider } from '@/context/location-context';
 import { DateProvider } from '@/context/date-context';
+import { CalendarViewProvider } from '@/context/calendar-view-context';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -32,11 +33,13 @@ export default function RootLayout({
         />
       </head>
       <body className={cn('font-body antialiased', 'min-h-screen bg-background font-sans')}>
-        <DateProvider>
-          <LocationProvider>
-            <AppShell>{children}</AppShell>
-          </LocationProvider>
-        </DateProvider>
+        <CalendarViewProvider>
+          <DateProvider>
+            <LocationProvider>
+              <AppShell>{children}</AppShell>
+            </LocationProvider>
+          </DateProvider>
+        </CalendarViewProvider>
         <Toaster />
       </body>
     </html>

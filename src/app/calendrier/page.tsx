@@ -18,8 +18,7 @@ export default function CalendrierPage() {
         <CardHeader>
           <CardTitle>Calendrier Lunaire</CardTitle>
           <CardDescription>
-            Sélectionnez une date pour mettre à jour les informations sur les
-            autres pages.
+            Utilisez le bouton en haut de page pour basculer entre la vue Pêche et Champs.
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -18,10 +18,21 @@ import { fr } from 'date-fns/locale';
 import { useDate } from '@/context/date-context';
 import { useLocation } from '@/context/location-context';
 import { getDataForDate } from '@/lib/data';
-import { Fish, Moon, Circle, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Fish,
+  Moon,
+  Circle,
+  ChevronLeft,
+  ChevronRight,
+  Spade,
+  Carrot,
+  Flower,
+  Leaf,
+  Scissors,
+} from 'lucide-react';
 import { Button } from './button';
 import { cn } from '@/lib/utils';
-import { Card, CardContent, CardHeader } from './card';
+import { useCalendarView } from '@/context/calendar-view-context';
 import type { FishRating } from '@/lib/types';
 
 export const MoonPhaseIcon = ({
@@ -86,8 +97,10 @@ function DayCell({
   onDateSelect: (d: Date) => void;
 }) {
   const { selectedLocation } = useLocation();
+  const { calendarView } = useCalendarView();
   const data = getDataForDate(selectedLocation, day);
 
+  // Fishing data
   const allFishRatings: FishRating[] = data.fishing.flatMap(
     (slot) => slot.fish
   );
@@ -99,8 +112,18 @@ function DayCell({
   const fishIcons = Array.from({ length: fishIconCount }).map((_, i) => (
     <Fish key={i} className="size-3 text-primary" />
   ));
-
   const tides = data.tides.slice(0, 4);
+
+  // Gardening data
+  const { zodiac, lunarPhase } = data.farming;
+  const isGoodForMowing = lunarPhase === 'Lune Descendante' && zodiac === 'Feuilles';
+  const GardeningIcon = {
+    'Fruits': Spade,
+    'Racines': Carrot,
+    'Fleurs': Flower,
+    'Feuilles': Leaf,
+  }[zodiac];
+
 
   const prevDate = new Date(day);
   prevDate.setDate(day.getDate() - 1);
@@ -129,10 +152,10 @@ function DayCell({
     <div
       onClick={() => onDateSelect(day)}
       className={cn(
-        'h-28 border-t border-l p-1 flex flex-col cursor-pointer hover:bg-accent/50 relative group',
+        'h-32 border-t border-l p-1 flex flex-col cursor-pointer hover:bg-accent/50 relative group',
         !isCurrentMonth && 'bg-muted/30 text-muted-foreground',
         isSelected && 'ring-2 ring-primary z-10',
-        (getDay(day) + 6) % 7 === 0 && 'border-l-0' // No left border for Mondays
+        (getDay(day) + 6) % 7 === 0 && 'border-l-0'
       )}
     >
       <div className="flex justify-between items-center">
@@ -149,14 +172,53 @@ function DayCell({
         </div>
       )}
 
-      <div className="flex-grow flex items-center justify-center gap-0.5">
-        {fishIcons}
-      </div>
-      <div className="grid grid-cols-2 gap-x-1 text-[10px] font-mono text-muted-foreground">
-        {tides.map((tide, i) => (
-          <span key={i} className="text-center">
-            {tide.type === 'haute' ? 'H' : 'B'}: {tide.height.toFixed(1)}m
-          </span>
+      {calendarView === 'peche' ? (
+        <>
+          <div className="flex-grow flex items-center justify-center gap-0.5">
+            {fishIcons}
+          </div>
+          <div className="grid grid-cols-2 gap-x-1 text-[10px] font-mono text-muted-foreground">
+            {tides.map((tide, i) => (
+              <span key={i} className="text-center">
+                {tide.type === 'haute' ? 'H' : 'B'}: {tide.height.toFixed(1)}m
+              </span>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div className="flex-grow flex flex-col items-center justify-center gap-1 text-center">
+            {GardeningIcon && <GardeningIcon className="size-5 text-primary" />}
+            <p className="text-xs text-muted-foreground">{zodiac}</p>
+            {isGoodForMowing && (
+                <div className="flex items-center gap-1 text-green-600">
+                    <Scissors className="size-3" />
+                    <span className="text-[10px] font-semibold">Tonte</span>
+                </div>
+            )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GardeningLegend() {
+  const legendItems = [
+    { icon: Spade, label: 'Fruits' },
+    { icon: Carrot, label: 'Racines' },
+    { icon: Flower, label: 'Fleurs' },
+    { icon: Leaf, label: 'Feuilles' },
+    { icon: Scissors, label: 'Tonte Gazon', color: 'text-green-600' },
+  ];
+
+  return (
+    <div className="mt-4 p-2 border rounded-lg bg-muted/50">
+      <h4 className="font-semibold mb-2 text-sm">Légende du Jardinier</h4>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        {legendItems.map(item => (
+          <div key={item.label} className="flex items-center gap-2 text-xs">
+            <item.icon className={cn("size-4", item.color || 'text-primary')} />
+            <span>{item.label}</span>
+          </div>
         ))}
       </div>
     </div>
@@ -165,6 +227,7 @@ function DayCell({
 
 export function LunarCalendar() {
   const { selectedDate, setSelectedDate } = useDate();
+  const { calendarView } = useCalendarView();
   const [displayDate, setDisplayDate] = useState(startOfMonth(selectedDate));
 
   const handlePrevMonth = () => {
@@ -191,39 +254,42 @@ export function LunarCalendar() {
   ];
 
   return (
-    <div className="border rounded-lg">
-      <div className="flex justify-between items-center p-2">
-        <Button variant="ghost" size="icon" onClick={handlePrevMonth}>
-          <ChevronLeft />
-        </Button>
-        <h2 className="text-lg font-semibold capitalize tracking-wide">
-          {format(displayDate, 'MMMM yyyy', { locale: fr })}
-        </h2>
-        <Button variant="ghost" size="icon" onClick={handleNextMonth}>
-          <ChevronRight />
-        </Button>
+    <div>
+      <div className="border rounded-lg">
+        <div className="flex justify-between items-center p-2">
+          <Button variant="ghost" size="icon" onClick={handlePrevMonth}>
+            <ChevronLeft />
+          </Button>
+          <h2 className="text-lg font-semibold capitalize tracking-wide">
+            {format(displayDate, 'MMMM yyyy', { locale: fr })}
+          </h2>
+          <Button variant="ghost" size="icon" onClick={handleNextMonth}>
+            <ChevronRight />
+          </Button>
+        </div>
+        <div className="grid grid-cols-7 border-t">
+          {weekdays.map((day) => (
+            <div
+              key={day}
+              className="text-center text-sm font-medium text-muted-foreground p-2 border-l first:border-l-0"
+            >
+              {day.substring(0, 3)}
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7">
+          {days.map((day) => (
+            <DayCell
+              key={day.toString()}
+              day={day}
+              isCurrentMonth={isSameMonth(day, displayDate)}
+              isSelected={isSameDay(day, selectedDate)}
+              onDateSelect={setSelectedDate}
+            />
+          ))}
+        </div>
       </div>
-      <div className="grid grid-cols-7 border-t">
-        {weekdays.map((day) => (
-          <div
-            key={day}
-            className="text-center text-sm font-medium text-muted-foreground p-2 border-l first:border-l-0"
-          >
-            {day.substring(0, 3)}
-          </div>
-        ))}
-      </div>
-      <div className="grid grid-cols-7">
-        {days.map((day) => (
-          <DayCell
-            key={day.toString()}
-            day={day}
-            isCurrentMonth={isSameMonth(day, displayDate)}
-            isSelected={isSameDay(day, selectedDate)}
-            onDateSelect={setSelectedDate}
-          />
-        ))}
-      </div>
+      {calendarView === 'champs' && <GardeningLegend />}
     </div>
   );
 }

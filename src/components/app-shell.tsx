@@ -19,7 +19,7 @@ import {
 } from './ui/dropdown-menu';
 import { AppLogo } from './icons';
 import { SidebarNav } from './sidebar-nav';
-import { Home, LogOut, Settings, Waves, Zap } from 'lucide-react';
+import { LogOut, Settings, Zap } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -28,9 +28,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useLocation } from '@/context/location-context';
+import { useCalendarView } from '@/context/calendar-view-context';
+import { Switch } from './ui/switch';
+import { Label } from './ui/label';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { locations, selectedLocation, setSelectedLocation } = useLocation();
+  const { calendarView, setCalendarView } = useCalendarView();
 
   return (
     <SidebarProvider>
@@ -99,7 +103,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main className="flex-1">
         <header className="flex h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30">
           <SidebarTrigger className="shrink-0 md:hidden" />
-          <div className="w-full flex-1">
+          <div className="w-full flex-1 flex items-center gap-4">
             <Select value={selectedLocation} onValueChange={setSelectedLocation}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Choisir une commune" />
@@ -112,6 +116,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 ))}
               </SelectContent>
             </Select>
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="calendar-view" className="text-sm font-medium">Pêche</Label>
+              <Switch
+                id="calendar-view"
+                checked={calendarView === 'champs'}
+                onCheckedChange={(checked) => setCalendarView(checked ? 'champs' : 'peche')}
+              />
+              <Label htmlFor="calendar-view" className="text-sm font-medium">Champs</Label>
+            </div>
           </div>
         </header>
         <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
