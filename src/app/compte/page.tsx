@@ -30,9 +30,9 @@ export default function ComptePage() {
     if (paypalLink) {
       toast({
         title: 'Redirection vers PayPal',
-        description: "Vous allez être redirigé pour finaliser votre abonnement.",
+        description: "Un nouvel onglet va s'ouvrir pour finaliser votre abonnement.",
       });
-      window.location.href = paypalLink;
+      window.open(paypalLink, '_blank');
     } else {
       console.error("La variable d'environnement NEXT_PUBLIC_PAYPAL_LINK n'est pas définie.");
       toast({
