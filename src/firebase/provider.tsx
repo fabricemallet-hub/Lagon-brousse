@@ -101,25 +101,31 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     if (user && !isUserLoading && firestore) {
       const userDocRef = doc(firestore, 'users', user.uid);
       getDoc(userDocRef).then(docSnap => {
-        if (!docSnap.exists()) {
-          const { uid, email } = user;
-          const isAdmin = email === 'f.mallet@gmail.com';
-          
-          let newUserAccount: UserAccount;
+        const { uid, email } = user;
+        const isAdmin = email === 'f.mallet@gmail.com';
 
-          if (isAdmin) {
-            newUserAccount = {
+        if (isAdmin) {
+          // This user is an admin. Ensure their document reflects this.
+          // This corrects documents created before the admin logic was in place.
+          if (!docSnap.exists() || docSnap.data().subscriptionStatus !== 'admin') {
+            const adminAccountData: UserAccount = {
               id: uid,
               email: email || '',
               subscriptionStatus: 'admin',
-              favoriteLocationIds: [],
+              // Preserve existing favorites if the document exists
+              favoriteLocationIds: docSnap.exists() ? docSnap.data().favoriteLocationIds || [] : [],
             };
-          } else {
+            // Use merge:true to avoid overwriting other fields if they exist
+            setDocumentNonBlocking(userDocRef, adminAccountData, { merge: true });
+          }
+        } else {
+          // This is a non-admin user. Create their profile on first login only.
+          if (!docSnap.exists()) {
             const trialStartDate = new Date();
             const trialExpiryDate = new Date(trialStartDate);
             trialExpiryDate.setDate(trialExpiryDate.getDate() + 7);
         
-            newUserAccount = {
+            const newUserAccount: UserAccount = {
               id: uid,
               email: email || '',
               subscriptionStatus: 'trial',
@@ -127,13 +133,11 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
               subscriptionExpiryDate: trialExpiryDate.toISOString(),
               favoriteLocationIds: [],
             };
+            setDocumentNonBlocking(userDocRef, newUserAccount, { merge: false });
           }
-
-          setDocumentNonBlocking(userDocRef, newUserAccount, { merge: false });
         }
       }).catch(error => {
-        // Handle getDoc error.
-        console.error("Error checking for user document:", error);
+        console.error("Error checking/updating user document:", error);
         const contextualError = new FirestorePermissionError({
             path: userDocRef.path,
             operation: 'get',
