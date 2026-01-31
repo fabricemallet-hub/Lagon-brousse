@@ -104,12 +104,31 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
         if (!docSnap.exists()) {
           const { uid, email } = user;
           const isAdmin = email === 'f.mallet@gmail.com';
-          const newUserAccount: UserAccount = {
-            id: uid,
-            email: email || '',
-            subscriptionStatus: isAdmin ? 'admin' : 'active',
-            favoriteLocationIds: [],
-          };
+          
+          let newUserAccount: UserAccount;
+
+          if (isAdmin) {
+            newUserAccount = {
+              id: uid,
+              email: email || '',
+              subscriptionStatus: 'admin',
+              favoriteLocationIds: [],
+            };
+          } else {
+            const trialStartDate = new Date();
+            const trialExpiryDate = new Date(trialStartDate);
+            trialExpiryDate.setDate(trialExpiryDate.getDate() + 7);
+        
+            newUserAccount = {
+              id: uid,
+              email: email || '',
+              subscriptionStatus: 'trial',
+              subscriptionStartDate: trialStartDate.toISOString(),
+              subscriptionExpiryDate: trialExpiryDate.toISOString(),
+              favoriteLocationIds: [],
+            };
+          }
+
           setDocumentNonBlocking(userDocRef, newUserAccount, { merge: false });
         }
       }).catch(error => {

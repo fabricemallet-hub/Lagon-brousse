@@ -25,6 +25,7 @@ import {
   ChevronRight,
   Calendar as CalendarIcon,
   BookOpen,
+  AlertCircle,
 } from 'lucide-react';
 import {
   Select,
@@ -41,7 +42,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useDate } from '@/context/date-context';
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
 import { Calendar } from './ui/calendar';
-import { format, addDays, subDays } from 'date-fns';
+import { format, addDays, subDays, isBefore } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import Link from 'next/link';
 import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
@@ -49,7 +50,12 @@ import { Skeleton } from './ui/skeleton';
 import { signOut } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
 import type { UserAccount } from '@/lib/types';
+import { useState, useEffect } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { Badge } from './ui/badge';
+import { cn } from '@/lib/utils';
 
+const USAGE_LIMIT_SECONDS = 60;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { locations, selectedLocation, setSelectedLocation } = useLocation();
@@ -60,6 +66,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
   const firestore = useFirestore();
+  const { toast } = useToast();
 
   const userDocRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -67,6 +74,101 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [user, firestore]);
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
+
+  const [status, setStatus] = useState<'loading' | 'admin' | 'active' | 'trial' | 'limited'>('loading');
+  const [timeLeft, setTimeLeft] = useState(USAGE_LIMIT_SECONDS);
+  const [trialEndDate, setTrialEndDate] = useState<Date | null>(null);
+
+  useEffect(() => {
+    if (isUserLoading || isProfileLoading) {
+      setStatus('loading');
+      return;
+    }
+    if (!user || !userProfile) {
+      // Guest users are also limited
+      setStatus('limited');
+      return;
+    }
+
+    if (userProfile.subscriptionStatus === 'admin') {
+      setStatus('admin');
+      return;
+    }
+    
+    if (userProfile.subscriptionStatus === 'active' && userProfile.subscriptionExpiryDate) {
+      const expiry = new Date(userProfile.subscriptionExpiryDate);
+      if (isBefore(new Date(), expiry)) {
+        setStatus('active');
+      } else {
+        setStatus('limited');
+      }
+      return;
+    }
+    
+    if (userProfile.subscriptionStatus === 'trial' && userProfile.subscriptionExpiryDate) {
+      const expiry = new Date(userProfile.subscriptionExpiryDate);
+      setTrialEndDate(expiry);
+      if (isBefore(new Date(), expiry)) {
+        setStatus('trial');
+      } else {
+        setStatus('limited');
+      }
+      return;
+    }
+
+    // Default to limited for 'inactive' or other cases
+    setStatus('limited');
+
+  }, [user, isUserLoading, userProfile, isProfileLoading]);
+
+  useEffect(() => {
+    if (status !== 'limited' || !auth) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    const lastUsageDate = localStorage.getItem('lastUsageDate');
+    let dailyUsage = parseInt(localStorage.getItem('dailyUsage') || '0', 10);
+
+    if (lastUsageDate !== today) {
+        dailyUsage = 0;
+        localStorage.setItem('lastUsageDate', today);
+        localStorage.setItem('dailyUsage', '0');
+    }
+    
+    const remainingTime = USAGE_LIMIT_SECONDS - dailyUsage;
+    setTimeLeft(remainingTime);
+
+    if (remainingTime <= 0) {
+        toast({
+            variant: "destructive",
+            title: "Limite quotidienne atteinte",
+            description: "Revenez demain ou passez à la version Full.",
+        });
+        signOut(auth);
+        return;
+    }
+
+    const interval = setInterval(() => {
+        setTimeLeft(prev => {
+            const newTime = prev - 1;
+            const newUsage = USAGE_LIMIT_SECONDS - newTime;
+            localStorage.setItem('dailyUsage', String(newUsage));
+
+            if (newTime <= 0) {
+                clearInterval(interval);
+                toast({
+                    variant: "destructive",
+                    title: "Limite quotidienne atteinte",
+                    description: "Revenez demain ou passez à la version Full.",
+                });
+                signOut(auth);
+            }
+            return newTime;
+        });
+    }, 1000);
+
+    return () => clearInterval(interval);
+
+  }, [status, auth, toast]);
 
   const handleLogout = async () => {
     if (!auth) return;
@@ -84,6 +186,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const showDayNavigator =
     ['/', '/lagon', '/peche', '/champs', '/chasse'].includes(pathname);
+
+  const getStatusLabel = () => {
+    switch (status) {
+        case 'admin': return 'Admin';
+        case 'active': return 'Abonné';
+        case 'trial': return 'Essai';
+        case 'limited': return 'Limité';
+        default: return 'Chargement...';
+    }
+  }
 
   const renderUserMenu = () => {
     if (isUserLoading || (user && isProfileLoading)) {
@@ -111,8 +223,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       );
     }
     
-    const userStatus = userProfile?.subscriptionStatus === 'admin' ? 'Admin' : 'Gratuit';
-
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -129,7 +239,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Avatar>
             <div className="text-left group-data-[collapsible=icon]:hidden">
               <p className="font-medium text-sm truncate" title={user.email!}>{user.email}</p>
-              <p className="text-xs text-muted-foreground">{userStatus}</p>
+              <p className="text-xs text-muted-foreground">{getStatusLabel()}</p>
             </div>
           </Button>
         </DropdownMenuTrigger>
@@ -173,10 +283,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </SidebarFooter>
       </Sidebar>
       <main className="flex-1">
-        <header className="flex h-auto min-h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30 py-2">
+        {status === 'limited' && (
+          <div className="fixed top-0 left-0 right-0 h-10 bg-destructive/90 text-destructive-foreground flex items-center justify-center text-sm font-bold z-50">
+              <AlertCircle className="size-4 mr-2" />
+              Mode Limité : {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')} restant.
+          </div>
+        )}
+        <header className={cn(
+          "flex h-auto min-h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30 py-2",
+          status === 'limited' && 'mt-10'
+        )}>
           <SidebarTrigger className="shrink-0 md:hidden" />
           <div className="w-full flex-1 flex items-center justify-between flex-wrap gap-y-2">
             <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+               {status === 'trial' && <Badge variant="secondary">Version d'essai</Badge>}
+               {status === 'limited' && <Badge variant="destructive">Mode Limité</Badge>}
               <Select
                 value={selectedLocation}
                 onValueChange={setSelectedLocation}
@@ -266,7 +387,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             )}
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
+        <div className={cn(
+          "flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6",
+          status === 'limited' && 'pointer-events-none opacity-50'
+        )}>
           {children}
         </div>
       </main>
