@@ -45,7 +45,7 @@ export const semisData: Vegetable[] = [
       watering: 'Arrosage très régulier pour garder le sol frais.',
       soilFertilizer: 'Sol riche en humus.',
       pests: 'Altises (petits coléoptères qui font des trous dans les feuilles), limaces.',
-      grandmaRecipe: 'Un arrosage fréquent du feuillage le soir décourage les altises. Cendres de bois contre les limaces.'
+      grandmaRecipe: 'Plantez-le à côté de la menthe ou du romarin pour aider à repousser les insectes. Un arrosage fréquent du feuillage le soir décourage aussi les altises.'
     }
   },
   {
@@ -65,7 +65,7 @@ export const semisData: Vegetable[] = [
         'Sol riche en matière organique et bien drainé. Un bon apport de compost à la plantation est idéal.',
       pests: 'Les mouches des fruits peuvent piquer les jeunes chouchoutes. Peu de maladies si bien aérée.',
       grandmaRecipe:
-        'Pour protéger les fruits des mouches, on peut les ensacher quand ils sont jeunes. Une seule plante suffit souvent pour toute la famille !',
+        'Sa croissance est très vigoureuse, elle peut servir d\'ombrage à des cultures craignant le soleil direct, mais attention à ne pas étouffer les voisins ! Une seule plante suffit souvent pour toute la famille.',
     },
   },
   {
@@ -81,7 +81,7 @@ export const semisData: Vegetable[] = [
       watering: 'Arrosage régulier pour une croissance rapide et des tiges tendres.',
       soilFertilizer: 'Sol frais et riche en humus.',
       pests: 'Généralement très résistant.',
-      grandmaRecipe: 'Coupez les tiges au besoin en laissant la base en terre, elles repousseront plusieurs fois. C\'est une culture "perpétuelle".'
+      grandmaRecipe: 'C\'est un excellent voisin pour les carottes, les tomates et les salades, aidant à éloigner certains nuisibles. Coupez les tiges au besoin en laissant la base en terre, elles repousseront.'
     }
   },
   {
@@ -97,7 +97,7 @@ export const semisData: Vegetable[] = [
       watering: 'Arrosage très régulier au pied, le concombre est gourmand en eau. Pailler généreusement.',
       soilFertilizer: 'Sol riche, frais et bien fumé.',
       pests: 'Oïdium, mildiou, araignées rouges.',
-      grandmaRecipe: 'Comme pour la courgette, une pulvérisation de lait dilué peut aider contre l\'oïdium. Associer avec du maïs qui lui fournira un support naturel.'
+      grandmaRecipe: 'Associer avec du maïs qui lui fournira un support naturel, et des haricots qui enrichiront le sol en azote. Une pulvérisation de lait dilué peut aider contre l\'oïdium.'
     }
   },
   {
@@ -117,7 +117,7 @@ export const semisData: Vegetable[] = [
         'Sol très riche en matière organique. Incorporer du compost ou du fumier bien décomposé à la plantation.',
       pests: 'Oïdium (poudre blanche sur les feuilles), pucerons.',
       grandmaRecipe:
-        'Pulvériser une solution de lait écrémé (1 part de lait pour 9 parts d\'eau) sur le feuillage pour prévenir l\'oïdium.',
+        'Plantez des capucines à proximité, elles attireront les pucerons sur elles et les détourneront des courgettes. L\'association avec le maïs et les haricots ("les trois sœurs") est également bénéfique.',
     },
   },
   {
@@ -133,7 +133,7 @@ export const semisData: Vegetable[] = [
       watering: 'Arrosage régulier au pied sans mouiller le feuillage, surtout pendant la floraison et la formation des gousses.',
       soilFertilizer: 'Sol léger et bien réchauffé. Le haricot fixe l\'azote, donc pas besoin d\'un engrais trop riche en azote.',
       pests: 'Pucerons, araignées rouges, rouille.',
-      grandmaRecipe: 'Semer des capucines à proximité pour attirer les pucerons loin des haricots. Une pulvérisation d\'eau savonneuse (savon noir) peut aider.'
+      grandmaRecipe: 'Le haricot fixe l\'azote dans le sol, ce qui en fait un excellent voisin pour les cultures gourmandes comme le maïs ou les courges. Évitez de le planter près des oignons ou de l\'ail.'
     }
   },
   {
@@ -149,7 +149,7 @@ export const semisData: Vegetable[] = [
       watering: 'Persil: sol toujours frais. Thym: supporte la sécheresse, arrosage modéré.',
       soilFertilizer: 'Sol léger et bien drainé. Pas trop d\'engrais pour ne pas diluer les arômes.',
       pests: 'Pucerons sur le persil.',
-      grandmaRecipe: 'Couper régulièrement les herbes (même si vous n\'en avez pas besoin) pour stimuler la production de nouvelles feuilles et éviter que les plants ne montent en graine.'
+      grandmaRecipe: 'Utilisez les herbes comme des gardes du corps pour votre potager ! Le basilic près des tomates, la menthe près des choux, et le romarin près des haricots aident à repousser les nuisibles.'
     }
   },
   {
@@ -165,7 +165,7 @@ export const semisData: Vegetable[] = [
       watering: 'Besoins en eau réguliers, surtout en début de croissance. Le paillage est crucial pour maintenir l\'humidité.',
       soilFertilizer: 'Sol très riche en humus, profond et bien drainé. Un apport de compost à la préparation des buttes est essentiel.',
       pests: 'Nématodes, cochenilles. Pourriture si le sol est mal drainé.',
-      grandmaRecipe: 'La culture de l\'igname est un art et un pilier de la culture Kanak. La rotation des cultures est fondamentale pour éviter l\'épuisement du sol et les maladies.'
+      grandmaRecipe: 'La culture de l\'igname est un art et un pilier de la culture Kanak. Elle peut être associée à des haricots grimpants qui utiliseront les tuteurs et enrichiront le sol en azote. La rotation des cultures reste fondamentale.'
     }
   },
   {
@@ -185,7 +185,7 @@ export const semisData: Vegetable[] = [
         'S\'adapte à tous types de sols pauvres, mais préfère un sol léger et bien drainé. Pas d\'engrais nécessaire en général.',
       pests: 'Cochenilles, acariens.',
       grandmaRecipe:
-        'La cendre de bois au pied des plants peut aider à limiter les attaques de certains insectes du sol.',
+        'Le manioc peut être associé avec des légumineuses à croissance rapide comme le haricot pour couvrir le sol, limiter les mauvaises herbes et enrichir la terre en azote.',
     },
   },
   {
@@ -217,7 +217,7 @@ export const semisData: Vegetable[] = [
       watering: 'Arrosage abondant et régulier au pied. Cesser l\'arrosage 1 à 2 semaines avant la récolte pour concentrer les sucres dans le fruit.',
       soilFertilizer: 'Sol très riche et bien drainé.',
       pests: 'Mildiou, oïdium.',
-      grandmaRecipe: 'Placer une tuile ou une planche sous chaque fruit pour l\'isoler de l\'humidité du sol et éviter la pourriture.'
+      grandmaRecipe: 'Placer une tuile ou une planche sous chaque fruit pour l\'isoler de l\'humidité du sol. Plantez des capucines ou des soucis à proximité pour repousser les insectes et attirer les pollinisateurs.'
     }
   },
   {
@@ -236,7 +236,7 @@ export const semisData: Vegetable[] = [
       soilFertilizer: 'Sol léger, sableux et bien drainé. N\'aime pas les excès d\'azote qui favorisent le feuillage au détriment des tubercules.',
       pests: 'Charançons de la patate douce, rats.',
       grandmaRecipe:
-        'Rotation des cultures indispensable. Ne pas replanter de patates douces au même endroit avant 3-4 ans pour limiter les risques de maladies et de charançons.',
+        'Son feuillage dense couvre le sol et limite les mauvaises herbes, ce qui en fait un bon compagnon pour des plantes hautes comme le maïs. La rotation des cultures reste indispensable.',
     },
   },
   {
@@ -252,7 +252,7 @@ export const semisData: Vegetable[] = [
       watering: 'Arrosage modéré mais régulier. Laisser la terre sécher légèrement entre deux arrosages.',
       soilFertilizer: 'Sol bien drainé, pas trop riche. Un excès d\'engrais favorise le feuillage au détriment des fruits.',
       pests: 'Pucerons et aleurodes.',
-      grandmaRecipe: 'Un paillage de feuilles de consoude au pied des plants est un excellent fertilisant naturel.'
+      grandmaRecipe: 'Le basilic planté à proximité peut améliorer la croissance et la saveur des piments, tout en repoussant certains nuisibles. La consoude en paillage est aussi un excellent fertilisant naturel.'
     }
   },
   {
@@ -268,7 +268,7 @@ export const semisData: Vegetable[] = [
       watering: 'Arrosage régulier lors de la formation des tubercules, mais sans excès pour éviter les maladies.',
       soilFertilizer: 'Sol riche et bien ameubli. Apprécie un bon apport de compost.',
       pests: 'Mildiou, doryphores (moins présents en NC).',
-      grandmaRecipe: 'Le purin de prêle en pulvérisation préventive aide à renforcer la plante contre le mildiou. La rotation des cultures est essentielle.'
+      grandmaRecipe: 'Plantez des haricots nains entre les rangs ; ils enrichissent le sol en azote. Les oeillets d\'Inde peuvent aider à éloigner les doryphores. Évitez la proximité des tomates.'
     }
   },
   {
@@ -287,7 +287,7 @@ export const semisData: Vegetable[] = [
       soilFertilizer: 'Sol léger, humifère et frais. Un bon compost suffit.',
       pests: 'Limaces et escargots.',
       grandmaRecipe:
-        'Disposer un cordon de cendres de bois, de coquilles d\'oeufs broyées ou de marc de café autour des plants pour créer une barrière anti-limaces.',
+        'Les radis semés à proximité ont un cycle court et seront récoltés avant que la salade ne prenne toute la place. Les soucis et le basilic aident à éloigner les nuisibles. Évitez le persil.',
     },
   },
   {
@@ -303,7 +303,7 @@ export const semisData: Vegetable[] = [
       watering: 'Nécessite beaucoup d\'eau, le sol ne doit jamais sécher. L\'irrigation par inondation est parfois pratiquée.',
       soilFertilizer: 'Sol très riche en matière organique, vaseux. Apprécie un bon paillage de feuilles.',
       pests: 'Doryphores du taro, pourriture des tubercules en cas de mauvais drainage.',
-      grandmaRecipe: 'La culture en rotation et le maintien d\'un écosystème de creek sain sont les meilleures préventions.'
+      grandmaRecipe: 'Le taro prospère dans un écosystème riche. Les plantes de berge comme les fougères aident à maintenir l\'humidité et l\'équilibre. La rotation des parcelles ("tarodières") est la meilleure prévention contre les maladies.'
     }
   },
   {
@@ -323,7 +323,7 @@ export const semisData: Vegetable[] = [
         'Sol riche, profond et bien drainé. Enrichir avec du compost bien mûr et un engrais spécial tomates.',
       pests: 'Mildiou, pucerons, aleurodes (mouches blanches), vers.',
       grandmaRecipe:
-        'Planter du basilic ou des oeillets d\'Inde à proximité pour repousser les nuisibles. Le purin d\'ortie en pulvérisation renforce la plante.',
+        'Planter du basilic ou des oeillets d\'Inde à proximité pour repousser les nuisibles. L\'odeur du basilic améliorerait même la saveur des tomates !',
     },
   },
 ];
