@@ -21,8 +21,6 @@ import { AppLogo } from './icons';
 import { SidebarNav } from './sidebar-nav';
 import {
   LogOut,
-  Settings,
-  Zap,
   ChevronLeft,
   ChevronRight,
   Calendar as CalendarIcon,
@@ -60,6 +58,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const auth = useAuth();
 
   const handleLogout = async () => {
+    if (!auth) return;
     await signOut(auth);
     router.push('/login');
   };
@@ -130,15 +129,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </p>
             </div>
           </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem>
-            <Zap className="mr-2 h-4 w-4" />
-            <span>Passer Pro</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <Settings className="mr-2 h-4 w-4" />
-            <span>Paramètres</span>
-          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleLogout}>
             <LogOut className="mr-2 h-4 w-4" />
