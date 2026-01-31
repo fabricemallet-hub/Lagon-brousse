@@ -44,6 +44,16 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
+    if (!auth) {
+      toast({
+        variant: "destructive",
+        title: "Erreur d'initialisation",
+        description: "Le service d'authentification n'est pas disponible. Veuillez réessayer.",
+      });
+      setIsLoading(false);
+      return;
+    }
+    
     try {
       if (mode === 'login') {
         await signInWithEmailAndPassword(auth, values.email, values.password);
@@ -63,8 +73,6 @@ export function AuthForm({ mode }: AuthFormProps) {
       // Handle specific Firebase Auth error codes
       switch (authError.code) {
         case 'auth/invalid-credential':
-        case 'auth/user-not-found':
-        case 'auth/wrong-password':
           errorMessage = 'Email ou mot de passe incorrect. Veuillez vérifier vos informations et réessayer.';
           break;
         case 'auth/email-already-in-use':
@@ -73,8 +81,13 @@ export function AuthForm({ mode }: AuthFormProps) {
         case 'auth/weak-password':
           errorMessage = 'Le mot de passe est trop faible. Il doit contenir au moins 6 caractères.';
           break;
+        case 'auth/too-many-requests':
+          errorMessage = "L'accès à ce compte a été temporairement désactivé en raison de nombreuses tentatives de connexion infructueuses. Veuillez réessayer plus tard.";
+          break;
+        case 'auth/network-request-failed':
+          errorMessage = "Un problème de réseau est survenu. Veuillez vérifier votre connexion Internet et réessayer.";
+          break;
         default:
-          // For other errors (network, config issues), show a general message
           errorMessage = "Un problème est survenu. Veuillez réessayer plus tard ou contacter le support si le problème persiste.";
           break;
       }
