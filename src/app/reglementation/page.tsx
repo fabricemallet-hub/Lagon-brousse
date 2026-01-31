@@ -14,10 +14,10 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
-import { Ban, Check, Scale, BookOpen } from 'lucide-react';
+import { Ban, Check, Scale, BookOpen, Crosshair } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const calendarData = [
+const fishingCalendarData = [
   {
     name: 'Picot',
     forbidden: [8, 9, 10, 11, 0], // Sep, Oct, Nov, Dec, Jan
@@ -45,6 +45,24 @@ const calendarData = [
   },
 ];
 
+const huntingCalendarData = [
+  {
+    name: 'Notou & Roussette',
+    allowed: [3, 4, 5], // Avril, Mai, Juin
+    details: 'Chasse autorisée uniquement les samedis et dimanches (quota max 5/jour/chasseur). Vente interdite toute l\'année.',
+  },
+  {
+    name: 'Gibier d\'eau (Canards, Sarcelle)',
+    allowed: [6, 7, 8, 9, 10], // Juillet à Novembre
+    details: 'Chasse autorisée du 1er juillet au 30 novembre inclus.',
+  },
+  {
+    name: 'Gibier terrestre',
+    allowed: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], // Toute l'année
+    details: 'Chasse autorisée sans quota. Inclut : Cerf, cochon, lapin, chèvre, faisan, dindon, canard Colvert, poule Sultane.',
+  },
+];
+
 const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
 
 
@@ -53,9 +71,9 @@ export default function ReglementationPage() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Réglementation de la Pêche</CardTitle>
+          <CardTitle>Réglementation</CardTitle>
           <CardDescription>
-            Résumé des principales règles de pêche de loisir en Province Sud.
+            Résumé des principales règles de pêche et de chasse de loisir en Province Sud.
             Ce guide ne remplace pas les textes officiels.
           </CardDescription>
         </CardHeader>
@@ -67,12 +85,9 @@ export default function ReglementationPage() {
             <BookOpen />
             Calendrier des Pêches
           </CardTitle>
-          <CardDescription>
-            Périodes d'interdiction pour certaines espèces clés.
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {calendarData.map((item) => (
+          {fishingCalendarData.map((item) => (
             <div key={item.name}>
               <h4 className="font-semibold text-lg mb-2">{item.name}</h4>
               <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-1">
@@ -104,8 +119,45 @@ export default function ReglementationPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
+            <Crosshair />
+            Calendrier de Chasse
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {huntingCalendarData.map((item) => (
+            <div key={item.name}>
+              <h4 className="font-semibold text-lg mb-2">{item.name}</h4>
+              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-1">
+                {months.map((month, index) => (
+                  <div
+                    key={month}
+                    className={cn(
+                      'flex flex-col items-center justify-center rounded-md h-16 text-center p-1 sm:p-2',
+                      item.allowed.includes(index)
+                        ? 'bg-green-600/10 text-green-800'
+                        : 'bg-destructive/10 text-destructive'
+                    )}
+                  >
+                    <span className="text-[10px] sm:text-xs font-bold">{month}</span>
+                    {item.allowed.includes(index) ? (
+                      <Check className="h-4 w-4 sm:h-5 sm:w-5 mt-1 text-green-600" />
+                    ) : (
+                      <Ban className="h-4 w-4 sm:h-5 sm:w-5 mt-1" />
+                    )}
+                  </div>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">{item.details}</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
             <Scale />
-            Autres Réglementations
+            Autres Réglementations (Pêche)
           </CardTitle>
         </CardHeader>
         <CardContent>
