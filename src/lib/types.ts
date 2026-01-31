@@ -37,8 +37,22 @@ export interface FarmingData {
   }[];
 }
 
+export interface FishRating {
+  name: string;
+  rating: number; // 1 to 10
+}
+
+export interface FishingSlot {
+  timeOfDay: string;
+  tide: string;
+  tideTime: string;
+  tideMovement: 'montante' | 'descendante' | 'étale';
+  fish: FishRating[];
+}
+
 export interface LocationData {
   weather: WeatherData;
   tides: Tide[];
   farming: FarmingData;
+  fishing: FishingSlot[];
 }

@@ -49,6 +49,52 @@ const noumeaData: LocationData = {
       },
     ],
   },
+  fishing: [
+    {
+      timeOfDay: 'Aube (05:00 - 07:00)',
+      tide: 'Marée basse',
+      tideTime: '04:15',
+      tideMovement: 'montante',
+      fish: [
+        { name: 'Carangue', rating: 8 },
+        { name: 'Mérou', rating: 7 },
+        { name: 'Bec de cane', rating: 9 },
+      ],
+    },
+    {
+      timeOfDay: 'Matinée (09:00 - 11:00)',
+      tide: 'Marée haute',
+      tideTime: '10:30',
+      tideMovement: 'descendante',
+      fish: [
+        { name: 'Poisson perroquet', rating: 6 },
+        { name: 'Mulet', rating: 7 },
+        { name: 'Loche', rating: 5 },
+      ],
+    },
+    {
+      timeOfDay: 'Après-midi (15:00 - 17:00)',
+      tide: 'Marée basse',
+      tideTime: '16:45',
+      tideMovement: 'montante',
+      fish: [
+        { name: 'Dawa', rating: 8 },
+        { name: 'Picot', rating: 6 },
+        { name: 'Bonite', rating: 7 },
+      ],
+    },
+    {
+      timeOfDay: 'Crépuscule (17:30 - 19:00)',
+      tide: 'Marée montante',
+      tideTime: '19:00',
+      tideMovement: 'montante',
+      fish: [
+        { name: 'Rouget', rating: 9 },
+        { name: 'Vivaneau', rating: 8 },
+        { name: 'Thon dents de chien', rating: 7 },
+      ],
+    },
+  ],
 };
 
 const data: Record<string, LocationData> = {
@@ -108,6 +154,52 @@ const data: Record<string, LocationData> = {
         },
       ],
     },
+    fishing: [
+      {
+        timeOfDay: 'Aube (05:00 - 07:00)',
+        tide: 'Marée basse',
+        tideTime: '04:30',
+        tideMovement: 'montante',
+        fish: [
+          { name: 'Carangue', rating: 8 },
+          { name: 'Mérou', rating: 7 },
+          { name: 'Bec de cane', rating: 9 },
+        ],
+      },
+      {
+        timeOfDay: 'Matinée (09:00 - 11:00)',
+        tide: 'Marée haute',
+        tideTime: '10:45',
+        tideMovement: 'descendante',
+        fish: [
+          { name: 'Poisson perroquet', rating: 6 },
+          { name: 'Mulet', rating: 7 },
+          { name: 'Loche', rating: 5 },
+        ],
+      },
+      {
+        timeOfDay: 'Après-midi (15:00 - 17:00)',
+        tide: 'Marée basse',
+        tideTime: '17:00',
+        tideMovement: 'montante',
+        fish: [
+          { name: 'Dawa', rating: 8 },
+          { name: 'Picot', rating: 6 },
+          { name: 'Bonite', rating: 7 },
+        ],
+      },
+      {
+        timeOfDay: 'Crépuscule (17:30 - 19:00)',
+        tide: 'Marée montante',
+        tideTime: '19:15',
+        tideMovement: 'montante',
+        fish: [
+          { name: 'Rouget', rating: 9 },
+          { name: 'Vivaneau', rating: 8 },
+          { name: 'Thon dents de chien', rating: 7 },
+        ],
+      },
+    ],
   },
   Kouaoua: noumeaData,
   Koumac: noumeaData,
@@ -171,6 +263,52 @@ const data: Record<string, LocationData> = {
         },
       ],
     },
+    fishing: [
+      {
+        timeOfDay: 'Aube (05:00 - 07:00)',
+        tide: 'Marée basse',
+        tideTime: '04:05',
+        tideMovement: 'montante',
+        fish: [
+          { name: 'Carangue', rating: 8 },
+          { name: 'Mérou', rating: 7 },
+          { name: 'Bec de cane', rating: 9 },
+        ],
+      },
+      {
+        timeOfDay: 'Matinée (09:00 - 11:00)',
+        tide: 'Marée haute',
+        tideTime: '10:20',
+        tideMovement: 'descendante',
+        fish: [
+          { name: 'Poisson perroquet', rating: 6 },
+          { name: 'Mulet', rating: 7 },
+          { name: 'Loche', rating: 5 },
+        ],
+      },
+      {
+        timeOfDay: 'Après-midi (15:00 - 17:00)',
+        tide: 'Marée basse',
+        tideTime: '16:35',
+        tideMovement: 'montante',
+        fish: [
+          { name: 'Dawa', rating: 8 },
+          { name: 'Picot', rating: 6 },
+          { name: 'Bonite', rating: 7 },
+        ],
+      },
+      {
+        timeOfDay: 'Crépuscule (17:30 - 19:00)',
+        tide: 'Marée montante',
+        tideTime: '18:50',
+        tideMovement: 'montante',
+        fish: [
+          { name: 'Rouget', rating: 9 },
+          { name: 'Vivaneau', rating: 8 },
+          { name: 'Thon dents de chien', rating: 7 },
+        ],
+      },
+    ],
   },
   Touho: noumeaData,
   Voh: noumeaData,
