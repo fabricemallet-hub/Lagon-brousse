@@ -14,6 +14,7 @@ import { getDataForDate } from '@/lib/data';
 import { Fish, Moon, Waves, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { fr } from 'date-fns/locale';
 
 export default function CalendrierPage() {
   const { selectedDate, setSelectedDate } = useDate();
@@ -40,14 +41,14 @@ export default function CalendrierPage() {
             jour les informations sur les autres pages.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col lg:flex-row gap-8 items-start">
-          <div className="flex-shrink-0">
+        <CardContent className="flex flex-col gap-8">
+          <div className="mx-auto">
             <Calendar
               mode="single"
               selected={selectedDate}
               onSelect={handleDateSelect}
               className="rounded-md border"
-              locale-fr
+              locale={fr}
             />
           </div>
           <div className="flex-grow w-full">
