@@ -102,6 +102,24 @@ function DayCell({
 
   const tides = data.tides.slice(0, 4);
 
+  const prevDate = new Date(day);
+  prevDate.setDate(day.getDate() - 1);
+  const prevData = getDataForDate(selectedLocation, prevDate);
+
+  const eventTexts = [];
+
+  const currentPhase = data.weather.moon.phase;
+  if (currentPhase !== prevData.weather.moon.phase) {
+    if (currentPhase === 'Premier quartier' || currentPhase === 'Dernier quartier') {
+      eventTexts.push(currentPhase);
+    }
+  }
+  
+  const currentTrend = data.farming.lunarPhase;
+  if (currentTrend !== prevData.farming.lunarPhase) {
+    eventTexts.push(currentTrend);
+  }
+
   return (
     <div
       onClick={() => onDateSelect(day)}
@@ -118,6 +136,13 @@ function DayCell({
         </div>
         <div className="font-semibold text-sm">{format(day, 'd')}</div>
       </div>
+      
+      {eventTexts.length > 0 && (
+        <div className="text-[10px] text-center text-accent font-semibold truncate leading-tight my-0.5">
+          {eventTexts.join(' / ')}
+        </div>
+      )}
+
       <div className="flex-grow flex items-center justify-center gap-0.5">
         {fishIcons}
       </div>
