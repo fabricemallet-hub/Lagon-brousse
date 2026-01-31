@@ -26,6 +26,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar as CalendarIcon,
+  BookOpen,
 } from 'lucide-react';
 import {
   Select,
@@ -44,6 +45,7 @@ import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { format, addDays, subDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import Link from 'next/link';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { locations, selectedLocation, setSelectedLocation } = useLocation();
@@ -183,6 +185,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
+              )}
+               {pathname === '/calendrier' && calendarView === 'champs' && (
+                 <Button asChild variant="outline" size="sm">
+                    <Link href="/semis">
+                      <BookOpen className="mr-2 h-4 w-4" />
+                      Guide de Culture
+                    </Link>
+                  </Button>
               )}
             </div>
 
