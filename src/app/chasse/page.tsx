@@ -184,7 +184,21 @@ export default function ChassePage() {
                 </p>
               </AccordionContent>
             </AccordionItem>
-            <AccordionItem value="item-3">
+             <AccordionItem value="item-3">
+              <AccordionTrigger>Parc des Grandes Fougères (Farino)</AccordionTrigger>
+              <AccordionContent className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Phone className="size-4" />
+                  <span>
+                    Contact : Maison du Parc (Tél : 44.35.00) ou Province Sud
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  La chasse y est très encadrée et vise à réguler les populations de cerfs et cochons. Elle n'est autorisée que lors de battues organisées à des dates spécifiques. Il est impératif de se renseigner auprès de la Maison du Parc pour connaître le calendrier et les modalités.
+                </p>
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="item-4">
               <AccordionTrigger>Plaine des Gaïacs (Koné)</AccordionTrigger>
               <AccordionContent className="space-y-2">
                 <div className="flex items-center gap-2">
@@ -198,7 +212,7 @@ export default function ChassePage() {
                 </p>
               </AccordionContent>
             </AccordionItem>
-            <AccordionItem value="item-4">
+            <AccordionItem value="item-5">
               <AccordionTrigger>
                 Chasses privées (La Foa, Boulouparis...)
               </AccordionTrigger>
