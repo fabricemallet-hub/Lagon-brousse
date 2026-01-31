@@ -327,7 +327,7 @@ export function getDataForDate(location: string, date?: Date): LocationData {
   const locationData = JSON.parse(JSON.stringify(baseData));
 
   // Deterministically vary data based on the day of the month and location for prototype purposes
-  const locationSeed = location.length;
+  const locationSeed = location.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   
   // Vary tides slightly
   locationData.tides.forEach((tide: Tide, i: number) => {
