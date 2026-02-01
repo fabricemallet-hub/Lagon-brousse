@@ -244,12 +244,28 @@ function DayCell({
             )}
           </div>
           <div className="space-y-0.5 text-[10px] font-mono text-muted-foreground">
-            {tides.map((tide, i) => (
-                <div key={i} className="flex justify-between px-1">
-                    <span>{tide.time}</span>
-                    <span>{tide.type === 'haute' ? 'H' : 'B'}: {tide.height.toFixed(2)}m</span>
+            {tides.map((tide, i) => {
+              const isHighTideHighlight =
+                tide.type === 'haute' && tide.height >= 1.7;
+              const isLowTideHighlight =
+                tide.type === 'basse' && tide.height <= 0.2;
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    'flex justify-between px-1',
+                    isHighTideHighlight && 'text-purple-600 font-bold',
+                    isLowTideHighlight && 'text-red-600 font-bold'
+                  )}
+                >
+                  <span>{tide.time}</span>
+                  <span>
+                    {tide.type === 'haute' ? 'H' : 'B'}:{' '}
+                    {tide.height.toFixed(2)}m
+                  </span>
                 </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ) : (
@@ -500,17 +516,30 @@ function PecheDetailDialogContent({
             <h4 className="font-semibold text-muted-foreground">
               Marées du jour
             </h4>
-            <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
-              {tides.map((tide, i) => (
-                <div key={i} className="flex justify-between">
-                  <span className="capitalize text-muted-foreground">
-                    {tide.type === 'haute' ? 'Haute' : 'Basse'}:
-                  </span>
-                  <span className="font-mono font-medium">
-                    {tide.time} ({tide.height.toFixed(2)}m)
-                  </span>
-                </div>
-              ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1 text-xs">
+              {tides.map((tide, i) => {
+                const isHighTideHighlight =
+                  tide.type === 'haute' && tide.height >= 1.7;
+                const isLowTideHighlight =
+                  tide.type === 'basse' && tide.height <= 0.2;
+                return (
+                  <div
+                    key={i}
+                    className={cn(
+                      'flex justify-between',
+                      isHighTideHighlight && 'text-purple-600',
+                      isLowTideHighlight && 'text-red-600'
+                    )}
+                  >
+                    <span className="capitalize text-muted-foreground">
+                      {tide.type === 'haute' ? 'Haute' : 'Basse'}:
+                    </span>
+                    <span className="font-mono font-bold">
+                      {tide.time} ({tide.height.toFixed(2)}m)
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -573,7 +602,7 @@ function PecheDetailDialogContent({
         </div>
         <Separator />
         <div className="space-y-4 pt-4">
-            <h4 className="font-semibold">Crabes & Langoustes</h4>
+            <h4 className="font-semibold">Crabes &amp; Langoustes</h4>
             <div className="flex items-start gap-3">
                 <CrabIcon className="h-6 w-6 text-primary mt-1" />
                 <div>

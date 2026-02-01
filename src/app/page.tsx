@@ -16,6 +16,7 @@ import {
 import { useLocation } from '@/context/location-context';
 import { useDate } from '@/context/date-context';
 import { WeatherForecast } from '@/components/ui/weather-forecast';
+import { cn } from '@/lib/utils';
 
 export default function Home() {
   const { selectedLocation } = useLocation();
@@ -56,16 +57,22 @@ export default function Home() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {tides.map((tide, index) => (
-              <div key={index} className="flex justify-between">
+            {tides.map((tide, index) => {
+              const isHighTideHighlight = tide.type === 'haute' && tide.height >= 1.7;
+              const isLowTideHighlight = tide.type === 'basse' && tide.height <= 0.2;
+              return (
+              <div key={index} className={cn("flex justify-between",
+                  isHighTideHighlight && "text-purple-600",
+                  isLowTideHighlight && "text-red-600",
+                )}>
                 <span className="text-muted-foreground capitalize">
                   Marée {tide.type}
                 </span>
-                <span className="font-medium">
+                <span className={cn("font-mono", (isHighTideHighlight || isLowTideHighlight) ? "font-bold" : "font-medium")}>
                   {tide.time} ({tide.height.toFixed(2)}m)
                 </span>
               </div>
-            ))}
+            )})}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Courant</span>
               <span className="font-medium">{tides[0].current}</span>

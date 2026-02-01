@@ -22,6 +22,7 @@ import { useLocation } from '@/context/location-context';
 import { useDate } from '@/context/date-context';
 import { WindMap } from '@/components/ui/wind-map';
 import type { WindDirection } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
 export default function LagonPage() {
   const { selectedLocation } = useLocation();
@@ -118,15 +119,22 @@ export default function LagonPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-            {tides.map((tide, i) => (
-              <div key={i} className="flex justify-between border-b pb-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+            {tides.map((tide, i) => {
+              const isHighTideHighlight = tide.type === 'haute' && tide.height >= 1.7;
+              const isLowTideHighlight = tide.type === 'basse' && tide.height <= 0.2;
+              return (
+              <div key={i} className={cn(
+                  "flex justify-between border-b pb-1",
+                   isHighTideHighlight && "text-purple-600",
+                   isLowTideHighlight && "text-red-600",
+                )}>
                 <span className="capitalize text-muted-foreground">
                   {tide.type}
                 </span>
-                <span className="font-mono font-medium">{tide.time} ({tide.height.toFixed(2)}m)</span>
+                <span className={cn("font-mono", (isHighTideHighlight || isLowTideHighlight) ? "font-bold" : "font-medium")}>{tide.time} ({tide.height.toFixed(2)}m)</span>
               </div>
-            ))}
+            )})}
           </div>
           <Separator />
           <div className="space-y-2">
