@@ -18,6 +18,7 @@ export interface HourlyForecast {
     | 'Nuit claire';
   windSpeed: number; // km/h
   windDirection: WindDirection;
+  stability: 'Stable' | 'Tournant';
   isNight: boolean;
   temp: number;
 }

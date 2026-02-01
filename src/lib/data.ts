@@ -433,7 +433,7 @@ export function generateProceduralData(location: string, date: Date): LocationDa
             else if (conditionSeed > 0.2) condition = 'Nuageux';
             else condition = 'Averses';
         }
-        locationData.weather.hourly.push({ date: forecastDate.toISOString(), condition: condition, windSpeed: windSpeed, windDirection: windDirection, isNight: isNight, temp: temp });
+        locationData.weather.hourly.push({ date: forecastDate.toISOString(), condition: condition, windSpeed: windSpeed, windDirection: windDirection, stability: 'Stable', isNight: isNight, temp: temp });
     }
     const currentHourForecast = locationData.weather.hourly.find(f => new Date(f.date).getHours() === effectiveDate.getHours());
     if (currentHourForecast) { locationData.weather.temp = currentHourForecast.temp; }
@@ -503,14 +503,26 @@ export async function getDataForDate(location: string, date: Date): Promise<Loca
     proceduralData.weather.moon.moonset = formatTime(todayForecast.moonset, timezoneOffset);
 
     // Map hourly forecast
-    proceduralData.weather.hourly = weatherApiData.hourly.map((h: any): HourlyForecast => {
+    proceduralData.weather.hourly = weatherApiData.hourly.map((h: any, index: number, arr: any[]): HourlyForecast => {
         const hourDate = new Date(h.dt * 1000);
         const isNight = hourDate.getHours() < 6 || hourDate.getHours() > 19;
+        
+        let stability: 'Stable' | 'Tournant' = 'Stable';
+        if (index > 0) {
+            const prevWindDeg = arr[index - 1].wind_deg;
+            const currentWindDeg = h.wind_deg;
+            const diff = Math.abs(prevWindDeg - currentWindDeg);
+            if (diff > 45 && diff < 315) { // more than 45 degree change, handles wrap-around
+                stability = 'Tournant';
+            }
+        }
+
         return {
             date: hourDate.toISOString(),
             condition: mapWeatherCondition(h.weather[0].id, isNight),
             windSpeed: Math.round(h.wind_speed * 3.6), // m/s to km/h
             windDirection: getWindDirection(h.wind_deg),
+            stability: stability,
             isNight: isNight,
             temp: Math.round(h.temp),
         }
@@ -524,14 +536,17 @@ export async function getDataForDate(location: string, date: Date): Promise<Loca
         proceduralData.weather.rain = 'Aucune';
     }
     
-    // update wind summary (less critical, can use first few hourly)
+    // update wind summary
     if(proceduralData.weather.hourly.length > 18) {
         proceduralData.weather.wind[0].speed = proceduralData.weather.hourly[6].windSpeed;
         proceduralData.weather.wind[0].direction = proceduralData.weather.hourly[6].windDirection;
+        proceduralData.weather.wind[0].stability = proceduralData.weather.hourly[6].stability;
         proceduralData.weather.wind[1].speed = proceduralData.weather.hourly[12].windSpeed;
         proceduralData.weather.wind[1].direction = proceduralData.weather.hourly[12].windDirection;
+        proceduralData.weather.wind[1].stability = proceduralData.weather.hourly[12].stability;
         proceduralData.weather.wind[2].speed = proceduralData.weather.hourly[18].windSpeed;
         proceduralData.weather.wind[2].direction = proceduralData.weather.hourly[18].windDirection;
+        proceduralData.weather.wind[2].stability = proceduralData.weather.hourly[18].stability;
     }
 
 
