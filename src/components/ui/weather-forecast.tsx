@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   CloudMoon,
   CloudSun,
@@ -16,6 +16,14 @@ import { fr } from 'date-fns/locale';
 import type { WeatherData, HourlyForecast, WindDirection } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Skeleton } from './skeleton';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+  type CarouselApi,
+} from '@/components/ui/carousel';
 
 const WeatherConditionIcon = ({
   condition,
@@ -82,41 +90,42 @@ const WindArrowIcon = ({ direction }: { direction: WindDirection }) => {
 };
 
 export function WeatherForecast({ weather }: { weather: WeatherData }) {
+  const [api, setApi] = useState<CarouselApi>();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isClient, setIsClient] = useState(false);
-  const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
-
+  
   useEffect(() => {
-    // When weather data changes, find the index for 12:00 PM.
-    const noonIndex = weather.hourly.findIndex(
-      (forecast) => new Date(forecast.date).getHours() === 12
-    );
-
+    if (!api) {
+      return;
+    }
+    
+    // Set initial state and scroll to noon
+    const noonIndex = weather.hourly.findIndex((forecast) => new Date(forecast.date).getHours() === 12);
     const targetIndex = noonIndex !== -1 ? noonIndex : 0;
     setSelectedIndex(targetIndex);
+    api.scrollTo(targetIndex, true);
 
-    // Scroll to the selected index instantly
-    setTimeout(() => {
-      if (listRef.current) {
-        const itemElement = listRef.current.querySelector(`[data-index="${targetIndex}"]`) as HTMLElement;
-        if (itemElement) {
-          itemElement.scrollIntoView({
-            behavior: 'auto',
-            block: 'nearest',
-          });
-        }
-      }
-    }, 0);
-  }, [weather]); // Re-run when weather data (i.e., the selected day) changes.
+    // Set up listener for subsequent selections
+    const onSelect = () => {
+      setSelectedIndex(api.selectedScrollSnap());
+    };
+    api.on('select', onSelect);
+    
+    // Clean up listener
+    return () => {
+      api.off('select', onSelect);
+    };
+  }, [api, weather]);
+
 
   const selectedForecast = weather.hourly[selectedIndex];
 
   if (!isClient || !selectedForecast) {
-    return <Skeleton className="h-[380px] w-full rounded-lg" />;
+    return <Skeleton className="h-[420px] w-full rounded-lg" />;
   }
 
   return (
@@ -166,50 +175,39 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
         </div>
       </div>
 
-      <div className="max-h-[260px] overflow-y-auto">
-        <div className="flex flex-col" ref={listRef}>
-          {weather.hourly.slice(0, 24).map((forecast, index) => {
-            const hour = new Date(forecast.date).getHours();
-            if (hour < 11 || hour > 14) {
-              return null;
-            }
-            return (
-              <div
+      <div className="p-4">
+        <Carousel setApi={setApi} opts={{ align: 'start' }}>
+          <CarouselContent>
+            {weather.hourly.slice(0, 24).map((forecast, index) => (
+              <CarouselItem
                 key={index}
-                data-index={index}
-                onClick={() => setSelectedIndex(index)}
-                className={cn(
-                  'flex items-center justify-between p-3 cursor-pointer border-b last:border-b-0',
-                  selectedIndex === index
-                    ? 'bg-blue-100'
-                    : 'bg-card hover:bg-muted/50'
-                )}
+                className="basis-1/4 sm:basis-1/5 md:basis-[12.5%]"
+                onClick={() => api?.scrollTo(index)}
               >
-                <div className="flex items-center gap-3">
+                <div
+                  className={cn(
+                    'flex flex-col items-center justify-between p-2 cursor-pointer rounded-lg border h-full space-y-2 text-center',
+                    selectedIndex === index
+                      ? 'bg-blue-100 border-blue-200'
+                      : 'bg-card hover:bg-muted/50'
+                  )}
+                >
+                  <p className="font-bold text-sm">
+                    {format(new Date(forecast.date), "HH'h'", { locale: fr })}
+                  </p>
                   <WeatherConditionIcon
                     condition={forecast.condition}
                     isNight={forecast.isNight}
                     className="size-6"
                   />
-                  <p className="font-bold w-12">
-                    {format(new Date(forecast.date), "HH'h'", { locale: fr })}
-                  </p>
+                  <p className="font-semibold text-sm">{forecast.temp}°</p>
                 </div>
-                <div className="flex items-center gap-4 text-sm">
-                  <p className="font-semibold w-8 text-center">
-                    {forecast.temp}°
-                  </p>
-                  <div className="flex items-center gap-1 w-20 justify-end">
-                    <WindArrowIcon direction={forecast.windDirection} />
-                    <p className="text-xs font-semibold">
-                      {forecast.windSpeed} km/h
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              </CarouselItem>
+            ))}
+          </CarouselContent>
+          <CarouselPrevious className="hidden sm:flex" />
+          <CarouselNext className="hidden sm:flex" />
+        </Carousel>
       </div>
     </div>
   );
