@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   format,
   startOfMonth,
@@ -17,7 +17,7 @@ import {
 import { fr } from 'date-fns/locale';
 import { useDate } from '@/context/date-context';
 import { useLocation } from '@/context/location-context';
-import { getDataForDate } from '@/lib/data';
+import { generateProceduralData, getDataForDate, LocationData } from '@/lib/data';
 import {
   Dialog,
   DialogContent,
@@ -49,10 +49,11 @@ import {
 import { Button } from './button';
 import { cn } from '@/lib/utils';
 import { useCalendarView } from '@/context/calendar-view-context';
-import type { FishRating, LocationData } from '@/lib/types';
+import type { FishRating } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { CrabIcon, LobsterIcon } from '../icons';
 import { Separator } from './separator';
+import { Skeleton } from './skeleton';
 
 export const MoonPhaseIcon = ({
   phase,
@@ -154,7 +155,7 @@ function DayCell({
 }) {
   const { selectedLocation } = useLocation();
   const { calendarView } = useCalendarView();
-  const data = getDataForDate(selectedLocation, day);
+  const data = generateProceduralData(selectedLocation, day);
 
   // Fishing data
   const allFishRatings: FishRating[] = data.fishing.flatMap(
@@ -189,7 +190,7 @@ function DayCell({
 
   const prevDate = new Date(day);
   prevDate.setDate(day.getDate() - 1);
-  const prevData = getDataForDate(selectedLocation, prevDate);
+  const prevData = generateProceduralData(selectedLocation, prevDate);
 
   const eventTexts = [];
 
@@ -369,6 +370,21 @@ function PecheLegend() {
   );
 }
 
+function DetailDialogSkeleton() {
+  return (
+    <div className="space-y-4 py-4">
+      <Skeleton className="h-8 w-3/4" />
+      <Skeleton className="h-5 w-1/2" />
+      <div className="space-y-4 pt-4">
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
+      </div>
+    </div>
+  )
+}
+
 function ChampsDetailDialogContent({
   day,
   location,
@@ -376,8 +392,25 @@ function ChampsDetailDialogContent({
   day: Date;
   location: string;
 }) {
-  const data = getDataForDate(location, day);
+  const [data, setData] = useState<LocationData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      setIsLoading(true);
+      const fetchedData = await getDataForDate(location, day);
+      setData(fetchedData);
+      setIsLoading(false);
+    }
+    fetchData();
+  }, [location, day]);
+
   const dateString = format(day, 'eeee d MMMM yyyy', { locale: fr });
+  
+  if (isLoading || !data) {
+    return <DetailDialogSkeleton />;
+  }
+  
   const { farming, weather } = data;
 
   return (
@@ -486,17 +519,35 @@ function PecheDetailDialogContent({
   day: Date;
   location: string;
 }) {
-  const data = getDataForDate(location, day);
-  const dateString = format(day, 'eeee d MMMM yyyy', { locale: fr });
-  const { fishing, weather, tides, pelagicInfo, crabAndLobster } = data;
+  const [data, setData] = useState<LocationData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
+  useEffect(() => {
+    async function fetchData() {
+      setIsLoading(true);
+      const fetchedData = await getDataForDate(location, day);
+      setData(fetchedData);
+      setIsLoading(false);
+    }
+    fetchData();
+  }, [location, day]);
+
+  const dateString = format(day, 'eeee d MMMM yyyy', { locale: fr });
+  
   const sortedTides = useMemo(() => {
+    if (!data) return [];
     const timeToMinutes = (time: string) => {
         const [hours, minutes] = time.split(':').map(Number);
         return hours * 60 + minutes;
     };
-    return [...tides].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
-  }, [tides]);
+    return [...data.tides].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+  }, [data]);
+  
+  if (isLoading || !data) {
+    return <DetailDialogSkeleton />;
+  }
+  
+  const { fishing, weather, pelagicInfo, crabAndLobster } = data;
 
   return (
     <>

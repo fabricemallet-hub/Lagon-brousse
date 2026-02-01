@@ -1,4 +1,5 @@
 import { LocationData, Tide, WindDirection, WindForecast, HourlyForecast } from './types';
+import { locations } from './locations';
 
 // Data from https://www.meteo.nc/nouvelle-caledonie/mer/previsions-site
 const tideStations = {
@@ -132,8 +133,29 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation'> = {
   }
 };
 
+function getWindDirection(deg: number): WindDirection {
+  const directions: WindDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  return directions[Math.round(deg / 45) % 8];
+}
 
-export function getDataForDate(location: string, date?: Date): LocationData {
+function mapWeatherCondition(owmId: number, isNight: boolean): HourlyForecast['condition'] {
+    if (owmId >= 200 && owmId < 300) return 'Averses'; // Thunderstorm -> Averses
+    if (owmId >= 300 && owmId < 600) return 'Pluvieux'; // Drizzle/Rain -> Pluvieux
+    if (owmId >= 600 && owmId < 700) return 'Averses'; // Snow -> Averses (NC context)
+    if (owmId >= 700 && owmId < 800) return 'Nuageux'; // Atmosphere (Mist, etc) -> Nuageux
+    if (owmId === 800) return isNight ? 'Nuit claire' : 'Ensoleillé';
+    if (owmId === 801 || owmId === 802) return 'Peu nuageux';
+    if (owmId === 803 || owmId === 804) return 'Nuageux';
+    return 'Nuageux'; // Default
+}
+
+function formatTime(unixTimestamp: number, timezoneOffset: number): string {
+    const date = new Date((unixTimestamp + timezoneOffset) * 1000);
+    return date.toISOString().substr(11, 5);
+}
+
+
+export function generateProceduralData(location: string, date: Date): LocationData {
   const effectiveDate = date || new Date();
   const dayOfMonth = effectiveDate.getDate();
   const month = effectiveDate.getMonth();
@@ -441,6 +463,85 @@ export function getDataForDate(location: string, date?: Date): LocationData {
 
   return locationData;
 }
+
+
+export async function getDataForDate(location: string, date: Date): Promise<LocationData> {
+  // First, get the base data with all the procedural info (tides, fishing, etc.)
+  const proceduralData = generateProceduralData(location, date);
+  
+  const apiKey = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY;
+  const locationCoords = locations[location];
+
+  if (!apiKey || !locationCoords) {
+    console.error("API key or location coordinates are missing.");
+    return proceduralData; // Return procedural data if setup is incomplete
+  }
+
+  const url = `https://api.openweathermap.org/data/3.0/onecall?lat=${locationCoords.lat}&lon=${locationCoords.lon}&appid=${apiKey}&units=metric&lang=fr`;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error(`OpenWeather API error: ${response.statusText}`);
+      return proceduralData; // Return procedural on API error
+    }
+    const weatherApiData = await response.json();
+
+    // Now, merge the API data into our procedural data structure
+    const todayForecast = weatherApiData.daily[0];
+    const timezoneOffset = weatherApiData.timezone_offset;
+
+    proceduralData.weather.temp = Math.round(weatherApiData.current.temp);
+    proceduralData.weather.tempMin = Math.round(todayForecast.temp.min);
+    proceduralData.weather.tempMax = Math.round(todayForecast.temp.max);
+    proceduralData.weather.uvIndex = Math.round(todayForecast.uvi);
+
+    // Use API-provided sun and moon times
+    proceduralData.weather.sun.sunrise = formatTime(todayForecast.sunrise, timezoneOffset);
+    proceduralData.weather.sun.sunset = formatTime(todayForecast.sunset, timezoneOffset);
+    proceduralData.weather.moon.moonrise = formatTime(todayForecast.moonrise, timezoneOffset);
+    proceduralData.weather.moon.moonset = formatTime(todayForecast.moonset, timezoneOffset);
+
+    // Map hourly forecast
+    proceduralData.weather.hourly = weatherApiData.hourly.map((h: any): HourlyForecast => {
+        const hourDate = new Date(h.dt * 1000);
+        const isNight = hourDate.getHours() < 6 || hourDate.getHours() > 19;
+        return {
+            date: hourDate.toISOString(),
+            condition: mapWeatherCondition(h.weather[0].id, isNight),
+            windSpeed: Math.round(h.wind_speed * 3.6), // m/s to km/h
+            windDirection: getWindDirection(h.wind_deg),
+            isNight: isNight,
+            temp: Math.round(h.temp),
+        }
+    }).slice(0, 48); // We only need 48 hours
+
+    // Update main weather trend
+    proceduralData.weather.trend = mapWeatherCondition(todayForecast.weather[0].id, false);
+    if(todayForecast.rain) {
+        proceduralData.weather.rain = todayForecast.rain > 5 ? 'Forte' : 'Fine';
+    } else {
+        proceduralData.weather.rain = 'Aucune';
+    }
+    
+    // update wind summary (less critical, can use first few hourly)
+    if(proceduralData.weather.hourly.length > 18) {
+        proceduralData.weather.wind[0].speed = proceduralData.weather.hourly[6].windSpeed;
+        proceduralData.weather.wind[0].direction = proceduralData.weather.hourly[6].windDirection;
+        proceduralData.weather.wind[1].speed = proceduralData.weather.hourly[12].windSpeed;
+        proceduralData.weather.wind[1].direction = proceduralData.weather.hourly[12].windDirection;
+        proceduralData.weather.wind[2].speed = proceduralData.weather.hourly[18].windSpeed;
+        proceduralData.weather.wind[2].direction = proceduralData.weather.hourly[18].windDirection;
+    }
+
+
+    return proceduralData;
+  } catch (error) {
+    console.error("Failed to fetch weather data:", error);
+    return proceduralData; // Return procedural data on fetch failure
+  }
+}
+
 
 export function getAvailableLocations(): string[] {
   return Object.keys(communeToTideStationMap).sort();

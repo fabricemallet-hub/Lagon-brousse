@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { getDataForDate } from '@/lib/data';
+import { getDataForDate, LocationData } from '@/lib/data';
 import {
   Waves,
   Wind,
@@ -23,14 +23,38 @@ import { Progress } from '@/components/ui/progress';
 import { useLocation } from '@/context/location-context';
 import { useDate } from '@/context/date-context';
 import { WindMap } from '@/components/ui/wind-map';
-import type { WindDirection } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
+
+function LagonSkeleton() {
+  return (
+     <div className="space-y-6">
+      <Skeleton className="h-28 w-full" />
+      <div className="grid gap-6 md:grid-cols-2">
+        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+      <Skeleton className="h-80 w-full" />
+    </div>
+  )
+}
 
 export default function LagonPage() {
   const { selectedLocation } = useLocation();
   const { selectedDate } = useDate();
-  const { weather, tides, tideStation } = getDataForDate(selectedLocation, selectedDate);
+  const [data, setData] = useState<LocationData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      setIsLoading(true);
+      const fetchedData = await getDataForDate(selectedLocation, selectedDate);
+      setData(fetchedData);
+      setIsLoading(false);
+    }
+    fetchData();
+  }, [selectedLocation, selectedDate]);
   
   const dateString = selectedDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
 
@@ -41,12 +65,19 @@ export default function LagonPage() {
   }
 
   const sortedTides = useMemo(() => {
+    if (!data) return [];
     const timeToMinutes = (time: string) => {
         const [hours, minutes] = time.split(':').map(Number);
         return hours * 60 + minutes;
     };
-    return [...tides].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
-  }, [tides]);
+    return [...data.tides].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+  }, [data]);
+
+  if (isLoading || !data) {
+    return <LagonSkeleton />;
+  }
+
+  const { weather, tideStation } = data;
 
   return (
     <div className="space-y-6">
@@ -70,7 +101,7 @@ export default function LagonPage() {
                         <p className="text-sm text-muted-foreground">{forecast.stability}</p>
                     </div>
                     <div className="text-right">
-                        <p className="font-semibold">{forecast.speed} nœuds</p>
+                        <p className="font-semibold">{forecast.speed} km/h</p>
                         <p className="text-sm text-muted-foreground">{forecast.direction}</p>
                     </div>
                 </div>
@@ -170,8 +201,8 @@ export default function LagonPage() {
             <h4 className="font-medium flex items-center gap-2">
               <Gauge className="text-primary" /> Force du Courant
             </h4>
-            <Progress value={currentStrength[tides[0].current as keyof typeof currentStrength]} className="h-2" />
-            <p className="text-sm text-muted-foreground text-right">{tides[0].current}</p>
+            <Progress value={currentStrength[data.tides[0].current as keyof typeof currentStrength]} className="h-2" />
+            <p className="text-sm text-muted-foreground text-right">{data.tides[0].current}</p>
           </div>
         </CardContent>
       </Card>

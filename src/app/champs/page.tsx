@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -7,7 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { getDataForDate } from '@/lib/data';
+import { getDataForDate, LocationData } from '@/lib/data';
 import {
   Spade,
   Scissors,
@@ -23,6 +24,7 @@ import type { LucideProps } from 'lucide-react';
 import { useLocation } from '@/context/location-context';
 import { useDate } from '@/context/date-context';
 import { MoonPhaseIcon } from '@/components/ui/lunar-calendar';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const icons: { [key: string]: React.FC<LucideProps> } = {
   Spade,
@@ -33,14 +35,48 @@ const icons: { [key: string]: React.FC<LucideProps> } = {
   RefreshCw,
 };
 
+function ChampsSkeleton() {
+  return (
+    <div className="space-y-6">
+      <Skeleton className="h-64 w-full" />
+       <div className="space-y-4">
+        <Skeleton className="h-9 w-64" />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function ChampsPage() {
   const { selectedLocation } = useLocation();
   const { selectedDate } = useDate();
-  const { farming, weather } = getDataForDate(selectedLocation, selectedDate);
+  const [data, setData] = useState<LocationData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      setIsLoading(true);
+      const fetchedData = await getDataForDate(selectedLocation, selectedDate);
+      setData(fetchedData);
+      setIsLoading(false);
+    }
+    fetchData();
+  }, [selectedLocation, selectedDate]);
+
   const dateString = selectedDate.toLocaleDateString('fr-FR', {
     day: 'numeric',
     month: 'long',
   });
+
+  if (isLoading || !data) {
+    return <ChampsSkeleton />;
+  }
+  
+  const { farming, weather } = data;
 
   return (
     <div className="space-y-6">

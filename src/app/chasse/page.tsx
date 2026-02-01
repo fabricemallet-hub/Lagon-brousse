@@ -1,5 +1,5 @@
 'use client';
-
+import { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { getDataForDate } from '@/lib/data';
+import { getDataForDate, LocationData } from '@/lib/data';
 import { useLocation } from '@/context/location-context';
 import { useDate } from '@/context/date-context';
 import { WindMap } from '@/components/ui/wind-map';
@@ -30,15 +30,49 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { ShootingTableCard } from '@/components/ui/shooting-table-card';
+import { Skeleton } from '@/components/ui/skeleton';
+
+function ChasseSkeleton() {
+  return (
+    <div className="space-y-6">
+      <Skeleton className="h-20 w-full" />
+      <Skeleton className="h-16 w-full" />
+      <div className="grid gap-6 md:grid-cols-2">
+        <Skeleton className="h-80 w-full" />
+        <Skeleton className="h-80 w-full" />
+      </div>
+      <Skeleton className="h-64 w-full" />
+      <Skeleton className="h-64 w-full" />
+    </div>
+  )
+}
 
 export default function ChassePage() {
   const { selectedLocation } = useLocation();
   const { selectedDate } = useDate();
-  const { hunting, weather } = getDataForDate(selectedLocation, selectedDate);
+  const [data, setData] = useState<LocationData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      setIsLoading(true);
+      const fetchedData = await getDataForDate(selectedLocation, selectedDate);
+      setData(fetchedData);
+      setIsLoading(false);
+    }
+    fetchData();
+  }, [selectedLocation, selectedDate]);
+  
   const dateString = selectedDate.toLocaleDateString('fr-FR', {
     day: 'numeric',
     month: 'long',
   });
+
+  if (isLoading || !data) {
+    return <ChasseSkeleton />;
+  }
+
+  const { hunting, weather } = data;
 
   return (
     <div className="space-y-6">
@@ -91,7 +125,7 @@ export default function ChassePage() {
                   <p className="text-muted-foreground">{forecast.stability}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xl font-bold">{forecast.speed} nœuds</p>
+                  <p className="text-xl font-bold">{forecast.speed} km/h</p>
                   <p className="text-muted-foreground">{forecast.direction}</p>
                 </div>
                 <WindMap direction={forecast.direction} className="w-16 h-24" />

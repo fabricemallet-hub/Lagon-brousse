@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { getDataForDate } from '@/lib/data';
+import { getDataForDate, LocationData } from '@/lib/data';
 import {
   Waves,
   Moon,
@@ -19,15 +19,40 @@ import { useLocation } from '@/context/location-context';
 import { useDate } from '@/context/date-context';
 import { WeatherForecast } from '@/components/ui/weather-forecast';
 import { cn } from '@/lib/utils';
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
+
+function HomeSkeleton() {
+  return (
+    <div className="flex flex-col gap-8">
+      <div>
+        <Skeleton className="h-9 w-48 mb-2" />
+        <Skeleton className="h-5 w-full max-w-sm" />
+      </div>
+      <Skeleton className="h-[420px] w-full" />
+      <div className="grid gap-6 md:grid-cols-2">
+        <Skeleton className="h-56 w-full" />
+        <Skeleton className="h-56 w-full" />
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   const { selectedLocation } = useLocation();
   const { selectedDate } = useDate();
-  const { weather, tides, farming, tideStation } = useMemo(() => getDataForDate(
-    selectedLocation,
-    selectedDate
-  ), [selectedLocation, selectedDate]);
+  const [data, setData] = useState<LocationData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      setIsLoading(true);
+      const fetchedData = await getDataForDate(selectedLocation, selectedDate);
+      setData(fetchedData);
+      setIsLoading(false);
+    }
+    fetchData();
+  }, [selectedLocation, selectedDate]);
 
   const dateString = selectedDate.toLocaleDateString('fr-FR', {
     weekday: 'long',
@@ -37,13 +62,19 @@ export default function Home() {
   });
 
   const sortedTides = useMemo(() => {
+    if (!data) return [];
     const timeToMinutes = (time: string) => {
         const [hours, minutes] = time.split(':').map(Number);
         return hours * 60 + minutes;
     };
-    return [...tides].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
-  }, [tides]);
+    return [...data.tides].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+  }, [data]);
 
+  if (isLoading || !data) {
+    return <HomeSkeleton />;
+  }
+
+  const { weather, farming, tideStation } = data;
 
   return (
     <div className="flex flex-col gap-8">
