@@ -59,7 +59,7 @@ export default function Home() {
           <CardContent className="space-y-4">
             {tides.map((tide, index) => {
               const isHighTideHighlight = tide.type === 'haute' && tide.height >= 1.7;
-              const isLowTideHighlight = tide.type === 'basse' && tide.height <= 0.2;
+              const isLowTideHighlight = tide.type === 'basse' && tide.height <= 0.23;
               return (
               <div key={index} className={cn("flex justify-between",
                   isHighTideHighlight && "text-purple-600",

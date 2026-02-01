@@ -248,7 +248,7 @@ function DayCell({
               const isHighTideHighlight =
                 tide.type === 'haute' && tide.height >= 1.7;
               const isLowTideHighlight =
-                tide.type === 'basse' && tide.height <= 0.2;
+                tide.type === 'basse' && tide.height <= 0.23;
               return (
                 <div
                   key={i}
@@ -521,7 +521,7 @@ function PecheDetailDialogContent({
                 const isHighTideHighlight =
                   tide.type === 'haute' && tide.height >= 1.7;
                 const isLowTideHighlight =
-                  tide.type === 'basse' && tide.height <= 0.2;
+                  tide.type === 'basse' && tide.height <= 0.23;
                 return (
                   <div
                     key={i}

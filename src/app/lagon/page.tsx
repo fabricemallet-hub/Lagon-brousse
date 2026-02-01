@@ -122,7 +122,7 @@ export default function LagonPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
             {tides.map((tide, i) => {
               const isHighTideHighlight = tide.type === 'haute' && tide.height >= 1.7;
-              const isLowTideHighlight = tide.type === 'basse' && tide.height <= 0.2;
+              const isLowTideHighlight = tide.type === 'basse' && tide.height <= 0.23;
               return (
               <div key={i} className={cn(
                   "flex justify-between border-b pb-1",
