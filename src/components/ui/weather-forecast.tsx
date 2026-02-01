@@ -10,6 +10,8 @@ import {
   CloudRain,
   ArrowRight,
   Moon,
+  Waves,
+  Zap,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -200,29 +202,38 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
             {weather.hourly.slice(0, 24).map((forecast, index) => (
               <CarouselItem
                 key={index}
-                className="basis-1/5 sm:basis-1/6"
+                className="basis-1/4 sm:basis-1/6"
                 onClick={() => api?.scrollTo(index)}
               >
                 <div
                   className={cn(
-                    'flex flex-col items-center justify-between p-3 cursor-pointer rounded-lg border h-full space-y-2 text-center',
+                    'flex flex-col items-center justify-between p-2 cursor-pointer rounded-lg border h-full space-y-1 text-center',
                     selectedIndex === index
                       ? 'bg-blue-100 border-blue-200'
                       : 'bg-card hover:bg-muted/50'
                   )}
                 >
-                  <p className="font-bold text-xl">
+                  <p className="font-bold text-lg">
                     {format(new Date(forecast.date), "HH'h'", { locale: fr })}
                   </p>
                   <WeatherConditionIcon
                     condition={forecast.condition}
                     isNight={forecast.isNight}
-                    className="size-12"
+                    className="size-10"
                   />
-                  <p className="font-bold text-3xl">{forecast.temp}°</p>
+                  <p className="font-bold text-2xl">{forecast.temp}°</p>
                   <div className="flex flex-col items-center text-muted-foreground">
-                    <WindArrowIcon direction={forecast.windDirection} className="size-7" />
-                    <span className="font-semibold text-lg">{forecast.windSpeed}</span>
+                    <WindArrowIcon direction={forecast.windDirection} className="size-6" />
+                    <span className="font-semibold text-base">{forecast.windSpeed}</span>
+                  </div>
+                  <div className="border-t w-full my-1"></div>
+                   <div className="flex items-center gap-1 text-muted-foreground" title="Hauteur de la marée">
+                      <Waves className="size-4" />
+                      <span className="font-semibold text-sm">{forecast.tideHeight.toFixed(1)}m</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-muted-foreground" title="Force du courant">
+                      <Zap className="size-4" />
+                      <span className="text-xs font-semibold">{forecast.tideCurrent}</span>
                   </div>
                 </div>
               </CarouselItem>

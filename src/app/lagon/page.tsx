@@ -14,15 +14,12 @@ import {
   Sunrise,
   Sunset,
   Moon,
-  Gauge,
   TrendingUp,
   TrendingDown,
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-import { Progress } from '@/components/ui/progress';
 import { useLocation } from '@/context/location-context';
 import { useDate } from '@/context/date-context';
-import { WindMap } from '@/components/ui/wind-map';
 import { cn } from '@/lib/utils';
 import { useMemo, useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -60,12 +57,6 @@ export default function LagonPage() {
   }, [firestore, selectedLocation, selectedDate]);
   
   const dateString = selectedDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
-
-  const currentStrength = {
-    'Faible': 20,
-    'Modéré': 50,
-    'Fort': 85,
-  }
 
   const sortedTides = useMemo(() => {
     if (!data) return [];
@@ -198,14 +189,6 @@ export default function LagonPage() {
                   </div>
               )
             })}
-          </div>
-          <Separator />
-          <div className="space-y-2">
-            <h4 className="font-medium flex items-center gap-2">
-              <Gauge className="text-primary" /> Force du Courant
-            </h4>
-            <Progress value={currentStrength[data.tides[0].current as keyof typeof currentStrength]} className="h-2" />
-            <p className="text-sm text-muted-foreground text-right">{data.tides[0].current}</p>
           </div>
         </CardContent>
       </Card>

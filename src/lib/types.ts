@@ -16,11 +16,13 @@ export interface HourlyForecast {
     | 'Averses'
     | 'Pluvieux'
     | 'Nuit claire';
-  windSpeed: number; // km/h
+  windSpeed: number; // in knots
   windDirection: WindDirection;
   stability: 'Stable' | 'Tournant';
   isNight: boolean;
   temp: number;
+  tideHeight: number;
+  tideCurrent: 'Nul' | 'Faible' | 'Modéré' | 'Fort';
 }
 
 export interface WeatherData {

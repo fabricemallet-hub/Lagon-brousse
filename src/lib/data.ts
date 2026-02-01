@@ -155,6 +155,100 @@ function formatTime(unixTimestamp: number, timezoneOffset: number): string {
     return date.toISOString().substr(11, 5);
 }
 
+function calculateHourlyTides(location: string, baseDate: Date): Pick<HourlyForecast, 'date' | 'tideHeight' | 'tideCurrent'>[] {
+    const getTidesForDay = (date: Date): Tide[] => {
+        const dayOfMonth = date.getDate();
+        const month = date.getMonth();
+        const year = date.getFullYear();
+        const dateSeed = dayOfMonth + month * 31 + year * 365.25;
+        const locationSeed = location.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        const tideStation = communeToTideStationMap[location] || 'Nouméa';
+        const stationTides = tideStations[tideStation as keyof typeof tideStations] || tideStations['Nouméa'];
+
+        const varyTime = (time: string, offset: number) => {
+            let [h, m] = time.split(':').map(Number);
+            m += Math.floor(Math.sin(dateSeed * 0.05 + locationSeed + offset) * 15);
+            if (m >= 60) { h = (h + 1) % 24; m %= 60; }
+            if (m < 0) { h = (h - 1 + 24) % 24; m += 60; }
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        }
+
+        const dailyTides: Tide[] = JSON.parse(JSON.stringify(stationTides.tides));
+        dailyTides.forEach((tide: Tide, i: number) => {
+            const baseTide = stationTides.tides[i % stationTides.tides.length];
+            const variation = Math.sin((dateSeed * (1 + i * 0.1) + locationSeed * 0.2)) * (baseTide.height * 0.1);
+            tide.height = parseFloat(Math.max(0.1, baseTide.height + variation).toFixed(2));
+            tide.time = varyTime(baseTide.time, i + 5);
+        });
+        return dailyTides;
+    }
+
+    const prevDate = new Date(baseDate);
+    prevDate.setDate(baseDate.getDate() - 1);
+    const nextDate = new Date(baseDate);
+    nextDate.setDate(baseDate.getDate() + 1);
+
+    const tidesPrev = getTidesForDay(prevDate);
+    const tidesToday = getTidesForDay(baseDate);
+    const tidesNext = getTidesForDay(nextDate);
+
+    const timeToMinutes = (timeStr: string) => {
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        return hours * 60 + minutes;
+    };
+
+    const allTideEvents = [
+        ...tidesPrev.map(t => ({ ...t, timeMinutes: timeToMinutes(t.time) - 24 * 60 })),
+        ...tidesToday.map(t => ({ ...t, timeMinutes: timeToMinutes(t.time) })),
+        ...tidesNext.map(t => ({ ...t, timeMinutes: timeToMinutes(t.time) + 24 * 60 })),
+    ].sort((a, b) => a.timeMinutes - b.timeMinutes);
+
+    const hourlyTides: Pick<HourlyForecast, 'date' | 'tideHeight' | 'tideCurrent'>[] = [];
+    const startDate = new Date(baseDate);
+    startDate.setHours(0, 0, 0, 0);
+
+    for (let i = 0; i < 48; i++) {
+        const currentHourDate = new Date(startDate.getTime() + i * 60 * 60 * 1000);
+        const totalMinutes = i * 60;
+
+        let nextTideIndex = allTideEvents.findIndex(t => t.timeMinutes > totalMinutes);
+        if (nextTideIndex === -1) nextTideIndex = allTideEvents.length - 1;
+        let prevTideIndex = nextTideIndex > 0 ? nextTideIndex - 1 : 0;
+
+        const prevTide = allTideEvents[prevTideIndex];
+        const nextTide = allTideEvents[nextTideIndex];
+
+        let tideHeight = prevTide.height;
+        let tideCurrent: 'Nul' | 'Faible' | 'Modéré' | 'Fort' = 'Nul';
+
+        const tideDuration = nextTide.timeMinutes - prevTide.timeMinutes;
+
+        if (tideDuration > 0) {
+            const timeSincePrevTide = totalMinutes - prevTide.timeMinutes;
+            const phase = (timeSincePrevTide / tideDuration) * Math.PI;
+
+            const amplitude = (prevTide.height - nextTide.height) / 2;
+            const midline = (prevTide.height + nextTide.height) / 2;
+            tideHeight = midline + amplitude * Math.cos(phase);
+
+            const maxTideRange = Math.abs(prevTide.height - nextTide.height);
+            const strengthValue = Math.abs(Math.sin(phase)) * maxTideRange;
+
+            if (strengthValue > 1.0) tideCurrent = 'Fort';
+            else if (strengthValue > 0.5) tideCurrent = 'Modéré';
+            else if (strengthValue > 0.1) tideCurrent = 'Faible';
+            else tideCurrent = 'Nul';
+        }
+
+        hourlyTides.push({
+            date: currentHourDate.toISOString(),
+            tideHeight: tideHeight,
+            tideCurrent: tideCurrent
+        });
+    }
+
+    return hourlyTides;
+}
 
 export function generateProceduralData(location: string, date: Date): LocationData {
   const effectiveDate = date || new Date();
@@ -435,7 +529,7 @@ export function generateProceduralData(location: string, date: Date): LocationDa
             else if (conditionSeed > 0.2) condition = 'Nuageux';
             else condition = 'Averses';
         }
-        locationData.weather.hourly.push({ date: forecastDate.toISOString(), condition: condition, windSpeed: windSpeed, windDirection: windDirection, stability: 'Stable', isNight: isNight, temp: temp });
+        locationData.weather.hourly.push({ date: forecastDate.toISOString(), condition: condition, windSpeed: windSpeed, windDirection: windDirection, stability: 'Stable', isNight: isNight, temp: temp, tideHeight: 0, tideCurrent: 'Nul' });
     }
     const currentHourForecast = locationData.weather.hourly.find(f => new Date(f.date).getHours() === effectiveDate.getHours());
     if (currentHourForecast) { locationData.weather.temp = currentHourForecast.temp; }
@@ -462,6 +556,20 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     } else {
         locationData.crabAndLobster = {...locationData.crabAndLobster, lobsterActivity: 'Moyenne', lobsterMessage: "Activité moyenne. Pêche possible à l'intérieur et à l'extérieur du lagon."};
     }
+
+    // Add hourly tide data
+    const hourlyTideData = calculateHourlyTides(location, effectiveDate);
+    locationData.weather.hourly.forEach(forecast => {
+        const forecastDate = new Date(forecast.date);
+        const correspondingTide = hourlyTideData.find(t => {
+            const tideDate = new Date(t.date);
+            return tideDate.getDate() === forecastDate.getDate() && tideDate.getHours() === forecastDate.getHours();
+        });
+        if (correspondingTide) {
+            forecast.tideHeight = correspondingTide.tideHeight;
+            forecast.tideCurrent = correspondingTide.tideCurrent;
+        }
+    });
 
   return locationData;
 }
@@ -522,8 +630,25 @@ export async function getDataForDate(firestore: Firestore, location: string, dat
             stability: stability,
             isNight: isNight,
             temp: Math.round(h.temp),
+            tideHeight: 0, // Placeholder
+            tideCurrent: 'Nul', // Placeholder
         }
     }).slice(0, 48);
+    
+    // Add hourly tide data to the now-populated hourly weather forecast
+    const hourlyTideData = calculateHourlyTides(location, date);
+    proceduralData.weather.hourly.forEach(forecast => {
+        const forecastDate = new Date(forecast.date);
+        const correspondingTide = hourlyTideData.find(t => {
+            const tideDate = new Date(t.date);
+            return tideDate.getDate() === forecastDate.getDate() && tideDate.getHours() === forecastDate.getHours();
+        });
+        if (correspondingTide) {
+            forecast.tideHeight = correspondingTide.tideHeight;
+            forecast.tideCurrent = correspondingTide.tideCurrent;
+        }
+    });
+
 
     proceduralData.weather.trend = mapWeatherCondition(todayForecast.weather[0].id, false);
     if(todayForecast.rain) {
