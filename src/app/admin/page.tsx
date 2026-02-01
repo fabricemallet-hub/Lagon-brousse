@@ -97,7 +97,7 @@ export default function AdminPage() {
       return;
     }
     setIsUpdatingArchive(true);
-    toast({ title: 'Mise à jour lancée', description: "Récupération des données de marées pour 90 jours. Cela peut prendre quelques minutes." });
+    toast({ title: 'Mise à jour lancée', description: "Récupération des données de marées pour 7 jours. Cela peut prendre quelques minutes." });
     try {
       await updateTideArchive(firestore);
       toast({ title: 'Succès', description: "L'archive des marées a été mise à jour." });
@@ -157,10 +157,10 @@ export default function AdminPage() {
         <CardContent>
           <Button onClick={handleArchiveUpdate} disabled={isUpdatingArchive}>
             {isUpdatingArchive && <Loader className="mr-2 h-4 w-4 animate-spin" />}
-            {isUpdatingArchive ? 'Mise à jour en cours...' : 'Forcer la mise à jour trimestrielle'}
+            {isUpdatingArchive ? 'Mise à jour en cours...' : 'Forcer la mise à jour hebdomadaire'}
           </Button>
           <p className="text-xs text-muted-foreground mt-2">
-            Lance une récupération des données de marées pour les 90 prochains jours. À n'utiliser qu'une fois par trimestre.
+            Lance une récupération des données de marées pour les 7 prochains jours. À n'utiliser qu'une fois par semaine si nécessaire.
           </p>
         </CardContent>
       </Card>

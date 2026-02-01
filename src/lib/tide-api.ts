@@ -56,7 +56,7 @@ export async function updateTideArchive(firestore: Firestore): Promise<void> {
         const stationDocRef = doc(firestore, 'stations', stationName);
         await setDoc(stationDocRef, { name: stationName, lat: coords.lat, lon: coords.lon }, { merge: true });
 
-        const url = `https://www.worldtides.info/api/v3?extremes&lat=${coords.lat}&lon=${coords.lon}&start=${startTimestamp}&days=90&key=${apiKey}`;
+        const url = `https://www.worldtides.info/api/v3?extremes&lat=${coords.lat}&lon=${coords.lon}&start=${startTimestamp}&days=7&key=${apiKey}`;
         
         const response = await fetch(url);
         if (!response.ok) {
