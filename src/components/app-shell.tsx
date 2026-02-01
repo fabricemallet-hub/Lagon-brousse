@@ -314,7 +314,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             status === 'limited' && 'mt-10'
           )}>
             <SidebarTrigger />
-            <div className="w-full flex-1 flex items-center justify-between flex-wrap gap-y-2">
+            <div className="w-full flex-1 flex items-center flex-wrap gap-y-2">
               <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
                 
                 {status === 'trial' && <Badge variant="secondary">Version d'essai</Badge>}
@@ -334,6 +334,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     ))}
                   </SelectContent>
                 </Select>
+
+                {pathname === '/calendrier' && (
+                  <div className="flex items-center space-x-2">
+                    <Label
+                      htmlFor="calendar-view"
+                      className="text-sm font-medium"
+                    >
+                      Pêche
+                    </Label>
+                    <Switch
+                      id="calendar-view"
+                      checked={calendarView === 'champs'}
+                      onCheckedChange={(checked) =>
+                        setCalendarView(checked ? 'champs' : 'peche')
+                      }
+                    />
+                    <Label
+                      htmlFor="calendar-view"
+                      className="text-sm font-medium"
+                    >
+                      Champs
+                    </Label>
+                  </div>
+                )}
+
                 {showDayNavigator && (
                   <div className="flex items-center gap-1 rounded-md border bg-background p-1">
                     <Button
@@ -383,29 +408,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 )}
               </div>
 
-              {pathname === '/calendrier' && (
-                <div className="flex items-center space-x-2">
-                  <Label
-                    htmlFor="calendar-view"
-                    className="text-sm font-medium"
-                  >
-                    Pêche
-                  </Label>
-                  <Switch
-                    id="calendar-view"
-                    checked={calendarView === 'champs'}
-                    onCheckedChange={(checked) =>
-                      setCalendarView(checked ? 'champs' : 'peche')
-                    }
-                  />
-                  <Label
-                    htmlFor="calendar-view"
-                    className="text-sm font-medium"
-                  >
-                    Champs
-                  </Label>
-                </div>
-              )}
             </div>
           </header>
           <div className={cn(
