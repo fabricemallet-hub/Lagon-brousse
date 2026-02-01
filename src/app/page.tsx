@@ -24,10 +24,10 @@ import { useMemo } from 'react';
 export default function Home() {
   const { selectedLocation } = useLocation();
   const { selectedDate } = useDate();
-  const { weather, tides, farming, tideStation } = getDataForDate(
+  const { weather, tides, farming, tideStation } = useMemo(() => getDataForDate(
     selectedLocation,
     selectedDate
-  );
+  ), [selectedLocation, selectedDate]);
 
   const dateString = selectedDate.toLocaleDateString('fr-FR', {
     weekday: 'long',
