@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, limit, getDocs, doc, documentId } from 'firebase/firestore';
 import type { UserAccount } from '@/lib/types';
@@ -52,34 +52,33 @@ export default function AdminPage() {
   }, [allUsers, areUsersLoading]);
 
   // Fetch tide archive status
-  useEffect(() => {
+  const checkArchive = useCallback(async () => {
     if (!firestore) return;
     setIsArchiveLoading(true);
-    const checkArchive = async () => {
-      try {
-        const q = query(
-          collection(firestore, 'stations/Nouméa/tides'),
-          orderBy(documentId(), 'desc'),
-          limit(1)
-        );
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          const lastDoc = querySnapshot.docs[0];
-          const [year, month, day] = lastDoc.id.split('-').map(Number);
-          const lastDate = new Date(year, month - 1, day);
-          setArchiveEndDate(format(lastDate, 'dd MMMM yyyy', { locale: fr }));
-        } else {
-          setArchiveEndDate(null);
-        }
-      } catch (error) {
-        console.error("Failed to check tide archive:", error);
-        setArchiveEndDate('Erreur');
-      } finally {
-        setIsArchiveLoading(false);
+    try {
+      const querySnapshot = await getDocs(collection(firestore, 'stations/Nouméa/tides'));
+      if (!querySnapshot.empty) {
+        // Sort documents by ID (date string 'YYYY-MM-DD') descending on the client
+        const sortedDocs = querySnapshot.docs.sort((a, b) => b.id.localeCompare(a.id));
+        const lastDoc = sortedDocs[0];
+        const [year, month, day] = lastDoc.id.split('-').map(Number);
+        // Use Date.UTC to correctly handle the date string regardless of client timezone
+        const lastDate = new Date(Date.UTC(year, month - 1, day));
+        setArchiveEndDate(format(lastDate, 'dd MMMM yyyy', { locale: fr }));
+      } else {
+        setArchiveEndDate(null);
       }
-    };
-    checkArchive();
+    } catch (error) {
+      console.error("Failed to check tide archive:", error);
+      setArchiveEndDate('Erreur');
+    } finally {
+      setIsArchiveLoading(false);
+    }
   }, [firestore]);
+  
+  useEffect(() => {
+    checkArchive();
+  }, [checkArchive]);
 
   // Route protection
   useEffect(() => {
@@ -102,11 +101,7 @@ export default function AdminPage() {
     try {
       await updateTideArchive(firestore);
       toast({ title: 'Succès', description: "L'archive des marées a été mise à jour." });
-       // Re-check archive status
-        const q = query(collection(firestore, 'stations/Nouméa/tides'), orderBy(documentId(), 'desc'), limit(1));
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) setArchiveEndDate(format(new Date(querySnapshot.docs[0].id), 'dd MMMM yyyy', { locale: fr }));
-
+      await checkArchive(); // Re-run the check
     } catch (error: any) {
       console.error(error);
       toast({ variant: 'destructive', title: 'Erreur de mise à jour', description: error.message || 'Une erreur inconnue est survenue.' });
