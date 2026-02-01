@@ -468,21 +468,8 @@ export function generateProceduralData(location: string, date: Date): LocationDa
 
 
 export async function getDataForDate(firestore: Firestore, location: string, date: Date): Promise<LocationData> {
-  const tideStation = communeToTideStationMap[location] || 'Nouméa';
-  // Use UTC date string to avoid timezone issues for document IDs
-  const dateStr = date.toISOString().slice(0, 10);
-  const tideDocRef = doc(firestore, 'stations', tideStation, 'tides', dateStr);
-  const tideDocSnap = await getDoc(tideDocRef);
-  
-  // Always generate procedural data first as a base
+  // Always generate procedural data first as a base. This includes the hardcoded tides.
   const proceduralData = generateProceduralData(location, date);
-
-  // If a tide document exists in Firestore, override the procedural tides
-  if (tideDocSnap.exists()) {
-    const firestoreTides = tideDocSnap.data().tides as any[];
-    // We need to add the 'current' property which is not stored in the archive
-    proceduralData.tides = firestoreTides.map(t => ({...t, current: 'Modéré'}));
-  }
 
   // Then, fetch real-time weather from OpenWeatherMap
   const apiKey = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY;
