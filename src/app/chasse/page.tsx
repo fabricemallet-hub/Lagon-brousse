@@ -125,7 +125,7 @@ export default function ChassePage() {
                   <p className="text-muted-foreground">{forecast.stability}</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xl font-bold">{forecast.speed} km/h</p>
+                  <p className="text-xl font-bold">{forecast.speed} nœuds</p>
                   <p className="text-muted-foreground">{forecast.direction}</p>
                 </div>
                 <WindMap direction={forecast.direction} className="w-16 h-24" />

@@ -76,9 +76,9 @@ const communeToTideStationMap: { [key: string]: string } = {
 const baseData: Omit<LocationData, 'tides' | 'tideStation'> = {
   weather: {
     wind: [
-      { time: '06:00', speed: 15, direction: 'SE', stability: 'Stable' },
-      { time: '12:00', speed: 20, direction: 'S', stability: 'Stable' },
-      { time: '18:00', speed: 12, direction: 'SE', stability: 'Tournant' },
+      { time: '06:00', speed: 8, direction: 'SE', stability: 'Stable' },
+      { time: '12:00', speed: 11, direction: 'S', stability: 'Stable' },
+      { time: '18:00', speed: 6, direction: 'SE', stability: 'Tournant' },
     ],
     swell: { inside: '0.5m', outside: '1.2m', period: 8 },
     sun: { sunrise: '06:31', sunset: '17:45' },
@@ -270,7 +270,7 @@ export function generateProceduralData(location: string, date: Date): LocationDa
 
   // Vary Wind
   locationData.weather.wind.forEach((forecast: WindForecast, index: number) => {
-    forecast.speed = Math.max(0, Math.round(15 + Math.sin(dateSeed * 0.2 + locationSeed + index) * 10));
+    forecast.speed = Math.max(0, Math.round(8 + Math.sin(dateSeed * 0.2 + locationSeed + index) * 5)); // in knots
     const directions: WindDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
     forecast.direction = directions[Math.floor(((dateSeed / 5) + locationSeed + index * 2) % directions.length)];
     const windStabilities: ('Stable' | 'Tournant')[] = ['Stable', 'Tournant'];
@@ -422,7 +422,8 @@ export function generateProceduralData(location: string, date: Date): LocationDa
         const temp = Math.round(baseTempMin + ((baseTempMax - baseTempMin) / 2) * (1 + tempVariation) + Math.sin(dateSeed+i/2)*2);
         const directions: WindDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
         const windDirection = directions[Math.floor((dateSeed/2 + hour/3 + locationSeed/100) % directions.length)];
-        const windSpeed = Math.round(5 + Math.abs(Math.sin(dateSeed + hour/4 + locationSeed/1000)) * 25);
+        const windSpeedInKmh = 5 + Math.abs(Math.sin(dateSeed + hour/4 + locationSeed/1000)) * 25;
+        const windSpeed = Math.round(windSpeedInKmh * 0.539957); // in knots
         let condition : HourlyForecast['condition'] = 'Ensoleillé';
         const conditionSeed = (Math.cos(dateSeed * 0.5 + i * 0.2 + locationSeed) + 1) / 2;
         if (isNight) {
@@ -520,7 +521,7 @@ export async function getDataForDate(location: string, date: Date): Promise<Loca
         return {
             date: hourDate.toISOString(),
             condition: mapWeatherCondition(h.weather[0].id, isNight),
-            windSpeed: Math.round(h.wind_speed * 3.6), // m/s to km/h
+            windSpeed: Math.round(h.wind_speed * 1.94384), // m/s to knots
             windDirection: getWindDirection(h.wind_deg),
             stability: stability,
             isNight: isNight,

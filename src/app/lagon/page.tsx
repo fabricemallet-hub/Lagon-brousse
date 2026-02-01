@@ -101,7 +101,7 @@ export default function LagonPage() {
                         <p className="text-sm text-muted-foreground">{forecast.stability}</p>
                     </div>
                     <div className="text-right">
-                        <p className="font-semibold">{forecast.speed} km/h</p>
+                        <p className="font-semibold">{forecast.speed} nœuds</p>
                         <p className="text-sm text-muted-foreground">{forecast.direction}</p>
                     </div>
                 </div>
