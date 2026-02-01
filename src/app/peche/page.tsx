@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { CrabIcon, LobsterIcon } from '@/components/icons';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useFirestore } from '@/firebase';
 
 function PecheSkeleton() {
   return (
@@ -36,18 +37,20 @@ function PecheSkeleton() {
 export default function PechePage() {
   const { selectedLocation } = useLocation();
   const { selectedDate } = useDate();
+  const firestore = useFirestore();
   const [data, setData] = useState<LocationData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (!firestore) return;
     async function fetchData() {
       setIsLoading(true);
-      const fetchedData = await getDataForDate(selectedLocation, selectedDate);
+      const fetchedData = await getDataForDate(firestore, selectedLocation, selectedDate);
       setData(fetchedData);
       setIsLoading(false);
     }
     fetchData();
-  }, [selectedLocation, selectedDate]);
+  }, [firestore, selectedLocation, selectedDate]);
   
   const dateString = selectedDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
 

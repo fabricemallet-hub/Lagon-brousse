@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/accordion';
 import { ShootingTableCard } from '@/components/ui/shooting-table-card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useFirestore } from '@/firebase';
 
 function ChasseSkeleton() {
   return (
@@ -50,18 +51,20 @@ function ChasseSkeleton() {
 export default function ChassePage() {
   const { selectedLocation } = useLocation();
   const { selectedDate } = useDate();
+  const firestore = useFirestore();
   const [data, setData] = useState<LocationData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (!firestore) return;
     async function fetchData() {
       setIsLoading(true);
-      const fetchedData = await getDataForDate(selectedLocation, selectedDate);
+      const fetchedData = await getDataForDate(firestore, selectedLocation, selectedDate);
       setData(fetchedData);
       setIsLoading(false);
     }
     fetchData();
-  }, [selectedLocation, selectedDate]);
+  }, [firestore, selectedLocation, selectedDate]);
   
   const dateString = selectedDate.toLocaleDateString('fr-FR', {
     day: 'numeric',

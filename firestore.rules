@@ -10,6 +10,8 @@
  * - /locations/{locationId}: Contains public location data that is readable by any client,
  *   including unauthenticated ones. Writes to this collection are locked down to prevent
  *   unauthorized modification, assuming this data is managed externally.
+ * - /stations/{stationId}: Contains public tide station data. Readable by all, writable only by admin.
+ * - /stations/{stationId}/tides/{date}: Contains archived tide data. Readable by all, writable only by admin.
  *
  * Key Security Decisions:
  * - User Isolation: A user can only interact with their own document at /users/{userId}.
@@ -97,11 +99,6 @@ service cloud.firestore {
     /**
      * @description Controls access to private user account documents.
      * @path /users/{userId}
-     * @allow (get) An authenticated user reads their own document: GET /users/user_abc
-     * @allow (create) A new user creates their own account document: CREATE /users/user_abc with { id: "user_abc", ... }
-     * @deny (get) A user tries to read another user's document: GET /users/user_xyz
-     * @deny (list) Any user tries to list all user documents: LIST /users
-     * @principle Restricts access to a user's own data tree and enforces relational integrity between the path and document data.
      */
     match /users/{userId} {
       allow get: if isOwner(userId);
@@ -114,18 +111,33 @@ service cloud.firestore {
     /**
      * @description Controls access to the public collection of locations.
      * @path /locations/{locationId}
-     * @allow (get) Any client (authenticated or not) can read a location: GET /locations/paris
-     * @allow (list) Any client (authenticated or not) can list all locations: LIST /locations
-     * @deny (create) Any user attempts to add a new location: CREATE /locations/london
-     * @deny (update) Any user attempts to modify an existing location: UPDATE /locations/paris
-     * @principle Provides public read access for shared application data while preventing all client-side writes, ensuring data integrity.
      */
     match /locations/{locationId} {
       allow get: if true;
       allow list: if true;
-      allow create: if false; // Only trusted server processes should write location data
+      allow create: if false; 
       allow update: if false;
       allow delete: if false;
+    }
+
+    /**
+     * @description Controls access to tide station metadata and their archived tide data.
+     * @path /stations/{stationId}
+     */
+    match /stations/{stationId} {
+      allow get: if true;
+      allow list: if true;
+      allow create, update, delete: if isAdmin();
+
+      /**
+       * @description Archived tide data for a specific station and date.
+       * @path /stations/{stationId}/tides/{date}
+       */
+      match /tides/{date} {
+        allow get: if true;
+        allow list: if true; // Allows querying for date ranges
+        allow create, update, delete: if isAdmin();
+      }
     }
   }
 }

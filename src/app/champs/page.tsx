@@ -25,6 +25,7 @@ import { useLocation } from '@/context/location-context';
 import { useDate } from '@/context/date-context';
 import { MoonPhaseIcon } from '@/components/ui/lunar-calendar';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useFirestore } from '@/firebase';
 
 const icons: { [key: string]: React.FC<LucideProps> } = {
   Spade,
@@ -54,18 +55,20 @@ function ChampsSkeleton() {
 export default function ChampsPage() {
   const { selectedLocation } = useLocation();
   const { selectedDate } = useDate();
+  const firestore = useFirestore();
   const [data, setData] = useState<LocationData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (!firestore) return;
     async function fetchData() {
       setIsLoading(true);
-      const fetchedData = await getDataForDate(selectedLocation, selectedDate);
+      const fetchedData = await getDataForDate(firestore, selectedLocation, selectedDate);
       setData(fetchedData);
       setIsLoading(false);
     }
     fetchData();
-  }, [selectedLocation, selectedDate]);
+  }, [firestore, selectedLocation, selectedDate]);
 
   const dateString = selectedDate.toLocaleDateString('fr-FR', {
     day: 'numeric',

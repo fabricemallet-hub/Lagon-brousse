@@ -1,5 +1,6 @@
 import { LocationData, Tide, WindDirection, WindForecast, HourlyForecast } from './types';
 import { locations } from './locations';
+import { Firestore, doc, getDoc } from 'firebase/firestore';
 
 // Data from https://www.meteo.nc/nouvelle-caledonie/mer/previsions-site
 const tideStations = {
@@ -61,7 +62,7 @@ const tideStations = {
   }
 };
 
-const communeToTideStationMap: { [key: string]: string } = {
+export const communeToTideStationMap: { [key: string]: string } = {
   'Bélep': 'Koumac', 'Boulouparis': 'Nouméa', 'Bourail': 'Bourail', 'Canala': 'Thio',
   'Dumbéa': 'Nouméa', 'Farino': 'Bourail', 'Hienghène': 'Hienghène', 'Houaïlou': 'Hienghène',
   "L'Île-des-Pins": 'Nouméa', 'Kaala-Gomen': 'Koumac', 'Koné': 'Koné', 'Kouaoua': 'Thio',
@@ -466,16 +467,30 @@ export function generateProceduralData(location: string, date: Date): LocationDa
 }
 
 
-export async function getDataForDate(location: string, date: Date): Promise<LocationData> {
-  // First, get the base data with all the procedural info (tides, fishing, etc.)
-  const proceduralData = generateProceduralData(location, date);
+export async function getDataForDate(firestore: Firestore, location: string, date: Date): Promise<LocationData> {
+  const tideStation = communeToTideStationMap[location] || 'Nouméa';
+  // Use UTC date string to avoid timezone issues for document IDs
+  const dateStr = date.toISOString().slice(0, 10);
+  const tideDocRef = doc(firestore, 'stations', tideStation, 'tides', dateStr);
+  const tideDocSnap = await getDoc(tideDocRef);
   
+  // Always generate procedural data first as a base
+  const proceduralData = generateProceduralData(location, date);
+
+  // If a tide document exists in Firestore, override the procedural tides
+  if (tideDocSnap.exists()) {
+    const firestoreTides = tideDocSnap.data().tides as any[];
+    // We need to add the 'current' property which is not stored in the archive
+    proceduralData.tides = firestoreTides.map(t => ({...t, current: 'Modéré'}));
+  }
+
+  // Then, fetch real-time weather from OpenWeatherMap
   const apiKey = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY;
   const locationCoords = locations[location];
 
   if (!apiKey || !locationCoords) {
-    console.error("API key or location coordinates are missing.");
-    return proceduralData; // Return procedural data if setup is incomplete
+    console.warn("API key or location coordinates are missing. Using only procedural data.");
+    return proceduralData;
   }
 
   const url = `https://api.openweathermap.org/data/3.0/onecall?lat=${locationCoords.lat}&lon=${locationCoords.lon}&appid=${apiKey}&units=metric&lang=fr`;
@@ -484,11 +499,9 @@ export async function getDataForDate(location: string, date: Date): Promise<Loca
     const response = await fetch(url);
     if (!response.ok) {
       console.error(`OpenWeather API error: ${response.statusText}`);
-      return proceduralData; // Return procedural on API error
+      return proceduralData;
     }
     const weatherApiData = await response.json();
-
-    // Now, merge the API data into our procedural data structure
     const todayForecast = weatherApiData.daily[0];
     const timezoneOffset = weatherApiData.timezone_offset;
 
@@ -496,14 +509,11 @@ export async function getDataForDate(location: string, date: Date): Promise<Loca
     proceduralData.weather.tempMin = Math.round(todayForecast.temp.min);
     proceduralData.weather.tempMax = Math.round(todayForecast.temp.max);
     proceduralData.weather.uvIndex = Math.round(todayForecast.uvi);
-
-    // Use API-provided sun and moon times
     proceduralData.weather.sun.sunrise = formatTime(todayForecast.sunrise, timezoneOffset);
     proceduralData.weather.sun.sunset = formatTime(todayForecast.sunset, timezoneOffset);
     proceduralData.weather.moon.moonrise = formatTime(todayForecast.moonrise, timezoneOffset);
     proceduralData.weather.moon.moonset = formatTime(todayForecast.moonset, timezoneOffset);
 
-    // Map hourly forecast
     proceduralData.weather.hourly = weatherApiData.hourly.map((h: any, index: number, arr: any[]): HourlyForecast => {
         const hourDate = new Date(h.dt * 1000);
         const isNight = hourDate.getHours() < 6 || hourDate.getHours() > 19;
@@ -513,23 +523,21 @@ export async function getDataForDate(location: string, date: Date): Promise<Loca
             const prevWindDeg = arr[index - 1].wind_deg;
             const currentWindDeg = h.wind_deg;
             const diff = Math.abs(prevWindDeg - currentWindDeg);
-            if (diff > 45 && diff < 315) { // more than 45 degree change, handles wrap-around
+            if (diff > 45 && diff < 315) {
                 stability = 'Tournant';
             }
         }
-
         return {
             date: hourDate.toISOString(),
             condition: mapWeatherCondition(h.weather[0].id, isNight),
-            windSpeed: Math.round(h.wind_speed * 1.94384), // m/s to knots
+            windSpeed: Math.round(h.wind_speed * 1.94384),
             windDirection: getWindDirection(h.wind_deg),
             stability: stability,
             isNight: isNight,
             temp: Math.round(h.temp),
         }
-    }).slice(0, 48); // We only need 48 hours
+    }).slice(0, 48);
 
-    // Update main weather trend
     proceduralData.weather.trend = mapWeatherCondition(todayForecast.weather[0].id, false);
     if(todayForecast.rain) {
         proceduralData.weather.rain = todayForecast.rain > 5 ? 'Forte' : 'Fine';
@@ -537,24 +545,16 @@ export async function getDataForDate(location: string, date: Date): Promise<Loca
         proceduralData.weather.rain = 'Aucune';
     }
     
-    // update wind summary
     if(proceduralData.weather.hourly.length > 18) {
-        proceduralData.weather.wind[0].speed = proceduralData.weather.hourly[6].windSpeed;
-        proceduralData.weather.wind[0].direction = proceduralData.weather.hourly[6].windDirection;
-        proceduralData.weather.wind[0].stability = proceduralData.weather.hourly[6].stability;
-        proceduralData.weather.wind[1].speed = proceduralData.weather.hourly[12].windSpeed;
-        proceduralData.weather.wind[1].direction = proceduralData.weather.hourly[12].windDirection;
-        proceduralData.weather.wind[1].stability = proceduralData.weather.hourly[12].stability;
-        proceduralData.weather.wind[2].speed = proceduralData.weather.hourly[18].windSpeed;
-        proceduralData.weather.wind[2].direction = proceduralData.weather.hourly[18].windDirection;
-        proceduralData.weather.wind[2].stability = proceduralData.weather.hourly[18].stability;
+        proceduralData.weather.wind[0] = { ...proceduralData.weather.hourly[6], time: '06:00' };
+        proceduralData.weather.wind[1] = { ...proceduralData.weather.hourly[12], time: '12:00' };
+        proceduralData.weather.wind[2] = { ...proceduralData.weather.hourly[18], time: '18:00' };
     }
-
 
     return proceduralData;
   } catch (error) {
     console.error("Failed to fetch weather data:", error);
-    return proceduralData; // Return procedural data on fetch failure
+    return proceduralData;
   }
 }
 

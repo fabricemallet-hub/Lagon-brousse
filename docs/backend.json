@@ -6,42 +6,14 @@
       "type": "object",
       "description": "Represents a user account within the application.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the user account."
-        },
-        "email": {
-          "type": "string",
-          "description": "The user's email address.",
-          "format": "email"
-        },
-        "subscriptionStatus": {
-          "type": "string",
-          "description": "The current subscription status of the user (e.g., 'active', 'inactive', 'trial', 'admin')."
-        },
-        "subscriptionStartDate": {
-          "type": "string",
-          "description": "The date when the user's subscription started.",
-          "format": "date-time"
-        },
-        "subscriptionExpiryDate": {
-          "type": "string",
-          "description": "The date when the user's subscription expires.",
-          "format": "date-time"
-        },
-        "favoriteLocationIds": {
-          "type": "array",
-          "description": "References to Location. (Relationship: UserAccount N:N Location)",
-          "items": {
-            "type": "string"
-          }
-        }
+        "id": { "type": "string", "description": "Unique identifier for the user account." },
+        "email": { "type": "string", "description": "The user's email address.", "format": "email" },
+        "subscriptionStatus": { "type": "string", "description": "The current subscription status of the user (e.g., 'active', 'inactive', 'trial', 'admin')." },
+        "subscriptionStartDate": { "type": "string", "description": "The date when the user's subscription started.", "format": "date-time" },
+        "subscriptionExpiryDate": { "type": "string", "description": "The date when the user's subscription expires.", "format": "date-time" },
+        "favoriteLocationIds": { "type": "array", "description": "References to Location. (Relationship: UserAccount N:N Location)", "items": { "type": "string" } }
       },
-      "required": [
-        "id",
-        "email",
-        "subscriptionStatus"
-      ]
+      "required": ["id", "email", "subscriptionStatus"]
     },
     "Location": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -49,35 +21,45 @@
       "type": "object",
       "description": "Represents a location (commune) selected by the user.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the location."
-        },
-        "name": {
-          "type": "string",
-          "description": "The name of the location."
-        },
-        "latitude": {
-          "type": "number",
-          "description": "The latitude of the location."
-        },
-        "longitude": {
-          "type": "number",
-          "description": "The longitude of the location."
-        }
+        "id": { "type": "string", "description": "Unique identifier for the location." },
+        "name": { "type": "string", "description": "The name of the location." },
+        "latitude": { "type": "number", "description": "The latitude of the location." },
+        "longitude": { "type": "number", "description": "The longitude of the location." }
       },
-      "required": [
-        "id",
-        "name",
-        "latitude",
-        "longitude"
-      ]
+      "required": ["id", "name", "latitude", "longitude"]
+    },
+    "Station": {
+      "title": "Station",
+      "type": "object",
+      "description": "Represents a tide station with its coordinates.",
+      "properties": {
+        "name": { "type": "string" },
+        "lat": { "type": "number" },
+        "lon": { "type": "number" }
+      }
+    },
+    "TideArchive": {
+      "title": "TideArchive",
+      "type": "object",
+      "description": "Contains the tide events for a specific day and station.",
+      "properties": {
+        "tides": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string" },
+              "time": { "type": "string" },
+              "height": { "type": "number" }
+            },
+            "required": ["type", "time", "height"]
+          }
+        }
+      }
     }
   },
   "auth": {
-    "providers": [
-      "password"
-    ]
+    "providers": ["password"]
   },
   "firestore": {
     "structure": [
@@ -85,31 +67,38 @@
         "path": "/users/{userId}",
         "definition": {
           "entityName": "UserAccount",
-          "schema": {
-            "$ref": "#/backend/entities/UserAccount"
-          },
-          "description": "Stores user account information.  The 'userId' path parameter is used to enforce path-based ownership for data privacy. Includes 'favoriteLocationIds' array.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier for the user account."
-            }
-          ]
+          "schema": { "$ref": "#/backend/entities/UserAccount" },
+          "description": "Stores user account information. The 'userId' path parameter is used to enforce path-based ownership for data privacy. Includes 'favoriteLocationIds' array.",
+          "params": [{ "name": "userId", "description": "The unique identifier for the user account." }]
         }
       },
       {
         "path": "/locations/{locationId}",
         "definition": {
           "entityName": "Location",
-          "schema": {
-            "$ref": "#/backend/entities/Location"
-          },
+          "schema": { "$ref": "#/backend/entities/Location" },
           "description": "Stores location data (communes).",
+          "params": [{ "name": "locationId", "description": "The unique identifier for the location." }]
+        }
+      },
+      {
+        "path": "/stations/{stationId}",
+        "definition": {
+          "entityName": "Station",
+          "schema": { "$ref": "#/backend/entities/Station" },
+          "description": "Stores tide station metadata like name and coordinates.",
+          "params": [{ "name": "stationId", "description": "The unique identifier for the tide station (e.g., 'Noumea')." }]
+        }
+      },
+      {
+        "path": "/stations/{stationId}/tides/{date}",
+        "definition": {
+          "entityName": "TideArchive",
+          "schema": { "$ref": "#/backend/entities/TideArchive" },
+          "description": "A subcollection storing daily tide data for a station. The document ID is the date in YYYY-MM-DD format.",
           "params": [
-            {
-              "name": "locationId",
-              "description": "The unique identifier for the location."
-            }
+            { "name": "stationId", "description": "The ID of the parent station." },
+            { "name": "date", "description": "The date of the tide data in YYYY-MM-DD format." }
           ]
         }
       }
