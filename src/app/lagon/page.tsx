@@ -15,6 +15,8 @@ import {
   Sunset,
   Moon,
   Gauge,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
@@ -23,6 +25,7 @@ import { useDate } from '@/context/date-context';
 import { WindMap } from '@/components/ui/wind-map';
 import type { WindDirection } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { useMemo } from 'react';
 
 export default function LagonPage() {
   const { selectedLocation } = useLocation();
@@ -36,6 +39,14 @@ export default function LagonPage() {
     'Modéré': 50,
     'Fort': 85,
   }
+
+  const sortedTides = useMemo(() => {
+    const timeToMinutes = (time: string) => {
+        const [hours, minutes] = time.split(':').map(Number);
+        return hours * 60 + minutes;
+    };
+    return [...tides].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+  }, [tides]);
 
   return (
     <div className="space-y-6">
@@ -119,22 +130,40 @@ export default function LagonPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
-            {tides.map((tide, i) => {
+          <div className="space-y-3">
+            {sortedTides.map((tide, i) => {
               const isHighTideHighlight = tide.type === 'haute' && tide.height >= 1.7;
               const isLowTideHighlight = tide.type === 'basse' && tide.height <= 0.23;
+              const TideIcon = tide.type === 'haute' ? TrendingUp : TrendingDown;
+              
               return (
-              <div key={i} className={cn(
-                  "flex justify-between border-b pb-1",
-                   isHighTideHighlight && "text-purple-600",
-                   isLowTideHighlight && "text-red-600",
-                )}>
-                <span className="capitalize text-muted-foreground">
-                  {tide.type}
-                </span>
-                <span className={cn("font-mono", (isHighTideHighlight || isLowTideHighlight) ? "font-bold" : "font-medium")}>{tide.time} ({tide.height.toFixed(2)}m)</span>
-              </div>
-            )})}
+                  <div key={i} className={cn(
+                      "flex items-center justify-between p-3 rounded-lg border bg-background transition-all",
+                      isHighTideHighlight && "border-purple-500/50 bg-purple-50/50 dark:bg-purple-900/20",
+                      isLowTideHighlight && "border-destructive/50 bg-destructive/10",
+                  )}>
+                      <div className="flex items-center gap-4">
+                          <TideIcon className={cn(
+                              "size-8 shrink-0",
+                              tide.type === 'haute' ? 'text-blue-500' : 'text-orange-500',
+                              isHighTideHighlight && "text-purple-600",
+                              isLowTideHighlight && "text-destructive",
+                          )} />
+                          <div>
+                              <p className="font-semibold text-lg capitalize">{`Marée ${tide.type}`}</p>
+                              <p className="text-muted-foreground font-mono">{tide.time}</p>
+                          </div>
+                      </div>
+                      <div className={cn(
+                          "font-bold text-xl",
+                          isHighTideHighlight && "text-purple-700 dark:text-purple-400",
+                          isLowTideHighlight && "text-destructive",
+                      )}>
+                          {tide.height.toFixed(2)}m
+                      </div>
+                  </div>
+              )
+            })}
           </div>
           <Separator />
           <div className="space-y-2">

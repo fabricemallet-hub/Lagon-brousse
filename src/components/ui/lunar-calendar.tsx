@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   format,
   startOfMonth,
@@ -490,6 +490,14 @@ function PecheDetailDialogContent({
   const dateString = format(day, 'eeee d MMMM yyyy', { locale: fr });
   const { fishing, weather, tides, pelagicInfo, crabAndLobster } = data;
 
+  const sortedTides = useMemo(() => {
+    const timeToMinutes = (time: string) => {
+        const [hours, minutes] = time.split(':').map(Number);
+        return hours * 60 + minutes;
+    };
+    return [...tides].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+  }, [tides]);
+
   return (
     <>
       <DialogHeader>
@@ -516,25 +524,31 @@ function PecheDetailDialogContent({
             <h4 className="font-semibold text-muted-foreground">
               Marées du jour
             </h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1 text-xs">
-              {tides.map((tide, i) => {
-                const isHighTideHighlight =
-                  tide.type === 'haute' && tide.height >= 1.7;
-                const isLowTideHighlight =
-                  tide.type === 'basse' && tide.height <= 0.23;
+            <div className="space-y-2">
+              {sortedTides.map((tide, i) => {
+                const isHighTideHighlight = tide.type === 'haute' && tide.height >= 1.7;
+                const isLowTideHighlight = tide.type === 'basse' && tide.height <= 0.23;
+                const TideIcon = tide.type === 'haute' ? TrendingUp : TrendingDown;
                 return (
-                  <div
-                    key={i}
-                    className={cn(
-                      'flex justify-between',
-                      isHighTideHighlight && 'text-purple-600',
-                      isLowTideHighlight && 'text-red-600'
-                    )}
-                  >
-                    <span className="capitalize text-muted-foreground">
-                      {tide.type === 'haute' ? 'Haute' : 'Basse'}:
-                    </span>
-                    <span className="font-mono font-bold">
+                  <div key={i} className={cn(
+                      "flex items-center justify-between rounded-md p-2 -mx-2 transition-colors text-xs",
+                      isHighTideHighlight && "bg-purple-50/50 dark:bg-purple-900/20",
+                      isLowTideHighlight && "bg-destructive/10",
+                  )}>
+                    <div className="flex items-center gap-2">
+                        <TideIcon className={cn(
+                          "size-4 shrink-0",
+                          tide.type === 'haute' ? 'text-blue-500' : 'text-orange-500',
+                          isHighTideHighlight && "text-purple-600",
+                          isLowTideHighlight && "text-destructive",
+                        )} />
+                        <span className="capitalize font-medium">{`Marée ${tide.type}`}</span>
+                    </div>
+                    <span className={cn(
+                        "font-mono font-medium",
+                        isHighTideHighlight && "text-purple-700 dark:text-purple-400 font-bold",
+                        isLowTideHighlight && "text-destructive font-bold",
+                      )}>
                       {tide.time} ({tide.height.toFixed(2)}m)
                     </span>
                   </div>

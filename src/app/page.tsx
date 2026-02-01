@@ -12,11 +12,14 @@ import {
   Waves,
   Moon,
   Spade,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react';
 import { useLocation } from '@/context/location-context';
 import { useDate } from '@/context/date-context';
 import { WeatherForecast } from '@/components/ui/weather-forecast';
 import { cn } from '@/lib/utils';
+import { useMemo } from 'react';
 
 export default function Home() {
   const { selectedLocation } = useLocation();
@@ -32,6 +35,15 @@ export default function Home() {
     month: 'long',
     day: 'numeric',
   });
+
+  const sortedTides = useMemo(() => {
+    const timeToMinutes = (time: string) => {
+        const [hours, minutes] = time.split(':').map(Number);
+        return hours * 60 + minutes;
+    };
+    return [...tides].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+  }, [tides]);
+
 
   return (
     <div className="flex flex-col gap-8">
@@ -56,27 +68,35 @@ export default function Home() {
               Données de marée de la station de {tideStation}.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {tides.map((tide, index) => {
+          <CardContent className="space-y-2">
+            {sortedTides.map((tide, index) => {
               const isHighTideHighlight = tide.type === 'haute' && tide.height >= 1.7;
               const isLowTideHighlight = tide.type === 'basse' && tide.height <= 0.23;
+              const TideIcon = tide.type === 'haute' ? TrendingUp : TrendingDown;
               return (
-              <div key={index} className={cn("flex justify-between",
-                  isHighTideHighlight && "text-purple-600",
-                  isLowTideHighlight && "text-red-600",
+              <div key={index} className={cn(
+                  "flex items-center justify-between rounded-md p-2 -mx-2 transition-colors",
+                  isHighTideHighlight && "bg-purple-50/50 dark:bg-purple-900/20",
+                  isLowTideHighlight && "bg-destructive/10",
                 )}>
-                <span className="text-muted-foreground capitalize">
-                  Marée {tide.type}
-                </span>
-                <span className={cn("font-mono", (isHighTideHighlight || isLowTideHighlight) ? "font-bold" : "font-medium")}>
+                <div className="flex items-center gap-2">
+                    <TideIcon className={cn(
+                      "size-5 shrink-0",
+                      tide.type === 'haute' ? 'text-blue-500' : 'text-orange-500',
+                      isHighTideHighlight && "text-purple-600",
+                      isLowTideHighlight && "text-destructive",
+                    )} />
+                    <span className="text-muted-foreground capitalize text-sm">{`Marée ${tide.type}`}</span>
+                </div>
+                <span className={cn(
+                    "font-mono font-medium text-sm",
+                    isHighTideHighlight && "text-purple-700 dark:text-purple-400 font-bold",
+                    isLowTideHighlight && "text-destructive font-bold",
+                  )}>
                   {tide.time} ({tide.height.toFixed(2)}m)
                 </span>
               </div>
             )})}
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Courant</span>
-              <span className="font-medium">{tides[0].current}</span>
-            </div>
           </CardContent>
         </Card>
         <Card>
