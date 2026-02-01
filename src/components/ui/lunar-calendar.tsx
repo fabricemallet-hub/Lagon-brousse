@@ -168,7 +168,7 @@ function DayCell({
   const fishIcons = Array.from({ length: fishIconCount }).map((_, i) => (
     <Fish key={i} className="size-3 text-primary" />
   ));
-  const tides = data.tides.slice(0, 4);
+  const tides = data.tides;
 
   // Gardening data
   const {
@@ -243,9 +243,10 @@ function DayCell({
                 <Fish className="size-3 text-accent glow" title="Bon pour les pélagiques" />
             )}
           </div>
-          <div className="space-y-0.5 text-[10px] font-mono text-muted-foreground text-center">
-            {tides.slice(0, 2).map((tide, i) => (
-                <div key={i}>
+          <div className="space-y-0.5 text-[10px] font-mono text-muted-foreground">
+            {tides.map((tide, i) => (
+                <div key={i} className="flex justify-between px-1">
+                    <span>{tide.time}</span>
                     <span>{tide.type === 'haute' ? 'H' : 'B'}: {tide.height.toFixed(2)}m</span>
                 </div>
             ))}
