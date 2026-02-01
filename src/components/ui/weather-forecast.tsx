@@ -109,13 +109,26 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
       }
     };
     api.on('select', onSelect);
+    api.on('reInit', onSelect);
 
-    // On page load, select noon but scroll to show 9am.
-    const nineAmIndex = weather.hourly.findIndex((forecast) => new Date(forecast.date).getHours() === 9);
-    const noonIndex = weather.hourly.findIndex((forecast) => new Date(forecast.date).getHours() === 12);
+    // On page load, find the forecast closest to the current time.
+    const now = new Date();
+    const currentHour = now.getHours();
     
-    const scrollToIndex = nineAmIndex !== -1 ? nineAmIndex : 0;
-    const selectIndex = noonIndex !== -1 ? noonIndex : 0;
+    // Find the index of the forecast for the current hour.
+    let closestHourIndex = weather.hourly.findIndex(
+      (forecast) => new Date(forecast.date).getHours() === currentHour
+    );
+
+    // If no exact hour found (e.g. API data starts later or it's not available), default to the first entry.
+    if (closestHourIndex === -1) {
+      closestHourIndex = 0;
+    }
+
+    const selectIndex = closestHourIndex;
+    
+    // Set the initial scroll position to be just before the selected time for context, allowing two items to be visible.
+    const scrollToIndex = Math.max(0, selectIndex > 0 ? selectIndex - 1 : 0);
 
     api.scrollTo(scrollToIndex, true);
     setSelectedIndex(selectIndex);
@@ -123,6 +136,7 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
     return () => {
       if (api) {
         api.off('select', onSelect);
+        api.off('reInit', onSelect);
       }
     };
   }, [api, weather]);
@@ -157,12 +171,12 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
             </p>
           </div>
           <div className="flex flex-col items-center justify-center text-center">
-            <p className="font-bold text-5xl">{selectedForecast.temp}°</p>
+            <p className="font-bold text-6xl">{selectedForecast.temp}°</p>
              <div className="flex items-center gap-3 mt-2">
-              <WindArrowIcon direction={selectedForecast.windDirection} className="size-6" />
+              <WindArrowIcon direction={selectedForecast.windDirection} className="size-7" />
               <div className="text-left">
-                <p className="font-bold text-lg">{selectedForecast.windSpeed} nœuds</p>
-                <p className="text-sm text-white/80">Vent de {selectedForecast.windDirection}</p>
+                <p className="font-bold text-xl">{selectedForecast.windSpeed} nœuds</p>
+                <p className="text-base text-white/80">Vent de {selectedForecast.windDirection}</p>
               </div>
             </div>
           </div>
@@ -188,29 +202,29 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
             {weather.hourly.slice(0, 24).map((forecast, index) => (
               <CarouselItem
                 key={index}
-                className="basis-1/3 sm:basis-1/4"
+                className="basis-1/2 sm:basis-1/3"
                 onClick={() => api?.scrollTo(index)}
               >
                 <div
                   className={cn(
-                    'flex flex-col items-center justify-between p-2 cursor-pointer rounded-lg border h-full space-y-2 text-center',
+                    'flex flex-col items-center justify-between p-3 cursor-pointer rounded-lg border h-full space-y-2 text-center',
                     selectedIndex === index
                       ? 'bg-blue-100 border-blue-200'
                       : 'bg-card hover:bg-muted/50'
                   )}
                 >
-                  <p className="font-bold text-base">
+                  <p className="font-bold text-lg">
                     {format(new Date(forecast.date), "HH'h'", { locale: fr })}
                   </p>
                   <WeatherConditionIcon
                     condition={forecast.condition}
                     isNight={forecast.isNight}
-                    className="size-8"
+                    className="size-10"
                   />
-                  <p className="font-bold text-lg">{forecast.temp}°</p>
-                  <div className="flex flex-col items-center text-sm text-muted-foreground">
-                    <WindArrowIcon direction={forecast.windDirection} className="size-5" />
-                    <span className="font-semibold">{forecast.windSpeed}</span>
+                  <p className="font-bold text-2xl">{forecast.temp}°</p>
+                  <div className="flex flex-col items-center text-muted-foreground">
+                    <WindArrowIcon direction={forecast.windDirection} className="size-6" />
+                    <span className="font-semibold text-base">{forecast.windSpeed}</span>
                   </div>
                 </div>
               </CarouselItem>
