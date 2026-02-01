@@ -18,6 +18,7 @@ import {
   TrendingDown,
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import { useLocation } from '@/context/location-context';
 import { useDate } from '@/context/date-context';
 import { cn } from '@/lib/utils';
@@ -176,7 +177,10 @@ export default function LagonPage() {
                           )} />
                           <div>
                               <p className="font-semibold text-lg capitalize">{`Marée ${tide.type}`}</p>
-                              <p className="text-muted-foreground font-mono">{tide.time}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-muted-foreground font-mono">{tide.time}</p>
+                                <Badge variant="secondary" className="text-xs">Étale</Badge>
+                              </div>
                           </div>
                       </div>
                       <div className={cn(

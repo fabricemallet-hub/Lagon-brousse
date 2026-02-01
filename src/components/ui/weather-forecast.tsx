@@ -93,7 +93,7 @@ const WindArrowIcon = ({ direction, className }: { direction: WindDirection, cla
 
 export function WeatherForecast({ weather }: { weather: WeatherData }) {
   const [api, setApi] = useState<CarouselApi>();
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState(12); // Default to noon
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -113,30 +113,23 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
     api.on('select', onSelect);
     api.on('reInit', onSelect);
 
-    // On page load, find the forecast closest to the current time.
     const now = new Date();
     const currentHour = now.getHours();
     
-    // Find the index of the forecast for the current hour.
     let closestHourIndex = weather.hourly.findIndex(
       (forecast) => new Date(forecast.date).getHours() === currentHour
     );
 
-    // If no exact hour found (e.g. API data starts later or it's not available), default to the first entry.
     if (closestHourIndex === -1) {
-      closestHourIndex = 0;
+      closestHourIndex = 12; // Fallback to noon
     }
-
-    // Set the initial scroll position to the current hour to show what's coming up.
-    const scrollToIndex = closestHourIndex;
-
-    api.scrollTo(scrollToIndex, true);
+    
+    api.scrollTo(closestHourIndex, true);
     setSelectedIndex(closestHourIndex);
 
     return () => {
       if (api) {
         api.off('select', onSelect);
-        api.off('reInit', onSelect);
       }
     };
   }, [api, weather]);
@@ -202,7 +195,7 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
             {weather.hourly.slice(0, 24).map((forecast, index) => (
               <CarouselItem
                 key={index}
-                className="basis-1/4 sm:basis-1/6"
+                className="basis-1/4 sm:basis-1/5 md:basis-1/6"
                 onClick={() => api?.scrollTo(index)}
               >
                 <div
@@ -231,9 +224,15 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
                       <Waves className="size-4" />
                       <span className="font-semibold text-sm">{forecast.tideHeight.toFixed(1)}m</span>
                   </div>
-                  <div className="flex items-center gap-1 text-muted-foreground" title="Force du courant">
-                      <Zap className="size-4" />
-                      <span className="text-xs font-semibold">{forecast.tideCurrent}</span>
+                  <div className="flex items-center justify-center gap-1 h-5" title="Force du courant">
+                    {forecast.tideCurrent === 'Nul' ? (
+                        <span className="text-xs font-bold text-primary px-2 py-0.5 rounded-full bg-primary/10">Étale</span>
+                    ) : (
+                        <>
+                            <Zap className="size-4" />
+                            <span className="text-xs font-semibold">{forecast.tideCurrent}</span>
+                        </>
+                    )}
                   </div>
                 </div>
               </CarouselItem>

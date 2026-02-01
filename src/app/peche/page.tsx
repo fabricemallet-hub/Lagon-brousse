@@ -17,6 +17,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { CrabIcon, LobsterIcon } from '@/components/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirestore } from '@/firebase';
+import { cn } from '@/lib/utils';
 
 function PecheSkeleton() {
   return (
@@ -157,7 +158,11 @@ export default function PechePage() {
                   </div>
                   <div className="flex items-center gap-1">
                     {getTideIcon(slot.tideMovement)}
-                    <span className="capitalize">{slot.tideMovement}</span>
+                    {slot.tideMovement === 'étale' ? (
+                      <Badge variant="secondary" className="capitalize">{slot.tideMovement}</Badge>
+                    ) : (
+                      <span className="capitalize">{slot.tideMovement}</span>
+                    )}
                   </div>
               </div>
             </CardHeader>
