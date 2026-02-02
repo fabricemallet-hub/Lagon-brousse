@@ -52,16 +52,9 @@ export function AuthForm({ mode }: AuthFormProps) {
   });
 
   async function onSubmit(values: z.infer<ReturnType<typeof formSchema>>) {
-    // LOG 1: Check if function is called
-    console.log(`[AuthForm] onSubmit triggered for mode: ${mode}`);
-    // LOG 2: Check submitted values
-    console.log('[AuthForm] Form values:', values);
-
     setIsLoading(true);
 
     if (!auth) {
-      // LOG 3: Check if auth service is missing
-      console.error('[AuthForm] Auth service is not available.');
       toast({
         variant: "destructive",
         title: "Erreur d'initialisation",
@@ -71,28 +64,20 @@ export function AuthForm({ mode }: AuthFormProps) {
       return;
     }
     
-    // LOG 4: Confirmation before try/catch
-    console.log('[AuthForm] Attempting Firebase operation...');
     try {
       if (mode === 'login') {
-        console.log('[AuthForm] Calling signInWithEmailAndPassword...');
         await signInWithEmailAndPassword(auth, values.email, values.password);
-        console.log('[AuthForm] signInWithEmailAndPassword successful.');
         toast({
             title: 'Connexion réussie!',
             description: "Vous allez être redirigé vers la page d'accueil.",
         });
         router.push('/');
       } else {
-        console.log('[AuthForm] Calling createUserWithEmailAndPassword...');
         const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-        console.log('[AuthForm] createUserWithEmailAndPassword successful.');
         if (values.displayName) {
-            console.log('[AuthForm] Updating profile...');
             await updateProfile(userCredential.user, {
                 displayName: values.displayName
             });
-            console.log('[AuthForm] Profile update successful.');
         }
         toast({
           title: 'Inscription réussie!',
@@ -101,9 +86,6 @@ export function AuthForm({ mode }: AuthFormProps) {
         router.push('/');
       }
     } catch (error) {
-      // LOG 5: Log the full error object
-      console.error('[AuthForm] Authentication error caught:', error);
-
       const authError = error as AuthError;
       let errorMessage = "Une erreur inattendue est survenue. Veuillez réessayer.";
 
@@ -140,8 +122,6 @@ export function AuthForm({ mode }: AuthFormProps) {
         description: errorMessage,
       });
     } finally {
-      // LOG 6: Log when the process finishes
-      console.log('[AuthForm] onSubmit finished.');
       setIsLoading(false);
     }
   }
