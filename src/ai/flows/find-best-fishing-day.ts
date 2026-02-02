@@ -7,7 +7,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
 import { generateProceduralData } from '@/lib/data';
 import type { LocationData } from '@/lib/types';
 import { addDays, format } from 'date-fns';
@@ -50,10 +50,13 @@ function formatForecastForPrompt(forecast: { date: string, data: LocationData })
     const { date, data } = forecast;
     const dayOfWeek = format(new Date(date), 'eeee', { locale: fr });
     const tides = data.tides.map(t => `${t.type} à ${t.time} (${t.height}m)`).join(', ');
+    const middaySwell = data.weather.swell.find(s => s.time === '12:00') || data.weather.swell[0];
+
     return `
 - Jour: ${date} (${dayOfWeek})
   - Météo: ${data.weather.trend}, Temp: ${data.weather.tempMin}°C - ${data.weather.tempMax}°C
   - Vent: Vitesse moyenne de ${Math.round(data.weather.wind.reduce((a, b) => a + b.speed, 0) / data.weather.wind.length)} nœuds
+  - Houle: ${middaySwell.inside} (lagon), ${middaySwell.outside} (large)
   - Lune: ${data.weather.moon.phase} (${data.weather.moon.percentage}% visible)
   - Marées: ${tides}
 `;
@@ -72,6 +75,7 @@ CONDITIONS DE LA PRISE PASSÉE:
 - Lune: {{{spotContext.moonPhase}}}
 - Météo: {{{spotContext.weatherCondition}}}
 - Vent: {{{spotContext.windSpeed}}} nœuds de direction {{{spotContext.windDirection}}}
+{{#if spotContext.swellInside}}- Houle: {{{spotContext.swellInside}}} (lagon), {{{spotContext.swellOutside}}} (large){{/if}}
 
 PRÉVISIONS DES JOURS À VENIR:
 {{{futureForecasts}}}
@@ -142,7 +146,13 @@ const analyzeBestDayFlow = ai.defineFlow(
       const futureForecasts = getFutureForecasts(input.location, input.searchRangeDays);
       const formattedForecasts = futureForecasts.map(formatForecastForPrompt).join('');
   
-      const formattedPastContexts = input.spotContexts.map(ctx => `- Prise le ${format(new Date(ctx.timestamp), 'd MMM', {locale: fr})}: Marée ${ctx.tideMovement}, Lune ${ctx.moonPhase}, Vent ${ctx.windDirection} ${ctx.windSpeed} nœuds.`).join('\n');
+      const formattedPastContexts = input.spotContexts.map(ctx => {
+        let contextString = `- Prise le ${format(new Date(ctx.timestamp), 'd MMM', {locale: fr})}: Marée ${ctx.tideMovement}, Lune ${ctx.moonPhase}, Vent ${ctx.windDirection} ${ctx.windSpeed} nœuds.`;
+        if (ctx.swellInside && ctx.swellOutside) {
+            contextString += ` Houle: ${ctx.swellInside}/${ctx.swellOutside}.`;
+        }
+        return contextString;
+      }).join('\n');
 
       const promptData = {
         pastContexts: formattedPastContexts,

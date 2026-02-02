@@ -16,7 +16,7 @@ import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebas
 import { collection, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import type { LocationData, FishingSpot } from '@/lib/types';
+import type { LocationData, FishingSpot, SwellForecast } from '@/lib/types';
 import { getDataForDate } from '@/lib/data';
 import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -131,21 +131,28 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             return;
         }
 
-        watchId.current = navigator.geolocation.watchPosition(
-            (position) => {
-                const { latitude, longitude } = position.coords;
-                const newLocation = { lat: latitude, lng: longitude };
-                setUserLocation(newLocation);
+        // Check for permission first
+        navigator.permissions.query({ name: 'geolocation' }).then(permissionStatus => {
+            if (permissionStatus.state === 'granted') {
+                watchId.current = navigator.geolocation.watchPosition(
+                    (position) => {
+                        const { latitude, longitude } = position.coords;
+                        const newLocation = { lat: latitude, lng: longitude };
+                        setUserLocation(newLocation);
 
-                if (map && !initialZoomDone) {
-                    map.panTo(newLocation);
-                    map.setZoom(16);
-                    setInitialZoomDone(true);
-                }
-            },
-            () => { /* Error handled by recenter button */ },
-            { enableHighAccuracy: true }
-        );
+                        if (map && !initialZoomDone) {
+                            map.panTo(newLocation);
+                            map.setZoom(16);
+                            setInitialZoomDone(true);
+                        }
+                    },
+                    () => { /* Error handled by recenter button */ },
+                    { enableHighAccuracy: true }
+                );
+            }
+            // If state is 'prompt' or 'denied', we don't start watching.
+            // The user must click the recenter button to trigger the prompt.
+        });
     }, [map, initialZoomDone]);
 
     const handleRecenter = () => {
@@ -180,12 +187,13 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     };
 
     useEffect(() => {
+        startWatchingPosition();
         return () => {
             if (watchId.current !== null) {
                 navigator.geolocation.clearWatch(watchId.current);
             }
         };
-    }, []);
+    }, [startWatchingPosition]);
 
     const handleMapClick = (e: google.maps.MapMouseEvent) => {
         if (e.latLng) {
@@ -197,6 +205,14 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         if (e.latLng) {
             setNewSpotLocation({ lat: e.latLng.lat(), lng: e.latLng.lng() });
         }
+    };
+
+    const handleToggleFishingType = (typeId: string) => {
+        setSelectedFishingTypes(prev =>
+            prev.includes(typeId)
+                ? prev.filter(id => id !== typeId)
+                : [...prev, typeId]
+        );
     };
 
     const handleSaveSpot = async () => {
@@ -245,6 +261,19 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         const currentHour = now.getHours();
         const currentForecast = todayData.weather.hourly.find(f => new Date(f.date).getHours() === currentHour) || todayData.weather.hourly[0];
 
+        const findClosestSwell = (swellForecasts: SwellForecast[]): SwellForecast => {
+            if (!swellForecasts || swellForecasts.length === 0) {
+                return { time: '12:00', inside: 'N/A', outside: 'N/A', period: 0 };
+            }
+            const nowMinutes = now.getHours() * 60 + now.getMinutes();
+            return swellForecasts.reduce((prev, curr) => {
+                const prevTimeMinutes = timeToMinutes(prev.time);
+                const currTimeMinutes = timeToMinutes(curr.time);
+                return (Math.abs(currTimeMinutes - nowMinutes) < Math.abs(prevTimeMinutes - nowMinutes) ? curr : prev);
+            });
+        };
+        const currentSwell = findClosestSwell(todayData.weather.swell);
+
         const newSpotData = {
             userId: user.uid,
             name: spotName,
@@ -267,6 +296,8 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                 waterTemperature: todayData.weather.waterTemperature,
                 ...(previousLowTide && { previousLowTide: { time: previousLowTide.time, height: previousLowTide.height } }),
                 ...(nextHighTide && { nextHighTide: { time: nextHighTide.time, height: nextHighTide.height } }),
+                swellInside: currentSwell.inside,
+                swellOutside: currentSwell.outside,
             }
         };
 
@@ -637,8 +668,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                    onCheckedChange={() => handleSpotSelection(spot.id)}
                                                />
                                            </span>
-                                           <AccordionPrimitive.Trigger asChild>
-                                             <div className="flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180 pl-2 pr-4 cursor-pointer">
+                                           <AccordionPrimitive.Trigger className="flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180 pl-2 pr-4 cursor-pointer">
                                                 <div className="flex items-center gap-3">
                                                     <div className="p-1 rounded-md" style={{backgroundColor: spot.color + '20'}}>
                                                         {React.createElement(mapIcons[spot.icon as keyof typeof mapIcons] || MapPin, { className: 'size-5', style: {color: spot.color} })}
@@ -651,7 +681,6 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                     </div>
                                                 </div>
                                                 <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
-                                             </div>
                                             </AccordionPrimitive.Trigger>
                                        </div>
                                        <AccordionPrimitive.Content className="overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
@@ -667,6 +696,9 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                {spot.notes && <p className="italic">"{spot.notes}"</p>}
                                                 <p><strong>Conditions :</strong> {spot.context.weatherCondition}, {spot.context.airTemperature}°C (air), {spot.context.waterTemperature}°C (eau)</p>
                                                 <p><strong>Vent :</strong> {spot.context.windSpeed} nœuds de {spot.context.windDirection}</p>
+                                                {spot.context.swellInside && spot.context.swellOutside && (
+                                                    <p><strong>Houle :</strong> {spot.context.swellInside} (lagon), {spot.context.swellOutside} (large)</p>
+                                                )}
                                                 <p><strong>Lune :</strong> {spot.context.moonPhase}</p>
                                                 <p><strong>Marée :</strong> {spot.context.tideMovement} ({spot.context.tideHeight.toFixed(2)}m), courant {spot.context.tideCurrent.toLowerCase()}</p>
                                                 {spot.context.previousLowTide && <p><strong>Marée basse précédente :</strong> {spot.context.previousLowTide.time} ({spot.context.previousLowTide.height.toFixed(2)}m)</p>}

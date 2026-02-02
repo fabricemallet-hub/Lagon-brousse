@@ -12,6 +12,8 @@ const FishingSpotContextSchema = z.object({
   windDirection: z.string(),
   airTemperature: z.number(),
   waterTemperature: z.number(),
+  swellInside: z.string().optional(),
+  swellOutside: z.string().optional(),
 });
 
 export const FindSimilarDayInputSchema = z.object({

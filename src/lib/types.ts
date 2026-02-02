@@ -177,6 +177,8 @@ export interface FishingSpot {
     waterTemperature: number;
     previousLowTide?: { time: string; height: number };
     nextHighTide?: { time: string; height: number };
+    swellInside?: string;
+    swellOutside?: string;
   };
 }
 
