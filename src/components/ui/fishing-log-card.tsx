@@ -12,11 +12,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { LocationData, FishingSpot } from '@/lib/types';
-import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown } from 'lucide-react';
+import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from './alert';
 import { useLocation } from '@/context/location-context';
@@ -68,7 +68,6 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     const firestore = useFirestore();
     const { toast } = useToast();
     const [newSpotLocation, setNewSpotLocation] = useState<{ lat: number, lng: number } | null>(null);
-    const [isAddSpotOpen, setIsAddSpotOpen] = useState(false);
     const [spotName, setSpotName] = useState('');
     const [spotNotes, setSpotNotes] = useState('');
     const [selectedIcon, setSelectedIcon] = useState<keyof typeof mapIcons>('Fish');
@@ -90,6 +89,11 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     
     const [openSpotId, setOpenSpotId] = useState<string | undefined>(undefined);
     const spotRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+    // State for the new unified dialog
+    const [isSpotDialogOpen, setIsSpotDialogOpen] = useState(false);
+    const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
+    const [spotToEdit, setSpotToEdit] = useState<FishingSpot | null>(null);
 
     const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     const { isLoaded, loadError } = useJsApiLoader({ googleMapsApiKey: googleMapsApiKey || "", mapIds: ['satellite_id'] });
@@ -181,7 +185,13 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
 
     useEffect(() => {
         // Automatically start watching if permission was already granted.
-        startWatchingPosition();
+        if (typeof window !== 'undefined' && navigator.geolocation) {
+            navigator.permissions.query({ name: 'geolocation' }).then(permissionStatus => {
+                if (permissionStatus.state === 'granted') {
+                    startWatchingPosition();
+                }
+            });
+        }
 
         return () => {
             if (watchId.current !== null) {
@@ -266,17 +276,63 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         try {
             await addDoc(collection(firestore, 'users', user.uid, 'fishing_spots'), newSpotData);
             toast({ title: 'Spot sauvegardé !' });
-            setIsAddSpotOpen(false);
+            setIsSpotDialogOpen(false);
             setNewSpotLocation(null);
-            setSpotName('');
-            setSpotNotes('');
-            setSelectedFishingTypes([]);
         } catch (error) {
             console.error("Erreur lors de la sauvegarde du spot :", error);
             toast({ variant: 'destructive', title: 'Erreur', description: "Impossible de sauvegarder le spot." });
         } finally {
             setIsSaving(false);
         }
+    };
+    
+    const handleUpdateSpot = async () => {
+        if (!user || !firestore || !spotToEdit || !spotName) {
+            toast({ variant: 'destructive', title: 'Erreur', description: "Le nom du spot est requis." });
+            return;
+        }
+        setIsSaving(true);
+        
+        const spotRef = doc(firestore, 'users', user.uid, 'fishing_spots', spotToEdit.id);
+        const updatedData = {
+            name: spotName,
+            notes: spotNotes,
+            icon: selectedIcon,
+            color: selectedColor,
+            fishingTypes: selectedFishingTypes,
+        };
+
+        try {
+            await updateDoc(spotRef, updatedData);
+            toast({ title: 'Spot mis à jour !' });
+            setIsSpotDialogOpen(false);
+            setSpotToEdit(null);
+        } catch (error) {
+            console.error("Erreur lors de la mise à jour du spot :", error);
+            toast({ variant: 'destructive', title: 'Erreur', description: "Impossible de mettre à jour le spot." });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleSave = async () => {
+        if (dialogMode === 'add') {
+            await handleSaveSpot();
+        } else {
+            await handleUpdateSpot();
+        }
+    };
+    
+    const handleEditClick = (spot: FishingSpot) => {
+        setDialogMode('edit');
+        setSpotToEdit(spot);
+        // Pre-fill form state
+        setSpotName(spot.name);
+        setSpotNotes(spot.notes || '');
+        setSelectedIcon(spot.icon as keyof typeof mapIcons);
+        setSelectedColor(spot.color);
+        setSelectedFishingTypes(spot.fishingTypes || []);
+        setIsSpotDialogOpen(true);
     };
     
     const handleDeleteSpot = async (spotId: string) => {
@@ -411,7 +467,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                             scaledSize: new window.google.maps.Size(32, 32),
                                             anchor: new window.google.maps.Point(16, 16),
                                         }}
-                                        onClick={(e) => { e.stop(); handleSpotClick(spot.id); }}
+                                        onClick={(e) => { e.domEvent.stopPropagation(); handleSpotClick(spot.id); }}
                                     />
                                     <OverlayView
                                         position={{ lat: spot.location.latitude, lng: spot.location.longitude }}
@@ -455,10 +511,22 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         <Button size="icon" onClick={handleRecenter} className="absolute top-2 right-2 shadow-lg h-9 w-9 z-10">
                             <LocateFixed className="h-5 w-5" />
                         </Button>
-                         <div className={cn("absolute bottom-4 left-1/2 -translate-x-1/2 z-10 w-[calc(100%-2rem)] max-w-sm")}>
+                         <div className={cn("absolute bottom-4 left-1/2 -translate-x-1/2 z-10 w-[calc(100%-2rem)] max-w-sm", !newSpotLocation && "hidden")}>
                             <Button 
                                 className="shadow-lg w-full" 
-                                onClick={() => { if (newSpotLocation) setIsAddSpotOpen(true); }}
+                                onClick={() => {
+                                    if (newSpotLocation) {
+                                        setDialogMode('add');
+                                        setSpotToEdit(null);
+                                        // Reset form fields for new spot
+                                        setSpotName('');
+                                        setSpotNotes('');
+                                        setSelectedIcon('Fish');
+                                        setSelectedColor('#3b82f6');
+                                        setSelectedFishingTypes([]);
+                                        setIsSpotDialogOpen(true);
+                                    }
+                                }}
                                 disabled={!newSpotLocation}
                             >
                                 <Plus className="mr-2" /> 
@@ -468,12 +536,12 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                     </div>
                 )}
                 
-                <Dialog open={isAddSpotOpen} onOpenChange={setIsAddSpotOpen}>
+                <Dialog open={isSpotDialogOpen} onOpenChange={(open) => { if (!open) setSpotToEdit(null); setIsSpotDialogOpen(open); }}>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>Enregistrer un nouveau spot</DialogTitle>
+                            <DialogTitle>{dialogMode === 'add' ? 'Enregistrer un nouveau spot' : 'Modifier le spot'}</DialogTitle>
                             <DialogDescription>
-                                Remplissez les détails et sauvegardez pour ajouter ce spot à votre carnet.
+                                {dialogMode === 'add' ? "Remplissez les détails et sauvegardez pour ajouter ce spot à votre carnet." : "Modifiez les informations de votre spot."}
                             </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4 py-4">
@@ -527,8 +595,8 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                             </div>
                         </div>
                         <DialogFooter>
-                            <Button variant="ghost" onClick={() => { setIsAddSpotOpen(false); setNewSpotLocation(null); setSelectedFishingTypes([]); }}>Annuler</Button>
-                            <Button onClick={handleSaveSpot} disabled={isSaving}><Save className="mr-2"/>{isSaving ? "Sauvegarde..." : "Sauvegarder"}</Button>
+                            <Button variant="ghost" onClick={() => { setIsSpotDialogOpen(false); if (dialogMode === 'add') setNewSpotLocation(null); }}>Annuler</Button>
+                            <Button onClick={handleSave} disabled={isSaving}><Save className="mr-2"/>{isSaving ? "Sauvegarde..." : "Sauvegarder"}</Button>
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
@@ -564,7 +632,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                         className="border-b"
                                     >
                                        <div className="flex items-center w-full">
-                                           <span className="pl-4 py-4" onClick={(e) => e.stopPropagation()}>
+                                           <span className="pl-4 py-4" onClick={(e) => {e.preventDefault(); e.stopPropagation(); handleSpotSelection(spot.id)}}>
                                                <Checkbox
                                                    id={`select-spot-${spot.id}`}
                                                    className="size-5"
@@ -572,8 +640,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                    onCheckedChange={() => handleSpotSelection(spot.id)}
                                                />
                                            </span>
-                                           <h3 className="flex items-center w-full">
-                                            <AccordionPrimitive.Trigger className={cn("flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180", "pl-2 pr-4")}>
+                                           <AccordionPrimitive.Trigger className={cn("flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180", "pl-2 pr-4")}>
                                                 <div className="flex items-center gap-3">
                                                     <div className="p-1 rounded-md" style={{backgroundColor: spot.color + '20'}}>
                                                         {React.createElement(mapIcons[spot.icon as keyof typeof mapIcons] || MapPin, { className: 'size-5', style: {color: spot.color} })}
@@ -587,7 +654,6 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                 </div>
                                                 <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
                                             </AccordionPrimitive.Trigger>
-                                           </h3>
                                        </div>
                                        <AccordionPrimitive.Content className="overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
                                            <div className="pb-4 pl-12 pr-4 space-y-4">
@@ -607,6 +673,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                            </div>
                                            <div className="flex flex-col sm:flex-row gap-2">
                                                <Button variant="outline" className="flex-1" onClick={() => handleFindSimilarDay(spot)} disabled={isAnalyzing}><BrainCircuit className="mr-2"/> Chercher un jour similaire (IA)</Button>
+                                               <Button variant="outline" size="icon" onClick={() => handleEditClick(spot)}><Pencil className="h-4 w-4" /></Button>
                                                <Button variant="destructive" size="icon" onClick={() => handleDeleteSpot(spot.id)}><Trash2 /></Button>
                                            </div>
                                            </div>
