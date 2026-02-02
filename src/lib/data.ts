@@ -101,7 +101,7 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation'> = {
       timeOfDay: 'Aube (05:00 - 07:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
         { name: 'Wahoo', rating: 9, location: 'Large', advice: { activity: 'Très forte activité à l\'aube. Vitesse et agressivité maximales.', feeding: 'Excellente heure de chasse pour les proies rapides.', location_specific: 'Tombants extérieurs, DCP, et zones de courant fort.', depth: 'Surface.' } },
-        { name: 'Mahi-mahi', rating: 8, location: 'Large', advice: { activity: 'Très actif, en chasse autour des objets flottants.', feeding: 'Excellente heure, se nourrit de tout ce qui passe à portée.', location_specific: 'Sous les débris, bouées ou nappes d\'algues sargasses.', depth: 'Surface.' } },
+        { name: 'Mahi-mahi', rating: 9, location: 'Large', advice: { activity: 'Très actif, en chasse autour des objets flottants.', feeding: 'Excellente heure, se nourrit de tout ce qui passe à portée.', location_specific: 'Sous les débris, bouées ou nappes d\'algues sargasses.', depth: 'Surface.' } },
         { name: 'Thon Jaune', rating: 9, location: 'Large', advice: { activity: 'Très actif, chasse en surface tôt le matin.', feeding: 'Excellente heure, se nourrit de poissons volants et calamars.', location_specific: 'Au large, chercher les chasses d\'oiseaux.', depth: 'Surface à 30m.' } },
         { name: 'Thazard', rating: 8, location: 'Mixte', advice: { activity: 'Actif, patrouille les bords de récifs.', feeding: 'Bonne heure, chasse les petits poissons près des tombants.', location_specific: 'Passes, tombants récifaux, et près des DCP.', depth: 'Surface à 20m.' } },
         { name: 'Thon dents de chien', rating: 8, location: 'Large', advice: { activity: 'Très actif au lever du jour, prédateur redoutable.', feeding: 'Excellente heure de chasse sur les proies de récif.', location_specific: 'Tombants vertigineux et passes profondes.', depth: '20-60m.' } },
@@ -329,7 +329,7 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     const baseTide = stationTides.tides[i % stationTides.tides.length];
     const variation = Math.sin((dateSeed * (1 + i * 0.1) + locationSeed * 0.2)) * (baseTide.height * 0.1); // Smaller variation
     tide.height = parseFloat(Math.max(0.1, baseTide.height + variation).toFixed(2));
-    tide.time = varyTime(baseTide.time, i + 5);
+    tide.time = varyTime(tide.time, i + 5);
   });
   
   const timeToMinutes = (timeStr: string) => {
@@ -448,7 +448,7 @@ export function generateProceduralData(location: string, date: Date): LocationDa
       locationData.weather.trend = 'Averses';
       locationData.weather.uvIndex = Math.min(locationData.weather.uvIndex, 5);
   } else { // No rain
-      if (uvSeed > 0.85) { // Lower threshold for "Ensoleillé"
+      if (uvSeed > 0.95) { // higher threshold for "Ensoleillé"
           locationData.weather.trend = 'Ensoleillé';
       } else {
           locationData.weather.trend = 'Nuageux';
@@ -615,29 +615,26 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     }
 
     // Octopus Data
-    let octopusActivity: 'Élevée' | 'Moyenne' | 'Faible' = 'Moyenne';
+    let octopusActivity: 'Élevée' | 'Moyenne' | 'Faible' | null = null;
     let octopusMessage = '';
-
-    const currentHour = effectiveDate.getHours();
-    const currentHourForecast = locationData.weather.hourly[currentHour];
     
-    const isSlackTide = currentHourForecast?.tideCurrent === 'Nul' || !!currentHourForecast?.tidePeakType;
-    const isDawn = currentHour >= 5 && currentHour <= 7;
-    const isDusk = currentHour >= 17 && currentHour <= 19;
-    const isLowLight = isDawn || isDusk;
+    const winterMonths = [5, 6, 7, 8]; // June to September
+    const isWinter = winterMonths.includes(month);
 
-    if (isSlackTide && isLowLight) {
+    const lowTides = locationData.tides.filter(t => t.type === 'basse');
+    const lowestTide = lowTides.length > 0 
+        ? lowTides.reduce((prev, current) => (prev.height < current.height) ? prev : current)
+        : null;
+
+    const isVeryLowTide = lowestTide && lowestTide.height <= 0.25;
+
+    if (isWinter && isVeryLowTide) {
         octopusActivity = 'Élevée';
-        octopusMessage = 'Activité maximale. Période idéale combinant marée étale et faible luminosité.';
-    } else if (isSlackTide || isLowLight) {
-        octopusActivity = 'Élevée';
-        octopusMessage = 'Bonne activité. Profitez de la marée étale ou de la faible luminosité pour les chercher.';
-    } else if (illumination < 0.4) { // Darker nights in general
-        octopusActivity = 'Moyenne';
-        octopusMessage = 'Activité moyenne. Les nuits sombres sont favorables, cherchez-les près des cailloux.';
+        octopusMessage = `Excellente période pour la pêche à pied lors de la marée basse de ${lowestTide.time}. Cherchez-les dans les trous sur le platier.`;
     } else {
-        octopusActivity = 'Faible';
-        octopusMessage = 'Activité faible. Les poulpes sont plus discrets en pleine journée et par nuits claires.';
+        // If conditions are not met, we don't display the octopus section by setting activity to null.
+        octopusActivity = null;
+        octopusMessage = '';
     }
 
     locationData.crabAndLobster.octopusActivity = octopusActivity;

@@ -120,7 +120,7 @@ export interface CrabLobsterData {
   crabMessage: string;
   lobsterActivity: 'Élevée' | 'Moyenne' | 'Faible';
   lobsterMessage: string;
-  octopusActivity: 'Élevée' | 'Moyenne' | 'Faible';
+  octopusActivity: 'Élevée' | 'Moyenne' | 'Faible' | null;
   octopusMessage: string;
 }
 
