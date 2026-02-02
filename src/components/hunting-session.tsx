@@ -86,6 +86,7 @@ function HuntingSessionContent() {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [zoom, setZoom] = useState(8);
   const [initialZoomDone, setInitialZoomDone] = useState(false);
+  const [mapTypeId, setMapTypeId] = useState<string>('terrain');
   
   const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   
@@ -93,6 +94,13 @@ function HuntingSessionContent() {
       googleMapsApiKey: googleMapsApiKey || "",
       preventGoogleFontsLoading: true,
   });
+
+  useEffect(() => {
+    const savedMapTypeId = localStorage.getItem('huntingMapTypeId');
+    if (savedMapTypeId && ['roadmap', 'satellite', 'hybrid', 'terrain'].includes(savedMapTypeId)) {
+      setMapTypeId(savedMapTypeId);
+    }
+  }, []);
 
   const handleLeaveSession = useCallback(async () => {
     if (updateIntervalRef.current) {
@@ -252,7 +260,18 @@ function HuntingSessionContent() {
     };
     
     // Using setDoc with merge to avoid overwriting if doc somehow exists
-    await setDoc(participantDocRef, participantData, { merge: true });
+    setDoc(participantDocRef, participantData, { merge: true }).catch(e => {
+        if (e.code === 'permission-denied') {
+            const permissionError = new FirestorePermissionError({
+                path: participantDocRef.path,
+                operation: 'create',
+                requestResourceData: participantData,
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        } else {
+            console.error("Error creating participant document:", e);
+        }
+    });
     
     // Explicitly trigger the first position update as a user gesture.
     await handleUpdatePosition(sessionId, true);
@@ -379,6 +398,16 @@ function HuntingSessionContent() {
     }
   }, [map]);
 
+  const handleMapTypeIdChanged = useCallback(() => {
+    if (map) {
+        const newMapTypeId = map.getMapTypeId();
+        if (newMapTypeId) {
+            setMapTypeId(newMapTypeId);
+            localStorage.setItem('huntingMapTypeId', newMapTypeId);
+        }
+    }
+  }, [map]);
+
   const handleRecenter = () => {
     if (map && userLocation) {
         map.panTo({ lat: userLocation.latitude, lng: userLocation.longitude });
@@ -432,7 +461,10 @@ function HuntingSessionContent() {
                 </CardHeader>
                 <CardContent>
                     <Skeleton className="h-80 w-full" />
-                    <Skeleton className="h-20 w-full mt-4" />
+                    <div className="mt-4">
+                        <Skeleton className="h-8 w-1/2 mb-2" />
+                        <Skeleton className="h-20 w-full" />
+                    </div>
                 </CardContent>
             </Card>
         )
@@ -459,11 +491,12 @@ function HuntingSessionContent() {
                         onLoad={onLoad}
                         onUnmount={onUnmount}
                         onIdle={handleMapIdle}
+                        onMapTypeIdChanged={handleMapTypeIdChanged}
                         options={{ 
                             disableDefaultUI: true, 
                             zoomControl: true, 
                             mapTypeControl: true,
-                            mapTypeId: 'terrain'
+                            mapTypeId: mapTypeId as google.maps.MapTypeId
                         }}
                     >
                         {participants?.map(p => {
