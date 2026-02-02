@@ -43,6 +43,7 @@ export default function LagonPage() {
   const { selectedDate } = useDate();
   const [data, setData] = useState<LocationData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedTime, setSelectedTime] = useState('12:00');
 
   useEffect(() => {
     setIsLoading(true);
@@ -62,6 +63,11 @@ export default function LagonPage() {
     return [...data.tides].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
   }, [data]);
 
+  const selectedSwell = useMemo(() => {
+    if (!data?.weather?.swell) return null;
+    return data.weather.swell.find(s => s.time === selectedTime) || data.weather.swell[1];
+  }, [data, selectedTime]);
+
   if (isLoading || !data) {
     return <LagonSkeleton />;
   }
@@ -78,13 +84,20 @@ export default function LagonPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6 md:grid-cols-2">
-          <div className="space-y-4 rounded-lg border p-4 bg-card">
+          <div className="space-y-2 rounded-lg border p-4 bg-card">
             <h3 className="font-semibold flex items-center gap-2 mb-2">
               <Wind className="text-primary" /> Vent
             </h3>
-            <div className="space-y-3">
+            <div className="space-y-1">
               {weather.wind.map((forecast, index) => (
-                <div key={index} className="flex justify-between items-center border-b pb-2 last:border-b-0">
+                <div 
+                  key={index} 
+                  onClick={() => setSelectedTime(forecast.time)}
+                  className={cn(
+                      "flex justify-between items-center py-2 px-2 -mx-2 cursor-pointer transition-colors rounded-md",
+                      selectedTime === forecast.time ? "bg-muted" : "hover:bg-muted/50"
+                  )}
+                >
                     <div>
                         <p className="font-bold">{forecast.time}</p>
                         <p className="text-sm text-muted-foreground">{forecast.stability}</p>
@@ -101,23 +114,31 @@ export default function LagonPage() {
             <h3 className="font-semibold flex items-center gap-2 mb-2">
               <Waves className="text-primary" /> Houle
             </h3>
-            <div className="flex flex-col gap-4">
-              <div>
-                <p className="font-bold text-xl">{weather.swell.inside}</p>
+            {selectedSwell ? (
+              <div className="flex flex-col gap-4">
+                <div>
+                  <p className="font-bold text-xl">{selectedSwell.inside}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Dans le lagon
+                  </p>
+                </div>
+                <div>
+                  <p className="font-bold text-xl">{selectedSwell.outside}</p>
+                  <p className="text-sm text-muted-foreground">
+                    À l'extérieur du récif
+                  </p>
+                </div>
                 <p className="text-sm text-muted-foreground">
-                  Dans le lagon
+                  Période de {selectedSwell.period} secondes
                 </p>
               </div>
-              <div>
-                <p className="font-bold text-xl">{weather.swell.outside}</p>
-                <p className="text-sm text-muted-foreground">
-                  À l'extérieur du récif
-                </p>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Période de {weather.swell.period} secondes
-              </p>
-            </div>
+            ) : (
+                <div className="flex flex-col gap-4">
+                    <Skeleton className="h-7 w-20" />
+                    <Skeleton className="h-7 w-20" />
+                    <Skeleton className="h-4 w-32" />
+                </div>
+            )}
           </div>
         </CardContent>
         <CardContent>

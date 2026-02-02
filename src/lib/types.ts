@@ -7,6 +7,13 @@ export interface WindForecast {
   stability: 'Stable' | 'Tournant';
 }
 
+export interface SwellForecast {
+  time: string;
+  inside: string;
+  outside: string;
+  period: number;
+}
+
 export interface HourlyForecast {
   date: string; // ISO string
   condition:
@@ -28,11 +35,7 @@ export interface HourlyForecast {
 
 export interface WeatherData {
   wind: WindForecast[];
-  swell: {
-    inside: string;
-    outside: string;
-    period: number;
-  };
+  swell: SwellForecast[];
   sun: {
     sunrise: string;
     sunset: string;

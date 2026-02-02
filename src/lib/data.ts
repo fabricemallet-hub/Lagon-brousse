@@ -1,5 +1,5 @@
 
-import { LocationData, Tide, WindDirection, WindForecast, HourlyForecast } from './types';
+import { LocationData, SwellForecast, Tide, WindDirection, WindForecast, HourlyForecast } from './types';
 import { locations } from './locations';
 import { Firestore, doc, getDoc, collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
 
@@ -82,7 +82,7 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation'> = {
       { time: '12:00', speed: 11, direction: 'S', stability: 'Stable' },
       { time: '18:00', speed: 6, direction: 'SE', stability: 'Tournant' },
     ],
-    swell: { inside: '0.5m', outside: '1.2m', period: 8 },
+    swell: [],
     sun: { sunrise: '06:31', sunset: '17:45' },
     moon: { moonrise: '12:05', moonset: '23:55', phase: 'Premier quartier', percentage: 50 },
     rain: 'Aucune', trend: 'Ensoleillé', uvIndex: 7, temp: 26, tempMin: 23, tempMax: 33, hourly: [],
@@ -421,11 +421,16 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   });
 
   // Vary Swell
-  const swellBase = 0.5;
-  locationData.weather.swell.inside = `${Math.max(0.1, swellBase + Math.sin(dateSeed * 0.3 + locationSeed * 0.1) * 0.5).toFixed(1)}m`;
-  const swellOutsideBase = 1.2;
-  locationData.weather.swell.outside = `${Math.max(0.2, swellOutsideBase + Math.cos(dateSeed * 0.3 + locationSeed * 0.1) * 1).toFixed(1)}m`;
-  locationData.weather.swell.period = Math.max(4, Math.round(8 + Math.sin(dateSeed * 0.1) * 3));
+  locationData.weather.swell = [];
+  const swellTimes = ['06:00', '12:00', '18:00'];
+  swellTimes.forEach((time, index) => {
+    const swellBase = 0.5;
+    const inside = `${Math.max(0.1, swellBase + Math.sin(dateSeed * 0.3 + locationSeed * 0.1 + index * 2) * 0.4).toFixed(1)}m`;
+    const swellOutsideBase = 1.2;
+    const outside = `${Math.max(0.2, swellOutsideBase + Math.cos(dateSeed * 0.3 + locationSeed * 0.1 + index * 2) * 1).toFixed(1)}m`;
+    const period = Math.max(4, Math.round(8 + Math.sin(dateSeed * 0.1 + index) * 3));
+    locationData.weather.swell.push({ time, inside, outside, period });
+  });
 
   // Vary Rain
   const rainChance = (Math.sin(dateSeed * 0.4 + locationSeed * 0.2) + 1) / 2; // Normalize to 0-1
