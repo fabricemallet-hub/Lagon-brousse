@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, serverTimestamp, deleteDoc, doc, Timestamp, orderBy, query, setDoc, writeBatch, getDocs } from 'firebase/firestore';
 import type { UserAccount, AccessToken } from '@/lib/types';
@@ -38,7 +38,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
+import { format, isBefore } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
@@ -80,7 +80,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (areUsersLoading || !allUsers) return;
     const totalUsers = allUsers.length;
-    const activeSubscribers = allUsers.filter(u => u.subscriptionStatus === 'active').length;
+    const activeSubscribers = allUsers.filter(u => u.subscriptionStatus === 'active' && u.subscriptionExpiryDate && isBefore(new Date(), new Date(u.subscriptionExpiryDate))).length;
     const monthlyRevenue = activeSubscribers * SUBSCRIPTION_PRICE;
     setStats({ totalUsers, activeSubscribers, monthlyRevenue });
   }, [allUsers, areUsersLoading]);
@@ -143,14 +143,27 @@ export default function AdminPage() {
     try {
         const usersQuery = query(collection(firestore, 'users'));
         const querySnapshot = await getDocs(usersQuery);
-        const usersToDelete = querySnapshot.docs.filter(doc => doc.data().email !== 'f.mallet81@outlook.com');
+        
+        const usersToDelete = querySnapshot.docs.filter(doc => {
+            const data = doc.data() as UserAccount;
+            if (data.email === 'f.mallet81@outlook.com') {
+                return false;
+            }
+            if (data.subscriptionStatus === 'active' && data.subscriptionExpiryDate) {
+                const expiryDate = new Date(data.subscriptionExpiryDate);
+                if (isBefore(new Date(), expiryDate)) {
+                    return false;
+                }
+            }
+            return true;
+        });
 
         if (usersToDelete.length === 0) {
-            toast({ title: "Aucun utilisateur à supprimer", description: "Seul le compte administrateur existe." });
+            toast({ title: "Aucun utilisateur à supprimer", description: "Aucun utilisateur inactif ou expiré n'a été trouvé." });
+            setIsResetAlertOpen(false);
             return;
         }
 
-        // Firestore batch writes are limited to 500 operations.
         const BATCH_SIZE = 499;
         for (let i = 0; i < usersToDelete.length; i += BATCH_SIZE) {
             const batch = writeBatch(firestore);
@@ -161,7 +174,7 @@ export default function AdminPage() {
             await batch.commit();
         }
 
-        toast({ title: "Utilisateurs réinitialisés", description: `${usersToDelete.length} utilisateurs ont été supprimés avec succès.` });
+        toast({ title: "Utilisateurs réinitialisés", description: `${usersToDelete.length} utilisateurs ont été supprimés. Les abonnés actifs ont été conservés.` });
     } catch (error) {
         console.error("Error resetting users:", error);
         toast({ variant: 'destructive', title: "Erreur", description: "Impossible de réinitialiser les utilisateurs." });
@@ -169,6 +182,20 @@ export default function AdminPage() {
         setIsResetAlertOpen(false);
     }
   };
+  
+  const deletableUsersCount = useMemo(() => {
+    if (!allUsers) return '...';
+    return allUsers.filter(u => {
+        if (u.email === 'f.mallet81@outlook.com') return false;
+        if (u.subscriptionStatus === 'active' && u.subscriptionExpiryDate) {
+            const expiryDate = new Date(u.subscriptionExpiryDate);
+            if (isBefore(new Date(), expiryDate)) {
+                return false;
+            }
+        }
+        return true;
+    }).length;
+  }, [allUsers]);
 
 
   const isLoading = isUserLoading || areUsersLoading || areTokensLoading;
@@ -284,7 +311,7 @@ export default function AdminPage() {
                 Réinitialiser les utilisateurs
             </Button>
             <p className="text-xs text-muted-foreground mt-2">
-                Supprime de manière permanente tous les comptes utilisateurs de la base de données, à l'exception du compte administrateur.
+                Supprime de manière permanente tous les comptes utilisateurs inactifs ou expirés.
             </p>
         </CardContent>
       </Card>
@@ -310,7 +337,7 @@ export default function AdminPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Êtes-vous absolument sûr ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action supprimera définitivement tous les utilisateurs ({stats ? (stats.totalUsers > 0 ? stats.totalUsers - 1 : 0) : '...'}) de la base de données. Seul le compte administrateur sera conservé. Cette action est irréversible.
+              Cette action supprimera définitivement tous les utilisateurs inactifs ou expirés ({deletableUsersCount}) de la base de données. Le compte administrateur et les abonnés actifs seront conservés. Cette action est irréversible.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
