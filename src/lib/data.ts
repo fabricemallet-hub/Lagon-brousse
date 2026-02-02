@@ -406,9 +406,9 @@ export function generateProceduralData(location: string, date: Date): LocationDa
 
   // Vary Rain
   const rainChance = (Math.sin(dateSeed * 0.4 + locationSeed * 0.2) + 1) / 2; // Normalize to 0-1
-  if (rainChance < 0.6) {
+  if (rainChance < 0.9) {
       locationData.weather.rain = 'Aucune';
-  } else if (rainChance < 0.85) {
+  } else if (rainChance < 0.98) {
       locationData.weather.rain = 'Fine';
   } else {
       locationData.weather.rain = 'Forte';
