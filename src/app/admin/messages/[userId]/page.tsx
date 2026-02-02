@@ -9,13 +9,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Send, ArrowLeft } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import Link from 'next/link';
 
-export default function AdminMessagePage({ params }: { params: { userId: string } }) {
+export default function AdminMessagePage() {
+  const params = useParams();
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const router = useRouter();
@@ -25,7 +26,7 @@ export default function AdminMessagePage({ params }: { params: { userId: string 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   
   const isAdmin = useMemo(() => user?.email === 'f.mallet81@outlook.com', [user]);
-  const conversationId = params.userId;
+  const conversationId = params.userId as string;
 
   // Fetch target user's profile
   useEffect(() => {
