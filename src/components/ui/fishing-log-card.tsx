@@ -240,8 +240,12 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
 
         const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
-        const previousLowTide = combinedTides.filter(t => t.type === 'basse' && t.timeMinutes < nowMinutes).pop();
-        const nextHighTide = combinedTides.find(t => t.type === 'haute' && t.timeMinutes > nowMinutes);
+        // Find the bracketing tides
+        const prevTide = combinedTides.filter(t => t.timeMinutes <= nowMinutes).pop();
+        const nextTide = combinedTides.find(t => t.timeMinutes > nowMinutes);
+
+        const closestLowTide = prevTide?.type === 'basse' ? prevTide : (nextTide?.type === 'basse' ? nextTide : null);
+        const closestHighTide = prevTide?.type === 'haute' ? prevTide : (nextTide?.type === 'haute' ? nextTide : null);
 
         const getTideMovementForContext = (): 'montante' | 'descendante' | 'étale' => {
             const nextTidePeak = combinedTides.find(t => t.timeMinutes > nowMinutes);
@@ -290,8 +294,8 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                 windDirection: currentForecast.windDirection,
                 airTemperature: currentForecast.temp,
                 waterTemperature: todayData.weather.waterTemperature,
-                ...(previousLowTide && { previousLowTide: { time: previousLowTide.time, height: previousLowTide.height } }),
-                ...(nextHighTide && { nextHighTide: { time: nextHighTide.time, height: nextHighTide.height } }),
+                ...(closestLowTide && { closestLowTide: { time: closestLowTide.time, height: closestLowTide.height } }),
+                ...(closestHighTide && { closestHighTide: { time: closestHighTide.time, height: closestHighTide.height } }),
                 swellInside: currentSwell.inside,
                 swellOutside: currentSwell.outside,
             }
@@ -666,7 +670,11 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                 value={openSpotId}
                                 onValueChange={setOpenSpotId}
                             >
-                               {savedSpots.map(spot => (
+                               {savedSpots.map(spot => {
+                                   const displayLowTide = spot.context.closestLowTide || (spot.context as any).previousLowTide;
+                                   const displayHighTide = spot.context.closestHighTide || (spot.context as any).nextHighTide;
+
+                                   return (
                                    <AccordionPrimitive.Item 
                                         ref={(el) => (spotRefs.current[spot.id] = el)}
                                         value={spot.id} 
@@ -722,8 +730,8 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                 )}
                                                 <p><strong>Lune :</strong> {spot.context.moonPhase}</p>
                                                 <p><strong>Marée :</strong> {spot.context.tideMovement} ({spot.context.tideHeight.toFixed(2)}m), courant {spot.context.tideCurrent.toLowerCase()}</p>
-                                                {spot.context.previousLowTide && <p><strong>Marée basse précédente :</strong> {spot.context.previousLowTide.time} ({spot.context.previousLowTide.height.toFixed(2)}m)</p>}
-                                                {spot.context.nextHighTide && <p><strong>Marée haute suivante :</strong> {spot.context.nextHighTide.time} ({spot.context.nextHighTide.height.toFixed(2)}m)</p>}
+                                                {displayLowTide && <p><strong>Marée basse :</strong> {displayLowTide.time} ({displayLowTide.height.toFixed(2)}m)</p>}
+                                                {displayHighTide && <p><strong>Marée haute :</strong> {displayHighTide.time} ({displayHighTide.height.toFixed(2)}m)</p>}
                                            </div>
                                            <div className="flex flex-col sm:flex-row gap-2">
                                                <Button variant="outline" className="flex-1" onClick={() => handleFindSimilarDay(spot)} disabled={isAnalyzing}><BrainCircuit className="mr-2"/> Chercher un jour similaire (IA)</Button>
@@ -733,7 +741,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                            </div>
                                        </AccordionPrimitive.Content>
                                    </AccordionPrimitive.Item>
-                               ))}
+                               )})}
                             </AccordionPrimitive.Root>
                         ) : (
                             <p className="text-sm text-muted-foreground text-center py-4">Aucun spot sauvegardé pour le moment.</p>

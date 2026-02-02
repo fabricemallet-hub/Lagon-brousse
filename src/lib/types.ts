@@ -111,6 +111,7 @@ export interface HuntingAdvice {
 
 export interface HuntingData {
   period: HuntingPeriod;
+  description?: string;
   advice: HuntingAdvice;
 }
 
@@ -176,8 +177,8 @@ export interface FishingSpot {
     windDirection: WindDirection;
     airTemperature: number;
     waterTemperature: number;
-    previousLowTide?: { time: string; height: number };
-    nextHighTide?: { time: string; height: number };
+    closestLowTide?: { time: string; height: number };
+    closestHighTide?: { time: string; height: number };
     swellInside?: string;
     swellOutside?: string;
   };
