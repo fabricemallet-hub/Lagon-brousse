@@ -90,6 +90,7 @@ function HuntingSessionContent() {
   const [isParticipating, setIsParticipating] = useState(false);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [zoom, setZoom] = useState(8);
+  const [initialZoomDone, setInitialZoomDone] = useState(false);
   
   const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   
@@ -108,6 +109,7 @@ function HuntingSessionContent() {
     setSession(null);
     setIsParticipating(false);
     setUserLocation(null);
+    setInitialZoomDone(false);
 
     if (!user || !previousSessionId || !firestore) {
         return;
@@ -134,7 +136,7 @@ function HuntingSessionContent() {
     }
   }, [user, session, firestore, toast]);
 
- const handleUpdatePosition = useCallback(async (currentSessionId: string) => {
+ const handleUpdatePosition = useCallback(async (currentSessionId: string, isFirstUpdate = false) => {
     if (!user || !firestore || !navigator.geolocation) return;
 
     try {
@@ -184,8 +186,9 @@ function HuntingSessionContent() {
           toast({
             variant: "destructive",
             title: "Géolocalisation refusée",
-            description: "La géolocalisation est requise pour être visible sur la carte.",
+            description: "La géolocalisation est requise pour être visible sur la carte. Activez-la dans les paramètres de votre navigateur.",
           });
+          // Do not leave session, just inform the user.
         }
     }
   }, [user, firestore, toast]);
@@ -208,6 +211,14 @@ function HuntingSessionContent() {
         }
     };
   }, [isParticipating, session, handleUpdatePosition]);
+
+  useEffect(() => {
+    if (map && userLocation && !initialZoomDone) {
+      map.panTo({ lat: userLocation.latitude, lng: userLocation.longitude });
+      map.setZoom(16); // Zoom level that approximates 73%
+      setInitialZoomDone(true);
+    }
+  }, [map, userLocation, initialZoomDone]);
 
   const generateUniqueCode = async (): Promise<string> => {
     if (!firestore) throw new Error("Firestore not initialized");
@@ -239,10 +250,8 @@ function HuntingSessionContent() {
         updatedAt: serverTimestamp(),
     };
     
-    // Use a non-blocking setDoc and return the promise
     await setDoc(participantDocRef, participantData);
     
-    // We return a promise that resolves with the document snapshot
     return getDoc(participantDocRef);
 }, [user, firestore]);
 
@@ -264,9 +273,10 @@ function HuntingSessionContent() {
         
         const sessionDocRef = doc(firestore, 'hunting_sessions', code);
         await setDoc(sessionDocRef, newSessionData);
-        await createParticipantDocument(code); // Wait for participant doc to be created
+        await createParticipantDocument(code);
         
-        handleUpdatePosition(code);
+        // Directly trigger position update
+        handleUpdatePosition(code, true);
 
         setSession({ id: code, ...newSessionData });
         setIsParticipating(true);
@@ -306,9 +316,10 @@ function HuntingSessionContent() {
          throw new Error('Cette session a expiré et a été supprimée.');
       }
       
-      await createParticipantDocument(sessionId); // Wait for participant doc to be created
+      await createParticipantDocument(sessionId);
       
-      handleUpdatePosition(sessionId);
+      // Directly trigger position update
+      handleUpdatePosition(sessionId, true);
 
       setSession({ id: sessionDoc.id, ...sessionData });
       setIsParticipating(true);
@@ -340,11 +351,8 @@ function HuntingSessionContent() {
   }
 
   const onLoad = useCallback(function callback(mapInstance: google.maps.Map) {
-    const ncBounds = new window.google.maps.LatLngBounds(
-        new window.google.maps.LatLng(-22.8, 163.5),
-        new window.google.maps.LatLng(-19.6, 168.1)
-    );
-    mapInstance.fitBounds(ncBounds);
+    // We remove fitBounds to allow for custom initial zoom on user location.
+    // The map will default to the 'center' and 'zoom' props of the <GoogleMap /> component.
     setMap(mapInstance);
   }, []);
 
@@ -365,7 +373,7 @@ function HuntingSessionContent() {
   const handleRecenter = () => {
     if (map && userLocation) {
         map.panTo({ lat: userLocation.latitude, lng: userLocation.longitude });
-        map.setZoom(13);
+        map.setZoom(16);
     } else {
         toast({
             variant: "destructive",
@@ -393,7 +401,7 @@ function HuntingSessionContent() {
                         <AlertCircle className="h-4 w-4" />
                         <AlertTitle>Erreur de chargement de la carte</AlertTitle>
                         <AlertDescription>
-                           La clé API Google Maps n'est pas valide ou mal configurée. Veuillez vérifier les instructions dans la console Google Cloud.
+                           La clé API Google Maps semble invalide ou mal configurée. Veuillez vérifier sa configuration dans la console Google Cloud.
                         </AlertDescription>
                     </Alert>
                 </CardContent>
