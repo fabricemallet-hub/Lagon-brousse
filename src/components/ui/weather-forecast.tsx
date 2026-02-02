@@ -18,14 +18,6 @@ import { fr } from 'date-fns/locale';
 import type { WeatherData, HourlyForecast, WindDirection, Tide } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Skeleton } from './skeleton';
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-  type CarouselApi,
-} from '@/components/ui/carousel';
 import { Badge } from './badge';
 
 const WeatherConditionIcon = ({
@@ -93,8 +85,6 @@ const WindArrowIcon = ({ direction, className }: { direction: WindDirection, cla
 };
 
 export function WeatherForecast({ weather, tides }: { weather: WeatherData; tides: Tide[] }) {
-  const [api, setApi] = useState<CarouselApi>();
-  const [selectedIndex, setSelectedIndex] = useState(0); 
   const [isClient, setIsClient] = useState(false);
   const [now, setNow] = useState(new Date());
 
@@ -104,9 +94,9 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
     return () => clearInterval(timer);
   }, []);
 
-  const summary = useMemo(() => {
+  const { summary, selectedForecast } = useMemo(() => {
     if (!weather.hourly.length || !tides.length) {
-      return null;
+      return { summary: null, selectedForecast: null };
     }
 
     // --- Tide Logic ---
@@ -139,16 +129,16 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
     const remainingTime = formatDistanceToNow(nextTide.date, { locale: fr, addSuffix: true });
     const tideSentence = `Marée ${tideDirection} jusqu'à ${nextTide.time}, pleine ${nextTide.type === 'haute' ? 'mer' : 'basse'} ${remainingTime}.`;
 
-    // --- Wind Logic ---
+    // --- Wind & Selected Forecast Logic ---
     const currentHour = now.getHours();
-    const currentForecast = weather.hourly.find(f => new Date(f.date).getHours() === currentHour) || weather.hourly[0];
+    const _selectedForecast = weather.hourly.find(f => new Date(f.date).getHours() === currentHour) || weather.hourly[0];
     
     const forecastIn3Hours = weather.hourly.find(f => new Date(f.date).getHours() === (currentHour + 3) % 24);
     const forecastIn6Hours = weather.hourly.find(f => new Date(f.date).getHours() === (currentHour + 6) % 24);
     
     let windTrend = "stable";
     if (forecastIn3Hours && forecastIn6Hours) {
-        const currentSpeed = currentForecast.windSpeed;
+        const currentSpeed = _selectedForecast.windSpeed;
         const speed3h = forecastIn3Hours.windSpeed;
         const speed6h = forecastIn6Hours.windSpeed;
         const upperThreshold = currentSpeed * 1.2;
@@ -164,46 +154,10 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
             windTrend = "à la hausse";
         }
     }
-    const windSentence = `Vent de ${currentForecast.windSpeed} nœuds, tendance ${windTrend}.`;
+    const windSentence = `Vent de ${_selectedForecast.windSpeed} nœuds, tendance ${windTrend}.`;
 
-    return {tideSentence, windSentence};
+    return { summary: {tideSentence, windSentence}, selectedForecast: _selectedForecast };
   }, [now, weather, tides]);
-
-  useEffect(() => {
-    if (!api || !weather.hourly.length) {
-      return;
-    }
-
-    const onSelect = () => {
-      if (api) {
-        setSelectedIndex(api.selectedScrollSnap());
-      }
-    };
-    api.on('select', onSelect);
-    api.on('reInit', onSelect);
-
-    const currentHour = new Date().getHours();
-    
-    let closestHourIndex = weather.hourly.findIndex(
-      (forecast) => new Date(forecast.date).getHours() === currentHour
-    );
-
-    if (closestHourIndex === -1) {
-      closestHourIndex = 0; 
-    }
-    
-    api.scrollTo(closestHourIndex, true);
-    setSelectedIndex(closestHourIndex);
-
-    return () => {
-      if (api) {
-        api.off('select', onSelect);
-      }
-    };
-  }, [api, weather]);
-
-
-  const selectedForecast = weather.hourly[selectedIndex];
 
   if (!isClient || !selectedForecast) {
     return <Skeleton className="h-[420px] w-full rounded-lg" />;
@@ -232,7 +186,7 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
           </h3>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-2 items-center justify-around">
+        <div className="flex flex-col sm:flex-row gap-4 items-center justify-around">
            <div className="flex flex-col items-center justify-center text-center">
                 <WeatherConditionIcon
                 condition={selectedForecast.condition}
@@ -267,20 +221,15 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
       </div>
 
       <div className="p-2">
-        <Carousel setApi={setApi} opts={{ align: 'start' }}>
-          <CarouselContent className="-ml-1">
-            {weather.hourly.slice(0, 24).map((forecast, index) => (
-              <CarouselItem
-                key={index}
-                className="basis-[24%] sm:basis-[19%] md:basis-1/6 lg:basis-[12.5%] pl-1"
-                onClick={() => api?.scrollTo(index)}
-              >
+        <div className="flex flex-row flex-wrap -m-1">
+          {weather.hourly.slice(0, 24).map((forecast, index) => {
+             const isSelected = new Date(forecast.date).getHours() === new Date(selectedForecast.date).getHours();
+             return (
+              <div key={index} className="w-1/4 sm:w-1/5 md:w-1/6 lg:basis-[12.5%] p-1">
                 <div
                   className={cn(
-                    'flex flex-col items-center justify-between p-1 cursor-pointer rounded-lg border h-full space-y-1 text-center',
-                    selectedIndex === index
-                      ? 'bg-blue-100 border-blue-200 dark:bg-blue-900/50 dark:border-blue-700'
-                      : 'bg-card hover:bg-muted/50'
+                    'flex flex-col items-center justify-between p-1 rounded-lg border h-full space-y-1 text-center bg-card',
+                     isSelected && 'bg-blue-100 border-blue-200 dark:bg-blue-900/50 dark:border-blue-700'
                   )}
                 >
                   <p className="font-bold text-xs">
@@ -293,7 +242,7 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
                   />
                   
                   <div className="flex items-baseline gap-0.5">
-                    <p className="font-bold text-base">{forecast.windSpeed}</p>
+                    <p className="font-bold text-xs">{forecast.windSpeed}</p>
                     <p className="text-[9px] text-muted-foreground">nœuds</p>
                   </div>
                   
@@ -318,12 +267,10 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
                     </div>
                   </div>
                 </div>
-              </CarouselItem>
-            ))}
-          </CarouselContent>
-          <CarouselPrevious className="hidden sm:flex" />
-          <CarouselNext className="hidden sm:flex" />
-        </Carousel>
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   );
