@@ -36,6 +36,7 @@ import {
   LocateFixed,
   AlertCircle,
   Navigation,
+  Download,
 } from 'lucide-react';
 import {
   useUser,
@@ -201,9 +202,10 @@ function HuntingSessionContent() {
   const { data: participants, isLoading: areParticipantsLoading } = useCollection<SessionParticipant>(participantsCollectionRef);
 
   useEffect(() => {
+    // This effect now only sets up the recurring interval.
+    // The initial position update is a one-off action triggered
+    // by the user gesture of creating or joining a session.
     if (isParticipating && session) {
-      // The initial position update is now triggered right after joining/creating.
-      // This interval is for subsequent updates.
       updateIntervalRef.current = setInterval(() => handleUpdatePosition(session.id), 30000); // 30 seconds
     } else if (updateIntervalRef.current) {
       clearInterval(updateIntervalRef.current);
@@ -258,7 +260,7 @@ function HuntingSessionContent() {
     // Using setDoc with merge to avoid overwriting if doc somehow exists
     await setDoc(participantDocRef, participantData, { merge: true });
     
-    // Now explicitly trigger the first position update as a user gesture.
+    // Explicitly trigger the first position update as a user gesture.
     await handleUpdatePosition(sessionId, true);
 }, [user, firestore, handleUpdatePosition]);
 
@@ -495,7 +497,7 @@ function HuntingSessionContent() {
                     <Button size="icon" onClick={handleRecenter} className="absolute top-2 right-2 shadow-lg h-9 w-9">
                         <LocateFixed className="h-5 w-5" />
                     </Button>
-                    <div className="absolute bottom-14 right-2 bg-card/80 p-1 px-2 rounded-md text-xs font-semibold shadow-lg border">
+                    <div className="absolute bottom-2 right-2 bg-card/80 p-1 px-2 rounded-md text-xs font-semibold shadow-lg border">
                       {Math.round((zoom / 22) * 100)}%
                     </div>
                 </div>
@@ -507,6 +509,13 @@ function HuntingSessionContent() {
                         </Button>
                     </CollapsibleTrigger>
                     <CollapsibleContent className="space-y-4 pt-4">
+                        <Alert>
+                          <Download className="h-4 w-4" />
+                          <AlertTitle>Mode Hors Ligne</AlertTitle>
+                          <AlertDescription>
+                            La carte peut être utilisée hors ligne. Pour mettre une zone en cache, naviguez simplement sur la carte lorsque vous êtes connecté. Les tuiles seront automatiquement sauvegardées. Les positions se synchroniseront au retour du réseau.
+                          </AlertDescription>
+                        </Alert>
                         <div className="flex flex-col sm:flex-row items-center gap-4">
                             <div className="space-y-1 flex-grow">
                                 <Label htmlFor="session-code-display">Code de session</Label>
