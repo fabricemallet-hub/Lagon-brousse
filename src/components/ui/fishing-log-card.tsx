@@ -16,7 +16,7 @@ import { collection, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc } f
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { LocationData, FishingSpot, WindDirection } from '@/lib/types';
-import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed } from 'lucide-react';
+import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from './alert';
 
@@ -59,6 +59,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     const [selectedIcon, setSelectedIcon] = useState<keyof typeof mapIcons>('Fish');
     const [selectedColor, setSelectedColor] = useState('#3b82f6');
     const [isSaving, setIsSaving] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
     
     const [map, setMap] = useState<google.maps.Map | null>(null);
     const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -268,16 +269,16 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     }
     
     return (
-        <Card>
-            <CardHeader>
+        <Card className={cn("transition-all", isFullscreen && "fixed inset-0 z-50 w-screen h-screen rounded-none border-none flex flex-col")}>
+            <CardHeader className={cn(isFullscreen && "flex-shrink-0")}>
                 <CardTitle className="flex items-center gap-2"><Map /> Carnet de Pêche</CardTitle>
                 <CardDescription>Cliquez sur la carte pour marquer un coin, puis enregistrez-le. Vos spots sauvegardés apparaîtront dans l'historique.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className={cn("space-y-4", isFullscreen ? "flex-grow flex flex-col p-2 gap-2" : "p-6 pt-0")}>
                 {loadError && <Alert variant="destructive"><AlertTitle>Erreur de chargement de la carte</AlertTitle></Alert>}
                 {!isLoaded && <Skeleton className="h-80 w-full" />}
                 {isLoaded && (
-                    <div className="relative h-80 w-full rounded-lg overflow-hidden border">
+                    <div className={cn("relative w-full rounded-lg overflow-hidden border", isFullscreen ? "flex-grow" : "h-80")}>
                         <GoogleMap
                             mapContainerClassName="w-full h-full"
                             center={userLocation || { lat: -21.5, lng: 165.5 }}
@@ -326,17 +327,22 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                 />
                             )}
                         </GoogleMap>
+                        <Button size="icon" onClick={() => setIsFullscreen(!isFullscreen)} className="absolute top-2 left-2 shadow-lg h-9 w-9 z-10">
+                            {isFullscreen ? <Shrink className="h-5 w-5" /> : <Expand className="h-5 w-5" />}
+                        </Button>
                         <Button size="icon" onClick={handleRecenter} className="absolute top-2 right-2 shadow-lg h-9 w-9 z-10">
                             <LocateFixed className="h-5 w-5" />
                         </Button>
-                        <Button 
-                            className="absolute bottom-4 left-1/2 -translate-x-1/2 shadow-lg" 
-                            onClick={() => { if (newSpotLocation) setIsAddSpotOpen(true); }}
-                            disabled={!newSpotLocation}
-                        >
-                            <Plus className="mr-2" /> 
-                            {newSpotLocation ? 'Ajouter ce coin de pêche' : 'Cliquez sur la carte pour placer un repère'}
-                        </Button>
+                        {!isFullscreen && (
+                            <Button 
+                                className="absolute bottom-4 left-1/2 -translate-x-1/2 shadow-lg" 
+                                onClick={() => { if (newSpotLocation) setIsAddSpotOpen(true); }}
+                                disabled={!newSpotLocation}
+                            >
+                                <Plus className="mr-2" /> 
+                                {newSpotLocation ? 'Ajouter ce coin de pêche' : 'Cliquez sur la carte pour placer un repère'}
+                            </Button>
+                        )}
                     </div>
                 )}
                 
@@ -344,7 +350,9 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>Enregistrer un nouveau spot</DialogTitle>
-                            <DialogDescription>Remplissez les détails et sauvegardez pour ajouter ce spot à votre carnet.</DialogDescription>
+                            <DialogDescription>
+                                Remplissez les détails et sauvegardez pour ajouter ce spot à votre carnet.
+                            </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4 py-4">
                             <div className="space-y-2">
@@ -384,47 +392,49 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                     </DialogContent>
                 </Dialog>
 
-                <div>
-                    <h4 className="font-semibold text-lg mb-2">Historique des prises</h4>
-                    {areSpotsLoading && <Skeleton className="h-24 w-full" />}
-                    {!areSpotsLoading && savedSpots && savedSpots.length > 0 ? (
-                        <Accordion type="single" collapsible className="w-full">
-                           {savedSpots.map(spot => (
-                               <AccordionItem value={spot.id} key={spot.id}>
-                                   <AccordionTrigger>
-                                       <div className="flex items-center justify-between w-full pr-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="p-1 rounded-md" style={{backgroundColor: spot.color + '20'}}>
-                                                    {React.createElement(mapIcons[spot.icon as keyof typeof mapIcons] || MapPin, { className: 'size-5', style: {color: spot.color} })}
+                {!isFullscreen && (
+                    <div>
+                        <h4 className="font-semibold text-lg mb-2">Historique des prises</h4>
+                        {areSpotsLoading && <Skeleton className="h-24 w-full" />}
+                        {!areSpotsLoading && savedSpots && savedSpots.length > 0 ? (
+                            <Accordion type="single" collapsible className="w-full">
+                               {savedSpots.map(spot => (
+                                   <AccordionItem value={spot.id} key={spot.id}>
+                                       <AccordionTrigger>
+                                           <div className="flex items-center justify-between w-full pr-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-1 rounded-md" style={{backgroundColor: spot.color + '20'}}>
+                                                        {React.createElement(mapIcons[spot.icon as keyof typeof mapIcons] || MapPin, { className: 'size-5', style: {color: spot.color} })}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-left">{spot.name}</p>
+                                                        <p className="text-xs text-muted-foreground text-left">{spot.createdAt ? format(spot.createdAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr }) : 'Enregistrement...'}</p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className="font-bold text-left">{spot.name}</p>
-                                                    <p className="text-xs text-muted-foreground text-left">{spot.createdAt ? format(spot.createdAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr }) : 'Enregistrement...'}</p>
-                                                </div>
-                                            </div>
-                                       </div>
-                                   </AccordionTrigger>
-                                   <AccordionContent className="space-y-4">
-                                       <div className="text-sm text-muted-foreground bg-muted/50 p-4 rounded-lg space-y-2">
-                                           {spot.notes && <p className="italic">"{spot.notes}"</p>}
-                                            <p><strong>Conditions :</strong> {spot.context.weatherCondition}, {spot.context.airTemperature}°C (air), {spot.context.waterTemperature}°C (eau)</p>
-                                            <p><strong>Vent :</strong> {spot.context.windSpeed} nœuds de {spot.context.windDirection}</p>
-                                            <p><strong>Lune :</strong> {spot.context.moonPhase}</p>
-                                            <p><strong>Marée :</strong> {spot.context.tideMovement} ({spot.context.tideHeight.toFixed(2)}m), courant {spot.context.tideCurrent.toLowerCase()}</p>
-                                       </div>
-                                       <div className="flex flex-col sm:flex-row gap-2">
-                                           <Button variant="outline" className="flex-1" disabled><BrainCircuit className="mr-2"/> Chercher un jour similaire (IA)</Button>
-                                           <Button variant="outline" className="flex-1" disabled><BarChart className="mr-2"/> Analyser pour les 7 prochains jours (IA)</Button>
-                                           <Button variant="destructive" size="icon" onClick={() => handleDeleteSpot(spot.id)}><Trash2 /></Button>
-                                       </div>
-                                   </AccordionContent>
-                               </AccordionItem>
-                           ))}
-                        </Accordion>
-                    ) : (
-                        <p className="text-sm text-muted-foreground text-center py-4">Aucun spot sauvegardé pour le moment.</p>
-                    )}
-                </div>
+                                           </div>
+                                       </AccordionTrigger>
+                                       <AccordionContent className="space-y-4">
+                                           <div className="text-sm text-muted-foreground bg-muted/50 p-4 rounded-lg space-y-2">
+                                               {spot.notes && <p className="italic">"{spot.notes}"</p>}
+                                                <p><strong>Conditions :</strong> {spot.context.weatherCondition}, {spot.context.airTemperature}°C (air), {spot.context.waterTemperature}°C (eau)</p>
+                                                <p><strong>Vent :</strong> {spot.context.windSpeed} nœuds de {spot.context.windDirection}</p>
+                                                <p><strong>Lune :</strong> {spot.context.moonPhase}</p>
+                                                <p><strong>Marée :</strong> {spot.context.tideMovement} ({spot.context.tideHeight.toFixed(2)}m), courant {spot.context.tideCurrent.toLowerCase()}</p>
+                                           </div>
+                                           <div className="flex flex-col sm:flex-row gap-2">
+                                               <Button variant="outline" className="flex-1" disabled><BrainCircuit className="mr-2"/> Chercher un jour similaire (IA)</Button>
+                                               <Button variant="outline" className="flex-1" disabled><BarChart className="mr-2"/> Analyser pour les 7 prochains jours (IA)</Button>
+                                               <Button variant="destructive" size="icon" onClick={() => handleDeleteSpot(spot.id)}><Trash2 /></Button>
+                                           </div>
+                                       </AccordionContent>
+                                   </AccordionItem>
+                               ))}
+                            </Accordion>
+                        ) : (
+                            <p className="text-sm text-muted-foreground text-center py-4">Aucun spot sauvegardé pour le moment.</p>
+                        )}
+                    </div>
+                )}
             </CardContent>
         </Card>
     );
