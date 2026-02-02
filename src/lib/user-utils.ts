@@ -34,6 +34,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
       displayName: 'Admin',
       subscriptionStatus: 'admin',
       favoriteLocationIds: [],
+      lastSelectedLocation: 'Nouméa',
     };
   } else {
     const trialStartDate = new Date();
@@ -47,6 +48,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
       subscriptionStartDate: trialStartDate.toISOString(),
       subscriptionExpiryDate: trialExpiryDate.toISOString(),
       favoriteLocationIds: [],
+      lastSelectedLocation: 'Nouméa',
     };
   }
   

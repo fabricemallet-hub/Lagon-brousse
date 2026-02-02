@@ -14,7 +14,8 @@
         "subscriptionExpiryDate": { "type": "string", "description": "The date when the user's subscription expires.", "format": "date-time" },
         "favoriteLocationIds": { "type": "array", "description": "References to Location. (Relationship: UserAccount N:N Location)", "items": { "type": "string" } },
         "mapIcon": { "type": "string", "description": "The user's chosen icon for the hunting map." },
-        "mapColor": { "type": "string", "description": "The user's chosen color for their map icon." }
+        "mapColor": { "type": "string", "description": "The user's chosen color for their map icon." },
+        "lastSelectedLocation": { "type": "string", "description": "The last location selected by the user." }
       },
       "required": ["id", "email", "displayName", "subscriptionStatus"]
     },

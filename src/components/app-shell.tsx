@@ -63,7 +63,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 const USAGE_LIMIT_SECONDS = 60;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { locations, selectedLocation, setSelectedLocation } = useLocation();
+  const { locations, selectedLocation, setSelectedLocation, isLocationLoading } = useLocation();
   const { calendarView, setCalendarView } = useCalendarView();
   const { selectedDate, setSelectedDate } = useDate();
   const pathname = usePathname();
@@ -366,21 +366,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 
                 {status === 'trial' && <Badge variant="secondary">Version d'essai</Badge>}
                 {status === 'limited' && !isAuthPage && <Badge variant="destructive">Mode Limité</Badge>}
-                <Select
-                  value={selectedLocation}
-                  onValueChange={setSelectedLocation}
-                >
-                  <SelectTrigger className="w-[150px] sm:w-[180px]">
-                    <SelectValue placeholder="Choisir une commune" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {locations.map((loc) => (
-                      <SelectItem key={loc} value={loc}>
-                        {loc}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {isLocationLoading ? (
+                  <Skeleton className="h-10 w-[180px]" />
+                ) : (
+                  <Select
+                    value={selectedLocation}
+                    onValueChange={setSelectedLocation}
+                  >
+                    <SelectTrigger className="w-[150px] sm:w-[180px]">
+                      <SelectValue placeholder="Choisir une commune" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locations.map((loc) => (
+                        <SelectItem key={loc} value={loc}>
+                          {loc}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
 
                 {pathname === '/calendrier' && (
                   <div className="flex items-center space-x-2">

@@ -149,6 +149,7 @@ export interface UserAccount {
   subscriptionStartDate?: string;
   subscriptionExpiryDate?: string;
   favoriteLocationIds?: string[];
+  lastSelectedLocation?: string;
 }
 
 export interface FishingSpot {
