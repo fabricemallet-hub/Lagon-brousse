@@ -50,24 +50,25 @@ export default function AdminPage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  const [newPrice, setNewPrice] = useState(SUBSCRIPTION_PRICE.toString());
   const [tokenDuration, setTokenDuration] = useState('1');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
   const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
+  
+  const isAdmin = useMemo(() => user?.email === 'f.mallet81@outlook.com', [user]);
 
-  // Fetch all users for stats
+  // Fetch all users for stats - only if admin
   const usersCollectionRef = useMemoFirebase(() => {
-    if (!firestore) return null;
+    if (!firestore || !isAdmin) return null;
     return collection(firestore, 'users');
-  }, [firestore]);
+  }, [firestore, isAdmin]);
   const { data: allUsers, isLoading: areUsersLoading } = useCollection<UserAccount>(usersCollectionRef);
 
-  // Fetch access tokens
+  // Fetch access tokens - only if admin
   const tokensCollectionRef = useMemoFirebase(() => {
-    if (!firestore) return null;
+    if (!firestore || !isAdmin) return null;
     return query(collection(firestore, 'access_tokens'), orderBy('createdAt', 'desc'));
-  }, [firestore]);
+  }, [firestore, isAdmin]);
   const { data: accessTokens, isLoading: areTokensLoading } = useCollection<AccessToken>(tokensCollectionRef);
 
   // Fetch stats for all users
@@ -87,10 +88,10 @@ export default function AdminPage() {
 
   // Route protection
   useEffect(() => {
-    if (!isUserLoading && user?.email !== 'f.mallet81@outlook.com') {
+    if (!isUserLoading && !isAdmin) {
       router.push('/compte'); // Redirect non-admins
     }
-  }, [user, isUserLoading, router]);
+  }, [isAdmin, isUserLoading, router]);
 
   const handleGenerateToken = async () => {
     if (!firestore) return;
@@ -138,7 +139,7 @@ export default function AdminPage() {
   };
   
   const handleResetUsers = async () => {
-    if (!firestore || !user || user.email !== 'f.mallet81@outlook.com') return;
+    if (!firestore || !user || !isAdmin) return;
     
     try {
         const usersQuery = query(collection(firestore, 'users'));
@@ -181,9 +182,8 @@ export default function AdminPage() {
 
 
   const isLoading = isUserLoading || areUsersLoading || areTokensLoading;
-  const isAdminUser = user?.email === 'f.mallet81@outlook.com';
 
-  if (!isAdminUser) {
+  if (isUserLoading || !isAdmin) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-48 w-full" />
