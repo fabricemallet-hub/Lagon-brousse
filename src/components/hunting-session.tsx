@@ -135,7 +135,7 @@ export function HuntingSessionCard() {
   }, [firestore, session, isParticipating]);
 
   const { data: participants, isLoading: areParticipantsLoading } = useCollection<SessionParticipant>(participantsCollectionRef);
-
+  
   useEffect(() => {
     if (!session || !user || !firestore) {
         return;
@@ -173,14 +173,7 @@ export function HuntingSessionCard() {
                 updatedAt: serverTimestamp(),
             };
 
-            updateDoc(participantDocRef, participantData).catch(serverError => {
-                const permissionError = new FirestorePermissionError({
-                    path: participantDocRef.path,
-                    operation: 'update',
-                    requestResourceData: participantData,
-                });
-                errorEmitter.emit('permission-error', permissionError);
-            });
+            await updateDoc(participantDocRef, participantData)
 
         } catch (err: any) {
             console.error("Error during periodic position update:", err);
@@ -190,6 +183,7 @@ export function HuntingSessionCard() {
     const joinAndSubscribe = async () => {
       if (isParticipating) {
         if (!updateIntervalRef.current) {
+            performPeriodicUpdate(); // Initial update
             updateIntervalRef.current = setInterval(performPeriodicUpdate, 30000);
         }
         return;
