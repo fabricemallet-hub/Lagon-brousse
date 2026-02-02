@@ -387,7 +387,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                 </div>
                                                 <div>
                                                     <p className="font-bold text-left">{spot.name}</p>
-                                                    <p className="text-xs text-muted-foreground text-left">{format(spot.createdAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr })}</p>
+                                                    <p className="text-xs text-muted-foreground text-left">{spot.createdAt ? format(spot.createdAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr }) : 'Enregistrement...'}</p>
                                                 </div>
                                             </div>
                                        </div>
