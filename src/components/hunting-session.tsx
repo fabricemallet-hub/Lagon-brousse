@@ -82,7 +82,6 @@ export function HuntingSessionCard() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
-
   const [session, setSession] = useState<WithId<HuntingSession> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [joinCode, setJoinCode] = useState('');
@@ -92,9 +91,9 @@ export function HuntingSessionCard() {
   const [isParticipating, setIsParticipating] = useState(false);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   
-  const googleMapsApiKey = "AIzaSyDCkKWAl86pviQm3jdH07CqQkJeqHL62JM";
+  const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const { isLoaded, loadError } = useJsApiLoader({
-      googleMapsApiKey: googleMapsApiKey,
+      googleMapsApiKey: googleMapsApiKey || "",
       preventGoogleFontsLoading: true,
   });
 
@@ -136,7 +135,7 @@ export function HuntingSessionCard() {
     }
 }, [user, session, firestore, toast]);
 
-  const handleUpdatePosition = useCallback(async (currentSession: WithId<HuntingSession>) => {
+  const handleUpdatePosition = useCallback(async (currentSessionId: string) => {
     if (!user || !firestore) return;
 
     try {
@@ -157,8 +156,9 @@ export function HuntingSessionCard() {
             batteryData = { level: battery.level, charging: battery.charging };
         }
 
-        const participantDocRef = doc(firestore, 'hunting_sessions', currentSession.id, 'participants', user.uid);
+        const participantDocRef = doc(firestore, 'hunting_sessions', currentSessionId, 'participants', user.uid);
         
+        // Use a non-blocking update to prevent UI lag.
         await updateDoc(participantDocRef, {
             location: { latitude, longitude },
             battery: batteryData,
@@ -179,8 +179,9 @@ export function HuntingSessionCard() {
   }, [user, firestore, handleLeaveSession, toast]);
   
   const setupAndStartUpdates = useCallback((sessionToUpdate: WithId<HuntingSession>) => {
-    handleUpdatePosition(sessionToUpdate); // Initial update
-    const intervalId = setInterval(() => handleUpdatePosition(sessionToUpdate), 30000);
+    const sessionId = sessionToUpdate.id;
+    handleUpdatePosition(sessionId); // Initial update
+    const intervalId = setInterval(() => handleUpdatePosition(sessionId), 30000);
     updateIntervalRef.current = intervalId;
     
     return () => {
@@ -254,8 +255,6 @@ export function HuntingSessionCard() {
         };
         
         await setDoc(doc(firestore, 'hunting_sessions', code), newSessionData);
-        
-        // Wait for participant doc to be created before setting state
         await createParticipantDocument(code);
         
         setSession({ id: code, ...newSessionData });
@@ -296,7 +295,6 @@ export function HuntingSessionCard() {
          throw new Error('Cette session a expiré et a été supprimée.');
       }
       
-      // Wait for participant doc to be created
       await createParticipantDocument(sessionId);
 
       setSession({ id: sessionDoc.id, ...sessionData });
@@ -318,7 +316,7 @@ export function HuntingSessionCard() {
              });
         }
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
   };
 
@@ -382,6 +380,27 @@ export function HuntingSessionCard() {
   }
 
   if (session) {
+    if (!googleMapsApiKey) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-destructive">
+                        <AlertCircle className="size-5" />
+                        Configuration Requise
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                     <Alert variant="destructive">
+                        <AlertTitle>Clé API Google Maps manquante</AlertTitle>
+                        <AlertDescription>
+                            <p>La clé API pour Google Maps n'est pas configurée. Veuillez l'ajouter à votre fichier <code>.env</code> sous le nom <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code>.</p>
+                        </AlertDescription>
+                    </Alert>
+                </CardContent>
+            </Card>
+        );
+    }
+
     if (!isLoaded) {
       return (
         <Card>
@@ -414,30 +433,30 @@ export function HuntingSessionCard() {
                     </div>
                     <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isLoading}><LogOut/> Quitter</Button>
                 </CardTitle>
-                <CardDescription>Partagez votre position avec votre groupe en temps réel.</CardDescription>
+                 <CardDescription>Partagez votre position avec votre groupe en temps réel.</CardDescription>
             </CardHeader>
             <CardContent>
                  <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Erreur : Impossible de charger la carte</AlertTitle>
+                    <AlertTitle>Erreur : Impossible de charger la carte Google</AlertTitle>
                     <AlertDescription className="space-y-2">
-                        <p>L'erreur `InvalidKeyMapError` signifie que votre clé API n'est pas acceptée par Google. Veuillez suivre ces étapes :</p>
+                        <p>Google Maps a rejeté votre clé API. Cela est généralement dû à une mauvaise configuration sur la console Google Cloud. Veuillez vérifier les points suivants :</p>
                         <ol className="list-decimal list-inside text-xs space-y-1">
                             <li>
-                                **Vérifiez la clé :** Assurez-vous que la clé API dans votre environnement est correcte.
+                                **API Activée :** Assurez-vous que l'API **"Maps JavaScript API"** est bien activée pour votre projet.
                             </li>
                             <li>
-                                **Vérifiez les restrictions d'API :** Allez sur votre <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="underline">console Google Cloud</a> et vérifiez que votre clé API a bien les restrictions de "Référents HTTP" suivantes :
-                                <ul className="list-disc list-inside pl-4 mt-1">
+                                **Restrictions de site web :** Si vous avez mis en place des restrictions, vérifiez qu'elles autorisent bien les domaines suivants :
+                                <ul className="list-disc list-inside pl-4 mt-1 font-mono">
                                     <li><code>*.cloudworkstations.dev/*</code></li>
                                     <li><code>studio.firebase.google.com/*</code></li>
                                 </ul>
-                                <p className="mt-1">Si le problème persiste, essayez de supprimer temporairement toutes les restrictions pour confirmer que la clé fonctionne.</p>
                             </li>
-                            <li>
-                                **Activez l'API :** Dans la console Google, assurez-vous que l'API "Maps JavaScript API" est bien activée pour votre projet.
+                             <li>
+                                **Facturation :** Un compte de facturation doit être associé à votre projet Google Cloud pour utiliser l'API Maps.
                             </li>
                         </ol>
+                        <p className="pt-2">Après avoir corrigé la configuration, attendez quelques minutes puis rafraîchissez la page.</p>
                     </AlertDescription>
                 </Alert>
             </CardContent>
