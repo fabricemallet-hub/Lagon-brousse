@@ -5,7 +5,6 @@ import { GoogleMap, useJsApiLoader, MarkerF, OverlayView } from '@react-google-m
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import * as AccordionPrimitive from "@radix-ui/react-accordion"
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -175,22 +174,6 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             );
         });
     }, [map, initialZoomDone, toast]);
-
-    useEffect(() => {
-        if (isLoaded && map) {
-            navigator.permissions?.query({ name: 'geolocation' }).then(permissionStatus => {
-                if (permissionStatus.state === 'granted') {
-                    startWatchingPosition(false); 
-                }
-            });
-        }
-
-        return () => {
-            if (watchId.current !== null) {
-                navigator.geolocation.clearWatch(watchId.current);
-            }
-        };
-    }, [isLoaded, map, startWatchingPosition]);
 
     const handleRecenter = () => {
         if (userLocation) {
@@ -366,7 +349,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         setSelectedSpotIds(prev =>
             prev.includes(spotId)
                 ? prev.filter(id => id !== spotId)
-                : [...prev, spotId]
+                : [...prev, id]
         );
     };
 
@@ -558,35 +541,37 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         <h4 className="font-semibold text-lg mb-2">Historique des prises</h4>
                         {areSpotsLoading && <Skeleton className="h-24 w-full" />}
                         {!areSpotsLoading && savedSpots && savedSpots.length > 0 ? (
-                            <Accordion type="single" collapsible className="w-full">
+                            <AccordionPrimitive.Root type="single" collapsible className="w-full">
                                {savedSpots.map(spot => (
-                                   <AccordionItem value={spot.id} key={spot.id}>
+                                   <AccordionPrimitive.Item value={spot.id} key={spot.id} className="border-b">
                                        <AccordionPrimitive.Header className="flex items-center w-full">
-                                            <span className="pl-4 py-4">
+                                            <span className="pl-4 py-4" onClick={(e) => e.stopPropagation()}>
                                                <Checkbox
                                                    id={`select-spot-${spot.id}`}
                                                    className="size-5"
                                                    checked={selectedSpotIds.includes(spot.id)}
                                                    onCheckedChange={() => handleSpotSelection(spot.id)}
-                                                   onClick={(e) => e.stopPropagation()}
                                                />
                                            </span>
-                                            <AccordionPrimitive.Trigger className={cn("flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180", "pr-4")}>
+                                           <AccordionPrimitive.Trigger className={cn("flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180", "pr-4")}>
                                                <div className="flex items-center gap-3">
                                                    <div className="p-1 rounded-md" style={{backgroundColor: spot.color + '20'}}>
                                                        {React.createElement(mapIcons[spot.icon as keyof typeof mapIcons] || MapPin, { className: 'size-5', style: {color: spot.color} })}
                                                    </div>
                                                    <div>
                                                        <p className="font-bold text-left">{spot.name}</p>
-                                                       <p className="text-xs text-muted-foreground text-left">{spot.createdAt ? format(spot.createdAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr }) : 'Enregistrement...'}</p>
+                                                        <p className="text-xs text-muted-foreground text-left">
+                                                          {spot.createdAt ? format(spot.createdAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr }) : 'Enregistrement...'}
+                                                        </p>
                                                    </div>
                                                </div>
                                                <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
                                            </AccordionPrimitive.Trigger>
                                        </AccordionPrimitive.Header>
-                                       <AccordionContent className="space-y-4">
+                                       <AccordionPrimitive.Content className="overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
+                                           <div className="pb-4 pl-12 pr-4 space-y-4">
                                             {spot.fishingTypes && spot.fishingTypes.length > 0 && (
-                                                <div className="flex flex-wrap gap-2 px-4 pb-2">
+                                                <div className="flex flex-wrap gap-2 pt-2">
                                                     {spot.fishingTypes.map(type => (
                                                         <Badge key={type} variant="secondary">{type}</Badge>
                                                     ))}
@@ -603,10 +588,11 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                <Button variant="outline" className="flex-1" onClick={() => handleFindSimilarDay(spot)} disabled={isAnalyzing}><BrainCircuit className="mr-2"/> Chercher un jour similaire (IA)</Button>
                                                <Button variant="destructive" size="icon" onClick={() => handleDeleteSpot(spot.id)}><Trash2 /></Button>
                                            </div>
-                                       </AccordionContent>
-                                   </AccordionItem>
+                                           </div>
+                                       </AccordionPrimitive.Content>
+                                   </AccordionPrimitive.Item>
                                ))}
-                            </Accordion>
+                            </AccordionPrimitive.Root>
                         ) : (
                             <p className="text-sm text-muted-foreground text-center py-4">Aucun spot sauvegardé pour le moment.</p>
                         )}
