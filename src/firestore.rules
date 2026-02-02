@@ -1,29 +1,3 @@
-/**
- * Core Philosophy: This ruleset enforces a strict user-ownership model for private data, 
- * while providing public read access to shared application data. The primary goal is to
- * ensure that users can only access and manage their own information, preventing any
- * cross-user data access or enumeration.
- *
- * Data Structure:
- * - /users/{userId}: Contains private user account information.
- * - /locations/{locationId}: Contains public location data.
- * - /stations/{stationId}: Contains public tide station data.
- * - /stations/{stationId}/tides/{date}: Contains archived tide data.
- * - /hunting_sessions/{sessionId}: Contains metadata for a hunting session.
- * - /hunting_sessions/{sessionId}/participants/{userId}: Contains real-time data for a participant.
- *
- * Key Security Decisions:
- * - User Isolation: A user can only interact with their own document at /users/{userId}.
- * - No User Listing for non-admins: Listing the entire /users collection is disallowed for privacy.
- * - Admin Listing: The administrator is allowed to list users.
- * - Public Read-Only Data: /locations is globally readable but not client-writable.
- * - Hunting Sessions:
- *   - Any authenticated user can create a session.
- *   - Only the organizer can delete the session document.
- *   - Session participants can read each other's data in real-time.
- *   - Users can only create, update, or delete their own participant document.
- * - Default Secure: Any path not explicitly defined denies all access.
- */
 
 rules_version = '2';
 service cloud.firestore {
@@ -32,89 +6,95 @@ service cloud.firestore {
     // ----------------------------------------------------------------------
     // Helper Functions
     // ----------------------------------------------------------------------
-
     function isSignedIn() {
       return request.auth != null;
-    }
-    
-    function isAdmin() {
-      return isSignedIn() && request.auth.token.email == 'f.mallet81@outlook.com';
     }
 
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
     
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
+    function isAdmin() {
+      // The admin's email is hardcoded for this application.
+      return request.auth.token.email == 'f.mallet81@outlook.com';
     }
 
     // ----------------------------------------------------------------------
-    // Collection Rules
+    // Collection: users
+    // Purpose: Stores private user account information.
+    // Rules:
+    // - A user can only read and write to their own document.
+    // - Only an admin can list all user documents.
     // ----------------------------------------------------------------------
-
     match /users/{userId} {
-      allow read: if isAdmin();
       allow get: if isOwner(userId);
-      
-      // A user can create their own document.
+      allow list: if isAdmin();
       allow create: if isOwner(userId);
-      
-      // An owner can update their own document, and an admin can update any document.
-      // This is permissive; a user can change their own subscription status.
-      // This should be refined in the future, but is not the cause of the login issue.
       allow update: if isOwner(userId) || isAdmin();
-      
-      // Only an existing owner can delete their account.
-      allow delete: if isExistingOwner(userId);
+      allow delete: if isOwner(userId);
     }
 
+    // ----------------------------------------------------------------------
+    // Collection: locations
+    // Purpose: Stores public, read-only location data.
+    // ----------------------------------------------------------------------
     match /locations/{locationId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false; 
-      allow update: if false;
-      allow delete: if false;
+      allow read: if true;
+      allow write: if false;
     }
-
+    
+    // ----------------------------------------------------------------------
+    // Collection: stations & subcollections
+    // Purpose: Stores public tide data, writable only by an admin process.
+    // ----------------------------------------------------------------------
     match /stations/{stationId} {
-      allow get: if true;
-      allow list: if true;
-      allow create, update, delete: if isAdmin();
-
+      allow read: if true;
+      allow write: if isAdmin();
+      
       match /tides/{date} {
-        allow get: if true;
-        allow list: if true; // Allows querying for date ranges
-        allow create, update, delete: if isAdmin();
+        allow read: if true;
+        allow write: if isAdmin();
       }
     }
-
+    
+    // ----------------------------------------------------------------------
+    // Collection: hunting_sessions
+    // Purpose: Manages real-time group hunting sessions.
+    // ----------------------------------------------------------------------
     match /hunting_sessions/{sessionId} {
-      allow create: if isSignedIn();
       allow get: if isSignedIn();
+      allow create: if isOwner(request.resource.data.organizerId);
       allow delete: if isOwner(resource.data.organizerId);
-      allow list: if false;
-
+      
+      // Participants subcollection
       match /participants/{userId} {
-        allow create: if isOwner(userId);
-        allow update, delete: if isOwner(userId);
+        // A user can only manage their own participant document.
+        allow create, update, delete: if isOwner(userId);
+        
+        // Any valid participant in the session can read the participant list.
         allow get, list: if exists(/databases/$(database)/documents/hunting_sessions/$(sessionId)/participants/$(request.auth.uid));
       }
     }
 
+    // ----------------------------------------------------------------------
+    // Collection: access_tokens
+    // Purpose: Manages subscription access tokens.
+    // ----------------------------------------------------------------------
     match /access_tokens/{tokenId} {
-      allow read: if isAdmin();
+      // Admin has full control.
+      allow read, write: if isAdmin();
+      
+      // An authenticated user can check if a token exists.
       allow get: if isSignedIn();
       
-      allow create, delete: if isAdmin();
-      
+      // A user can update a token ONLY to redeem it for themselves.
       function isRedeemingOwnToken() {
-        return request.resource.data.redeemedBy == request.auth.uid
-          && request.resource.data.status == 'redeemed'
-          && resource.data.status == 'active';
+        let isBecomingRedeemed = request.resource.data.status == 'redeemed';
+        let wasActive = resource.data.status == 'active';
+        let isRedeemer = request.resource.data.redeemedBy == request.auth.uid;
+        return isBecomingRedeemed && wasActive && isRedeemer;
       }
-      
-      allow update: if isAdmin() || isRedeemingOwnToken();
+      allow update: if isRedeemingOwnToken();
     }
   }
 }
