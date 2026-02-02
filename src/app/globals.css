@@ -99,4 +99,27 @@
         drop-shadow(0 0 10px hsl(var(--accent)));
     }
   }
+
+  .status-flash-animation {
+    animation: status-flash 2s ease-out;
+  }
+
+  @keyframes status-flash {
+    0% {
+      opacity: 0;
+      transform: scale(0.5);
+    }
+    20% {
+      opacity: 1;
+      transform: scale(1.1);
+    }
+    80% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(1.2);
+    }
+  }
 }

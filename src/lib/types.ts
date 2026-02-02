@@ -152,6 +152,7 @@ export interface SessionParticipant {
   displayName: string;
   mapIcon?: string;
   mapColor?: string;
+  status?: 'En position' | 'Battue en cours' | 'Gibier en vue';
   location?: {
     latitude: number;
     longitude: number;
