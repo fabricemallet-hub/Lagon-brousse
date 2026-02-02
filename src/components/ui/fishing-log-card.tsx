@@ -126,7 +126,24 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
 
     useEffect(() => {
         if (isLoaded && map) {
-            startWatchingPosition(true);
+            if (navigator.permissions && navigator.permissions.query) {
+                navigator.permissions.query({ name: 'geolocation' }).then((status) => {
+                    if (status.state === 'granted') {
+                        startWatchingPosition(true);
+                    }
+                    status.onchange = () => {
+                        if (status.state === 'granted') {
+                            startWatchingPosition(true);
+                        } else {
+                            if (watchId.current !== null) {
+                                navigator.geolocation.clearWatch(watchId.current);
+                                watchId.current = null;
+                            }
+                            setUserLocation(null);
+                        }
+                    };
+                });
+            }
         }
         return () => {
             if (watchId.current !== null) {
@@ -265,7 +282,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                             mapContainerClassName="w-full h-full"
                             center={userLocation || { lat: -21.5, lng: 165.5 }}
                             zoom={userLocation && initialZoomDone ? (map?.getZoom() ?? 16) : 7}
-                            options={{ disableDefaultUI: true, zoomControl: true, mapTypeControl: true, clickableIcons: false, mapId: 'satellite_id' }}
+                            options={{ disableDefaultUI: true, zoomControl: true, mapTypeControl: true, clickableIcons: false, mapTypeId: 'satellite' }}
                             onClick={handleMapClick}
                             onLoad={onLoad}
                             onUnmount={onUnmount}
