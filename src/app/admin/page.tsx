@@ -344,20 +344,23 @@ export default function AdminPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {accessTokens && accessTokens.length > 0 ? accessTokens.map(token => (
-                    <TableRow key={token.id}>
-                      <TableCell className="font-mono text-xs">{token.id}</TableCell>
-                      <TableCell>{token.durationMonths} mois</TableCell>
-                      <TableCell><Badge variant={token.status === 'active' ? 'default' : 'secondary'}>{token.status}</Badge></TableCell>
-                      <TableCell className="text-xs">{token.redeemedBy || 'N/A'}</TableCell>
-                      <TableCell>{token.createdAt ? format(token.createdAt.toDate(), 'P p', { locale: fr }) : '-'}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteToken(token.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  )) : (
+                  {accessTokens && accessTokens.length > 0 ? accessTokens.map(token => {
+                    const redeemedUser = allUsers?.find(u => u.id === token.redeemedBy);
+                    return (
+                        <TableRow key={token.id}>
+                        <TableCell className="font-mono text-xs">{token.id}</TableCell>
+                        <TableCell>{token.durationMonths} mois</TableCell>
+                        <TableCell><Badge variant={token.status === 'active' ? 'default' : 'secondary'}>{token.status}</Badge></TableCell>
+                        <TableCell className="text-xs">{redeemedUser?.email || (token.redeemedBy ? 'Non trouvé' : 'N/A')}</TableCell>
+                        <TableCell>{token.createdAt ? format(token.createdAt.toDate(), 'P p', { locale: fr }) : '-'}</TableCell>
+                        <TableCell className="text-right">
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteToken(token.id)}>
+                            <Trash2 className="h-4 w-4" />
+                            </Button>
+                        </TableCell>
+                        </TableRow>
+                    );
+                  }) : (
                     <TableRow><TableCell colSpan={6} className="text-center">Aucun jeton trouvé.</TableCell></TableRow>
                   )}
                 </TableBody>
