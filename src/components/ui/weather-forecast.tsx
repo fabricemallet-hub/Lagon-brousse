@@ -94,9 +94,9 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
     return () => clearInterval(timer);
   }, []);
 
-  const { summary, selectedForecast } = useMemo(() => {
+  const { summary, selectedForecast, hourlyForecastsToShow } = useMemo(() => {
     if (!weather.hourly.length || !tides.length) {
-      return { summary: null, selectedForecast: null };
+      return { summary: null, selectedForecast: null, hourlyForecastsToShow: [] };
     }
 
     // --- Tide Logic ---
@@ -156,7 +156,20 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
     }
     const windSentence = `Vent de ${_selectedForecast.windSpeed} nœuds, tendance ${windTrend}.`;
 
-    return { summary: {tideSentence, windSentence}, selectedForecast: _selectedForecast };
+    const forecasts = weather.hourly.slice(0, 24);
+    
+    // Check if the forecast is for today
+    const forecastDate = new Date(forecasts[0].date);
+    const isToday = forecastDate.getFullYear() === now.getFullYear() &&
+                    forecastDate.getMonth() === now.getMonth() &&
+                    forecastDate.getDate() === now.getDate();
+
+    // Filter out past hours only if it's today
+    const forecastsToShow = isToday
+      ? forecasts.filter(f => new Date(f.date).getHours() >= currentHour)
+      : forecasts;
+
+    return { summary: {tideSentence, windSentence}, selectedForecast: _selectedForecast, hourlyForecastsToShow: forecastsToShow };
   }, [now, weather, tides]);
 
   if (!isClient || !selectedForecast) {
@@ -165,55 +178,55 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
 
   return (
     <div className="rounded-lg border bg-card text-card-foreground shadow-sm overflow-hidden">
-      <div className="bg-blue-600 text-white p-4 rounded-t-lg">
+      <div className="bg-blue-600 text-white p-2 sm:p-4 rounded-t-lg">
         
-        <div className="text-center mb-4 border-b border-white/20 pb-3">
+        <div className="text-center mb-2 border-b border-white/20 pb-2">
           {summary ? (
             <>
-              <p className="text-xs sm:text-sm font-medium leading-snug">{summary.tideSentence}</p>
-              <p className="text-xs sm:text-sm text-white/90 leading-snug mt-1">{summary.windSentence}</p>
+              <p className="text-[11px] sm:text-sm font-medium leading-snug">{summary.tideSentence}</p>
+              <p className="text-[11px] sm:text-sm text-white/90 leading-snug mt-1">{summary.windSentence}</p>
             </>
           ) : (
             <Skeleton className="h-10 w-full max-w-sm mx-auto bg-white/20" />
           )}
         </div>
 
-        <div className="text-center mb-4">
-          <h3 className="font-semibold text-base sm:text-lg capitalize truncate">
-            {format(new Date(selectedForecast.date), "eeee dd MMMM 'à' HH'h'", {
+        <div className="text-center">
+          <h3 className="font-semibold text-sm sm:text-base capitalize truncate">
+            {format(new Date(selectedForecast.date), "eeee dd MMMM", {
               locale: fr,
             })}
           </h3>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 items-center justify-around">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 items-center justify-around mt-2">
            <div className="flex flex-col items-center justify-center text-center">
                 <WeatherConditionIcon
                 condition={selectedForecast.condition}
                 isNight={selectedForecast.isNight}
-                className="size-10"
+                className="size-8 sm:size-10"
                 />
-                <p className="font-medium text-base mt-1">
+                <p className="font-medium text-sm sm:text-base mt-1">
                 {selectedForecast.condition}
                 </p>
             </div>
             <div className="flex flex-col items-center justify-center text-center">
                 <div className="flex items-baseline gap-1">
-                    <p className="font-bold text-5xl">{selectedForecast.windSpeed}</p>
-                    <p className="font-medium text-base">nœuds</p>
+                    <p className="font-bold text-4xl sm:text-5xl">{selectedForecast.windSpeed}</p>
+                    <p className="font-medium text-sm sm:text-base">nœuds</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <WindArrowIcon direction={selectedForecast.windDirection} className="size-4" />
-                    <p className="text-sm text-white/80">Vent de {selectedForecast.windDirection}</p>
+                    <WindArrowIcon direction={selectedForecast.windDirection} className="size-3 sm:size-4" />
+                    <p className="text-xs sm:text-sm text-white/80">Vent de {selectedForecast.windDirection}</p>
                 </div>
             </div>
-             <div className="flex flex-col items-center justify-center text-center text-sm space-y-1 text-white/90">
+             <div className="flex flex-col items-center justify-center text-center text-xs sm:text-sm space-y-1 text-white/90">
                 <div className="flex items-center gap-2">
-                    <Thermometer className="size-4" />
+                    <Thermometer className="size-3 sm:size-4" />
                     <span>{selectedForecast.temp}°C</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Sun className="size-4" />
+                    <Sun className="size-3 sm:size-4" />
                     <span>Indice UV: {weather.uvIndex}</span>
                 </div>
              </div>
@@ -222,10 +235,10 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
 
       <div className="p-2">
         <div className="flex flex-row flex-wrap -m-1">
-          {weather.hourly.slice(0, 24).map((forecast, index) => {
+          {hourlyForecastsToShow.map((forecast, index) => {
              const isSelected = new Date(forecast.date).getHours() === new Date(selectedForecast.date).getHours();
              return (
-              <div key={index} className="w-1/4 sm:w-1/5 md:w-1/6 lg:basis-[12.5%] p-1">
+              <div key={index} className="basis-[24%] p-1">
                 <div
                   className={cn(
                     'flex flex-col items-center justify-between p-1 rounded-lg border h-full space-y-1 text-center bg-card',
@@ -238,11 +251,11 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
                   <WeatherConditionIcon
                     condition={forecast.condition}
                     isNight={forecast.isNight}
-                    className="size-5 my-0.5"
+                    className="size-4 sm:size-5 my-0.5"
                   />
                   
                   <div className="flex items-baseline gap-0.5">
-                    <p className="font-bold text-xs">{forecast.windSpeed}</p>
+                    <p className="font-bold text-[11px] sm:text-xs">{forecast.windSpeed}</p>
                     <p className="text-[9px] text-muted-foreground">nœuds</p>
                   </div>
                   
@@ -262,7 +275,7 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
                         ) : forecast.tideCurrent === 'Nul' ? (
                             <Badge variant="secondary" className="h-4 px-1 text-[8px] font-semibold leading-none">Étale</Badge>
                         ) : (
-                            <span className="font-semibold">{forecast.tideCurrent}</span>
+                            <span className="font-semibold text-[10px]">{forecast.tideCurrent}</span>
                         )}
                     </div>
                   </div>
