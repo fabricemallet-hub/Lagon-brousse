@@ -392,35 +392,14 @@ export function HuntingSessionCard() {
   }
 
   if (session) {
-     if (!googleMapsApiKey) {
-        return (
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-destructive">
-                        <AlertCircle className="size-5" />
-                        Configuration Requise
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                     <Alert variant="destructive">
-                        <AlertTitle>Clé API Google Maps manquante</AlertTitle>
-                        <AlertDescription>
-                            <p>La clé API pour Google Maps n'est pas configurée. Veuillez l'ajouter à votre fichier <code>.env</code> sous le nom <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> et redémarrer votre environnement de développement.</p>
-                        </AlertDescription>
-                    </Alert>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    if (loadError) {
-      return (
+    // FORCED ERROR DISPLAY FOR DEBUGGING GCP CONFIG
+    return (
         <Card>
             <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <Users className="size-5 text-primary" />
-                        Session de Chasse Active
+                        Session de Chasse
                     </div>
                     <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isSessionLoading}><LogOut/> Quitter</Button>
                 </CardTitle>
@@ -431,19 +410,19 @@ export function HuntingSessionCard() {
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>Action requise : Erreur de configuration de Google Maps</AlertTitle>
                     <AlertDescription className="space-y-3">
-                        <p>L'API Google Maps continue de rejeter votre clé API. Le code de l'application est correct ; le problème vient de la configuration de votre projet Google Cloud.</p>
-                        <p className="font-bold">La cause la plus fréquente est que le compte de facturation n'est pas activé pour votre projet.</p>
-                        <p>Veuillez vérifier les points suivants dans votre <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" className="underline font-semibold">Console Google Cloud</a> :</p>
+                        <p>L'API Google Maps rejette votre clé API. Le code de l'application étant correct, le problème vient de la configuration de votre projet sur la console Google Cloud.</p>
+                        <p className="font-bold">Veuillez vérifier les points suivants un par un :</p>
                         <ol className="list-decimal list-inside space-y-2 text-sm">
                             <li>
-                                <strong>Compte de facturation :</strong> L'API Google Maps <strong>ne fonctionne pas</strong> sans un compte de facturation valide associé à votre projet. C'est la cause la plus fréquente de cette erreur.
+                                <strong>Compte de facturation :</strong> L'API Google Maps <strong>ne fonctionne pas</strong> sans un compte de facturation valide associé à votre projet, même pour une utilisation gratuite. C'est la cause la plus fréquente.
                                 <Button size="sm" variant="link" asChild><a href="https://console.cloud.google.com/billing" target="_blank" rel="noopener noreferrer">Vérifier la facturation</a></Button>
                             </li>
                             <li>
                                 <strong>API "Maps JavaScript API" activée :</strong> Assurez-vous que cette API spécifique est bien activée pour votre projet.
+                                <Button size="sm" variant="link" asChild><a href="https://console.cloud.google.com/apis/library/maps-backend.googleapis.com" target="_blank" rel="noopener noreferrer">Activer l'API</a></Button>
                             </li>
                             <li>
-                                <strong>Restrictions de la clé API :</strong> Assurez-vous que <code>*.cloudworkstations.dev/*</code> et <code>studio.firebase.google.com/*</code> sont bien autorisés.
+                                <strong>Restrictions de la clé API :</strong> Assurez-vous que <code>*.cloudworkstations.dev/*</code> et <code>studio.firebase.google.com/*</code> sont bien dans la liste des sites autorisés.
                                  <Button size="sm" variant="link" asChild><a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">Vérifier les restrictions</a></Button>
                             </li>
                         </ol>
@@ -452,121 +431,6 @@ export function HuntingSessionCard() {
                 </Alert>
             </CardContent>
         </Card>
-      );
-    }
-    
-    if (!isLoaded) {
-      return (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Users className="size-5 text-primary" />
-                Session de Chasse Active
-              </div>
-              <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isSessionLoading}><LogOut/> Quitter</Button>
-            </CardTitle>
-            <CardDescription>Partagez votre position avec votre groupe en temps réel.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="w-full aspect-square rounded-lg" />
-            <p className="text-sm text-center text-muted-foreground mt-2">Chargement de la carte...</p>
-          </CardContent>
-        </Card>
-      )
-    }
-
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Users className="size-5 text-primary" />
-              Session de Chasse Active
-            </div>
-            <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isSessionLoading}><LogOut/> Quitter</Button>
-          </CardTitle>
-           <CardDescription>Partagez votre position avec votre groupe en temps réel.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-            <div className="flex items-center justify-between gap-4 p-3 rounded-lg bg-muted/50">
-                <div className="space-y-1">
-                    <Label>Code de la session</Label>
-                    <p className="text-2xl font-bold font-mono tracking-widest">{session.id}</p>
-                </div>
-                <Button onClick={copyToClipboard} variant="outline" size="icon"><Copy /></Button>
-            </div>
-            {error && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertTitle>{error}</AlertTitle></Alert>}
-
-            <div className="relative w-full aspect-square rounded-lg overflow-hidden border">
-                <GoogleMap
-                  mapContainerStyle={{ width: '100%', height: '100%' }}
-                  onLoad={onLoad}
-                  onUnmount={onUnmount}
-                  options={{
-                    mapTypeId: 'satellite',
-                    disableDefaultUI: true,
-                    zoomControl: true,
-                  }}
-                >
-                  {isParticipating && participants?.map(p => {
-                    if (!p.location?.latitude || !p.location?.longitude) return null;
-                    
-                    return (
-                      <OverlayView
-                        key={p.id}
-                        position={{ lat: p.location.latitude, lng: p.location.longitude }}
-                        mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-                      >
-                        <div className="absolute flex flex-col items-center" style={{transform: 'translate(-50%, -100%)'}}>
-                          <div className="bg-black/60 text-white rounded-md px-2 py-0.5 text-xs whitespace-nowrap backdrop-blur-sm">
-                            <p className="font-bold text-center">{p.displayName}</p>
-                            {p.battery && (
-                              <div className="flex items-center justify-center gap-1">
-                                <BatteryIcon level={p.battery.level} charging={p.battery.charging} />
-                                <span className="font-mono">{Math.round(p.battery.level * 100)}%</span>
-                              </div>
-                            )}
-                          </div>
-                          <div className={cn("w-3 h-3 rounded-full mt-1 border-2 border-white", p.id === user?.uid ? "bg-accent" : "bg-primary")}></div>
-                        </div>
-                      </OverlayView>
-                    )
-                  })}
-                </GoogleMap>
-                 <Button onClick={handleRecenter} variant="secondary" size="sm" className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 shadow-lg">
-                    <Navigation className="mr-2"/>
-                    Recentrer sur moi
-                </Button>
-            </div>
-            
-            <Collapsible>
-                <CollapsibleTrigger asChild>
-                    <Button variant="outline" className="w-full">
-                        <Users className="mr-2"/>
-                        {isParticipating ? (participants?.length ?? 0) : 0} Participant(s)
-                        <ChevronUp className="ml-auto h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
-                    </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                    <div className="mt-2 space-y-2 max-h-40 overflow-y-auto p-1">
-                        {areParticipantsLoading && <Skeleton className="h-10 w-full" />}
-                        {isParticipating && participants?.map(p => (
-                            <div key={p.id} className="flex items-center justify-between p-2 rounded-lg border">
-                                <span className="font-semibold">{p.displayName}</span>
-                                {p.battery && (
-                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                        <BatteryIcon level={p.battery.level} charging={p.battery.charging} />
-                                        <span>{Math.round(p.battery.level * 100)}%</span>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                </CollapsibleContent>
-            </Collapsible>
-        </CardContent>
-      </Card>
     );
   }
 
