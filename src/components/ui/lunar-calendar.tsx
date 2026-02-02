@@ -835,7 +835,7 @@ export function LunarCalendar() {
           open={!!detailedDay}
           onOpenChange={(isOpen) => !isOpen && setDetailedDay(null)}
         >
-          <DialogContent className="md:max-w-xl flex flex-col h-full sm:h-auto">
+          <DialogContent className="md:max-w-xl">
             <div className="flex-grow overflow-y-auto">
               {calendarView === 'peche' ? (
                 <PecheDetailDialogContent
