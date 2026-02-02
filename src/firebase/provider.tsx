@@ -2,13 +2,13 @@
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
-import { Firestore, doc, getDoc } from 'firebase/firestore';
+import { Firestore, doc, getDoc, setDoc } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
-import { setDocumentNonBlocking } from './non-blocking-updates';
 import { UserAccount } from '@/lib/types';
 import { FirestorePermissionError } from './errors';
 import { errorEmitter } from './error-emitter';
+import { addMonths } from 'date-fns';
 
 
 interface FirebaseProviderProps {
@@ -100,33 +100,32 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   useEffect(() => {
     if (user && !isUserLoading && firestore) {
       const userDocRef = doc(firestore, 'users', user.uid);
-      getDoc(userDocRef).then(docSnap => {
-        const { uid, email, displayName } = user;
-        const isAdmin = email === 'f.mallet81@outlook.com';
 
-        if (isAdmin) {
-          // This user is an admin. Ensure their document reflects this.
-          // This corrects documents created before the admin logic was in place.
-          if (!docSnap.exists() || docSnap.data().subscriptionStatus !== 'admin' || docSnap.data().displayName !== (displayName || 'Admin')) {
-            const adminAccountData: Partial<UserAccount> = {
+      getDoc(userDocRef).then(docSnap => {
+        // Only create the document if it does not exist.
+        if (!docSnap.exists()) {
+          const { uid, email, displayName } = user;
+          const isAdmin = email === 'f.mallet81@outlook.com';
+
+          // All fields must be provided for the 'create' operation.
+          let newUserDocument: UserAccount;
+
+          if (isAdmin) {
+            newUserDocument = {
               id: uid,
               email: email || '',
               displayName: displayName || 'Admin',
               subscriptionStatus: 'admin',
-              // Preserve existing favorites if the document exists
-              favoriteLocationIds: docSnap.exists() ? docSnap.data().favoriteLocationIds || [] : [],
+              subscriptionStartDate: new Date().toISOString(),
+              subscriptionExpiryDate: addMonths(new Date(), 1200).toISOString(), // ~100 years
+              favoriteLocationIds: [],
             };
-            // Use merge:true to avoid overwriting other fields if they exist
-            setDocumentNonBlocking(userDocRef, adminAccountData, { merge: true });
-          }
-        } else {
-          // This is a non-admin user. Create their profile on first login only.
-          if (!docSnap.exists()) {
+          } else {
             const trialStartDate = new Date();
             const trialExpiryDate = new Date(trialStartDate);
             trialExpiryDate.setDate(trialExpiryDate.getDate() + 7);
-        
-            const newUserAccount: UserAccount = {
+            
+            newUserDocument = {
               id: uid,
               email: email || '',
               displayName: displayName || email?.split('@')[0] || 'Chasseur',
@@ -135,16 +134,25 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
               subscriptionExpiryDate: trialExpiryDate.toISOString(),
               favoriteLocationIds: [],
             };
-            setDocumentNonBlocking(userDocRef, newUserAccount, { merge: false });
           }
+
+          // Non-blocking write with proper error handling
+          setDoc(userDocRef, newUserDocument).catch(error => {
+              console.error("Error creating user document:", error);
+              // Emit a contextual error for debugging in the dev overlay
+              errorEmitter.emit('permission-error', new FirestorePermissionError({
+                  path: userDocRef.path,
+                  operation: 'create',
+                  requestResourceData: newUserDocument,
+              }));
+          });
         }
       }).catch(error => {
-        console.error("Error checking/updating user document:", error);
-        const contextualError = new FirestorePermissionError({
+        console.error("Error checking user document:", error);
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: userDocRef.path,
             operation: 'get',
-        });
-        errorEmitter.emit('permission-error', contextualError);
+        }));
       });
     }
   }, [user, isUserLoading, firestore]);

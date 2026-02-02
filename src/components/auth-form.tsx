@@ -19,6 +19,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, AuthError } from 'firebase/auth';
 import { ForgotPasswordDialog } from './forgot-password-dialog';
+import { Eye, EyeOff } from 'lucide-react';
 
 type AuthFormProps = {
   mode: 'login' | 'signup';
@@ -39,6 +40,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<z.infer<ReturnType<typeof formSchema>>>({
     resolver: zodResolver(formSchema(mode)),
@@ -51,7 +53,6 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   async function onSubmit(values: z.infer<ReturnType<typeof formSchema>>) {
     setIsLoading(true);
-    toast({ title: 'Tentative de connexion...', description: `Connexion en cours pour ${values.email}` });
 
     if (!auth) {
       toast({
@@ -172,11 +173,21 @@ export function AuthForm({ mode }: AuthFormProps) {
                 )}
               </div>
               <FormControl>
-                <Input 
-                  type="password" 
-                  placeholder="********" {...field} 
-                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'} 
-                />
+                <div className="relative">
+                  <Input 
+                    type={showPassword ? 'text' : 'password'} 
+                    placeholder="********" {...field} 
+                    autoComplete={mode === 'login' ? 'current-password' : 'new-password'} 
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground"
+                    aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>
