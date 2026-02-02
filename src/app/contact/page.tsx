@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, doc, orderBy, query, serverTimestamp, addDoc, setDoc } from 'firebase/firestore';
 import type { WithId, ChatMessage, Conversation } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,6 +32,12 @@ export default function ContactPage() {
 
   const { data: messages, isLoading: areMessagesLoading } = useCollection<ChatMessage>(messagesCollectionRef);
 
+  const conversationRef = useMemoFirebase(() => {
+    if (!firestore || !conversationId) return null;
+    return doc(firestore, 'conversations', conversationId);
+  }, [firestore, conversationId]);
+  const { data: conversation } = useDoc<Conversation>(conversationRef);
+
   useEffect(() => {
     // Redirect if not logged in
     if (!isUserLoading && !user) {
@@ -39,8 +45,8 @@ export default function ContactPage() {
     }
     // Mark as read when page is opened
     if (firestore && user) {
-        const conversationRef = doc(firestore, 'conversations', user.uid);
-        setDoc(conversationRef, { isReadByUser: true }, { merge: true });
+        const conversationDocRef = doc(firestore, 'conversations', user.uid);
+        setDoc(conversationDocRef, { isReadByUser: true }, { merge: true });
     }
   }, [user, isUserLoading, router, firestore]);
 
@@ -59,8 +65,8 @@ export default function ContactPage() {
     const convId = user.uid;
 
     try {
-        const conversationRef = doc(firestore, 'conversations', convId);
-        const messagesRef = collection(conversationRef, 'messages');
+        const conversationDocRef = doc(firestore, 'conversations', convId);
+        const messagesRef = collection(conversationDocRef, 'messages');
         
         const messageData: Omit<ChatMessage, 'id'> = {
             senderId: user.uid,
@@ -80,7 +86,7 @@ export default function ContactPage() {
             isReadByAdmin: false, // Mark as unread for admin
             isReadByUser: true,
         };
-        await setDoc(conversationRef, conversationData, { merge: true });
+        await setDoc(conversationDocRef, conversationData, { merge: true });
 
         setNewMessage('');
     } catch (error) {
@@ -97,6 +103,10 @@ export default function ContactPage() {
   if (!user) {
     return null; // or redirect, which useEffect handles
   }
+  
+  const lastMessage = messages?.[messages.length - 1];
+  const isLastMessageFromUser = lastMessage?.senderId === user.uid;
+  const hasAdminRead = conversation?.isReadByAdmin === true;
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -114,24 +124,29 @@ export default function ContactPage() {
                                 <Skeleton className="h-10 w-3/4 ml-auto" />
                             </>
                         ) : messages && messages.length > 0 ? (
-                            messages.map(msg => {
-                                const isUserMessage = msg.senderId === user.uid;
-                                return (
-                                    <div key={msg.id} className={cn("flex items-end gap-2", isUserMessage ? "justify-end" : "justify-start")}>
-                                        {!isUserMessage && (
-                                            <Avatar className="h-8 w-8">
-                                                <AvatarFallback>A</AvatarFallback>
-                                            </Avatar>
-                                        )}
-                                        <div className={cn(
-                                            "max-w-[75%] rounded-lg px-3 py-2 text-sm",
-                                            isUserMessage ? "bg-primary text-primary-foreground" : "bg-muted"
-                                        )}>
-                                            {msg.content}
+                           <>
+                                {messages.map(msg => {
+                                    const isUserMessage = msg.senderId === user.uid;
+                                    return (
+                                        <div key={msg.id} className={cn("flex items-end gap-2", isUserMessage ? "justify-end" : "justify-start")}>
+                                            {!isUserMessage && (
+                                                <Avatar className="h-8 w-8">
+                                                    <AvatarFallback>A</AvatarFallback>
+                                                </Avatar>
+                                            )}
+                                            <div className={cn(
+                                                "max-w-[75%] rounded-lg px-3 py-2 text-sm",
+                                                isUserMessage ? "bg-primary text-primary-foreground" : "bg-muted"
+                                            )}>
+                                                {msg.content}
+                                            </div>
                                         </div>
-                                    </div>
-                                )
-                            })
+                                    )
+                                })}
+                                {isLastMessageFromUser && hasAdminRead && (
+                                    <p className="text-right text-xs text-muted-foreground -mt-3 pr-2">Vu</p>
+                                )}
+                            </>
                         ) : (
                             <p className="text-center text-muted-foreground">Aucun message pour le moment.</p>
                         )}

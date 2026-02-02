@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, doc, orderBy, query, serverTimestamp, addDoc, setDoc, getDoc } from 'firebase/firestore';
 import type { WithId, ChatMessage, Conversation, UserAccount } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,6 +27,12 @@ export default function AdminMessagePage() {
   
   const isAdmin = useMemo(() => user?.email === 'f.mallet81@outlook.com', [user]);
   const conversationId = params.userId as string;
+
+  const conversationRef = useMemoFirebase(() => {
+    if (!firestore || !conversationId) return null;
+    return doc(firestore, 'conversations', conversationId);
+  }, [firestore, conversationId]);
+  const { data: conversation } = useDoc<Conversation>(conversationRef);
 
   // Fetch target user's profile
   useEffect(() => {
@@ -111,6 +117,10 @@ export default function AdminMessagePage() {
     return null;
   }
 
+  const lastMessage = messages?.[messages.length - 1];
+  const isLastMessageFromAdmin = lastMessage?.senderId === 'admin';
+  const hasUserRead = conversation?.isReadByUser === true;
+
   return (
     <div className="max-w-2xl mx-auto">
         <Button asChild variant="outline" size="sm" className="mb-4">
@@ -130,7 +140,8 @@ export default function AdminMessagePage() {
                                 <Skeleton className="h-10 w-3/4 ml-auto" />
                             </>
                         ) : messages && messages.length > 0 ? (
-                            messages.map(msg => {
+                           <>
+                            {messages.map(msg => {
                                 const isAdminMessage = msg.senderId === 'admin';
                                 return (
                                     <div key={msg.id} className={cn("flex items-end gap-2", isAdminMessage ? "justify-end" : "justify-start")}>
@@ -147,7 +158,11 @@ export default function AdminMessagePage() {
                                         </div>
                                     </div>
                                 )
-                            })
+                            })}
+                            {isLastMessageFromAdmin && hasUserRead && (
+                                <p className="text-right text-xs text-muted-foreground -mt-3 pr-2">Vu par l'utilisateur</p>
+                            )}
+                            </>
                         ) : (
                             <p className="text-center text-muted-foreground">Aucun message pour le moment.</p>
                         )}
