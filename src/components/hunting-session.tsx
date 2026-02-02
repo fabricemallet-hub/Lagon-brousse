@@ -590,10 +590,13 @@ function HuntingSessionContent() {
                                         <div className="px-2 py-0.5 rounded-md text-xs font-bold text-white bg-black/60 mb-1 whitespace-nowrap">
                                             {p.displayName}
                                         </div>
-                                        <div className={cn(
-                                            "p-1.5 rounded-full flex flex-col items-center shadow-lg",
-                                            isCurrentUser ? "bg-primary" : "bg-card border"
-                                        )}>
+                                        <div
+                                            className={cn(
+                                                "p-1.5 rounded-full flex flex-col items-center shadow-lg",
+                                                !isCurrentUser && "bg-card border"
+                                            )}
+                                            style={isCurrentUser ? { backgroundColor: iconColor } : undefined}
+                                        >
                                             <IconComponent
                                                 className={cn("size-5 drop-shadow-md")}
                                                 style={{ color: isCurrentUser ? 'white' : iconColor }}
