@@ -52,9 +52,12 @@ export function AuthForm({ mode }: AuthFormProps) {
   });
 
   async function onSubmit(values: z.infer<ReturnType<typeof formSchema>>) {
+    console.log('[AuthForm] 1. onSubmit a été déclenché.');
     setIsLoading(true);
+    console.log('[AuthForm] 2. isLoading est maintenant `true`.');
 
     if (!auth) {
+      console.error('[AuthForm] Erreur: Le service d\'authentification (auth) n\'est pas disponible.');
       toast({
         variant: "destructive",
         title: "Erreur d'initialisation",
@@ -64,32 +67,41 @@ export function AuthForm({ mode }: AuthFormProps) {
       return;
     }
     
+    console.log('[AuthForm] 3. Tentative de connexion pour:', values.email);
     try {
       if (mode === 'login') {
         await signInWithEmailAndPassword(auth, values.email, values.password);
+        console.log('[AuthForm] 4. Connexion réussie via Firebase.');
         toast({
             title: 'Connexion réussie!',
             description: "Vous allez être redirigé vers la page d'accueil.",
         });
         router.push('/');
+        console.log('[AuthForm] 5. Redirection vers la page d\'accueil.');
       } else {
+        console.log('[AuthForm] Tentative d\'inscription...');
         const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+        console.log('[AuthForm] Inscription réussie.');
         if (values.displayName) {
             await updateProfile(userCredential.user, {
                 displayName: values.displayName
             });
+            console.log('[AuthForm] Profil mis à jour.');
         }
         toast({
           title: 'Inscription réussie!',
           description: "Vous allez être redirigé vers la page d'accueil.",
         });
         router.push('/');
+        console.log('[AuthForm] Redirection vers la page d\'accueil.');
       }
     } catch (error) {
+      console.error('[AuthForm] Erreur d\'authentification attrapée:', error);
       const authError = error as AuthError;
       let errorMessage = "Une erreur inattendue est survenue. Veuillez réessayer.";
 
       if (authError && authError.code) {
+        console.error('[AuthForm] Code d\'erreur Firebase:', authError.code);
         switch (authError.code) {
           case 'auth/invalid-credential':
           case 'auth/user-not-found':
@@ -123,6 +135,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       });
     } finally {
       setIsLoading(false);
+      console.log('[AuthForm] 6. isLoading est maintenant `false` (dans le bloc finally).');
     }
   }
 
