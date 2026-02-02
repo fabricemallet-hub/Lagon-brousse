@@ -1,3 +1,4 @@
+
 import type { NextConfig } from 'next';
 import withPWAInit from '@ducanh2912/next-pwa';
 
@@ -9,7 +10,19 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  async headers() {
+    return [
+      {
+        source: "/manifest.json",
+        headers: [
+          { 
+            key: "Access-Control-Allow-Origin", 
+            value: "*" 
+          },
+        ],
+      },
+    ];
+  },
   typescript: {
     ignoreBuildErrors: true,
   },
