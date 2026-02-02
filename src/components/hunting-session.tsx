@@ -184,12 +184,11 @@ function HuntingSessionContent() {
           toast({
             variant: "destructive",
             title: "Géolocalisation refusée",
-            description: "La géolocalisation est requise. Déconnexion de la session.",
+            description: "La géolocalisation est requise pour être visible sur la carte.",
           });
-          handleLeaveSession();
         }
     }
-  }, [user, firestore, toast, handleLeaveSession]);
+  }, [user, firestore, toast]);
   
   const participantsCollectionRef = useMemoFirebase(() => {
     if (!firestore || !session || !isParticipating) return null;
@@ -201,7 +200,6 @@ function HuntingSessionContent() {
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
     if (isParticipating && session) {
-        handleUpdatePosition(session.id); // Initial update
         intervalId = setInterval(() => handleUpdatePosition(session.id), 30000); // 30 seconds
     }
     return () => {
@@ -268,6 +266,8 @@ function HuntingSessionContent() {
         await setDoc(sessionDocRef, newSessionData);
         await createParticipantDocument(code); // Wait for participant doc to be created
         
+        handleUpdatePosition(code);
+
         setSession({ id: code, ...newSessionData });
         setIsParticipating(true);
         
@@ -307,6 +307,8 @@ function HuntingSessionContent() {
       }
       
       await createParticipantDocument(sessionId); // Wait for participant doc to be created
+      
+      handleUpdatePosition(sessionId);
 
       setSession({ id: sessionDoc.id, ...sessionData });
       setIsParticipating(true);
