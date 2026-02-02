@@ -241,8 +241,12 @@ export function HuntingSessionCard() {
         displayName: user.displayName || user.email || 'Chasseur',
         updatedAt: serverTimestamp(),
     };
+    
+    // Use a non-blocking setDoc and return the promise
     await setDoc(participantDocRef, participantData);
-    return getDoc(participantDocRef); // Return promise to wait for creation
+    
+    // We return a promise that resolves with the document snapshot
+    return getDoc(participantDocRef);
 }, [user, firestore]);
 
   const handleCreateSession = async () => {
