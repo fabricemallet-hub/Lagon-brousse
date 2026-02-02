@@ -93,7 +93,7 @@ export function HuntingSessionCard() {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   
   const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-
+  
   const { isLoaded, loadError } = useJsApiLoader({
       googleMapsApiKey: googleMapsApiKey || "",
       preventGoogleFontsLoading: true,
@@ -392,7 +392,73 @@ export function HuntingSessionCard() {
   }
 
   if (session) {
-    // FORCED ERROR DISPLAY FOR DEBUGGING GCP CONFIG
+     if (loadError || !googleMapsApiKey) {
+        return (
+             <Card>
+                <CardHeader>
+                     <CardTitle className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Users className="size-5 text-primary" />
+                            Session de Chasse
+                        </div>
+                        <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isSessionLoading}><LogOut/> Quitter</Button>
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                     <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Action requise : Erreur de configuration de Google Maps</AlertTitle>
+                        <AlertDescription className="space-y-3">
+                            {!googleMapsApiKey ? (
+                                <p>La variable d'environnement <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> n'est pas définie dans votre fichier <code>.env</code>.</p>
+                            ) : (
+                                <>
+                                <p>L'API Google Maps rejette votre clé API. Le code de l'application étant correct, le problème vient de la configuration de votre projet sur la console Google Cloud.</p>
+                                <p className="font-bold">Veuillez vérifier les points suivants un par un :</p>
+                                <ol className="list-decimal list-inside space-y-2 text-sm">
+                                    <li>
+                                        <strong>Compte de facturation :</strong> L'API Google Maps <strong>ne fonctionne pas</strong> sans un compte de facturation valide associé à votre projet, même pour une utilisation gratuite. C'est la cause la plus fréquente.
+                                        <Button size="sm" variant="link" asChild><a href="https://console.cloud.google.com/billing" target="_blank" rel="noopener noreferrer">Vérifier la facturation</a></Button>
+                                    </li>
+                                    <li>
+                                        <strong>API "Maps JavaScript API" activée :</strong> Assurez-vous que cette API spécifique est bien activée pour votre projet.
+                                        <Button size="sm" variant="link" asChild><a href="https://console.cloud.google.com/apis/library/maps-backend.googleapis.com" target="_blank" rel="noopener noreferrer">Activer l'API</a></Button>
+                                    </li>
+                                    <li>
+                                        <strong>Restrictions de la clé API :</strong> Assurez-vous que <code>*.cloudworkstations.dev/*</code> et <code>studio.firebase.google.com/*</code> sont bien dans la liste des sites autorisés.
+                                        <Button size="sm" variant="link" asChild><a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">Vérifier les restrictions</a></Button>
+                                    </li>
+                                </ol>
+                                <p className="pt-2">Après avoir vérifié et corrigé ces points, attendez 5 minutes puis rafraîchissez la page. L'erreur devrait disparaître.</p>
+                                </>
+                            )}
+                        </AlertDescription>
+                    </Alert>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (!isLoaded) {
+        return (
+             <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Users className="size-5 text-primary" />
+                            Session de Chasse
+                        </div>
+                        <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isSessionLoading}><LogOut/> Quitter</Button>
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <Skeleton className="h-80 w-full" />
+                    <Skeleton className="h-20 w-full mt-4" />
+                </CardContent>
+            </Card>
+        )
+    }
+
     return (
         <Card>
             <CardHeader>
@@ -406,29 +472,80 @@ export function HuntingSessionCard() {
                  <CardDescription>Partagez votre position avec votre groupe en temps réel.</CardDescription>
             </CardHeader>
             <CardContent>
-                 <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Action requise : Erreur de configuration de Google Maps</AlertTitle>
-                    <AlertDescription className="space-y-3">
-                        <p>L'API Google Maps rejette votre clé API. Le code de l'application étant correct, le problème vient de la configuration de votre projet sur la console Google Cloud.</p>
-                        <p className="font-bold">Veuillez vérifier les points suivants un par un :</p>
-                        <ol className="list-decimal list-inside space-y-2 text-sm">
-                            <li>
-                                <strong>Compte de facturation :</strong> L'API Google Maps <strong>ne fonctionne pas</strong> sans un compte de facturation valide associé à votre projet, même pour une utilisation gratuite. C'est la cause la plus fréquente.
-                                <Button size="sm" variant="link" asChild><a href="https://console.cloud.google.com/billing" target="_blank" rel="noopener noreferrer">Vérifier la facturation</a></Button>
-                            </li>
-                            <li>
-                                <strong>API "Maps JavaScript API" activée :</strong> Assurez-vous que cette API spécifique est bien activée pour votre projet.
-                                <Button size="sm" variant="link" asChild><a href="https://console.cloud.google.com/apis/library/maps-backend.googleapis.com" target="_blank" rel="noopener noreferrer">Activer l'API</a></Button>
-                            </li>
-                            <li>
-                                <strong>Restrictions de la clé API :</strong> Assurez-vous que <code>*.cloudworkstations.dev/*</code> et <code>studio.firebase.google.com/*</code> sont bien dans la liste des sites autorisés.
-                                 <Button size="sm" variant="link" asChild><a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">Vérifier les restrictions</a></Button>
-                            </li>
-                        </ol>
-                        <p className="pt-2">Après avoir vérifié et corrigé ces points, attendez 5 minutes puis rafraîchissez la page. L'erreur devrait disparaître.</p>
-                    </AlertDescription>
-                </Alert>
+                 <div className="relative h-80 w-full mb-4 rounded-lg overflow-hidden border">
+                    <GoogleMap
+                        mapContainerClassName="w-full h-full"
+                        center={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : { lat: -21.45, lng: 165.5 }}
+                        zoom={8}
+                        onLoad={onLoad}
+                        onUnmount={onUnmount}
+                        options={{ 
+                            disableDefaultUI: true, 
+                            zoomControl: true, 
+                            mapTypeId: 'terrain'
+                        }}
+                    >
+                        {participants?.map(p => {
+                            if (!p.location) return null;
+                            const isCurrentUser = p.id === user.uid;
+                            return (
+                                <OverlayView
+                                    key={p.id}
+                                    position={{ lat: p.location.latitude, lng: p.location.longitude }}
+                                    mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                                >
+                                    <div className={cn(
+                                        "p-1.5 rounded-full flex flex-col items-center transform -translate-x-1/2 -translate-y-1/2",
+                                        isCurrentUser ? "bg-primary/80" : "bg-card/80 border"
+                                    )}>
+                                        <Navigation className={cn(
+                                            "size-5 drop-shadow-md",
+                                            isCurrentUser ? "text-primary-foreground" : "text-card-foreground"
+                                        )} />
+                                    </div>
+                                </OverlayView>
+                            )
+                        })}
+                    </GoogleMap>
+                    <Button size="icon" onClick={handleRecenter} className="absolute top-2 right-2 shadow-lg h-9 w-9">
+                        <LocateFixed className="h-5 w-5" />
+                    </Button>
+                </div>
+                 <Collapsible>
+                    <CollapsibleTrigger asChild>
+                         <Button variant="outline" className="w-full">
+                            <span className="flex-1">Afficher la Session & Participants</span>
+                            <ChevronUp className="h-4 w-4 transition-transform [&[data-state=open]]:rotate-180" />
+                        </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-4 pt-4">
+                        <div className="flex flex-col sm:flex-row items-center gap-4">
+                            <div className="space-y-1 flex-grow">
+                                <Label htmlFor="session-code-display">Code de session</Label>
+                                <Input id="session-code-display" readOnly value={session.id} className="font-mono text-center text-lg tracking-widest" />
+                            </div>
+                            <Button onClick={copyToClipboard} size="sm" className="w-full sm:w-auto self-end"><Copy className="mr-2"/> Copier</Button>
+                        </div>
+                        <div className="space-y-2">
+                           <h4 className="font-semibold">Participants ({participants?.length || 0})</h4>
+                            {areParticipantsLoading ? (
+                                <Skeleton className="h-24 w-full" />
+                            ) : (
+                                <div className="max-h-48 overflow-y-auto space-y-2 pr-2">
+                                {participants?.map(p => (
+                                    <div key={p.id} className="flex items-center justify-between p-2 border rounded-lg">
+                                        <p className="font-medium text-sm">{p.displayName}</p>
+                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                            {p.battery && <BatteryIcon level={p.battery.level} charging={p.battery.charging} />}
+                                            {p.location && <span>{p.location.latitude.toFixed(3)}, {p.location.longitude.toFixed(3)}</span>}
+                                        </div>
+                                    </div>
+                                ))}
+                                </div>
+                            )}
+                        </div>
+                    </CollapsibleContent>
+                </Collapsible>
             </CardContent>
         </Card>
     );
