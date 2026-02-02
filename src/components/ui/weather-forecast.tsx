@@ -137,7 +137,7 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
     
     const tideDirection = nextTide.type === 'haute' ? 'montante' : 'descendante';
     const remainingTime = formatDistanceToNow(nextTide.date, { locale: fr, addSuffix: true });
-    const tideSentence = `Marée ${tideDirection} jusqu'à ${nextTide.time} (pleine ${nextTide.type === 'haute' ? 'mer' : 'basse'} ${remainingTime}).`;
+    const tideSentence = `Marée ${tideDirection} jusqu'à ${nextTide.time}, pleine ${nextTide.type === 'haute' ? 'mer' : 'basse'} ${remainingTime}.`;
 
     // --- Wind Logic ---
     const currentHour = now.getHours();
@@ -164,9 +164,9 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
             windTrend = "à la hausse";
         }
     }
-    const windSentence = `Vent actuel de ${currentForecast.windSpeed} nœuds, tendance ${windTrend}.`;
+    const windSentence = `Vent de ${currentForecast.windSpeed} nœuds, tendance ${windTrend}.`;
 
-    return `${tideSentence} ${windSentence}`;
+    return {tideSentence, windSentence};
   }, [now, weather, tides]);
 
   useEffect(() => {
@@ -214,9 +214,14 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
       <div className="bg-blue-600 text-white p-4 rounded-t-lg">
         
         <div className="text-center mb-4 border-b border-white/20 pb-3">
-          <p className="text-sm sm:text-base font-medium leading-relaxed">
-            {summary || <Skeleton className="h-5 w-3/4 mx-auto bg-white/20" />}
-          </p>
+          {summary ? (
+            <>
+              <p className="text-sm font-medium leading-snug">{summary.tideSentence}</p>
+              <p className="text-sm text-white/90 leading-snug mt-1">{summary.windSentence}</p>
+            </>
+          ) : (
+            <Skeleton className="h-10 w-full max-w-sm mx-auto bg-white/20" />
+          )}
         </div>
 
         <div className="text-center mb-4">
@@ -270,7 +275,7 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
             {weather.hourly.slice(0, 24).map((forecast, index) => (
               <CarouselItem
                 key={index}
-                className="basis-1/4 sm:basis-1/5 md:basis-[16%]"
+                className="basis-1/5 sm:basis-1/6 md:basis-[16%]"
                 onClick={() => api?.scrollTo(index)}
               >
                 <div
