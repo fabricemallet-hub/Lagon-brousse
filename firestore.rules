@@ -24,6 +24,8 @@
  *   - Users can only create, update, or delete their own participant document.
  * - Default Secure: Any path not explicitly defined denies all access.
  */
+
+// Triggering a redeploy to resolve potential 409 conflicts.
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
