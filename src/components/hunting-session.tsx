@@ -100,6 +100,31 @@ export function HuntingSessionCard() {
 
   const { data: participants, isLoading: areParticipantsLoading } = useCollection<SessionParticipant>(participantsCollectionRef);
   
+  const handleLeaveSession = useCallback(async () => {
+     if (!user || !session || !firestore) return;
+     setIsLoading(true);
+     try {
+       const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
+       await deleteDoc(participantDocRef);
+       setSession(null);
+       setIsParticipating(false);
+       setUserLocation(null);
+       toast({ title: 'Vous avez quitté la session.' });
+     } catch (e: any) {
+        if (e.name === 'FirebaseError' || e.code === 'permission-denied') {
+            const permissionError = new FirestorePermissionError({
+                path: `hunting_sessions/${session.id}/participants/${user.uid}`,
+                operation: 'delete',
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        } else {
+            setError(e.message);
+        }
+     } finally {
+        setIsLoading(false);
+     }
+  }, [user, session, firestore, toast]);
+
   const handleUpdatePosition = useCallback(async () => {
     if (!user || !session || !firestore) return;
 
@@ -134,11 +159,11 @@ export function HuntingSessionCard() {
             updatedAt: serverTimestamp(),
         };
         
-        await setDoc(participantDocRef, participantData, { merge: true });
-
-        if (!isParticipating) {
-            setIsParticipating(true);
-        }
+        setDoc(participantDocRef, participantData, { merge: true }).then(() => {
+          if (!isParticipating) {
+              setIsParticipating(true);
+          }
+        });
 
     } catch (err: any) {
         console.error("Error updating position:", err);
@@ -154,15 +179,12 @@ export function HuntingSessionCard() {
           handleLeaveSession();
         }
     }
-  }, [user, session, firestore, isParticipating, setIsParticipating, handleLeaveSession]);
+  }, [user, session, firestore, isParticipating, handleLeaveSession]);
   
   useEffect(() => {
-    if (session && !isParticipating) {
-      handleUpdatePosition();
-    }
-    
-    if (session && isParticipating) {
-      updateIntervalRef.current = setInterval(handleUpdatePosition, 30000);
+    if (session) {
+      handleUpdatePosition(); // Initial update
+      updateIntervalRef.current = setInterval(handleUpdatePosition, 30000); // Subsequent updates
     }
 
     return () => {
@@ -171,7 +193,7 @@ export function HuntingSessionCard() {
         updateIntervalRef.current = null;
       }
     };
-  }, [session, isParticipating, handleUpdatePosition]);
+  }, [session, handleUpdatePosition]);
 
 
   const generateUniqueCode = async (): Promise<string> => {
@@ -280,31 +302,6 @@ export function HuntingSessionCard() {
     }
   };
 
-  const handleLeaveSession = useCallback(async () => {
-     if (!user || !session || !firestore) return;
-     setIsLoading(true);
-     try {
-       const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
-       await deleteDoc(participantDocRef);
-       setSession(null);
-       setIsParticipating(false);
-       setUserLocation(null);
-       toast({ title: 'Vous avez quitté la session.' });
-     } catch (e: any) {
-        if (e.name === 'FirebaseError' || e.code === 'permission-denied') {
-            const permissionError = new FirestorePermissionError({
-                path: `hunting_sessions/${session.id}/participants/${user.uid}`,
-                operation: 'delete',
-            });
-            errorEmitter.emit('permission-error', permissionError);
-        } else {
-            setError(e.message);
-        }
-     } finally {
-        setIsLoading(false);
-     }
-  }, [user, session, firestore, toast]);
-  
   const copyToClipboard = () => {
     if(!session) return;
     navigator.clipboard.writeText(session.id);
@@ -313,32 +310,19 @@ export function HuntingSessionCard() {
 
   const onLoad = useCallback(function callback(mapInstance: google.maps.Map) {
     if (userLocation) {
-      const bounds = new window.google.maps.LatLngBounds();
-      bounds.extend(new window.google.maps.LatLng(userLocation.latitude, userLocation.longitude));
-      
-      if (participants) {
-          participants.forEach(p => {
-              if (p.location) {
-                  bounds.extend(new window.google.maps.LatLng(p.location.latitude, p.location.longitude));
-              }
-          });
-      }
-      mapInstance.fitBounds(bounds);
-
-      const listener = window.google.maps.event.addListener(mapInstance, 'idle', () => {
-        if (mapInstance.getZoom()! > 15) mapInstance.setZoom(15);
-        window.google.maps.event.removeListener(listener);
-      });
-
+        const center = new window.google.maps.LatLng(userLocation.latitude, userLocation.longitude);
+        mapInstance.setCenter(center);
+        mapInstance.setZoom(15); // Zoom level for ~10km radius
     } else {
-       const ncBounds = new window.google.maps.LatLngBounds(
-        new window.google.maps.LatLng(-22.8, 163.5),
-        new window.google.maps.LatLng(-19.6, 168.1)
-      );
-      mapInstance.fitBounds(ncBounds);
+        const ncBounds = new window.google.maps.LatLngBounds(
+            new window.google.maps.LatLng(-22.8, 163.5),
+            new window.google.maps.LatLng(-19.6, 168.1)
+        );
+        mapInstance.fitBounds(ncBounds);
     }
     setMap(mapInstance);
-  }, [userLocation, participants]);
+  }, [userLocation]);
+
 
   const onUnmount = useCallback(function callback(map: google.maps.Map) {
     setMap(null);
