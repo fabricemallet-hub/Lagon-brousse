@@ -52,6 +52,7 @@ export interface WeatherData {
   temp: number;
   tempMin: number;
   tempMax: number;
+  waterTemperature: number;
   hourly: HourlyForecast[];
 }
 
@@ -150,6 +151,32 @@ export interface UserAccount {
   favoriteLocationIds?: string[];
 }
 
+export interface FishingSpot {
+  id: string;
+  userId: string;
+  name: string;
+  notes?: string;
+  location: {
+    latitude: number;
+    longitude: number;
+  };
+  icon: string;
+  color: string;
+  createdAt: any; // Firestore ServerTimestamp
+  context: {
+    timestamp: string; // ISO string
+    moonPhase: string;
+    tideHeight: number;
+    tideMovement: 'montante' | 'descendante' | 'étale';
+    tideCurrent: 'Nul' | 'Faible' | 'Modéré' | 'Fort';
+    weatherCondition: string;
+    windSpeed: number;
+    windDirection: WindDirection;
+    airTemperature: number;
+    waterTemperature: number;
+  };
+}
+
 export interface SessionParticipant {
   id: string; // user UID
   displayName: string;
@@ -200,3 +227,5 @@ export interface ChatMessage {
   content: string;
   createdAt: any; // Firestore ServerTimestamp
 }
+
+    

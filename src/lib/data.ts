@@ -81,7 +81,7 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation'> = {
     swell: [],
     sun: { sunrise: '06:31', sunset: '17:45' },
     moon: { moonrise: '12:05', moonset: '23:55', phase: 'Premier quartier', percentage: 50 },
-    rain: 'Aucune', trend: 'Ensoleillé', uvIndex: 7, temp: 26, tempMin: 23, tempMax: 33, hourly: [],
+    rain: 'Aucune', trend: 'Ensoleillé', uvIndex: 7, temp: 26, tempMin: 23, tempMax: 33, waterTemperature: 24, hourly: [],
   },
   farming: {
     lunarPhase: 'Lune Montante', zodiac: 'Feuilles', recommendation: 'Planter des légumes feuilles, bouturer.',
@@ -423,20 +423,20 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   locationData.fishing.forEach((slot) => {
     slot.fish.forEach((f) => {
       // Start with a base rating of 2/10 for more variation and stricter scoring.
-      let rating = 2;
+      let rating = 1;
 
       // 1. Time of day bonus/penalty is now more pronounced.
       if (slot.timeOfDay.includes('Aube') || slot.timeOfDay.includes('Crépuscule')) {
-        rating += 3; // Prime time gets a significant boost.
+        rating += 3.5; // Prime time gets a significant boost.
       } else {
-        rating -= 1; // Mid-day is generally less active.
+        rating -= 2; // Mid-day is generally less active.
       }
 
       // 2. Tide movement is critical. Increased penalty for slack tide.
       if (slot.tideMovement !== 'étale') {
-        rating += 3; // Moving water is good.
+        rating += 3.5; // Moving water is good.
       } else {
-        rating -= 5; // Strong penalty for slack tide, as fish are less active.
+        rating -= 6; // Strong penalty for slack tide, as fish are less active.
       }
 
       // 3. Moon Phase Bonus with stronger penalties.
@@ -445,9 +445,9 @@ export function generateProceduralData(location: string, date: Date): LocationDa
       const isNearQuarterMoon = (dayInCycle >= 4 && dayInCycle <= 10.75) || (dayInCycle >= 18.75 && dayInCycle <= 25.5);
 
       if (isNearNewOrFullMoon) {
-        rating += 3; // Strong bonus for new/full moon springs tides.
+        rating += 3.5; // Strong bonus for new/full moon springs tides.
       } else if (isNearQuarterMoon) {
-        rating -= 2; // Stronger penalty for quarter moons (neap tides).
+        rating -= 3; // Stronger penalty for quarter moons (neap tides).
       }
 
       // 4. Pelagic season bonus with stronger penalties.
@@ -456,7 +456,7 @@ export function generateProceduralData(location: string, date: Date): LocationDa
         if (isPelagicSeason) {
           rating += 2;
         } else {
-          rating -= 5; // Very strong penalty out of season.
+          rating -= 6; // Very strong penalty out of season.
         }
       }
 
@@ -601,6 +601,8 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     }
     const currentHourForecastForTemp = locationData.weather.hourly.find(f => new Date(f.date).getHours() === effectiveDate.getHours());
     if (currentHourForecastForTemp) { locationData.weather.temp = currentHourForecastForTemp.temp; }
+    locationData.weather.waterTemperature = Math.round(locationData.weather.temp - (2 + Math.sin(dateSeed * 0.1)));
+
     const dayForecasts = locationData.weather.hourly.slice(0, 24);
     if (dayForecasts.length > 0) {
       locationData.weather.tempMin = Math.min(...dayForecasts.map(f => f.temp));
@@ -710,3 +712,5 @@ export async function getTideArchiveStatus(firestore: Firestore): Promise<{ last
         stationCount: stations.length,
     };
 }
+
+    

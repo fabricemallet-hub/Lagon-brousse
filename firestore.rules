@@ -29,6 +29,10 @@ service cloud.firestore {
       allow create: if isOwner(userId);
       allow update: if isOwner(userId) || isAdmin();
       allow delete: if isOwner(userId) || isAdmin(); // Admin can now delete users
+      
+      match /fishing_spots/{spotId} {
+        allow read, write, delete: if isOwner(userId);
+      }
     }
 
     // ----------------------------------------------------------------------
@@ -115,3 +119,5 @@ service cloud.firestore {
     }
   }
 }
+
+    

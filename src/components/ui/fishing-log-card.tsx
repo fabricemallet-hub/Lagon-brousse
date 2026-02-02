@@ -1,0 +1,296 @@
+'use client';
+
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { GoogleMap, useJsApiLoader, MarkerF, OverlayView } from '@react-google-maps/api';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import type { LocationData, FishingSpot, WindDirection } from '@/lib/types';
+import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Alert, AlertTitle, AlertDescription } from './alert';
+
+const mapIcons = {
+    Fish: Fish,
+    MapPin: MapPin,
+    Anchor: Anchor
+};
+const availableIcons = Object.keys(mapIcons);
+const availableColors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
+
+const createMarkerIconSvg = (color: string, iconName: keyof typeof mapIcons) => {
+    const Icon = mapIcons[iconName];
+    // A simplified SVG representation to avoid JSX in data URI
+    const iconSvgPaths: Record<keyof typeof mapIcons, string> = {
+        Fish: `<path d="M16.5 22a2.5 2.5 0 0 1-4.25-2.035l-.625-5.003a3.5 3.5 0 0 1 3.25-3.96h.625a3.5 3.5 0 0 1 3.25 3.96l-.625 5.003A2.5 2.5 0 0 1 16.5 22Z" /><path d="m18 11-2.5-2a4 4 0 0 0-5.336-1.336" /><path d="M6.5 12c-2 0-4.5 1-4.5 4v0" /><path d="M12 12A3 3 0 0 0 9 9" /><path d="M15.5 12c2 0 4.5 1 4.5 4v0" />`,
+        MapPin: `<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" />`,
+        Anchor: `<path d="M12 22V8" /><path d="M5 12H2a10 10 0 0 0 20 0h-3" /><circle cx="12" cy="5" r="3" />`
+    };
+    const iconPath = iconSvgPaths[iconName] || iconSvgPaths.MapPin;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${iconPath}</svg>`;
+    return `data:image/svg+xml;base64,${btoa(svg)}`;
+};
+
+export function FishingLogCard({ data: locationData }: { data: LocationData }) {
+    const { user } = useUser();
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [newSpotLocation, setNewSpotLocation] = useState<{ lat: number, lng: number } | null>(null);
+    const [isAddSpotOpen, setIsAddSpotOpen] = useState(false);
+    const [spotName, setSpotName] = useState('');
+    const [spotNotes, setSpotNotes] = useState('');
+    const [selectedIcon, setSelectedIcon] = useState<keyof typeof mapIcons>('Fish');
+    const [selectedColor, setSelectedColor] = useState('#3b82f6');
+    const [isSaving, setIsSaving] = useState(false);
+
+    const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    const { isLoaded, loadError } = useJsApiLoader({ googleMapsApiKey: googleMapsApiKey || "" });
+
+    const fishingSpotsRef = useMemoFirebase(() => {
+        if (!user || !firestore) return null;
+        return query(collection(firestore, 'users', user.uid, 'fishing_spots'), orderBy('createdAt', 'desc'));
+    }, [user, firestore]);
+    const { data: savedSpots, isLoading: areSpotsLoading } = useCollection<FishingSpot>(fishingSpotsRef);
+
+    const handleMapClick = (e: google.maps.MapMouseEvent) => {
+        if (e.latLng) {
+            setNewSpotLocation({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+        }
+    };
+
+    const getTideMovement = useCallback((): 'montante' | 'descendante' | 'étale' => {
+        const now = new Date();
+        const currentHour = now.getHours();
+        const currentForecast = locationData.weather.hourly.find(f => new Date(f.date).getHours() === currentHour) || locationData.weather.hourly[0];
+        if (currentForecast.tideCurrent === 'Nul' || currentForecast.tidePeakType) {
+            return 'étale';
+        }
+        const timeToMinutes = (timeStr: string) => {
+            const [h, m] = timeStr.split(':').map(Number);
+            return h * 60 + m;
+        };
+        const sortedTides = [...locationData.tides].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+        const nowMinutes = now.getHours() * 60 + now.getMinutes();
+        let nextTidePeak = sortedTides.find(t => timeToMinutes(t.time) > nowMinutes);
+        if (!nextTidePeak) {
+            nextTidePeak = sortedTides[0];
+        }
+        return nextTidePeak.type === 'haute' ? 'montante' : 'descendante';
+    }, [locationData]);
+
+    const handleSaveSpot = async () => {
+        if (!user || !firestore || !newSpotLocation || !spotName) {
+            toast({ variant: 'destructive', title: 'Erreur', description: "Le nom du spot est requis." });
+            return;
+        }
+        setIsSaving(true);
+        const now = new Date();
+        const currentHour = now.getHours();
+        const currentForecast = locationData.weather.hourly.find(f => new Date(f.date).getHours() === currentHour) || locationData.weather.hourly[0];
+
+        const newSpotData = {
+            userId: user.uid,
+            name: spotName,
+            notes: spotNotes,
+            location: { latitude: newSpotLocation.lat, longitude: newSpotLocation.lng },
+            icon: selectedIcon,
+            color: selectedColor,
+            createdAt: serverTimestamp(),
+            context: {
+                timestamp: now.toISOString(),
+                moonPhase: locationData.weather.moon.phase,
+                tideHeight: currentForecast.tideHeight,
+                tideMovement: getTideMovement(),
+                tideCurrent: currentForecast.tideCurrent,
+                weatherCondition: currentForecast.condition,
+                windSpeed: currentForecast.windSpeed,
+                windDirection: currentForecast.windDirection,
+                airTemperature: currentForecast.temp,
+                waterTemperature: locationData.weather.waterTemperature,
+            }
+        };
+
+        try {
+            await addDoc(collection(firestore, 'users', user.uid, 'fishing_spots'), newSpotData);
+            toast({ title: 'Spot sauvegardé !' });
+            setIsAddSpotOpen(false);
+            setNewSpotLocation(null);
+            setSpotName('');
+            setSpotNotes('');
+        } catch (error) {
+            console.error("Erreur lors de la sauvegarde du spot :", error);
+            toast({ variant: 'destructive', title: 'Erreur', description: "Impossible de sauvegarder le spot." });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+    
+    const handleDeleteSpot = async (spotId: string) => {
+        if (!user || !firestore) return;
+        const spotRef = doc(firestore, 'users', user.uid, 'fishing_spots', spotId);
+        try {
+            await deleteDoc(spotRef);
+            toast({ title: 'Spot supprimé.'});
+        } catch (error) {
+            console.error("Erreur lors de la suppression du spot:", error);
+            toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de supprimer le spot.' });
+        }
+    }
+
+    if (!user) {
+        return (
+            <Card>
+                <CardHeader><CardTitle className="flex items-center gap-2"><Map /> Carnet de Pêche</CardTitle></CardHeader>
+                <CardContent>
+                    <Alert>
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Connectez-vous pour utiliser le carnet de pêche</AlertTitle>
+                        <AlertDescription>Sauvegardez vos meilleurs coins de pêche et consultez votre historique.</AlertDescription>
+                    </Alert>
+                </CardContent>
+            </Card>
+        );
+    }
+    
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Map /> Carnet de Pêche</CardTitle>
+                <CardDescription>Cliquez sur la carte pour marquer un coin, puis enregistrez-le. Vos spots sauvegardés apparaîtront dans l'historique.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {loadError && <Alert variant="destructive"><AlertTitle>Erreur de chargement de la carte</AlertTitle></Alert>}
+                {!isLoaded && <Skeleton className="h-80 w-full" />}
+                {isLoaded && (
+                    <div className="relative h-80 w-full rounded-lg overflow-hidden border">
+                        <GoogleMap
+                            mapContainerClassName="w-full h-full"
+                            center={{ lat: -21.5, lng: 165.5 }}
+                            zoom={7}
+                            options={{ disableDefaultUI: true, zoomControl: true, mapTypeControl: true, clickableIcons: false }}
+                            onClick={handleMapClick}
+                        >
+                            {savedSpots?.map(spot => (
+                                <MarkerF 
+                                    key={spot.id} 
+                                    position={spot.location} 
+                                    icon={{
+                                        url: createMarkerIconSvg(spot.color, spot.icon as keyof typeof mapIcons),
+                                        scaledSize: new window.google.maps.Size(32, 32),
+                                        anchor: new window.google.maps.Point(16, 16),
+                                    }}
+                                />
+                            ))}
+                            {newSpotLocation && (
+                                <MarkerF position={newSpotLocation} />
+                            )}
+                        </GoogleMap>
+                        {newSpotLocation && (
+                            <Dialog open={isAddSpotOpen} onOpenChange={(open) => { if(!open) setNewSpotLocation(null); setIsAddSpotOpen(open); }}>
+                                <DialogTrigger asChild>
+                                    <Button className="absolute bottom-4 left-1/2 -translate-x-1/2 shadow-lg" onClick={() => setIsAddSpotOpen(true)}>
+                                        <Plus className="mr-2" /> Ajouter mon coin de pêche ici
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Enregistrer un nouveau spot</DialogTitle>
+                                    </DialogHeader>
+                                    <div className="space-y-4 py-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="spot-name">Nom du spot</Label>
+                                            <Input id="spot-name" placeholder="Ex: Spot à bec de cane" value={spotName} onChange={(e) => setSpotName(e.target.value)} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="spot-notes">Notes</Label>
+                                            <Textarea id="spot-notes" placeholder="Ex: Pris à la traîne avec un leurre rouge" value={spotNotes} onChange={(e) => setSpotNotes(e.target.value)} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Icône</Label>
+                                            <div className="flex gap-2">
+                                                {availableIcons.map(iconName => {
+                                                    const Icon = mapIcons[iconName as keyof typeof mapIcons];
+                                                    return (
+                                                        <Button key={iconName} variant="outline" size="icon" onClick={() => setSelectedIcon(iconName as keyof typeof mapIcons)} className={cn(selectedIcon === iconName && "ring-2 ring-primary")}>
+                                                            <Icon className="size-5" />
+                                                        </Button>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Couleur</Label>
+                                            <div className="flex gap-2">
+                                                {availableColors.map(color => (
+                                                    <button key={color} onClick={() => setSelectedColor(color)} className={cn("w-8 h-8 rounded-full border-2", selectedColor === color ? "border-primary ring-2 ring-primary" : "border-transparent")} style={{ backgroundColor: color }} />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <DialogFooter>
+                                        <DialogClose asChild><Button variant="ghost">Annuler</Button></DialogClose>
+                                        <Button onClick={handleSaveSpot} disabled={isSaving}><Save className="mr-2"/>{isSaving ? "Sauvegarde..." : "Sauvegarder"}</Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        )}
+                    </div>
+                )}
+                
+                <div>
+                    <h4 className="font-semibold text-lg mb-2">Historique des prises</h4>
+                    {areSpotsLoading && <Skeleton className="h-24 w-full" />}
+                    {!areSpotsLoading && savedSpots && savedSpots.length > 0 ? (
+                        <Accordion type="single" collapsible className="w-full">
+                           {savedSpots.map(spot => (
+                               <AccordionItem value={spot.id} key={spot.id}>
+                                   <AccordionTrigger>
+                                       <div className="flex items-center justify-between w-full pr-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-1 rounded-md" style={{backgroundColor: spot.color + '20'}}>
+                                                    {React.createElement(mapIcons[spot.icon as keyof typeof mapIcons] || MapPin, { className: 'size-5', style: {color: spot.color} })}
+                                                </div>
+                                                <div>
+                                                    <p className="font-bold text-left">{spot.name}</p>
+                                                    <p className="text-xs text-muted-foreground text-left">{format(spot.createdAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr })}</p>
+                                                </div>
+                                            </div>
+                                       </div>
+                                   </AccordionTrigger>
+                                   <AccordionContent className="space-y-4">
+                                       <div className="text-sm text-muted-foreground bg-muted/50 p-4 rounded-lg space-y-2">
+                                           {spot.notes && <p className="italic">"{spot.notes}"</p>}
+                                            <p><strong>Conditions :</strong> {spot.context.weatherCondition}, {spot.context.airTemperature}°C (air), {spot.context.waterTemperature}°C (eau)</p>
+                                            <p><strong>Vent :</strong> {spot.context.windSpeed} nœuds de {spot.context.windDirection}</p>
+                                            <p><strong>Lune :</strong> {spot.context.moonPhase}</p>
+                                            <p><strong>Marée :</strong> {spot.context.tideMovement} ({spot.context.tideHeight.toFixed(2)}m), courant {spot.context.tideCurrent.toLowerCase()}</p>
+                                       </div>
+                                       <div className="flex flex-col sm:flex-row gap-2">
+                                           <Button variant="outline" className="flex-1" disabled><BrainCircuit className="mr-2"/> Chercher un jour similaire (IA)</Button>
+                                           <Button variant="outline" className="flex-1" disabled><BarChart className="mr-2"/> Analyser pour les 7 prochains jours (IA)</Button>
+                                           <Button variant="destructive" size="icon" onClick={() => handleDeleteSpot(spot.id)}><Trash2 /></Button>
+                                       </div>
+                                   </AccordionContent>
+                               </AccordionItem>
+                           ))}
+                        </Accordion>
+                    ) : (
+                        <p className="text-sm text-muted-foreground text-center py-4">Aucun spot sauvegardé pour le moment.</p>
+                    )}
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+    

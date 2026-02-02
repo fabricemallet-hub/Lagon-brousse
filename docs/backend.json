@@ -144,6 +144,42 @@
         "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp when the message was sent." }
       },
       "required": ["senderId", "content", "createdAt"]
+    },
+    "FishingSpot": {
+      "title": "FishingSpot",
+      "type": "object",
+      "description": "Represents a saved fishing spot with its environmental context.",
+      "properties": {
+        "userId": { "type": "string", "description": "The UID of the user who saved the spot." },
+        "name": { "type": "string", "description": "A name or comment for the spot." },
+        "location": {
+          "type": "object",
+          "properties": {
+            "latitude": { "type": "number" },
+            "longitude": { "type": "number" }
+          }
+        },
+        "icon": { "type": "string", "description": "The icon chosen for the spot marker." },
+        "color": { "type": "string", "description": "The color chosen for the spot marker." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "context": {
+          "type": "object",
+          "description": "Environmental context at the time of saving.",
+          "properties": {
+            "timestamp": { "type": "string", "format": "date-time" },
+            "moonPhase": { "type": "string" },
+            "tideHeight": { "type": "number" },
+            "tideMovement": { "type": "string" },
+            "tideCurrent": { "type": "string" },
+            "weatherCondition": { "type": "string" },
+            "windSpeed": { "type": "number" },
+            "windDirection": { "type": "string" },
+            "airTemperature": { "type": "number" },
+            "waterTemperature": { "type": "number" }
+          }
+        }
+      },
+      "required": ["userId", "name", "location", "createdAt", "context"]
     }
   },
   "auth": {
@@ -158,6 +194,18 @@
           "schema": { "$ref": "#/backend/entities/UserAccount" },
           "description": "Stores user account information. The 'userId' path parameter is used to enforce path-based ownership for data privacy. Includes 'favoriteLocationIds' array.",
           "params": [{ "name": "userId", "description": "The unique identifier for the user account." }]
+        }
+      },
+      {
+        "path": "/users/{userId}/fishing_spots/{spotId}",
+        "definition": {
+          "entityName": "FishingSpot",
+          "schema": { "$ref": "#/backend/entities/FishingSpot" },
+          "description": "Stores a user's saved fishing spots and the conditions of the catch.",
+          "params": [
+            { "name": "userId", "description": "The user's ID." },
+            { "name": "spotId", "description": "The unique ID for the fishing spot." }
+          ]
         }
       },
       {
@@ -245,3 +293,5 @@
     "reasoning": "This design prioritizes security and scalability for the Marées et Terroir Calédonien application, focusing on user authentication and location data. It leverages path-based ownership for user accounts and separates location data for efficient querying and management. The design emphasizes authorization independence by not relying on `get()` calls in security rules.\n\n**Authorization Independence:** User account data is stored under `/users/{userId}`, ensuring clear ownership and avoiding reliance on external document data for authorization. No data is denormalized as the only relationship is a N:N relationship between user and location and this handled within the user document as an array of IDs.\n\n**Structural Segregation:**  User account data is kept separate from location data, allowing for distinct security rules tailored to each data type.\n\n**QAPs (Query Across Partitions):** Because there are no list operations required for UserAccount collection and favoriteLocationIds only stores the references to existing locations, QAP is automatically supported. List operation on the location data is supported given there is no restriction on listing locations, thus no need to store the role in database."
   }
 }
+
+    

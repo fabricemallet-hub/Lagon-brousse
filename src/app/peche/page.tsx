@@ -23,6 +23,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import { FishingLogCard } from '@/components/ui/fishing-log-card';
 
 function PecheSkeleton() {
   return (
@@ -233,6 +234,9 @@ export default function PechePage() {
           </Card>
         ))}
       </div>
+      <FishingLogCard data={data} />
     </div>
   );
 }
+
+    
