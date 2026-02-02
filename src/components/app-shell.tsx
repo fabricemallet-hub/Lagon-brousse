@@ -90,15 +90,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isAuthPage = pathname === '/login' || pathname === '/signup';
 
   useEffect(() => {
-    if (isUserLoading || isProfileLoading) {
+    // If we are still waiting for auth or the firestore doc for a logged-in user, we are loading.
+    if (isUserLoading || (user && isProfileLoading)) {
       setStatus('loading');
       return;
     }
-    if (!user || !userProfile) {
-      // Guest users are also limited
+
+    // If there is no user, they are a guest with limited access.
+    if (!user) {
       setStatus('limited');
       return;
     }
+
+    // If we have a user, but their profile document doesn't exist in Firestore.
+    // This can happen for a brief moment after sign-up. We should wait,
+    // as the FirebaseProvider is likely creating it. Treating it as 'loading'
+    // prevents the 'limited' status flicker that triggers the usage timer.
+    if (!userProfile) {
+        setStatus('loading'); // Treat as loading until profile is available
+        return;
+    }
+    
+    // At this point, we have a user and their profile data.
+    // Now we can determine their real status.
 
     if (userProfile.subscriptionStatus === 'admin') {
       setStatus('admin');
