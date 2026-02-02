@@ -79,6 +79,12 @@ export interface FishRating {
   name: string;
   rating: number; // 1 to 10
   location?: 'Lagon' | 'Large' | 'Mixte';
+  advice: {
+    activity: string;
+    feeding: string;
+    location_specific: string;
+    depth: string;
+  };
 }
 
 export interface FishingSlot {

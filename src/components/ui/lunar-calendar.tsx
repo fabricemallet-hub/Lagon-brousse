@@ -56,6 +56,12 @@ import { Badge } from '@/components/ui/badge';
 import { CrabIcon, LobsterIcon } from '../icons';
 import { Separator } from './separator';
 import { Skeleton } from './skeleton';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 
 export const MoonPhaseIcon = ({
   phase,
@@ -644,28 +650,51 @@ function PecheDetailDialogContent({
                 </div>
               </div>
 
-              <div className="space-y-2">
+               <div className="space-y-2">
                 <h5 className="font-semibold flex items-center gap-2">
                   <Fish className="h-4 w-4 text-primary" />
                   Potentiel par espèce
                 </h5>
-                {slot.fish.map((f, i) => (
-                  <div key={i} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{f.name}</span>
-                      {f.location && <Badge variant={f.location === 'Large' ? 'destructive' : 'secondary'} className="text-xs font-semibold">{f.location}</Badge>}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <RatingStars rating={f.rating} />
-                      <Badge
-                        variant="outline"
-                        className="w-12 justify-center"
-                      >
-                        {f.rating}/10
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
+                <Accordion type="single" collapsible className="w-full space-y-2">
+                  {slot.fish.map((f, i) => (
+                    <AccordionItem value={`item-dialog-${i}`} key={i} className="border-b-0">
+                      <div className="border rounded-lg overflow-hidden bg-background">
+                         <AccordionTrigger className="p-2 hover:no-underline text-sm [&[data-state=open]]:bg-muted/50 [&[data-state=open]]:border-b">
+                            <div className="flex justify-between items-center w-full">
+                              <div className="flex items-center gap-2 text-left">
+                                <span className="font-medium text-xs">{f.name}</span>
+                                {f.location && <Badge variant={f.location === 'Large' ? 'destructive' : 'secondary'} className="text-xs font-semibold">{f.location}</Badge>}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <RatingStars rating={f.rating} />
+                                <Badge variant="outline" className="w-12 justify-center text-xs">{f.rating}/10</Badge>
+                              </div>
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent className="p-3 text-xs bg-muted/50">
+                             <ul className="space-y-1.5 text-muted-foreground">
+                              <li className="flex items-start gap-2">
+                                <strong className="w-20 shrink-0 font-semibold text-card-foreground/80">Activité:</strong>
+                                <span>{f.advice.activity}</span>
+                              </li>
+                              <li className="flex items-start gap-2">
+                                <strong className="w-20 shrink-0 font-semibold text-card-foreground/80">Alim.:</strong>
+                                <span>{f.advice.feeding}</span>
+                              </li>
+                              <li className="flex items-start gap-2">
+                                <strong className="w-20 shrink-0 font-semibold text-card-foreground/80">Spot:</strong>
+                                <span>{f.advice.location_specific}</span>
+                              </li>
+                              <li className="flex items-start gap-2">
+                                <strong className="w-20 shrink-0 font-semibold text-card-foreground/80">Prof.:</strong>
+                                <span>{f.advice.depth}</span>
+                              </li>
+                            </ul>
+                          </AccordionContent>
+                      </div>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
               </div>
             </div>
           ))}

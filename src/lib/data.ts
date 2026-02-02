@@ -99,29 +99,37 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation'> = {
     {
       timeOfDay: 'Aube (05:00 - 07:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
-        { name: 'Carangue', rating: 8, location: 'Lagon' }, { name: 'Mérou', rating: 7, location: 'Lagon' },
-        { name: 'Bec de cane', rating: 9, location: 'Lagon' }, { name: 'Bossu doré', rating: 8, location: 'Lagon' },
+        { name: 'Carangue', rating: 8, location: 'Lagon', advice: { activity: 'Très active, en chasse près de la surface.', feeding: 'Excellente heure, prédateurs affamés.', location_specific: 'Cibler les passes, les tombants et les patates de corail.', depth: 'Surface à 15m.' } },
+        { name: 'Mérou', rating: 7, location: 'Lagon', advice: { activity: 'Sort de son abri, activité modérée.', feeding: 'Bonne heure, opportuniste.', location_specific: 'Proche des structures rocheuses et des grottes.', depth: '10-30m.' } },
+        { name: 'Bec de cane', rating: 9, location: 'Lagon', advice: { activity: 'En bancs, très actif.', feeding: 'Très bonne heure, se nourrit agressivement.', location_specific: 'Sur les platiers, bords de chenaux.', depth: '2-10m.' } },
+        { name: 'Bossu doré', rating: 8, location: 'Lagon', advice: { activity: 'Activité en hausse, se déplace pour chasser.', feeding: 'Excellente heure, mordeur.', location_specific: 'Autour des patates de corail isolées et petits tombants.', depth: '5-20m.' } },
       ],
     },
     {
       timeOfDay: 'Matinée (09:00 - 11:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
-        { name: 'Poisson perroquet', rating: 6, location: 'Lagon' }, { name: 'Wahoo', rating: 4, location: 'Large' },
-        { name: 'Mahi-mahi', rating: 4, location: 'Large' }, { name: 'Bossu doré', rating: 7, location: 'Lagon' },
+        { name: 'Poisson perroquet', rating: 6, location: 'Lagon', advice: { activity: 'Actif, en train de brouter le corail.', feeding: 'Heure correcte pour se nourrir.', location_specific: 'Sur les platiers coralliens et les zones riches en algues.', depth: '1-5m.' } },
+        { name: 'Wahoo', rating: 4, location: 'Large', advice: { activity: 'En déplacement rapide, activité modérée.', feeding: 'Période de chasse possible mais moins intense qu\'à l\'aube.', location_specific: 'Tombants extérieurs, DCP et lignes de courant.', depth: 'Surface.' } },
+        { name: 'Mahi-mahi', rating: 4, location: 'Large', advice: { activity: 'Activité moyenne, souvent à la recherche d\'ombre.', feeding: 'Opportuniste, peut mordre si une proie passe.', location_specific: 'Autour des objets flottants (épaves, bouées, débris).', depth: 'Surface.' } },
+        { name: 'Bossu doré', rating: 7, location: 'Lagon', advice: { activity: 'Activité modérée, proche de sa structure.', feeding: 'Bonne heure, reste à l\'affût.', location_specific: 'Proche des patates de corail, reste à l\'ombre de la structure.', depth: '10-25m.' } },
       ],
     },
     {
       timeOfDay: 'Après-midi (15:00 - 17:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
-        { name: 'Thon Jaune', rating: 4, location: 'Large' }, { name: 'Thazard', rating: 5, location: 'Mixte' },
-        { name: 'Bonite', rating: 7, location: 'Mixte' }, { name: 'Bossu doré', rating: 5, location: 'Lagon' },
+        { name: 'Thon Jaune', rating: 4, location: 'Large', advice: { activity: 'Activité modérée, peut sonder plus profond.', feeding: 'Moins prévisible, peut ignorer les leurres.', location_specific: 'Au large, suivez les oiseaux marins.', depth: '20-50m.' } },
+        { name: 'Thazard', rating: 5, location: 'Mixte', advice: { activity: 'Actif, patrouille le long des récifs.', feeding: 'Bonne heure de chasse avant le crépuscule.', location_specific: 'Bords extérieurs du récif, passes.', depth: 'Surface à 20m.' } },
+        { name: 'Bonite', rating: 7, location: 'Mixte', advice: { activity: 'Très active, chasse en bancs.', feeding: 'Se nourrit frénétiquement si une boule de fourrage est trouvée.', location_specific: 'Souvent en surface, crée des chasses visibles.', depth: 'Surface.' } },
+        { name: 'Bossu doré', rating: 5, location: 'Lagon', advice: { activity: 'Activité en baisse, plus discret.', feeding: 'Heure moyenne, moins agressif.', location_specific: 'Au plus près des structures, difficile à déloger.', depth: '15-30m.' } },
       ],
     },
     {
       timeOfDay: 'Crépuscule (17:30 - 19:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
-        { name: 'Rouget', rating: 9, location: 'Lagon' }, { name: 'Vivaneau', rating: 8, location: 'Lagon' },
-        { name: 'Thon dents de chien', rating: 7, location: 'Large' }, { name: 'Bossu doré', rating: 8, location: 'Lagon' },
+        { name: 'Rouget', rating: 9, location: 'Lagon', advice: { activity: 'Très actif, sort pour se nourrir.', feeding: 'Excellente heure, fouille le sable activement.', location_specific: 'Fonds sableux près des zones rocheuses ou coralliennes.', depth: '5-15m.' } },
+        { name: 'Vivaneau', rating: 8, location: 'Lagon', advice: { activity: 'Quitte son abri, devient un prédateur actif.', feeding: 'Très bonne heure, chasse à l\'affût.', location_specific: 'Autour des patates de corail et des tombants.', depth: '10-40m.' } },
+        { name: 'Thon dents de chien', rating: 7, location: 'Large', advice: { activity: 'Prédateur redoutable, très actif à cette heure.', feeding: 'Excellente heure de chasse.', location_specific: 'Tombants vertigineux et passes profondes.', depth: '20-60m.' } },
+        { name: 'Bossu doré', rating: 8, location: 'Lagon', advice: { activity: 'Très bonne activité, sort pour chasser.', feeding: 'Excellente heure, très agressif.', location_specific: 'Se détache des structures pour chasser sur les fonds sableux environnants.', depth: '5-20m.' } },
       ],
     },
   ],
@@ -406,9 +414,9 @@ export function generateProceduralData(location: string, date: Date): LocationDa
 
   // Vary Rain
   const rainChance = (Math.sin(dateSeed * 0.4 + locationSeed * 0.2) + 1) / 2; // Normalize to 0-1
-  if (rainChance < 0.95) {
+  if (rainChance < 0.98) {
       locationData.weather.rain = 'Aucune';
-  } else if (rainChance < 0.99) {
+  } else if (rainChance < 0.995) {
       locationData.weather.rain = 'Fine';
   } else {
       locationData.weather.rain = 'Forte';
