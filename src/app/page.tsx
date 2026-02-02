@@ -101,23 +101,19 @@ export default function Home() {
               const TideIcon = tide.type === 'haute' ? TrendingUp : TrendingDown;
               return (
               <div key={index} className={cn(
-                  "flex items-center justify-between rounded-md p-2 -mx-2 transition-colors",
-                  tide.type === 'haute' && "bg-primary/10",
-                  tide.type === 'basse' && "bg-destructive/10",
+                  "flex items-center justify-between rounded-md p-3 border",
+                  tide.type === 'haute' && "border-primary/50 bg-primary/10 text-primary",
+                  tide.type === 'basse' && "border-destructive/50 bg-destructive/10 text-destructive",
                 )}>
-                <div className="flex items-center gap-2">
-                    <TideIcon className={cn(
-                      "size-5 shrink-0",
-                      tide.type === 'haute' ? 'text-primary' : 'text-destructive',
-                    )} />
-                    <span className="text-muted-foreground capitalize text-sm">{`Marée ${tide.type}`}</span>
+                <div className="flex items-center gap-3">
+                    <TideIcon className="size-6 shrink-0" />
+                    <div>
+                      <span className="font-semibold capitalize text-base">{`Marée ${tide.type}`}</span>
+                      <p className="text-sm font-mono text-current/80">{tide.time}</p>
+                    </div>
                 </div>
-                <span className={cn(
-                    "font-mono font-medium text-sm",
-                    tide.type === 'haute' && "text-primary font-bold",
-                    tide.type === 'basse' && "text-destructive font-bold",
-                  )}>
-                  {tide.time} ({tide.height.toFixed(2)}m)
+                <span className="font-mono font-bold text-lg">
+                  {tide.height.toFixed(2)}m
                 </span>
               </div>
             )})}
