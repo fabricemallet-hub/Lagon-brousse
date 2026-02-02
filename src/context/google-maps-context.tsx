@@ -17,7 +17,7 @@ export function GoogleMapsProvider({ children }: { children: ReactNode }) {
   const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
   const { isLoaded, loadError } = useJsApiLoader({
-    id: 'google-map-script',
+    id: 'lagon-brousse-google-maps',
     googleMapsApiKey: googleMapsApiKey || "",
     mapIds: ['satellite_id'],
     preventGoogleFontsLoading: true,
