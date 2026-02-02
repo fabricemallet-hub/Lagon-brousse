@@ -21,7 +21,6 @@ import {
   Sunset,
   Info,
   MapPin,
-  Phone,
 } from 'lucide-react';
 import {
   Accordion,
@@ -169,74 +168,6 @@ export default function ChassePage() {
         </Card>
       </div>
       <ShootingTableCard />
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MapPin className="size-5 text-primary" />
-            Zones de Chasse Autorisées
-          </CardTitle>
-          <CardDescription>
-            Liste non-exhaustive de zones de chasse. Contactez toujours les
-            responsables avant de vous y rendre.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Accordion type="single" collapsible className="w-full">
-            <AccordionItem value="item-1">
-              <AccordionTrigger>Domaine de Deva (Bourail)</AccordionTrigger>
-              <AccordionContent className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  Chasse réglementée au cerf et cochon sauvage sur un vaste
-                  domaine. La réservation est obligatoire. Des guides peuvent
-                  être disponibles.
-                </p>
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-2">
-              <AccordionTrigger>Forêt de la Thy (Yaté)</AccordionTrigger>
-              <AccordionContent className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  Zone de chasse publique. Le permis de chasse de la Province Sud
-                  est obligatoire. Se renseigner sur les dates d'ouverture et
-                  les secteurs autorisés.
-                </p>
-              </AccordionContent>
-            </AccordionItem>
-             <AccordionItem value="item-3">
-              <AccordionTrigger>Parc des Grandes Fougères (Farino)</AccordionTrigger>
-              <AccordionContent className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  La chasse y est très encadrée et vise à réguler les populations de cerfs et cochons. Elle n'est autorisée que lors de battues organisées à des dates spécifiques. Il est impératif de se renseigner auprès de la Maison du Parc pour connaître le calendrier et les modalités.
-                </p>
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-4">
-              <AccordionTrigger>Plaine des Gaïacs (Koné)</AccordionTrigger>
-              <AccordionContent className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  Grande zone de chasse publique en Province Nord. Le permis de
-                  chasse provincial est requis. Renseignez-vous sur les
-                  réglementations spécifiques.
-                </p>
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-5">
-              <AccordionTrigger>
-                Chasses privées (La Foa, Boulouparis...)
-              </AccordionTrigger>
-              <AccordionContent className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  De nombreuses propriétés privées proposent des week-ends de
-                  chasse. Les contacts se trouvent souvent via les réseaux
-                  sociaux (groupes de chasseurs) ou le bouche-à-oreille.
-                  Exemple: "Chasse en Calédonie" sur les réseaux sociaux. Soyez
-                  respectueux des propriétés.
-                </p>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </CardContent>
-      </Card>
     </div>
   );
 }
