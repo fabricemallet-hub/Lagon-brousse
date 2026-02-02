@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Fragment } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, addDoc, serverTimestamp, deleteDoc, doc, Timestamp, orderBy, query } from 'firebase/firestore';
+import { collection, serverTimestamp, deleteDoc, doc, Timestamp, orderBy, query, setDoc } from 'firebase/firestore';
 import type { UserAccount, AccessToken } from '@/lib/types';
 import { WithId } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -101,7 +101,9 @@ export default function AdminPage() {
         code += chars.charAt(Math.floor(Math.random() * chars.length));
       }
 
-      await addDoc(collection(firestore, 'access_tokens'), {
+      const tokenDocRef = doc(firestore, 'access_tokens', code);
+
+      await setDoc(tokenDocRef, {
         durationMonths: parseInt(tokenDuration, 10),
         createdAt: serverTimestamp(),
         status: 'active',

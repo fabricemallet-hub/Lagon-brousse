@@ -69,8 +69,11 @@ service cloud.firestore {
     // ----------------------------------------------------------------------
 
     match /users/{userId} {
+      // 'read' is a shortcut for 'get' and 'list'
+      allow read: if isAdmin();
+      // Allow users to get their own document
       allow get: if isOwner(userId);
-      allow list: if isAdmin();
+
       allow create: if isCreatingOwnAccount(userId);
       allow update: if isMaintainingOwnAccount(userId) || isAdmin();
       allow delete: if isExistingOwner(userId);
@@ -118,8 +121,11 @@ service cloud.firestore {
     }
 
     match /access_tokens/{tokenId} {
+      // 'read' is a shortcut for 'get' and 'list'
+      allow read: if isAdmin();
+      // Allow any signed-in user to 'get' a token to check its status (e.g., before redeeming)
       allow get: if isSignedIn();
-      allow list: if isAdmin();
+      
       allow create, delete: if isAdmin();
       
       function isRedeemingOwnToken() {
