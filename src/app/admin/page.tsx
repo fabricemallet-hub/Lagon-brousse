@@ -55,6 +55,7 @@ export default function AdminPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
   const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
+  const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
   
   const isAdmin = useMemo(() => user?.email === 'f.mallet81@outlook.com', [user]);
 
@@ -138,6 +139,32 @@ export default function AdminPage() {
     } catch (error) {
       console.error("Error deleting token:", error);
       toast({ variant: 'destructive', title: "Erreur", description: "Impossible de supprimer le jeton." });
+    }
+  };
+
+  const handleDeleteConversation = async (conversationId: string) => {
+    if (!firestore) return;
+    try {
+        const messagesRef = collection(firestore, 'conversations', conversationId, 'messages');
+        const messagesSnap = await getDocs(messagesRef);
+
+        const batch = writeBatch(firestore);
+
+        messagesSnap.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+
+        const conversationRef = doc(firestore, 'conversations', conversationId);
+        batch.delete(conversationRef);
+
+        await batch.commit();
+
+        toast({ title: "Conversation supprimée" });
+    } catch (error) {
+        console.error("Error deleting conversation:", error);
+        toast({ variant: 'destructive', title: "Erreur", description: "Impossible de supprimer la conversation." });
+    } finally {
+        setConversationToDelete(null);
     }
   };
   
@@ -244,19 +271,24 @@ export default function AdminPage() {
                     <TableHead>Utilisateur</TableHead>
                     <TableHead>Dernier Message</TableHead>
                     <TableHead>Date</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {conversations && conversations.length > 0 ? conversations.map(convo => (
-                    <TableRow key={convo.id} className={cn(!convo.isReadByAdmin && "bg-blue-50 dark:bg-blue-900/20 font-bold")}>
-                      <TableCell>{convo.userDisplayName}<br/><span className="text-xs font-normal text-muted-foreground">{convo.userEmail}</span></TableCell>
-                      <TableCell className="max-w-xs truncate font-normal">{convo.lastMessageContent}</TableCell>
-                      <TableCell className="text-xs font-normal">{convo.lastMessageAt ? format(convo.lastMessageAt.toDate(), 'P p', { locale: fr }) : '-'}</TableCell>
+                    <TableRow key={convo.id} className={cn(!convo.isReadByAdmin && "bg-blue-50 dark:bg-blue-900/20")}>
+                      <TableCell><span className={cn(!convo.isReadByAdmin && "font-bold")}>{convo.userDisplayName}</span><br/><span className="text-xs font-normal text-muted-foreground">{convo.userEmail}</span></TableCell>
+                      <TableCell className={cn("max-w-xs truncate", !convo.isReadByAdmin ? "font-bold" : "font-normal")}>{convo.lastMessageContent}</TableCell>
+                      <TableCell className={cn("text-xs", !convo.isReadByAdmin ? "font-bold" : "font-normal")}>{convo.lastMessageAt ? format(convo.lastMessageAt.toDate(), 'P p', { locale: fr }) : '-'}</TableCell>
                       <TableCell className="text-right">
-                        <Button asChild variant="outline" size="sm">
-                           <Link href={`/admin/messages/${convo.userId}`}>Répondre</Link>
-                        </Button>
+                        <div className="flex justify-end items-center gap-2">
+                          <Button asChild variant="outline" size="sm">
+                             <Link href={`/admin/messages/${convo.userId}`}>Répondre</Link>
+                          </Button>
+                           <Button variant="ghost" size="icon" onClick={() => setConversationToDelete(convo.id)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                           </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )) : (
@@ -385,6 +417,24 @@ export default function AdminPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={!!conversationToDelete} onOpenChange={() => setConversationToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer la conversation ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. La conversation et tous ses messages seront définitivement supprimés.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleDeleteConversation(conversationToDelete!)} className={cn(buttonVariants({ variant: "destructive" }))}>
+              Oui, supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
