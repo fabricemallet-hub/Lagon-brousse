@@ -70,3 +70,24 @@ export function LobsterIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function OctopusIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M9.46 8.16A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 5.5 5.5c0 5-4.5 6.5-5.5 6.5s-5.5-1.5-5.5-6.5a5.32 5.32 0 0 1 2.96-4.84z" />
+      <path d="M8.5 18a2.5 2.5 0 0 0 2.5 2.5v0a2.5 2.5 0 0 0 2.5-2.5" />
+      <path d="M15.5 18a2.5 2.5 0 0 1-2.5 2.5v0a2.5 2.5 0 0 1-2.5-2.5" />
+      <path d="M5 15c0 .83.67 1.5 1.5 1.5v0c.83 0 1.5-.67 1.5-1.5" />
+      <path d="M19 15c0 .83-.67 1.5-1.5 1.5v0c-.83 0-1.5-.67-1.5-1.5" />
+    </svg>
+  );
+}

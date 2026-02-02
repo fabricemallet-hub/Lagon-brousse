@@ -152,7 +152,8 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation'> = {
     advice: { rain: 'Temps sec, avancez silencieusement.', scent: 'Le vent stable facilite la gestion des odeurs.' }
   },
   crabAndLobster: {
-    crabStatus: 'Plein', crabMessage: '', lobsterActivity: 'Moyenne', lobsterMessage: ''
+    crabStatus: 'Plein', crabMessage: '', lobsterActivity: 'Moyenne', lobsterMessage: '',
+    octopusActivity: 'Moyenne', octopusMessage: ''
   }
 };
 
@@ -587,8 +588,8 @@ export function generateProceduralData(location: string, date: Date): LocationDa
         }
         locationData.weather.hourly.push({ date: forecastDate.toISOString(), condition: condition, windSpeed: windSpeed, windDirection: windDirection, stability: 'Stable', isNight: isNight, temp: temp, tideHeight: 0, tideCurrent: 'Nul', tidePeakType: undefined });
     }
-    const currentHourForecast = locationData.weather.hourly.find(f => new Date(f.date).getHours() === effectiveDate.getHours());
-    if (currentHourForecast) { locationData.weather.temp = currentHourForecast.temp; }
+    const currentHourForecastForTemp = locationData.weather.hourly.find(f => new Date(f.date).getHours() === effectiveDate.getHours());
+    if (currentHourForecastForTemp) { locationData.weather.temp = currentHourForecastForTemp.temp; }
     const dayForecasts = locationData.weather.hourly.slice(0, 24);
     if (dayForecasts.length > 0) {
       locationData.weather.tempMin = Math.min(...dayForecasts.map(f => f.temp));
@@ -612,6 +613,36 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     } else {
         locationData.crabAndLobster = {...locationData.crabAndLobster, lobsterActivity: 'Moyenne', lobsterMessage: "Activité moyenne. Pêche possible à l'intérieur et à l'extérieur du lagon."};
     }
+
+    // Octopus Data
+    let octopusActivity: 'Élevée' | 'Moyenne' | 'Faible' = 'Moyenne';
+    let octopusMessage = '';
+
+    const currentHour = effectiveDate.getHours();
+    const currentHourForecast = locationData.weather.hourly[currentHour];
+    
+    const isSlackTide = currentHourForecast?.tideCurrent === 'Nul' || !!currentHourForecast?.tidePeakType;
+    const isDawn = currentHour >= 5 && currentHour <= 7;
+    const isDusk = currentHour >= 17 && currentHour <= 19;
+    const isLowLight = isDawn || isDusk;
+
+    if (isSlackTide && isLowLight) {
+        octopusActivity = 'Élevée';
+        octopusMessage = 'Activité maximale. Période idéale combinant marée étale et faible luminosité.';
+    } else if (isSlackTide || isLowLight) {
+        octopusActivity = 'Élevée';
+        octopusMessage = 'Bonne activité. Profitez de la marée étale ou de la faible luminosité pour les chercher.';
+    } else if (illumination < 0.4) { // Darker nights in general
+        octopusActivity = 'Moyenne';
+        octopusMessage = 'Activité moyenne. Les nuits sombres sont favorables, cherchez-les près des cailloux.';
+    } else {
+        octopusActivity = 'Faible';
+        octopusMessage = 'Activité faible. Les poulpes sont plus discrets en pleine journée et par nuits claires.';
+    }
+
+    locationData.crabAndLobster.octopusActivity = octopusActivity;
+    locationData.crabAndLobster.octopusMessage = octopusMessage;
+
 
     // Add hourly tide data
     const hourlyTideData = calculateHourlyTides(location, effectiveDate);

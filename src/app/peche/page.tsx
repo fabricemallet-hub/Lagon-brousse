@@ -14,7 +14,7 @@ import { useDate } from '@/context/date-context';
 import { Clock, Waves, TrendingUp, TrendingDown, Fish, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { CrabIcon, LobsterIcon } from '@/components/icons';
+import { CrabIcon, LobsterIcon, OctopusIcon } from '@/components/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import {
@@ -110,12 +110,12 @@ export default function PechePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Crabes & Langoustes</CardTitle>
+          <CardTitle>Autres Captures</CardTitle>
           <CardDescription>
             Prévisions basées sur le cycle lunaire pour le {dateString}.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-6 md:grid-cols-2">
+        <CardContent className="grid gap-6 md:grid-cols-3">
           <div className="flex items-start gap-4">
             <CrabIcon className="h-8 w-8 text-primary mt-1" />
             <div>
@@ -140,6 +140,20 @@ export default function PechePage() {
               <p className="text-sm text-muted-foreground">{crabAndLobster.lobsterMessage}</p>
             </div>
           </div>
+           {crabAndLobster.octopusActivity && (
+            <div className="flex items-start gap-4">
+              <OctopusIcon className="h-8 w-8 text-primary mt-1" />
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="font-semibold">Poulpe</h4>
+                    <Badge variant={crabAndLobster.octopusActivity === 'Élevée' ? 'default' : crabAndLobster.octopusActivity === 'Moyenne' ? 'secondary' : 'outline'}>
+                    {crabAndLobster.octopusActivity}
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">{crabAndLobster.octopusMessage}</p>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

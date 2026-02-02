@@ -53,7 +53,7 @@ import { cn } from '@/lib/utils';
 import { useCalendarView } from '@/context/calendar-view-context';
 import type { FishRating } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
-import { CrabIcon, LobsterIcon } from '../icons';
+import { CrabIcon, LobsterIcon, OctopusIcon } from '../icons';
 import { Separator } from './separator';
 import { Skeleton } from './skeleton';
 import {
@@ -701,7 +701,7 @@ function PecheDetailDialogContent({
         </div>
         <Separator />
         <div className="space-y-4 pt-4">
-            <h4 className="font-semibold">Crabes &amp; Langoustes</h4>
+            <h4 className="font-semibold">Autres Captures</h4>
             <div className="flex items-start gap-3">
                 <CrabIcon className="h-6 w-6 text-primary mt-1" />
                 <div>
@@ -726,6 +726,20 @@ function PecheDetailDialogContent({
                     <p className="text-xs text-muted-foreground">{crabAndLobster.lobsterMessage}</p>
                 </div>
             </div>
+             {crabAndLobster.octopusActivity && (
+              <div className="flex items-start gap-3">
+                  <OctopusIcon className="h-6 w-6 text-primary mt-1" />
+                  <div>
+                      <div className="flex items-center gap-2">
+                          <h5 className="font-medium">Poulpe</h5>
+                          <Badge variant={crabAndLobster.octopusActivity === 'Élevée' ? 'default' : crabAndLobster.octopusActivity === 'Moyenne' ? 'secondary' : 'outline'} className="text-xs">
+                          {crabAndLobster.octopusActivity}
+                          </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{crabAndLobster.octopusMessage}</p>
+                  </div>
+              </div>
+            )}
         </div>
       </div>
     </>
