@@ -24,6 +24,8 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
+  DialogClose
 } from '@/components/ui/dialog';
 import {
   Fish,
@@ -426,7 +428,7 @@ function ChampsDetailDialogContent({
           Tâches de jardinage recommandées selon la lune.
         </DialogDescription>
       </DialogHeader>
-      <div className="space-y-4 py-4 text-sm max-h-[70vh] overflow-y-auto pr-4">
+      <div className="space-y-4 py-4 text-sm">
         <div className="flex justify-between items-center bg-muted/50 p-2 rounded-lg">
           <div className="flex items-center gap-2">
             <MoonPhaseIcon
@@ -560,7 +562,7 @@ function PecheDetailDialogContent({
           Prévisions détaillées, marées et potentiel par espèce.
         </DialogDescription>
       </DialogHeader>
-      <div className="space-y-6 py-4 text-sm max-h-[70vh] overflow-y-auto pr-4">
+      <div className="space-y-6 py-4 text-sm">
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <h4 className="font-semibold text-muted-foreground">
@@ -648,7 +650,7 @@ function PecheDetailDialogContent({
                   Potentiel par espèce
                 </h5>
                 {slot.fish.map((f, i) => (
-                  <div key={i} className="flex justify-between items-center">
+                  <div key={i} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{f.name}</span>
                       {f.location && <Badge variant={f.location === 'Large' ? 'destructive' : 'secondary'} className="text-xs font-semibold">{f.location}</Badge>}
@@ -783,18 +785,27 @@ export function LunarCalendar() {
           open={!!detailedDay}
           onOpenChange={(isOpen) => !isOpen && setDetailedDay(null)}
         >
-          <DialogContent className="sm:max-w-lg">
-            {calendarView === 'peche' ? (
-              <PecheDetailDialogContent
-                day={detailedDay}
-                location={selectedLocation}
-              />
-            ) : (
-              <ChampsDetailDialogContent
-                day={detailedDay}
-                location={selectedLocation}
-              />
-            )}
+          <DialogContent className="md:max-w-xl flex flex-col h-full sm:h-auto">
+            <div className="flex-grow overflow-y-auto">
+              {calendarView === 'peche' ? (
+                <PecheDetailDialogContent
+                  day={detailedDay}
+                  location={selectedLocation}
+                />
+              ) : (
+                <ChampsDetailDialogContent
+                  day={detailedDay}
+                  location={selectedLocation}
+                />
+              )}
+            </div>
+             <DialogFooter className="mt-auto pt-4 border-t sm:justify-start">
+                <DialogClose asChild>
+                <Button type="button" variant="outline">
+                    Retour
+                </Button>
+                </DialogClose>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       )}
