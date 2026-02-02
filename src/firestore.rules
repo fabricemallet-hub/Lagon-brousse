@@ -57,14 +57,14 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow get: if isOwner(userId);
       
-      // A user can create their own document.
-      // They cannot grant themselves admin status unless their email is the admin email.
-      // The 'id' field in the document must match the user's UID.
-      allow create: if isOwner(userId) &&
+      // Enforce correct status on creation. Only the admin email can create an admin user.
+      // All other new users must have a 'trial' status.
+      allow create: if isOwner(userId) && 
                        request.resource.data.id == userId &&
-                       (request.resource.data.subscriptionStatus == 'admin' ? 
-                          request.auth.token.email == 'f.mallet81@outlook.com' : 
-                          request.resource.data.subscriptionStatus == 'trial');
+                       (
+                           (request.auth.token.email == 'f.mallet81@outlook.com' && request.resource.data.subscriptionStatus == 'admin') ||
+                           (request.auth.token.email != 'f.mallet81@outlook.com' && request.resource.data.subscriptionStatus == 'trial')
+                       );
       
       // An owner or admin can update the document.
       allow update: if isOwner(userId) || isAdmin();
