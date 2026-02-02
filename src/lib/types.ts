@@ -139,6 +139,8 @@ export interface UserAccount {
   id: string;
   email: string;
   displayName: string;
+  mapIcon?: string;
+  mapColor?: string;
   subscriptionStatus: 'active' | 'inactive' | 'trial' | 'admin';
   subscriptionStartDate?: string;
   subscriptionExpiryDate?: string;
@@ -148,6 +150,8 @@ export interface UserAccount {
 export interface SessionParticipant {
   id: string; // user UID
   displayName: string;
+  mapIcon?: string;
+  mapColor?: string;
   location?: {
     latitude: number;
     longitude: number;

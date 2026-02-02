@@ -33,6 +33,11 @@ import {
   Download,
   Expand,
   Shrink,
+  User as UserIcon,
+  Crosshair,
+  Footprints,
+  Mountain,
+  Save,
 } from 'lucide-react';
 import {
   useUser,
@@ -41,6 +46,7 @@ import {
   useMemoFirebase,
   errorEmitter,
   FirestorePermissionError,
+  useDoc,
 } from '@/firebase';
 import {
   collection,
@@ -55,11 +61,17 @@ import {
   getDocs,
 } from 'firebase/firestore';
 import type { WithId } from '@/firebase';
-import type { HuntingSession, SessionParticipant } from '@/lib/types';
+import type { HuntingSession, SessionParticipant, UserAccount } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Skeleton } from './ui/skeleton';
 import { GoogleMap, useJsApiLoader, OverlayView } from '@react-google-maps/api';
+
+
+// --- Icon Map ---
+const iconMap = { Navigation, UserIcon, Crosshair, Footprints, Mountain };
+const availableIcons = Object.keys(iconMap);
+const availableColors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
 
 
 // --- Helper Components ---
@@ -67,8 +79,7 @@ import { GoogleMap, useJsApiLoader, OverlayView } from '@react-google-maps/api';
 const BatteryIcon = ({ level, charging }: { level: number; charging: boolean }) => {
   const props = { className: 'w-4 h-4 inline-block' };
   if (charging) return <BatteryCharging {...props} className="text-blue-500" />;
-  if (level > 0.5) return <BatteryFull {...props} className="text-green-500" />;
-  if (level > 0.15) return <BatteryMedium {...props} className="text-orange-500" />;
+  if (level > 0.15) return <BatteryFull {...props} className="text-green-500" />;
   return <BatteryLow {...props} className="text-red-500" />;
 };
 
@@ -90,6 +101,28 @@ function HuntingSessionContent() {
   const [initialZoomDone, setInitialZoomDone] = useState(false);
   const [mapTypeId, setMapTypeId] = useState<string>('terrain');
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Customization state
+  const [nickname, setNickname] = useState('');
+  const [selectedIcon, setSelectedIcon] = useState('Navigation');
+  const [selectedColor, setSelectedColor] = useState('#3b82f6');
+  const [isSavingPrefs, setIsSavingPrefs] = useState(false);
+
+  const userDocRef = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [user, firestore]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
+
+  useEffect(() => {
+    if (userProfile) {
+      setNickname(userProfile.displayName || user?.displayName || user?.email?.split('@')[0] || '');
+      setSelectedIcon(userProfile.mapIcon || 'Navigation');
+      setSelectedColor(userProfile.mapColor || '#3b82f6');
+    } else if (user) {
+      setNickname(user.displayName || user.email?.split('@')[0] || '');
+    }
+  }, [userProfile, user]);
   
   const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   
@@ -258,7 +291,9 @@ function HuntingSessionContent() {
 
     const participantDocRef = doc(firestore, 'hunting_sessions', sessionId, 'participants', user.uid);
     const participantData: Omit<SessionParticipant, 'id' | 'location' | 'battery'> = {
-        displayName: user.displayName || user.email || 'Chasseur',
+        displayName: nickname,
+        mapIcon: selectedIcon,
+        mapColor: selectedColor,
         updatedAt: serverTimestamp(),
     };
     
@@ -278,7 +313,7 @@ function HuntingSessionContent() {
     
     // Explicitly trigger the first position update as a user gesture.
     await handleUpdatePosition(sessionId, true);
-}, [user, firestore, handleUpdatePosition]);
+}, [user, firestore, handleUpdatePosition, nickname, selectedIcon, selectedColor]);
 
   const handleCreateSession = async () => {
     if (!user || !firestore) return;
@@ -304,7 +339,9 @@ function HuntingSessionContent() {
         
         const participantDocRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
         const participantData: Omit<SessionParticipant, 'id' | 'location' | 'battery'> = {
-            displayName: user.displayName || user.email || 'Chasseur',
+            displayName: nickname,
+            mapIcon: selectedIcon,
+            mapColor: selectedColor,
             updatedAt: serverTimestamp(),
         };
         batch.set(participantDocRef, participantData);
@@ -374,6 +411,42 @@ function HuntingSessionContent() {
         }
     } finally {
         setIsSessionLoading(false);
+    }
+  };
+
+  const handleSavePreferences = async () => {
+    if (!user || !firestore || !nickname) {
+        toast({ variant: 'destructive', title: 'Surnom requis', description: 'Veuillez entrer un surnom.' });
+        return;
+    }
+    setIsSavingPrefs(true);
+    const userDocRef = doc(firestore, 'users', user.uid);
+    const newPreferences = {
+        displayName: nickname,
+        mapIcon: selectedIcon,
+        mapColor: selectedColor,
+    };
+    try {
+        await updateDoc(userDocRef, newPreferences);
+
+        if (session && isParticipating) {
+            const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
+            await updateDoc(participantDocRef, newPreferences);
+        }
+
+        toast({ title: 'Préférences sauvegardées !' });
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de sauvegarder les préférences.' });
+        if (e.code === 'permission-denied') {
+            const permissionError = new FirestorePermissionError({
+                path: userDocRef.path,
+                operation: 'update',
+                requestResourceData: newPreferences
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        }
+    } finally {
+        setIsSavingPrefs(false);
     }
   };
 
@@ -450,7 +523,7 @@ function HuntingSessionContent() {
         );
     }
 
-    if (!isLoaded) {
+    if (!isLoaded || isProfileLoading) {
         return (
              <Card>
                 <CardHeader>
@@ -505,20 +578,27 @@ function HuntingSessionContent() {
                         {participants?.map(p => {
                             if (!p.location) return null;
                             const isCurrentUser = p.id === user.uid;
+                            const IconComponent = iconMap[p.mapIcon as keyof typeof iconMap] || Navigation;
+                            const iconColor = p.mapColor || '#3b82f6';
                             return (
                                 <OverlayView
                                     key={p.id}
                                     position={{ lat: p.location.latitude, lng: p.location.longitude }}
                                     mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                                 >
-                                    <div className={cn(
-                                        "p-1.5 rounded-full flex flex-col items-center transform -translate-x-1/2 -translate-y-1/2",
-                                        isCurrentUser ? "bg-primary/80" : "bg-card/80 border"
-                                    )}>
-                                        <Navigation className={cn(
-                                            "size-5 drop-shadow-md",
-                                            isCurrentUser ? "text-primary-foreground" : "text-card-foreground"
-                                        )} />
+                                    <div className="flex flex-col items-center transform -translate-x-1/2 -translate-y-full">
+                                        <div className="px-2 py-0.5 rounded-md text-xs font-bold text-white bg-black/60 mb-1 whitespace-nowrap">
+                                            {p.displayName}
+                                        </div>
+                                        <div className={cn(
+                                            "p-1.5 rounded-full flex flex-col items-center shadow-lg",
+                                            isCurrentUser ? "bg-primary" : "bg-card border"
+                                        )}>
+                                            <IconComponent
+                                                className={cn("size-5 drop-shadow-md")}
+                                                style={{ color: isCurrentUser ? 'white' : iconColor }}
+                                            />
+                                        </div>
                                     </div>
                                 </OverlayView>
                             )
@@ -535,6 +615,40 @@ function HuntingSessionContent() {
                     </div>
                 </div>
                 <div className={cn("space-y-4", isFullscreen ? "flex-shrink-0 overflow-y-auto" : "")}>
+                    <div className="space-y-4 rounded-lg border p-4">
+                        <h4 className="font-semibold text-sm">Personnalisation</h4>
+                        <div className="space-y-1">
+                            <Label htmlFor="nickname">Surnom</Label>
+                            <Input id="nickname" value={nickname} onChange={e => setNickname(e.target.value)} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Icône</Label>
+                                <div className="flex flex-wrap gap-2">
+                                    {availableIcons.map(iconName => {
+                                        const Icon = iconMap[iconName as keyof typeof iconMap];
+                                        return (
+                                            <Button key={iconName} variant="outline" size="icon" onClick={() => setSelectedIcon(iconName)} className={cn(selectedIcon === iconName && "ring-2 ring-primary")}>
+                                                <Icon className="size-5" />
+                                            </Button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Couleur</Label>
+                                <div className="flex flex-wrap gap-2">
+                                    {availableColors.map(color => (
+                                        <button key={color} onClick={() => setSelectedColor(color)} className={cn("w-8 h-8 rounded-full border-2", selectedColor === color ? "border-primary ring-2 ring-primary" : "border-transparent")} style={{ backgroundColor: color }} />
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                         <Button onClick={handleSavePreferences} size="sm" disabled={isSavingPrefs} className="w-full">
+                            <Save className="mr-2" /> 
+                            {isSavingPrefs ? 'Sauvegarde...' : 'Sauvegarder mes préférences'}
+                        </Button>
+                    </div>
                     <Alert>
                         <Download className="h-4 w-4" />
                         <AlertTitle>Mode Hors Ligne</AlertTitle>
