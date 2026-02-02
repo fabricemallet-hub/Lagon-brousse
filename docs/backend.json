@@ -118,6 +118,32 @@
         "redeemedAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the token was redeemed." }
       },
       "required": ["durationMonths", "createdAt", "status"]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "type": "object",
+      "description": "Represents a single conversation thread between a user and the admin.",
+      "properties": {
+        "userId": { "type": "string", "description": "The UID of the user who initiated the conversation." },
+        "userEmail": { "type": "string", "description": "The email of the user." },
+        "userDisplayName": { "type": "string", "description": "The display name of the user." },
+        "lastMessageContent": { "type": "string", "description": "A snippet of the latest message for preview." },
+        "lastMessageAt": { "type": "string", "format": "date-time", "description": "Timestamp of the last message sent." },
+        "isReadByAdmin": { "type": "boolean", "description": "True if the admin has read the latest message from the user." },
+        "isReadByUser": { "type": "boolean", "description": "True if the user has read the latest message from the admin." }
+      },
+      "required": ["userId", "userEmail", "userDisplayName", "lastMessageAt", "isReadByAdmin", "isReadByUser"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "type": "object",
+      "description": "Represents a single message within a conversation.",
+      "properties": {
+        "senderId": { "type": "string", "description": "The UID of the sender ('admin' if from the administrator)." },
+        "content": { "type": "string", "description": "The text content of the message." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp when the message was sent." }
+      },
+      "required": ["senderId", "content", "createdAt"]
     }
   },
   "auth": {
@@ -192,6 +218,27 @@
           "schema": { "$ref": "#/backend/entities/AccessToken" },
           "description": "Stores access tokens that can be redeemed for subscriptions.",
           "params": [{ "name": "tokenId", "description": "The unique ID of the access token." }]
+        }
+      },
+      {
+        "path": "/conversations/{userId}",
+        "definition": {
+          "entityName": "Conversation",
+          "schema": { "$ref": "#/backend/entities/Conversation" },
+          "description": "Stores conversation threads between users and the admin. The document ID is the user's UID.",
+          "params": [{ "name": "userId", "description": "The user's unique ID." }]
+        }
+      },
+      {
+        "path": "/conversations/{userId}/messages/{messageId}",
+        "definition": {
+          "entityName": "ChatMessage",
+          "schema": { "$ref": "#/backend/entities/ChatMessage" },
+          "description": "Stores individual messages within a user's conversation thread.",
+          "params": [
+            { "name": "userId", "description": "The ID of the parent conversation (user's ID)." },
+            { "name": "messageId", "description": "The unique ID for the message." }
+          ]
         }
       }
     ],

@@ -3,15 +3,16 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, serverTimestamp, deleteDoc, doc, Timestamp, orderBy, query, setDoc, writeBatch, getDocs } from 'firebase/firestore';
-import type { UserAccount, AccessToken } from '@/lib/types';
+import type { UserAccount, AccessToken, Conversation } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { DollarSign, Users, Crown, KeyRound, Copy, Trash2, AlertCircle } from 'lucide-react';
+import { DollarSign, Users, Crown, KeyRound, Copy, Trash2, AlertCircle, Mail } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 import {
   Table,
   TableBody,
@@ -70,6 +71,13 @@ export default function AdminPage() {
     return query(collection(firestore, 'access_tokens'), orderBy('createdAt', 'desc'));
   }, [firestore, isAdmin]);
   const { data: accessTokens, isLoading: areTokensLoading } = useCollection<AccessToken>(tokensCollectionRef);
+
+  // Fetch conversations - only if admin
+  const conversationsCollectionRef = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    return query(collection(firestore, 'conversations'), orderBy('lastMessageAt', 'desc'));
+  }, [firestore, isAdmin]);
+  const { data: conversations, isLoading: areConversationsLoading } = useCollection<Conversation>(conversationsCollectionRef);
 
   // Fetch stats for all users
   const [stats, setStats] = useState<{
@@ -219,6 +227,47 @@ export default function AdminPage() {
             <CardContent><div className="text-2xl font-bold">{stats ? `${stats.monthlyRevenue.toLocaleString('fr-FR')} FCFP` : <Skeleton className="h-8 w-24" />}</div></CardContent>
         </Card>
       </div>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mail /> Messagerie
+          </CardTitle>
+          <CardDescription>Consultez les messages des utilisateurs et répondez-y.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {areConversationsLoading ? <Skeleton className="h-32 w-full" /> : (
+            <div className="border rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Utilisateur</TableHead>
+                    <TableHead>Dernier Message</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {conversations && conversations.length > 0 ? conversations.map(convo => (
+                    <TableRow key={convo.id} className={cn(!convo.isReadByAdmin && "bg-blue-50 dark:bg-blue-900/20 font-bold")}>
+                      <TableCell>{convo.userDisplayName}<br/><span className="text-xs font-normal text-muted-foreground">{convo.userEmail}</span></TableCell>
+                      <TableCell className="max-w-xs truncate font-normal">{convo.lastMessageContent}</TableCell>
+                      <TableCell className="text-xs font-normal">{convo.lastMessageAt ? format(convo.lastMessageAt.toDate(), 'P p', { locale: fr }) : '-'}</TableCell>
+                      <TableCell className="text-right">
+                        <Button asChild variant="outline" size="sm">
+                           <Link href={`/admin/messages/${convo.userId}`}>Répondre</Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )) : (
+                    <TableRow><TableCell colSpan={4} className="text-center">Aucun message.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

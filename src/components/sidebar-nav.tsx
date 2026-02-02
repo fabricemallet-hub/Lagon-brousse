@@ -34,6 +34,12 @@ export function SidebarNav() {
         if (link.adminOnly && !isAdmin) {
           return null;
         }
+        if (link.href === '/contact' && isAdmin) {
+          return null;
+        }
+        if (link.href === '/contact' && !user) {
+          return null;
+        }
         return (
           <SidebarMenuItem key={link.href}>
             <SidebarMenuButton

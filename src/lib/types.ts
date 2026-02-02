@@ -182,3 +182,21 @@ export interface AccessToken {
   redeemedBy?: string;
   redeemedAt?: any; // Firestore ServerTimestamp
 }
+
+export interface Conversation {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userDisplayName: string;
+  lastMessageContent: string;
+  lastMessageAt: any; // Firestore ServerTimestamp
+  isReadByAdmin: boolean;
+  isReadByUser: boolean;
+}
+
+export interface ChatMessage {
+  id: string;
+  senderId: string; // user.uid or 'admin'
+  content: string;
+  createdAt: any; // Firestore ServerTimestamp
+}

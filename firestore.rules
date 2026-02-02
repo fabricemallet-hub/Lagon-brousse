@@ -96,5 +96,22 @@ service cloud.firestore {
       }
       allow update: if isRedeemingOwnToken();
     }
+    
+    // ----------------------------------------------------------------------
+    // Collection: conversations
+    // Purpose: Manages support conversations between users and admin.
+    // ----------------------------------------------------------------------
+    match /conversations/{userId} {
+      // User can read/write their own conversation document.
+      // Admin can read/write any conversation document.
+      allow read, write: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin(); // Only admin can list all conversation threads.
+
+      match /messages/{messageId} {
+        // User can read/write messages in their own thread.
+        // Admin can read/write messages in any thread.
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+    }
   }
 }
