@@ -89,6 +89,7 @@ function HuntingSessionContent() {
   const updateIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isParticipating, setIsParticipating] = useState(false);
   const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [zoom, setZoom] = useState(8);
   
   const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   
@@ -350,6 +351,15 @@ function HuntingSessionContent() {
     setMap(null);
   }, []);
 
+  const handleMapIdle = useCallback(() => {
+    if (map) {
+      const newZoom = map.getZoom();
+      if (newZoom) {
+        setZoom(newZoom);
+      }
+    }
+  }, [map]);
+
   const handleRecenter = () => {
     if (map && userLocation) {
         map.panTo({ lat: userLocation.latitude, lng: userLocation.longitude });
@@ -381,8 +391,7 @@ function HuntingSessionContent() {
                         <AlertCircle className="h-4 w-4" />
                         <AlertTitle>Erreur de chargement de la carte</AlertTitle>
                         <AlertDescription>
-                          Impossible de charger Google Maps. Veuillez vérifier la clé API et votre connexion internet.
-                          L'erreur est probablement due à une mauvaise configuration de la clé API sur la console Google Cloud.
+                           La clé API Google Maps n'est pas valide ou mal configurée. Veuillez vérifier les instructions dans la console Google Cloud.
                         </AlertDescription>
                     </Alert>
                 </CardContent>
@@ -430,6 +439,7 @@ function HuntingSessionContent() {
                         zoom={8}
                         onLoad={onLoad}
                         onUnmount={onUnmount}
+                        onIdle={handleMapIdle}
                         options={{ 
                             disableDefaultUI: true, 
                             zoomControl: true, 
@@ -461,6 +471,9 @@ function HuntingSessionContent() {
                     <Button size="icon" onClick={handleRecenter} className="absolute top-2 right-2 shadow-lg h-9 w-9">
                         <LocateFixed className="h-5 w-5" />
                     </Button>
+                    <div className="absolute bottom-14 right-2 bg-card/80 p-1 px-2 rounded-md text-xs font-semibold shadow-lg border">
+                      {Math.round((zoom / 22) * 100)}%
+                    </div>
                 </div>
                  <Collapsible>
                     <CollapsibleTrigger asChild>
