@@ -90,27 +90,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isAuthPage = pathname === '/login' || pathname === '/signup';
 
   useEffect(() => {
-    // State determination:
-    // loading: if auth state is unknown OR if a user is logged in but their profile hasn't loaded yet.
-    // limited: if no user is logged in (guest) OR if a user is logged in and their profile explicitly says they have limited access (inactive/expired).
-    // admin/active/trial: if a user is logged in and their profile confirms this status.
-    
     if (isUserLoading) {
-      // Still waiting for Firebase Auth to tell us if anyone is logged in.
       setStatus('loading');
       return;
     }
-
     if (!user) {
-      // Auth is resolved, and there's no user. They are a guest.
       setStatus('limited');
       return;
     }
-
-    // At this point, we have a logged-in user. Now we need their profile from Firestore.
+    // If we have a user, but are waiting for their profile, stay in loading state.
     if (isProfileLoading || !userProfile) {
-      // The profile is still being fetched, or the hook hasn't returned it yet.
-      // We MUST wait. Setting status to 'limited' here would be a mistake.
       setStatus('loading');
       return;
     }
@@ -131,7 +120,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         break;
       case 'inactive':
       default:
-        // Explicitly limited.
         setStatus('limited');
         break;
     }
