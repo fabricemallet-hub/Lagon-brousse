@@ -236,7 +236,7 @@ function DayCell({
     <div
       onClick={() => onDateSelect(day)}
       className={cn(
-        'h-40 border-t border-l p-1 flex flex-col cursor-pointer hover:bg-accent/50 relative group min-w-24',
+        'h-44 border-t border-l p-1 flex flex-col cursor-pointer hover:bg-accent/50 relative group min-w-24',
         !isCurrentMonth && 'bg-muted/30 text-muted-foreground',
         isSelected && 'ring-2 ring-primary z-10',
         (getDay(day) + 6) % 7 === 0 && 'border-l-0'
