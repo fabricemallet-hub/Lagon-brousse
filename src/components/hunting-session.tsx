@@ -53,6 +53,7 @@ import {
   setDoc,
   deleteDoc,
   Timestamp,
+  updateDoc,
 } from 'firebase/firestore';
 import type { WithId } from '@/firebase';
 import type { HuntingSession, SessionParticipant } from '@/lib/types';
@@ -103,13 +104,14 @@ export function HuntingSessionCard() {
   const handleLeaveSession = useCallback(async () => {
      if (!user || !session || !firestore) return;
      setIsLoading(true);
+      if (updateIntervalRef.current) {
+        clearInterval(updateIntervalRef.current);
+        updateIntervalRef.current = null;
+      }
      try {
        const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
        await deleteDoc(participantDocRef);
-       setSession(null);
-       setIsParticipating(false);
-       setUserLocation(null);
-       toast({ title: 'Vous avez quitté la session.' });
+       
      } catch (e: any) {
         if (e.name === 'FirebaseError' || e.code === 'permission-denied') {
             const permissionError = new FirestorePermissionError({
@@ -118,20 +120,36 @@ export function HuntingSessionCard() {
             });
             errorEmitter.emit('permission-error', permissionError);
         } else {
+            // We show the error, but still proceed with client-side cleanup
             setError(e.message);
         }
      } finally {
+        setSession(null);
+        setIsParticipating(false);
+        setUserLocation(null);
         setIsLoading(false);
+        toast({ title: 'Vous avez quitté la session.' });
      }
   }, [user, session, firestore, toast]);
 
-  const handleUpdatePosition = useCallback(async () => {
-    if (!user || !session || !firestore) return;
+  // Main logic effect for joining and updating position
+  useEffect(() => {
+    // Stop everything if we don't have a session object.
+    if (!session || !user || !firestore) {
+      return;
+    }
 
-    let participantData: Omit<SessionParticipant, 'id'> | null = null;
-    const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
+    let isCancelled = false;
 
-    try {
+    // Define the core update logic for periodic updates
+    const performPeriodicUpdate = async () => {
+      // If the effect has been cancelled (component unmounted/re-run), stop.
+      if (isCancelled || !session) return;
+      
+      const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
+      let participantData: Partial<SessionParticipant>;
+
+      try {
         const position = await new Promise<GeolocationPosition>((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject, {
                 enableHighAccuracy: true,
@@ -139,61 +157,97 @@ export function HuntingSessionCard() {
                 maximumAge: 0,
             });
         });
-
+        if (isCancelled) return;
         const { latitude, longitude } = position.coords;
         setUserLocation({ latitude, longitude });
         
         let batteryData: SessionParticipant['battery'] | undefined = undefined;
         if ('getBattery' in navigator) {
             const battery = await (navigator as any).getBattery();
-            batteryData = {
-                level: battery.level,
-                charging: battery.charging,
-            };
+            if(isCancelled) return;
+            batteryData = { level: battery.level, charging: battery.charging };
         }
 
         participantData = {
-            displayName: user.displayName || 'Chasseur Anonyme',
             location: { latitude, longitude },
             battery: batteryData,
             updatedAt: serverTimestamp(),
         };
-        
-        setDoc(participantDocRef, participantData, { merge: true }).then(() => {
-          if (!isParticipating) {
-              setIsParticipating(true);
-          }
+
+        // This is a subsequent update, fire-and-forget is fine.
+        updateDoc(participantDocRef, participantData).catch(serverError => {
+            const permissionError = new FirestorePermissionError({
+                path: participantDocRef.path,
+                operation: 'update',
+                requestResourceData: participantData,
+            });
+            errorEmitter.emit('permission-error', permissionError);
         });
 
-    } catch (err: any) {
-        console.error("Error updating position:", err);
-        if (err.name === 'FirebaseError' && err.code === 'permission-denied') {
-             const permissionError = new FirestorePermissionError({
-                path: participantDocRef.path,
-                operation: 'write',
-                requestResourceData: participantData,
-             });
-             errorEmitter.emit('permission-error', permissionError);
-        } else if (err.code === 1) { // PERMISSION_DENIED for geolocation
-          setError("La géolocalisation est requise. Veuillez l'activer dans les paramètres de votre navigateur.");
-          handleLeaveSession();
-        }
-    }
-  }, [user, session, firestore, isParticipating, handleLeaveSession]);
-  
-  useEffect(() => {
-    if (session) {
-      handleUpdatePosition(); // Initial update
-      updateIntervalRef.current = setInterval(handleUpdatePosition, 30000); // Subsequent updates
-    }
+      } catch (err: any) {
+        console.error("Error during periodic position update:", err);
+      }
+    };
+    
+    // Logic to handle the initial join
+    const joinAndSubscribe = async () => {
+        const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
 
+        try {
+            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+            });
+            if (isCancelled) return;
+            const { latitude, longitude } = position.coords;
+            setUserLocation({ latitude, longitude });
+
+            let batteryData: SessionParticipant['battery'] | undefined = undefined;
+            if ('getBattery' in navigator) {
+                const battery = await (navigator as any).getBattery();
+                if(isCancelled) return;
+                batteryData = { level: battery.level, charging: battery.charging };
+            }
+
+            const initialParticipantData = {
+                displayName: user.displayName || 'Chasseur Anonyme',
+                location: { latitude, longitude },
+                battery: batteryData,
+                updatedAt: serverTimestamp(),
+            };
+
+            // AWAIT the initial write to ensure the document exists before we try to listen.
+            await setDoc(participantDocRef, initialParticipantData, { merge: true });
+            
+            // Only if the write succeeds, we set participating to true.
+            if (!isCancelled) {
+              setIsParticipating(true);
+              // And set up the interval for subsequent updates.
+              updateIntervalRef.current = setInterval(performPeriodicUpdate, 30000);
+            }
+
+        } catch (err: any) {
+            if (isCancelled) return;
+            console.error("Error joining session:", err);
+            if (err.code === 1) { // Geolocation permission denied
+              setError("La géolocalisation est requise. Veuillez l'activer pour rejoindre une session.");
+            } else {
+              setError("Une erreur est survenue en rejoignant la session.");
+            }
+            handleLeaveSession();
+        }
+    };
+
+    joinAndSubscribe();
+
+    // Cleanup function
     return () => {
+      isCancelled = true;
       if (updateIntervalRef.current) {
         clearInterval(updateIntervalRef.current);
         updateIntervalRef.current = null;
       }
     };
-  }, [session, handleUpdatePosition]);
+  }, [session, user, firestore, handleLeaveSession]);
 
 
   const generateUniqueCode = async (): Promise<string> => {
@@ -234,22 +288,18 @@ export function HuntingSessionCard() {
         };
         const sessionDocRef = doc(firestore, 'hunting_sessions', code);
         
-        setDoc(sessionDocRef, docData).then(() => {
-             setSession({ id: code, ...docData });
-             toast({
-                title: 'Session créée !',
-                description: `Le code de votre session est : ${code}`,
-            });
-            setIsLoading(false);
-        }).catch((serverError) => {
-            const permissionError = new FirestorePermissionError({
-                path: sessionDocRef.path,
-                operation: 'create',
-                requestResourceData: docData,
-            });
-            errorEmitter.emit('permission-error', permissionError);
-            setIsLoading(false);
+        // We create the session doc but don't set local state yet.
+        await setDoc(sessionDocRef, docData);
+
+        // The useEffect will handle the rest once setSession is called.
+        setSession({ id: code, ...docData });
+        
+        toast({
+            title: 'Session créée !',
+            description: `Le code de votre session est : ${code}`,
         });
+        setIsLoading(false);
+
     }
 
     create().catch(e => {
@@ -279,7 +329,8 @@ export function HuntingSessionCard() {
       if (sessionData.expiresAt && (sessionData.expiresAt as Timestamp).toDate() < new Date()) {
          throw new Error('Cette session a expiré.');
       }
-
+      
+      // The useEffect will handle joining logic once this is set.
       setSession({ id: sessionDoc.id, ...sessionData });
 
     } catch (e: any) {
@@ -312,7 +363,7 @@ export function HuntingSessionCard() {
     if (userLocation) {
         const center = new window.google.maps.LatLng(userLocation.latitude, userLocation.longitude);
         mapInstance.setCenter(center);
-        mapInstance.setZoom(15); // Zoom level for ~10km radius
+        mapInstance.setZoom(15);
     } else {
         const ncBounds = new window.google.maps.LatLngBounds(
             new window.google.maps.LatLng(-22.8, 163.5),
@@ -372,7 +423,7 @@ export function HuntingSessionCard() {
       return (
         <Alert variant="destructive">
           <AlertTitle>Erreur de chargement</AlertTitle>
-          <AlertDescription>La carte n'a pas pu être chargée. Vérifiez la clé API Google Maps.</AlertDescription>
+          <AlertDescription>La carte n'a pas pu être chargée. Vérifiez votre clé API Google Maps et sa configuration.</AlertDescription>
         </Alert>
       );
     }
@@ -415,7 +466,7 @@ export function HuntingSessionCard() {
                     zoomControl: true,
                   }}
                 >
-                  {participants?.map(p => {
+                  {isParticipating && participants?.map(p => {
                     if (!p.location?.latitude || !p.location?.longitude) return null;
                     
                     return (
@@ -447,19 +498,18 @@ export function HuntingSessionCard() {
             </div>
             )}
             
-
             <Collapsible>
                 <CollapsibleTrigger asChild>
                     <Button variant="outline" className="w-full">
                         <Users className="mr-2"/>
-                        {participants?.length ?? 0} Participant(s)
+                        {isParticipating ? (participants?.length ?? 1) : 0} Participant(s)
                         <ChevronUp className="ml-auto h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
                     </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                     <div className="mt-2 space-y-2 max-h-40 overflow-y-auto p-1">
                         {areParticipantsLoading && <Skeleton className="h-10 w-full" />}
-                        {participants?.map(p => (
+                        {isParticipating && participants?.map(p => (
                             <div key={p.id} className="flex items-center justify-between p-2 rounded-lg border">
                                 <span className="font-semibold">{p.displayName}</span>
                                 {p.battery && (
