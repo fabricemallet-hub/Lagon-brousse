@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { GoogleMap, useJsApiLoader, MarkerF, OverlayView } from '@react-google-maps/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,7 @@ import { collection, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc } f
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { LocationData, FishingSpot, WindDirection } from '@/lib/types';
-import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor } from 'lucide-react';
+import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from './alert';
 
@@ -41,6 +41,13 @@ const createMarkerIconSvg = (color: string, iconName: keyof typeof mapIcons) => 
     return `data:image/svg+xml;base64,${btoa(svg)}`;
 };
 
+const PulsingDot = () => (
+    <div className="absolute" style={{ transform: 'translate(-50%, -50%)' }}>
+      <div className="w-5 h-5 rounded-full bg-blue-500 opacity-75 animate-ping absolute"></div>
+      <div className="w-5 h-5 rounded-full bg-blue-500 border-2 border-white relative"></div>
+    </div>
+);
+
 export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     const { user } = useUser();
     const firestore = useFirestore();
@@ -52,6 +59,11 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     const [selectedIcon, setSelectedIcon] = useState<keyof typeof mapIcons>('Fish');
     const [selectedColor, setSelectedColor] = useState('#3b82f6');
     const [isSaving, setIsSaving] = useState(false);
+    
+    const [map, setMap] = useState<google.maps.Map | null>(null);
+    const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+    const [initialZoomDone, setInitialZoomDone] = useState(false);
+    const watchId = useRef<number | null>(null);
 
     const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     const { isLoaded, loadError } = useJsApiLoader({ googleMapsApiKey: googleMapsApiKey || "" });
@@ -62,6 +74,75 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     }, [user, firestore]);
     const { data: savedSpots, isLoading: areSpotsLoading } = useCollection<FishingSpot>(fishingSpotsRef);
 
+    const onLoad = useCallback(function callback(mapInstance: google.maps.Map) {
+        setMap(mapInstance);
+    }, []);
+
+    const onUnmount = useCallback(function callback(map: google.maps.Map) {
+        setMap(null);
+        setInitialZoomDone(false);
+        if (watchId.current !== null) {
+            navigator.geolocation.clearWatch(watchId.current);
+            watchId.current = null;
+        }
+    }, []);
+
+    const startWatchingPosition = useCallback((centerMap: boolean) => {
+        if (!navigator.geolocation) {
+            toast({
+                variant: 'destructive',
+                title: 'Géolocalisation non supportée',
+            });
+            return;
+        }
+
+        if (watchId.current !== null) {
+            navigator.geolocation.clearWatch(watchId.current);
+        }
+
+        watchId.current = navigator.geolocation.watchPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                const newLocation = { lat: latitude, lng: longitude };
+                setUserLocation(newLocation);
+
+                if (map && centerMap && !initialZoomDone) {
+                    map.panTo(newLocation);
+                    map.setZoom(16);
+                    setInitialZoomDone(true);
+                }
+            },
+            () => {
+                 toast({
+                    variant: 'destructive',
+                    title: 'Position non disponible',
+                    description: "Veuillez autoriser l'accès à votre position.",
+                });
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    }, [map, initialZoomDone, toast]);
+
+    useEffect(() => {
+        if (isLoaded && map) {
+            startWatchingPosition(true);
+        }
+        return () => {
+            if (watchId.current !== null) {
+                navigator.geolocation.clearWatch(watchId.current);
+            }
+        };
+    }, [isLoaded, map, startWatchingPosition]);
+
+    const handleRecenter = () => {
+        if (userLocation) {
+            map?.panTo(userLocation);
+            map?.setZoom(16);
+        } else {
+            startWatchingPosition(true);
+        }
+    };
+    
     const handleMapClick = (e: google.maps.MapMouseEvent) => {
         if (e.latLng) {
             setNewSpotLocation({ lat: e.latLng.lat(), lng: e.latLng.lng() });
@@ -175,11 +256,21 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                     <div className="relative h-80 w-full rounded-lg overflow-hidden border">
                         <GoogleMap
                             mapContainerClassName="w-full h-full"
-                            center={{ lat: -21.5, lng: 165.5 }}
-                            zoom={7}
+                            center={userLocation || { lat: -21.5, lng: 165.5 }}
+                            zoom={userLocation && initialZoomDone ? (map?.getZoom() ?? 16) : 7}
                             options={{ disableDefaultUI: true, zoomControl: true, mapTypeControl: true, clickableIcons: false }}
                             onClick={handleMapClick}
+                            onLoad={onLoad}
+                            onUnmount={onUnmount}
                         >
+                           {userLocation && (
+                                <OverlayView
+                                    position={userLocation}
+                                    mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                                >
+                                    <PulsingDot />
+                                </OverlayView>
+                            )}
                             {savedSpots?.map(spot => (
                                 <MarkerF 
                                     key={spot.id} 
@@ -195,6 +286,9 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                 <MarkerF position={newSpotLocation} />
                             )}
                         </GoogleMap>
+                         <Button size="icon" onClick={handleRecenter} className="absolute top-2 right-2 shadow-lg h-9 w-9 z-10">
+                            <LocateFixed className="h-5 w-5" />
+                        </Button>
                         {newSpotLocation && (
                             <Dialog open={isAddSpotOpen} onOpenChange={(open) => { if(!open) setNewSpotLocation(null); setIsAddSpotOpen(open); }}>
                                 <DialogTrigger asChild>
@@ -292,5 +386,3 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         </Card>
     );
 }
-
-    
