@@ -113,32 +113,32 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     }, []);
 
     const startWatchingPosition = useCallback(() => {
-    if (!navigator.geolocation) {
-        return;
-    }
-    // Only start watching if permission is already granted.
-    navigator.permissions.query({ name: 'geolocation' }).then(permissionStatus => {
-        if (permissionStatus.state === 'granted') {
-             if (watchId.current !== null) {
-                navigator.geolocation.clearWatch(watchId.current);
-            }
-            watchId.current = navigator.geolocation.watchPosition(
-                (position) => {
-                    const { latitude, longitude } = position.coords;
-                    const newLocation = { lat: latitude, lng: longitude };
-                    setUserLocation(newLocation);
-                    if (map && !initialZoomDone) {
-                        map.panTo(newLocation);
-                        map.setZoom(16);
-                        setInitialZoomDone(true);
-                    }
-                },
-                () => { /* Error can be handled silently or with a toast */ },
-                { enableHighAccuracy: true }
-            );
+        if (!navigator.geolocation) {
+            return;
         }
-    });
-}, [map, initialZoomDone]);
+        // Only start watching if permission is already granted.
+        navigator.permissions.query({ name: 'geolocation' }).then(permissionStatus => {
+            if (permissionStatus.state === 'granted') {
+                 if (watchId.current !== null) {
+                    navigator.geolocation.clearWatch(watchId.current);
+                }
+                watchId.current = navigator.geolocation.watchPosition(
+                    (position) => {
+                        const { latitude, longitude } = position.coords;
+                        const newLocation = { lat: latitude, lng: longitude };
+                        setUserLocation(newLocation);
+                        if (map && !initialZoomDone) {
+                            map.panTo(newLocation);
+                            map.setZoom(16);
+                            setInitialZoomDone(true);
+                        }
+                    },
+                    () => { /* Error can be handled silently or with a toast */ },
+                    { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+                );
+            }
+        });
+    }, [map, initialZoomDone]);
 
      useEffect(() => {
         if (map && isLoaded) {
@@ -169,7 +169,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                 if (typeof latitude !== 'number' || typeof longitude !== 'number') return;
                 const newLocation = { lat: latitude, lng: longitude };
                 
-                setUserLocation(newLocation);
+                setUserLocation({lat: latitude, lng: longitude});
 
                 if (map) {
                     map.panTo(newLocation);
@@ -180,13 +180,21 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                 }
             },
             (err) => {
+                 let description = "Impossible d'obtenir votre position actuelle.";
+                 if (err.code === 1) {
+                   description = "Veuillez activer la géolocalisation dans les paramètres de votre navigateur.";
+                 } else if (err.code === 3) {
+                   description = "La demande de localisation a expiré. Veuillez réessayer dans une zone avec un meilleur signal GPS.";
+                 } else if (err.code === 2) {
+                   description = "Position indisponible. Vérifiez les paramètres de votre appareil et le signal GPS.";
+                 }
                  toast({
-                    variant: "destructive",
-                    title: "Géolocalisation refusée",
-                    description: "Veuillez l'activer dans les paramètres de votre navigateur pour utiliser cette fonctionnalité.",
-                });
+                     variant: "destructive",
+                     title: "Erreur de localisation",
+                     description: description,
+                 });
             },
-            { enableHighAccuracy: true }
+            { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
         );
     };
 
@@ -488,19 +496,23 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                             className="flex flex-col items-center gap-1 cursor-pointer"
                                             onClick={(e) => { e.stopPropagation(); handleSpotClick(spot.id); }}
                                         >
-                                            <div className="flex flex-col items-center gap-0.5 px-2 py-1 bg-card/90 backdrop-blur-sm border border-border rounded-md shadow">
-                                                <span className="text-xs font-bold text-card-foreground whitespace-nowrap">{spot.name}</span>
+                                            <div className="flex flex-col items-center gap-1 px-2 py-1 bg-card/90 backdrop-blur-sm border border-border rounded-md shadow">
+                                                <span className="text-xs font-bold text-black dark:text-white whitespace-nowrap">{spot.name}</span>
                                                 {spot.fishingTypes && spot.fishingTypes.length > 0 && (
-                                                    <div className="flex gap-1">
+                                                    <div className="flex flex-wrap gap-1 mt-1 justify-center max-w-[120px]">
                                                         {spot.fishingTypes.map(type => {
-                                                        const typeInfo = fishingTypes.find(t => t.id === type);
-                                                        return (
-                                                            <div
-                                                            key={type}
-                                                            className={cn("w-2 h-2 rounded-full", typeInfo?.color)}
-                                                            title={typeInfo?.label}
-                                                            />
-                                                        );
+                                                            const typeInfo = fishingTypes.find(t => t.id === type);
+                                                            if (!typeInfo) return null;
+                                                            return (
+                                                                <div
+                                                                    key={type}
+                                                                    className={cn(
+                                                                        "w-3 h-3 rounded-full border-2 border-white/50",
+                                                                        typeInfo.color
+                                                                    )}
+                                                                    title={typeInfo.label}
+                                                                />
+                                                            );
                                                         })}
                                                     </div>
                                                 )}
