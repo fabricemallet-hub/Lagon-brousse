@@ -19,6 +19,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, AuthError } from 'firebase/auth';
 import { ForgotPasswordDialog } from './forgot-password-dialog';
+import { Eye, EyeOff } from 'lucide-react';
 
 type AuthFormProps = {
   mode: 'login' | 'signup';
@@ -39,6 +40,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<z.infer<ReturnType<typeof formSchema>>>({
     resolver: zodResolver(formSchema(mode)),
@@ -89,6 +91,8 @@ export function AuthForm({ mode }: AuthFormProps) {
       if (authError && authError.code) {
         switch (authError.code) {
           case 'auth/invalid-credential':
+          case 'auth/user-not-found':
+          case 'auth/wrong-password':
             errorMessage = "L'email ou le mot de passe est incorrect. Veuillez vérifier vos informations ou cliquer sur 'Mot de passe oublié ?' pour le réinitialiser.";
             break;
           case 'auth/email-already-in-use':
@@ -165,9 +169,26 @@ export function AuthForm({ mode }: AuthFormProps) {
                    </ForgotPasswordDialog>
                 )}
               </div>
-              <FormControl>
-                <Input type="password" placeholder="********" {...field} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
-              </FormControl>
+              <div className="relative">
+                <FormControl>
+                  <Input 
+                    type={showPassword ? "text" : "password"} 
+                    placeholder="********" {...field} 
+                    autoComplete={mode === 'login' ? 'current-password' : 'new-password'} 
+                    className="pr-10"
+                  />
+                </FormControl>
+                <Button 
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute inset-y-0 right-0 h-full w-10 text-muted-foreground hover:bg-transparent"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    <span className="sr-only">{showPassword ? "Cacher le mot de passe" : "Afficher le mot de passe"}</span>
+                </Button>
+              </div>
               <FormMessage />
             </FormItem>
           )}
