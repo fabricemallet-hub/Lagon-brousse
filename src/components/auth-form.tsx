@@ -84,27 +84,29 @@ export function AuthForm({ mode }: AuthFormProps) {
       }
     } catch (error) {
       const authError = error as AuthError;
-      let errorMessage = "Une erreur est survenue lors de l'authentification.";
+      let errorMessage = "Une erreur inattendue est survenue. Veuillez réessayer.";
 
-      switch (authError.code) {
-        case 'auth/invalid-credential':
-          errorMessage = 'Email ou mot de passe incorrect. Essayez de réinitialiser votre mot de passe.';
-          break;
-        case 'auth/email-already-in-use':
-          errorMessage = 'Cette adresse email est déjà utilisée par un autre compte.';
-          break;
-        case 'auth/weak-password':
-          errorMessage = 'Le mot de passe est trop faible. Il doit contenir au moins 6 caractères.';
-          break;
-        case 'auth/too-many-requests':
-          errorMessage = "L'accès à ce compte a été temporairement désactivé en raison de nombreuses tentatives de connexion infructueuses. Veuillez réessayer plus tard.";
-          break;
-        case 'auth/network-request-failed':
-          errorMessage = "Un problème de réseau est survenu. Veuillez vérifier votre connexion Internet et réessayer.";
-          break;
-        default:
-          errorMessage = "Un problème est survenu. Veuillez réessayer plus tard ou contacter le support si le problème persiste.";
-          break;
+      if (authError && authError.code) {
+        switch (authError.code) {
+          case 'auth/invalid-credential':
+            errorMessage = "L'email ou le mot de passe est incorrect. Veuillez vérifier vos informations ou cliquer sur 'Mot de passe oublié ?' pour le réinitialiser.";
+            break;
+          case 'auth/email-already-in-use':
+            errorMessage = 'Cette adresse email est déjà utilisée par un autre compte.';
+            break;
+          case 'auth/weak-password':
+            errorMessage = 'Le mot de passe est trop faible. Il doit contenir au moins 6 caractères.';
+            break;
+          case 'auth/too-many-requests':
+            errorMessage = "L'accès à ce compte a été temporairement désactivé en raison de nombreuses tentatives de connexion infructueuses. Veuillez réessayer plus tard.";
+            break;
+          case 'auth/network-request-failed':
+            errorMessage = "Un problème de réseau est survenu. Veuillez vérifier votre connexion Internet et réessayer.";
+            break;
+          default:
+            errorMessage = `Une erreur est survenue (code: ${authError.code}). Veuillez contacter le support si le problème persiste.`;
+            break;
+        }
       }
       
       toast({
