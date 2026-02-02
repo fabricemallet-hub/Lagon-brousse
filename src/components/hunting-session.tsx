@@ -201,14 +201,19 @@ function HuntingSessionContent() {
   const { data: participants, isLoading: areParticipantsLoading } = useCollection<SessionParticipant>(participantsCollectionRef);
 
   useEffect(() => {
-    let intervalId: NodeJS.Timeout | null = null;
     if (isParticipating && session) {
-        intervalId = setInterval(() => handleUpdatePosition(session.id), 30000); // 30 seconds
+      // The initial position update is now triggered right after joining/creating.
+      // This interval is for subsequent updates.
+      updateIntervalRef.current = setInterval(() => handleUpdatePosition(session.id), 30000); // 30 seconds
+    } else if (updateIntervalRef.current) {
+      clearInterval(updateIntervalRef.current);
+      updateIntervalRef.current = null;
     }
+    
     return () => {
-        if (intervalId) {
-            clearInterval(intervalId);
-        }
+      if (updateIntervalRef.current) {
+        clearInterval(updateIntervalRef.current);
+      }
     };
   }, [isParticipating, session, handleUpdatePosition]);
 
@@ -250,10 +255,12 @@ function HuntingSessionContent() {
         updatedAt: serverTimestamp(),
     };
     
-    await setDoc(participantDocRef, participantData);
+    // Using setDoc with merge to avoid overwriting if doc somehow exists
+    await setDoc(participantDocRef, participantData, { merge: true });
     
-    return getDoc(participantDocRef);
-}, [user, firestore]);
+    // Now explicitly trigger the first position update as a user gesture.
+    await handleUpdatePosition(sessionId, true);
+}, [user, firestore, handleUpdatePosition]);
 
   const handleCreateSession = async () => {
     if (!user || !firestore) return;
@@ -272,11 +279,22 @@ function HuntingSessionContent() {
         };
         
         const sessionDocRef = doc(firestore, 'hunting_sessions', code);
-        await setDoc(sessionDocRef, newSessionData);
-        await createParticipantDocument(code);
         
-        // Directly trigger position update
-        handleUpdatePosition(code, true);
+        // Use a batch to ensure session and participant are created together
+        const batch = writeBatch(firestore);
+        batch.set(sessionDocRef, newSessionData);
+        
+        const participantDocRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
+        const participantData: Omit<SessionParticipant, 'id' | 'location' | 'battery'> = {
+            displayName: user.displayName || user.email || 'Chasseur',
+            updatedAt: serverTimestamp(),
+        };
+        batch.set(participantDocRef, participantData);
+        
+        await batch.commit();
+        
+        // This will now be called after the user clicks "Create"
+        await handleUpdatePosition(code, true);
 
         setSession({ id: code, ...newSessionData });
         setIsParticipating(true);
@@ -317,9 +335,6 @@ function HuntingSessionContent() {
       }
       
       await createParticipantDocument(sessionId);
-      
-      // Directly trigger position update
-      handleUpdatePosition(sessionId, true);
 
       setSession({ id: sessionDoc.id, ...sessionData });
       setIsParticipating(true);
@@ -351,8 +366,6 @@ function HuntingSessionContent() {
   }
 
   const onLoad = useCallback(function callback(mapInstance: google.maps.Map) {
-    // We remove fitBounds to allow for custom initial zoom on user location.
-    // The map will default to the 'center' and 'zoom' props of the <GoogleMap /> component.
     setMap(mapInstance);
   }, []);
 
@@ -399,9 +412,9 @@ function HuntingSessionContent() {
                 <CardContent>
                     <Alert variant="destructive">
                         <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>Erreur de chargement de la carte</AlertTitle>
+                        <AlertTitle>Erreur de clé API Google Maps</AlertTitle>
                         <AlertDescription>
-                           La clé API Google Maps semble invalide ou mal configurée. Veuillez vérifier sa configuration dans la console Google Cloud.
+                           La clé API semble invalide ou mal configurée. Veuillez suivre les instructions dans la console Google Cloud pour la corriger.
                         </AlertDescription>
                     </Alert>
                 </CardContent>
@@ -446,13 +459,14 @@ function HuntingSessionContent() {
                     <GoogleMap
                         mapContainerClassName="w-full h-full"
                         center={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : { lat: -21.45, lng: 165.5 }}
-                        zoom={8}
+                        zoom={initialZoomDone ? zoom : 8}
                         onLoad={onLoad}
                         onUnmount={onUnmount}
                         onIdle={handleMapIdle}
                         options={{ 
                             disableDefaultUI: true, 
                             zoomControl: true, 
+                            mapTypeControl: true,
                             mapTypeId: 'terrain'
                         }}
                     >
