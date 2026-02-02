@@ -127,6 +127,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // Effect to initialize and run the countdown timer.
   useEffect(() => {
+    if (isAuthPage) return; // Do not run timer on auth pages.
+    
     // Do not run timer logic while auth or profile is loading.
     if (isUserLoading || (user && isProfileLoading)) {
       return;
@@ -154,10 +156,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       }, 1000);
       return () => clearInterval(interval);
     }
-  }, [status, auth, user, isUserLoading, isProfileLoading]);
+  }, [status, auth, user, isUserLoading, isProfileLoading, isAuthPage]);
 
   // Effect to handle side-effects when timeLeft changes (logout, persist to localStorage).
   useEffect(() => {
+    if (isAuthPage) return; // Do not run timer on auth pages.
+
      // Do not run timer logic while auth or profile is loading.
     if (isUserLoading || isLoggingOut || (user && isProfileLoading)) {
       return;
@@ -181,13 +185,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         signOut(auth).then(() => {
           localStorage.clear();
           sessionStorage.clear();
-          router.push('/login');
+          if (pathname !== '/login') {
+             router.push('/login');
+          }
         });
       } else {
-        router.push('/login');
+        if (pathname !== '/login') {
+            router.push('/login');
+        }
       }
     }
-  }, [timeLeft, status, auth, toast, router, isLoggingOut, user, isUserLoading, isProfileLoading]);
+  }, [timeLeft, status, auth, toast, router, isLoggingOut, user, isUserLoading, isProfileLoading, isAuthPage, pathname]);
 
   if (isAuthPage) {
     return <>{children}</>;
@@ -344,7 +352,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </SidebarFooter>
         </Sidebar>
         <main className="flex-1">
-          {status === 'limited' && (
+          {status === 'limited' && !isAuthPage && (
             <div className="fixed top-0 left-0 right-0 h-10 bg-destructive/90 text-destructive-foreground flex items-center justify-center text-sm font-bold z-50">
                 <AlertCircle className="size-4 mr-2" />
                 Mode Limité : {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')} restant.
@@ -352,14 +360,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           )}
           <header className={cn(
             "flex h-auto min-h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30 py-2",
-            status === 'limited' && 'mt-10'
+            status === 'limited' && !isAuthPage && 'mt-10'
           )}>
             <SidebarTrigger />
             <div className="w-full flex-1 flex items-center flex-wrap gap-y-2">
               <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
                 
                 {status === 'trial' && <Badge variant="secondary">Version d'essai</Badge>}
-                {status === 'limited' && <Badge variant="destructive">Mode Limité</Badge>}
+                {status === 'limited' && !isAuthPage && <Badge variant="destructive">Mode Limité</Badge>}
                 <Select
                   value={selectedLocation}
                   onValueChange={setSelectedLocation}

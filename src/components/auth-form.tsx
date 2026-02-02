@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -57,6 +58,10 @@ export function AuthForm({ mode }: AuthFormProps) {
       password: '',
     },
   });
+
+  const onValidationErrors = (errors: any) => {
+    console.error('--- [AuthForm] Validation Failed ---', errors);
+  };
 
   async function onSubmit(values: z.infer<ReturnType<typeof formSchema>>) {
     console.log('--- [AuthForm] onSubmit started. ---', values);
@@ -145,7 +150,7 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit, onValidationErrors)} className="flex flex-col space-y-4">
         {mode === 'signup' && (
           <FormField
             control={form.control}
@@ -216,7 +221,6 @@ export function AuthForm({ mode }: AuthFormProps) {
             type="submit" 
             className="w-full" 
             disabled={isLoading}
-            onClick={() => console.log('--- [AuthForm] Login button clicked. ---')}
           >
             {isLoading ? "Chargement..." : (mode === 'login' ? 'Se connecter' : "S'inscrire")}
           </Button>
