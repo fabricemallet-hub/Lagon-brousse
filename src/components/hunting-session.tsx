@@ -42,15 +42,11 @@ import {
   useCollection,
   useMemoFirebase,
   errorEmitter,
-  FirestorePermissionError
+  FirestorePermissionError,
 } from '@/firebase';
 import {
   collection,
-  query,
-  where,
-  getDocs,
   getDoc,
-  addDoc,
   serverTimestamp,
   doc,
   setDoc,
@@ -145,12 +141,13 @@ export function HuntingSessionCard() {
   const [error, setError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number} | null>(null);
   const updateIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [isParticipating, setIsParticipating] = useState(false);
 
   // Subscribe to participants of the active session
   const participantsCollectionRef = useMemoFirebase(() => {
-    if (!firestore || !session) return null;
+    if (!firestore || !session || !isParticipating) return null;
     return collection(firestore, 'hunting_sessions', session.id, 'participants');
-  }, [firestore, session]);
+  }, [firestore, session, isParticipating]);
 
   const { data: participants, isLoading: areParticipantsLoading } = useCollection<SessionParticipant>(participantsCollectionRef);
   
@@ -196,6 +193,10 @@ export function HuntingSessionCard() {
         };
 
         await setDoc(participantDocRef, participantData, { merge: true });
+
+        if (!isParticipating) {
+            setIsParticipating(true);
+        }
 
     } catch (err: any) {
         console.error("Error updating position:", err);
@@ -345,6 +346,7 @@ export function HuntingSessionCard() {
        const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
        await deleteDoc(participantDocRef);
        setSession(null);
+       setIsParticipating(false);
        toast({ title: 'Vous avez quitté la session.' });
      } catch (e: any) {
         if (e.name === 'FirebaseError' || e.code === 'permission-denied') {
