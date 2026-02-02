@@ -419,6 +419,7 @@ export default function AdminPage() {
               <div className="border rounded-lg p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                   <p className="font-semibold">Accès global actif</p>
+                  <p className="text-sm text-muted-foreground">ID du jeton: <span className="font-mono text-xs">{sharedToken.id}</span></p>
                   <p className="text-sm text-muted-foreground">Expire le: <span className="font-bold">{format(sharedToken.expiresAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr })}</span></p>
                   <p className="text-xs text-muted-foreground">Durée: {sharedToken.durationMonths} mois</p>
                 </div>
