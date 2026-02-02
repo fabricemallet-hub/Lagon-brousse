@@ -56,9 +56,20 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAdmin();
       allow get: if isOwner(userId);
-      // Temporarily simplified to unblock account creation.
-      allow create: if isOwner(userId);
+      
+      // A user can create their own document.
+      // They cannot grant themselves admin status unless their email is the admin email.
+      // The 'id' field in the document must match the user's UID.
+      allow create: if isOwner(userId) &&
+                       request.resource.data.id == userId &&
+                       (request.resource.data.subscriptionStatus == 'admin' ? 
+                          request.auth.token.email == 'f.mallet81@outlook.com' : 
+                          request.resource.data.subscriptionStatus == 'trial');
+      
+      // An owner or admin can update the document.
       allow update: if isOwner(userId) || isAdmin();
+      
+      // Only an existing owner can delete their account.
       allow delete: if isExistingOwner(userId);
     }
 
