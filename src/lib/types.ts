@@ -175,6 +175,8 @@ export interface FishingSpot {
     windDirection: WindDirection;
     airTemperature: number;
     waterTemperature: number;
+    previousLowTide?: { time: string; height: number };
+    nextHighTide?: { time: string; height: number };
   };
 }
 
