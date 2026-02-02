@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -31,13 +30,15 @@ type AuthFormProps = {
   mode: 'login' | 'signup';
 };
 
-const formSchema = (mode: AuthFormProps['mode']) => z.object({
-  displayName: z.string().min(3, { message: 'Le nom doit contenir au moins 3 caractères.' }).optional(),
+const loginSchema = z.object({
   email: z.string().email({ message: 'Veuillez entrer une adresse email valide.' }),
   password: z.string().min(6, { message: 'Le mot de passe doit contenir au moins 6 caractères.' }),
-}).refine(data => mode !== 'signup' || (!!data.displayName && data.displayName.length > 0), {
-    message: "Le nom d'utilisateur est requis.",
-    path: ["displayName"],
+});
+
+const signupSchema = z.object({
+  displayName: z.string().min(3, { message: 'Le nom doit contenir au moins 3 caractères.' }),
+  email: z.string().email({ message: 'Veuillez entrer une adresse email valide.' }),
+  password: z.string().min(6, { message: 'Le mot de passe doit contenir au moins 6 caractères.' }),
 });
 
 
@@ -48,11 +49,12 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  console.log(`--- [AuthForm] Rendering. Mode: ${mode}, IsLoading: ${isLoading} ---`);
+  const formSchema = mode === 'signup' ? signupSchema : loginSchema;
 
-  const form = useForm<z.infer<ReturnType<typeof formSchema>>>({
-    resolver: zodResolver(formSchema(mode)),
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
+      // @ts-ignore
       displayName: '',
       email: '',
       password: '',
@@ -60,15 +62,13 @@ export function AuthForm({ mode }: AuthFormProps) {
   });
 
   const onValidationErrors = (errors: any) => {
-    console.error('--- [AuthForm] Validation Failed ---', errors);
+    // This function is for debugging validation errors
   };
 
-  async function onSubmit(values: z.infer<ReturnType<typeof formSchema>>) {
-    console.log('--- [AuthForm] onSubmit started. ---', values);
+  async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
 
     if (!auth) {
-      console.error("--- [AuthForm] Auth service is not available. ---");
       toast({
         variant: "destructive",
         title: "Erreur d'initialisation",
@@ -80,24 +80,19 @@ export function AuthForm({ mode }: AuthFormProps) {
     
     try {
       if (mode === 'login') {
-        console.log('--- [AuthForm] Calling signInWithEmailAndPassword with:', values.email);
         await signInWithEmailAndPassword(auth, values.email, values.password);
-        console.log('--- [AuthForm] signInWithEmailAndPassword SUCCESS. ---');
         toast({
             title: 'Connexion réussie!',
             description: "Vous allez être redirigé vers la page d'accueil.",
         });
         router.push('/');
       } else {
-        console.log('--- [AuthForm] Calling createUserWithEmailAndPassword... ---');
-        const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-        if (values.displayName) {
-            console.log('--- [AuthForm] Calling updateProfile... ---');
-            await updateProfile(userCredential.user, {
-                displayName: values.displayName
-            });
-        }
-        console.log('--- [AuthForm] Sign up SUCCESS. ---');
+        // We can safely assert displayName exists because of the signupSchema
+        const signupValues = values as z.infer<typeof signupSchema>;
+        const userCredential = await createUserWithEmailAndPassword(auth, signupValues.email, signupValues.password);
+        await updateProfile(userCredential.user, {
+            displayName: signupValues.displayName
+        });
         toast({
           title: 'Inscription réussie!',
           description: "Vous allez être redirigé vers la page d'accueil.",
@@ -106,7 +101,6 @@ export function AuthForm({ mode }: AuthFormProps) {
       }
     } catch (error) {
       const authError = error as AuthError;
-      console.error("--- [AuthForm] Authentication failed. ---", authError);
 
       let errorMessage = "Une erreur inattendue est survenue. Veuillez réessayer.";
 
@@ -143,7 +137,6 @@ export function AuthForm({ mode }: AuthFormProps) {
         description: errorMessage,
       });
     } finally {
-      console.log('--- [AuthForm] onSubmit finished. ---');
       setIsLoading(false);
     }
   }
@@ -159,6 +152,7 @@ export function AuthForm({ mode }: AuthFormProps) {
               <FormItem>
                 <FormLabel>Nom d'utilisateur</FormLabel>
                 <FormControl>
+                  {/* @ts-ignore */}
                   <Input placeholder="Votre nom" {...field} autoComplete="name" />
                 </FormControl>
                 <FormMessage />
