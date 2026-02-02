@@ -427,41 +427,41 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   // Fishing rating
   locationData.fishing.forEach((slot) => {
     slot.fish.forEach((f) => {
-      // Start with a base rating of 5/10.
-      let rating = 5;
+      // Start with a base rating of 4/10 for more variation.
+      let rating = 4;
 
-      // 1. Time of day bonus
+      // 1. Time of day bonus/penalty is now more pronounced.
       if (slot.timeOfDay.includes('Aube') || slot.timeOfDay.includes('Crépuscule')) {
-        rating += 2;
+        rating += 2; // Prime time
       } else {
-        rating -= 1; // Slight penalty for mid-day
+        rating -= 2; // Mid-day is generally less active.
       }
 
-      // 2. Tide movement is critical.
+      // 2. Tide movement is critical. Increased penalty for slack tide.
       if (slot.tideMovement !== 'étale') {
-        rating += 3;
+        rating += 3; // Moving water is good.
       } else {
-        rating -= 4; // Strong penalty for slack tide
+        rating -= 5; // Strong penalty for slack tide, as fish are less active.
       }
 
-      // 3. Moon Phase Bonus
+      // 3. Moon Phase Bonus with stronger penalties.
       // dayInCycle: 0=new, 7.4=1st Q, 14.76=full, 22.1=3rd Q
       const isNearNewOrFullMoon = (dayInCycle < 4 || dayInCycle > 25.5) || (dayInCycle > 10.75 && dayInCycle < 18.75);
       const isNearQuarterMoon = (dayInCycle >= 4 && dayInCycle <= 10.75) || (dayInCycle >= 18.75 && dayInCycle <= 25.5);
 
       if (isNearNewOrFullMoon) {
-        rating += 2; // Strong bonus for new/full moon
+        rating += 2; // Strong bonus for new/full moon springs tides.
       } else if (isNearQuarterMoon) {
-        rating -= 1; // Slight penalty for quarter moons
+        rating -= 2; // Stronger penalty for quarter moons (neap tides).
       }
 
-      // 4. Pelagic season bonus
+      // 4. Pelagic season bonus with stronger penalties.
       const isPelagic = ['Mahi-mahi', 'Wahoo', 'Thon Jaune', 'Thazard', 'Bonite', 'Thon dents de chien'].includes(f.name);
       if (isPelagic) {
         if (isPelagicSeason) {
           rating += 2;
         } else {
-          rating -= 4; // Strong penalty out of season
+          rating -= 5; // Very strong penalty out of season.
         }
       }
 
