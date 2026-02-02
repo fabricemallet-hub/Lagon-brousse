@@ -556,7 +556,7 @@ function HuntingSessionContent() {
 
             // Pan the map to the new location
             if (map) {
-                map.panTo(newLocation);
+                map.panTo({ lat: newLocation.latitude, lng: newLocation.longitude });
                 if(map.getZoom()! < 14) { // only zoom in if user is zoomed out
                     map.setZoom(16);
                 }
@@ -670,7 +670,7 @@ function HuntingSessionContent() {
                         {myParticipant && userLocation && (
                           <Fragment>
                             <MarkerF
-                              position={userLocation}
+                              position={{ lat: userLocation.latitude, lng: userLocation.longitude }}
                               draggable={true}
                               onDragEnd={handleDragEnd}
                               icon={{
@@ -681,7 +681,7 @@ function HuntingSessionContent() {
                               zIndex={99}
                             />
                              <OverlayView
-                                position={userLocation}
+                                position={{ lat: userLocation.latitude, lng: userLocation.longitude }}
                                 mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                             >
                                 <div className="transform -translate-x-1/2 -translate-y-[calc(100%+25px)]">
