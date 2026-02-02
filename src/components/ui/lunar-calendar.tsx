@@ -170,7 +170,8 @@ function DayCell({
     (slot) => slot.fish
   );
   
-  const lagonRatings = allFishRatings.filter(f => f.location === 'Lagon');
+  const targetLagonFish = ['Bossu doré', 'Bec de cane', 'Rouget'];
+  const lagonRatings = allFishRatings.filter(f => targetLagonFish.includes(f.name));
   const pelagicRatings = allFishRatings.filter(f => f.location === 'Large' || f.location === 'Mixte');
 
   const totalLagonRating = lagonRatings.reduce((acc, f) => acc + f.rating, 0);
