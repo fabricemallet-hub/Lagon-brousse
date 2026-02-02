@@ -162,6 +162,7 @@ export interface FishingSpot {
   };
   icon: string;
   color: string;
+  fishingTypes?: string[];
   createdAt: any; // Firestore ServerTimestamp
   context: {
     timestamp: string; // ISO string
@@ -227,5 +228,3 @@ export interface ChatMessage {
   content: string;
   createdAt: any; // Firestore ServerTimestamp
 }
-
-    

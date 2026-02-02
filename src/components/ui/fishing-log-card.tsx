@@ -25,6 +25,7 @@ import { findSimilarDay, analyzeBestDay } from '@/ai/flows/find-best-fishing-day
 import type { FishingAnalysisOutput } from '@/ai/schemas';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
+import { Badge } from './badge';
 
 
 const mapIcons = {
@@ -34,6 +35,14 @@ const mapIcons = {
 };
 const availableIcons = Object.keys(mapIcons);
 const availableColors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
+
+const fishingTypes = [
+  { id: 'Dérive', color: 'bg-blue-500', label: 'Dérive' },
+  { id: 'Mouillage', color: 'bg-green-500', label: 'Mouillage' },
+  { id: 'Pêche à la ligne', color: 'bg-yellow-500', label: 'Ligne' },
+  { id: 'Pêche au lancer', color: 'bg-purple-500', label: 'Lancer' },
+  { id: 'Traine', color: 'bg-red-500', label: 'Traine' },
+];
 
 const createMarkerIconSvg = (color: string, iconName: keyof typeof mapIcons) => {
     const Icon = mapIcons[iconName];
@@ -65,6 +74,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     const [spotNotes, setSpotNotes] = useState('');
     const [selectedIcon, setSelectedIcon] = useState<keyof typeof mapIcons>('Fish');
     const [selectedColor, setSelectedColor] = useState('#3b82f6');
+    const [selectedFishingTypes, setSelectedFishingTypes] = useState<string[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     
@@ -98,7 +108,6 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         setInitialZoomDone(false);
         if (watchId.current !== null) {
             navigator.geolocation.clearWatch(watchId.current);
-            watchId.current = null;
         }
     }, []);
 
@@ -111,65 +120,39 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             navigator.geolocation.clearWatch(watchId.current);
         }
 
-        if (navigator.permissions && navigator.permissions.query) {
-            navigator.permissions.query({name: 'geolocation'}).then(status => {
-                if (status.state === 'prompt') {
-                    // Prompt will be shown by handleRecenter if user clicks it
-                    if (centerMap) { // Only prompt if it's a user gesture
-                         navigator.geolocation.getCurrentPosition(position => {
-                            const { latitude, longitude } = position.coords;
-                            const newLocation = { lat: latitude, lng: longitude };
-                            setUserLocation(newLocation);
-                            if (map) {
-                                map.panTo(newLocation);
-                                map.setZoom(16);
-                                setInitialZoomDone(true);
-                            }
-                         },
-                         () => {
-                             toast({
-                                variant: 'destructive',
-                                title: 'Position non disponible',
-                                description: "Veuillez autoriser l'accès à votre position.",
-                            });
-                         });
-                    }
-                    return;
-                }
-                if (status.state === 'denied') {
-                     toast({
-                        variant: 'destructive',
-                        title: 'Géolocalisation refusée',
-                        description: "Veuillez l'activer dans les paramètres de votre navigateur pour utiliser cette fonctionnalité.",
-                    });
-                    return;
-                }
-                // 'granted'
-                watchId.current = navigator.geolocation.watchPosition(
-                    (position) => {
+        navigator.permissions?.query({name: 'geolocation'}).then(status => {
+            if (status.state === 'prompt') {
+                if (centerMap) { 
+                     navigator.geolocation.getCurrentPosition(position => {
                         const { latitude, longitude } = position.coords;
                         const newLocation = { lat: latitude, lng: longitude };
                         setUserLocation(newLocation);
-
-                        if (map && centerMap && !initialZoomDone) {
+                        if (map) {
                             map.panTo(newLocation);
                             map.setZoom(16);
                             setInitialZoomDone(true);
                         }
-                    },
-                    () => {
+                     },
+                     () => {
                          toast({
                             variant: 'destructive',
                             title: 'Position non disponible',
                             description: "Veuillez autoriser l'accès à votre position.",
                         });
-                    },
-                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-                );
-            });
-        } else {
-            // Fallback for older browsers
-             watchId.current = navigator.geolocation.watchPosition(
+                     });
+                }
+                return;
+            }
+            if (status.state === 'denied') {
+                 toast({
+                    variant: 'destructive',
+                    title: 'Géolocalisation refusée',
+                    description: "Veuillez l'activer dans les paramètres de votre navigateur pour utiliser cette fonctionnalité.",
+                });
+                return;
+            }
+            
+            watchId.current = navigator.geolocation.watchPosition(
                 (position) => {
                     const { latitude, longitude } = position.coords;
                     const newLocation = { lat: latitude, lng: longitude };
@@ -180,9 +163,17 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         map.setZoom(16);
                         setInitialZoomDone(true);
                     }
-                }, () => {}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                },
+                () => {
+                     toast({
+                        variant: 'destructive',
+                        title: 'Position non disponible',
+                        description: "Veuillez autoriser l'accès à votre position.",
+                    });
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
-        }
+        });
     }, [map, initialZoomDone, toast]);
 
     useEffect(() => {
@@ -242,6 +233,14 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         return nextTidePeak.type === 'haute' ? 'montante' : 'descendante';
     }, [locationData]);
 
+    const handleToggleFishingType = (typeId: string) => {
+        setSelectedFishingTypes(prev =>
+            prev.includes(typeId)
+                ? prev.filter(t => t !== typeId)
+                : [...prev, typeId]
+        );
+    };
+
     const handleSaveSpot = async () => {
         if (!user || !firestore || !newSpotLocation || !spotName) {
             toast({ variant: 'destructive', title: 'Erreur', description: "Le nom du spot est requis." });
@@ -259,6 +258,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             location: { latitude: newSpotLocation.lat, longitude: newSpotLocation.lng },
             icon: selectedIcon,
             color: selectedColor,
+            fishingTypes: selectedFishingTypes,
             createdAt: serverTimestamp(),
             context: {
                 timestamp: now.toISOString(),
@@ -281,6 +281,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             setNewSpotLocation(null);
             setSpotName('');
             setSpotNotes('');
+            setSelectedFishingTypes([]);
         } catch (error) {
             console.error("Erreur lors de la sauvegarde du spot :", error);
             toast({ variant: 'destructive', title: 'Erreur', description: "Impossible de sauvegarder le spot." });
@@ -428,9 +429,23 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                     >
                                         <div 
                                             style={{ transform: 'translate(-50%, -150%)' }} 
-                                            className="px-2 py-0.5 bg-card/90 border border-border rounded-md shadow text-xs font-bold text-card-foreground whitespace-nowrap"
+                                            className="flex flex-col items-center gap-1"
                                         >
-                                            {spot.name}
+                                            <div className="flex flex-col items-center gap-1 px-2 py-1 bg-card/90 border border-border rounded-md shadow text-xs font-bold text-card-foreground whitespace-nowrap">
+                                                <span>{spot.name}</span>
+                                                {spot.fishingTypes && spot.fishingTypes.length > 0 && (
+                                                    <div className="flex gap-1">
+                                                        {spot.fishingTypes.map(type => {
+                                                            const typeInfo = fishingTypes.find(t => t.id === type);
+                                                            return (
+                                                                <Badge key={type} variant="secondary" className={cn("text-xs px-1.5 py-0 text-white", typeInfo?.color)}>
+                                                                    {type}
+                                                                </Badge>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </OverlayView>
                                 </React.Fragment>
@@ -449,7 +464,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         <Button size="icon" onClick={handleRecenter} className="absolute top-2 right-2 shadow-lg h-9 w-9 z-10">
                             <LocateFixed className="h-5 w-5" />
                         </Button>
-                        <div className={cn("absolute bottom-4 left-1/2 -translate-x-1/2 z-10", isFullscreen && "w-[calc(100%-2rem)]")}>
+                        <div className={cn("absolute bottom-4 left-1/2 -translate-x-1/2 z-10 w-[calc(100%-2rem)] max-w-sm")}>
                             <Button 
                                 className="shadow-lg w-full" 
                                 onClick={() => { if (newSpotLocation) setIsAddSpotOpen(true); }}
@@ -479,6 +494,25 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                 <Label htmlFor="spot-notes">Notes</Label>
                                 <Textarea id="spot-notes" placeholder="Ex: Pris à la traîne avec un leurre rouge" value={spotNotes} onChange={(e) => setSpotNotes(e.target.value)} />
                             </div>
+                             <div className="space-y-2">
+                                <Label>Techniques de pêche</Label>
+                                <div className="flex flex-wrap gap-2">
+                                    {fishingTypes.map((type) => {
+                                        const isSelected = selectedFishingTypes.includes(type.id);
+                                        return (
+                                            <Button
+                                                key={type.id}
+                                                variant={isSelected ? 'default' : 'outline'}
+                                                size="sm"
+                                                onClick={() => handleToggleFishingType(type.id)}
+                                                className={cn(isSelected && `${type.color} hover:${type.color}/90 text-white`)}
+                                            >
+                                                {type.label}
+                                            </Button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
                             <div className="space-y-2">
                                 <Label>Icône</Label>
                                 <div className="flex gap-2">
@@ -502,7 +536,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                             </div>
                         </div>
                         <DialogFooter>
-                            <Button variant="ghost" onClick={() => { setIsAddSpotOpen(false); setNewSpotLocation(null); }}>Annuler</Button>
+                            <Button variant="ghost" onClick={() => { setIsAddSpotOpen(false); setNewSpotLocation(null); setSelectedFishingTypes([]); }}>Annuler</Button>
                             <Button onClick={handleSaveSpot} disabled={isSaving}><Save className="mr-2"/>{isSaving ? "Sauvegarde..." : "Sauvegarder"}</Button>
                         </DialogFooter>
                     </DialogContent>
@@ -528,7 +562,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                {savedSpots.map(spot => (
                                    <AccordionItem value={spot.id} key={spot.id}>
                                        <AccordionPrimitive.Header className="flex items-center w-full">
-                                           <span className="pl-4 py-4">
+                                            <span className="pl-4 py-4">
                                                <Checkbox
                                                    id={`select-spot-${spot.id}`}
                                                    className="size-5"
@@ -537,7 +571,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                    onClick={(e) => e.stopPropagation()}
                                                />
                                            </span>
-                                           <AccordionPrimitive.Trigger className={cn("flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180", "pr-4")}>
+                                            <AccordionPrimitive.Trigger className={cn("flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180", "pr-4")}>
                                                <div className="flex items-center gap-3">
                                                    <div className="p-1 rounded-md" style={{backgroundColor: spot.color + '20'}}>
                                                        {React.createElement(mapIcons[spot.icon as keyof typeof mapIcons] || MapPin, { className: 'size-5', style: {color: spot.color} })}
@@ -551,6 +585,13 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                            </AccordionPrimitive.Trigger>
                                        </AccordionPrimitive.Header>
                                        <AccordionContent className="space-y-4">
+                                            {spot.fishingTypes && spot.fishingTypes.length > 0 && (
+                                                <div className="flex flex-wrap gap-2 px-4 pb-2">
+                                                    {spot.fishingTypes.map(type => (
+                                                        <Badge key={type} variant="secondary">{type}</Badge>
+                                                    ))}
+                                                </div>
+                                            )}
                                            <div className="text-sm text-muted-foreground bg-muted/50 p-4 rounded-lg space-y-2">
                                                {spot.notes && <p className="italic">"{spot.notes}"</p>}
                                                 <p><strong>Conditions :</strong> {spot.context.weatherCondition}, {spot.context.airTemperature}°C (air), {spot.context.waterTemperature}°C (eau)</p>
