@@ -31,6 +31,8 @@ import {
   AlertCircle,
   Navigation,
   Download,
+  Expand,
+  Shrink,
 } from 'lucide-react';
 import {
   useUser,
@@ -66,7 +68,7 @@ const BatteryIcon = ({ level, charging }: { level: number; charging: boolean }) 
   const props = { className: 'w-4 h-4 inline-block' };
   if (charging) return <BatteryCharging {...props} className="text-blue-500" />;
   if (level > 0.5) return <BatteryFull {...props} className="text-green-500" />;
-  if (level > 0.2) return <BatteryMedium {...props} className="text-orange-500" />;
+  if (level > 0.15) return <BatteryMedium {...props} className="text-orange-500" />;
   return <BatteryLow {...props} className="text-red-500" />;
 };
 
@@ -87,6 +89,7 @@ function HuntingSessionContent() {
   const [zoom, setZoom] = useState(8);
   const [initialZoomDone, setInitialZoomDone] = useState(false);
   const [mapTypeId, setMapTypeId] = useState<string>('terrain');
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
   const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   
@@ -224,7 +227,7 @@ function HuntingSessionContent() {
   useEffect(() => {
     if (map && userLocation && !initialZoomDone) {
       map.panTo({ lat: userLocation.latitude, lng: userLocation.longitude });
-      map.setZoom(16); // Zoom level that approximates 73%
+      map.setZoom(16);
       setInitialZoomDone(true);
     }
   }, [map, userLocation, initialZoomDone]);
@@ -439,7 +442,7 @@ function HuntingSessionContent() {
                         <AlertCircle className="h-4 w-4" />
                         <AlertTitle>Erreur de clé API Google Maps</AlertTitle>
                         <AlertDescription>
-                           La clé API semble invalide ou mal configurée. Veuillez suivre les instructions dans la console Google Cloud pour la corriger.
+                           La clé API semble invalide ou mal configurée.
                         </AlertDescription>
                     </Alert>
                 </CardContent>
@@ -471,8 +474,8 @@ function HuntingSessionContent() {
     }
 
     return (
-        <Card>
-            <CardHeader>
+        <Card className={cn("transition-all", isFullscreen && "fixed inset-0 z-50 w-screen h-screen rounded-none border-none flex flex-col")}>
+            <CardHeader className={cn(isFullscreen && "flex-shrink-0")}>
                 <CardTitle className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <Users className="size-5 text-primary" />
@@ -482,8 +485,8 @@ function HuntingSessionContent() {
                 </CardTitle>
                  <CardDescription>Partagez votre position avec votre groupe en temps réel.</CardDescription>
             </CardHeader>
-            <CardContent>
-                 <div className="relative h-80 w-full mb-4 rounded-lg overflow-hidden border">
+            <CardContent className={cn("flex-grow flex flex-col", isFullscreen ? "p-2 gap-2 overflow-hidden" : "")}>
+                 <div className={cn("relative w-full rounded-lg overflow-hidden border", isFullscreen ? "flex-grow" : "h-80 mb-4")}>
                     <GoogleMap
                         mapContainerClassName="w-full h-full"
                         center={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : { lat: -21.45, lng: 165.5 }}
@@ -521,6 +524,9 @@ function HuntingSessionContent() {
                             )
                         })}
                     </GoogleMap>
+                    <Button size="icon" onClick={() => setIsFullscreen(!isFullscreen)} className="absolute top-2 left-2 shadow-lg h-9 w-9 z-10">
+                        {isFullscreen ? <Shrink className="h-5 w-5" /> : <Expand className="h-5 w-5" />}
+                    </Button>
                     <Button size="icon" onClick={handleRecenter} className="absolute top-2 right-2 shadow-lg h-9 w-9">
                         <LocateFixed className="h-5 w-5" />
                     </Button>
@@ -528,7 +534,7 @@ function HuntingSessionContent() {
                       {Math.round((zoom / 22) * 100)}%
                     </div>
                 </div>
-                <div className="space-y-4">
+                <div className={cn("space-y-4", isFullscreen ? "flex-shrink-0 overflow-y-auto" : "")}>
                     <Alert>
                         <Download className="h-4 w-4" />
                         <AlertTitle>Mode Hors Ligne</AlertTitle>
