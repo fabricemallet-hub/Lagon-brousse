@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   CloudMoon,
   CloudSun,
@@ -13,9 +13,9 @@ import {
   Waves,
   Zap,
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import type { WeatherData, HourlyForecast, WindDirection } from '@/lib/types';
+import type { WeatherData, HourlyForecast, WindDirection, Tide } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Skeleton } from './skeleton';
 import {
@@ -92,14 +92,82 @@ const WindArrowIcon = ({ direction, className }: { direction: WindDirection, cla
   );
 };
 
-export function WeatherForecast({ weather }: { weather: WeatherData }) {
+export function WeatherForecast({ weather, tides }: { weather: WeatherData; tides: Tide[] }) {
   const [api, setApi] = useState<CarouselApi>();
   const [selectedIndex, setSelectedIndex] = useState(0); 
   const [isClient, setIsClient] = useState(false);
+  const [now, setNow] = useState(new Date());
 
   useEffect(() => {
     setIsClient(true);
+    const timer = setInterval(() => setNow(new Date()), 60 * 1000); // update every minute
+    return () => clearInterval(timer);
   }, []);
+
+  const summary = useMemo(() => {
+    if (!weather.hourly.length || !tides.length) {
+      return null;
+    }
+
+    // --- Tide Logic ---
+    const timeToDate = (timeStr: string, date: Date) => {
+      const newDate = new Date(date);
+      const [h, m] = timeStr.split(':').map(Number);
+      newDate.setHours(h, m, 0, 0);
+      return newDate;
+    };
+
+    const tideEventsToday = tides.map(tide => ({
+      ...tide,
+      date: timeToDate(tide.time, now),
+    }));
+    
+    const firstTideOfList = tides[0];
+    const firstTideEventTomorrow = {
+        ...firstTideOfList,
+        date: timeToDate(firstTideOfList.time, new Date(now.getTime() + 24 * 60 * 60 * 1000))
+    };
+
+    const allTideEvents = [...tideEventsToday, firstTideEventTomorrow].sort((a,b) => a.date.getTime() - b.date.getTime());
+    
+    let nextTide = allTideEvents.find(tide => tide.date > now);
+    if (!nextTide) {
+        nextTide = firstTideEventTomorrow;
+    }
+    
+    const tideDirection = nextTide.type === 'haute' ? 'montante' : 'descendante';
+    const remainingTime = formatDistanceToNow(nextTide.date, { locale: fr, addSuffix: true });
+    const tideSentence = `Marée ${tideDirection} jusqu'à ${nextTide.time} (pleine ${nextTide.type === 'haute' ? 'mer' : 'basse'} ${remainingTime}).`;
+
+    // --- Wind Logic ---
+    const currentHour = now.getHours();
+    const currentForecast = weather.hourly.find(f => new Date(f.date).getHours() === currentHour) || weather.hourly[0];
+    
+    const forecastIn3Hours = weather.hourly.find(f => new Date(f.date).getHours() === (currentHour + 3) % 24);
+    const forecastIn6Hours = weather.hourly.find(f => new Date(f.date).getHours() === (currentHour + 6) % 24);
+    
+    let windTrend = "stable";
+    if (forecastIn3Hours && forecastIn6Hours) {
+        const currentSpeed = currentForecast.windSpeed;
+        const speed3h = forecastIn3Hours.windSpeed;
+        const speed6h = forecastIn6Hours.windSpeed;
+        const upperThreshold = currentSpeed * 1.2;
+        const lowerThreshold = currentSpeed * 0.8;
+
+        if (speed3h < lowerThreshold && speed6h > speed3h) {
+            windTrend = "à la baisse puis remontant";
+        } else if (speed3h < lowerThreshold) {
+            windTrend = "à la baisse";
+        } else if (speed3h > upperThreshold && speed6h < speed3h) {
+            windTrend = "à la hausse puis baissant";
+        } else if (speed3h > upperThreshold) {
+            windTrend = "à la hausse";
+        }
+    }
+    const windSentence = `Vent actuel de ${currentForecast.windSpeed} nœuds, tendance ${windTrend}.`;
+
+    return `${tideSentence} ${windSentence}`;
+  }, [now, weather, tides]);
 
   useEffect(() => {
     if (!api || !weather.hourly.length) {
@@ -114,15 +182,13 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
     api.on('select', onSelect);
     api.on('reInit', onSelect);
 
-    const now = new Date();
-    const currentHour = now.getHours();
+    const currentHour = new Date().getHours();
     
     let closestHourIndex = weather.hourly.findIndex(
       (forecast) => new Date(forecast.date).getHours() === currentHour
     );
 
     if (closestHourIndex === -1) {
-      // Fallback to the first hour if current hour isn't in the list (e.g. API data lag)
       closestHourIndex = 0; 
     }
     
@@ -146,6 +212,13 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
   return (
     <div className="rounded-lg border bg-card text-card-foreground shadow-sm overflow-hidden">
       <div className="bg-blue-600 text-white p-4 rounded-t-lg">
+        
+        <div className="text-center mb-4 border-b border-white/20 pb-3">
+          <p className="text-sm sm:text-base font-medium leading-relaxed">
+            {summary || <Skeleton className="h-5 w-3/4 mx-auto bg-white/20" />}
+          </p>
+        </div>
+
         <div className="text-center mb-4">
           <h3 className="font-semibold text-base sm:text-lg capitalize truncate">
             {format(new Date(selectedForecast.date), "eeee dd MMMM 'à' HH'h'", {
@@ -197,7 +270,7 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
             {weather.hourly.slice(0, 24).map((forecast, index) => (
               <CarouselItem
                 key={index}
-                className="basis-1/4 sm:basis-1/5 md:basis-1/6"
+                className="basis-1/4 sm:basis-1/5 md:basis-[16%]"
                 onClick={() => api?.scrollTo(index)}
               >
                 <div
@@ -217,14 +290,12 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
                     className="size-10"
                   />
                   
-                  {/* NEW: Prominent wind display */}
                   <div className="flex flex-col items-center text-card-foreground my-1">
                     <WindArrowIcon direction={forecast.windDirection} className="size-7 text-yellow-500" />
                     <span className="font-bold text-3xl">{forecast.windSpeed}</span>
                     <span className="text-xs text-muted-foreground -mt-1">nœuds</span>
                   </div>
 
-                  {/* NEW: Smaller temperature display */}
                   <div className="flex items-baseline text-muted-foreground">
                     <span className="font-semibold text-lg">{forecast.temp}°</span>
                   </div>

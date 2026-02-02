@@ -89,7 +89,7 @@ export default function Home() {
         </p>
       </div>
 
-      <WeatherForecast weather={weather} />
+      <WeatherForecast weather={weather} tides={sortedTides} />
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
