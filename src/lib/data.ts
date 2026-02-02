@@ -400,6 +400,18 @@ export function generateProceduralData(location: string, date: Date): LocationDa
         }
     }
   });
+  
+    // Moon phase calculation
+  const phases: string[] = ['Nouvelle lune', 'Premier croissant', 'Premier quartier', 'Lune gibbeuse croissante', 'Pleine lune', 'Lune gibbeuse décroissante', 'Dernier quartier', 'Dernier croissant'];
+  const knownNewMoon = new Date('2024-01-11T00:00:00Z');
+  const daysSinceKnownNewMoon = (effectiveDate.getTime() - knownNewMoon.getTime()) / (1000 * 3600 * 24);
+  const dayInCycle = daysSinceKnownNewMoon % 29.53;
+  
+  const phaseIndex = Math.floor((dayInCycle / 29.53) * 8 + 0.5) % 8;
+  locationData.weather.moon.phase = phases[phaseIndex];
+  
+  const illumination = 0.5 * (1 - Math.cos((dayInCycle / 29.53) * 2 * Math.PI));
+  locationData.weather.moon.percentage = Math.round(illumination * 100);
 
   // Pelagic fish season logic
   const warmSeasonMonths = [8, 9, 10, 11, 0, 1, 2, 3]; // Sep to Apr
@@ -411,6 +423,57 @@ export function generateProceduralData(location: string, date: Date): LocationDa
           ? 'La saison chaude bat son plein ! C\'est le meilleur moment pour cibler les pélagiques comme le thon, le mahi-mahi et le wahoo au large.'
           : 'Hors saison pour les grands pélagiques. Concentrez-vous sur les espèces de récif et de lagon.'
   };
+
+  // Fishing rating
+  locationData.fishing.forEach((slot) => {
+    slot.fish.forEach((f) => {
+      // Start with a base rating of 5/10.
+      let rating = 5;
+
+      // 1. Time of day bonus
+      if (slot.timeOfDay.includes('Aube') || slot.timeOfDay.includes('Crépuscule')) {
+        rating += 2;
+      } else {
+        rating -= 1; // Slight penalty for mid-day
+      }
+
+      // 2. Tide movement is critical.
+      if (slot.tideMovement !== 'étale') {
+        rating += 3;
+      } else {
+        rating -= 4; // Strong penalty for slack tide
+      }
+
+      // 3. Moon Phase Bonus
+      // dayInCycle: 0=new, 7.4=1st Q, 14.76=full, 22.1=3rd Q
+      const isNearNewOrFullMoon = (dayInCycle < 4 || dayInCycle > 25.5) || (dayInCycle > 10.75 && dayInCycle < 18.75);
+      const isNearQuarterMoon = (dayInCycle >= 4 && dayInCycle <= 10.75) || (dayInCycle >= 18.75 && dayInCycle <= 25.5);
+
+      if (isNearNewOrFullMoon) {
+        rating += 2; // Strong bonus for new/full moon
+      } else if (isNearQuarterMoon) {
+        rating -= 1; // Slight penalty for quarter moons
+      }
+
+      // 4. Pelagic season bonus
+      const isPelagic = ['Mahi-mahi', 'Wahoo', 'Thon Jaune', 'Thazard', 'Bonite', 'Thon dents de chien'].includes(f.name);
+      if (isPelagic) {
+        if (isPelagicSeason) {
+          rating += 2;
+        } else {
+          rating -= 4; // Strong penalty out of season
+        }
+      }
+
+      // 5. Add a smaller, deterministic random factor for variety
+      const fishNameSeed = f.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      const randomFactor = Math.sin(dateSeed * 0.1 + locationSeed * 0.05 + fishNameSeed * 0.02 + slot.timeOfDay.length); // value between -1 and 1
+      rating += randomFactor;
+
+      // Clamp the final rating between 1 and 10
+      f.rating = Math.max(1, Math.min(10, Math.round(rating)));
+    });
+  });
 
   // Vary Wind
   locationData.weather.wind.forEach((forecast: WindForecast, index: number) => {
@@ -469,18 +532,6 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   locationData.weather.moon.moonrise = varyTime(baseData.weather.moon.moonrise, 3);
   locationData.weather.moon.moonset = varyTime(baseData.weather.moon.moonset, 4);
 
-  // Moon phase calculation
-  const phases: string[] = ['Nouvelle lune', 'Premier croissant', 'Premier quartier', 'Lune gibbeuse croissante', 'Pleine lune', 'Lune gibbeuse décroissante', 'Dernier quartier', 'Dernier croissant'];
-  const knownNewMoon = new Date('2024-01-11T00:00:00Z');
-  const daysSinceKnownNewMoon = (effectiveDate.getTime() - knownNewMoon.getTime()) / (1000 * 3600 * 24);
-  const dayInCycle = daysSinceKnownNewMoon % 29.53;
-  
-  const phaseIndex = Math.floor((dayInCycle / 29.53) * 8 + 0.5) % 8;
-  locationData.weather.moon.phase = phases[phaseIndex];
-  
-  const illumination = 0.5 * (1 - Math.cos((dayInCycle / 29.53) * 2 * Math.PI));
-  locationData.weather.moon.percentage = Math.round(illumination * 100);
-
   // Farming data
   const lunarPhase = dayInCycle < 14.76 ? 'Lune Montante' : 'Lune Descendante';
   locationData.farming.lunarPhase = lunarPhase;
@@ -510,51 +561,6 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   locationData.farming.sow = sow;
   locationData.farming.harvest = harvest;
 
-  // Fishing rating
-  locationData.fishing.forEach((slot) => {
-    slot.fish.forEach((f) => {
-      // Start with a base rating. A fish being in a time slot suggests some potential.
-      let rating = 3;
-
-      // 1. Time of day bonus (Dawn/Dusk are prime time)
-      if (slot.timeOfDay.includes('Aube') || slot.timeOfDay.includes('Crépuscule')) {
-        rating += 2;
-      }
-
-      // 2. Tide movement is critical. Strong bonus for moving tide, penalty for slack.
-      if (slot.tideMovement !== 'étale') {
-        rating += 3;
-      } else {
-        rating -= 2;
-      }
-
-      // 3. Moon Phase Bonus (stronger effect around new/full moon)
-      // dayInCycle: 0=new, 7.4=1st Q, 14.76=full, 22.1=3rd Q
-      const isNearNewOrFullMoon = (dayInCycle < 4 || dayInCycle > 25.5) || (dayInCycle > 10.75 && dayInCycle < 18.75);
-      if (isNearNewOrFullMoon) {
-        rating += 2;
-      }
-
-      // 4. Pelagic season bonus
-      const isPelagic = ['Mahi-mahi', 'Wahoo', 'Thon Jaune', 'Thazard', 'Bonite', 'Thon dents de chien'].includes(f.name);
-      if (isPelagic) {
-        if (isPelagicSeason) {
-          rating += 2;
-        } else {
-          rating -= 3; // Strong penalty out of season
-        }
-      }
-
-      // 5. Add a smaller, deterministic random factor for variety
-      const fishNameSeed = f.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-      const randomFactor = Math.sin(dateSeed * 0.1 + locationSeed * 0.05 + fishNameSeed * 0.02 + slot.timeOfDay.length); // value between -1 and 1
-      rating += randomFactor;
-
-      // Clamp the final rating between 1 and 10
-      f.rating = Math.max(1, Math.min(10, Math.round(rating)));
-    });
-  });
-  
   // Hunting data
   if (month >= 6 && month <= 7) { 
     locationData.hunting.period = { name: 'Brame', description: 'Période de reproduction des cerfs. Les mâles sont moins méfiants et plus actifs, même en journée.' };

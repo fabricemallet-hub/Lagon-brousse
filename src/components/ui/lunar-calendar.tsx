@@ -169,14 +169,26 @@ function DayCell({
   const allFishRatings: FishRating[] = data.fishing.flatMap(
     (slot) => slot.fish
   );
-  const totalRating = allFishRatings.reduce((acc, f) => acc + f.rating, 0);
-  const averageRating =
-    allFishRatings.length > 0 ? totalRating / allFishRatings.length : 0;
-  const fishIconCount = Math.min(5, Math.max(0, Math.round(averageRating / 2)));
+  
+  const lagonRatings = allFishRatings.filter(f => f.location === 'Lagon');
+  const pelagicRatings = allFishRatings.filter(f => f.location === 'Large' || f.location === 'Mixte');
 
-  const fishIcons = Array.from({ length: fishIconCount }).map((_, i) => (
-    <Fish key={i} className="size-3 text-primary" />
+  const totalLagonRating = lagonRatings.reduce((acc, f) => acc + f.rating, 0);
+  const averageLagonRating = lagonRatings.length > 0 ? totalLagonRating / lagonRatings.length : 0;
+  const lagonFishCount = Math.max(1, Math.round(averageLagonRating / 2));
+
+  const totalPelagicRating = pelagicRatings.reduce((acc, f) => acc + f.rating, 0);
+  const averagePelagicRating = pelagicRatings.length > 0 ? totalPelagicRating / pelagicRatings.length : 0;
+  const pelagicFishCount = Math.max(1, Math.round(averagePelagicRating / 2));
+
+  const lagonFishIcons = Array.from({ length: lagonFishCount }).map((_, i) => (
+    <Fish key={`lagon-${i}`} className="size-3 text-primary" />
   ));
+
+  const pelagicFishIcons = Array.from({ length: pelagicFishCount }).map((_, i) => (
+    <Fish key={`pelagic-${i}`} className="size-3 text-destructive" />
+  ));
+
   const tides = data.tides;
 
   // Gardening data
@@ -246,13 +258,15 @@ function DayCell({
 
       {calendarView === 'peche' ? (
         <div className="flex-grow flex flex-col justify-between pt-1">
-          <div className="flex-grow flex items-center justify-center gap-0.5">
-            {fishIcons}
-            {data.pelagicInfo?.inSeason && (Math.sin(day.getDate()) + 1) / 2 > 0.7 && (
-                <Fish className="size-3 text-accent glow" title="Bon pour les pélagiques" />
-            )}
+          <div className="flex-grow flex flex-col items-center justify-center space-y-1">
+            <div className="flex items-center justify-center gap-0.5 h-3">
+              {lagonFishIcons}
+            </div>
+            <div className="flex items-center justify-center gap-0.5 h-3">
+              {pelagicFishIcons}
+            </div>
           </div>
-          <div className="space-y-0.5 text-[10px] font-mono text-muted-foreground">
+          <div className="space-y-0.5 text-[10px] font-mono text-muted-foreground mt-1">
             {tides.map((tide, i) => {
               const isHighTideHighlight =
                 tide.type === 'haute' && tide.height >= 1.7;
@@ -358,20 +372,12 @@ function PecheLegend() {
       <h4 className="font-semibold mb-2">Légende de Pêche</h4>
       <div className="space-y-2">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1">
-            <Fish className="size-4 text-primary" />
-            <Fish className="size-4 text-primary" />
-            <Fish className="size-4 text-primary" />
-          </div>
-          <span>
-            Indique le potentiel de pêche général (de 1 à 5 poissons).
-          </span>
+          <Fish className="size-4 text-primary" />
+          <span>Potentiel de pêche dans le lagon (1 à 5).</span>
         </div>
         <div className="flex items-center gap-3">
-          <Fish className="size-4 text-accent glow" />
-          <span>
-            Signale une bonne opportunité pour la pêche des pélagiques.
-          </span>
+          <Fish className="size-4 text-destructive" />
+          <span>Potentiel de pêche au large / pélagique (1 à 5).</span>
         </div>
       </div>
     </div>
