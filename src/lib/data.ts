@@ -77,7 +77,12 @@ export const communeToTideStationMap: { [key: string]: string } = {
 // Base data for all locations, tides will be added dynamically.
 const baseData: Omit<LocationData, 'tides' | 'tideStation'> = {
   weather: {
-    wind: [],
+    wind: [
+      { time: '03:00', speed: 0, direction: 'N', stability: 'Stable' },
+      { time: '09:00', speed: 0, direction: 'N', stability: 'Stable' },
+      { time: '15:00', speed: 0, direction: 'N', stability: 'Stable' },
+      { time: '21:00', speed: 0, direction: 'N', stability: 'Stable' },
+    ],
     swell: [],
     sun: { sunrise: '06:31', sunset: '17:45' },
     moon: { moonrise: '12:05', moonset: '23:55', phase: 'Premier quartier', percentage: 50 },
