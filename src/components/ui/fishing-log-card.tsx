@@ -17,7 +17,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { LocationData, FishingSpot, SwellForecast } from '@/lib/types';
 import { getDataForDate } from '@/lib/data';
-import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown, Pencil, Download } from 'lucide-react';
+import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from './alert';
 import { useLocation } from '@/context/location-context';
@@ -38,11 +38,11 @@ const availableIcons = Object.keys(mapIcons);
 const availableColors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
 
 const fishingTypes = [
-  { id: 'Dérive', color: 'bg-blue-500', label: 'Dérive' },
-  { id: 'Mouillage', color: 'bg-green-500', label: 'Mouillage' },
-  { id: 'Pêche à la ligne', color: 'bg-yellow-500', label: 'Ligne' },
-  { id: 'Pêche au lancer', color: 'bg-purple-500', label: 'Lancer' },
-  { id: 'Traine', color: 'bg-red-500', label: 'Traine' },
+  { id: 'Dérive', bgColor: 'bg-blue-500', textColor: 'text-blue-600 dark:text-blue-400', label: 'Dérive' },
+  { id: 'Mouillage', bgColor: 'bg-green-500', textColor: 'text-green-600 dark:text-green-400', label: 'Mouillage' },
+  { id: 'Pêche à la ligne', bgColor: 'bg-yellow-500', textColor: 'text-yellow-600 dark:text-yellow-400', label: 'Ligne' },
+  { id: 'Pêche au lancer', bgColor: 'bg-purple-500', textColor: 'text-purple-600 dark:text-purple-400', label: 'Lancer' },
+  { id: 'Traine', bgColor: 'bg-red-500', textColor: 'text-red-600 dark:text-red-400', label: 'Traine' },
 ];
 
 const PulsingDot = () => (
@@ -116,9 +116,8 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         if (!navigator.geolocation) {
             return;
         }
-        // Only start watching if permission is already granted.
         navigator.permissions.query({ name: 'geolocation' }).then(permissionStatus => {
-            if (permissionStatus.state === 'granted') {
+            if (permissionStatus.state === 'prompt' || permissionStatus.state === 'granted') {
                  if (watchId.current !== null) {
                     navigator.geolocation.clearWatch(watchId.current);
                 }
@@ -497,21 +496,22 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                             onClick={(e) => { e.stopPropagation(); handleSpotClick(spot.id); }}
                                         >
                                             <div className="flex flex-col items-center gap-1 px-2 py-1 bg-card/90 backdrop-blur-sm border border-border rounded-md shadow">
-                                                <span className="text-xs font-bold text-black dark:text-white whitespace-nowrap">{spot.name}</span>
+                                                <span className="text-xs font-bold text-foreground whitespace-nowrap">{spot.name}</span>
                                                 {spot.fishingTypes && spot.fishingTypes.length > 0 && (
-                                                    <div className="flex flex-wrap gap-1 mt-1 justify-center max-w-[120px]">
+                                                    <div className="flex flex-wrap gap-x-2 gap-y-1 mt-1 justify-center max-w-[150px]">
                                                         {spot.fishingTypes.map(type => {
                                                             const typeInfo = fishingTypes.find(t => t.id === type);
                                                             if (!typeInfo) return null;
                                                             return (
-                                                                <div
+                                                                <span
                                                                     key={type}
                                                                     className={cn(
-                                                                        "w-3 h-3 rounded-full border-2 border-white/50",
-                                                                        typeInfo.color
+                                                                        "text-[10px] font-bold",
+                                                                        typeInfo.textColor
                                                                     )}
-                                                                    title={typeInfo.label}
-                                                                />
+                                                                >
+                                                                    {typeInfo.label}
+                                                                </span>
                                                             );
                                                         })}
                                                     </div>
@@ -571,10 +571,10 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                     </div>
                 )}
                  <Alert className={cn(isFullscreen && "hidden")}>
-                    <Download className="h-4 w-4" />
+                    
                     <AlertTitle>Mode Hors Ligne</AlertTitle>
                     <AlertDescription>
-                        La carte peut être utilisée hors ligne. Pour mettre une zone en cache, naviguez simplement sur la carte lorsque vous êtes connecté. Les tuiles seront automatiquement sauvegardées.
+                        La carte peut être utilisée hors ligne. Pour mettre une zone en cache, naviguez simplement sur la carte lorsque vous êtes connecté.
                     </AlertDescription>
                 </Alert>
                 
@@ -606,7 +606,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                 variant={isSelected ? 'default' : 'outline'}
                                                 size="sm"
                                                 onClick={() => handleToggleFishingType(type.id)}
-                                                className={cn(isSelected && `${type.color} hover:${type.color}/90 text-white`)}
+                                                className={cn(isSelected && `${type.bgColor} hover:${type.bgColor}/90 text-white`)}
                                             >
                                                 {type.label}
                                             </Button>
@@ -706,7 +706,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                     {spot.fishingTypes.map(type => {
                                                         const typeInfo = fishingTypes.find(t => t.id === type);
                                                         return (
-                                                            <Badge key={type} variant="secondary" className={cn("text-xs text-white", typeInfo?.color)}>
+                                                            <Badge key={type} variant="secondary" className={cn("text-xs text-white", typeInfo?.bgColor)}>
                                                                 {typeInfo?.label}
                                                             </Badge>
                                                         )
