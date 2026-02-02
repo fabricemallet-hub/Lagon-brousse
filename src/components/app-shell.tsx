@@ -43,6 +43,7 @@ import { Label } from './ui/label';
 import { usePathname, useRouter } from 'next/navigation';
 import { useDate } from '@/context/date-context';
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
+import { Dialog, DialogContent, DialogTrigger } from './ui/dialog';
 import { Calendar } from './ui/calendar';
 import { format, addDays, subDays, isBefore } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -57,6 +58,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from './ui/badge';
 import { cn } from '@/lib/utils';
 import { BottomNav } from './bottom-nav';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const USAGE_LIMIT_SECONDS = 60;
 
@@ -70,6 +72,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const auth = useAuth();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
+  const [isDatePickerOpen, setDatePickerOpen] = useState(false);
 
   const userDocRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -281,6 +285,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
+  const handleDateSelect = (date: Date | undefined) => {
+    if (date) {
+        setSelectedDate(date);
+        if(isMobile) {
+            setDatePickerOpen(false);
+        }
+    }
+  };
+
+  const datePickerTrigger = (
+    <Button
+        variant={'outline'}
+        className="w-[150px] sm:w-[180px] justify-start text-left font-normal h-8"
+    >
+        <CalendarIcon className="mr-2 h-4 w-4" />
+        {format(selectedDate, 'PPP', { locale: fr })}
+    </Button>
+  );
+
+  const calendarComponent = (
+      <Calendar
+          mode="single"
+          selected={selectedDate}
+          onSelect={handleDateSelect}
+          initialFocus
+          defaultMonth={selectedDate}
+      />
+  );
+
   return (
     <div className={cn(auth?.currentUser && status === 'limited' && timeLeft <= 0 && 'pointer-events-none opacity-50')}>
       <SidebarProvider>
@@ -369,25 +402,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant={'outline'}
-                          className="w-[150px] sm:w-[180px] justify-start text-left font-normal h-8"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {format(selectedDate, 'PPP', { locale: fr })}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={selectedDate}
-                          onSelect={(date) => date && setSelectedDate(date)}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    
+                    {isMobile ? (
+                      <Dialog open={isDatePickerOpen} onOpenChange={setDatePickerOpen}>
+                        <DialogTrigger asChild>
+                            {datePickerTrigger}
+                        </DialogTrigger>
+                        <DialogContent className="w-auto p-0">
+                            {calendarComponent}
+                        </DialogContent>
+                      </Dialog>
+                    ) : (
+                      <Popover open={isDatePickerOpen} onOpenChange={setDatePickerOpen}>
+                        <PopoverTrigger asChild>
+                            {datePickerTrigger}
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          {calendarComponent}
+                        </PopoverContent>
+                      </Popover>
+                    )}
+
                     <Button
                       variant="ghost"
                       size="icon"
