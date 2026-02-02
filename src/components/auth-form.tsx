@@ -17,7 +17,14 @@ import { useAuth } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, AuthError } from 'firebase/auth';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  updateProfile, 
+  AuthError,
+  setPersistence,
+  browserLocalPersistence
+} from 'firebase/auth';
 import { ForgotPasswordDialog } from './forgot-password-dialog';
 import { Eye, EyeOff } from 'lucide-react';
 
@@ -65,6 +72,7 @@ export function AuthForm({ mode }: AuthFormProps) {
     }
     
     try {
+      await setPersistence(auth, browserLocalPersistence);
       if (mode === 'login') {
         await signInWithEmailAndPassword(auth, values.email, values.password);
         toast({

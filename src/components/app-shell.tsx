@@ -159,7 +159,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Effect to handle side-effects when timeLeft changes (logout, persist to localStorage).
   useEffect(() => {
      // Do not run timer logic while auth or profile is loading.
-    if (isUserLoading || (user && isProfileLoading)) {
+    if (isUserLoading || isLoggingOut || (user && isProfileLoading)) {
       return;
     }
 
@@ -170,7 +170,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     localStorage.setItem('dailyUsage', String(newUsage));
 
     // Handle logout when time runs out.
-    if (timeLeft <= 0 && !isLoggingOut) {
+    if (timeLeft <= 0) {
       setIsLoggingOut(true);
       toast({
         variant: 'destructive',
@@ -179,6 +179,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       });
       if (auth.currentUser) {
         signOut(auth).then(() => {
+          localStorage.clear();
+          sessionStorage.clear();
           router.push('/login');
         });
       } else {
@@ -194,6 +196,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const handleLogout = async () => {
     if (!auth) return;
     await signOut(auth);
+    localStorage.clear();
+    sessionStorage.clear();
     router.push('/login');
   };
 

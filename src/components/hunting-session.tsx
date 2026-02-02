@@ -76,10 +76,8 @@ const BatteryIcon = ({ level, charging }: { level: number; charging: boolean }) 
 };
 
 
-// --- Main Component ---
-
-export function HuntingSessionCard() {
-  const { user, isUserLoading } = useUser();
+function HuntingSessionContent() {
+  const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
   
@@ -365,32 +363,6 @@ export function HuntingSessionCard() {
     }
   };
 
-  if (isUserLoading) {
-    return <Card><CardContent><Skeleton className="h-48 w-full" /></CardContent></Card>
-  }
-  
-  if (!user) {
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <Users className="size-5 text-primary" />
-                    Session de Chasse en Groupe
-                </CardTitle>
-            </CardHeader>
-            <CardContent>
-                <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Fonctionnalité réservée</AlertTitle>
-                    <AlertDescription>
-                       Vous devez être connecté pour créer ou rejoindre une session de chasse.
-                    </AlertDescription>
-                </Alert>
-            </CardContent>
-        </Card>
-    )
-  }
-
   if (session) {
      if (loadError) {
         return (
@@ -597,4 +569,36 @@ export function HuntingSessionCard() {
       </CardContent>
     </Card>
   );
+}
+
+export function HuntingSessionCard() {
+  const { user, isUserLoading } = useUser();
+
+  if (isUserLoading) {
+    return <Card><CardContent><Skeleton className="h-48 w-full" /></CardContent></Card>;
+  }
+
+  if (!user) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="size-5 text-primary" />
+            Session de Chasse en Groupe
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Fonctionnalité réservée</AlertTitle>
+            <AlertDescription>
+              Vous devez être connecté pour créer ou rejoindre une session de chasse.
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return <HuntingSessionContent />;
 }
