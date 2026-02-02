@@ -259,7 +259,21 @@ function DayCell({
 
       {calendarView === 'peche' ? (
         <div className="flex-grow flex flex-col justify-between pt-1">
-          <div className="flex-grow flex flex-col items-center justify-center space-y-1">
+          <div className="flex-grow flex flex-col items-center justify-center space-y-0.5">
+            <div className="flex items-center justify-center gap-1.5 h-4">
+              {data.crabAndLobster.crabStatus === 'Plein' && (
+                <CrabIcon className="size-3 text-green-600" title="Crabe plein" />
+              )}
+              {data.crabAndLobster.crabStatus === 'Mout' && (
+                <CrabIcon className="size-3 text-orange-500" title="Crabe en mue" />
+              )}
+              {data.crabAndLobster.lobsterActivity === 'Élevée' && (
+                <LobsterIcon className="size-3 text-blue-600" title="Activité langouste élevée" />
+              )}
+              {data.crabAndLobster.octopusActivity === 'Élevée' && (
+                <OctopusIcon className="size-3 text-purple-600" title="Bonne période pour le poulpe" />
+              )}
+            </div>
             <div className="flex items-center justify-center gap-0.5 h-3">
               {lagonFishIcons}
             </div>
@@ -371,14 +385,30 @@ function PecheLegend() {
   return (
     <div className="mt-4 p-3 border rounded-lg bg-muted/50 text-sm">
       <h4 className="font-semibold mb-2">Légende de Pêche</h4>
-      <div className="space-y-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
         <div className="flex items-center gap-3">
           <Fish className="size-4 text-primary" />
-          <span>Potentiel de pêche dans le lagon (1 à 5).</span>
+          <span>Pêche en lagon</span>
         </div>
         <div className="flex items-center gap-3">
           <Fish className="size-4 text-destructive" />
-          <span>Potentiel de pêche au large / pélagique (1 à 5).</span>
+          <span>Pêche au large</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <CrabIcon className="size-4 text-green-600" />
+          <span>Crabe plein</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <CrabIcon className="size-4 text-orange-500" />
+          <span>Crabe en mue</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <LobsterIcon className="size-4 text-blue-600" />
+          <span>Forte activité langouste</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <OctopusIcon className="size-4 text-purple-600" />
+          <span>Bonne période poulpe</span>
         </div>
       </div>
     </div>
@@ -835,7 +865,7 @@ export function LunarCalendar() {
           open={!!detailedDay}
           onOpenChange={(isOpen) => !isOpen && setDetailedDay(null)}
         >
-          <DialogContent className="md:max-w-xl">
+          <DialogContent className="md:max-w-xl flex flex-col max-h-[85vh]">
             <div className="flex-grow overflow-y-auto">
               {calendarView === 'peche' ? (
                 <PecheDetailDialogContent
