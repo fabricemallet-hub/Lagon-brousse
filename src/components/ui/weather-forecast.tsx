@@ -216,8 +216,8 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
         <div className="text-center mb-4 border-b border-white/20 pb-3">
           {summary ? (
             <>
-              <p className="text-sm font-medium leading-snug">{summary.tideSentence}</p>
-              <p className="text-sm text-white/90 leading-snug mt-1">{summary.windSentence}</p>
+              <p className="text-xs sm:text-sm font-medium leading-snug">{summary.tideSentence}</p>
+              <p className="text-xs sm:text-sm text-white/90 leading-snug mt-1">{summary.windSentence}</p>
             </>
           ) : (
             <Skeleton className="h-10 w-full max-w-sm mx-auto bg-white/20" />
@@ -232,7 +232,7 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
           </h3>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+        <div className="flex flex-col sm:flex-row gap-4 items-center justify-around">
            <div className="flex flex-col items-center justify-center text-center">
                 <WeatherConditionIcon
                 condition={selectedForecast.condition}
@@ -245,7 +245,7 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
             </div>
             <div className="flex flex-col items-center justify-center text-center">
                 <div className="flex items-baseline gap-1">
-                    <p className="font-bold text-6xl">{selectedForecast.windSpeed}</p>
+                    <p className="font-bold text-5xl sm:text-6xl">{selectedForecast.windSpeed}</p>
                     <p className="font-medium text-lg">nœuds</p>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
@@ -275,16 +275,16 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
 
       <div className="p-2 sm:p-4">
         <Carousel setApi={setApi} opts={{ align: 'start' }}>
-          <CarouselContent className="-ml-2">
+          <CarouselContent className="-ml-1">
             {weather.hourly.slice(0, 24).map((forecast, index) => (
               <CarouselItem
                 key={index}
-                className="basis-1/4 sm:basis-1/5 md:basis-1/6 lg:basis-[12.5%] pl-2"
+                className="basis-[28%] sm:basis-1/4 md:basis-1/6 lg:basis-[12.5%] pl-1"
                 onClick={() => api?.scrollTo(index)}
               >
                 <div
                   className={cn(
-                    'flex flex-col items-center justify-between p-1.5 cursor-pointer rounded-lg border h-full space-y-1 text-center',
+                    'flex flex-col items-center justify-between p-1 cursor-pointer rounded-lg border h-full space-y-1 text-center',
                     selectedIndex === index
                       ? 'bg-blue-100 border-blue-200 dark:bg-blue-900/50 dark:border-blue-700'
                       : 'bg-card hover:bg-muted/50'
@@ -296,12 +296,12 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
                   <WeatherConditionIcon
                     condition={forecast.condition}
                     isNight={forecast.isNight}
-                    className="size-7 my-0.5"
+                    className="size-6 my-0.5"
                   />
                   
-                  <div className="flex flex-col items-center">
+                  <div className="flex items-baseline">
                     <p className="font-bold text-lg">{forecast.windSpeed}</p>
-                    <p className="text-[10px] text-muted-foreground -mt-1">nœuds</p>
+                    <p className="text-[10px] text-muted-foreground">nœuds</p>
                   </div>
                   
                   <div className="border-t w-full my-0.5"></div>
