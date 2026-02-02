@@ -139,6 +139,7 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation'> = {
         { name: 'Rouget', rating: 9, location: 'Lagon', advice: { activity: 'Très actif, sort pour se nourrir.', feeding: 'Excellente heure, fouille le sable activement.', location_specific: 'Fonds sableux près des zones rocheuses ou coralliennes.', depth: '5-15m.' } },
         { name: 'Vivaneau', rating: 8, location: 'Lagon', advice: { activity: 'Quitte son abri, devient un prédateur actif.', feeding: 'Très bonne heure, chasse à l\'affût.', location_specific: 'Autour des patates de corail et des tombants.', depth: '10-40m.' } },
         { name: 'Bossu doré', rating: 8, location: 'Lagon', advice: { activity: 'Très bonne activité, sort pour chasser.', feeding: 'Excellente heure, très agressif.', location_specific: 'Se détache des structures pour chasser sur les fonds sableux environnants.', depth: '5-20m.' } },
+        { name: 'Bec de cane', rating: 9, location: 'Lagon', advice: { activity: 'En bancs, activité intense au crépuscule.', feeding: 'Très bonne heure de chasse avant la nuit.', location_specific: 'Sur les platiers, bords de chenaux et près des patates.', depth: '2-10m.' } },
       ],
     },
   ],
