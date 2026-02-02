@@ -307,7 +307,7 @@ function HuntingSessionContent() {
         const position = await new Promise<GeolocationPosition>((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject, {
                 enableHighAccuracy: true,
-                timeout: 10000,
+                timeout: 20000, // Increased timeout
                 maximumAge: 0,
             });
         });
@@ -363,6 +363,12 @@ function HuntingSessionContent() {
             description: "La géolocalisation est requise pour être visible sur la carte. Activez-la dans les paramètres de votre navigateur.",
           });
           // Do not leave session, just inform the user.
+        } else if (err.code === 3 && isFirstUpdate) { // Only show toast for timeout on initial fetch
+            toast({
+                variant: "destructive",
+                title: "Délai de localisation dépassé",
+                description: "Impossible d'obtenir une position initiale. Veuillez réessayer avec un meilleur signal.",
+            });
         }
     }
   }, [user, firestore, session, toast, map]);
@@ -791,6 +797,10 @@ function HuntingSessionContent() {
             let description = "Impossible d'obtenir votre position actuelle.";
             if (err.code === 1) {
               description = "Veuillez activer la géolocalisation dans les paramètres de votre navigateur.";
+            } else if (err.code === 3) {
+              description = "La demande de localisation a expiré. Veuillez réessayer dans une zone avec un meilleur signal GPS.";
+            } else if (err.code === 2) {
+              description = "Position indisponible. Vérifiez les paramètres de votre appareil et le signal GPS.";
             }
             toast({
                 variant: "destructive",
@@ -798,7 +808,7 @@ function HuntingSessionContent() {
                 description: description,
             });
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
     );
   };
 
