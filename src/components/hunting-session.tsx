@@ -181,13 +181,6 @@ export function HuntingSessionCard() {
     };
   
     const joinAndSubscribe = async () => {
-      if (isParticipating) {
-        if (!updateIntervalRef.current) {
-            performPeriodicUpdate(); // Initial update
-            updateIntervalRef.current = setInterval(performPeriodicUpdate, 30000);
-        }
-        return;
-      }
       
       try {
         const position = await new Promise<GeolocationPosition>((resolve, reject) => {
@@ -218,6 +211,10 @@ export function HuntingSessionCard() {
         
         if (!isCancelled) {
           setIsParticipating(true);
+          performPeriodicUpdate(); // Initial update
+          if (!updateIntervalRef.current) {
+            updateIntervalRef.current = setInterval(performPeriodicUpdate, 30000);
+          }
         }
 
       } catch (err: any) {
@@ -241,7 +238,7 @@ export function HuntingSessionCard() {
         updateIntervalRef.current = null;
       }
     };
-  }, [session, user, firestore, isParticipating, handleLeaveSession]);
+  }, [session, user, firestore, handleLeaveSession]);
 
   const generateUniqueCode = async (): Promise<string> => {
     if (!firestore) throw new Error("Firestore not initialized");
