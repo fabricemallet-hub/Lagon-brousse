@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { ShootingTableCard } from '@/components/ui/shooting-table-card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { HuntingSessionCard } from '@/components/hunting-session';
 
 function ChasseSkeleton() {
   return (
@@ -160,6 +161,7 @@ export default function ChassePage() {
         </Card>
       </div>
       <ShootingTableCard />
+      <HuntingSessionCard />
     </div>
   );
 }

@@ -17,17 +17,22 @@ import { useAuth } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, AuthError } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, AuthError } from 'firebase/auth';
 import { ForgotPasswordDialog } from './forgot-password-dialog';
-
-const formSchema = z.object({
-  email: z.string().email({ message: 'Veuillez entrer une adresse email valide.' }),
-  password: z.string().min(6, { message: 'Le mot de passe doit contenir au moins 6 caractères.' }),
-});
 
 type AuthFormProps = {
   mode: 'login' | 'signup';
 };
+
+const formSchema = (mode: AuthFormProps['mode']) => z.object({
+  displayName: z.string().min(3, { message: 'Le nom doit contenir au moins 3 caractères.' }).optional(),
+  email: z.string().email({ message: 'Veuillez entrer une adresse email valide.' }),
+  password: z.string().min(6, { message: 'Le mot de passe doit contenir au moins 6 caractères.' }),
+}).refine(data => mode !== 'signup' || (!!data.displayName && data.displayName.length > 0), {
+    message: "Le nom d'utilisateur est requis.",
+    path: ["displayName"],
+});
+
 
 export function AuthForm({ mode }: AuthFormProps) {
   const auth = useAuth();
@@ -35,15 +40,16 @@ export function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<z.infer<ReturnType<typeof formSchema>>>({
+    resolver: zodResolver(formSchema(mode)),
     defaultValues: {
+      displayName: '',
       email: '',
       password: '',
     },
   });
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: z.infer<ReturnType<typeof formSchema>>) {
     setIsLoading(true);
     if (!auth) {
       toast({
@@ -59,7 +65,12 @@ export function AuthForm({ mode }: AuthFormProps) {
       if (mode === 'login') {
         await signInWithEmailAndPassword(auth, values.email, values.password);
       } else {
-        await createUserWithEmailAndPassword(auth, values.email, values.password);
+        const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+        if (values.displayName) {
+            await updateProfile(userCredential.user, {
+                displayName: values.displayName
+            });
+        }
       }
       toast({
         title: mode === 'login' ? 'Connexion réussie!' : 'Inscription réussie!',
@@ -105,6 +116,21 @@ export function AuthForm({ mode }: AuthFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col space-y-4">
+        {mode === 'signup' && (
+          <FormField
+            control={form.control}
+            name="displayName"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Nom d'utilisateur</FormLabel>
+                <FormControl>
+                  <Input placeholder="Votre nom" {...field} autoComplete="name" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
         <FormField
           control={form.control}
           name="email"

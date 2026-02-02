@@ -9,7 +9,7 @@ export default function SignupPage() {
       <Card className="w-full max-w-sm mx-auto">
         <CardHeader>
           <CardTitle>Inscription</CardTitle>
-          <CardDescription>Créez votre compte pour sauvegarder vos préférences.</CardDescription>
+          <CardDescription>Créez votre compte pour sauvegarder vos préférences et utiliser les fonctionnalités de partage.</CardDescription>
         </CardHeader>
         <CardContent>
           <AuthForm mode="signup" />

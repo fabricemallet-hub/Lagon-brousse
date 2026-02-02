@@ -8,12 +8,13 @@
       "properties": {
         "id": { "type": "string", "description": "Unique identifier for the user account." },
         "email": { "type": "string", "description": "The user's email address.", "format": "email" },
+        "displayName": { "type": "string", "description": "The user's public display name." },
         "subscriptionStatus": { "type": "string", "description": "The current subscription status of the user (e.g., 'active', 'inactive', 'trial', 'admin')." },
         "subscriptionStartDate": { "type": "string", "description": "The date when the user's subscription started.", "format": "date-time" },
         "subscriptionExpiryDate": { "type": "string", "description": "The date when the user's subscription expires.", "format": "date-time" },
         "favoriteLocationIds": { "type": "array", "description": "References to Location. (Relationship: UserAccount N:N Location)", "items": { "type": "string" } }
       },
-      "required": ["id", "email", "subscriptionStatus"]
+      "required": ["id", "email", "displayName", "subscriptionStatus"]
     },
     "Location": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -56,6 +57,42 @@
           }
         }
       }
+    },
+    "HuntingSession": {
+      "title": "HuntingSession",
+      "type": "object",
+      "description": "Represents a real-time hunting session.",
+      "properties": {
+        "code": { "type": "string", "description": "A unique, 6-character code for joining the session." },
+        "organizerId": { "type": "string", "description": "The UID of the user who created the session." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the session was created." },
+        "expiresAt": { "type": "string", "format": "date-time", "description": "Timestamp when the session expires and should be deleted by TTL." }
+      },
+      "required": ["code", "organizerId", "createdAt", "expiresAt"]
+    },
+    "SessionParticipant": {
+      "title": "SessionParticipant",
+      "type": "object",
+      "description": "Represents a participant in a hunting session.",
+      "properties": {
+        "displayName": { "type": "string", "description": "The display name of the participant." },
+        "location": {
+          "type": "object",
+          "properties": {
+            "latitude": { "type": "number" },
+            "longitude": { "type": "number" }
+          }
+        },
+        "battery": {
+          "type": "object",
+          "properties": {
+            "level": { "type": "number", "description": "Battery level from 0 to 1." },
+            "charging": { "type": "boolean", "description": "Is the device charging." }
+          }
+        },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp." }
+      },
+      "required": ["displayName", "updatedAt"]
     }
   },
   "auth": {
@@ -99,6 +136,27 @@
           "params": [
             { "name": "stationId", "description": "The ID of the parent station." },
             { "name": "date", "description": "The date of the tide data in YYYY-MM-DD format." }
+          ]
+        }
+      },
+      {
+        "path": "/hunting_sessions/{sessionId}",
+        "definition": {
+          "entityName": "HuntingSession",
+          "schema": { "$ref": "#/backend/entities/HuntingSession" },
+          "description": "Stores hunting session metadata. Documents have a TTL based on the 'expiresAt' field.",
+          "params": [{ "name": "sessionId", "description": "The unique ID for the hunting session." }]
+        }
+      },
+      {
+        "path": "/hunting_sessions/{sessionId}/participants/{userId}",
+        "definition": {
+          "entityName": "SessionParticipant",
+          "schema": { "$ref": "#/backend/entities/SessionParticipant" },
+          "description": "Stores real-time data for each participant in a session. The document ID is the user's UID.",
+          "params": [
+            { "name": "sessionId", "description": "The ID of the parent session." },
+            { "name": "userId", "description": "The participant's user ID." }
           ]
         }
       }

@@ -101,16 +101,17 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     if (user && !isUserLoading && firestore) {
       const userDocRef = doc(firestore, 'users', user.uid);
       getDoc(userDocRef).then(docSnap => {
-        const { uid, email } = user;
+        const { uid, email, displayName } = user;
         const isAdmin = email === 'f.mallet@gmail.com';
 
         if (isAdmin) {
           // This user is an admin. Ensure their document reflects this.
           // This corrects documents created before the admin logic was in place.
-          if (!docSnap.exists() || docSnap.data().subscriptionStatus !== 'admin') {
-            const adminAccountData: UserAccount = {
+          if (!docSnap.exists() || docSnap.data().subscriptionStatus !== 'admin' || docSnap.data().displayName !== (displayName || 'Admin')) {
+            const adminAccountData: Partial<UserAccount> = {
               id: uid,
               email: email || '',
+              displayName: displayName || 'Admin',
               subscriptionStatus: 'admin',
               // Preserve existing favorites if the document exists
               favoriteLocationIds: docSnap.exists() ? docSnap.data().favoriteLocationIds || [] : [],
@@ -128,6 +129,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
             const newUserAccount: UserAccount = {
               id: uid,
               email: email || '',
+              displayName: displayName || email?.split('@')[0] || 'Chasseur',
               subscriptionStatus: 'trial',
               subscriptionStartDate: trialStartDate.toISOString(),
               subscriptionExpiryDate: trialExpiryDate.toISOString(),

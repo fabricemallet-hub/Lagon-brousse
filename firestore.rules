@@ -5,33 +5,24 @@
  * cross-user data access or enumeration.
  *
  * Data Structure:
- * - /users/{userId}: Contains private user account information. All access to documents
- *   within this path is restricted to the authenticated user whose UID matches the {userId}.
- * - /locations/{locationId}: Contains public location data that is readable by any client,
- *   including unauthenticated ones. Writes to this collection are locked down to prevent
- *   unauthorized modification, assuming this data is managed externally.
- * - /stations/{stationId}: Contains public tide station data. Readable by all, writable only by admin.
- * - /stations/{stationId}/tides/{date}: Contains archived tide data. Readable by all, writable only by admin.
+ * - /users/{userId}: Contains private user account information.
+ * - /locations/{locationId}: Contains public location data.
+ * - /stations/{stationId}: Contains public tide station data.
+ * - /stations/{stationId}/tides/{date}: Contains archived tide data.
+ * - /hunting_sessions/{sessionId}: Contains metadata for a hunting session.
+ * - /hunting_sessions/{sessionId}/participants/{userId}: Contains real-time data for a participant.
  *
  * Key Security Decisions:
  * - User Isolation: A user can only interact with their own document at /users/{userId}.
- * - No User Listing for non-admins: Listing the entire /users collection is explicitly disallowed for normal users to 
- *   protect user privacy and prevent data scraping.
- * - Admin Listing: The administrator is allowed to list users for statistical purposes.
- * - Public Read-Only Data: The /locations collection is globally readable but not writable
- *   by clients, making it suitable for shared, static application data.
- * - Default Secure: The default security posture for any path not explicitly defined is to deny all access.
- *
- * Denormalization for Authorization:
- * The security model relies on path-based authorization for user data, where the document ID
- * `{userId}` is the user's authentication UID. To ensure integrity, the rules mandate that
- * on creation, the user document must contain an `id` field that mirrors the `{userId}` in the path.
- * This prevents data from being associated with the wrong user.
- *
- * Structural Segregation:
- * The ruleset leverages separate top-level collections for private user data (`/users`) and
- * public location data (`/locations`). This clear separation simplifies rule logic, improves
- * query performance, and enhances security by preventing accidental data leakage.
+ * - No User Listing for non-admins: Listing the entire /users collection is disallowed for privacy.
+ * - Admin Listing: The administrator is allowed to list users.
+ * - Public Read-Only Data: /locations is globally readable but not client-writable.
+ * - Hunting Sessions:
+ *   - Any authenticated user can create a session.
+ *   - Only the organizer can delete the session document.
+ *   - Session participants can read each other's data in real-time.
+ *   - Users can only create, update, or delete their own participant document.
+ * - Default Secure: Any path not explicitly defined denies all access.
  */
 rules_version = '2';
 service cloud.firestore {
@@ -41,65 +32,40 @@ service cloud.firestore {
     // Helper Functions
     // ----------------------------------------------------------------------
 
-    /**
-     * Checks if the user is authenticated.
-     */
     function isSignedIn() {
       return request.auth != null;
     }
     
-    /**
-     * Checks if the current authenticated user is an administrator.
-     * This is based on a hardcoded email address.
-     */
     function isAdmin() {
       return isSignedIn() && request.auth.token.email == 'f.mallet@gmail.com';
     }
 
-    /**
-     * Checks if the authenticated user's UID matches the provided userId.
-     * This is the foundation of the user ownership model.
-     */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
     
-    /**
-     * Checks for ownership on an existing document. Used for safe updates and deletes.
-     * Denies requests that target non-existent documents.
-     */
     function isExistingOwner(userId) {
       return isOwner(userId) && resource != null;
     }
 
-    /**
-     * Validates a new user account document on creation.
-     * - Ensures the creator is the owner.
-     * - Enforces path-data consistency by requiring the internal 'id' field
-     *   to match the document's {userId}.
-     */
     function isCreatingOwnAccount(userId) {
-      return isOwner(userId) && request.resource.data.id == userId;
+      let displayName = request.resource.data.displayName;
+      return isOwner(userId) 
+        && request.resource.data.id == userId
+        && displayName is string && displayName.size() > 2 && displayName.size() < 30;
     }
 
-    /**
-     * Validates a user account document on update.
-     * - Ensures the user is the owner of the existing document.
-     * - Enforces immutability of the 'id' field to prevent re-associating
-     *   the document with a different user.
-     */
     function isMaintainingOwnAccount(userId) {
-      return isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      let displayName = request.resource.data.displayName;
+      return isExistingOwner(userId) 
+        && request.resource.data.id == resource.data.id
+        && displayName is string && displayName.size() > 2 && displayName.size() < 30;
     }
 
     // ----------------------------------------------------------------------
     // Collection Rules
     // ----------------------------------------------------------------------
 
-    /**
-     * @description Controls access to private user account documents.
-     * @path /users/{userId}
-     */
     match /users/{userId} {
       allow get: if isOwner(userId);
       allow list: if isAdmin();
@@ -108,10 +74,6 @@ service cloud.firestore {
       allow delete: if isExistingOwner(userId);
     }
 
-    /**
-     * @description Controls access to the public collection of locations.
-     * @path /locations/{locationId}
-     */
     match /locations/{locationId} {
       allow get: if true;
       allow list: if true;
@@ -120,23 +82,36 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    /**
-     * @description Controls access to tide station metadata and their archived tide data.
-     * @path /stations/{stationId}
-     */
     match /stations/{stationId} {
       allow get: if true;
       allow list: if true;
       allow create, update, delete: if isAdmin();
 
-      /**
-       * @description Archived tide data for a specific station and date.
-       * @path /stations/{stationId}/tides/{date}
-       */
       match /tides/{date} {
         allow get: if true;
         allow list: if true; // Allows querying for date ranges
         allow create, update, delete: if isAdmin();
+      }
+    }
+
+    /**
+     * @description Real-time hunting session data.
+     * @path /hunting_sessions/{sessionId}
+     */
+    match /hunting_sessions/{sessionId} {
+      allow create: if isSignedIn();
+      allow get: if isOwner(resource.data.organizerId) || exists(/databases/$(database)/documents/hunting_sessions/$(sessionId)/participants/$(request.auth.uid));
+      allow delete: if isOwner(resource.data.organizerId);
+      allow list: if false;
+
+      /**
+       * @description Participant data within a session.
+       * @path /hunting_sessions/{sessionId}/participants/{userId}
+       */
+      match /participants/{userId} {
+        allow create: if isOwner(userId);
+        allow update, delete: if isOwner(userId);
+        allow get, list: if exists(/databases/$(database)/documents/hunting_sessions/$(sessionId)/participants/$(request.auth.uid));
       }
     }
   }

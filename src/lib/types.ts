@@ -138,8 +138,31 @@ export interface LocationData {
 export interface UserAccount {
   id: string;
   email: string;
+  displayName: string;
   subscriptionStatus: 'active' | 'inactive' | 'trial' | 'admin';
   subscriptionStartDate?: string;
   subscriptionExpiryDate?: string;
   favoriteLocationIds: string[];
+}
+
+export interface SessionParticipant {
+  id: string; // user UID
+  displayName: string;
+  location?: {
+    latitude: number;
+    longitude: number;
+  };
+  battery?: {
+    level: number; // 0 to 1
+    charging: boolean;
+  };
+  updatedAt: any; // Firestore ServerTimestamp
+}
+
+export interface HuntingSession {
+  id: string; // document ID
+  code: string;
+  organizerId: string;
+  createdAt: any; // Firestore ServerTimestamp
+  expiresAt: any; // Firestore ServerTimestamp for TTL
 }
