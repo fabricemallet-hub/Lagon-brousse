@@ -588,136 +588,14 @@ export function generateProceduralData(location: string, date: Date): LocationDa
 }
 
 
-export async function getDataForDate(firestore: Firestore, location: string, date: Date): Promise<LocationData> {
-  const dateStr = date.toISOString().split('T')[0];
-  const tideStation = communeToTideStationMap[location] || 'Nouméa';
-  const tideDocRef = doc(firestore, `stations/${tideStation}/tides/${dateStr}`);
-
-  let proceduralData = generateProceduralData(location, date);
+export function getDataForDate(location: string, date: Date): LocationData {
+  // Ensure date is valid, fallback to now if not.
+  const validDate = date || new Date();
+  const proceduralData = generateProceduralData(location, validDate);
   
-  try {
-      const tideDocSnap = await getDoc(tideDocRef);
-      if (tideDocSnap.exists()) {
-          const archivedTides: Omit<Tide, 'current'>[] = tideDocSnap.data().tides;
-          if (archivedTides && archivedTides.length > 0) {
-            // Replace procedural tides with archived tides
-            proceduralData.tides = archivedTides.map(t => ({...t, current: 'Modéré'}));
-            // Recalculate hourly data with the new tides
-            const hourlyTideData = calculateHourlyTides(location, date);
-            proceduralData.weather.hourly.forEach(forecast => {
-                const forecastDate = new Date(forecast.date);
-                const correspondingTide = hourlyTideData.find(t => {
-                    const tideDate = new Date(t.date);
-                    return tideDate.getDate() === forecastDate.getDate() && tideDate.getHours() === forecastDate.getHours();
-                });
-                if (correspondingTide) {
-                    forecast.tideHeight = correspondingTide.tideHeight;
-                    forecast.tideCurrent = correspondingTide.tideCurrent;
-                    forecast.tidePeakType = correspondingTide.tidePeakType;
-                }
-            });
-          }
-      }
-  } catch (error) {
-      console.error("Failed to fetch archived tides, using procedural data.", error);
-  }
-
-  // Then, fetch real-time weather from OpenWeatherMap
-  const apiKey = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY;
-  const locationCoords = locations[location];
-
-  if (!apiKey || !locationCoords || apiKey === "6d514194-0b92-4f0f-a0ed-698b92076c94") {
-    console.warn("API key or location coordinates are missing/invalid. Using only procedural data.");
-    return proceduralData;
-  }
-
-  const url = `https://api.openweathermap.org/data/3.0/onecall?lat=${locationCoords.lat}&lon=${locationCoords.lon}&appid=${apiKey}&units=metric&lang=fr`;
-
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      console.error(`OpenWeather API error: ${response.statusText}`);
-      return proceduralData;
-    }
-    const weatherApiData = await response.json();
-    const todayForecast = weatherApiData.daily[0];
-    const timezoneOffset = weatherApiData.timezone_offset;
-
-    proceduralData.weather.temp = Math.round(weatherApiData.current.temp);
-    proceduralData.weather.tempMin = Math.round(todayForecast.temp.min);
-    proceduralData.weather.tempMax = Math.round(todayForecast.temp.max);
-    proceduralData.weather.uvIndex = Math.round(todayForecast.uvi);
-    proceduralData.weather.sun.sunrise = formatTime(todayForecast.sunrise, timezoneOffset);
-    proceduralData.weather.sun.sunset = formatTime(todayForecast.sunset, timezoneOffset);
-    proceduralData.weather.moon.moonrise = formatTime(todayForecast.moonrise, timezoneOffset);
-    proceduralData.weather.moon.moonset = formatTime(todayForecast.moonset, timezoneOffset);
-
-    proceduralData.weather.hourly = weatherApiData.hourly.map((h: any, index: number, arr: any[]): HourlyForecast => {
-        const hourDate = new Date(h.dt * 1000);
-        const isNight = hourDate.getHours() < 6 || hourDate.getHours() > 19;
-        
-        let stability: 'Stable' | 'Tournant' = 'Stable';
-        if (index > 0) {
-            const prevWindDeg = arr[index - 1].wind_deg;
-            const currentWindDeg = h.wind_deg;
-            const diff = Math.abs(prevWindDeg - currentWindDeg);
-            if (diff > 45 && diff < 315) {
-                stability = 'Tournant';
-            }
-        }
-        return {
-            date: hourDate.toISOString(),
-            condition: mapWeatherCondition(h.weather[0].id, isNight),
-            windSpeed: Math.round(h.wind_speed * 1.94384),
-            windDirection: getWindDirection(h.wind_deg),
-            stability: stability,
-            isNight: isNight,
-            temp: Math.round(h.temp),
-            tideHeight: 0, // Placeholder
-            tideCurrent: 'Nul', // Placeholder
-            tidePeakType: undefined,
-        }
-    }).slice(0, 48);
-    
-    // Add hourly tide data to the now-populated hourly weather forecast
-    const hourlyTideData = calculateHourlyTides(location, date);
-    proceduralData.weather.hourly.forEach(forecast => {
-        const forecastDate = new Date(forecast.date);
-        const correspondingTide = hourlyTideData.find(t => {
-            const tideDate = new Date(t.date);
-            return tideDate.getDate() === forecastDate.getDate() && tideDate.getHours() === forecastDate.getHours();
-        });
-        if (correspondingTide) {
-            forecast.tideHeight = correspondingTide.tideHeight;
-            forecast.tideCurrent = correspondingTide.tideCurrent;
-            forecast.tidePeakType = correspondingTide.tidePeakType;
-        }
-    });
-
-
-    proceduralData.weather.trend = mapWeatherCondition(todayForecast.weather[0].id, false);
-    if(todayForecast.rain) {
-        proceduralData.weather.rain = todayForecast.rain > 5 ? 'Forte' : 'Fine';
-    } else {
-        proceduralData.weather.rain = 'Aucune';
-    }
-    
-    if(proceduralData.weather.hourly.length > 18) {
-        proceduralData.weather.wind[0] = { ...proceduralData.weather.hourly[6], time: '06:00' };
-        proceduralData.weather.wind[1] = { ...proceduralData.weather.hourly[12], time: '12:00' };
-        proceduralData.weather.wind[2] = { ...proceduralData.weather.hourly[18], time: '18:00' };
-    }
-
-    return proceduralData;
-  } catch (error) {
-    console.error("Failed to fetch weather data:", error);
-    return proceduralData;
-  }
-}
-
-
-export function getAvailableLocations(): string[] {
-  return Object.keys(communeToTideStationMap).sort();
+  // All API fetching logic has been removed to ensure the app is self-contained and free.
+  // The data is now fully procedural, eliminating external API errors and costs.
+  return proceduralData;
 }
 
 

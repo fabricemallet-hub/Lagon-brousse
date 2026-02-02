@@ -372,17 +372,21 @@ function PecheLegend() {
 
 function DetailDialogSkeleton() {
   return (
-    <div className="space-y-4 py-4">
-      <Skeleton className="h-8 w-3/4" />
-      <Skeleton className="h-5 w-1/2" />
-      <div className="space-y-4 pt-4">
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-24 w-full" />
-        <Skeleton className="h-24 w-full" />
+    <>
+      <DialogHeader>
+        <DialogTitle><Skeleton className="h-7 w-3/4" /></DialogTitle>
+        <DialogDescription><Skeleton className="h-4 w-1/2" /></DialogDescription>
+      </DialogHeader>
+      <div className="space-y-4 py-4">
+        <div className="space-y-4 pt-4">
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </div>
       </div>
-    </div>
-  )
+    </>
+  );
 }
 
 function ChampsDetailDialogContent({
@@ -396,13 +400,10 @@ function ChampsDetailDialogContent({
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchData() {
-      setIsLoading(true);
-      const fetchedData = await getDataForDate(location, day);
-      setData(fetchedData);
-      setIsLoading(false);
-    }
-    fetchData();
+    setIsLoading(true);
+    const fetchedData = getDataForDate(location, day);
+    setData(fetchedData);
+    setIsLoading(false);
   }, [location, day]);
 
   const dateString = format(day, 'eeee d MMMM yyyy', { locale: fr });
@@ -523,13 +524,10 @@ function PecheDetailDialogContent({
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchData() {
-      setIsLoading(true);
-      const fetchedData = await getDataForDate(location, day);
-      setData(fetchedData);
-      setIsLoading(false);
-    }
-    fetchData();
+    setIsLoading(true);
+    const fetchedData = getDataForDate(location, day);
+    setData(fetchedData);
+    setIsLoading(false);
   }, [location, day]);
 
   const dateString = format(day, 'eeee d MMMM yyyy', { locale: fr });

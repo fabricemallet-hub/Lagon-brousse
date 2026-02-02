@@ -1,6 +1,6 @@
 'use client';
 
-import { getAvailableLocations } from '@/lib/data';
+import { locations as locationsMap } from '@/lib/locations';
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState } from 'react';
 
@@ -15,7 +15,7 @@ const LocationContext = createContext<LocationContextType | undefined>(
 );
 
 export function LocationProvider({ children }: { children: ReactNode }) {
-  const locations = getAvailableLocations();
+  const locations = Object.keys(locationsMap);
   const [selectedLocation, setSelectedLocation] = useState<string>('Nouméa');
 
   const value = {
