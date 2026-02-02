@@ -660,7 +660,7 @@ function HuntingSessionContent() {
                  <div className={cn("relative w-full rounded-lg overflow-hidden border", isFullscreen ? "flex-grow" : "h-80 mb-4")}>
                     <GoogleMap
                         mapContainerClassName="w-full h-full"
-                        center={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : { lat: -21.45, lng: 165.5 }}
+                        center={(userLocation && userLocation.latitude && userLocation.longitude) ? { lat: userLocation.latitude, lng: userLocation.longitude } : { lat: -21.45, lng: 165.5 }}
                         zoom={initialZoomDone ? zoom : 8}
                         onLoad={onLoad}
                         onUnmount={onUnmount}
@@ -673,7 +673,7 @@ function HuntingSessionContent() {
                             mapTypeId: mapTypeId as google.maps.MapTypeId
                         }}
                     >
-                        {myParticipant && userLocation && (
+                        {myParticipant && userLocation && userLocation.latitude && userLocation.longitude && (
                           <Fragment>
                             <MarkerF
                               position={{ lat: userLocation.latitude, lng: userLocation.longitude }}
@@ -690,8 +690,8 @@ function HuntingSessionContent() {
                                 position={{ lat: userLocation.latitude, lng: userLocation.longitude }}
                                 mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                             >
-                                <div style={{ transform: 'translate(-50%, -170%)' }}>
-                                  <div className="px-2 py-0.5 rounded-md text-xs font-bold text-white bg-black/60 whitespace-nowrap">
+                                <div style={{ transform: 'translate(-50%, -26px)' }}>
+                                  <div className="px-2 py-0.5 text-xs font-bold text-white [text-shadow:0_1px_3px_rgb(0_0_0_/_70%)] whitespace-nowrap">
                                       {myParticipant.displayName}
                                   </div>
                                 </div>
@@ -710,7 +710,7 @@ function HuntingSessionContent() {
                                     mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                                 >
                                     <div className="flex flex-col items-center" style={{ transform: 'translate(-50%, -100%)' }}>
-                                        <div className="px-2 py-0.5 rounded-md text-xs font-bold text-white bg-black/60 mb-1 whitespace-nowrap">
+                                        <div className="px-2 pb-0.5 text-xs font-bold text-white [text-shadow:0_1px_3px_rgb(0_0_0_/_70%)] whitespace-nowrap">
                                             {p.displayName}
                                         </div>
                                         <div
@@ -898,3 +898,5 @@ export function HuntingSessionCard() {
 
   return <HuntingSessionContent />;
 }
+
+    
