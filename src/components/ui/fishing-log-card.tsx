@@ -296,15 +296,27 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                 </OverlayView>
                             )}
                             {savedSpots?.map(spot => (
-                                <MarkerF 
-                                    key={spot.id} 
-                                    position={{ lat: spot.location.latitude, lng: spot.location.longitude }}
-                                    icon={{
-                                        url: createMarkerIconSvg(spot.color, spot.icon as keyof typeof mapIcons),
-                                        scaledSize: new window.google.maps.Size(32, 32),
-                                        anchor: new window.google.maps.Point(16, 16),
-                                    }}
-                                />
+                                <React.Fragment key={spot.id}>
+                                    <MarkerF 
+                                        position={{ lat: spot.location.latitude, lng: spot.location.longitude }}
+                                        icon={{
+                                            url: createMarkerIconSvg(spot.color, spot.icon as keyof typeof mapIcons),
+                                            scaledSize: new window.google.maps.Size(32, 32),
+                                            anchor: new window.google.maps.Point(16, 16),
+                                        }}
+                                    />
+                                    <OverlayView
+                                        position={{ lat: spot.location.latitude, lng: spot.location.longitude }}
+                                        mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                                    >
+                                        <div 
+                                            style={{ transform: 'translate(-50%, -150%)' }} 
+                                            className="px-2 py-0.5 bg-card/90 border border-border rounded-md shadow text-xs font-bold text-card-foreground whitespace-nowrap"
+                                        >
+                                            {spot.name}
+                                        </div>
+                                    </OverlayView>
+                                </React.Fragment>
                             ))}
                             {newSpotLocation && (
                                 <MarkerF 
