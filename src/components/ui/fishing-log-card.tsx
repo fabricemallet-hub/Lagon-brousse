@@ -674,7 +674,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                         className="border-b"
                                     >
                                        <div className="flex items-center w-full">
-                                            <span className="pl-4 py-4" onClick={(e) => {e.preventDefault(); e.stopPropagation(); handleSpotSelection(spot.id)}}>
+                                            <span className="pl-4 py-4" onClick={(e) => { e.stopPropagation(); }}>
                                                 <Checkbox
                                                     id={`select-spot-${spot.id}`}
                                                     className="size-5"
