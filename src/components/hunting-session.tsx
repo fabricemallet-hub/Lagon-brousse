@@ -61,6 +61,7 @@ import {
   updateDoc,
   writeBatch,
   getDocs,
+  deleteField,
 } from 'firebase/firestore';
 import type { WithId } from '@/firebase';
 import type { HuntingSession, SessionParticipant, UserAccount } from '@/lib/types';
@@ -395,7 +396,7 @@ function HuntingSessionContent() {
       setBaseStatus(myParticipant.baseStatus);
       setIsGibierEnVue(!!myParticipant.isGibierEnVue);
     }
-  }, [myParticipant]);
+  }, [myParticipant, userLocation]);
 
   useEffect(() => {
     if (isParticipating && session && !updateIntervalRef.current) {
@@ -428,7 +429,7 @@ function HuntingSessionContent() {
   }, [map, initialCenter, initialZoomDone]);
 
   useEffect(() => {
-    if (map && userLocation && !initialZoomDone && userLocation.latitude && userLocation.longitude) {
+    if (map && userLocation && !initialZoomDone && typeof userLocation.latitude === 'number' && typeof userLocation.longitude === 'number') {
       map.panTo({ lat: userLocation.latitude, lng: userLocation.longitude });
       map.setZoom(16);
       setInitialZoomDone(true);
@@ -618,7 +619,7 @@ function HuntingSessionContent() {
     }
   };
 
-  const updateStatusInFirestore = async (updateData: Partial<SessionParticipant>) => {
+  const updateStatusInFirestore = async (updateData: { [key: string]: any }) => {
     if (!user || !firestore || !session) return;
     const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
     try {
@@ -650,9 +651,16 @@ function HuntingSessionContent() {
   };
   
   const handleBaseStatusChange = (status: NonNullable<SessionParticipant['baseStatus']>) => {
-    const newBaseStatus = baseStatus === status ? undefined : status;
+    const isTogglingOff = baseStatus === status;
+    const newBaseStatus = isTogglingOff ? undefined : status;
     setBaseStatus(newBaseStatus);
-    updateStatusInFirestore({ baseStatus: newBaseStatus });
+  
+    const updatePayload = {
+      baseStatus: isTogglingOff ? deleteField() : status
+    };
+    
+    updateStatusInFirestore(updatePayload);
+  
     if(newBaseStatus) {
         triggerFlash(newBaseStatus, newBaseStatus === 'En position' ? 'text-green-500' : 'text-blue-500');
     }
@@ -737,19 +745,15 @@ function HuntingSessionContent() {
     navigator.geolocation.getCurrentPosition(
         (position) => {
             const { latitude, longitude } = position.coords;
-            const newLocation = { lat: latitude, lng: longitude };
             if (!latitude || !longitude) return;
-
-            // Update state for immediate UI feedback
-            setUserLocation({latitude, longitude});
+            const newLocation = { lat: latitude, lng: longitude };
             
-            // Update Firestore in the background
+            setUserLocation({latitude, longitude});
             updateFirestorePosition(latitude, longitude);
 
-            // Pan the map to the new location
             if (map) {
                 map.panTo(newLocation);
-                if(map.getZoom()! < 14) { // only zoom in if user is zoomed out
+                if(map.getZoom()! < 14) {
                     map.setZoom(16);
                 }
             }
@@ -757,7 +761,7 @@ function HuntingSessionContent() {
         (err) => {
             console.error("Error getting geolocation for recenter:", err);
             let description = "Impossible d'obtenir votre position actuelle.";
-            if (err.code === 1) { // User denied Geolocation
+            if (err.code === 1) {
               description = "Veuillez activer la géolocalisation dans les paramètres de votre navigateur.";
             }
             toast({
@@ -902,17 +906,15 @@ function HuntingSessionContent() {
 
                         {otherParticipants?.map(p => {
                             if (!p.location || typeof p.location.latitude !== 'number' || typeof p.location.longitude !== 'number') return null;
-                            const IconComponent = iconMap[p.mapIcon as keyof typeof iconMap] || Navigation;
-                            
-                            return (
+                             return (
                                 <OverlayView
                                     key={p.id}
                                     position={{ lat: p.location.latitude, lng: p.location.longitude }}
                                     mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                                 >
                                     <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center">
-                                        <div className="flex items-baseline gap-2 px-2 pb-0.5 text-xs font-bold text-white [text-shadow:0_1px_3px_rgb(0_0_0_/_70%)] whitespace-nowrap" style={{ transform: 'translateY(-20px)'}}>
-                                            <span>{p.displayName}</span>
+                                        <div className="px-2 pb-0.5 text-xs font-bold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.7)] whitespace-nowrap" style={{ transform: 'translateY(-20px)'}}>
+                                            <span className="mr-1">{p.displayName}</span>
                                             {(() => {
                                               const statusDisplay = getStatusDisplay(p);
                                               return statusDisplay.text && (
@@ -923,10 +925,10 @@ function HuntingSessionContent() {
                                             })()}
                                         </div>
                                         <div
-                                            className="p-1.5 rounded-full flex flex-col items-center justify-center shadow-lg border"
+                                            className="p-1.5 rounded-full flex items-center justify-center shadow-lg border"
                                             style={{ backgroundColor: p.mapColor || '#3b82f6' }}
                                         >
-                                            <IconComponent
+                                            <UserIcon
                                                 className="size-5 drop-shadow-md text-white"
                                             />
                                         </div>

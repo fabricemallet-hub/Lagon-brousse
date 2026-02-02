@@ -68,8 +68,11 @@ service cloud.firestore {
         // A user can only manage their own participant document.
         allow create, update, delete: if isOwner(userId);
         
-        // Any valid participant in the session can read the participant list.
-        allow get, list: if exists(/databases/$(database)/documents/hunting_sessions/$(sessionId)/participants/$(request.auth.uid));
+        // A signed-in user can get a specific participant document (e.g., to find the organizer).
+        allow get: if isSignedIn();
+        
+        // Only an existing participant can list all other participants.
+        allow list: if exists(/databases/$(database)/documents/hunting_sessions/$(sessionId)/participants/$(request.auth.uid));
       }
     }
 
