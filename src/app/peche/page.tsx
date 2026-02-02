@@ -59,9 +59,9 @@ export default function PechePage() {
   const getTideIcon = (movement: 'montante' | 'descendante' | 'étale') => {
     switch (movement) {
       case 'montante':
-        return <TrendingUp className="h-4 w-4 text-green-500" />;
+        return <TrendingUp className="h-4 w-4 text-primary" />;
       case 'descendante':
-        return <TrendingDown className="h-4 w-4 text-red-500" />;
+        return <TrendingDown className="h-4 w-4 text-destructive" />;
       default:
         return null;
     }
@@ -179,7 +179,9 @@ export default function PechePage() {
                     ) : (
                       <>
                         {getTideIcon(slot.tideMovement)}
-                        <span className="capitalize">{slot.tideMovement}</span>
+                        <span className={cn("capitalize font-semibold", slot.tideMovement === 'montante' ? 'text-primary' : 'text-destructive')}>
+                          {slot.tideMovement}
+                        </span>
                       </>
                     )}
                   </div>
@@ -238,5 +240,3 @@ export default function PechePage() {
     </div>
   );
 }
-
-    
