@@ -77,12 +77,7 @@ export const communeToTideStationMap: { [key: string]: string } = {
 // Base data for all locations, tides will be added dynamically.
 const baseData: Omit<LocationData, 'tides' | 'tideStation'> = {
   weather: {
-    wind: [
-      { time: '00:00', speed: 5, direction: 'E', stability: 'Stable' },
-      { time: '06:00', speed: 8, direction: 'SE', stability: 'Stable' },
-      { time: '12:00', speed: 11, direction: 'S', stability: 'Stable' },
-      { time: '18:00', speed: 6, direction: 'SE', stability: 'Tournant' },
-    ],
+    wind: [],
     swell: [],
     sun: { sunrise: '06:31', sunset: '17:45' },
     moon: { moonrise: '12:05', moonset: '23:55', phase: 'Premier quartier', percentage: 50 },
@@ -427,14 +422,14 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   // Fishing rating
   locationData.fishing.forEach((slot) => {
     slot.fish.forEach((f) => {
-      // Start with a base rating of 4/10 for more variation.
-      let rating = 4;
+      // Start with a base rating of 2/10 for more variation and stricter scoring.
+      let rating = 2;
 
       // 1. Time of day bonus/penalty is now more pronounced.
       if (slot.timeOfDay.includes('Aube') || slot.timeOfDay.includes('Crépuscule')) {
-        rating += 2; // Prime time
+        rating += 3; // Prime time gets a significant boost.
       } else {
-        rating -= 2; // Mid-day is generally less active.
+        rating -= 1; // Mid-day is generally less active.
       }
 
       // 2. Tide movement is critical. Increased penalty for slack tide.
@@ -450,7 +445,7 @@ export function generateProceduralData(location: string, date: Date): LocationDa
       const isNearQuarterMoon = (dayInCycle >= 4 && dayInCycle <= 10.75) || (dayInCycle >= 18.75 && dayInCycle <= 25.5);
 
       if (isNearNewOrFullMoon) {
-        rating += 2; // Strong bonus for new/full moon springs tides.
+        rating += 3; // Strong bonus for new/full moon springs tides.
       } else if (isNearQuarterMoon) {
         rating -= 2; // Stronger penalty for quarter moons (neap tides).
       }
