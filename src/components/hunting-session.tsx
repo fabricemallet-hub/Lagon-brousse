@@ -91,50 +91,53 @@ export function HuntingSessionCard() {
   const updateIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isParticipating, setIsParticipating] = useState(false);
   const [map, setMap] = useState<google.maps.Map | null>(null);
-
-  const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  
+  const googleMapsApiKey = "AIzaSyDCkKWAl86pviQm3jdH07CqQkJeqHL62JM";
   const { isLoaded, loadError } = useJsApiLoader({
-      googleMapsApiKey: googleMapsApiKey || "",
+      googleMapsApiKey: googleMapsApiKey,
       preventGoogleFontsLoading: true,
   });
-  
+
   const handleLeaveSession = useCallback(async () => {
-     if (updateIntervalRef.current) {
+    if (updateIntervalRef.current) {
         clearInterval(updateIntervalRef.current);
         updateIntervalRef.current = null;
-      }
-     if (!user || !session || !firestore) {
-         setSession(null);
-         setIsParticipating(false);
-         return;
-     };
-     setIsLoading(true);
+    }
+    
+    // Immediately update UI state
+    const previousSessionId = session?.id;
+    setSession(null);
+    setIsParticipating(false);
+    setUserLocation(null);
 
-     try {
-       const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
-       await deleteDoc(participantDocRef);
-       
-     } catch (e: any) {
-        if (e.name === 'FirebaseError' || e.code === 'permission-denied') {
+    if (!user || !previousSessionId || !firestore) {
+        return;
+    }
+
+    setIsLoading(true);
+    try {
+        const participantDocRef = doc(firestore, 'hunting_sessions', previousSessionId, 'participants', user.uid);
+        await deleteDoc(participantDocRef);
+        toast({ title: 'Vous avez quitté la session.' });
+    } catch (e: any) {
+        // Error handling for deletion
+        if (e.code === 'permission-denied') {
             const permissionError = new FirestorePermissionError({
-                path: `hunting_sessions/${session.id}/participants/${user.uid}`,
+                path: `hunting_sessions/${previousSessionId}/participants/${user.uid}`,
                 operation: 'delete',
             });
             errorEmitter.emit('permission-error', permissionError);
         } else {
-            setError(e.message);
+            console.error("Failed to leave session:", e);
+            setError("Erreur lors de la déconnexion de la session.");
         }
-     } finally {
-        setSession(null);
-        setIsParticipating(false);
-        setUserLocation(null);
+    } finally {
         setIsLoading(false);
-        toast({ title: 'Vous avez quitté la session.' });
-     }
-  }, [user, session, firestore, toast]);
-  
-  const handleUpdatePosition = useCallback(async () => {
-    if (!user || !session || !firestore || !isParticipating) return;
+    }
+}, [user, session, firestore, toast]);
+
+  const handleUpdatePosition = useCallback(async (currentSession: WithId<HuntingSession>) => {
+    if (!user || !firestore) return;
 
     try {
         const position = await new Promise<GeolocationPosition>((resolve, reject) => {
@@ -154,15 +157,13 @@ export function HuntingSessionCard() {
             batteryData = { level: battery.level, charging: battery.charging };
         }
 
-        const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
-        const participantData: Partial<SessionParticipant> = {
-            displayName: user.displayName || user.email || 'Chasseur',
+        const participantDocRef = doc(firestore, 'hunting_sessions', currentSession.id, 'participants', user.uid);
+        
+        await updateDoc(participantDocRef, {
             location: { latitude, longitude },
             battery: batteryData,
             updatedAt: serverTimestamp(),
-        };
-
-        await setDoc(participantDocRef, participantData, { merge: true });
+        });
 
     } catch (err: any) {
         console.error("Error during periodic position update:", err);
@@ -170,25 +171,32 @@ export function HuntingSessionCard() {
           toast({
             variant: "destructive",
             title: "Géolocalisation refusée",
-            description: "Vous avez été déconnecté de la session car la géolocalisation est requise.",
+            description: "La géolocalisation est requise. Déconnexion de la session.",
           });
           handleLeaveSession();
         }
     }
-  }, [user, session, firestore, isParticipating, handleLeaveSession, toast]);
+  }, [user, firestore, handleLeaveSession, toast]);
+  
+  const setupAndStartUpdates = useCallback((sessionToUpdate: WithId<HuntingSession>) => {
+    handleUpdatePosition(sessionToUpdate); // Initial update
+    const intervalId = setInterval(() => handleUpdatePosition(sessionToUpdate), 30000);
+    updateIntervalRef.current = intervalId;
+    
+    return () => {
+        if (updateIntervalRef.current) {
+            clearInterval(updateIntervalRef.current);
+            updateIntervalRef.current = null;
+        }
+    };
+}, [handleUpdatePosition]);
 
   useEffect(() => {
-    if (isParticipating && user && session) {
-      handleUpdatePosition(); // Initial update
-      const intervalId = setInterval(handleUpdatePosition, 30000);
-      updateIntervalRef.current = intervalId;
-
-      return () => {
-        clearInterval(intervalId);
-        updateIntervalRef.current = null;
-      };
+    if (isParticipating && session) {
+      const cleanup = setupAndStartUpdates(session);
+      return cleanup;
     }
-  }, [isParticipating, user, session, handleUpdatePosition]);
+  }, [isParticipating, session, setupAndStartUpdates]);
 
   const participantsCollectionRef = useMemoFirebase(() => {
     if (!firestore || !session || !isParticipating) return null;
@@ -217,6 +225,17 @@ export function HuntingSessionCard() {
     }
     throw new Error('Impossible de générer un code unique.');
   };
+  
+  const createParticipantDocument = useCallback(async (sessionId: string) => {
+    if (!user || !firestore) throw new Error("User or Firestore not available");
+
+    const participantDocRef = doc(firestore, 'hunting_sessions', sessionId, 'participants', user.uid);
+    const participantData: Omit<SessionParticipant, 'id' | 'location' | 'battery'> = {
+        displayName: user.displayName || user.email || 'Chasseur',
+        updatedAt: serverTimestamp(),
+    };
+    await setDoc(participantDocRef, participantData);
+}, [user, firestore]);
 
   const handleCreateSession = async () => {
     if (!user || !firestore) return;
@@ -228,23 +247,20 @@ export function HuntingSessionCard() {
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + 24);
 
-        const sessionDocData: Omit<HuntingSession, 'id'> = {
+        const newSessionData: Omit<HuntingSession, 'id'> = {
           organizerId: user.uid,
           createdAt: serverTimestamp(),
           expiresAt: Timestamp.fromDate(expiresAt),
         };
         
-        await setDoc(doc(firestore, 'hunting_sessions', code), sessionDocData);
-        setSession({ id: code, ...sessionDocData });
+        await setDoc(doc(firestore, 'hunting_sessions', code), newSessionData);
         
-        const participantDocRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
-        const participantData: Omit<SessionParticipant, 'id'> = {
-            displayName: user.displayName || user.email || 'Chasseur',
-            updatedAt: serverTimestamp()
-        };
-        await setDoc(participantDocRef, participantData);
+        // Wait for participant doc to be created before setting state
+        await createParticipantDocument(code);
         
+        setSession({ id: code, ...newSessionData });
         setIsParticipating(true);
+        
         toast({
             title: 'Session créée !',
             description: `Le code de votre session est : ${code}`,
@@ -276,21 +292,18 @@ export function HuntingSessionCard() {
       const sessionData = sessionDoc.data() as HuntingSession;
 
       if (sessionData.expiresAt && (sessionData.expiresAt as Timestamp).toDate() < new Date()) {
-         throw new Error('Cette session a expiré.');
+         await deleteDoc(sessionDocRef); // Clean up expired session
+         throw new Error('Cette session a expiré et a été supprimée.');
       }
       
-      const participantDocRef = doc(firestore, 'hunting_sessions', sessionId, 'participants', user.uid);
-      const participantData: Omit<SessionParticipant, 'id'> = {
-          displayName: user.displayName || user.email || 'Chasseur',
-          updatedAt: serverTimestamp(),
-      };
-      
-      await setDoc(participantDocRef, participantData);
-      
+      // Wait for participant doc to be created
+      await createParticipantDocument(sessionId);
+
       setSession({ id: sessionDoc.id, ...sessionData });
       setIsParticipating(true);
+
     } catch (e: any) {
-        if (e.name === 'FirebaseError' || e.code === 'permission-denied') {
+        if (e.code === 'permission-denied') {
              const permissionError = new FirestorePermissionError({
                 path: `hunting_sessions/${joinCode.toUpperCase()}`,
                 operation: 'get',
@@ -316,19 +329,13 @@ export function HuntingSessionCard() {
   }
 
   const onLoad = useCallback(function callback(mapInstance: google.maps.Map) {
-    if (userLocation) {
-        const center = new window.google.maps.LatLng(userLocation.latitude, userLocation.longitude);
-        mapInstance.setCenter(center);
-        mapInstance.setZoom(13); // Zoom for ~10km radius
-    } else {
-        const ncBounds = new window.google.maps.LatLngBounds(
-            new window.google.maps.LatLng(-22.8, 163.5),
-            new window.google.maps.LatLng(-19.6, 168.1)
-        );
-        mapInstance.fitBounds(ncBounds);
-    }
+    const ncBounds = new window.google.maps.LatLngBounds(
+        new window.google.maps.LatLng(-22.8, 163.5),
+        new window.google.maps.LatLng(-19.6, 168.1)
+    );
+    mapInstance.fitBounds(ncBounds);
     setMap(mapInstance);
-  }, [userLocation]);
+  }, []);
 
 
   const onUnmount = useCallback(function callback(map: google.maps.Map) {
@@ -375,30 +382,25 @@ export function HuntingSessionCard() {
   }
 
   if (session) {
-    if (!googleMapsApiKey) {
-        return (
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                         <div className="flex items-center gap-2">
-                            <Users className="size-5 text-primary" />
-                            Session de Chasse Active
-                        </div>
-                        <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isLoading}><LogOut/> Quitter</Button>
-                    </CardTitle>
-                    <CardDescription>Partagez votre position avec votre groupe en temps réel.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Alert variant="destructive">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>Clé API Google Maps manquante</AlertTitle>
-                        <AlertDescription>
-                            La variable d'environnement `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` n'est pas définie dans votre fichier `.env`. La carte ne peut pas se charger sans elle.
-                        </AlertDescription>
-                    </Alert>
-                </CardContent>
-            </Card>
-        );
+    if (!isLoaded) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="size-5 text-primary" />
+                Session de Chasse Active
+              </div>
+              <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isLoading}><LogOut/> Quitter</Button>
+            </CardTitle>
+            <CardDescription>Partagez votre position avec votre groupe en temps réel.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="w-full aspect-square rounded-lg" />
+            <p className="text-sm text-center text-muted-foreground mt-2">Chargement de la carte...</p>
+          </CardContent>
+        </Card>
+      )
     }
 
     if (loadError) {
@@ -422,20 +424,18 @@ export function HuntingSessionCard() {
                         <p>L'erreur `InvalidKeyMapError` signifie que votre clé API n'est pas acceptée par Google. Veuillez suivre ces étapes :</p>
                         <ol className="list-decimal list-inside text-xs space-y-1">
                             <li>
-                                **Vérifiez la clé :** Assurez-vous que la clé dans votre fichier `.env` est correcte et ne contient pas de fautes de frappe.
+                                **Vérifiez la clé :** Assurez-vous que la clé API dans votre environnement est correcte.
                             </li>
                             <li>
-                                **Vérifiez les restrictions d'API :** Allez sur votre <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="underline">console Google Cloud</a> et vérifiez que votre clé API a bien les restrictions suivantes sous "Restrictions liées aux sites Web":
+                                **Vérifiez les restrictions d'API :** Allez sur votre <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="underline">console Google Cloud</a> et vérifiez que votre clé API a bien les restrictions de "Référents HTTP" suivantes :
                                 <ul className="list-disc list-inside pl-4 mt-1">
                                     <li><code>*.cloudworkstations.dev/*</code></li>
                                     <li><code>studio.firebase.google.com/*</code></li>
                                 </ul>
+                                <p className="mt-1">Si le problème persiste, essayez de supprimer temporairement toutes les restrictions pour confirmer que la clé fonctionne.</p>
                             </li>
                             <li>
                                 **Activez l'API :** Dans la console Google, assurez-vous que l'API "Maps JavaScript API" est bien activée pour votre projet.
-                            </li>
-                            <li>
-                                **Redémarrez le serveur :** Après avoir modifié le fichier `.env` ou les restrictions, il est parfois nécessaire de redémarrer le serveur de développement.
                             </li>
                         </ol>
                     </AlertDescription>
@@ -443,26 +443,6 @@ export function HuntingSessionCard() {
             </CardContent>
         </Card>
       );
-    }
-
-    if (!isLoaded) {
-      return (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Users className="size-5 text-primary" />
-                Session de Chasse Active
-              </div>
-              <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isLoading}><LogOut/> Quitter</Button>
-            </CardTitle>
-            <CardDescription>Partagez votre position avec votre groupe en temps réel.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="w-full aspect-square rounded-lg" />
-          </CardContent>
-        </Card>
-      )
     }
 
     return (
@@ -490,8 +470,6 @@ export function HuntingSessionCard() {
             <div className="relative w-full aspect-square rounded-lg overflow-hidden border">
                 <GoogleMap
                   mapContainerStyle={{ width: '100%', height: '100%' }}
-                  center={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : { lat: -21.5, lng: 165.5 }}
-                  zoom={userLocation ? 13 : 7}
                   onLoad={onLoad}
                   onUnmount={onUnmount}
                   options={{
@@ -610,5 +588,3 @@ export function HuntingSessionCard() {
     </Card>
   );
 }
-
-    
