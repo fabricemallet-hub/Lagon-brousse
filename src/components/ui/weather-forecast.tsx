@@ -262,21 +262,25 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
                   <div className="border-t w-full my-0.5"></div>
 
                   <div className="w-full space-y-0.5 text-[10px]">
-                    <div className="flex items-center justify-center gap-1" title="Hauteur de la marée">
-                        <Waves className="size-3 text-muted-foreground" />
-                        <span className="font-semibold">{forecast.tideHeight.toFixed(1)}m</span>
+                    <div className="flex items-center justify-center" title="Hauteur de la marée">
+                      <span className="text-muted-foreground mr-1">Hauteur:</span>
+                      <Waves className="size-3 text-muted-foreground" />
+                      <span className="font-semibold ml-1">{forecast.tideHeight.toFixed(1)}m</span>
                     </div>
-                    <div className="flex items-center justify-center gap-1 h-5" title="Force du courant">
+                    <div className="flex items-center justify-center h-5" title="Force du courant">
+                        <span className="text-muted-foreground mr-1">Courant:</span>
                         <Zap className="size-3 text-muted-foreground" />
-                        {forecast.tidePeakType ? (
-                            <Badge variant={forecast.tidePeakType === 'haute' ? 'default' : 'destructive'} className="h-4 px-1 text-[8px] font-semibold leading-none">
-                                {forecast.tidePeakType === 'haute' ? 'Pleine' : 'Basse'}
-                            </Badge>
-                        ) : forecast.tideCurrent === 'Nul' ? (
-                            <Badge variant="secondary" className="h-4 px-1 text-[8px] font-semibold leading-none">Étale</Badge>
-                        ) : (
-                            <span className="font-semibold text-[10px]">{forecast.tideCurrent}</span>
-                        )}
+                        <div className="ml-1 flex items-center">
+                            {forecast.tidePeakType ? (
+                                <Badge variant={forecast.tidePeakType === 'haute' ? 'default' : 'destructive'} className="h-4 px-1 text-[8px] font-semibold leading-none">
+                                    {forecast.tidePeakType === 'haute' ? 'Pleine' : 'Basse'}
+                                </Badge>
+                            ) : forecast.tideCurrent === 'Nul' ? (
+                                <Badge variant="secondary" className="h-4 px-1 text-[8px] font-semibold leading-none">Étale</Badge>
+                            ) : (
+                                <span className="font-semibold text-[10px]">{forecast.tideCurrent}</span>
+                            )}
+                        </div>
                     </div>
                   </div>
                 </div>
