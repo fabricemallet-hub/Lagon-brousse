@@ -102,7 +102,7 @@ service cloud.firestore {
      */
     match /hunting_sessions/{sessionId} {
       allow create: if isSignedIn();
-      allow get: if isOwner(resource.data.organizerId) || exists(/databases/$(database)/documents/hunting_sessions/$(sessionId)/participants/$(request.auth.uid));
+      allow get: if isSignedIn();
       allow delete: if isOwner(resource.data.organizerId);
       allow list: if false;
 

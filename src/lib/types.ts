@@ -160,8 +160,6 @@ export interface SessionParticipant {
 }
 
 export interface HuntingSession {
-  id: string; // document ID
-  code: string;
   organizerId: string;
   createdAt: any; // Firestore ServerTimestamp
   expiresAt: any; // Firestore ServerTimestamp for TTL

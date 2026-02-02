@@ -33,7 +33,6 @@ import {
   BatteryMedium,
   BatteryLow,
   BatteryCharging,
-  BatteryWarning,
   LocateFixed,
   AlertCircle,
 } from 'lucide-react';
@@ -42,12 +41,15 @@ import {
   useFirestore,
   useCollection,
   useMemoFirebase,
+  errorEmitter,
+  FirestorePermissionError
 } from '@/firebase';
 import {
   collection,
   query,
   where,
   getDocs,
+  getDoc,
   addDoc,
   serverTimestamp,
   doc,
@@ -186,16 +188,24 @@ export function HuntingSessionCard() {
         }
 
         const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
-        await setDoc(participantDocRef, {
-            displayName: user.displayName,
+        const participantData: Omit<SessionParticipant, 'id'> = {
+            displayName: user.displayName || 'Chasseur Anonyme',
             location: { latitude, longitude },
             battery: batteryData,
             updatedAt: serverTimestamp(),
-        }, { merge: true });
+        };
+
+        await setDoc(participantDocRef, participantData, { merge: true });
 
     } catch (err: any) {
         console.error("Error updating position:", err);
-        if (err.code === 1) { // PERMISSION_DENIED
+        if (err.name === 'FirebaseError' && err.code === 'permission-denied') {
+             const permissionError = new FirestorePermissionError({
+                path: `hunting_sessions/${session?.id}/participants/${user.uid}`,
+                operation: 'write',
+             });
+             errorEmitter.emit('permission-error', permissionError);
+        } else if (err.code === 1) { // PERMISSION_DENIED
           setError("La géolocalisation est requise. Veuillez l'activer dans les paramètres de votre navigateur.");
           handleLeaveSession(); // Kick user out if they deny permission
         }
@@ -223,6 +233,7 @@ export function HuntingSessionCard() {
 
 
   const generateUniqueCode = async (): Promise<string> => {
+    if (!firestore) throw new Error("Firestore not initialized");
     const chars = '0123456789';
     let code: string;
     let attempts = 0;
@@ -231,12 +242,10 @@ export function HuntingSessionCard() {
       for (let i = 0; i < 4; i++) {
         code += chars.charAt(Math.floor(Math.random() * chars.length));
       }
-      const q = query(
-        collection(firestore!, 'hunting_sessions'),
-        where('code', '==', code)
-      );
-      const snapshot = await getDocs(q);
-      if (snapshot.empty) {
+      const sessionDocRef = doc(firestore, 'hunting_sessions', code);
+      const docSnap = await getDoc(sessionDocRef);
+
+      if (!docSnap.exists()) {
         return code;
       }
       attempts++;
@@ -244,41 +253,50 @@ export function HuntingSessionCard() {
     throw new Error('Impossible de générer un code unique.');
   };
 
-  const handleCreateSession = async () => {
+  const handleCreateSession = () => {
     if (!user || !firestore) return;
     setIsLoading(true);
     setError(null);
-    try {
-      const code = await generateUniqueCode();
-      const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + 24);
 
-      const sessionDoc = await addDoc(
-        collection(firestore, 'hunting_sessions'),
-        {
-          code,
+    const create = async () => {
+        const code = await generateUniqueCode();
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 24);
+
+        const docData: Omit<HuntingSession, 'id'> = {
           organizerId: user.uid,
           createdAt: serverTimestamp(),
           expiresAt: Timestamp.fromDate(expiresAt),
-        }
-      );
-      
-      setSession({ id: sessionDoc.id, code, organizerId: user.uid, createdAt: new Date(), expiresAt });
-
-      toast({
-        title: 'Session créée !',
-        description: `Le code de votre session est : ${code}`,
-      });
-    } catch (e: any) {
-      setError(e.message);
-      toast({
-        variant: 'destructive',
-        title: 'Erreur',
-        description: e.message,
-      });
-    } finally {
-      setIsLoading(false);
+        };
+        const sessionDocRef = doc(firestore, 'hunting_sessions', code);
+        
+        setDoc(sessionDocRef, docData).then(() => {
+             setSession({ id: code, ...docData });
+             toast({
+                title: 'Session créée !',
+                description: `Le code de votre session est : ${code}`,
+            });
+            setIsLoading(false);
+        }).catch((serverError) => {
+            const permissionError = new FirestorePermissionError({
+                path: sessionDocRef.path,
+                operation: 'create',
+                requestResourceData: docData,
+            });
+            errorEmitter.emit('permission-error', permissionError);
+            setIsLoading(false);
+        });
     }
+
+    create().catch(e => {
+        setError(e.message);
+        toast({
+            variant: 'destructive',
+            title: 'Erreur de création',
+            description: e.message,
+        });
+        setIsLoading(false);
+    });
   };
   
   const handleJoinSession = async () => {
@@ -286,30 +304,35 @@ export function HuntingSessionCard() {
     setIsLoading(true);
     setError(null);
     try {
-      const q = query(
-        collection(firestore, 'hunting_sessions'),
-        where('code', '==', joinCode.toUpperCase())
-      );
-      const snapshot = await getDocs(q);
-      if (snapshot.empty) {
+      const sessionDocRef = doc(firestore, 'hunting_sessions', joinCode.toUpperCase());
+      const sessionDoc = await getDoc(sessionDocRef);
+
+      if (!sessionDoc.exists()) {
         throw new Error('Aucune session trouvée avec ce code.');
       }
-      const sessionDoc = snapshot.docs[0];
       const sessionData = sessionDoc.data() as HuntingSession;
 
-      if (sessionData.expiresAt && sessionData.expiresAt.toDate() < new Date()) {
+      if (sessionData.expiresAt && (sessionData.expiresAt as Timestamp).toDate() < new Date()) {
          throw new Error('Cette session a expiré.');
       }
 
       setSession({ id: sessionDoc.id, ...sessionData });
 
     } catch (e: any) {
-      setError(e.message);
-       toast({
-        variant: 'destructive',
-        title: 'Erreur',
-        description: e.message,
-      });
+        if (e.name === 'FirebaseError' || e.code === 'permission-denied') {
+             const permissionError = new FirestorePermissionError({
+                path: `hunting_sessions/${joinCode.toUpperCase()}`,
+                operation: 'get',
+             });
+             errorEmitter.emit('permission-error', permissionError);
+        } else {
+             setError(e.message);
+             toast({
+                variant: 'destructive',
+                title: 'Erreur',
+                description: e.message,
+             });
+        }
     } finally {
       setIsLoading(false);
     }
@@ -324,7 +347,15 @@ export function HuntingSessionCard() {
        setSession(null);
        toast({ title: 'Vous avez quitté la session.' });
      } catch (e: any) {
-        setError(e.message);
+        if (e.name === 'FirebaseError' || e.code === 'permission-denied') {
+            const permissionError = new FirestorePermissionError({
+                path: `hunting_sessions/${session.id}/participants/${user.uid}`,
+                operation: 'delete',
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        } else {
+            setError(e.message);
+        }
      } finally {
         setIsLoading(false);
      }
@@ -332,7 +363,7 @@ export function HuntingSessionCard() {
   
   const copyToClipboard = () => {
     if(!session) return;
-    navigator.clipboard.writeText(session.code);
+    navigator.clipboard.writeText(session.id);
     toast({ description: "Code copié dans le presse-papiers !" });
   }
 
@@ -379,7 +410,7 @@ export function HuntingSessionCard() {
             <div className="flex items-center justify-between gap-4 p-3 rounded-lg bg-muted/50">
                 <div className="space-y-1">
                     <Label>Code de la session</Label>
-                    <p className="text-2xl font-bold font-mono tracking-widest">{session.code}</p>
+                    <p className="text-2xl font-bold font-mono tracking-widest">{session.id}</p>
                 </div>
                 <Button onClick={copyToClipboard} variant="outline" size="icon"><Copy /></Button>
             </div>
