@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -65,7 +66,7 @@ export default function LagonPage() {
 
   const selectedSwell = useMemo(() => {
     if (!data?.weather?.swell) return null;
-    return data.weather.swell.find(s => s.time === selectedTime) || data.weather.swell[1];
+    return data.weather.swell.find(s => s.time === selectedTime) || data.weather.swell[2];
   }, [data, selectedTime]);
 
   if (isLoading || !data) {

@@ -78,6 +78,7 @@ export const communeToTideStationMap: { [key: string]: string } = {
 const baseData: Omit<LocationData, 'tides' | 'tideStation'> = {
   weather: {
     wind: [
+      { time: '00:00', speed: 5, direction: 'E', stability: 'Stable' },
       { time: '06:00', speed: 8, direction: 'SE', stability: 'Stable' },
       { time: '12:00', speed: 11, direction: 'S', stability: 'Stable' },
       { time: '18:00', speed: 6, direction: 'SE', stability: 'Tournant' },
@@ -422,7 +423,7 @@ export function generateProceduralData(location: string, date: Date): LocationDa
 
   // Vary Swell
   locationData.weather.swell = [];
-  const swellTimes = ['06:00', '12:00', '18:00'];
+  const swellTimes = ['00:00', '06:00', '12:00', '18:00'];
   swellTimes.forEach((time, index) => {
     const swellBase = 0.5;
     const inside = `${Math.max(0.1, swellBase + Math.sin(dateSeed * 0.3 + locationSeed * 0.1 + index * 2) * 0.4).toFixed(1)}m`;
