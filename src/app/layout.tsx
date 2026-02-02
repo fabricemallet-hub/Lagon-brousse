@@ -54,7 +54,7 @@ export default function RootLayout({
         />
       </head>
       <body className={cn('font-body antialiased', 'min-h-screen bg-background font-sans')}>
-        <Suspense fallback={<div>Chargement...</div>}>
+        <Suspense fallback={null}>
          <AppContent>{children}</AppContent>
         </Suspense>
         <Toaster />
