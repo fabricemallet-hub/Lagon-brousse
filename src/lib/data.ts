@@ -100,28 +100,28 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation'> = {
       timeOfDay: 'Aube (05:00 - 07:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
         { name: 'Carangue', rating: 8, location: 'Lagon' }, { name: 'Mérou', rating: 7, location: 'Lagon' },
-        { name: 'Bec de cane', rating: 9, location: 'Lagon' },
+        { name: 'Bec de cane', rating: 9, location: 'Lagon' }, { name: 'Bossu doré', rating: 8, location: 'Lagon' },
       ],
     },
     {
       timeOfDay: 'Matinée (09:00 - 11:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
         { name: 'Poisson perroquet', rating: 6, location: 'Lagon' }, { name: 'Wahoo', rating: 4, location: 'Large' },
-        { name: 'Mahi-mahi', rating: 4, location: 'Large' },
+        { name: 'Mahi-mahi', rating: 4, location: 'Large' }, { name: 'Bossu doré', rating: 7, location: 'Lagon' },
       ],
     },
     {
       timeOfDay: 'Après-midi (15:00 - 17:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
         { name: 'Thon Jaune', rating: 4, location: 'Large' }, { name: 'Thazard', rating: 5, location: 'Mixte' },
-        { name: 'Bonite', rating: 7, location: 'Mixte' },
+        { name: 'Bonite', rating: 7, location: 'Mixte' }, { name: 'Bossu doré', rating: 5, location: 'Lagon' },
       ],
     },
     {
       timeOfDay: 'Crépuscule (17:30 - 19:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
         { name: 'Rouget', rating: 9, location: 'Lagon' }, { name: 'Vivaneau', rating: 8, location: 'Lagon' },
-        { name: 'Thon dents de chien', rating: 7, location: 'Large' },
+        { name: 'Thon dents de chien', rating: 7, location: 'Large' }, { name: 'Bossu doré', rating: 8, location: 'Lagon' },
       ],
     },
   ],
@@ -406,9 +406,9 @@ export function generateProceduralData(location: string, date: Date): LocationDa
 
   // Vary Rain
   const rainChance = (Math.sin(dateSeed * 0.4 + locationSeed * 0.2) + 1) / 2; // Normalize to 0-1
-  if (rainChance < 0.9) {
+  if (rainChance < 0.95) {
       locationData.weather.rain = 'Aucune';
-  } else if (rainChance < 0.98) {
+  } else if (rainChance < 0.99) {
       locationData.weather.rain = 'Fine';
   } else {
       locationData.weather.rain = 'Forte';
@@ -492,6 +492,15 @@ export function generateProceduralData(location: string, date: Date): LocationDa
         baseRating = isPelagicSeason ? 8 : 2;
       } else {
         baseRating = 6; // Lagon fish have a generally good base rating
+      }
+
+      // Add specific logic for Bossu Doré
+      if (f.name === 'Bossu doré') {
+          if (slot.timeOfDay.includes('Aube') || slot.timeOfDay.includes('Crépuscule')) {
+              baseRating += 2; // Better in morning/evening
+          } else if (slot.timeOfDay.includes('Après-midi')) {
+              baseRating -= 1; // Less active in the afternoon
+          }
       }
       
       // Add variation based on moon phase
