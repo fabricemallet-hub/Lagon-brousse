@@ -50,12 +50,46 @@ service cloud.firestore {
     }
 
     function isCreatingOwnAccount(userId) {
+      let data = request.resource.data;
+      // Normal users can only create 'trial' accounts for themselves
       return isOwner(userId) 
-        && request.resource.data.id == userId;
+          && data.id == userId
+          && data.email == request.auth.token.email
+          && data.displayName is string && data.displayName.size() > 2 && data.displayName.size() < 30
+          && data.subscriptionStatus == 'trial'
+          && data.favoriteLocationIds is list && data.favoriteLocationIds.size() == 0;
+    }
+    
+    function isCreatingOwnAdminAccount(userId) {
+      let data = request.resource.data;
+      // The admin can create their own 'admin' status account
+      return isAdmin()
+          && isOwner(userId)
+          && data.id == userId
+          && data.subscriptionStatus == 'admin';
     }
 
     function isMaintainingOwnAccount(userId) {
-      return isExistingOwner(userId);
+      let incoming = request.resource.data;
+      let existing = resource.data;
+      
+      // Users cannot change critical fields
+      let areCriticalFieldsUnchanged = 
+          incoming.subscriptionStatus == existing.subscriptionStatus &&
+          incoming.subscriptionStartDate == existing.subscriptionStartDate &&
+          incoming.subscriptionExpiryDate == existing.subscriptionExpiryDate &&
+          incoming.id == existing.id &&
+          incoming.email == existing.email;
+
+      // Users can change their display name and favorite locations
+      let isDisplayNameValid = incoming.displayName is string && incoming.displayName.size() > 2 && incoming.displayName.size() < 30;
+      let areFavoritesValid = incoming.favoriteLocationIds is list;
+
+      return isOwner(userId) 
+          && resource != null
+          && areCriticalFieldsUnchanged
+          && isDisplayNameValid
+          && areFavoritesValid;
     }
 
     // ----------------------------------------------------------------------
@@ -65,7 +99,7 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAdmin();
       allow get: if isOwner(userId);
-      allow create: if isCreatingOwnAccount(userId);
+      allow create: if isCreatingOwnAccount(userId) || isCreatingOwnAdminAccount(userId);
       allow update: if isMaintainingOwnAccount(userId) || isAdmin();
       allow delete: if isExistingOwner(userId);
     }
@@ -90,20 +124,12 @@ service cloud.firestore {
       }
     }
 
-    /**
-     * @description Real-time hunting session data.
-     * @path /hunting_sessions/{sessionId}
-     */
     match /hunting_sessions/{sessionId} {
       allow create: if isSignedIn();
       allow get: if isSignedIn();
       allow delete: if isOwner(resource.data.organizerId);
       allow list: if false;
 
-      /**
-       * @description Participant data within a session.
-       * @path /hunting_sessions/{sessionId}/participants/{userId}
-       */
       match /participants/{userId} {
         allow create: if isOwner(userId);
         allow update, delete: if isOwner(userId);
