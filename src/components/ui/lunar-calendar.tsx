@@ -14,6 +14,7 @@ import {
   startOfWeek,
   endOfWeek,
   getDay,
+  startOfDay,
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useDate } from '@/context/date-context';
@@ -122,6 +123,11 @@ const DayCell = React.memo(({
   
   const data = useMemo(() => generateProceduralData(selectedLocation, day), [selectedLocation, day]);
 
+  const today = startOfDay(new Date());
+  const cellDate = startOfDay(day);
+  const isPastDay = cellDate < today;
+  const isTodayDay = isSameDay(day, today);
+
   const fishingIcons = useMemo(() => {
     if (calendarView !== 'peche') return null;
     const allFishRatings: FishRating[] = data.fishing.flatMap((slot) => slot.fish);
@@ -165,9 +171,11 @@ const DayCell = React.memo(({
     <div
       onClick={() => onDateSelect(day)}
       className={cn(
-        'h-44 border-t border-l p-1 flex flex-col cursor-pointer hover:bg-accent/50 relative group min-w-24',
+        'h-44 border-t border-l p-1 flex flex-col cursor-pointer hover:bg-accent/50 relative group min-w-24 transition-colors',
         !isCurrentMonth && 'bg-muted/30 text-muted-foreground',
-        isSelected && 'ring-2 ring-primary z-10',
+        isPastDay && 'opacity-40 bg-muted/10',
+        isTodayDay && 'bg-primary/5 ring-2 ring-inset ring-primary/30',
+        isSelected && 'ring-2 ring-primary z-10 bg-background shadow-inner',
         (getDay(day) + 6) % 7 === 0 && 'border-l-0'
       )}
     >
@@ -176,7 +184,10 @@ const DayCell = React.memo(({
           <MoonPhaseIcon phase={data.weather.moon.phase} className="size-3"/>
           <span className="font-mono">{data.weather.moon.percentage}%</span>
         </div>
-        <div className="font-bold text-sm text-right">{format(day, 'd')}</div>
+        <div className={cn(
+          "font-bold text-sm text-right px-1.5 py-0.5 rounded-full transition-colors",
+          isTodayDay ? "bg-primary text-primary-foreground" : "text-foreground"
+        )}>{format(day, 'd')}</div>
       </div>
 
       {eventTexts.length > 0 && (
