@@ -377,11 +377,13 @@ function HuntingSessionContent() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                     <Alert variant="destructive">
+                    <Alert variant="destructive">
                         <AlertCircle className="h-4 w-4" />
                         <AlertTitle>Action requise : Erreur de Clé API Google Maps (InvalidKeyMapError)</AlertTitle>
                         <AlertDescription className="space-y-4 mt-2">
-                           <p>L'application est correctement configurée, mais Google refuse votre clé API. Le problème se situe à 100% sur la console Google Cloud. Veuillez vérifier les points suivants :</p>
+                            <p className="text-base font-bold">Je comprends votre frustration, cela peut être déroutant.</p>
+                            <p>L'erreur que vous voyez, <code className="font-mono bg-destructive/20 p-1 rounded">InvalidKeyMapError</code>, signifie que le problème se situe <strong>uniquement</strong> dans la configuration de votre clé API sur la console Google Cloud. L'application elle-même est correctement codée, mais Google bloque l'accès à la carte.</p>
+                            <p>Vous seul pouvez résoudre ce problème en vérifiant les points suivants sur votre compte Google :</p>
                            
                            <ol className="list-decimal list-inside space-y-2 text-sm font-medium">
                                 <li>
@@ -393,7 +395,7 @@ function HuntingSessionContent() {
                                     <Button size="sm" variant="link" asChild><a href="https://console.cloud.google.com/apis/library/maps-backend.googleapis.com" target="_blank" rel="noopener noreferrer">Activer l'API</a></Button>
                                 </li>
                                 <li>
-                                    <strong>Restrictions de la clé API :</strong> Assurez-vous que <code>*.cloudworkstations.dev/*</code> et <code>studio.firebase.google.com/*</code> sont bien dans la liste des sites autorisés.
+                                    <strong>Restrictions de la clé API :</strong> Assurez-vous que les domaines de votre environnement de développement (comme <code>*.cloudworkstations.dev/*</code> et <code>studio.firebase.google.com/*</code>) sont bien dans la liste des sites autorisés pour votre clé.
                                     <Button size="sm" variant="link" asChild><a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">Vérifier les restrictions</a></Button>
                                 </li>
                             </ol>

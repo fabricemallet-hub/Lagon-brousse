@@ -148,21 +148,16 @@ export default function AdminPage() {
         const usersToDelete = querySnapshot.docs.filter(doc => {
             const data = doc.data() as UserAccount;
             
+            // Never delete the admin
             if (data.email === 'f.mallet81@outlook.com') {
-                return false; // Do not delete admin
-            }
-            
-            if (data.subscriptionStatus === 'active' && data.subscriptionExpiryDate) {
-                 if (isBefore(new Date(), new Date(data.subscriptionExpiryDate))) {
-                     return false; // Do not delete active subscriber
-                 }
+                return false;
             }
             
             return true;
         });
 
         if (usersToDelete.length === 0) {
-            toast({ title: "Aucun utilisateur à supprimer", description: "Aucun utilisateur inactif ou avec un abonnement expiré n'a été trouvé." });
+            toast({ title: "Aucun utilisateur à supprimer", description: "Seul le compte administrateur a été trouvé." });
             setIsResetAlertOpen(false);
             return;
         }
@@ -177,7 +172,7 @@ export default function AdminPage() {
             await batch.commit();
         }
 
-        toast({ title: "Utilisateurs réinitialisés", description: `${usersToDelete.length} utilisateurs ont été supprimés. Les abonnés actifs et le compte administrateur ont été conservés.` });
+        toast({ title: "Utilisateurs réinitialisés", description: `${usersToDelete.length} utilisateurs ont été supprimés. Seul le compte administrateur a été conservé.` });
     } catch (error) {
         console.error("Error resetting users:", error);
         toast({ variant: 'destructive', title: "Erreur", description: "Impossible de réinitialiser les utilisateurs." });
@@ -188,17 +183,7 @@ export default function AdminPage() {
   
   const deletableUsersCount = useMemo(() => {
     if (!allUsers) return '...';
-    return allUsers.filter(u => {
-      if (u.email === 'f.mallet81@outlook.com') {
-        return false;
-      }
-      if (u.subscriptionStatus === 'active' && u.subscriptionExpiryDate) {
-        if (isBefore(new Date(), new Date(u.subscriptionExpiryDate))) {
-          return false;
-        }
-      }
-      return true;
-    }).length;
+    return allUsers.filter(u => u.email !== 'f.mallet81@outlook.com').length;
   }, [allUsers]);
 
 
@@ -307,14 +292,14 @@ export default function AdminPage() {
             <CardTitle className="flex items-center gap-2 text-destructive">
                 <AlertCircle /> Zone de Danger
             </CardTitle>
-            <CardDescription>Ces actions sont irréversibles et doivent être utilisées avec une extrême prudence.</CardDescription>
+            <CardDescription>Cette action est irréversible et doit être utilisée avec une extrême prudence.</CardDescription>
         </CardHeader>
         <CardContent>
             <Button variant="destructive" onClick={() => setIsResetAlertOpen(true)}>
                 Réinitialiser les utilisateurs
             </Button>
             <p className="text-xs text-muted-foreground mt-2">
-                Supprime de manière permanente tous les comptes utilisateurs inactifs ou expirés.
+                Supprime de manière permanente tous les comptes utilisateurs sauf celui de l'administrateur.
             </p>
         </CardContent>
       </Card>
@@ -340,7 +325,7 @@ export default function AdminPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Êtes-vous absolument sûr ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action supprimera définitivement tous les utilisateurs inactifs ou expirés ({deletableUsersCount}). Votre compte administrateur et les comptes des abonnés avec une souscription valide seront conservés. Cette action est irréversible.
+              Cette action supprimera définitivement tous les utilisateurs ({deletableUsersCount}) sauf votre compte administrateur. Cette action est irréversible.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
