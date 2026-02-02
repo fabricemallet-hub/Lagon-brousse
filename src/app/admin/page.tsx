@@ -1,17 +1,16 @@
 'use client';
 
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, serverTimestamp, deleteDoc, doc, Timestamp, orderBy, query, setDoc } from 'firebase/firestore';
+import { collection, serverTimestamp, deleteDoc, doc, Timestamp, orderBy, query, setDoc, writeBatch, getDocs } from 'firebase/firestore';
 import type { UserAccount, AccessToken } from '@/lib/types';
-import { WithId } from '@/firebase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { DollarSign, Users, Crown, KeyRound, Copy, Trash2 } from 'lucide-react';
+import { DollarSign, Users, Crown, KeyRound, Copy, Trash2, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   Table,
@@ -31,6 +30,7 @@ import {
 import {
   AlertDialog,
   AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -40,8 +40,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-
-const SUBSCRIPTION_PRICE = 500; // Default price in FCFP
+import { cn } from '@/lib/utils';
 
 export default function AdminPage() {
   const { user, isUserLoading } = useUser();
@@ -53,6 +52,7 @@ export default function AdminPage() {
   const [tokenDuration, setTokenDuration] = useState('1');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
+  const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
 
   // Fetch all users for stats
   const usersCollectionRef = useMemoFirebase(() => {
@@ -134,10 +134,39 @@ export default function AdminPage() {
     navigator.clipboard.writeText(text);
     toast({ description: "Copié dans le presse-papiers !" });
   };
+  
+  const handleResetUsers = async () => {
+    if (!firestore || !user || user.email !== 'f.mallet81@outlook.com') return;
+    
+    try {
+        const usersQuery = query(collection(firestore, 'users'));
+        const querySnapshot = await getDocs(usersQuery);
+        const usersToDelete = querySnapshot.docs.filter(doc => doc.data().email !== 'f.mallet81@outlook.com');
+
+        if (usersToDelete.length === 0) {
+            toast({ title: "Aucun utilisateur à supprimer", description: "Seul le compte administrateur existe." });
+            return;
+        }
+
+        const batch = writeBatch(firestore);
+        usersToDelete.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+        await batch.commit();
+
+        toast({ title: "Utilisateurs réinitialisés", description: `${usersToDelete.length} utilisateurs ont été supprimés avec succès.` });
+    } catch (error) {
+        console.error("Error resetting users:", error);
+        toast({ variant: 'destructive', title: "Erreur", description: "Impossible de réinitialiser les utilisateurs." });
+    } finally {
+        setIsResetAlertOpen(false);
+    }
+  };
 
 
   const isLoading = isUserLoading || areUsersLoading || areTokensLoading;
   const isAdminUser = user?.email === 'f.mallet81@outlook.com';
+  const SUBSCRIPTION_PRICE = 500; // Default price in FCFP
 
   if (!isAdminUser) {
     return (
@@ -237,6 +266,23 @@ export default function AdminPage() {
         </CardContent>
       </Card>
       
+      <Card className="border-destructive">
+        <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-destructive">
+                <AlertCircle /> Zone de Danger
+            </CardTitle>
+            <CardDescription>Ces actions sont irréversibles et doivent être utilisées avec une extrême prudence.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <Button variant="destructive" onClick={() => setIsResetAlertOpen(true)}>
+                Réinitialiser les utilisateurs
+            </Button>
+            <p className="text-xs text-muted-foreground mt-2">
+                Supprime de manière permanente tous les comptes utilisateurs de la base de données, à l'exception du compte administrateur.
+            </p>
+        </CardContent>
+      </Card>
+
       {generatedToken && (
         <AlertDialog open={!!generatedToken} onOpenChange={() => setGeneratedToken(null)}>
           <AlertDialogContent>
@@ -246,12 +292,29 @@ export default function AdminPage() {
             </AlertDialogHeader>
             <div className="p-4 bg-muted rounded-md font-mono text-center text-lg my-4">{generatedToken}</div>
             <AlertDialogFooter>
-              <Button variant="outline" onClick={() => setGeneratedToken(null)}>Fermer</Button>
+              <AlertDialogCancel>Fermer</AlertDialogCancel>
               <AlertDialogAction onClick={() => copyToClipboard(generatedToken)}><Copy className="mr-2"/> Copier</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       )}
+
+      <AlertDialog open={isResetAlertOpen} onOpenChange={setIsResetAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Êtes-vous absolument sûr ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action supprimera définitivement tous les utilisateurs ({stats ? (stats.totalUsers > 0 ? stats.totalUsers - 1 : 0) : '...'}) de la base de données. Seul le compte administrateur sera conservé. Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+              <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogAction onClick={handleResetUsers} className={cn(buttonVariants({ variant: "destructive" }))}>
+                  Oui, supprimer les utilisateurs
+              </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
