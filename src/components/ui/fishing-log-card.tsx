@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { GoogleMap, MarkerF, OverlayView } from '@react-google-maps/api';
+import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -117,7 +117,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             return;
         }
         navigator.permissions.query({ name: 'geolocation' }).then(permissionStatus => {
-            if (permissionStatus.state === 'granted' || permissionStatus.state === 'prompt') {
+            if (permissionStatus.state === 'granted') {
                  if (watchId.current !== null) {
                     navigator.geolocation.clearWatch(watchId.current);
                 }
@@ -140,15 +140,15 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     }, [map, initialZoomDone]);
 
      useEffect(() => {
-        if(map && userLocation) {
-          startWatchingPosition();
+        if (map && isLoaded) {
+            startWatchingPosition();
         }
         return () => {
             if (watchId.current !== null) {
                 navigator.geolocation.clearWatch(watchId.current);
             }
         };
-    }, [map, userLocation, startWatchingPosition]);
+    }, [map, isLoaded, startWatchingPosition]);
 
     const handleRecenter = () => {
         if (!navigator.geolocation) {
@@ -487,21 +487,21 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                             className="flex flex-col items-center gap-1 cursor-pointer"
                                             onClick={(e) => { e.stopPropagation(); handleSpotClick(spot.id); }}
                                         >
-                                            <div className="flex flex-col items-center gap-1 px-2 py-1 bg-card/90 border border-border rounded-md shadow text-xs font-bold text-card-foreground whitespace-nowrap">
-                                                <span>{spot.name}</span>
+                                            <div className="flex flex-col items-center gap-1 px-2 py-1 bg-card/90 border border-border rounded-md shadow">
+                                                <span className="text-xs font-bold text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.5)] whitespace-nowrap">{spot.name}</span>
                                                 {spot.fishingTypes && spot.fishingTypes.length > 0 && (
-                                                <div className="flex gap-1">
-                                                    {spot.fishingTypes.map(type => {
-                                                    const typeInfo = fishingTypes.find(t => t.id === type);
-                                                    return (
-                                                        <div
-                                                        key={type}
-                                                        className={cn("w-2 h-2 rounded-full", typeInfo?.color)}
-                                                        title={typeInfo?.label}
-                                                        />
-                                                    );
-                                                    })}
-                                                </div>
+                                                    <div className="flex gap-1">
+                                                        {spot.fishingTypes.map(type => {
+                                                        const typeInfo = fishingTypes.find(t => t.id === type);
+                                                        return (
+                                                            <div
+                                                            key={type}
+                                                            className={cn("w-2 h-2 rounded-full", typeInfo?.color)}
+                                                            title={typeInfo?.label}
+                                                            />
+                                                        );
+                                                        })}
+                                                    </div>
                                                 )}
                                             </div>
                                              <div
