@@ -513,41 +513,45 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   // Fishing rating
   locationData.fishing.forEach((slot) => {
     slot.fish.forEach((f) => {
-      let baseRating = 5; // Start with a neutral rating
-      
-      // Adjust base rating based on pelagic season
+      // Start with a base rating. A fish being in a time slot suggests some potential.
+      let rating = 3;
+
+      // 1. Time of day bonus (Dawn/Dusk are prime time)
+      if (slot.timeOfDay.includes('Aube') || slot.timeOfDay.includes('Crépuscule')) {
+        rating += 2;
+      }
+
+      // 2. Tide movement is critical. Strong bonus for moving tide, penalty for slack.
+      if (slot.tideMovement !== 'étale') {
+        rating += 3;
+      } else {
+        rating -= 2;
+      }
+
+      // 3. Moon Phase Bonus (stronger effect around new/full moon)
+      // dayInCycle: 0=new, 7.4=1st Q, 14.76=full, 22.1=3rd Q
+      const isNearNewOrFullMoon = (dayInCycle < 4 || dayInCycle > 25.5) || (dayInCycle > 10.75 && dayInCycle < 18.75);
+      if (isNearNewOrFullMoon) {
+        rating += 2;
+      }
+
+      // 4. Pelagic season bonus
       const isPelagic = ['Mahi-mahi', 'Wahoo', 'Thon Jaune', 'Thazard', 'Bonite', 'Thon dents de chien'].includes(f.name);
       if (isPelagic) {
-        baseRating = isPelagicSeason ? 8 : 2;
-      } else {
-        baseRating = 6; // Lagon fish have a generally good base rating
+        if (isPelagicSeason) {
+          rating += 2;
+        } else {
+          rating -= 3; // Strong penalty out of season
+        }
       }
 
-      // Add specific logic for Bossu Doré
-      if (f.name === 'Bossu doré') {
-          if (slot.timeOfDay.includes('Aube') || slot.timeOfDay.includes('Crépuscule')) {
-              baseRating += 2; // Better in morning/evening
-          } else if (slot.timeOfDay.includes('Après-midi')) {
-              baseRating -= 1; // Less active in the afternoon
-          }
-      }
-      
-      // Add variation based on moon phase
-      const moonFactor = (1 - Math.abs(dayInCycle - 14.76) / 14.76); // 1 at full/new moon, 0 at quarters
-      baseRating += moonFactor * 2;
-
-      // Add variation based on tide movement
-      if (slot.tideMovement !== 'étale') {
-        baseRating += 1.5;
-      }
-      
-      // Add deterministic random variation
+      // 5. Add a smaller, deterministic random factor for variety
       const fishNameSeed = f.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-      const randomFactor = Math.sin(dateSeed * 0.15 + locationSeed * 0.05 + fishNameSeed * 0.02 + slot.timeOfDay.length) * 1.5;
-      
-      const finalRating = baseRating + randomFactor;
+      const randomFactor = Math.sin(dateSeed * 0.1 + locationSeed * 0.05 + fishNameSeed * 0.02 + slot.timeOfDay.length); // value between -1 and 1
+      rating += randomFactor;
 
-      f.rating = Math.max(1, Math.min(10, Math.round(finalRating)));
+      // Clamp the final rating between 1 and 10
+      f.rating = Math.max(1, Math.min(10, Math.round(rating)));
     });
   });
   
