@@ -13,12 +13,14 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useAuth } from '@/firebase';
+import { useAuth, useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, AuthError } from 'firebase/auth';
 import { ForgotPasswordDialog } from './forgot-password-dialog';
+import { redeemAccessToken } from '@/lib/token-utils';
+import { Ticket } from 'lucide-react';
 
 type AuthFormProps = {
   mode: 'login' | 'signup';
@@ -28,6 +30,7 @@ const formSchema = (mode: AuthFormProps['mode']) => z.object({
   displayName: z.string().min(3, { message: 'Le nom doit contenir au moins 3 caractères.' }).optional(),
   email: z.string().email({ message: 'Veuillez entrer une adresse email valide.' }),
   password: z.string().min(6, { message: 'Le mot de passe doit contenir au moins 6 caractères.' }),
+  token: z.string().optional(),
 }).refine(data => mode !== 'signup' || (!!data.displayName && data.displayName.length > 0), {
     message: "Le nom d'utilisateur est requis.",
     path: ["displayName"],
@@ -36,6 +39,7 @@ const formSchema = (mode: AuthFormProps['mode']) => z.object({
 
 export function AuthForm({ mode }: AuthFormProps) {
   const auth = useAuth();
+  const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -46,12 +50,13 @@ export function AuthForm({ mode }: AuthFormProps) {
       displayName: '',
       email: '',
       password: '',
+      token: '',
     },
   });
 
   async function onSubmit(values: z.infer<ReturnType<typeof formSchema>>) {
     setIsLoading(true);
-    if (!auth) {
+    if (!auth || !firestore) {
       toast({
         variant: "destructive",
         title: "Erreur d'initialisation",
@@ -63,7 +68,34 @@ export function AuthForm({ mode }: AuthFormProps) {
     
     try {
       if (mode === 'login') {
-        await signInWithEmailAndPassword(auth, values.email, values.password);
+        const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
+
+        if (values.token) {
+          const result = await redeemAccessToken(firestore, userCredential.user, values.token);
+          if (result.success) {
+            toast({
+              title: "Connexion et activation réussies !",
+              description: result.message,
+            });
+          } else {
+            toast({
+              title: "Connexion réussie !",
+              description: "Redirection en cours... Le jeton n'a pas pu être validé.",
+            });
+             toast({
+              variant: "destructive",
+              title: "Erreur de jeton",
+              description: result.message,
+            });
+          }
+        } else {
+             toast({
+                title: 'Connexion réussie!',
+                description: "Vous allez être redirigé vers la page d'accueil.",
+            });
+        }
+        router.push('/');
+
       } else {
         const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
         if (values.displayName) {
@@ -71,12 +103,12 @@ export function AuthForm({ mode }: AuthFormProps) {
                 displayName: values.displayName
             });
         }
+        toast({
+          title: 'Inscription réussie!',
+          description: "Vous allez être redirigé vers la page d'accueil.",
+        });
+        router.push('/');
       }
-      toast({
-        title: mode === 'login' ? 'Connexion réussie!' : 'Inscription réussie!',
-        description: "Vous allez être redirigé vers la page d'accueil.",
-      });
-      router.push('/');
     } catch (error) {
       const authError = error as AuthError;
       let errorMessage = "Une erreur est survenue lors de l'authentification.";
@@ -158,11 +190,36 @@ export function AuthForm({ mode }: AuthFormProps) {
           )}
         />
 
-        {mode === 'login' && <ForgotPasswordDialog />}
+        {mode === 'login' && (
+            <FormField
+              control={form.control}
+              name="token"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2">
+                    <Ticket className="size-4 text-muted-foreground" />
+                    Jeton d'accès (Optionnel)
+                  </FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="LBN-XXXX-XXXX" 
+                      {...field} 
+                      className="font-mono tracking-wider" 
+                      autoComplete="off" 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+        )}
         
-        <Button type="submit" className="w-full" disabled={isLoading}>
-          {isLoading ? "Chargement..." : (mode === 'login' ? 'Se connecter' : "S'inscrire")}
-        </Button>
+        <div className="pt-2">
+          {mode === 'login' && <ForgotPasswordDialog />}
+          <Button type="submit" className="w-full mt-2" disabled={isLoading}>
+            {isLoading ? "Chargement..." : (mode === 'login' ? 'Se connecter' : "S'inscrire")}
+          </Button>
+        </div>
       </form>
     </Form>
   );
