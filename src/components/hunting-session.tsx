@@ -231,7 +231,14 @@ function HuntingSessionContent() {
         });
         
         const { latitude, longitude } = position.coords;
-        setUserLocation({ latitude, longitude });
+        const newLocation = { latitude, longitude };
+        setUserLocation(newLocation);
+
+        if (isFirstUpdate && map) {
+            map.panTo({ lat: latitude, lng: longitude });
+            map.setZoom(16);
+            setInitialZoomDone(true);
+        }
 
         let batteryData: SessionParticipant['battery'] | undefined = undefined;
         if ('getBattery' in navigator) {
@@ -245,7 +252,7 @@ function HuntingSessionContent() {
         
         const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
         const dataToUpdate: any = {
-            location: { latitude, longitude },
+            location: newLocation,
             updatedAt: serverTimestamp(),
         };
         if (batteryData) {
@@ -276,7 +283,7 @@ function HuntingSessionContent() {
           // Do not leave session, just inform the user.
         }
     }
-  }, [user, firestore, session, toast]);
+  }, [user, firestore, session, toast, map]);
   
   const participantsCollectionRef = useMemoFirebase(() => {
     if (!firestore || !session || !isParticipating) return null;
@@ -302,7 +309,6 @@ function HuntingSessionContent() {
 
   useEffect(() => {
     if (isParticipating && session && !updateIntervalRef.current) {
-        // Don't start interval immediately, wait for initial fetch to be triggered by user gesture
         updateIntervalRef.current = setInterval(() => {
             if (navigator.geolocation) {
                 fetchAndSetUserPosition();
@@ -546,17 +552,17 @@ function HuntingSessionContent() {
     navigator.geolocation.getCurrentPosition(
         (position) => {
             const { latitude, longitude } = position.coords;
-            const newLocation = { latitude, longitude };
+            const newLocation = { lat: latitude, lng: longitude };
 
             // Update state for immediate UI feedback
-            setUserLocation(newLocation);
+            setUserLocation({latitude, longitude});
             
             // Update Firestore in the background
             updateFirestorePosition(latitude, longitude);
 
             // Pan the map to the new location
             if (map) {
-                map.panTo({ lat: newLocation.latitude, lng: newLocation.longitude });
+                map.panTo(newLocation);
                 if(map.getZoom()! < 14) { // only zoom in if user is zoomed out
                     map.setZoom(16);
                 }
@@ -684,7 +690,7 @@ function HuntingSessionContent() {
                                 position={{ lat: userLocation.latitude, lng: userLocation.longitude }}
                                 mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                             >
-                                <div className="transform -translate-x-1/2 -translate-y-[calc(100%+25px)]">
+                                <div style={{ transform: 'translate(-50%, -170%)' }}>
                                   <div className="px-2 py-0.5 rounded-md text-xs font-bold text-white bg-black/60 whitespace-nowrap">
                                       {myParticipant.displayName}
                                   </div>
@@ -703,12 +709,12 @@ function HuntingSessionContent() {
                                     position={{ lat: p.location.latitude, lng: p.location.longitude }}
                                     mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                                 >
-                                    <div className="flex flex-col items-center transform -translate-x-1/2 -translate-y-full">
+                                    <div className="flex flex-col items-center" style={{ transform: 'translate(-50%, -100%)' }}>
                                         <div className="px-2 py-0.5 rounded-md text-xs font-bold text-white bg-black/60 mb-1 whitespace-nowrap">
                                             {p.displayName}
                                         </div>
                                         <div
-                                            className="p-1.5 rounded-full flex flex-col items-center shadow-lg border bg-white"
+                                            className="p-1.5 rounded-full flex flex-col items-center justify-center shadow-lg border bg-white"
                                         >
                                             <IconComponent
                                                 className="size-5 drop-shadow-md"
@@ -727,7 +733,7 @@ function HuntingSessionContent() {
                         <LocateFixed className="h-5 w-5" />
                     </Button>
                     <div className="absolute bottom-2 right-2 bg-card/80 p-1 px-2 rounded-md text-xs font-semibold shadow-lg border">
-                      {Math.round((zoom / 22) * 100)}%
+                      {map?.getZoom() ? `${Math.round((map.getZoom()! / 22) * 100)}%` : '...'}
                     </div>
                 </div>
                 <div className={cn("space-y-4", isFullscreen ? "flex-shrink-0 overflow-y-auto" : "")}>
