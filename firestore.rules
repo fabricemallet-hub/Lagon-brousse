@@ -24,7 +24,7 @@ service cloud.firestore {
     // Purpose: Stores private user account information.
     // ----------------------------------------------------------------------
     match /users/{userId} {
-      allow get: if isOwner(userId);
+      allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
       allow create: if isOwner(userId);
       allow update: if isOwner(userId) || isAdmin();
