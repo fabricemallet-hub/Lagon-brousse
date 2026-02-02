@@ -124,26 +124,27 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         if (!navigator.geolocation) {
             return;
         }
-        
+    
         navigator.permissions?.query({ name: 'geolocation' }).then(status => {
-            if (status.state === 'granted') {
-                 if (watchId.current !== null) return;
-                 watchId.current = navigator.geolocation.watchPosition(
-                    (position) => {
-                        const { latitude, longitude } = position.coords;
-                        const newLocation = { lat: latitude, lng: longitude };
-                        setUserLocation(newLocation);
-
-                        if (map && !initialZoomDone) {
-                            map.panTo(newLocation);
-                            map.setZoom(16);
-                            setInitialZoomDone(true);
-                        }
-                    },
-                    () => { /* Error handled by recenter button */ },
-                    { enableHighAccuracy: true }
-                );
+            if (status.state !== 'granted') {
+                return;
             }
+            if (watchId.current !== null) return;
+             watchId.current = navigator.geolocation.watchPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    const newLocation = { lat: latitude, lng: longitude };
+                    setUserLocation(newLocation);
+
+                    if (map && !initialZoomDone) {
+                        map.panTo(newLocation);
+                        map.setZoom(16);
+                        setInitialZoomDone(true);
+                    }
+                },
+                () => { /* Error handled by recenter button */ },
+                { enableHighAccuracy: true }
+            );
         });
     }, [map, initialZoomDone]);
 
@@ -179,7 +180,9 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     };
 
     useEffect(() => {
+        // Automatically start watching if permission was already granted.
         startWatchingPosition();
+
         return () => {
             if (watchId.current !== null) {
                 navigator.geolocation.clearWatch(watchId.current);
@@ -408,7 +411,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                             scaledSize: new window.google.maps.Size(32, 32),
                                             anchor: new window.google.maps.Point(16, 16),
                                         }}
-                                        onClick={() => handleSpotClick(spot.id)}
+                                        onClick={(e) => { e.stop(); handleSpotClick(spot.id); }}
                                     />
                                     <OverlayView
                                         position={{ lat: spot.location.latitude, lng: spot.location.longitude }}
@@ -417,7 +420,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                         <div 
                                             style={{ transform: 'translate(-50%, -150%)' }} 
                                             className="flex flex-col items-center gap-1 cursor-pointer"
-                                            onClick={() => handleSpotClick(spot.id)}
+                                            onClick={(e) => { e.stopPropagation(); handleSpotClick(spot.id); }}
                                         >
                                             <div className="flex flex-col items-center gap-1 px-2 py-1 bg-card/90 border border-border rounded-md shadow text-xs font-bold text-card-foreground whitespace-nowrap">
                                                 <span>{spot.name}</span>
@@ -569,22 +572,22 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                    onCheckedChange={() => handleSpotSelection(spot.id)}
                                                />
                                            </span>
-                                           <AccordionPrimitive.Header className="flex flex-1">
-                                                <AccordionPrimitive.Trigger className={cn("flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180", "pl-2 pr-4")}>
-                                                   <div className="flex items-center gap-3">
-                                                       <div className="p-1 rounded-md" style={{backgroundColor: spot.color + '20'}}>
-                                                           {React.createElement(mapIcons[spot.icon as keyof typeof mapIcons] || MapPin, { className: 'size-5', style: {color: spot.color} })}
-                                                       </div>
-                                                       <div>
-                                                           <p className="font-bold text-left">{spot.name}</p>
-                                                           <p className="text-xs text-muted-foreground text-left">
-                                                               {spot.createdAt ? format(spot.createdAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr }) : 'Enregistrement...'}
-                                                           </p>
-                                                       </div>
-                                                   </div>
-                                                   <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
-                                               </AccordionPrimitive.Trigger>
-                                           </AccordionPrimitive.Header>
+                                           <h3 className="flex items-center w-full">
+                                            <AccordionPrimitive.Trigger className={cn("flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180", "pl-2 pr-4")}>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-1 rounded-md" style={{backgroundColor: spot.color + '20'}}>
+                                                        {React.createElement(mapIcons[spot.icon as keyof typeof mapIcons] || MapPin, { className: 'size-5', style: {color: spot.color} })}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-left">{spot.name}</p>
+                                                        <p className="text-xs text-muted-foreground text-left">
+                                                            {spot.createdAt ? format(spot.createdAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr }) : 'Enregistrement...'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
+                                            </AccordionPrimitive.Trigger>
+                                           </h3>
                                        </div>
                                        <AccordionPrimitive.Content className="overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
                                            <div className="pb-4 pl-12 pr-4 space-y-4">
