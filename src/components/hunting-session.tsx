@@ -133,6 +133,7 @@ function HuntingSessionContent() {
   const [session, setSession] = useState<WithId<HuntingSession> | null>(null);
   const [isSessionLoading, setIsSessionLoading] = useState(false);
   const [joinCode, setJoinCode] = useState('');
+  const [createCode, setCreateCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number} | null>(null);
   const updateIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -476,7 +477,21 @@ function HuntingSessionContent() {
     setError(null);
 
     try {
-        const code = await generateUniqueCode();
+        let code: string;
+        if (createCode.trim()) {
+            code = createCode.trim().toUpperCase();
+            if (code.length < 6) {
+                throw new Error('Le code de session doit contenir au moins 6 caractères.');
+            }
+            const sessionDocRef = doc(firestore, 'hunting_sessions', code);
+            const docSnap = await getDoc(sessionDocRef);
+            if (docSnap.exists()) {
+                throw new Error('Ce code de session est déjà utilisé. Veuillez en choisir un autre.');
+            }
+        } else {
+            code = await generateUniqueCode();
+        }
+        
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + 24);
 
@@ -1087,10 +1102,17 @@ function HuntingSessionContent() {
             </Button>
           </TabsContent>
           <TabsContent value="create" className="space-y-4 pt-4">
-            <p className="text-sm text-muted-foreground">
-              Créez une nouvelle session et partagez le code avec votre groupe. La
-              session expirera automatiquement dans 24 heures.
-            </p>
+            <div className="space-y-2">
+              <Label htmlFor="create-code">Personnaliser le code de session</Label>
+              <Input
+                id="create-code"
+                placeholder="Optionnel, 6 caractères min."
+                value={createCode}
+                onChange={(e) => setCreateCode(e.target.value.toUpperCase())}
+                className="font-mono text-center text-lg tracking-widest"
+              />
+               <p className="text-xs text-muted-foreground text-center">Si ce champ est laissé vide, un code aléatoire sera généré.</p>
+            </div>
             <Button onClick={handleCreateSession} className="w-full" disabled={isSessionLoading}>
               <Share2 className="mr-2" />
               {isSessionLoading ? 'Création...' : 'Créer une nouvelle session'}
