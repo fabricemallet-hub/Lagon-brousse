@@ -108,6 +108,8 @@ function HuntingSessionContent() {
   const [initialZoomDone, setInitialZoomDone] = useState(false);
   const [mapTypeId, setMapTypeId] = useState<string>('terrain');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [initialCenter, setInitialCenter] = useState<{ lat: number; lng: number } | null>(null);
+
 
   // Customization state
   const [nickname, setNickname] = useState('');
@@ -329,6 +331,15 @@ function HuntingSessionContent() {
   }, [isParticipating, session, fetchAndSetUserPosition]);
 
   useEffect(() => {
+    if (map && initialCenter && !initialZoomDone) {
+        map.panTo(initialCenter);
+        map.setZoom(16);
+        setInitialZoomDone(true);
+        setInitialCenter(null);
+    }
+  }, [map, initialCenter, initialZoomDone]);
+
+  useEffect(() => {
     if (map && userLocation && !initialZoomDone) {
       map.panTo({ lat: userLocation.latitude, lng: userLocation.longitude });
       map.setZoom(16);
@@ -442,6 +453,22 @@ function HuntingSessionContent() {
          throw new Error('Cette session a expiré et a été supprimée.');
       }
       
+      const organizerId = sessionData.organizerId;
+      if (organizerId && organizerId !== user.uid) {
+        const organizerDocRef = doc(firestore, 'hunting_sessions', sessionId, 'participants', organizerId);
+        try {
+          const organizerDoc = await getDoc(organizerDocRef);
+          if (organizerDoc.exists()) {
+            const organizerData = organizerDoc.data() as SessionParticipant;
+            if (organizerData.location) {
+              setInitialCenter({ lat: organizerData.location.latitude, lng: organizerData.location.longitude });
+            }
+          }
+        } catch (e) {
+          console.error("Could not fetch organizer's location", e);
+        }
+      }
+
       await createParticipantDocument(sessionId);
 
       setSession({ id: sessionDoc.id, ...sessionData });
@@ -673,7 +700,7 @@ function HuntingSessionContent() {
                             mapTypeId: mapTypeId as google.maps.MapTypeId
                         }}
                     >
-                        {myParticipant && userLocation && userLocation.latitude && userLocation.longitude && (
+                        {myParticipant && userLocation?.latitude && userLocation?.longitude && (
                           <Fragment>
                             <MarkerF
                               position={{ lat: userLocation.latitude, lng: userLocation.longitude }}
@@ -710,7 +737,7 @@ function HuntingSessionContent() {
                                     mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                                 >
                                     <div className="flex flex-col items-center" style={{ transform: 'translate(-50%, -100%)' }}>
-                                        <div className="px-2 pb-0.5 text-xs font-bold text-white [text-shadow:0_1px_3px_rgb(0_0_0_/_70%)] whitespace-nowrap">
+                                        <div className="px-2 pb-0.5 text-xs font-bold text-white [text-shadow:0_1px_3px_rgb(0_0_0_/_70%)] whitespace-nowrap" style={{ transform: 'translateY(16px)'}}>
                                             {p.displayName}
                                         </div>
                                         <div
@@ -898,5 +925,3 @@ export function HuntingSessionCard() {
 
   return <HuntingSessionContent />;
 }
-
-    
