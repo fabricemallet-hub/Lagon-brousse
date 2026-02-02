@@ -55,6 +55,7 @@ import {
   Timestamp,
   updateDoc,
   writeBatch,
+  getDocs,
 } from 'firebase/firestore';
 import type { WithId } from '@/firebase';
 import type { HuntingSession, SessionParticipant } from '@/lib/types';
@@ -90,6 +91,12 @@ export function HuntingSessionCard() {
   const updateIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isParticipating, setIsParticipating] = useState(false);
   const [map, setMap] = useState<google.maps.Map | null>(null);
+
+  const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const { isLoaded, loadError } = useJsApiLoader({
+      googleMapsApiKey: googleMapsApiKey || "",
+      preventGoogleFontsLoading: true,
+  });
   
   const handleLeaveSession = useCallback(async () => {
      if (updateIntervalRef.current) {
@@ -227,27 +234,21 @@ export function HuntingSessionCard() {
           expiresAt: Timestamp.fromDate(expiresAt),
         };
         
-        const participantDocData: Omit<SessionParticipant, 'id'> = {
+        await setDoc(doc(firestore, 'hunting_sessions', code), sessionDocData);
+        setSession({ id: code, ...sessionDocData });
+        
+        const participantDocRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
+        const participantData: Omit<SessionParticipant, 'id'> = {
             displayName: user.displayName || user.email || 'Chasseur',
             updatedAt: serverTimestamp()
         };
-
-        const batch = writeBatch(firestore);
-        const sessionDocRef = doc(firestore, 'hunting_sessions', code);
-        const participantDocRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
+        await setDoc(participantDocRef, participantData);
         
-        batch.set(sessionDocRef, sessionDocData);
-        batch.set(participantDocRef, participantDocData);
-        await batch.commit();
-
-        setSession({ id: code, ...sessionDocData });
         setIsParticipating(true);
-        
         toast({
             title: 'Session créée !',
             description: `Le code de votre session est : ${code}`,
         });
-
     } catch (e: any) {
         setError(e.message);
         toast({
@@ -288,7 +289,6 @@ export function HuntingSessionCard() {
       
       setSession({ id: sessionDoc.id, ...sessionData });
       setIsParticipating(true);
-
     } catch (e: any) {
         if (e.name === 'FirebaseError' || e.code === 'permission-denied') {
              const permissionError = new FirestorePermissionError({
@@ -375,13 +375,6 @@ export function HuntingSessionCard() {
   }
 
   if (session) {
-    const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-
-    const { isLoaded, loadError } = useJsApiLoader({
-        googleMapsApiKey: googleMapsApiKey || "",
-        preventGoogleFontsLoading: true,
-    });
-
     if (!googleMapsApiKey) {
         return (
             <Card>
@@ -452,6 +445,26 @@ export function HuntingSessionCard() {
       );
     }
 
+    if (!isLoaded) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="size-5 text-primary" />
+                Session de Chasse Active
+              </div>
+              <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isLoading}><LogOut/> Quitter</Button>
+            </CardTitle>
+            <CardDescription>Partagez votre position avec votre groupe en temps réel.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="w-full aspect-square rounded-lg" />
+          </CardContent>
+        </Card>
+      )
+    }
+
     return (
       <Card>
         <CardHeader>
@@ -474,10 +487,7 @@ export function HuntingSessionCard() {
             </div>
             {error && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertTitle>{error}</AlertTitle></Alert>}
 
-            {!isLoaded ? (
-              <Skeleton className="w-full aspect-square rounded-lg" />
-            ) : (
-              <div className="relative w-full aspect-square rounded-lg overflow-hidden border">
+            <div className="relative w-full aspect-square rounded-lg overflow-hidden border">
                 <GoogleMap
                   mapContainerStyle={{ width: '100%', height: '100%' }}
                   center={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : { lat: -21.5, lng: 165.5 }}
@@ -520,7 +530,6 @@ export function HuntingSessionCard() {
                     Recentrer sur moi
                 </Button>
             </div>
-            )}
             
             <Collapsible>
                 <CollapsibleTrigger asChild>
