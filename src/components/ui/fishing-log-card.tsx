@@ -130,8 +130,6 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         if (!navigator.geolocation || watchId.current !== null) {
             return;
         }
-
-        // Check for permission first
         navigator.permissions.query({ name: 'geolocation' }).then(permissionStatus => {
             if (permissionStatus.state === 'granted') {
                 watchId.current = navigator.geolocation.watchPosition(
@@ -139,53 +137,52 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         const { latitude, longitude } = position.coords;
                         const newLocation = { lat: latitude, lng: longitude };
                         setUserLocation(newLocation);
-
                         if (map && !initialZoomDone) {
                             map.panTo(newLocation);
                             map.setZoom(16);
                             setInitialZoomDone(true);
                         }
                     },
-                    () => { /* Error handled by recenter button */ },
+                    () => { /* Error can be handled silently or with a toast */ },
                     { enableHighAccuracy: true }
                 );
             }
-            // If state is 'prompt' or 'denied', we don't start watching.
-            // The user must click the recenter button to trigger the prompt.
         });
     }, [map, initialZoomDone]);
-
-    useEffect(() => {
-        startWatchingPosition();
-    }, [startWatchingPosition]);
 
     const handleRecenter = () => {
         if (!navigator.geolocation) {
             toast({
-                variant: 'destructive',
-                title: 'Géolocalisation non supportée',
+                variant: "destructive",
+                title: "Géolocalisation non supportée",
+                description: "Votre navigateur ne supporte pas la géolocalisation.",
             });
             return;
         }
-        
+
+        toast({ description: "Mise à jour de votre position..." });
+
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 const { latitude, longitude } = position.coords;
+                if (typeof latitude !== 'number' || typeof longitude !== 'number') return;
                 const newLocation = { lat: latitude, lng: longitude };
-                setUserLocation(newLocation);
+                
+                setUserLocation({latitude, longitude});
+
                 if (map) {
                     map.panTo(newLocation);
-                    if (!initialZoomDone) {
+                    if(!initialZoomDone) {
                         map.setZoom(16);
                         setInitialZoomDone(true);
                     }
                 }
-                startWatchingPosition(); // Attempt to start watching again after a successful manual fetch
+                startWatchingPosition();
             },
             (err) => {
                  toast({
-                    variant: 'destructive',
-                    title: 'Géolocalisation refusée',
+                    variant: "destructive",
+                    title: "Géolocalisation refusée",
                     description: "Veuillez l'activer dans les paramètres de votre navigateur pour utiliser cette fonctionnalité.",
                 });
             },
@@ -666,7 +663,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                     onCheckedChange={() => handleSpotSelection(spot.id)}
                                                 />
                                             </span>
-                                            <AccordionPrimitive.Header className="flex flex-1">
+                                            <AccordionPrimitive.Header asChild>
                                                 <AccordionPrimitive.Trigger className='flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180 pl-2 pr-4 text-left'>
                                                     <div className="flex items-center gap-3">
                                                         <div className="p-1 rounded-md" style={{backgroundColor: spot.color + '20'}}>
@@ -768,3 +765,5 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         </Card>
     );
 }
+
+    
