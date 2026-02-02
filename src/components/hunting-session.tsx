@@ -928,33 +928,36 @@ function HuntingSessionContent() {
                             )
                         })}
                     </GoogleMap>
-                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 flex gap-2">
+                    <div className="absolute bottom-2 left-0 right-0 z-10 flex flex-wrap justify-center gap-1 sm:gap-2 px-2">
                         <Button
+                            size="sm"
                             onClick={() => handleBaseStatusChange('En position')}
                             className={cn(
-                                'shadow-lg text-white bg-green-600 hover:bg-green-700',
+                                'shadow-lg text-white bg-green-600 hover:bg-green-700 text-[10px] sm:text-sm px-2 sm:px-4',
                                 baseStatus === 'En position' && 'ring-2 ring-offset-2 ring-green-500'
                             )}
                         >
-                            <MapPin className="mr-2 h-4 w-4" /> En position
+                            <MapPin className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" /> En position
                         </Button>
                         <Button
+                            size="sm"
                             onClick={() => handleBaseStatusChange('Battue en cours')}
                             className={cn(
-                                'shadow-lg text-white bg-blue-600 hover:bg-blue-700',
+                                'shadow-lg text-white bg-blue-600 hover:bg-blue-700 text-[10px] sm:text-sm px-2 sm:px-4',
                                 baseStatus === 'Battue en cours' && 'ring-2 ring-offset-2 ring-blue-500'
                             )}
                         >
-                            <Footprints className="mr-2 h-4 w-4" /> Battue en cours
+                            <Footprints className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Battue en cours
                         </Button>
                         <Button
+                            size="sm"
                             onClick={handleGibierEnVueToggle}
                             className={cn(
-                                'shadow-lg text-white bg-red-600 hover:bg-red-700',
+                                'shadow-lg text-white bg-red-600 hover:bg-red-700 text-[10px] sm:text-sm px-2 sm:px-4',
                                 isGibierEnVue && 'ring-2 ring-offset-2 ring-red-500'
                             )}
                         >
-                            <Eye className="mr-2 h-4 w-4" /> Gibier en vue
+                            <Eye className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Gibier en vue
                         </Button>
                     </div>
                     <Button size="icon" onClick={() => setIsFullscreen(!isFullscreen)} className="absolute top-2 left-2 shadow-lg h-9 w-9 z-10">
