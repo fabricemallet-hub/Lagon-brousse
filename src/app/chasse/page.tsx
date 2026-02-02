@@ -185,10 +185,6 @@ export default function ChassePage() {
             <AccordionItem value="item-1">
               <AccordionTrigger>Domaine de Deva (Bourail)</AccordionTrigger>
               <AccordionContent className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Phone className="size-4" />
-                  <span>Contact : SEM Mwe Ara - Tél : 46.57.57</span>
-                </div>
                 <p className="text-sm text-muted-foreground">
                   Chasse réglementée au cerf et cochon sauvage sur un vaste
                   domaine. La réservation est obligatoire. Des guides peuvent
@@ -199,13 +195,6 @@ export default function ChassePage() {
             <AccordionItem value="item-2">
               <AccordionTrigger>Forêt de la Thy (Yaté)</AccordionTrigger>
               <AccordionContent className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Phone className="size-4" />
-                  <span>
-                    Contact : Province Sud, Direction de l'Environnement - Tél :
-                    20.34.00
-                  </span>
-                </div>
                 <p className="text-sm text-muted-foreground">
                   Zone de chasse publique. Le permis de chasse de la Province Sud
                   est obligatoire. Se renseigner sur les dates d'ouverture et
@@ -216,12 +205,6 @@ export default function ChassePage() {
              <AccordionItem value="item-3">
               <AccordionTrigger>Parc des Grandes Fougères (Farino)</AccordionTrigger>
               <AccordionContent className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Phone className="size-4" />
-                  <span>
-                    Contact : Maison du Parc (Tél : 44.35.00) ou Province Sud
-                  </span>
-                </div>
                 <p className="text-sm text-muted-foreground">
                   La chasse y est très encadrée et vise à réguler les populations de cerfs et cochons. Elle n'est autorisée que lors de battues organisées à des dates spécifiques. Il est impératif de se renseigner auprès de la Maison du Parc pour connaître le calendrier et les modalités.
                 </p>
@@ -230,10 +213,6 @@ export default function ChassePage() {
             <AccordionItem value="item-4">
               <AccordionTrigger>Plaine des Gaïacs (Koné)</AccordionTrigger>
               <AccordionContent className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Phone className="size-4" />
-                  <span>Contact : Province Nord, Service de l'environnement</span>
-                </div>
                 <p className="text-sm text-muted-foreground">
                   Grande zone de chasse publique en Province Nord. Le permis de
                   chasse provincial est requis. Renseignez-vous sur les
