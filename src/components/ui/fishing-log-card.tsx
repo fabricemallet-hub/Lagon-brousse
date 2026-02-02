@@ -187,14 +187,10 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
 
     useEffect(() => {
         if (isLoaded && map) {
-            // Check for permissions without prompting the user.
             navigator.permissions?.query({ name: 'geolocation' }).then(permissionStatus => {
                 if (permissionStatus.state === 'granted') {
-                    // If permission is already granted, start watching the position.
                     startWatchingPosition(false); 
                 }
-                // If state is 'prompt' or 'denied', we do nothing and wait for a user gesture
-                // (like clicking the recenter button) to request permission.
             });
         }
 
@@ -453,14 +449,16 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         <Button size="icon" onClick={handleRecenter} className="absolute top-2 right-2 shadow-lg h-9 w-9 z-10">
                             <LocateFixed className="h-5 w-5" />
                         </Button>
-                        <Button 
-                            className="absolute bottom-4 left-1/2 -translate-x-1/2 shadow-lg z-10" 
-                            onClick={() => { if (newSpotLocation) setIsAddSpotOpen(true); }}
-                            disabled={!newSpotLocation}
-                        >
-                            <Plus className="mr-2" /> 
-                            {newSpotLocation ? 'Ajouter ce coin de pêche' : 'Cliquez sur la carte pour placer un repère'}
-                        </Button>
+                        <div className={cn("absolute bottom-4 left-1/2 -translate-x-1/2 z-10", isFullscreen && "w-[calc(100%-2rem)]")}>
+                            <Button 
+                                className="shadow-lg w-full" 
+                                onClick={() => { if (newSpotLocation) setIsAddSpotOpen(true); }}
+                                disabled={!newSpotLocation}
+                            >
+                                <Plus className="mr-2" /> 
+                                {newSpotLocation ? 'Ajouter ce coin de pêche' : 'Cliquez sur la carte pour placer un repère'}
+                            </Button>
+                        </div>
                     </div>
                 )}
                 
@@ -539,7 +537,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                    onClick={(e) => e.stopPropagation()}
                                                />
                                            </span>
-                                           <AccordionTrigger className={cn("flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180", "pr-4")}>
+                                           <AccordionPrimitive.Trigger className={cn("flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180", "pr-4")}>
                                                <div className="flex items-center gap-3">
                                                    <div className="p-1 rounded-md" style={{backgroundColor: spot.color + '20'}}>
                                                        {React.createElement(mapIcons[spot.icon as keyof typeof mapIcons] || MapPin, { className: 'size-5', style: {color: spot.color} })}
@@ -550,7 +548,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                    </div>
                                                </div>
                                                <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
-                                           </AccordionTrigger>
+                                           </AccordionPrimitive.Trigger>
                                        </AccordionPrimitive.Header>
                                        <AccordionContent className="space-y-4">
                                            <div className="text-sm text-muted-foreground bg-muted/50 p-4 rounded-lg space-y-2">
