@@ -27,7 +27,7 @@ function Calendar({
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
         caption: "flex justify-center pt-1 relative items-center",
-        caption_label: "text-lg font-medium capitalize",
+        caption_label: "text-lg font-medium",
         nav: "space-x-1 flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
@@ -36,17 +36,17 @@ function Calendar({
         nav_button_previous: "absolute left-1",
         nav_button_next: "absolute right-1",
         table: "w-full border-collapse space-y-1",
-        head_row: "flex w-full",
+        head_row: "flex",
         head_cell:
-          "text-muted-foreground rounded-md w-10 font-normal text-[0.8rem] lowercase flex items-center justify-center",
+          "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
         row: "flex w-full mt-2",
-        cell: "h-10 w-10 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
+        cell: "h-9 w-9 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
         day: cn(
           buttonVariants({ variant: "ghost" }),
-          "h-10 w-10 p-0 font-normal aria-selected:opacity-100"
+          "h-9 w-9 p-0 font-normal aria-selected:opacity-100"
         ),
         day_selected:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/90 focus:bg-secondary focus:text-secondary-foreground rounded-full",
+          "bg-foreground text-background hover:bg-foreground/90 focus:bg-foreground focus:text-background rounded-full",
         day_today: "bg-muted rounded-full",
         day_outside:
           "day-outside text-muted-foreground opacity-50",
@@ -57,7 +57,7 @@ function Calendar({
         ...classNames,
       }}
       formatters={{
-        formatWeekdayName: (date) => format(date, 'EEEEEE', { locale: fr }),
+        formatWeekdayName: (date) => format(date, 'EEEEEE', { locale: fr }).toLowerCase(),
       }}
       components={{
         IconLeft: ({ ...props }) => <ChevronLeft className="h-4 w-4" {...props} />,
