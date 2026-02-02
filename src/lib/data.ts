@@ -102,6 +102,9 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation'> = {
       fish: [
         { name: 'Wahoo', rating: 9, location: 'Large', advice: { activity: 'Très forte activité à l\'aube. Vitesse et agressivité maximales.', feeding: 'Excellente heure de chasse pour les proies rapides.', location_specific: 'Tombants extérieurs, DCP, et zones de courant fort.', depth: 'Surface.' } },
         { name: 'Mahi-mahi', rating: 8, location: 'Large', advice: { activity: 'Très actif, en chasse autour des objets flottants.', feeding: 'Excellente heure, se nourrit de tout ce qui passe à portée.', location_specific: 'Sous les débris, bouées ou nappes d\'algues sargasses.', depth: 'Surface.' } },
+        { name: 'Thon Jaune', rating: 9, location: 'Large', advice: { activity: 'Très actif, chasse en surface tôt le matin.', feeding: 'Excellente heure, se nourrit de poissons volants et calamars.', location_specific: 'Au large, chercher les chasses d\'oiseaux.', depth: 'Surface à 30m.' } },
+        { name: 'Thazard', rating: 8, location: 'Mixte', advice: { activity: 'Actif, patrouille les bords de récifs.', feeding: 'Bonne heure, chasse les petits poissons près des tombants.', location_specific: 'Passes, tombants récifaux, et près des DCP.', depth: 'Surface à 20m.' } },
+        { name: 'Thon dents de chien', rating: 8, location: 'Large', advice: { activity: 'Très actif au lever du jour, prédateur redoutable.', feeding: 'Excellente heure de chasse sur les proies de récif.', location_specific: 'Tombants vertigineux et passes profondes.', depth: '20-60m.' } },
         { name: 'Carangue', rating: 8, location: 'Lagon', advice: { activity: 'Très active, en chasse près de la surface.', feeding: 'Excellente heure, prédateurs affamés.', location_specific: 'Cibler les passes, les tombants et les patates de corail.', depth: 'Surface à 15m.' } },
         { name: 'Mérou', rating: 7, location: 'Lagon', advice: { activity: 'Sort de son abri, activité modérée.', feeding: 'Bonne heure, opportuniste.', location_specific: 'Proche des structures rocheuses et des grottes.', depth: '10-30m.' } },
         { name: 'Bec de cane', rating: 9, location: 'Lagon', advice: { activity: 'En bancs, très actif.', feeding: 'Très bonne heure, se nourrit agressivement.', location_specific: 'Sur les platiers, bords de chenaux.', depth: '2-10m.' } },
@@ -111,10 +114,13 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation'> = {
     {
       timeOfDay: 'Matinée (09:00 - 11:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
-        { name: 'Poisson perroquet', rating: 6, location: 'Lagon', advice: { activity: 'Actif, en train de brouter le corail.', feeding: 'Heure correcte pour se nourrir.', location_specific: 'Sur les platiers coralliens et les zones riches en algues.', depth: '1-5m.' } },
         { name: 'Wahoo', rating: 4, location: 'Large', advice: { activity: 'En déplacement rapide, activité modérée.', feeding: 'Période de chasse possible mais moins intense qu\'à l\'aube.', location_specific: 'Tombants extérieurs, DCP et lignes de courant.', depth: 'Surface.' } },
         { name: 'Mahi-mahi', rating: 4, location: 'Large', advice: { activity: 'Activité moyenne, souvent à la recherche d\'ombre.', feeding: 'Opportuniste, peut mordre si une proie passe.', location_specific: 'Autour des objets flottants (épaves, bouées, débris).', depth: 'Surface.' } },
+        { name: 'Thon Jaune', rating: 6, location: 'Large', advice: { activity: 'Activité en baisse, peut sonder plus profond.', feeding: 'Moins prévisible, mais toujours à la recherche d\'opportunités.', location_specific: 'Suivre les oiseaux, ou chercher près des DCP.', depth: '20-50m.' } },
+        { name: 'Thazard', rating: 6, location: 'Mixte', advice: { activity: 'Continue de patrouiller mais peut être moins agressif.', feeding: 'Période de chasse correcte.', location_specific: 'Tombants et passes, souvent un peu plus au large.', depth: '10-30m.' } },
+        { name: 'Carangue', rating: 7, location: 'Lagon', advice: { activity: 'Toujours active, mais peut être moins frénétique qu\'à l\'aube.', feeding: 'Bonne heure, reste un prédateur efficace.', location_specific: 'Continue de chasser autour des passes et des patates de corail.', depth: 'Surface à 20m.' } },
         { name: 'Bossu doré', rating: 7, location: 'Lagon', advice: { activity: 'Activité modérée, proche de sa structure.', feeding: 'Bonne heure, reste à l\'affût.', location_specific: 'Proche des patates de corail, reste à l\'ombre de la structure.', depth: '10-25m.' } },
+        { name: 'Poisson perroquet', rating: 6, location: 'Lagon', advice: { activity: 'Actif, en train de brouter le corail.', feeding: 'Heure correcte pour se nourrir.', location_specific: 'Sur les platiers coralliens et les zones riches en algues.', depth: '1-5m.' } },
       ],
     },
     {
@@ -129,9 +135,9 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation'> = {
     {
       timeOfDay: 'Crépuscule (17:30 - 19:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
+        { name: 'Thon dents de chien', rating: 7, location: 'Large', advice: { activity: 'Prédateur redoutable, très actif à cette heure.', feeding: 'Excellente heure de chasse.', location_specific: 'Tombants vertigineux et passes profondes.', depth: '20-60m.' } },
         { name: 'Rouget', rating: 9, location: 'Lagon', advice: { activity: 'Très actif, sort pour se nourrir.', feeding: 'Excellente heure, fouille le sable activement.', location_specific: 'Fonds sableux près des zones rocheuses ou coralliennes.', depth: '5-15m.' } },
         { name: 'Vivaneau', rating: 8, location: 'Lagon', advice: { activity: 'Quitte son abri, devient un prédateur actif.', feeding: 'Très bonne heure, chasse à l\'affût.', location_specific: 'Autour des patates de corail et des tombants.', depth: '10-40m.' } },
-        { name: 'Thon dents de chien', rating: 7, location: 'Large', advice: { activity: 'Prédateur redoutable, très actif à cette heure.', feeding: 'Excellente heure de chasse.', location_specific: 'Tombants vertigineux et passes profondes.', depth: '20-60m.' } },
         { name: 'Bossu doré', rating: 8, location: 'Lagon', advice: { activity: 'Très bonne activité, sort pour chasser.', feeding: 'Excellente heure, très agressif.', location_specific: 'Se détache des structures pour chasser sur les fonds sableux environnants.', depth: '5-20m.' } },
       ],
     },
