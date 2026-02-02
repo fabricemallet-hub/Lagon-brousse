@@ -197,40 +197,48 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
             {weather.hourly.slice(0, 24).map((forecast, index) => (
               <CarouselItem
                 key={index}
-                className="basis-1/3 sm:basis-1/5 md:basis-1/6"
+                className="basis-1/4 sm:basis-1/5 md:basis-1/6"
                 onClick={() => api?.scrollTo(index)}
               >
                 <div
                   className={cn(
                     'flex flex-col items-center justify-between p-2 cursor-pointer rounded-lg border h-full space-y-1 text-center',
                     selectedIndex === index
-                      ? 'bg-blue-100 border-blue-200'
+                      ? 'bg-blue-100 border-blue-200 dark:bg-blue-900/50 dark:border-blue-700'
                       : 'bg-card hover:bg-muted/50'
                   )}
                 >
-                  <p className="font-bold text-xl">
+                  <p className="font-bold text-lg">
                     {format(new Date(forecast.date), "HH'h'", { locale: fr })}
                   </p>
                   <WeatherConditionIcon
                     condition={forecast.condition}
                     isNight={forecast.isNight}
-                    className="size-12"
+                    className="size-10"
                   />
-                  <p className="font-bold text-3xl">{forecast.temp}°</p>
-                  <div className="flex flex-col items-center text-muted-foreground">
-                    <WindArrowIcon direction={forecast.windDirection} className="size-7" />
-                    <span className="font-semibold text-lg">{forecast.windSpeed}</span>
+                  
+                  {/* NEW: Prominent wind display */}
+                  <div className="flex flex-col items-center text-card-foreground my-1">
+                    <WindArrowIcon direction={forecast.windDirection} className="size-7 text-yellow-500" />
+                    <span className="font-bold text-3xl">{forecast.windSpeed}</span>
+                    <span className="text-xs text-muted-foreground -mt-1">nœuds</span>
                   </div>
+
+                  {/* NEW: Smaller temperature display */}
+                  <div className="flex items-baseline text-muted-foreground">
+                    <span className="font-semibold text-lg">{forecast.temp}°</span>
+                  </div>
+                  
                   <div className="border-t w-full my-1"></div>
                   <div className="w-full px-1 space-y-1">
-                     <div className="flex items-center justify-center gap-2 text-xs" title="Hauteur de la marée">
+                     <div className="flex items-center justify-center gap-1 text-xs" title="Hauteur de la marée">
                         <span className="text-muted-foreground">Hauteur:</span>
                         <div className="flex items-center gap-1 font-semibold">
                           <Waves className="size-3 text-muted-foreground" />
                           <span>{forecast.tideHeight.toFixed(1)}m</span>
                         </div>
                     </div>
-                    <div className="flex items-center justify-center gap-2 text-xs" title="Force du courant">
+                    <div className="flex items-center justify-center gap-1 text-xs" title="Force du courant">
                         <span className="text-muted-foreground">Courant:</span>
                         <div className="flex items-center gap-1">
                           {forecast.tidePeakType ? (
