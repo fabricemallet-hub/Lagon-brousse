@@ -176,7 +176,7 @@ export default function PechePage() {
                 Potentiel par espèce
               </h4>
                <Accordion type="single" collapsible className="w-full space-y-2">
-                {slot.fish.map((f, i) => (
+                {slot.fish.filter(f => f.rating >= 9).map((f, i) => (
                   <AccordionItem value={`item-${i}`} key={i} className="border-b-0">
                     <div className="border rounded-lg overflow-hidden bg-card">
                       <AccordionTrigger className="p-3 hover:no-underline text-sm [&[data-state=open]]:bg-muted/50 [&[data-state=open]]:border-b">

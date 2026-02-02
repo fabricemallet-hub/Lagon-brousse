@@ -656,7 +656,7 @@ function PecheDetailDialogContent({
                   Potentiel par espèce
                 </h5>
                 <Accordion type="single" collapsible className="w-full space-y-2">
-                  {slot.fish.map((f, i) => (
+                  {slot.fish.filter(f => f.rating >= 9).map((f, i) => (
                     <AccordionItem value={`item-dialog-${i}`} key={i} className="border-b-0">
                       <div className="border rounded-lg overflow-hidden bg-background">
                          <AccordionTrigger className="p-2 hover:no-underline text-sm [&[data-state=open]]:bg-muted/50 [&[data-state=open]]:border-b">
