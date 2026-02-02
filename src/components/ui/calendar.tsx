@@ -35,19 +35,19 @@ function Calendar({
         ),
         nav_button_previous: "absolute left-1",
         nav_button_next: "absolute right-1",
-        table: "w-full border-collapse",
-        head_row: "flex",
+        table: "w-full border-collapse space-y-1",
+        head_row: "flex w-full",
         head_cell:
-          "text-muted-foreground rounded-md w-10 font-normal text-sm",
+          "text-muted-foreground rounded-md w-10 font-normal text-[0.8rem] lowercase flex items-center justify-center",
         row: "flex w-full mt-2",
-        cell: "h-10 w-10 text-center text-sm p-0 relative [&:has([aria-selected])]:bg-accent/50 first:[&:has([aria-selected])]:rounded-l-lg last:[&:has([aria-selected])]:rounded-r-lg focus-within:relative focus-within:z-20",
+        cell: "h-10 w-10 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
         day: cn(
           buttonVariants({ variant: "ghost" }),
           "h-10 w-10 p-0 font-normal aria-selected:opacity-100"
         ),
         day_selected:
-          "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground rounded-lg",
-        day_today: "bg-transparent border border-primary text-primary rounded-lg",
+          "bg-secondary text-secondary-foreground hover:bg-secondary/90 focus:bg-secondary focus:text-secondary-foreground rounded-full",
+        day_today: "bg-muted rounded-full",
         day_outside:
           "day-outside text-muted-foreground opacity-50",
         day_disabled: "text-muted-foreground opacity-50",
