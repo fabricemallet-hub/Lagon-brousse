@@ -495,7 +495,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                             className="flex flex-col items-center gap-1 cursor-pointer"
                                             onClick={(e) => { e.stopPropagation(); handleSpotClick(spot.id); }}
                                         >
-                                            <div className="flex flex-col items-center gap-1 px-2 py-1 bg-card/90 backdrop-blur-sm border border-border rounded-md shadow">
+                                            <div className="flex flex-col items-center gap-1 px-2 py-1 bg-card/90 backdrop-blur-sm border border-border rounded-md shadow" onClick={(e) => e.stopPropagation()}>
                                                 <span className="text-xs font-bold text-foreground whitespace-nowrap">{spot.name}</span>
                                                 {spot.fishingTypes && spot.fishingTypes.length > 0 && (
                                                     <div className="flex flex-wrap gap-x-2 gap-y-1 mt-1 justify-center max-w-[150px]">
@@ -674,14 +674,14 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                         className="border-b"
                                     >
                                        <div className="flex items-center w-full">
-                                            <span className="pl-4 py-4" onClick={(e) => { e.stopPropagation(); }}>
+                                            <div className="pl-4 py-4" onClick={(e) => e.stopPropagation()}>
                                                 <Checkbox
                                                     id={`select-spot-${spot.id}`}
                                                     className="size-5"
                                                     checked={selectedSpotIds.includes(spot.id)}
                                                     onCheckedChange={() => handleSpotSelection(spot.id)}
                                                 />
-                                            </span>
+                                            </div>
                                             <AccordionPrimitive.Header asChild>
                                                 <AccordionPrimitive.Trigger className='flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180 pl-2 pr-4 text-left'>
                                                     <div className="flex items-center gap-3">
@@ -748,13 +748,13 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                 <BrainCircuit /> Analyse de l'IA
                             </DialogTitle>
                             <DialogDescription>
-                                L'intelligence artificielle recherche les meilleures opportunités de pêche pour vous.
+                                L'intelligence artificielle recherche les meilleures opportunités basées exclusivement sur les marées et la lune.
                             </DialogDescription>
                         </DialogHeader>
                         <div className="py-4 space-y-4">
                             {isAnalyzing && (
                                 <div className="flex flex-col items-center justify-center space-y-2">
-                                    <p className="text-sm text-muted-foreground">Analyse des marées, de la lune et de la météo...</p>
+                                    <p className="text-sm text-muted-foreground">Analyse des marées et de la lune...</p>
                                     <Skeleton className="h-4 w-full" />
                                     <Skeleton className="h-4 w-4/5" />
                                     <Skeleton className="h-4 w-full" />

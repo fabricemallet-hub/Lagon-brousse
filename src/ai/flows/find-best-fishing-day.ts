@@ -50,13 +50,9 @@ function formatForecastForPrompt(forecast: { date: string, data: LocationData })
     const { date, data } = forecast;
     const dayOfWeek = format(new Date(date), 'eeee', { locale: fr });
     const tides = data.tides.map(t => `${t.type} à ${t.time} (${t.height}m)`).join(', ');
-    const middaySwell = data.weather.swell.find(s => s.time === '12:00') || data.weather.swell[0];
 
     return `
 - Jour: ${date} (${dayOfWeek})
-  - Météo: ${data.weather.trend}, Temp: ${data.weather.tempMin}°C - ${data.weather.tempMax}°C
-  - Vent: Vitesse moyenne de ${Math.round(data.weather.wind.reduce((a, b) => a + b.speed, 0) / data.weather.wind.length)} nœuds
-  - Houle: ${middaySwell.inside} (lagon), ${middaySwell.outside} (large)
   - Lune: ${data.weather.moon.phase} (${data.weather.moon.percentage}% visible)
   - Marées: ${tides}
 `;
@@ -68,24 +64,22 @@ const findSimilarDayPrompt = ai.definePrompt({
   input: { schema: z.any() },
   output: { schema: FishingAnalysisOutputSchema },
   prompt: `Tu es un expert en pêche en Nouvelle-Calédonie. Analyse les conditions d'une prise passée et trouve le jour le plus similaire dans les prévisions futures.
+IMPORTANT: Pour cette analyse, concentre-toi EXCLUSIVEMENT sur la marée et la lune. Ignore totalement le vent, la houle et la météo.
 
 CONDITIONS DE LA PRISE PASSÉE:
 - Date: {{{pastDate}}}
 - Marée: Mouvement {{{spotContext.tideMovement}}}, Courant {{{spotContext.tideCurrent}}}, Hauteur ~{{{spotContext.tideHeight}}}m
 - Lune: {{{spotContext.moonPhase}}}
-- Météo: {{{spotContext.weatherCondition}}}
-- Vent: {{{spotContext.windSpeed}}} nœuds de direction {{{spotContext.windDirection}}}
-{{#if spotContext.swellInside}}- Houle: {{{spotContext.swellInside}}} (lagon), {{{spotContext.swellOutside}}} (large){{/if}}
 
 PRÉVISIONS DES JOURS À VENIR:
 {{{futureForecasts}}}
 
 TA MISSION:
-1. Compare chaque jour futur aux conditions de la prise passée.
-2. Évalue l'importance de chaque facteur (la marée et la lune sont très importantes).
-3. Choisis le **MEILLEUR** jour qui maximise les chances de recréer le succès passé.
+1. Compare chaque jour futur aux conditions de la prise passée uniquement sur les critères de marée et de lune.
+2. Évalue l'importance de ces deux facteurs.
+3. Choisis le **MEILLEUR** jour qui maximise les chances de recréer le succès passé au niveau du cycle de marée et de lune.
 4. Attribue un score de confiance de 0 à 100.
-5. Fournis une explication claire et concise, en comparant les facteurs clés qui justifient ton choix.
+5. Fournis une explication claire et concise, en comparant les facteurs clés (marée/lune) qui justifient ton choix.
 
 Réponds uniquement avec l'objet JSON formaté.`,
 });
@@ -118,6 +112,7 @@ const analyzeBestDayPrompt = ai.definePrompt({
     input: { schema: z.any() },
     output: { schema: FishingAnalysisOutputSchema },
     prompt: `Tu es un expert en pêche en Nouvelle-Calédonie. Un pêcheur te donne les conditions de ses meilleures prises. Ta mission est d'analyser ces succès pour trouver des tendances, puis de recommander le meilleur jour pour pêcher dans la semaine à venir.
+IMPORTANT: Concentre-toi EXCLUSIVEMENT sur la marée et la lune. Ignore totalement le vent, la houle et la météo.
 
 CONDITIONS DES PRISES PASSÉES:
 {{{pastContexts}}}
@@ -126,12 +121,12 @@ PRÉVISIONS DES 7 PROCHAINS JOURS:
 {{{futureForecasts}}}
 
 TA MISSION:
-1. Analyse les "CONDITIONS DES PRISES PASSÉES" pour identifier les **tendances gagnantes**. Regarde le mouvement de marée, la phase de lune, la direction du vent, etc. qui reviennent le plus souvent.
-2. Rédige une brève synthèse de ces tendances (ex: "Il semble que vous ayez le plus de succès par marée montante, durant la nouvelle lune, avec un vent de secteur Est.").
+1. Analyse les "CONDITIONS DES PRISES PASSÉES" pour identifier les **tendances gagnantes** liées au cycle lunaire et aux marées qui reviennent le plus souvent.
+2. Rédige une brève synthèse de ces tendances (ex: "Il semble que vous ayez le plus de succès par marée montante, durant la nouvelle lune.").
 3. Compare ces tendances avec les "PRÉVISIONS DES 7 PROCHAINS JOURS".
 4. Choisis le **MEILLEUR** jour et créneau horaire qui correspond le mieux à ces tendances gagnantes.
 5. Attribue un score de confiance de 0 à 100 pour ta prédiction.
-6. Fournis une explication claire : commence par la synthèse des tendances, puis justifie ton choix du meilleur jour futur.
+6. Fournis une explication claire : commence par la synthèse des tendances (marée/lune), puis justifie ton choix du meilleur jour futur.
 
 Réponds uniquement avec l'objet JSON formaté.`,
 });
@@ -147,11 +142,7 @@ const analyzeBestDayFlow = ai.defineFlow(
       const formattedForecasts = futureForecasts.map(formatForecastForPrompt).join('');
   
       const formattedPastContexts = input.spotContexts.map(ctx => {
-        let contextString = `- Prise le ${format(new Date(ctx.timestamp), 'd MMM', {locale: fr})}: Marée ${ctx.tideMovement}, Lune ${ctx.moonPhase}, Vent ${ctx.windDirection} ${ctx.windSpeed} nœuds.`;
-        if (ctx.swellInside && ctx.swellOutside) {
-            contextString += ` Houle: ${ctx.swellInside}/${ctx.swellOutside}.`;
-        }
-        return contextString;
+        return `- Prise le ${format(new Date(ctx.timestamp), 'd MMM', {locale: fr})}: Marée ${ctx.tideMovement}, Lune ${ctx.moonPhase}.`;
       }).join('\n');
 
       const promptData = {
