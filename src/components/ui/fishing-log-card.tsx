@@ -15,10 +15,16 @@ import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebas
 import { collection, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import type { LocationData, FishingSpot, WindDirection } from '@/lib/types';
+import type { LocationData, FishingSpot } from '@/lib/types';
 import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from './alert';
+import { useLocation } from '@/context/location-context';
+import { findSimilarDay, analyzeBestDay } from '@/ai/flows/find-best-fishing-day';
+import type { FishingAnalysisOutput } from '@/ai/flows/find-best-fishing-day';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from '@/components/ui/progress';
+
 
 const mapIcons = {
     Fish: Fish,
@@ -65,6 +71,12 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
     const [initialZoomDone, setInitialZoomDone] = useState(false);
     const watchId = useRef<number | null>(null);
+
+    const { selectedLocation } = useLocation();
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [analysisResult, setAnalysisResult] = useState<FishingAnalysisOutput | null>(null);
+    const [isAnalysisDialogOpen, setIsAnalysisDialogOpen] = useState(false);
+    const [selectedSpotIds, setSelectedSpotIds] = useState<string[]>([]);
 
     const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     const { isLoaded, loadError } = useJsApiLoader({ googleMapsApiKey: googleMapsApiKey || "", mapIds: ['satellite_id'] });
@@ -141,7 +153,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
 
     useEffect(() => {
         if (isLoaded && map) {
-           startWatchingPosition(true)
+           startWatchingPosition(true);
         }
         return () => {
             if (watchId.current !== null) {
@@ -248,7 +260,75 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             console.error("Erreur lors de la suppression du spot:", error);
             toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de supprimer le spot.' });
         }
-    }
+    };
+
+    const handleFindSimilarDay = async (spot: FishingSpot) => {
+        setIsAnalyzing(true);
+        setAnalysisResult(null);
+        setIsAnalysisDialogOpen(true);
+        try {
+            const result = await findSimilarDay({
+                spotContext: spot.context,
+                location: selectedLocation,
+                searchRangeDays: 30,
+            });
+            setAnalysisResult(result);
+        } catch (error) {
+            console.error("AI analysis failed:", error);
+            toast({
+                variant: 'destructive',
+                title: 'Erreur de l\'analyse IA',
+                description: 'Impossible de trouver un jour similaire. Veuillez réessayer.'
+            });
+            setIsAnalysisDialogOpen(false);
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
+    const handleAnalyzeNext7Days = async () => {
+        if (selectedSpotIds.length === 0) {
+            toast({
+                title: 'Aucun spot sélectionné',
+                description: 'Veuillez sélectionner au moins un spot à analyser.'
+            });
+            return;
+        }
+
+        const spotsToAnalyze = savedSpots?.filter(spot => selectedSpotIds.includes(spot.id));
+        if (!spotsToAnalyze || spotsToAnalyze.length === 0) return;
+
+        setIsAnalyzing(true);
+        setAnalysisResult(null);
+        setIsAnalysisDialogOpen(true);
+
+        try {
+            const result = await analyzeBestDay({
+                spotContexts: spotsToAnalyze.map(s => s.context),
+                location: selectedLocation,
+                searchRangeDays: 7,
+            });
+            setAnalysisResult(result);
+        } catch (error) {
+            console.error("AI analysis failed:", error);
+            toast({
+                variant: 'destructive',
+                title: 'Erreur de l\'analyse IA',
+                description: 'Impossible d\'analyser les spots. Veuillez réessayer.'
+            });
+            setIsAnalysisDialogOpen(false);
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
+    const handleSpotSelection = (spotId: string) => {
+        setSelectedSpotIds(prev =>
+            prev.includes(spotId)
+                ? prev.filter(id => id !== spotId)
+                : [...prev, spotId]
+        );
+    };
 
     if (!user) {
         return (
@@ -389,6 +469,17 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
 
                 {!isFullscreen && (
                     <div>
+                        <div className="flex items-center gap-2 mb-4">
+                            <Button 
+                                variant="outline" 
+                                className="flex-1" 
+                                onClick={handleAnalyzeNext7Days}
+                                disabled={selectedSpotIds.length === 0 || isAnalyzing}
+                            >
+                                <BarChart className="mr-2"/> 
+                                Analyser {selectedSpotIds.length > 0 ? `(${selectedSpotIds.length}) spot(s)` : ''} pour les 7 prochains jours (IA)
+                            </Button>
+                        </div>
                         <h4 className="font-semibold text-lg mb-2">Historique des prises</h4>
                         {areSpotsLoading && <Skeleton className="h-24 w-full" />}
                         {!areSpotsLoading && savedSpots && savedSpots.length > 0 ? (
@@ -398,6 +489,13 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                        <AccordionTrigger>
                                            <div className="flex items-center justify-between w-full pr-4">
                                                 <div className="flex items-center gap-3">
+                                                    <Checkbox
+                                                        id={`select-spot-${spot.id}`}
+                                                        className="size-5"
+                                                        checked={selectedSpotIds.includes(spot.id)}
+                                                        onCheckedChange={() => handleSpotSelection(spot.id)}
+                                                        onClick={(e) => e.stopPropagation()} // Prevent accordion from toggling
+                                                    />
                                                     <div className="p-1 rounded-md" style={{backgroundColor: spot.color + '20'}}>
                                                         {React.createElement(mapIcons[spot.icon as keyof typeof mapIcons] || MapPin, { className: 'size-5', style: {color: spot.color} })}
                                                     </div>
@@ -417,8 +515,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                 <p><strong>Marée :</strong> {spot.context.tideMovement} ({spot.context.tideHeight.toFixed(2)}m), courant {spot.context.tideCurrent.toLowerCase()}</p>
                                            </div>
                                            <div className="flex flex-col sm:flex-row gap-2">
-                                               <Button variant="outline" className="flex-1" disabled><BrainCircuit className="mr-2"/> Chercher un jour similaire (IA)</Button>
-                                               <Button variant="outline" className="flex-1" disabled><BarChart className="mr-2"/> Analyser pour les 7 prochains jours (IA)</Button>
+                                               <Button variant="outline" className="flex-1" onClick={() => handleFindSimilarDay(spot)} disabled={isAnalyzing}><BrainCircuit className="mr-2"/> Chercher un jour similaire (IA)</Button>
                                                <Button variant="destructive" size="icon" onClick={() => handleDeleteSpot(spot.id)}><Trash2 /></Button>
                                            </div>
                                        </AccordionContent>
@@ -430,6 +527,51 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         )}
                     </div>
                 )}
+
+                <Dialog open={isAnalysisDialogOpen} onOpenChange={setIsAnalysisDialogOpen}>
+                    <DialogContent className="max-w-md">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <BrainCircuit /> Analyse de l'IA
+                            </DialogTitle>
+                            <DialogDescription>
+                                L'intelligence artificielle recherche les meilleures opportunités de pêche pour vous.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4 space-y-4">
+                            {isAnalyzing && (
+                                <div className="flex flex-col items-center justify-center space-y-2">
+                                    <p className="text-sm text-muted-foreground">Analyse des marées, de la lune et de la météo...</p>
+                                    <Skeleton className="h-4 w-full" />
+                                    <Skeleton className="h-4 w-4/5" />
+                                    <Skeleton className="h-4 w-full" />
+                                </div>
+                            )}
+                            {analysisResult && (
+                                <div className="space-y-4">
+                                    <div className="text-center">
+                                        <p className="text-sm text-muted-foreground">Meilleur jour recommandé</p>
+                                        <p className="text-2xl font-bold text-primary">
+                                            {format(new Date(analysisResult.bestDate.replace(/-/g, '/')), 'eeee d MMMM', { locale: fr })}
+                                        </p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor="confidence-score">Score de confiance</Label>
+                                        <Progress value={analysisResult.score} id="confidence-score" />
+                                        <p className="text-xs text-right text-muted-foreground">{analysisResult.score}%</p>
+                                    </div>
+                                    <div className="p-3 bg-muted/50 rounded-lg max-h-60 overflow-y-auto">
+                                        <h4 className="font-semibold mb-2">Explication de l'IA</h4>
+                                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{analysisResult.explanation}</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setIsAnalysisDialogOpen(false)}>Fermer</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </CardContent>
         </Card>
     );
