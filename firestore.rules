@@ -1,10 +1,97 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // WARNING: Insecure rules for debugging deployment conflicts.
-    // This is a temporary measure to unblock the server.
-    match /{document=**} {
-      allow read, write: if true;
+
+    // ----------------------------------------------------------------------
+    // Helper Functions
+    // ----------------------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      // The admin's email is hardcoded for this application.
+      return request.auth.token.email == 'f.mallet81@outlook.com';
+    }
+
+    // ----------------------------------------------------------------------
+    // Collection: users
+    // Purpose: Stores private user account information.
+    // ----------------------------------------------------------------------
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if isAdmin();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isOwner(userId) || isAdmin(); // Admin can now delete users
+    }
+
+    // ----------------------------------------------------------------------
+    // Collection: locations
+    // Purpose: Stores public, read-only location data.
+    // ----------------------------------------------------------------------
+    match /locations/{locationId} {
+      allow read: if true;
+      allow write: if false;
+    }
+    
+    // ----------------------------------------------------------------------
+    // Collection: stations & subcollections
+    // Purpose: Stores public tide data, writable only by an admin process.
+    // ----------------------------------------------------------------------
+    match /stations/{stationId} {
+      allow read: if true;
+      allow write: if isAdmin();
+      
+      match /tides/{date} {
+        allow read: if true;
+        allow write: if isAdmin();
+      }
+    }
+    
+    // ----------------------------------------------------------------------
+    // Collection: hunting_sessions
+    // Purpose: Manages real-time group hunting sessions.
+    // ----------------------------------------------------------------------
+    match /hunting_sessions/{sessionId} {
+      allow get: if isSignedIn();
+      allow create: if isOwner(request.resource.data.organizerId);
+      allow delete: if isOwner(resource.data.organizerId);
+      
+      // Participants subcollection
+      match /participants/{userId} {
+        // A user can only manage their own participant document.
+        allow create, update, delete: if isOwner(userId);
+        
+        // Any valid participant in the session can read the participant list.
+        allow get, list: if exists(/databases/$(database)/documents/hunting_sessions/$(sessionId)/participants/$(request.auth.uid));
+      }
+    }
+
+    // ----------------------------------------------------------------------
+    // Collection: access_tokens
+    // Purpose: Manages subscription access tokens.
+    // ----------------------------------------------------------------------
+    match /access_tokens/{tokenId} {
+      // Admin has full control.
+      allow read, write: if isAdmin();
+      
+      // An authenticated user can check if a token exists.
+      allow get: if isSignedIn();
+      
+      // A user can update a token ONLY to redeem it for themselves.
+      function isRedeemingOwnToken() {
+        let isBecomingRedeemed = request.resource.data.status == 'redeemed';
+        let wasActive = resource.data.status == 'active';
+        let isRedeemer = request.resource.data.redeemedBy == request.auth.uid;
+        return isBecomingRedeemed && wasActive && isRedeemer;
+      }
+      allow update: if isRedeemingOwnToken();
     }
   }
 }

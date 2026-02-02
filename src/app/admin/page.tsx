@@ -150,11 +150,16 @@ export default function AdminPage() {
             return;
         }
 
-        const batch = writeBatch(firestore);
-        usersToDelete.forEach(doc => {
-            batch.delete(doc.ref);
-        });
-        await batch.commit();
+        // Firestore batch writes are limited to 500 operations.
+        const BATCH_SIZE = 499;
+        for (let i = 0; i < usersToDelete.length; i += BATCH_SIZE) {
+            const batch = writeBatch(firestore);
+            const chunk = usersToDelete.slice(i, i + BATCH_SIZE);
+            chunk.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+            await batch.commit();
+        }
 
         toast({ title: "Utilisateurs réinitialisés", description: `${usersToDelete.length} utilisateurs ont été supprimés avec succès.` });
     } catch (error) {
