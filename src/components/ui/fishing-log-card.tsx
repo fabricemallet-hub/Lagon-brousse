@@ -171,7 +171,10 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                 setUserLocation(newLocation);
                 if (map) {
                     map.panTo(newLocation);
-                    map.setZoom(16);
+                    if (!initialZoomDone) {
+                        map.setZoom(16);
+                        setInitialZoomDone(true);
+                    }
                 }
                 startWatchingPosition();
             },
@@ -185,15 +188,6 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             { enableHighAccuracy: true }
         );
     };
-
-    useEffect(() => {
-        startWatchingPosition();
-        return () => {
-            if (watchId.current !== null) {
-                navigator.geolocation.clearWatch(watchId.current);
-            }
-        };
-    }, [startWatchingPosition]);
 
     const handleMapClick = (e: google.maps.MapMouseEvent) => {
         if (e.latLng) {
@@ -660,28 +654,30 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                         className="border-b"
                                     >
                                        <div className="flex items-center w-full">
-                                           <span className="pl-4 py-4" onClick={(e) => {e.preventDefault(); e.stopPropagation(); handleSpotSelection(spot.id)}}>
-                                               <Checkbox
-                                                   id={`select-spot-${spot.id}`}
-                                                   className="size-5"
-                                                   checked={selectedSpotIds.includes(spot.id)}
-                                                   onCheckedChange={() => handleSpotSelection(spot.id)}
-                                               />
-                                           </span>
-                                           <AccordionPrimitive.Trigger className="flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180 pl-2 pr-4 cursor-pointer">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="p-1 rounded-md" style={{backgroundColor: spot.color + '20'}}>
-                                                        {React.createElement(mapIcons[spot.icon as keyof typeof mapIcons] || MapPin, { className: 'size-5', style: {color: spot.color} })}
+                                            <span className="pl-4 py-4" onClick={(e) => {e.preventDefault(); e.stopPropagation(); handleSpotSelection(spot.id)}}>
+                                                <Checkbox
+                                                    id={`select-spot-${spot.id}`}
+                                                    className="size-5"
+                                                    checked={selectedSpotIds.includes(spot.id)}
+                                                    onCheckedChange={() => handleSpotSelection(spot.id)}
+                                                />
+                                            </span>
+                                            <AccordionPrimitive.Header className="flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180 pl-2 pr-4 cursor-pointer">
+                                                <AccordionPrimitive.Trigger className='text-left'>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="p-1 rounded-md" style={{backgroundColor: spot.color + '20'}}>
+                                                            {React.createElement(mapIcons[spot.icon as keyof typeof mapIcons] || MapPin, { className: 'size-5', style: {color: spot.color} })}
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-bold text-left">{spot.name}</p>
+                                                            <p className="text-xs text-muted-foreground text-left">
+                                                                {spot.createdAt ? format(spot.createdAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr }) : 'Enregistrement...'}
+                                                            </p>
+                                                        </div>
                                                     </div>
-                                                    <div>
-                                                        <p className="font-bold text-left">{spot.name}</p>
-                                                        <p className="text-xs text-muted-foreground text-left">
-                                                            {spot.createdAt ? format(spot.createdAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr }) : 'Enregistrement...'}
-                                                        </p>
-                                                    </div>
-                                                </div>
+                                                </AccordionPrimitive.Trigger>
                                                 <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
-                                            </AccordionPrimitive.Trigger>
+                                            </AccordionPrimitive.Header>
                                        </div>
                                        <AccordionPrimitive.Content className="overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
                                            <div className="pb-4 pl-12 pr-4 space-y-4">
