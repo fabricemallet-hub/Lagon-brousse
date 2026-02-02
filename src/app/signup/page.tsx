@@ -9,7 +9,7 @@ export default function SignupPage() {
       <Card className="w-full max-w-sm mx-auto">
         <CardHeader>
           <CardTitle>Inscription</CardTitle>
-          <CardDescription>Créez votre compte pour sauvegarder vos préférences et utiliser les fonctionnalités de partage.</CardDescription>
+          <CardDescription>Créez votre compte pour bénéficier d'une période d'essai gratuite de 3 mois. Au-delà, l'accès sera limité à 1 minute par jour.</CardDescription>
         </CardHeader>
         <CardContent>
           <AuthForm mode="signup" />

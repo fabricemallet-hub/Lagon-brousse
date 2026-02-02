@@ -122,17 +122,17 @@ export default function ComptePage() {
          if (isBefore(new Date(), expiryDate)) {
              return { label: 'Actif', badgeVariant: 'default', icon: Star, description: `Votre abonnement est actif jusqu'au ${formattedDate}.` };
          }
-         return { label: 'Expiré', badgeVariant: 'destructive', icon: XCircle, description: `Votre abonnement a expiré le ${formattedDate}.` };
+         return { label: 'Expiré', badgeVariant: 'destructive', icon: XCircle, description: `Votre abonnement a expiré le ${formattedDate}. Vous disposez maintenant d'un accès limité à une minute par jour.` };
       case 'trial':
         const trialExpiryDate = new Date(userProfile.subscriptionExpiryDate!);
         if (isBefore(new Date(), trialExpiryDate)) {
             return { label: 'Essai', badgeVariant: 'secondary', icon: Star, description: `Votre période d'essai se termine le ${format(trialExpiryDate, 'dd MMMM yyyy', { locale: fr })}.` };
         }
-        return { label: 'Limité', badgeVariant: 'destructive', icon: XCircle, description: "Votre période d'essai est terminée. Passez à la version complète pour un accès illimité." };
+        return { label: 'Limité', badgeVariant: 'destructive', icon: XCircle, description: "Votre période d'essai est terminée. Vous disposez maintenant d'un accès limité à une minute par jour. Passez à la version complète pour un accès illimité." };
       case 'inactive':
-        return { label: 'Limité', badgeVariant: 'destructive', icon: XCircle, description: "Votre abonnement est inactif. Réabonnez-vous pour profiter de toutes les fonctionnalités." };
+        return { label: 'Limité', badgeVariant: 'destructive', icon: XCircle, description: "Votre abonnement est inactif. Vous disposez d'un accès limité à une minute par jour. Réabonnez-vous pour profiter de toutes les fonctionnalités." };
       default:
-        return { label: 'Limité', badgeVariant: 'destructive', icon: XCircle, description: "Passez à la version complète pour un accès illimité." };
+        return { label: 'Limité', badgeVariant: 'destructive', icon: XCircle, description: "Votre accès est limité à une minute par jour. Passez à la version complète pour un accès illimité." };
     }
   };
 
