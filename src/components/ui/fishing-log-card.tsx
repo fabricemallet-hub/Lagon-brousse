@@ -18,7 +18,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { LocationData, FishingSpot, SwellForecast } from '@/lib/types';
 import { getDataForDate } from '@/lib/data';
-import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown, Pencil } from 'lucide-react';
+import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown, Pencil, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from './alert';
 import { useLocation } from '@/context/location-context';
@@ -127,11 +127,14 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     }, []);
 
     const startWatchingPosition = useCallback(() => {
-        if (!navigator.geolocation || watchId.current !== null) {
+        if (!navigator.geolocation) {
             return;
         }
         navigator.permissions.query({ name: 'geolocation' }).then(permissionStatus => {
             if (permissionStatus.state === 'granted') {
+                 if (watchId.current !== null) {
+                    navigator.geolocation.clearWatch(watchId.current);
+                }
                 watchId.current = navigator.geolocation.watchPosition(
                     (position) => {
                         const { latitude, longitude } = position.coords;
@@ -149,6 +152,15 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             }
         });
     }, [map, initialZoomDone]);
+
+     useEffect(() => {
+        startWatchingPosition();
+        return () => {
+            if (watchId.current !== null) {
+                navigator.geolocation.clearWatch(watchId.current);
+            }
+        };
+    }, [startWatchingPosition]);
 
     const handleRecenter = () => {
         if (!navigator.geolocation) {
@@ -177,7 +189,6 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         setInitialZoomDone(true);
                     }
                 }
-                startWatchingPosition();
             },
             (err) => {
                  toast({
@@ -492,28 +503,30 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                         }}
                                         onClick={(e) => { e.domEvent.stopPropagation(); handleSpotClick(spot.id); }}
                                     />
-                                    <OverlayView
+                                     <OverlayView
                                         position={{ lat: spot.location.latitude, lng: spot.location.longitude }}
                                         mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-                                    >
-                                        <div 
-                                            style={{ transform: 'translate(-50%, -150%)' }} 
+                                        >
+                                        <div
+                                            style={{ transform: 'translate(-50%, -150%)' }}
                                             className="flex flex-col items-center gap-1 cursor-pointer"
                                             onClick={(e) => { e.stopPropagation(); handleSpotClick(spot.id); }}
                                         >
                                             <div className="flex flex-col items-center gap-1 px-2 py-1 bg-card/90 border border-border rounded-md shadow text-xs font-bold text-card-foreground whitespace-nowrap">
                                                 <span>{spot.name}</span>
                                                 {spot.fishingTypes && spot.fishingTypes.length > 0 && (
-                                                    <div className="flex gap-1">
-                                                        {spot.fishingTypes.map(type => {
-                                                            const typeInfo = fishingTypes.find(t => t.id === type);
-                                                            return (
-                                                                <Badge key={type} variant="secondary" className={cn("text-xs px-1.5 py-0 text-white", typeInfo?.color)}>
-                                                                    {type}
-                                                                </Badge>
-                                                            )
-                                                        })}
-                                                    </div>
+                                                <div className="flex gap-1">
+                                                    {spot.fishingTypes.map(type => {
+                                                    const typeInfo = fishingTypes.find(t => t.id === type);
+                                                    return (
+                                                        <div
+                                                        key={type}
+                                                        className={cn("w-2 h-2 rounded-full", typeInfo?.color)}
+                                                        title={typeInfo?.label}
+                                                        />
+                                                    );
+                                                    })}
+                                                </div>
                                                 )}
                                             </div>
                                         </div>
@@ -558,6 +571,13 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         </div>
                     </div>
                 )}
+                 <Alert className={cn(isFullscreen && "hidden")}>
+                    <Download className="h-4 w-4" />
+                    <AlertTitle>Mode Hors Ligne</AlertTitle>
+                    <AlertDescription>
+                        La carte peut être utilisée hors ligne. Pour mettre une zone en cache, naviguez simplement sur la carte lorsque vous êtes connecté. Les tuiles seront automatiquement sauvegardées.
+                    </AlertDescription>
+                </Alert>
                 
                 <Dialog open={isSpotDialogOpen} onOpenChange={(open) => { if (!open) setSpotToEdit(null); setIsSpotDialogOpen(open); }}>
                     <DialogContent>
@@ -684,9 +704,14 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                            <div className="pb-4 pl-12 pr-4 space-y-4">
                                             {spot.fishingTypes && spot.fishingTypes.length > 0 && (
                                                 <div className="flex flex-wrap gap-2 pt-2">
-                                                    {spot.fishingTypes.map(type => (
-                                                        <Badge key={type} variant="secondary">{type}</Badge>
-                                                    ))}
+                                                    {spot.fishingTypes.map(type => {
+                                                        const typeInfo = fishingTypes.find(t => t.id === type);
+                                                        return (
+                                                            <Badge key={type} variant="secondary" className={cn("text-xs text-white", typeInfo?.color)}>
+                                                                {typeInfo?.label}
+                                                            </Badge>
+                                                        )
+                                                    })}
                                                 </div>
                                             )}
                                            <div className="text-sm text-muted-foreground bg-muted/50 p-4 rounded-lg space-y-2">
@@ -766,4 +791,3 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     );
 }
 
-    
