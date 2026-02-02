@@ -392,7 +392,7 @@ export function HuntingSessionCard() {
   }
 
   if (session) {
-     if (loadError || !googleMapsApiKey) {
+     if (loadError) {
         return (
              <Card>
                 <CardHeader>
@@ -407,31 +407,29 @@ export function HuntingSessionCard() {
                 <CardContent>
                      <Alert variant="destructive">
                         <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>Action requise : Erreur de configuration de Google Maps</AlertTitle>
-                        <AlertDescription className="space-y-3">
-                            {!googleMapsApiKey ? (
-                                <p>La variable d'environnement <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> n'est pas définie dans votre fichier <code>.env</code>.</p>
-                            ) : (
-                                <>
-                                <p>L'API Google Maps rejette votre clé API. Le code de l'application étant correct, le problème vient de la configuration de votre projet sur la console Google Cloud.</p>
-                                <p className="font-bold">Veuillez vérifier les points suivants un par un :</p>
-                                <ol className="list-decimal list-inside space-y-2 text-sm">
-                                    <li>
-                                        <strong>Compte de facturation :</strong> L'API Google Maps <strong>ne fonctionne pas</strong> sans un compte de facturation valide associé à votre projet, même pour une utilisation gratuite. C'est la cause la plus fréquente.
-                                        <Button size="sm" variant="link" asChild><a href="https://console.cloud.google.com/billing" target="_blank" rel="noopener noreferrer">Vérifier la facturation</a></Button>
-                                    </li>
-                                    <li>
-                                        <strong>API "Maps JavaScript API" activée :</strong> Assurez-vous que cette API spécifique est bien activée pour votre projet.
-                                        <Button size="sm" variant="link" asChild><a href="https://console.cloud.google.com/apis/library/maps-backend.googleapis.com" target="_blank" rel="noopener noreferrer">Activer l'API</a></Button>
-                                    </li>
-                                    <li>
-                                        <strong>Restrictions de la clé API :</strong> Assurez-vous que <code>*.cloudworkstations.dev/*</code> et <code>studio.firebase.google.com/*</code> sont bien dans la liste des sites autorisés.
-                                        <Button size="sm" variant="link" asChild><a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">Vérifier les restrictions</a></Button>
-                                    </li>
-                                </ol>
-                                <p className="pt-2">Après avoir vérifié et corrigé ces points, attendez 5 minutes puis rafraîchissez la page. L'erreur devrait disparaître.</p>
-                                </>
-                            )}
+                        <AlertTitle>Action requise : Erreur de Clé API Google Maps (InvalidKeyMapError)</AlertTitle>
+                        <AlertDescription className="space-y-4 mt-2">
+                           <p>L'application est correctement configurée, mais Google refuse votre clé API. Le problème se situe à 100% sur la console Google Cloud. Veuillez vérifier les points suivants :</p>
+                           
+                           <ol className="list-decimal list-inside space-y-2 text-sm font-medium">
+                                <li>
+                                    <strong>Compte de facturation :</strong> L'API Google Maps <strong>ne fonctionne pas</strong> sans un compte de facturation valide associé à votre projet, même pour une utilisation gratuite.
+                                    <Button size="sm" variant="link" asChild><a href="https://console.cloud.google.com/billing" target="_blank" rel="noopener noreferrer">Vérifier la facturation</a></Button>
+                                </li>
+                                <li>
+                                    <strong>API "Maps JavaScript API" activée :</strong> Assurez-vous que cette API spécifique est bien activée pour votre projet.
+                                    <Button size="sm" variant="link" asChild><a href="https://console.cloud.google.com/apis/library/maps-backend.googleapis.com" target="_blank" rel="noopener noreferrer">Activer l'API</a></Button>
+                                </li>
+                                <li>
+                                    <strong>Restrictions de la clé API :</strong> Assurez-vous que <code>*.cloudworkstations.dev/*</code> et <code>studio.firebase.google.com/*</code> sont bien dans la liste des sites autorisés.
+                                    <Button size="sm" variant="link" asChild><a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">Vérifier les restrictions</a></Button>
+                                </li>
+                            </ol>
+
+                            <div className="border-t pt-4 mt-4">
+                                <h4 className="font-bold">Plan B : Créer une nouvelle clé de test</h4>
+                                <p className="text-xs text-muted-foreground mt-1">Si le problème persiste après avoir tout vérifié, créez une nouvelle clé API **sans aucune restriction** pour un test. Copiez-la dans votre fichier <code>.env</code>. Si la carte fonctionne avec cette nouvelle clé, le problème vient des restrictions de la clé originale. Sinon, il est lié à la facturation de votre projet.</p>
+                            </div>
                         </AlertDescription>
                     </Alert>
                 </CardContent>
