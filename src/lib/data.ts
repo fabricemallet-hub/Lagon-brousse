@@ -3,6 +3,9 @@ import { LocationData, SwellForecast, Tide, WindDirection, WindForecast, HourlyF
 import { locations } from './locations';
 import { Firestore, doc, getDoc, collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
 
+// Simple cache to prevent redundant procedural calculations
+const proceduralCache = new Map<string, LocationData>();
+
 // Data from https://www.meteo.nc/nouvelle-caledonie/mer/previsions-site
 const tideStations = {
   'Nouméa': {
@@ -163,22 +166,6 @@ function getWindDirection(deg: number): WindDirection {
   return directions[Math.round(deg / 45) % 8];
 }
 
-function mapWeatherCondition(owmId: number, isNight: boolean): HourlyForecast['condition'] {
-    if (owmId >= 200 && owmId < 300) return 'Averses'; // Thunderstorm -> Averses
-    if (owmId >= 300 && owmId < 600) return 'Pluvieux'; // Drizzle/Rain -> Pluvieux
-    if (owmId >= 600 && owmId < 700) return 'Averses'; // Snow -> Averses (NC context)
-    if (owmId >= 700 && owmId < 800) return 'Nuageux'; // Atmosphere (Mist, etc) -> Nuageux
-    if (owmId === 800) return isNight ? 'Nuit claire' : 'Ensoleillé';
-    if (owmId === 801 || owmId === 802) return 'Peu nuageux';
-    if (owmId === 803 || owmId === 804) return 'Nuageux';
-    return 'Nuageux'; // Default
-}
-
-function formatTime(unixTimestamp: number, timezoneOffset: number): string {
-    const date = new Date((unixTimestamp + timezoneOffset) * 1000);
-    return date.toISOString().substr(11, 5);
-}
-
 function calculateHourlyTides(location: string, baseDate: Date): Pick<HourlyForecast, 'date' | 'tideHeight' | 'tideCurrent' | 'tidePeakType'>[] {
     const getTidesForDay = (date: Date): Tide[] => {
         const dayOfMonth = date.getDate();
@@ -298,7 +285,14 @@ function calculateHourlyTides(location: string, baseDate: Date): Pick<HourlyFore
 }
 
 export function generateProceduralData(location: string, date: Date): LocationData {
-  const effectiveDate = date || new Date();
+  const dateKey = date.toISOString().split('T')[0];
+  const cacheKey = `${location}-${dateKey}`;
+  
+  if (proceduralCache.has(cacheKey)) {
+    return proceduralCache.get(cacheKey)!;
+  }
+
+  const effectiveDate = new Date(dateKey);
   const dayOfMonth = effectiveDate.getDate();
   const month = effectiveDate.getMonth();
   const year = effectiveDate.getFullYear();
@@ -427,57 +421,42 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   // Fishing rating
   locationData.fishing.forEach((slot) => {
     slot.fish.forEach((f) => {
-      // Start with a base rating of 2/10 for more variation and stricter scoring.
       let rating = 1;
-
-      // 1. Time of day bonus/penalty is now more pronounced.
       if (slot.timeOfDay.includes('Aube') || slot.timeOfDay.includes('Crépuscule')) {
-        rating += 3.5; // Prime time gets a significant boost.
+        rating += 3.5;
       } else {
-        rating -= 2; // Mid-day is generally less active.
+        rating -= 2;
       }
-
-      // 2. Tide movement is critical. Increased penalty for slack tide.
       if (slot.tideMovement !== 'étale') {
-        rating += 3.5; // Moving water is good.
+        rating += 3.5;
       } else {
-        rating -= 6; // Strong penalty for slack tide, as fish are less active.
+        rating -= 6;
       }
-
-      // 3. Moon Phase Bonus with stronger penalties.
-      // dayInCycle: 0=new, 7.4=1st Q, 14.76=full, 22.1=3rd Q
       const isNearNewOrFullMoon = (dayInCycle < 4 || dayInCycle > 25.5) || (dayInCycle > 10.75 && dayInCycle < 18.75);
       const isNearQuarterMoon = (dayInCycle >= 4 && dayInCycle <= 10.75) || (dayInCycle >= 18.75 && dayInCycle <= 25.5);
-
       if (isNearNewOrFullMoon) {
-        rating += 3.5; // Strong bonus for new/full moon springs tides.
+        rating += 3.5;
       } else if (isNearQuarterMoon) {
-        rating -= 3; // Stronger penalty for quarter moons (neap tides).
+        rating -= 3;
       }
-
-      // 4. Pelagic season bonus with stronger penalties.
       const isPelagic = ['Mahi-mahi', 'Wahoo', 'Thon Jaune', 'Thazard', 'Bonite', 'Thon dents de chien'].includes(f.name);
       if (isPelagic) {
         if (isPelagicSeason) {
           rating += 2;
         } else {
-          rating -= 6; // Very strong penalty out of season.
+          rating -= 6;
         }
       }
-
-      // 5. Add a smaller, deterministic random factor for variety
       const fishNameSeed = f.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-      const randomFactor = Math.sin(dateSeed * 0.1 + locationSeed * 0.05 + fishNameSeed * 0.02 + slot.timeOfDay.length); // value between -1 and 1
+      const randomFactor = Math.sin(dateSeed * 0.1 + locationSeed * 0.05 + fishNameSeed * 0.02 + slot.timeOfDay.length);
       rating += randomFactor;
-
-      // Clamp the final rating between 1 and 10
       f.rating = Math.max(1, Math.min(10, Math.round(rating)));
     });
   });
 
   // Vary Wind
   locationData.weather.wind.forEach((forecast: WindForecast, index: number) => {
-    forecast.speed = Math.max(0, Math.round(8 + Math.sin(dateSeed * 0.2 + locationSeed + index) * 5)); // in knots
+    forecast.speed = Math.max(0, Math.round(8 + Math.sin(dateSeed * 0.2 + locationSeed + index) * 5));
     const directions: WindDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
     forecast.direction = directions[Math.floor(((dateSeed / 5) + locationSeed + index * 2) % directions.length)];
     const windStabilities: ('Stable' | 'Tournant')[] = ['Stable', 'Tournant'];
@@ -496,35 +475,15 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     locationData.weather.swell.push({ time, inside, outside, period });
   });
 
-  // Vary Rain
-  const rainChance = (Math.sin(dateSeed * 0.4 + locationSeed * 0.2) + 1) / 2; // Normalize to 0-1
-  if (rainChance < 0.98) {
-      locationData.weather.rain = 'Aucune';
-  } else if (rainChance < 0.995) {
-      locationData.weather.rain = 'Fine';
-  } else {
-      locationData.weather.rain = 'Forte';
-  }
-
-  // Vary Trend and UV Index
+  // Vary Rain, Trend, UV Index
+  const rainChance = (Math.sin(dateSeed * 0.4 + locationSeed * 0.2) + 1) / 2;
+  if (rainChance < 0.98) { locationData.weather.rain = 'Aucune'; } else if (rainChance < 0.995) { locationData.weather.rain = 'Fine'; } else { locationData.weather.rain = 'Forte'; }
   const uvSeed = (Math.sin(dateSeed * 0.25 + locationSeed * 0.15) + 1) / 2;
   locationData.weather.uvIndex = Math.round(1 + uvSeed * 10);
-
-  if (locationData.weather.rain === 'Forte') {
-      locationData.weather.trend = 'Pluvieux';
-      locationData.weather.uvIndex = Math.min(locationData.weather.uvIndex, 2);
-  } else if (locationData.weather.rain === 'Fine') {
-      locationData.weather.trend = 'Averses';
-      locationData.weather.uvIndex = Math.min(locationData.weather.uvIndex, 5);
-  } else { // No rain
-      if (uvSeed > 0.95) { // higher threshold for "Ensoleillé"
-          locationData.weather.trend = 'Ensoleillé';
-      } else {
-          locationData.weather.trend = 'Nuageux';
-      }
-  }
+  if (locationData.weather.rain === 'Forte') { locationData.weather.trend = 'Pluvieux'; locationData.weather.uvIndex = Math.min(locationData.weather.uvIndex, 2); } 
+  else if (locationData.weather.rain === 'Fine') { locationData.weather.trend = 'Averses'; locationData.weather.uvIndex = Math.min(locationData.weather.uvIndex, 5); } 
+  else { if (uvSeed > 0.95) { locationData.weather.trend = 'Ensoleillé'; } else { locationData.weather.trend = 'Nuageux'; } }
   locationData.weather.uvIndex = Math.max(1, Math.min(11, locationData.weather.uvIndex));
-
 
   // Vary Sun/Moon times
   locationData.weather.sun.sunrise = varyTime(baseData.weather.sun.sunrise, 1);
@@ -538,184 +497,101 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   const zodiacSigns = ['Fruits', 'Racines', 'Fleurs', 'Feuilles'];
   const zodiac = zodiacSigns[Math.floor((dayInCycle / (27.3/4)) % 4)] as 'Fruits' | 'Racines' | 'Fleurs' | 'Feuilles';
   locationData.farming.zodiac = zodiac;
-
   locationData.farming.isGoodForCuttings = lunarPhase === 'Lune Montante';
   locationData.farming.isGoodForPruning = lunarPhase === 'Lune Descendante';
   locationData.farming.isGoodForMowing = lunarPhase === 'Lune Descendante' && zodiac === 'Feuilles';
   
   const sow: string[] = [];
   const harvest: string[] = [];
-
   if (month >= 9 || month <= 2) { 
     if (zodiac === 'Fruits') { sow.push('Tomates', 'Aubergines', 'Poivrons'); harvest.push('Melons', 'Pastèques'); }
     if (zodiac === 'Racines') { sow.push('Carottes', 'Radis'); harvest.push('Patates douces', 'Manioc'); }
     if (zodiac === 'Feuilles') { sow.push('Salades', 'Brèdes'); harvest.push('Choux de Chine'); }
     if (zodiac === 'Fleurs') { sow.push('Fleurs annuelles'); harvest.push('Artichauts'); }
-  } 
-  else { 
+  } else { 
     if (zodiac === 'Fruits') { sow.push('Pois', 'Haricots'); harvest.push('Citrouilles', 'Courgettes'); }
     if (zodiac === 'Racines') { sow.push('Oignons', 'Ail', 'Poireaux'); harvest.push('Carottes', 'Taro', 'Pommes de terre'); }
     if (zodiac === 'Feuilles') { sow.push('Choux', 'Épinards', 'Bettes'); harvest.push('Salades'); }
-     if (zodiac === 'Fleurs') { sow.push('Brocolis', 'Choux-fleurs'); }
+    if (zodiac === 'Fleurs') { sow.push('Brocolis', 'Choux-fleurs'); }
   }
   locationData.farming.sow = sow;
   locationData.farming.harvest = harvest;
 
   // Hunting data
-  if (month >= 6 && month <= 7) { 
-    locationData.hunting.period = { name: 'Brame', description: 'Période de reproduction des cerfs. Les mâles sont moins méfiants et plus actifs, même en journée.' };
-  } else if (month >= 1 && month <= 2) { 
-      locationData.hunting.period = { name: 'Chute des bois', description: 'Les cerfs mâles perdent leurs bois. Ils sont plus discrets et difficiles à repérer.' };
-  } else {
-      locationData.hunting.period = { name: 'Normal', description: 'Activité habituelle des cerfs, principalement à l\'aube et au crépuscule.' };
-  }
-  if (locationData.weather.rain === 'Fine') { locationData.hunting.advice.rain = 'Excellente condition, la pluie masque le bruit de vos pas.'; } 
-  else if (locationData.weather.rain === 'Forte') { locationData.hunting.advice.rain = 'Chasse difficile, les animaux sont bloqués et peu mobiles.'; } 
-  else { locationData.hunting.advice.rain = 'Temps sec, soyez particulièrement silencieux.'; }
+  if (month >= 6 && month <= 7) { locationData.hunting.period = { name: 'Brame', description: 'Période de reproduction des cerfs.' }; } 
+  else if (month >= 1 && month <= 2) { locationData.hunting.period = { name: 'Chute des bois', description: 'Les cerfs mâles perdent leurs bois.' }; } 
+  else { locationData.hunting.period = { name: 'Normal', description: 'Activité habituelle des cerfs.' }; }
+  
+  if (locationData.weather.rain === 'Fine') { locationData.hunting.advice.rain = 'La pluie masque le bruit de vos pas.'; } 
+  else if (locationData.weather.rain === 'Forte') { locationData.hunting.advice.rain = 'Chasse difficile, les animaux sont peu mobiles.'; } 
+  else { locationData.hunting.advice.rain = 'Temps sec, soyez silencieux.'; }
+  
   const isWindUnstable = locationData.weather.wind.some(f => f.stability === 'Tournant');
-  if (!isWindUnstable) { locationData.hunting.advice.scent = 'Le vent stable vous permet de bien gérer votre odeur. Chassez face au vent.'; } 
-  else { locationData.hunting.advice.scent = 'Le vent tournant rend la gestion des odeurs très difficile. Redoublez de prudence.'; }
+  if (!isWindUnstable) { locationData.hunting.advice.scent = 'Vent stable, chassez face au vent.'; } 
+  else { locationData.hunting.advice.scent = 'Vent tournant, gestion des odeurs difficile.'; }
 
     // Generate Hourly Forecasts
     locationData.weather.hourly = [];
-    const startDate = new Date(effectiveDate);
-    startDate.setHours(0, 0, 0, 0);
     const baseTempMin = 22 + (locationSeed % 5);
     const baseTempMax = baseTempMin + 8 + (locationSeed % 3);
     for (let i = 0; i < 48; i++) {
-        const forecastDate = new Date(startDate.getTime() + i * 60 * 60 * 1000);
+        const forecastDate = new Date(effectiveDate.getTime() + i * 60 * 60 * 1000);
         const hour = forecastDate.getHours();
         const isNight = hour < 6 || hour > 19;
         const tempVariation = Math.sin((hour / 24) * Math.PI * 2 - Math.PI/2);
         const temp = Math.round(baseTempMin + ((baseTempMax - baseTempMin) / 2) * (1 + tempVariation) + Math.sin(dateSeed+i/2)*2);
         const directions: WindDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
         const windDirection = directions[Math.floor((dateSeed/2 + hour/3 + locationSeed/100) % directions.length)];
-        const windSpeedInKmh = 5 + Math.abs(Math.sin(dateSeed + hour/4 + locationSeed/1000)) * 25;
-        const windSpeed = Math.round(windSpeedInKmh * 0.539957); // in knots
+        const windSpeed = Math.round((5 + Math.abs(Math.sin(dateSeed + hour/4 + locationSeed/1000)) * 25) * 0.539957);
         let condition : HourlyForecast['condition'] = 'Ensoleillé';
         const conditionSeed = (Math.cos(dateSeed * 0.5 + i * 0.2 + locationSeed) + 1) / 2;
-        if (isNight) {
-            condition = conditionSeed > 0.6 ? 'Nuit claire' : 'Peu nuageux';
-        } else {
-            if (conditionSeed > 0.85) condition = 'Ensoleillé';
-            else if (conditionSeed > 0.4) condition = 'Peu nuageux';
-            else if (conditionSeed > 0.2) condition = 'Nuageux';
-            else condition = 'Averses';
+        if (isNight) { condition = conditionSeed > 0.6 ? 'Nuit claire' : 'Peu nuageux'; } else {
+            if (conditionSeed > 0.85) condition = 'Ensoleillé'; else if (conditionSeed > 0.4) condition = 'Peu nuageux'; else if (conditionSeed > 0.2) condition = 'Nuageux'; else condition = 'Averses';
         }
-        locationData.weather.hourly.push({ date: forecastDate.toISOString(), condition: condition, windSpeed: windSpeed, windDirection: windDirection, stability: 'Stable', isNight: isNight, temp: temp, tideHeight: 0, tideCurrent: 'Nul', tidePeakType: undefined });
+        locationData.weather.hourly.push({ date: forecastDate.toISOString(), condition, windSpeed, windDirection, stability: 'Stable', isNight, temp, tideHeight: 0, tideCurrent: 'Nul' });
     }
-    const currentHourForecastForTemp = locationData.weather.hourly.find(f => new Date(f.date).getHours() === effectiveDate.getHours());
-    if (currentHourForecastForTemp) { locationData.weather.temp = currentHourForecastForTemp.temp; }
-    locationData.weather.waterTemperature = Math.round(locationData.weather.temp - (2 + Math.sin(dateSeed * 0.1)));
-
-    const dayForecasts = locationData.weather.hourly.slice(0, 24);
-    if (dayForecasts.length > 0) {
-      locationData.weather.tempMin = Math.min(...dayForecasts.map(f => f.temp));
-      locationData.weather.tempMax = Math.max(...dayForecasts.map(f => f.temp));
-    }
-
-    // Crab and Lobster Data
-    if (dayInCycle >= 27 || dayInCycle <= 3) {
-        locationData.crabAndLobster = {...locationData.crabAndLobster, crabStatus: 'Plein', crabMessage: "Bonne période (nouvelle lune). Les crabes sont généralement pleins."};
-    } else if (dayInCycle >= 12 && dayInCycle <= 18) {
-        locationData.crabAndLobster = {...locationData.crabAndLobster, crabStatus: 'Plein', crabMessage: "Excellente période (pleine lune). Les crabes sont pleins et actifs."};
-    } else if (dayInCycle > 3 && dayInCycle < 12) {
-        locationData.crabAndLobster = {...locationData.crabAndLobster, crabStatus: 'Vide', crabMessage: "Période de 'crabes vides' (en mue). Moins intéressant pour la pêche."};
-    } else {
-        locationData.crabAndLobster = {...locationData.crabAndLobster, crabStatus: 'Mout', crabMessage: "Période de 'crabes mous' (en mue). Qualité de chair moindre et pêche interdite."};
-    }
-    if (illumination < 0.3) {
-        locationData.crabAndLobster = {...locationData.crabAndLobster, lobsterActivity: 'Élevée', lobsterMessage: "Nuits sombres, activité élevée. Privilégiez l'intérieur du lagon et les platiers."};
-    } else if (illumination > 0.7) {
-        locationData.crabAndLobster = {...locationData.crabAndLobster, lobsterActivity: 'Faible', lobsterMessage: "Nuits claires, langoustes plus discrètes. Tentez votre chance à l'extérieur du récif ou plus en profondeur."};
-    } else {
-        locationData.crabAndLobster = {...locationData.crabAndLobster, lobsterActivity: 'Moyenne', lobsterMessage: "Activité moyenne. Pêche possible à l'intérieur et à l'extérieur du lagon."};
-    }
-
-    // Octopus Data
-    let octopusActivity: 'Élevée' | 'Moyenne' | 'Faible' | null = null;
-    let octopusMessage = '';
     
-    const winterMonths = [5, 6, 7, 8]; // June to September
-    const isWinter = winterMonths.includes(month);
+    locationData.weather.temp = locationData.weather.hourly[0].temp;
+    locationData.weather.waterTemperature = Math.round(locationData.weather.temp - (2 + Math.sin(dateSeed * 0.1)));
+    locationData.weather.tempMin = Math.min(...locationData.weather.hourly.slice(0, 24).map(f => f.temp));
+    locationData.weather.tempMax = Math.max(...locationData.weather.hourly.slice(0, 24).map(f => f.temp));
 
-    const lowTides = locationData.tides.filter(t => t.type === 'basse');
-    const lowestTide = lowTides.length > 0 
-        ? lowTides.reduce((prev, current) => (prev.height < current.height) ? prev : current)
-        : null;
+    // Crab, Lobster, Octopus
+    if (dayInCycle >= 27 || dayInCycle <= 3) { locationData.crabAndLobster.crabStatus = 'Plein'; } else if (dayInCycle >= 12 && dayInCycle <= 18) { locationData.crabAndLobster.crabStatus = 'Plein'; } else { locationData.crabAndLobster.crabStatus = 'Mout'; }
+    locationData.crabAndLobster.lobsterActivity = illumination < 0.3 ? 'Élevée' : illumination > 0.7 ? 'Faible' : 'Moyenne';
+    const isWinter = [5, 6, 7, 8].includes(month);
+    const lowestTideHeight = Math.min(...locationData.tides.filter(t => t.type === 'basse').map(t => t.height));
+    locationData.crabAndLobster.octopusActivity = (isWinter && lowestTideHeight <= 0.25) ? 'Élevée' : null;
 
-    const isVeryLowTide = lowestTide && lowestTide.height <= 0.25;
-
-    if (isWinter && isVeryLowTide) {
-        octopusActivity = 'Élevée';
-        octopusMessage = `Excellente période pour la pêche à pied lors de la marée basse de ${lowestTide.time}. Cherchez-les dans les trous sur le platier.`;
-    } else {
-        // If conditions are not met, we don't display the octopus section by setting activity to null.
-        octopusActivity = null;
-        octopusMessage = '';
-    }
-
-    locationData.crabAndLobster.octopusActivity = octopusActivity;
-    locationData.crabAndLobster.octopusMessage = octopusMessage;
-
-
-    // Add hourly tide data
+    // Add hourly tides
     const hourlyTideData = calculateHourlyTides(location, effectiveDate);
-    locationData.weather.hourly.forEach(forecast => {
-        const forecastDate = new Date(forecast.date);
-        const correspondingTide = hourlyTideData.find(t => {
-            const tideDate = new Date(t.date);
-            return tideDate.getDate() === forecastDate.getDate() && tideDate.getHours() === forecastDate.getHours();
-        });
-        if (correspondingTide) {
-            forecast.tideHeight = correspondingTide.tideHeight;
-            forecast.tideCurrent = correspondingTide.tideCurrent;
-            forecast.tidePeakType = correspondingTide.tidePeakType;
-        }
+    locationData.weather.hourly.forEach(f => {
+        const forecastDate = new Date(f.date);
+        const t = hourlyTideData.find(td => new Date(td.date).getHours() === forecastDate.getHours());
+        if (t) { f.tideHeight = t.tideHeight; f.tideCurrent = t.tideCurrent; f.tidePeakType = t.tidePeakType; }
     });
 
+  proceduralCache.set(cacheKey, locationData);
   return locationData;
 }
 
-
 export function getDataForDate(location: string, date: Date): LocationData {
-  // Ensure date is valid, fallback to now if not.
-  const validDate = date || new Date();
-  const proceduralData = generateProceduralData(location, validDate);
-  
-  // All API fetching logic has been removed to ensure the app is self-contained and free.
-  // The data is now fully procedural, eliminating external API errors and costs.
-  return proceduralData;
+  return generateProceduralData(location, date);
 }
-
 
 export async function getTideArchiveStatus(firestore: Firestore): Promise<{ lastDate: string | null, stationCount: number }> {
     const stations = [...new Set(Object.values(communeToTideStationMap))];
     let latestDate: Date | null = null;
-
     for (const stationName of stations) {
         try {
             const tidesColRef = collection(firestore, `stations/${stationName}/tides`);
             const q = query(tidesColRef, orderBy('__name__', 'desc'), limit(1));
             const querySnapshot = await getDocs(q);
-            
             if (!querySnapshot.empty) {
-                const lastDocId = querySnapshot.docs[0].id;
-                const docDate = new Date(lastDocId);
-                 if (!latestDate || docDate > latestDate) {
-                    latestDate = docDate;
-                }
+                const docDate = new Date(querySnapshot.docs[0].id);
+                 if (!latestDate || docDate > latestDate) { latestDate = docDate; }
             }
-        } catch (error) {
-            console.error(`Failed to check tide archive for ${stationName}:`, error);
-            // This might be a missing index error, but we continue to check other stations
-        }
+        } catch (error) { console.error(`Failed to check tide archive for ${stationName}:`, error); }
     }
-
-    return {
-        lastDate: latestDate ? latestDate.toISOString().split('T')[0] : null,
-        stationCount: stations.length,
-    };
+    return { lastDate: latestDate ? latestDate.toISOString().split('T')[0] : null, stationCount: stations.length };
 }
-
-    
