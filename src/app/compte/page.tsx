@@ -39,7 +39,7 @@ export default function ComptePage() {
 
   const handleSubscribe = () => {
     const paypalLink = process.env.NEXT_PUBLIC_PAYPAL_LINK;
-    if (paypalLink) {
+    if (paypalLink && paypalLink !== 'https://www.paypal.com/paypalme/YOUR_PAYPAL_ID_HERE') {
       toast({
         title: 'Redirection vers PayPal',
         description: "Un nouvel onglet va s'ouvrir pour finaliser votre abonnement.",
@@ -49,7 +49,7 @@ export default function ComptePage() {
       toast({
         variant: "destructive",
         title: "Configuration requise",
-        description: "Le lien de paiement n'est pas configuré.",
+        description: "Le lien de paiement PayPal n'a pas été configuré par l'administrateur.",
       });
     }
   };
