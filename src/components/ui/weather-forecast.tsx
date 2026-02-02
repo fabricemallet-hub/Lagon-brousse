@@ -275,7 +275,7 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
             {weather.hourly.slice(0, 24).map((forecast, index) => (
               <CarouselItem
                 key={index}
-                className="basis-1/5 sm:basis-1/6 md:basis-[16%]"
+                className="basis-1/3 sm:basis-1/4 md:basis-1/5 lg:basis-1/6 xl:basis-[14.28%]"
                 onClick={() => api?.scrollTo(index)}
               >
                 <div
@@ -286,23 +286,23 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
                       : 'bg-card hover:bg-muted/50'
                   )}
                 >
-                  <p className="font-bold text-lg">
+                  <p className="font-bold text-sm">
                     {format(new Date(forecast.date), "HH'h'", { locale: fr })}
                   </p>
                   <WeatherConditionIcon
                     condition={forecast.condition}
                     isNight={forecast.isNight}
-                    className="size-10"
+                    className="size-8"
                   />
                   
                   <div className="flex flex-col items-center text-card-foreground my-1">
-                    <WindArrowIcon direction={forecast.windDirection} className="size-7 text-yellow-500" />
-                    <span className="font-bold text-3xl">{forecast.windSpeed}</span>
+                    <WindArrowIcon direction={forecast.windDirection} className="size-6 text-yellow-500" />
+                    <span className="font-bold text-2xl">{forecast.windSpeed}</span>
                     <span className="text-xs text-muted-foreground -mt-1">nœuds</span>
                   </div>
 
                   <div className="flex items-baseline text-muted-foreground">
-                    <span className="font-semibold text-lg">{forecast.temp}°</span>
+                    <span className="font-semibold text-base">{forecast.temp}°</span>
                   </div>
                   
                   <div className="border-t w-full my-1"></div>

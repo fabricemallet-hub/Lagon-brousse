@@ -85,7 +85,7 @@ export default function Home() {
 
       <WeatherForecast weather={weather} tides={sortedTides} />
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 sm:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl md:text-2xl">
