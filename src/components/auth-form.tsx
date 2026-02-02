@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { useAuth, useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -27,6 +27,7 @@ import { ForgotPasswordDialog } from './forgot-password-dialog';
 import { Eye, EyeOff, Ticket } from 'lucide-react';
 import { ensureUserDocument } from '@/lib/user-utils';
 import { redeemAccessToken } from '@/lib/token-utils';
+import { Checkbox } from '@/components/ui/checkbox';
 
 type AuthFormProps = {
   mode: 'login' | 'signup';
@@ -37,6 +38,7 @@ const loginSchema = z.object({
   email: z.string().email({ message: 'Veuillez entrer une adresse email valide.' }),
   password: z.string().min(6, { message: 'Le mot de passe doit contenir au moins 6 caractères.' }),
   token: z.string().optional(),
+  rememberMe: z.boolean().optional(),
 });
 
 // Schéma pour l'inscription
@@ -65,8 +67,20 @@ export function AuthForm({ mode }: AuthFormProps) {
       email: '',
       password: '',
       token: '',
+      rememberMe: false,
     },
   });
+  
+  useEffect(() => {
+    if (mode === 'login') {
+        const rememberedEmail = localStorage.getItem('rememberedEmail');
+        if (rememberedEmail) {
+            form.setValue('email', rememberedEmail);
+            form.setValue('rememberMe', true);
+        }
+    }
+  }, [form, mode]);
+
 
   const onValidationErrors = (errors: any) => {
     // This function can be used for debugging validation errors
@@ -88,6 +102,13 @@ export function AuthForm({ mode }: AuthFormProps) {
     try {
       if (mode === 'login') {
         const loginValues = values as z.infer<typeof loginSchema>;
+
+        if (loginValues.rememberMe) {
+            localStorage.setItem('rememberedEmail', loginValues.email);
+        } else {
+            localStorage.removeItem('rememberedEmail');
+        }
+
         const userCredential = await signInWithEmailAndPassword(auth, loginValues.email, loginValues.password);
 
         if (userCredential.user && loginValues.token) {
@@ -257,6 +278,28 @@ export function AuthForm({ mode }: AuthFormProps) {
             </FormItem>
           )}
         />
+
+        {mode === 'login' && (
+          <FormField
+            control={form.control}
+            name="rememberMe"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+                <div className="space-y-1 leading-none">
+                  <FormLabel>
+                    Se souvenir de moi
+                  </FormLabel>
+                </div>
+              </FormItem>
+            )}
+          />
+        )}
         
         <FormField
           control={form.control}
