@@ -90,59 +90,51 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isAuthPage = pathname === '/login' || pathname === '/signup';
 
   useEffect(() => {
-    // If we are still waiting for auth or the firestore doc for a logged-in user, we are loading.
-    if (isUserLoading || (user && isProfileLoading)) {
+    // State determination:
+    // loading: if auth state is unknown OR if a user is logged in but their profile hasn't loaded yet.
+    // limited: if no user is logged in (guest) OR if a user is logged in and their profile explicitly says they have limited access (inactive/expired).
+    // admin/active/trial: if a user is logged in and their profile confirms this status.
+    
+    if (isUserLoading) {
+      // Still waiting for Firebase Auth to tell us if anyone is logged in.
       setStatus('loading');
       return;
     }
 
-    // If there is no user, they are a guest with limited access.
     if (!user) {
+      // Auth is resolved, and there's no user. They are a guest.
       setStatus('limited');
       return;
     }
 
-    // If we have a user, but their profile document doesn't exist in Firestore.
-    // This can happen for a brief moment after sign-up. We should wait,
-    // as the FirebaseProvider is likely creating it. Treating it as 'loading'
-    // prevents the 'limited' status flicker that triggers the usage timer.
-    if (!userProfile) {
-        setStatus('loading'); // Treat as loading until profile is available
-        return;
-    }
-    
-    // At this point, we have a user and their profile data.
-    // Now we can determine their real status.
-
-    if (userProfile.subscriptionStatus === 'admin') {
-      setStatus('admin');
+    // At this point, we have a logged-in user. Now we need their profile from Firestore.
+    if (isProfileLoading || !userProfile) {
+      // The profile is still being fetched, or the hook hasn't returned it yet.
+      // We MUST wait. Setting status to 'limited' here would be a mistake.
+      setStatus('loading');
       return;
     }
-    
-    if (userProfile.subscriptionStatus === 'active' && userProfile.subscriptionExpiryDate) {
-      const expiry = new Date(userProfile.subscriptionExpiryDate);
-      if (isBefore(new Date(), expiry)) {
-        setStatus('active');
-      } else {
+
+    // Now we have the user and their profile. We can make a final decision.
+    switch (userProfile.subscriptionStatus) {
+      case 'admin':
+        setStatus('admin');
+        break;
+      case 'active':
+        const expiry = new Date(userProfile.subscriptionExpiryDate!);
+        setStatus(isBefore(new Date(), expiry) ? 'active' : 'limited');
+        break;
+      case 'trial':
+        const trialExpiry = new Date(userProfile.subscriptionExpiryDate!);
+        setTrialEndDate(trialExpiry);
+        setStatus(isBefore(new Date(), trialExpiry) ? 'trial' : 'limited');
+        break;
+      case 'inactive':
+      default:
+        // Explicitly limited.
         setStatus('limited');
-      }
-      return;
+        break;
     }
-    
-    if (userProfile.subscriptionStatus === 'trial' && userProfile.subscriptionExpiryDate) {
-      const expiry = new Date(userProfile.subscriptionExpiryDate);
-      setTrialEndDate(expiry);
-      if (isBefore(new Date(), expiry)) {
-        setStatus('trial');
-      } else {
-        setStatus('limited');
-      }
-      return;
-    }
-
-    // Default to limited for 'inactive' or other cases
-    setStatus('limited');
-
   }, [user, isUserLoading, userProfile, isProfileLoading]);
 
   // Effect to initialize and run the countdown timer.
