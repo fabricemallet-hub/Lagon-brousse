@@ -4,7 +4,7 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { GoogleMap, useJsApiLoader, MarkerF, OverlayView } from '@react-google-maps/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -66,7 +66,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     const watchId = useRef<number | null>(null);
 
     const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    const { isLoaded, loadError } = useJsApiLoader({ googleMapsApiKey: googleMapsApiKey || "" });
+    const { isLoaded, loadError } = useJsApiLoader({ googleMapsApiKey: googleMapsApiKey || "", mapIds: ['satellite_id'] });
 
     const fishingSpotsRef = useMemoFirebase(() => {
         if (!user || !firestore) return null;
@@ -76,6 +76,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
 
     const onLoad = useCallback(function callback(mapInstance: google.maps.Map) {
         setMap(mapInstance);
+        mapInstance.setMapTypeId('satellite');
     }, []);
 
     const onUnmount = useCallback(function callback(map: google.maps.Map) {
@@ -144,6 +145,12 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     };
     
     const handleMapClick = (e: google.maps.MapMouseEvent) => {
+        if (e.latLng) {
+            setNewSpotLocation({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+        }
+    };
+    
+    const handleNewSpotDragEnd = (e: google.maps.MapMouseEvent) => {
         if (e.latLng) {
             setNewSpotLocation({ lat: e.latLng.lat(), lng: e.latLng.lng() });
         }
@@ -258,7 +265,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                             mapContainerClassName="w-full h-full"
                             center={userLocation || { lat: -21.5, lng: 165.5 }}
                             zoom={userLocation && initialZoomDone ? (map?.getZoom() ?? 16) : 7}
-                            options={{ disableDefaultUI: true, zoomControl: true, mapTypeControl: true, clickableIcons: false }}
+                            options={{ disableDefaultUI: true, zoomControl: true, mapTypeControl: true, clickableIcons: false, mapId: 'satellite_id' }}
                             onClick={handleMapClick}
                             onLoad={onLoad}
                             onUnmount={onUnmount}
@@ -283,65 +290,71 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                 />
                             ))}
                             {newSpotLocation && (
-                                <MarkerF position={newSpotLocation} />
+                                <MarkerF 
+                                    position={newSpotLocation}
+                                    draggable={true}
+                                    onDragEnd={handleNewSpotDragEnd}
+                                />
                             )}
                         </GoogleMap>
-                         <Button size="icon" onClick={handleRecenter} className="absolute top-2 right-2 shadow-lg h-9 w-9 z-10">
+                        <Button size="icon" onClick={handleRecenter} className="absolute top-2 right-2 shadow-lg h-9 w-9 z-10">
                             <LocateFixed className="h-5 w-5" />
                         </Button>
-                        {newSpotLocation && (
-                            <Dialog open={isAddSpotOpen} onOpenChange={(open) => { if(!open) setNewSpotLocation(null); setIsAddSpotOpen(open); }}>
-                                <DialogTrigger asChild>
-                                    <Button className="absolute bottom-4 left-1/2 -translate-x-1/2 shadow-lg" onClick={() => setIsAddSpotOpen(true)}>
-                                        <Plus className="mr-2" /> Ajouter mon coin de pêche ici
-                                    </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                    <DialogHeader>
-                                        <DialogTitle>Enregistrer un nouveau spot</DialogTitle>
-                                        <DialogDescription>Remplissez les détails et sauvegardez pour ajouter ce spot à votre carnet.</DialogDescription>
-                                    </DialogHeader>
-                                    <div className="space-y-4 py-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="spot-name">Nom du spot</Label>
-                                            <Input id="spot-name" placeholder="Ex: Spot à bec de cane" value={spotName} onChange={(e) => setSpotName(e.target.value)} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="spot-notes">Notes</Label>
-                                            <Textarea id="spot-notes" placeholder="Ex: Pris à la traîne avec un leurre rouge" value={spotNotes} onChange={(e) => setSpotNotes(e.target.value)} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Icône</Label>
-                                            <div className="flex gap-2">
-                                                {availableIcons.map(iconName => {
-                                                    const Icon = mapIcons[iconName as keyof typeof mapIcons];
-                                                    return (
-                                                        <Button key={iconName} variant="outline" size="icon" onClick={() => setSelectedIcon(iconName as keyof typeof mapIcons)} className={cn(selectedIcon === iconName && "ring-2 ring-primary")}>
-                                                            <Icon className="size-5" />
-                                                        </Button>
-                                                    )
-                                                })}
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Couleur</Label>
-                                            <div className="flex gap-2">
-                                                {availableColors.map(color => (
-                                                    <button key={color} onClick={() => setSelectedColor(color)} className={cn("w-8 h-8 rounded-full border-2", selectedColor === color ? "border-primary ring-2 ring-primary" : "border-transparent")} style={{ backgroundColor: color }} />
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <DialogFooter>
-                                        <DialogClose asChild><Button variant="ghost">Annuler</Button></DialogClose>
-                                        <Button onClick={handleSaveSpot} disabled={isSaving}><Save className="mr-2"/>{isSaving ? "Sauvegarde..." : "Sauvegarder"}</Button>
-                                    </DialogFooter>
-                                </DialogContent>
-                            </Dialog>
-                        )}
+                        <Button 
+                            className="absolute bottom-4 left-1/2 -translate-x-1/2 shadow-lg" 
+                            onClick={() => { if (newSpotLocation) setIsAddSpotOpen(true); }}
+                            disabled={!newSpotLocation}
+                        >
+                            <Plus className="mr-2" /> 
+                            {newSpotLocation ? 'Ajouter ce coin de pêche' : 'Cliquez sur la carte pour placer un repère'}
+                        </Button>
                     </div>
                 )}
                 
+                <Dialog open={isAddSpotOpen} onOpenChange={setIsAddSpotOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Enregistrer un nouveau spot</DialogTitle>
+                            <DialogDescription>Remplissez les détails et sauvegardez pour ajouter ce spot à votre carnet.</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="spot-name">Nom du spot</Label>
+                                <Input id="spot-name" placeholder="Ex: Spot à bec de cane" value={spotName} onChange={(e) => setSpotName(e.target.value)} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="spot-notes">Notes</Label>
+                                <Textarea id="spot-notes" placeholder="Ex: Pris à la traîne avec un leurre rouge" value={spotNotes} onChange={(e) => setSpotNotes(e.target.value)} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Icône</Label>
+                                <div className="flex gap-2">
+                                    {availableIcons.map(iconName => {
+                                        const Icon = mapIcons[iconName as keyof typeof mapIcons];
+                                        return (
+                                            <Button key={iconName} variant="outline" size="icon" onClick={() => setSelectedIcon(iconName as keyof typeof mapIcons)} className={cn(selectedIcon === iconName && "ring-2 ring-primary")}>
+                                                <Icon className="size-5" />
+                                            </Button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Couleur</Label>
+                                <div className="flex gap-2">
+                                    {availableColors.map(color => (
+                                        <button key={color} onClick={() => setSelectedColor(color)} className={cn("w-8 h-8 rounded-full border-2", selectedColor === color ? "border-primary ring-2 ring-primary" : "border-transparent")} style={{ backgroundColor: color }} />
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button variant="ghost" onClick={() => { setIsAddSpotOpen(false); setNewSpotLocation(null); }}>Annuler</Button>
+                            <Button onClick={handleSaveSpot} disabled={isSaving}><Save className="mr-2"/>{isSaving ? "Sauvegarde..." : "Sauvegarder"}</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
                 <div>
                     <h4 className="font-semibold text-lg mb-2">Historique des prises</h4>
                     {areSpotsLoading && <Skeleton className="h-24 w-full" />}
