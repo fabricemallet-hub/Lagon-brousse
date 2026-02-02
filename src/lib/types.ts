@@ -142,7 +142,7 @@ export interface UserAccount {
   subscriptionStatus: 'active' | 'inactive' | 'trial' | 'admin';
   subscriptionStartDate?: string;
   subscriptionExpiryDate?: string;
-  favoriteLocationIds: string[];
+  favoriteLocationIds?: string[];
 }
 
 export interface SessionParticipant {

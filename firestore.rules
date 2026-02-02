@@ -1,30 +1,3 @@
-/**
- * Core Philosophy: This ruleset enforces a strict user-ownership model for private data, 
- * while providing public read access to shared application data. The primary goal is to
- * ensure that users can only access and manage their own information, preventing any
- * cross-user data access or enumeration.
- *
- * Data Structure:
- * - /users/{userId}: Contains private user account information.
- * - /locations/{locationId}: Contains public location data.
- * - /stations/{stationId}: Contains public tide station data.
- * - /stations/{stationId}/tides/{date}: Contains archived tide data.
- * - /hunting_sessions/{sessionId}: Contains metadata for a hunting session.
- * - /hunting_sessions/{sessionId}/participants/{userId}: Contains real-time data for a participant.
- *
- * Key Security Decisions:
- * - User Isolation: A user can only interact with their own document at /users/{userId}.
- * - No User Listing for non-admins: Listing the entire /users collection is disallowed for privacy.
- * - Admin Listing: The administrator is allowed to list users.
- * - Public Read-Only Data: /locations is globally readable but not client-writable.
- * - Hunting Sessions:
- *   - Any authenticated user can create a session.
- *   - Only the organizer can delete the session document.
- *   - Session participants can read each other's data in real-time.
- *   - Users can only create, update, or delete their own participant document.
- * - Default Secure: Any path not explicitly defined denies all access.
- */
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -44,68 +17,59 @@ service cloud.firestore {
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
-    
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
 
     // ----------------------------------------------------------------------
     // Collection Rules
     // ----------------------------------------------------------------------
 
     match /users/{userId} {
-      allow read: if isAdmin();
-      allow get: if isOwner(userId);
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
       
-      // A user can create their own document.
+      // Allow a user to create their own document.
+      // This simple rule prevents deployment conflicts. The client-side code in 
+      // FirebaseProvider is responsible for creating the correct document structure.
       allow create: if isOwner(userId);
       
       // An owner can update their own document, and an admin can update any document.
-      // This is permissive; a user can change their own subscription status.
-      // This should be refined in the future, but is not the cause of the login issue.
       allow update: if isOwner(userId) || isAdmin();
       
-      // Only an existing owner can delete their account.
-      allow delete: if isExistingOwner(userId);
+      // Disallow client-side deletion for now to prevent accidental data loss.
+      allow delete: if false; 
     }
 
     match /locations/{locationId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false; 
-      allow update: if false;
-      allow delete: if false;
+      // Publicly readable data.
+      allow get, list: if true;
+      // Data is managed by the admin, not client-writable.
+      allow write: if false;
     }
 
     match /stations/{stationId} {
-      allow get: if true;
-      allow list: if true;
-      allow create, update, delete: if isAdmin();
+      allow get, list: if true;
+      allow write: if isAdmin();
 
       match /tides/{date} {
-        allow get: if true;
-        allow list: if true; // Allows querying for date ranges
-        allow create, update, delete: if isAdmin();
+        allow get, list: if true;
+        allow write: if isAdmin();
       }
     }
 
     match /hunting_sessions/{sessionId} {
-      allow create: if isSignedIn();
-      allow get: if isSignedIn();
-      allow delete: if isOwner(resource.data.organizerId);
-      allow list: if false;
+      allow create, get: if isSignedIn();
+      allow delete: if resource.data.organizerId == request.auth.uid;
+      allow list: if false; // Do not allow listing all sessions.
 
       match /participants/{userId} {
-        allow create: if isOwner(userId);
-        allow update, delete: if isOwner(userId);
-        allow get, list: if exists(/databases/$(database)/documents/hunting_sessions/$(sessionId)/participants/$(request.auth.uid));
+        allow create, update, delete: if isOwner(userId);
+        // Allow any participant of the session to read other participants' data.
+        allow read: if exists(/databases/$(database)/documents/hunting_sessions/$(sessionId)/participants/$(request.auth.uid));
       }
     }
 
     match /access_tokens/{tokenId} {
-      allow read: if isAdmin();
-      allow get: if isSignedIn();
-      
+      allow read: if isAdmin(); // List tokens
+      allow get: if isSignedIn(); // Read a single token
       allow create, delete: if isAdmin();
       
       function isRedeemingOwnToken() {

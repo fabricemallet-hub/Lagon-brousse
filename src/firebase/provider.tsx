@@ -105,30 +105,26 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
         // Only create the document if it does not exist.
         if (!docSnap.exists()) {
           const { uid, email, displayName } = user;
-          const isAdmin = email === 'f.mallet81@outlook.com';
+          const isAdminUser = email === 'f.mallet81@outlook.com';
 
-          // All fields must be provided for the 'create' operation.
           let newUserDocument: UserAccount;
 
-          if (isAdmin) {
+          if (isAdminUser) {
             newUserDocument = {
               id: uid,
               email: email || '',
               displayName: displayName || 'Admin',
               subscriptionStatus: 'admin',
-              subscriptionStartDate: new Date().toISOString(),
-              subscriptionExpiryDate: addMonths(new Date(), 1200).toISOString(), // ~100 years
               favoriteLocationIds: [],
             };
           } else {
             const trialStartDate = new Date();
-            const trialExpiryDate = new Date(trialStartDate);
-            trialExpiryDate.setDate(trialExpiryDate.getDate() + 7);
+            const trialExpiryDate = addMonths(trialStartDate, 3);
             
             newUserDocument = {
               id: uid,
               email: email || '',
-              displayName: displayName || email?.split('@')[0] || 'Chasseur',
+              displayName: displayName || email?.split('@')[0] || 'Utilisateur',
               subscriptionStatus: 'trial',
               subscriptionStartDate: trialStartDate.toISOString(),
               subscriptionExpiryDate: trialExpiryDate.toISOString(),
