@@ -15,6 +15,7 @@ export const metadata: Metadata = {
   title: 'Lagon & Brousse NC',
   description:
     'Votre guide pour la mer et la terre en Nouvelle-Calédonie.',
+  manifest: '/manifest.webmanifest',
 };
 
 function AppContent({ children }: { children: React.ReactNode }) {
