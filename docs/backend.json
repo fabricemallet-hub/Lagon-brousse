@@ -120,6 +120,17 @@
       },
       "required": ["durationMonths", "createdAt", "status"]
     },
+    "SharedAccessToken": {
+      "title": "SharedAccessToken",
+      "type": "object",
+      "description": "Represents a globally shared access token that grants access to all users.",
+      "properties": {
+        "durationMonths": { "type": "number", "description": "The duration of the subscription in months granted by this token." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the token was created." },
+        "expiresAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the token expires." }
+      },
+      "required": ["durationMonths", "createdAt", "expiresAt"]
+    },
     "Conversation": {
       "title": "Conversation",
       "type": "object",
@@ -272,6 +283,15 @@
           "schema": { "$ref": "#/backend/entities/AccessToken" },
           "description": "Stores access tokens that can be redeemed for subscriptions.",
           "params": [{ "name": "tokenId", "description": "The unique ID of the access token." }]
+        }
+      },
+      {
+        "path": "/shared_access_tokens/{tokenId}",
+        "definition": {
+          "entityName": "SharedAccessToken",
+          "schema": { "$ref": "#/backend/entities/SharedAccessToken" },
+          "description": "Stores a single, globally shared access token. The document ID is typically a fixed value like 'GLOBAL'.",
+          "params": [{ "name": "tokenId", "description": "The unique ID for the shared token, e.g., 'GLOBAL'." }]
         }
       },
       {

@@ -216,6 +216,13 @@ export interface AccessToken {
   redeemedAt?: any; // Firestore ServerTimestamp
 }
 
+export interface SharedAccessToken {
+  id: string;
+  durationMonths: number;
+  createdAt: any; // Firestore ServerTimestamp
+  expiresAt: any; // Firestore ServerTimestamp
+}
+
 export interface Conversation {
   id: string;
   userId: string;

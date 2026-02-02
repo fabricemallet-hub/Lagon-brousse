@@ -1,16 +1,16 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, serverTimestamp, deleteDoc, doc, Timestamp, orderBy, query, setDoc, writeBatch, getDocs } from 'firebase/firestore';
-import type { UserAccount, AccessToken, Conversation } from '@/lib/types';
+import type { UserAccount, AccessToken, Conversation, SharedAccessToken } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { DollarSign, Users, Crown, KeyRound, Copy, Trash2, AlertCircle, Mail } from 'lucide-react';
+import { DollarSign, Users, Crown, KeyRound, Copy, Trash2, AlertCircle, Mail, Share2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import {
@@ -39,7 +39,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
-import { format, isBefore } from 'date-fns';
+import { format, isBefore, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
@@ -54,38 +54,45 @@ export default function AdminPage() {
   const [tokenDuration, setTokenDuration] = useState('1');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
+
+  const [sharedTokenDuration, setSharedTokenDuration] = useState('1');
+  const [isGeneratingShared, setIsGeneratingShared] = useState(false);
+  const [isDeleteSharedAlertOpen, setIsDeleteSharedAlertOpen] = useState(false);
+
   const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
   const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
   
   const isAdmin = useMemo(() => user?.email === 'f.mallet81@outlook.com', [user]);
 
-  // Fetch all users for stats - only if admin
+  // Fetch all users for stats
   const usersCollectionRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
     return collection(firestore, 'users');
   }, [firestore, isAdmin]);
   const { data: allUsers, isLoading: areUsersLoading } = useCollection<UserAccount>(usersCollectionRef);
 
-  // Fetch access tokens - only if admin
+  // Fetch unique access tokens
   const tokensCollectionRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
     return query(collection(firestore, 'access_tokens'), orderBy('createdAt', 'desc'));
   }, [firestore, isAdmin]);
   const { data: accessTokens, isLoading: areTokensLoading } = useCollection<AccessToken>(tokensCollectionRef);
 
-  // Fetch conversations - only if admin
+  // Fetch shared access token
+  const sharedTokenRef = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    return doc(firestore, 'shared_access_tokens', 'GLOBAL');
+  }, [firestore, isAdmin]);
+  const { data: sharedToken, isLoading: isSharedTokenLoading } = useDoc<SharedAccessToken>(sharedTokenRef);
+
+  // Fetch conversations
   const conversationsCollectionRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
     return query(collection(firestore, 'conversations'), orderBy('lastMessageAt', 'desc'));
   }, [firestore, isAdmin]);
   const { data: conversations, isLoading: areConversationsLoading } = useCollection<Conversation>(conversationsCollectionRef);
 
-  // Fetch stats for all users
-  const [stats, setStats] = useState<{
-    totalUsers: number;
-    activeSubscribers: number;
-    monthlyRevenue: number;
-  } | null>(null);
+  const [stats, setStats] = useState<{ totalUsers: number; activeSubscribers: number; monthlyRevenue: number; } | null>(null);
 
   useEffect(() => {
     if (areUsersLoading || !allUsers) return;
@@ -95,10 +102,9 @@ export default function AdminPage() {
     setStats({ totalUsers, activeSubscribers, monthlyRevenue });
   }, [allUsers, areUsersLoading]);
 
-  // Route protection
   useEffect(() => {
     if (!isUserLoading && !isAdmin) {
-      router.push('/compte'); // Redirect non-admins
+      router.push('/compte');
     }
   }, [isAdmin, isUserLoading, router]);
 
@@ -114,7 +120,6 @@ export default function AdminPage() {
       }
 
       const tokenDocRef = doc(firestore, 'access_tokens', code);
-
       await setDoc(tokenDocRef, {
         durationMonths: parseInt(tokenDuration, 10),
         createdAt: serverTimestamp(),
@@ -128,6 +133,39 @@ export default function AdminPage() {
       toast({ variant: 'destructive', title: "Erreur", description: "Impossible de générer le jeton." });
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleGenerateSharedToken = async () => {
+    if (!firestore) return;
+    setIsGeneratingShared(true);
+    try {
+        const expiresAt = addMonths(new Date(), parseInt(sharedTokenDuration, 10));
+        const sharedTokenDocRef = doc(firestore, 'shared_access_tokens', 'GLOBAL');
+        await setDoc(sharedTokenDocRef, {
+            durationMonths: parseInt(sharedTokenDuration, 10),
+            createdAt: serverTimestamp(),
+            expiresAt: Timestamp.fromDate(expiresAt),
+        });
+        toast({ title: "Jeton partagé créé/mis à jour !", description: `Tous les utilisateurs ont maintenant accès jusqu'au ${format(expiresAt, 'P p', { locale: fr })}.` });
+    } catch (error) {
+        console.error("Error generating shared token:", error);
+        toast({ variant: 'destructive', title: "Erreur", description: "Impossible de générer le jeton partagé." });
+    } finally {
+        setIsGeneratingShared(false);
+    }
+  };
+
+  const handleDeleteSharedToken = async () => {
+    if (!firestore) return;
+    try {
+        await deleteDoc(doc(firestore, 'shared_access_tokens', 'GLOBAL'));
+        toast({ title: "Jeton partagé supprimé", description: "L'accès global a été révoqué." });
+    } catch (error) {
+        console.error("Error deleting shared token:", error);
+        toast({ variant: 'destructive', title: "Erreur", description: "Impossible de supprimer le jeton partagé." });
+    } finally {
+        setIsDeleteSharedAlertOpen(false);
     }
   };
   
@@ -147,18 +185,11 @@ export default function AdminPage() {
     try {
         const messagesRef = collection(firestore, 'conversations', conversationId, 'messages');
         const messagesSnap = await getDocs(messagesRef);
-
         const batch = writeBatch(firestore);
-
-        messagesSnap.forEach(doc => {
-            batch.delete(doc.ref);
-        });
-
+        messagesSnap.forEach(doc => batch.delete(doc.ref));
         const conversationRef = doc(firestore, 'conversations', conversationId);
         batch.delete(conversationRef);
-
         await batch.commit();
-
         toast({ title: "Conversation supprimée" });
     } catch (error) {
         console.error("Error deleting conversation:", error);
@@ -175,21 +206,10 @@ export default function AdminPage() {
   
   const handleResetUsers = async () => {
     if (!firestore || !user || !isAdmin) return;
-    
     try {
         const usersQuery = query(collection(firestore, 'users'));
         const querySnapshot = await getDocs(usersQuery);
-        
-        const usersToDelete = querySnapshot.docs.filter(doc => {
-            const data = doc.data() as UserAccount;
-            
-            // Never delete the admin
-            if (data.email === 'f.mallet81@outlook.com') {
-                return false;
-            }
-            
-            return true;
-        });
+        const usersToDelete = querySnapshot.docs.filter(doc => doc.data().email !== 'f.mallet81@outlook.com');
 
         if (usersToDelete.length === 0) {
             toast({ title: "Aucun utilisateur à supprimer", description: "Seul le compte administrateur a été trouvé." });
@@ -201,13 +221,11 @@ export default function AdminPage() {
         for (let i = 0; i < usersToDelete.length; i += BATCH_SIZE) {
             const batch = writeBatch(firestore);
             const chunk = usersToDelete.slice(i, i + BATCH_SIZE);
-            chunk.forEach(doc => {
-                batch.delete(doc.ref);
-            });
+            chunk.forEach(doc => batch.delete(doc.ref));
             await batch.commit();
         }
 
-        toast({ title: "Utilisateurs réinitialisés", description: `${usersToDelete.length} utilisateurs ont été supprimés. Seul le compte administrateur a été conservé.` });
+        toast({ title: "Utilisateurs réinitialisés", description: `${usersToDelete.length} utilisateurs ont été supprimés.` });
     } catch (error) {
         console.error("Error resetting users:", error);
         toast({ variant: 'destructive', title: "Erreur", description: "Impossible de réinitialiser les utilisateurs." });
@@ -222,7 +240,7 @@ export default function AdminPage() {
   }, [allUsers]);
 
 
-  const isLoading = isUserLoading || areUsersLoading || areTokensLoading;
+  const isLoading = isUserLoading || areUsersLoading || areTokensLoading || isSharedTokenLoading;
 
   if (isUserLoading || !isAdmin) {
     return (
@@ -257,9 +275,7 @@ export default function AdminPage() {
       
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Mail /> Messagerie
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2"><Mail /> Messagerie</CardTitle>
           <CardDescription>Consultez les messages des utilisateurs et répondez-y.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -303,8 +319,8 @@ export default function AdminPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Gestion des Jetons d'Accès</CardTitle>
-          <CardDescription>Générez des jetons pour donner un accès temporaire à l'application.</CardDescription>
+          <CardTitle>Gestion des Jetons d'Accès Individuels</CardTitle>
+          <CardDescription>Générez des jetons uniques pour donner un accès temporaire à un utilisateur.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-end gap-4">
@@ -329,7 +345,7 @@ export default function AdminPage() {
           </div>
           
           <div className="space-y-2">
-            <h4 className="font-medium">Jetons Existants</h4>
+            <h4 className="font-medium">Jetons Individuels Existants</h4>
             {isLoading ? <Skeleton className="h-32 w-full" /> : (
             <div className="border rounded-lg">
               <Table>
@@ -361,7 +377,7 @@ export default function AdminPage() {
                         </TableRow>
                     );
                   }) : (
-                    <TableRow><TableCell colSpan={6} className="text-center">Aucun jeton trouvé.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6} className="text-center">Aucun jeton individuel trouvé.</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
@@ -370,12 +386,56 @@ export default function AdminPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Gestion du Jeton d'Accès Partagé</CardTitle>
+          <CardDescription>Générez un jeton global pour donner accès à tous les utilisateurs pendant une période définie. Un nouveau jeton remplace l'ancien.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-end gap-4">
+            <div className="flex-grow space-y-2">
+              <Label htmlFor="shared-duration">Durée de validité</Label>
+              <Select value={sharedTokenDuration} onValueChange={setSharedTokenDuration}>
+                <SelectTrigger id="shared-duration">
+                  <SelectValue placeholder="Choisir une durée" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 Mois</SelectItem>
+                  <SelectItem value="3">3 Mois</SelectItem>
+                  <SelectItem value="6">6 Mois</SelectItem>
+                  <SelectItem value="12">12 Mois</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={handleGenerateSharedToken} disabled={isGeneratingShared}>
+              <Share2 className="mr-2 h-4 w-4" />
+              {isGeneratingShared ? 'Génération...' : "Générer / Remplacer"}
+            </Button>
+          </div>
+          <div className="space-y-2">
+            <h4 className="font-medium">Jeton Partagé Actif</h4>
+            {isSharedTokenLoading ? <Skeleton className="h-20 w-full" /> : sharedToken ? (
+              <div className="border rounded-lg p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <p className="font-semibold">Accès global actif</p>
+                  <p className="text-sm text-muted-foreground">Expire le: <span className="font-bold">{format(sharedToken.expiresAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr })}</span></p>
+                  <p className="text-xs text-muted-foreground">Durée: {sharedToken.durationMonths} mois</p>
+                </div>
+                <Button variant="destructive" size="sm" onClick={() => setIsDeleteSharedAlertOpen(true)}>
+                  <Trash2 className="mr-2 h-4 w-4" /> Supprimer
+                </Button>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">Aucun jeton partagé actif.</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
       
       <Card className="border-destructive">
         <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-destructive">
-                <AlertCircle /> Zone de Danger
-            </CardTitle>
+            <CardTitle className="flex items-center gap-2 text-destructive"><AlertCircle /> Zone de Danger</CardTitle>
             <CardDescription>Cette action est irréversible et doit être utilisée avec une extrême prudence.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -417,6 +477,23 @@ export default function AdminPage() {
               <AlertDialogAction onClick={handleResetUsers} className={cn(buttonVariants({ variant: "destructive" }))}>
                   Oui, supprimer les utilisateurs
               </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isDeleteSharedAlertOpen} onOpenChange={setIsDeleteSharedAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer le Jeton Partagé ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action révoquera l'accès global pour tous les utilisateurs. Ils reviendront à leur statut d'abonnement individuel.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteSharedToken} className={cn(buttonVariants({ variant: "destructive" }))}>
+              Oui, supprimer
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

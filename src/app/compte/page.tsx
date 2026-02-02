@@ -1,7 +1,7 @@
 'use client';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, getDoc, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
-import type { UserAccount, AccessToken } from '@/lib/types';
+import type { UserAccount, AccessToken, SharedAccessToken } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, isBefore, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Crown, Star, XCircle, KeyRound, Ticket } from 'lucide-react';
+import { Crown, Star, XCircle, KeyRound, Ticket, Gift } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
@@ -29,9 +29,16 @@ export default function ComptePage() {
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
+  const sharedTokenRef = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return doc(firestore, 'shared_access_tokens', 'GLOBAL');
+  }, [firestore]);
+  const { data: sharedToken, isLoading: isSharedTokenLoading } = useDoc<SharedAccessToken>(sharedTokenRef);
+
+  const isSharedAccessActive = sharedToken && sharedToken.expiresAt && isBefore(new Date(), sharedToken.expiresAt.toDate());
+
   const handleSubscribe = () => {
     const paypalLink = process.env.NEXT_PUBLIC_PAYPAL_LINK;
-
     if (paypalLink) {
       toast({
         title: 'Redirection vers PayPal',
@@ -39,11 +46,10 @@ export default function ComptePage() {
       });
       window.open(paypalLink, '_blank');
     } else {
-      console.error("La variable d'environnement NEXT_PUBLIC_PAYPAL_LINK n'est pas définie.");
       toast({
         variant: "destructive",
         title: "Configuration requise",
-        description: "Le lien de paiement n'est pas configuré. Veuillez contacter l'administrateur.",
+        description: "Le lien de paiement n'est pas configuré.",
       });
     }
   };
@@ -112,6 +118,15 @@ export default function ComptePage() {
 
   const getStatusInfo = () => {
     if (!userProfile) return { label: 'Chargement', badgeVariant: 'secondary', icon: Skeleton, description: '' };
+
+    if (isSharedAccessActive) {
+      return {
+        label: 'Accès Partagé',
+        badgeVariant: 'default',
+        icon: Gift,
+        description: `Un accès global est offert à tous les utilisateurs jusqu'au ${format(sharedToken!.expiresAt.toDate(), 'dd MMMM yyyy', { locale: fr })}.`
+      };
+    }
     
     switch (userProfile.subscriptionStatus) {
       case 'admin':
@@ -138,11 +153,10 @@ export default function ComptePage() {
 
   const statusInfo = getStatusInfo();
   const Icon = statusInfo.icon;
-  const isSubscribed = userProfile?.subscriptionStatus === 'active' && isBefore(new Date(), new Date(userProfile.subscriptionExpiryDate!));
+  const isSubscribed = userProfile?.subscriptionStatus === 'active' && userProfile.subscriptionExpiryDate && isBefore(new Date(), new Date(userProfile.subscriptionExpiryDate));
   
   const renderButtons = () => {
-    if (!userProfile) return null;
-    
+    if (!userProfile || isSharedAccessActive) return null;
     if (userProfile.subscriptionStatus === 'admin') return null;
 
     if (isSubscribed) {
@@ -152,7 +166,7 @@ export default function ComptePage() {
     return <Button onClick={handleSubscribe}>S'abonner pour 4.19 euro/mois</Button>;
   }
 
-  if (isUserLoading || isProfileLoading) {
+  if (isUserLoading || isProfileLoading || isSharedTokenLoading) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-32 w-full" />
@@ -195,7 +209,7 @@ export default function ComptePage() {
         </CardContent>
        </Card>
 
-      {!isSubscribed && userProfile?.subscriptionStatus !== 'admin' && (
+      {!isSubscribed && userProfile?.subscriptionStatus !== 'admin' && !isSharedAccessActive && (
         <Card>
             <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Ticket /> Activer avec un jeton d'accès</CardTitle>

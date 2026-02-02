@@ -102,6 +102,18 @@ service cloud.firestore {
     }
     
     // ----------------------------------------------------------------------
+    // Collection: shared_access_tokens
+    // Purpose: Manages a global access token for all users.
+    // ----------------------------------------------------------------------
+    match /shared_access_tokens/{tokenId} {
+      // Admin has full control.
+      allow write: if isAdmin();
+      
+      // Any authenticated user can read the global token.
+      allow read: if isSignedIn();
+    }
+
+    // ----------------------------------------------------------------------
     // Collection: conversations
     // Purpose: Manages support conversations between users and admin.
     // ----------------------------------------------------------------------
