@@ -852,7 +852,7 @@ function HuntingSessionContent() {
                 </CardTitle>
                  <CardDescription>Partagez votre position avec votre groupe en temps réel.</CardDescription>
             </CardHeader>
-            <CardContent className={cn("flex-grow flex flex-col", isFullscreen ? "p-2 gap-2 overflow-hidden" : "p-6 pt-0")}>
+            <CardContent className={cn("flex-grow flex flex-col", isFullscreen ? "p-2 gap-2" : "p-6 pt-0")}>
                  <div className={cn("relative w-full rounded-lg overflow-hidden border", isFullscreen ? "flex-grow" : "h-80 mb-4")}>
                     <GoogleMap
                         mapContainerClassName="w-full h-full"
@@ -1040,24 +1040,39 @@ function HuntingSessionContent() {
                         {areParticipantsLoading ? (
                             <Skeleton className="h-24 w-full" />
                         ) : (
-                            <div className="max-h-48 overflow-y-auto space-y-2 pr-2">
-                            {participants?.map(p => (
-                                <div key={p.id} className="flex items-center justify-between p-2 border rounded-lg">
-                                    <div className="flex items-center gap-2">
-                                        <div style={{color: p.mapColor}} className="p-1 bg-white rounded-full border"><UserIcon className="size-4" /></div>
-                                        <p className="font-medium text-sm">{p.displayName}</p>
+                            <div className={cn("space-y-2 pr-2", !isFullscreen && "max-h-48 overflow-y-auto")}>
+                            {participants?.map(p => {
+                                const statusDisplay = getStatusDisplay(p);
+                                return (
+                                <div key={p.id} className="flex items-center justify-between p-2 border rounded-lg bg-card">
+                                    <div className="flex items-center gap-3">
+                                        <div
+                                            className="p-1.5 rounded-full flex items-center justify-center shadow-sm"
+                                            style={{ backgroundColor: p.mapColor || '#3b82f6' }}
+                                        >
+                                            <UserIcon className="size-5 text-white" />
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-sm">{p.displayName}</p>
+                                            {statusDisplay.text ? (
+                                                <p className={cn("text-xs font-semibold", statusDisplay.colorClass)}>
+                                                    {statusDisplay.text}
+                                                </p>
+                                            ) : (
+                                                <p className="text-xs text-muted-foreground">En attente...</p>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                    <div className="flex items-center gap-2 text-sm font-semibold">
                                         {p.battery && (
-                                            <div className="flex items-center gap-1">
+                                            <>
                                                 <BatteryIcon level={p.battery.level} charging={p.battery.charging} />
                                                 <span>{Math.round(p.battery.level * 100)}%</span>
-                                            </div>
+                                            </>
                                         )}
-                                        {p.location && <span className="font-mono">{p.location.latitude.toFixed(3)}, {p.location.longitude.toFixed(3)}</span>}
                                     </div>
                                 </div>
-                            ))}
+                            )})}
                             </div>
                         )}
                     </div>
