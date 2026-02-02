@@ -68,7 +68,8 @@ import type { HuntingSession, SessionParticipant, UserAccount } from '@/lib/type
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Skeleton } from './ui/skeleton';
-import { GoogleMap, useJsApiLoader, OverlayView, MarkerF } from '@react-google-maps/api';
+import { GoogleMap, OverlayView, MarkerF } from '@react-google-maps/api';
+import { useGoogleMaps } from '@/context/google-maps-context';
 
 const playSound = (type: 'position' | 'battue' | 'gibier') => {
   const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -212,13 +213,7 @@ function HuntingSessionContent() {
     }
   }, [userProfile, user]);
   
-  const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-  
-  const { isLoaded, loadError } = useJsApiLoader({
-      googleMapsApiKey: googleMapsApiKey || "",
-      preventGoogleFontsLoading: true,
-      mapIds: ['satellite_id']
-  });
+  const { isLoaded, loadError } = useGoogleMaps();
 
   useEffect(() => {
     const savedMapTypeId = localStorage.getItem('huntingMapTypeId');

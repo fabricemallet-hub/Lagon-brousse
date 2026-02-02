@@ -9,6 +9,7 @@ import { CalendarViewProvider } from '@/context/calendar-view-context';
 import './globals.css';
 import { Suspense } from 'react';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
+import { GoogleMapsProvider } from '@/context/google-maps-context';
 
 export const metadata: Metadata = {
   title: 'Lagon & Brousse NC',
@@ -19,13 +20,15 @@ export const metadata: Metadata = {
 function AppContent({ children }: { children: React.ReactNode }) {
   return (
     <FirebaseClientProvider>
-      <CalendarViewProvider>
-        <DateProvider>
-          <LocationProvider>
-            <AppShell>{children}</AppShell>
-          </LocationProvider>
-        </DateProvider>
-      </CalendarViewProvider>
+      <GoogleMapsProvider>
+        <CalendarViewProvider>
+          <DateProvider>
+            <LocationProvider>
+              <AppShell>{children}</AppShell>
+            </LocationProvider>
+          </DateProvider>
+        </CalendarViewProvider>
+      </GoogleMapsProvider>
     </FirebaseClientProvider>
   )
 }

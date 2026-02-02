@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { GoogleMap, useJsApiLoader, MarkerF, OverlayView } from '@react-google-maps/api';
+import { GoogleMap, MarkerF, OverlayView } from '@react-google-maps/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -27,6 +27,7 @@ import type { FishingAnalysisOutput } from '@/ai/schemas';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from './badge';
+import { useGoogleMaps } from '@/context/google-maps-context';
 
 
 const mapIcons = {
@@ -97,8 +98,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
     const [spotToEdit, setSpotToEdit] = useState<FishingSpot | null>(null);
 
-    const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    const { isLoaded, loadError } = useJsApiLoader({ googleMapsApiKey: googleMapsApiKey || "", mapIds: ['satellite_id'], preventGoogleFontsLoading: true });
+    const { isLoaded, loadError } = useGoogleMaps();
 
     const fishingSpotsRef = useMemoFirebase(() => {
         if (!user || !firestore) return null;
@@ -131,7 +131,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             return;
         }
         navigator.permissions.query({ name: 'geolocation' }).then(permissionStatus => {
-            if (permissionStatus.state === 'granted') {
+            if (permissionStatus.state === 'granted' || permissionStatus.state === 'prompt') {
                  if (watchId.current !== null) {
                     navigator.geolocation.clearWatch(watchId.current);
                 }
@@ -154,13 +154,15 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     }, [map, initialZoomDone]);
 
      useEffect(() => {
-        startWatchingPosition();
+        if(map) {
+          // No automatic start
+        }
         return () => {
             if (watchId.current !== null) {
                 navigator.geolocation.clearWatch(watchId.current);
             }
         };
-    }, [startWatchingPosition]);
+    }, [map]);
 
     const handleRecenter = () => {
         if (!navigator.geolocation) {
@@ -189,6 +191,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         setInitialZoomDone(true);
                     }
                 }
+                startWatchingPosition();
             },
             (err) => {
                  toast({
