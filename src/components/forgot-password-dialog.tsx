@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -32,7 +32,7 @@ const formSchema = z.object({
   email: z.string().email({ message: 'Veuillez entrer une adresse email valide.' }),
 });
 
-export function ForgotPasswordDialog() {
+export function ForgotPasswordDialog({ children }: { children: ReactNode }) {
   const auth = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -80,9 +80,7 @@ export function ForgotPasswordDialog() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <button type="button" className="text-sm text-primary hover:underline self-end">
-          Mot de passe oublié ?
-        </button>
+        {children}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>

@@ -88,7 +88,7 @@ export function AuthForm({ mode }: AuthFormProps) {
 
       switch (authError.code) {
         case 'auth/invalid-credential':
-          errorMessage = 'Email ou mot de passe incorrect. Veuillez vérifier vos informations et réessayer.';
+          errorMessage = 'Email ou mot de passe incorrect. Essayez de réinitialiser votre mot de passe.';
           break;
         case 'auth/email-already-in-use':
           errorMessage = 'Cette adresse email est déjà utilisée par un autre compte.';
@@ -153,7 +153,16 @@ export function AuthForm({ mode }: AuthFormProps) {
           name="password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Mot de passe</FormLabel>
+               <div className="flex items-center justify-between">
+                <FormLabel>Mot de passe</FormLabel>
+                {mode === 'login' && (
+                   <ForgotPasswordDialog>
+                      <button type="button" className="text-sm font-medium text-primary hover:underline -translate-y-px">
+                        Mot de passe oublié ?
+                      </button>
+                   </ForgotPasswordDialog>
+                )}
+              </div>
               <FormControl>
                 <Input type="password" placeholder="********" {...field} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
               </FormControl>
@@ -162,9 +171,8 @@ export function AuthForm({ mode }: AuthFormProps) {
           )}
         />
         
-        <div className="pt-2">
-          {mode === 'login' && <ForgotPasswordDialog />}
-          <Button type="submit" className="w-full mt-2" disabled={isLoading}>
+        <div className="pt-4">
+          <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? "Chargement..." : (mode === 'login' ? 'Se connecter' : "S'inscrire")}
           </Button>
         </div>
