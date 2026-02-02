@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import * as AccordionPrimitive from "@radix-ui/react-accordion"
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,7 +17,7 @@ import { collection, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc } f
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { LocationData, FishingSpot } from '@/lib/types';
-import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink } from 'lucide-react';
+import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from './alert';
 import { useLocation } from '@/context/location-context';
@@ -103,10 +104,6 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
 
     const startWatchingPosition = useCallback((centerMap: boolean) => {
         if (!navigator.geolocation) {
-            toast({
-                variant: 'destructive',
-                title: 'Géolocalisation non supportée',
-            });
             return;
         }
 
@@ -118,6 +115,18 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             navigator.permissions.query({name: 'geolocation'}).then(status => {
                 if (status.state === 'prompt') {
                     // Prompt will be shown by handleRecenter if user clicks it
+                    if (centerMap) { // Only prompt if it's a user gesture
+                         navigator.geolocation.getCurrentPosition(position => {
+                            const { latitude, longitude } = position.coords;
+                            const newLocation = { lat: latitude, lng: longitude };
+                            setUserLocation(newLocation);
+                            if (map) {
+                                map.panTo(newLocation);
+                                map.setZoom(16);
+                                setInitialZoomDone(true);
+                            }
+                         });
+                    }
                     return;
                 }
                 if (status.state === 'denied') {
@@ -428,16 +437,14 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         <Button size="icon" onClick={handleRecenter} className="absolute top-2 right-2 shadow-lg h-9 w-9 z-10">
                             <LocateFixed className="h-5 w-5" />
                         </Button>
-                        {(!isFullscreen || newSpotLocation) && (
-                            <Button 
-                                className="absolute bottom-4 left-1/2 -translate-x-1/2 shadow-lg z-10" 
-                                onClick={() => { if (newSpotLocation) setIsAddSpotOpen(true); }}
-                                disabled={!newSpotLocation}
-                            >
-                                <Plus className="mr-2" /> 
-                                {newSpotLocation ? 'Ajouter ce coin de pêche' : 'Cliquez sur la carte pour placer un repère'}
-                            </Button>
-                        )}
+                        <Button 
+                            className="absolute bottom-4 left-1/2 -translate-x-1/2 shadow-lg z-10" 
+                            onClick={() => { if (newSpotLocation) setIsAddSpotOpen(true); }}
+                            disabled={!newSpotLocation}
+                        >
+                            <Plus className="mr-2" /> 
+                            {newSpotLocation ? 'Ajouter ce coin de pêche' : 'Cliquez sur la carte pour placer un repère'}
+                        </Button>
                     </div>
                 )}
                 
@@ -506,26 +513,29 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                             <Accordion type="single" collapsible className="w-full">
                                {savedSpots.map(spot => (
                                    <AccordionItem value={spot.id} key={spot.id}>
-                                       <AccordionTrigger>
-                                           <div className="flex items-center justify-between w-full pr-4">
-                                                <div className="flex items-center gap-3">
-                                                    <Checkbox
-                                                        id={`select-spot-${spot.id}`}
-                                                        className="size-5"
-                                                        checked={selectedSpotIds.includes(spot.id)}
-                                                        onCheckedChange={() => handleSpotSelection(spot.id)}
-                                                        onClick={(e) => e.stopPropagation()} // Prevent accordion from toggling
-                                                    />
-                                                    <div className="p-1 rounded-md" style={{backgroundColor: spot.color + '20'}}>
-                                                        {React.createElement(mapIcons[spot.icon as keyof typeof mapIcons] || MapPin, { className: 'size-5', style: {color: spot.color} })}
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-bold text-left">{spot.name}</p>
-                                                        <p className="text-xs text-muted-foreground text-left">{spot.createdAt ? format(spot.createdAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr }) : 'Enregistrement...'}</p>
-                                                    </div>
-                                                </div>
-                                           </div>
-                                       </AccordionTrigger>
+                                       <AccordionPrimitive.Header className="flex items-center w-full">
+                                           <span className="pl-4 py-4">
+                                               <Checkbox
+                                                   id={`select-spot-${spot.id}`}
+                                                   className="size-5"
+                                                   checked={selectedSpotIds.includes(spot.id)}
+                                                   onCheckedChange={() => handleSpotSelection(spot.id)}
+                                                   onClick={(e) => e.stopPropagation()}
+                                               />
+                                           </span>
+                                           <AccordionPrimitive.Trigger className={cn("flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180", "pr-4")}>
+                                               <div className="flex items-center gap-3">
+                                                   <div className="p-1 rounded-md" style={{backgroundColor: spot.color + '20'}}>
+                                                       {React.createElement(mapIcons[spot.icon as keyof typeof mapIcons] || MapPin, { className: 'size-5', style: {color: spot.color} })}
+                                                   </div>
+                                                   <div>
+                                                       <p className="font-bold text-left">{spot.name}</p>
+                                                       <p className="text-xs text-muted-foreground text-left">{spot.createdAt ? format(spot.createdAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr }) : 'Enregistrement...'}</p>
+                                                   </div>
+                                               </div>
+                                               <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
+                                           </AccordionPrimitive.Trigger>
+                                       </AccordionPrimitive.Header>
                                        <AccordionContent className="space-y-4">
                                            <div className="text-sm text-muted-foreground bg-muted/50 p-4 rounded-lg space-y-2">
                                                {spot.notes && <p className="italic">"{spot.notes}"</p>}
