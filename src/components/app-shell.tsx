@@ -183,7 +183,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       });
       if (auth.currentUser) {
         signOut(auth).then(() => {
-          localStorage.clear();
           sessionStorage.clear();
           if (pathname !== '/login') {
              router.push('/login');
@@ -204,7 +203,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const handleLogout = async () => {
     if (!auth) return;
     await signOut(auth);
-    localStorage.clear();
     sessionStorage.clear();
     router.push('/login');
   };
