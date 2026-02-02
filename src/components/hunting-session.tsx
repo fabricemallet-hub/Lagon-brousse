@@ -18,17 +18,11 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs';
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
-import {
   Share2,
   LogIn,
   LogOut,
   Copy,
   Users,
-  ChevronUp,
   BatteryFull,
   BatteryMedium,
   BatteryLow,
@@ -501,53 +495,45 @@ function HuntingSessionContent() {
                       {Math.round((zoom / 22) * 100)}%
                     </div>
                 </div>
-                 <Collapsible>
-                    <CollapsibleTrigger asChild>
-                         <Button variant="outline" className="w-full">
-                            <span className="flex-1">Afficher la Session & Participants</span>
-                            <ChevronUp className="h-4 w-4 transition-transform [&[data-state=open]]:rotate-180" />
-                        </Button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="space-y-4 pt-4">
-                        <Alert>
-                          <Download className="h-4 w-4" />
-                          <AlertTitle>Mode Hors Ligne</AlertTitle>
-                          <AlertDescription>
-                            La carte peut être utilisée hors ligne. Pour mettre une zone en cache, naviguez simplement sur la carte lorsque vous êtes connecté. Les tuiles seront automatiquement sauvegardées. Les positions se synchroniseront au retour du réseau.
-                          </AlertDescription>
-                        </Alert>
-                        <div className="flex flex-col sm:flex-row items-center gap-4">
-                            <div className="space-y-1 flex-grow">
-                                <Label htmlFor="session-code-display">Code de session</Label>
-                                <Input id="session-code-display" readOnly value={session.id} className="font-mono text-center text-lg tracking-widest" />
-                            </div>
-                            <Button onClick={copyToClipboard} size="sm" className="w-full sm:w-auto self-end"><Copy className="mr-2"/> Copier</Button>
+                <div className="space-y-4">
+                    <Alert>
+                        <Download className="h-4 w-4" />
+                        <AlertTitle>Mode Hors Ligne</AlertTitle>
+                        <AlertDescription>
+                        La carte peut être utilisée hors ligne. Pour mettre une zone en cache, naviguez simplement sur la carte lorsque vous êtes connecté. Les tuiles seront automatiquement sauvegardées. Les positions se synchroniseront au retour du réseau.
+                        </AlertDescription>
+                    </Alert>
+                    <div className="flex flex-col sm:flex-row items-center gap-4">
+                        <div className="space-y-1 flex-grow">
+                            <Label htmlFor="session-code-display">Code de session</Label>
+                            <Input id="session-code-display" readOnly value={session.id} className="font-mono text-center text-lg tracking-widest" />
                         </div>
-                        <div className="space-y-2">
-                           <h4 className="font-semibold">Participants ({participants?.length || 0})</h4>
-                            {areParticipantsLoading ? (
-                                <Skeleton className="h-24 w-full" />
-                            ) : (
-                                <div className="max-h-48 overflow-y-auto space-y-2 pr-2">
-                                {participants?.map(p => (
-                                    <div key={p.id} className="flex items-center justify-between p-2 border rounded-lg">
-                                        <p className="font-medium text-sm">{p.displayName}</p>
-                                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                                            {p.battery && (
-                                                <div className="flex items-center gap-1">
-                                                    <BatteryIcon level={p.battery.level} charging={p.battery.charging} />
-                                                    <span>{Math.round(p.battery.level * 100)}%</span>
-                                                </div>
-                                            )}
-                                            {p.location && <span className="font-mono">{p.location.latitude.toFixed(3)}, {p.location.longitude.toFixed(3)}</span>}
-                                        </div>
+                        <Button onClick={copyToClipboard} size="sm" className="w-full sm:w-auto self-end"><Copy className="mr-2"/> Copier</Button>
+                    </div>
+                    <div className="space-y-2">
+                        <h4 className="font-semibold">Participants ({participants?.length || 0})</h4>
+                        {areParticipantsLoading ? (
+                            <Skeleton className="h-24 w-full" />
+                        ) : (
+                            <div className="max-h-48 overflow-y-auto space-y-2 pr-2">
+                            {participants?.map(p => (
+                                <div key={p.id} className="flex items-center justify-between p-2 border rounded-lg">
+                                    <p className="font-medium text-sm">{p.displayName}</p>
+                                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                        {p.battery && (
+                                            <div className="flex items-center gap-1">
+                                                <BatteryIcon level={p.battery.level} charging={p.battery.charging} />
+                                                <span>{Math.round(p.battery.level * 100)}%</span>
+                                            </div>
+                                        )}
+                                        {p.location && <span className="font-mono">{p.location.latitude.toFixed(3)}, {p.location.longitude.toFixed(3)}</span>}
                                     </div>
-                                ))}
                                 </div>
-                            )}
-                        </div>
-                    </CollapsibleContent>
-                </Collapsible>
+                            ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
             </CardContent>
         </Card>
     );
