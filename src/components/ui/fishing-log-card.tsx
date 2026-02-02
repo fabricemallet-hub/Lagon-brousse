@@ -723,7 +723,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                             )}
                                            <div className="text-sm text-muted-foreground bg-muted/50 p-4 rounded-lg space-y-2">
                                                {spot.notes && <p className="italic">"{spot.notes}"</p>}
-                                                <p><strong>Conditions :</strong> {spot.context.weatherCondition}, {spot.context.airTemperature}°C (air), {spot.context.waterTemperature}°C (eau)</p>
+                                                <p><strong>Conditions :</strong> {spot.context.airTemperature}°C (air), {spot.context.waterTemperature}°C (eau)</p>
                                                 <p><strong>Vent :</strong> {spot.context.windSpeed} nœuds de {spot.context.windDirection}</p>
                                                 {spot.context.swellInside && spot.context.swellOutside && (
                                                     <p><strong>Houle :</strong> {spot.context.swellInside} (lagon), {spot.context.swellOutside} (large)</p>
