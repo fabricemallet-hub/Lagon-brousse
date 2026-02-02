@@ -17,10 +17,10 @@ import { useAuth } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  updateProfile, 
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
   AuthError,
 } from 'firebase/auth';
 import { ForgotPasswordDialog } from './forgot-password-dialog';
@@ -30,11 +30,13 @@ type AuthFormProps = {
   mode: 'login' | 'signup';
 };
 
+// Schéma pour la connexion
 const loginSchema = z.object({
   email: z.string().email({ message: 'Veuillez entrer une adresse email valide.' }),
   password: z.string().min(6, { message: 'Le mot de passe doit contenir au moins 6 caractères.' }),
 });
 
+// Schéma pour l'inscription
 const signupSchema = z.object({
   displayName: z.string().min(3, { message: 'Le nom doit contenir au moins 3 caractères.' }),
   email: z.string().email({ message: 'Veuillez entrer une adresse email valide.' }),
@@ -54,16 +56,11 @@ export function AuthForm({ mode }: AuthFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      // @ts-ignore
       displayName: '',
       email: '',
       password: '',
     },
   });
-
-  const onValidationErrors = (errors: any) => {
-    // This function is for debugging validation errors
-  };
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
@@ -77,7 +74,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       setIsLoading(false);
       return;
     }
-    
+
     try {
       if (mode === 'login') {
         await signInWithEmailAndPassword(auth, values.email, values.password);
@@ -87,12 +84,13 @@ export function AuthForm({ mode }: AuthFormProps) {
         });
         router.push('/');
       } else {
-        // We can safely assert displayName exists because of the signupSchema
         const signupValues = values as z.infer<typeof signupSchema>;
         const userCredential = await createUserWithEmailAndPassword(auth, signupValues.email, signupValues.password);
-        await updateProfile(userCredential.user, {
-            displayName: signupValues.displayName
-        });
+        if (userCredential.user) {
+          await updateProfile(userCredential.user, {
+              displayName: signupValues.displayName
+          });
+        }
         toast({
           title: 'Inscription réussie!',
           description: "Vous allez être redirigé vers la page d'accueil.",
@@ -143,7 +141,7 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit, onValidationErrors)} className="flex flex-col space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col space-y-4">
         {mode === 'signup' && (
           <FormField
             control={form.control}
@@ -152,7 +150,6 @@ export function AuthForm({ mode }: AuthFormProps) {
               <FormItem>
                 <FormLabel>Nom d'utilisateur</FormLabel>
                 <FormControl>
-                  {/* @ts-ignore */}
                   <Input placeholder="Votre nom" {...field} autoComplete="name" />
                 </FormControl>
                 <FormMessage />
