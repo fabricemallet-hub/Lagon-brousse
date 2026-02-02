@@ -232,54 +232,47 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
           </h3>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 items-center justify-around">
+        <div className="flex flex-col sm:flex-row gap-2 items-center justify-around">
            <div className="flex flex-col items-center justify-center text-center">
                 <WeatherConditionIcon
                 condition={selectedForecast.condition}
                 isNight={selectedForecast.isNight}
-                className="size-12"
+                className="size-10"
                 />
-                <p className="font-medium text-lg mt-2">
+                <p className="font-medium text-base mt-1">
                 {selectedForecast.condition}
                 </p>
             </div>
             <div className="flex flex-col items-center justify-center text-center">
                 <div className="flex items-baseline gap-1">
-                    <p className="font-bold text-5xl sm:text-6xl">{selectedForecast.windSpeed}</p>
-                    <p className="font-medium text-lg">nœuds</p>
+                    <p className="font-bold text-5xl">{selectedForecast.windSpeed}</p>
+                    <p className="font-medium text-base">nœuds</p>
                 </div>
-                <div className="flex items-center gap-2 mt-1">
-                    <WindArrowIcon direction={selectedForecast.windDirection} className="size-5" />
-                    <p className="text-base text-white/80">Vent de {selectedForecast.windDirection}</p>
-                </div>
-                <div className="flex items-center gap-2 text-base text-white/90 mt-2">
-                    <Thermometer className="size-5" />
-                    <span>{selectedForecast.temp}°C</span>
+                <div className="flex items-center gap-2">
+                    <WindArrowIcon direction={selectedForecast.windDirection} className="size-4" />
+                    <p className="text-sm text-white/80">Vent de {selectedForecast.windDirection}</p>
                 </div>
             </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
-          <div className="flex items-center gap-2 justify-center">
-            <Thermometer className="size-5" />
-            <p>
-              min/max : {weather.tempMin}° / {weather.tempMax}°
-            </p>
-          </div>
-          <div className="flex items-center gap-2 justify-center">
-            <Sun className="size-5" />
-            <p>Indice UV : {weather.uvIndex}</p>
-          </div>
+             <div className="flex flex-col items-center justify-center text-center text-sm space-y-1 text-white/90">
+                <div className="flex items-center gap-2">
+                    <Thermometer className="size-4" />
+                    <span>{selectedForecast.temp}°C</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Sun className="size-4" />
+                    <span>Indice UV: {weather.uvIndex}</span>
+                </div>
+             </div>
         </div>
       </div>
 
-      <div className="p-2 sm:p-4">
+      <div className="p-2">
         <Carousel setApi={setApi} opts={{ align: 'start' }}>
           <CarouselContent className="-ml-1">
             {weather.hourly.slice(0, 24).map((forecast, index) => (
               <CarouselItem
                 key={index}
-                className="basis-[28%] sm:basis-1/4 md:basis-1/6 lg:basis-[12.5%] pl-1"
+                className="basis-[24%] sm:basis-[19%] md:basis-1/6 lg:basis-[12.5%] pl-1"
                 onClick={() => api?.scrollTo(index)}
               >
                 <div
@@ -290,18 +283,18 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
                       : 'bg-card hover:bg-muted/50'
                   )}
                 >
-                  <p className="font-bold text-sm">
+                  <p className="font-bold text-xs">
                     {format(new Date(forecast.date), "HH'h'", { locale: fr })}
                   </p>
                   <WeatherConditionIcon
                     condition={forecast.condition}
                     isNight={forecast.isNight}
-                    className="size-6 my-0.5"
+                    className="size-5 my-0.5"
                   />
                   
-                  <div className="flex items-baseline">
-                    <p className="font-bold text-lg">{forecast.windSpeed}</p>
-                    <p className="text-[10px] text-muted-foreground">nœuds</p>
+                  <div className="flex items-baseline gap-0.5">
+                    <p className="font-bold text-base">{forecast.windSpeed}</p>
+                    <p className="text-[9px] text-muted-foreground">nœuds</p>
                   </div>
                   
                   <div className="border-t w-full my-0.5"></div>
@@ -314,11 +307,11 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
                     <div className="flex items-center justify-center gap-1 h-5" title="Force du courant">
                         <Zap className="size-3 text-muted-foreground" />
                         {forecast.tidePeakType ? (
-                            <Badge variant={forecast.tidePeakType === 'haute' ? 'default' : 'destructive'} className="h-4 px-1 text-[9px] font-semibold leading-none">
+                            <Badge variant={forecast.tidePeakType === 'haute' ? 'default' : 'destructive'} className="h-4 px-1 text-[8px] font-semibold leading-none">
                                 {forecast.tidePeakType === 'haute' ? 'Pleine' : 'Basse'}
                             </Badge>
                         ) : forecast.tideCurrent === 'Nul' ? (
-                            <Badge variant="secondary" className="h-4 px-1 text-[9px] font-semibold leading-none">Étale</Badge>
+                            <Badge variant="secondary" className="h-4 px-1 text-[8px] font-semibold leading-none">Étale</Badge>
                         ) : (
                             <span className="font-semibold">{forecast.tideCurrent}</span>
                         )}
