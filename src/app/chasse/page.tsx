@@ -121,17 +121,14 @@ export default function ChassePage() {
             {weather.wind.map((forecast, index) => (
               <div
                 key={index}
-                className="flex items-center justify-between rounded-lg border p-3"
+                className="flex items-center justify-between rounded-lg border p-3 gap-3"
               >
-                <div>
+                <div className='flex-1'>
                   <p className="font-bold text-lg">{forecast.time}</p>
-                  <p className="text-muted-foreground">{forecast.stability}</p>
-                </div>
-                <div className="text-center">
                   <p className="text-xl font-bold">{forecast.speed} nœuds</p>
-                  <p className="text-muted-foreground">{forecast.direction}</p>
+                  <p className="text-sm text-muted-foreground">{forecast.direction} - {forecast.stability}</p>
                 </div>
-                <WindMap direction={forecast.direction} className="w-16 h-24" />
+                <WindMap direction={forecast.direction} className="w-20 h-24" />
               </div>
             ))}
           </CardContent>

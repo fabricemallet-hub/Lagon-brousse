@@ -82,7 +82,7 @@ export function ShootingTableCard() {
         {adjustment && (
           <div className="mt-4 p-4 bg-muted/50 rounded-lg text-center space-y-2">
             <h4 className="font-semibold">Ajustement Recommandé</h4>
-            <div className="flex justify-around items-center text-lg">
+            <div className="flex flex-col sm:flex-row justify-around items-center text-lg gap-2">
                  <div className="flex items-center gap-2">
                     <ArrowUp className="size-5" />
                     <p>Hausse: <span className="font-bold">{adjustment.vertical} cm</span></p>
