@@ -127,6 +127,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // Effect to initialize and run the countdown timer.
   useEffect(() => {
+    // Do not run timer logic while auth or profile is loading.
+    if (isUserLoading || (user && isProfileLoading)) {
+      return;
+    }
+
     if (status !== 'limited' || !auth) return;
 
     // Initialize timeLeft from localStorage.
@@ -149,10 +154,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       }, 1000);
       return () => clearInterval(interval);
     }
-  }, [status, auth]);
+  }, [status, auth, user, isUserLoading, isProfileLoading]);
 
   // Effect to handle side-effects when timeLeft changes (logout, persist to localStorage).
   useEffect(() => {
+     // Do not run timer logic while auth or profile is loading.
+    if (isUserLoading || (user && isProfileLoading)) {
+      return;
+    }
+
     if (status !== 'limited' || !auth) return;
     
     // Persist usage to localStorage whenever timeLeft changes.
@@ -175,7 +185,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         router.push('/login');
       }
     }
-  }, [timeLeft, status, auth, toast, router, isLoggingOut]);
+  }, [timeLeft, status, auth, toast, router, isLoggingOut, user, isUserLoading, isProfileLoading]);
 
   if (isAuthPage) {
     return <>{children}</>;
