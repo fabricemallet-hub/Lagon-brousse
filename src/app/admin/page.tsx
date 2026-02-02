@@ -48,6 +48,8 @@ export default function AdminPage() {
   const router = useRouter();
   const { toast } = useToast();
 
+  const SUBSCRIPTION_PRICE = 500; // Default price in FCFP
+
   const [newPrice, setNewPrice] = useState(SUBSCRIPTION_PRICE.toString());
   const [tokenDuration, setTokenDuration] = useState('1');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -166,7 +168,6 @@ export default function AdminPage() {
 
   const isLoading = isUserLoading || areUsersLoading || areTokensLoading;
   const isAdminUser = user?.email === 'f.mallet81@outlook.com';
-  const SUBSCRIPTION_PRICE = 500; // Default price in FCFP
 
   if (!isAdminUser) {
     return (
