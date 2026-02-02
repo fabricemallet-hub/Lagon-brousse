@@ -374,8 +374,12 @@ function DetailDialogSkeleton() {
   return (
     <>
       <DialogHeader>
-        <DialogTitle><Skeleton className="h-7 w-3/4" /></DialogTitle>
-        <DialogDescription><Skeleton className="h-4 w-1/2" /></DialogDescription>
+        <DialogTitle asChild>
+          <div><Skeleton className="h-7 w-3/4" /></div>
+        </DialogTitle>
+        <DialogDescription asChild>
+          <div><Skeleton className="h-4 w-1/2" /></div>
+        </DialogDescription>
       </DialogHeader>
       <div className="space-y-4 py-4">
         <div className="space-y-4 pt-4">
@@ -525,12 +529,13 @@ function PecheDetailDialogContent({
 
   useEffect(() => {
     setIsLoading(true);
+    if (!day) return;
     const fetchedData = getDataForDate(location, day);
     setData(fetchedData);
     setIsLoading(false);
   }, [location, day]);
 
-  const dateString = format(day, 'eeee d MMMM yyyy', { locale: fr });
+  const dateString = day ? format(day, 'eeee d MMMM yyyy', { locale: fr }) : '';
   
   const sortedTides = useMemo(() => {
     if (!data) return [];
