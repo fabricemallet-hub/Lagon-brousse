@@ -20,17 +20,9 @@ import {
   Sunrise,
   Sunset,
   Info,
-  MapPin,
 } from 'lucide-react';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
 import { ShootingTableCard } from '@/components/ui/shooting-table-card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useFirestore } from '@/firebase';
 
 function ChasseSkeleton() {
   return (
