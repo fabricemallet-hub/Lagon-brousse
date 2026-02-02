@@ -49,9 +49,6 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap"
           rel="stylesheet"
         />
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#3498db" />
-        <link rel="apple-touch-icon" href="/icon-192x192.png" />
       </head>
       <body className={cn('font-body antialiased', 'min-h-screen bg-background font-sans')}>
         <Suspense fallback={<div>Chargement...</div>}>
