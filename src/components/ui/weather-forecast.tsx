@@ -94,7 +94,7 @@ const WindArrowIcon = ({ direction, className }: { direction: WindDirection, cla
 
 export function WeatherForecast({ weather }: { weather: WeatherData }) {
   const [api, setApi] = useState<CarouselApi>();
-  const [selectedIndex, setSelectedIndex] = useState(12); // Default to noon
+  const [selectedIndex, setSelectedIndex] = useState(0); 
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -122,7 +122,8 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
     );
 
     if (closestHourIndex === -1) {
-      closestHourIndex = 12; // Fallback to noon
+      // Fallback to the first hour if current hour isn't in the list (e.g. API data lag)
+      closestHourIndex = 0; 
     }
     
     api.scrollTo(closestHourIndex, true);
@@ -196,7 +197,7 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
             {weather.hourly.slice(0, 24).map((forecast, index) => (
               <CarouselItem
                 key={index}
-                className="basis-1/4 sm:basis-1/5 md:basis-[14%]"
+                className="basis-1/3 sm:basis-1/4 md:basis-1/6"
                 onClick={() => api?.scrollTo(index)}
               >
                 <div
@@ -221,23 +222,31 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
                     <span className="font-semibold text-base">{forecast.windSpeed}</span>
                   </div>
                   <div className="border-t w-full my-1"></div>
-                   <div className="flex items-center gap-1 text-muted-foreground" title="Hauteur de la marée">
-                      <Waves className="size-4" />
-                      <span className="font-semibold text-sm">{forecast.tideHeight.toFixed(1)}m</span>
-                  </div>
-                  <div className="flex items-center justify-center gap-1 h-5" title="Force du courant">
-                    {forecast.tidePeakType ? (
-                        <Badge variant={forecast.tidePeakType === 'haute' ? 'default' : 'destructive'} className="capitalize text-xs font-semibold">
-                            {forecast.tidePeakType === 'haute' ? 'Pleine Mer' : 'Basse Mer'}
-                        </Badge>
-                    ) : forecast.tideCurrent === 'Nul' ? (
-                        <Badge variant="secondary" className="text-xs">Étale</Badge>
-                    ) : (
-                        <>
-                            <Zap className="size-4" />
-                            <span className="text-xs font-semibold">{forecast.tideCurrent}</span>
-                        </>
-                    )}
+                  <div className="w-full px-1 space-y-1 text-left">
+                     <div className="flex items-center justify-between text-xs" title="Hauteur de la marée">
+                        <span className="text-muted-foreground">Hauteur:</span>
+                        <div className="flex items-center gap-1 font-semibold">
+                          <Waves className="size-3 text-muted-foreground" />
+                          <span>{forecast.tideHeight.toFixed(1)}m</span>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between text-xs" title="Force du courant">
+                        <span className="text-muted-foreground">Courant:</span>
+                        <div className="flex items-center gap-1">
+                          {forecast.tidePeakType ? (
+                              <Badge variant={forecast.tidePeakType === 'haute' ? 'default' : 'destructive'} className="capitalize text-xs font-semibold">
+                                  {forecast.tidePeakType === 'haute' ? 'Pleine Mer' : 'Basse Mer'}
+                              </Badge>
+                          ) : forecast.tideCurrent === 'Nul' ? (
+                              <Badge variant="secondary" className="text-xs">Étale</Badge>
+                          ) : (
+                              <>
+                                  <Zap className="size-3 text-muted-foreground" />
+                                  <span className="font-semibold">{forecast.tideCurrent}</span>
+                              </>
+                          )}
+                        </div>
+                    </div>
                   </div>
                 </div>
               </CarouselItem>
