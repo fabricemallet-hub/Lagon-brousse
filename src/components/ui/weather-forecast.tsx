@@ -197,7 +197,7 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
             {weather.hourly.slice(0, 24).map((forecast, index) => (
               <CarouselItem
                 key={index}
-                className="basis-1/3 sm:basis-1/4 md:basis-1/6"
+                className="basis-1/3 sm:basis-1/5 md:basis-1/6"
                 onClick={() => api?.scrollTo(index)}
               >
                 <div
@@ -208,29 +208,29 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
                       : 'bg-card hover:bg-muted/50'
                   )}
                 >
-                  <p className="font-bold text-lg">
+                  <p className="font-bold text-xl">
                     {format(new Date(forecast.date), "HH'h'", { locale: fr })}
                   </p>
                   <WeatherConditionIcon
                     condition={forecast.condition}
                     isNight={forecast.isNight}
-                    className="size-10"
+                    className="size-12"
                   />
-                  <p className="font-bold text-2xl">{forecast.temp}°</p>
+                  <p className="font-bold text-3xl">{forecast.temp}°</p>
                   <div className="flex flex-col items-center text-muted-foreground">
-                    <WindArrowIcon direction={forecast.windDirection} className="size-6" />
-                    <span className="font-semibold text-base">{forecast.windSpeed}</span>
+                    <WindArrowIcon direction={forecast.windDirection} className="size-7" />
+                    <span className="font-semibold text-lg">{forecast.windSpeed}</span>
                   </div>
                   <div className="border-t w-full my-1"></div>
-                  <div className="w-full px-1 space-y-1 text-left">
-                     <div className="flex items-center justify-between text-xs" title="Hauteur de la marée">
+                  <div className="w-full px-1 space-y-1">
+                     <div className="flex items-center justify-center gap-2 text-xs" title="Hauteur de la marée">
                         <span className="text-muted-foreground">Hauteur:</span>
                         <div className="flex items-center gap-1 font-semibold">
                           <Waves className="size-3 text-muted-foreground" />
                           <span>{forecast.tideHeight.toFixed(1)}m</span>
                         </div>
                     </div>
-                    <div className="flex items-center justify-between text-xs" title="Force du courant">
+                    <div className="flex items-center justify-center gap-2 text-xs" title="Force du courant">
                         <span className="text-muted-foreground">Courant:</span>
                         <div className="flex items-center gap-1">
                           {forecast.tidePeakType ? (
