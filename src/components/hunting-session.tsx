@@ -58,25 +58,62 @@ import type { HuntingSession, SessionParticipant } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Skeleton } from './ui/skeleton';
+import { User } from 'firebase/auth';
 
-// --- Helper Components ---
+// --- Helper Functions and Components ---
 
-const NewCaledoniaMap = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 200 200"
-    className="w-full h-full"
-    fill="currentColor"
-  >
-    <path d="M94.6,23.3C60,80,60,130,90,180c40-40,40-80,10-140C98.6,33.3,96.6,28.3,94.6,23.3z" />
-    <path d="M91.6,18.3c-2-1-1-4,1-3C92.6,16.3,92.6,17.3,91.6,18.3z" />
-    <path d="M87.6,14.3c-2-1-1-4,1-3C88.6,12.3,88.6,13.3,87.6,14.3z" />
-    <path d="M152,70c-12,15,0,30,5,25C162,85,162,75,152,70z" />
-    <path d="M165,105c-12,20,0,35,8,30C178,125,175,110,165,105z" />
-    <path d="M185,140c-8,15,2,28,8,22C198,155,193,145,185,140z" />
-    <path d="M125,170c-10,12,0,25,10,20C140,185,135,175,125,170z" />
-  </svg>
+// Constants for the full map view
+const NC_LAT_MIN = -22.8; // South
+const NC_LAT_MAX = -19.6; // North
+const NC_LON_MIN = 163.5; // West
+const NC_LON_MAX = 168.1; // East
+const NC_LON_RANGE = NC_LON_MAX - NC_LON_MIN;
+const NC_LAT_RANGE = NC_LAT_MAX - NC_LAT_MIN;
+const SVG_VIEWBOX_SIZE = 200;
+
+// Function to convert Lat/Lon to SVG coordinates of the full map
+const convertCoordsToSVG = (lat: number, lon: number) => {
+    const x = ((lon - NC_LON_MIN) / NC_LON_RANGE) * SVG_VIEWBOX_SIZE;
+    const y = ((NC_LAT_MAX - lat) / NC_LAT_RANGE) * SVG_VIEWBOX_SIZE;
+    return { x, y };
+};
+
+// Function to calculate a zoomed-in viewBox
+const getZoomedViewBox = (centerLat: number, centerLon: number, viewDiameterKm: number = 20) => {
+    // Approximate conversion: 1 degree lat ~= 111km, 1 degree lon ~= 111 * cos(lat)
+    const degPerKmLat = 1 / 111.1;
+    const degPerKmLon = 1 / (111.3 * Math.cos(centerLat * Math.PI / 180));
+
+    const latRadiusDeg = (viewDiameterKm / 2) * degPerKmLat;
+    const lonRadiusDeg = (viewDiameterKm / 2) * degPerKmLon;
+
+    // To make the view square in SVG units, we convert radii and take the max
+    const vbWidthRadius = (lonRadiusDeg / NC_LON_RANGE) * SVG_VIEWBOX_SIZE;
+    const vbHeightRadius = (latRadiusDeg / NC_LAT_RANGE) * SVG_VIEWBOX_SIZE;
+    const vbRadius = Math.max(vbWidthRadius, vbHeightRadius);
+
+    const center = convertCoordsToSVG(centerLat, centerLon);
+
+    const vbX = center.x - vbRadius;
+    const vbY = center.y - vbRadius;
+    const size = vbRadius * 2;
+
+    return `${vbX} ${vbY} ${size} ${size}`;
+}
+
+
+const NewCaledoniaPaths = () => (
+    <g>
+        <path d="M94.6,23.3C60,80,60,130,90,180c40-40,40-80,10-140C98.6,33.3,96.6,28.3,94.6,23.3z" />
+        <path d="M91.6,18.3c-2-1-1-4,1-3C92.6,16.3,92.6,17.3,91.6,18.3z" />
+        <path d="M87.6,14.3c-2-1-1-4,1-3C88.6,12.3,88.6,13.3,87.6,14.3z" />
+        <path d="M152,70c-12,15,0,30,5,25C162,85,162,75,152,70z" />
+        <path d="M165,105c-12,20,0,35,8,30C178,125,175,110,165,105z" />
+        <path d="M185,140c-8,15,2,28,8,22C198,155,193,145,185,140z" />
+        <path d="M125,170c-10,12,0,25,10,20C140,185,135,175,125,170z" />
+    </g>
 );
+
 
 const BatteryIcon = ({ level, charging }: { level: number; charging: boolean }) => {
   const props = { className: 'w-4 h-4' };
@@ -86,32 +123,40 @@ const BatteryIcon = ({ level, charging }: { level: number; charging: boolean }) 
   return <BatteryLow {...props} className="text-red-500" />;
 };
 
-const convertCoordsToPercent = (lat: number, lon: number) => {
-  const latMin = -22.8; // South
-  const latMax = -19.6; // North
-  const lonMin = 163.5; // West
-  const lonMax = 168.1; // East
 
-  const x = Math.max(0, Math.min(100, ((lon - lonMin) / (lonMax - lonMin)) * 100));
-  const y = Math.max(0, Math.min(100, ((latMax - lat) / (latMax - latMin)) * 100));
-  return { x, y };
-};
-
-const ParticipantMarker = ({ participant }: { participant: WithId<SessionParticipant> }) => {
+const ParticipantMarker = ({ participant, isCurrentUser, centerLat, centerLon, viewDiameterKm }: { participant: WithId<SessionParticipant>, isCurrentUser: boolean, centerLat: number, centerLon: number, viewDiameterKm: number }) => {
   if (!participant.location) return null;
-  const { x, y } = convertCoordsToPercent(
-    participant.location.latitude,
-    participant.location.longitude
-  );
+  
+  // Approximate conversion to calculate the view boundaries in degrees
+  const degPerKmLat = 1 / 111.1;
+  const degPerKmLon = 1 / (111.3 * Math.cos(centerLat * Math.PI / 180));
+  const latRadiusDeg = (viewDiameterKm / 2) * degPerKmLat;
+  const lonRadiusDeg = (viewDiameterKm / 2) * degPerKmLon;
+  const viewRadiusDeg = Math.max(latRadiusDeg, lonRadiusDeg);
+
+  // Define the square viewing area in degrees
+  const viewLatMin = centerLat - viewRadiusDeg;
+  const viewLatMax = centerLat + viewRadiusDeg;
+  const viewLonMin = centerLon - viewRadiusDeg;
+  const viewLonMax = centerLon + viewRadiusDeg;
+
+  // Calculate the participant's position as a percentage within this view
+  const y = ((viewLatMax - participant.location.latitude) / (viewLatMax - viewLatMin)) * 100;
+  const x = ((participant.location.longitude - viewLonMin) / (viewLonMax - viewLonMin)) * 100;
+
+  // Don't render the marker if it's outside the current field of view
+  if (x < 0 || x > 100 || y < 0 || y > 100) {
+    return null;
+  }
 
   return (
     <div
       className="absolute flex flex-col items-center transition-all duration-1000 ease-linear"
-      style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -100%)' }}
+      style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)' }}
     >
-      <div className="bg-background/80 backdrop-blur-sm rounded-full px-2 py-0.5 text-center shadow">
+      <div className={cn("bg-background/80 backdrop-blur-sm rounded-full px-2 py-0.5 text-center shadow", isCurrentUser && "ring-2 ring-primary")}>
         <p className="text-xs font-bold truncate max-w-[100px]">
-          {participant.displayName}
+          {isCurrentUser ? "Vous" : participant.displayName}
         </p>
         {participant.battery && (
           <div className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground">
@@ -123,10 +168,11 @@ const ParticipantMarker = ({ participant }: { participant: WithId<SessionPartici
           </div>
         )}
       </div>
-      <div className="w-2 h-2 rounded-full bg-primary ring-2 ring-background mt-1"></div>
+      <div className={cn("w-2 h-2 rounded-full bg-primary ring-2 ring-background mt-1", isCurrentUser && "bg-accent")}></div>
     </div>
   );
 };
+
 
 // --- Main Component ---
 
@@ -192,7 +238,14 @@ export function HuntingSessionCard() {
             updatedAt: serverTimestamp(),
         };
 
-        await setDoc(participantDocRef, participantData, { merge: true });
+        setDoc(participantDocRef, participantData, { merge: true }).catch((serverError) => {
+             const permissionError = new FirestorePermissionError({
+                path: participantDocRef.path,
+                operation: 'write',
+                requestResourceData: participantData,
+             });
+             errorEmitter.emit('permission-error', permissionError);
+        });
 
         if (!isParticipating) {
             setIsParticipating(true);
@@ -215,7 +268,7 @@ export function HuntingSessionCard() {
   
   // Start/stop location tracking when session state changes
   useEffect(() => {
-    if (session) {
+    if (session && isParticipating) {
       handleUpdatePosition(); // Initial update
       updateIntervalRef.current = setInterval(handleUpdatePosition, 15000); // Update every 15s
     } else {
@@ -230,7 +283,7 @@ export function HuntingSessionCard() {
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  }, [session, isParticipating]);
 
 
   const generateUniqueCode = async (): Promise<string> => {
@@ -273,6 +326,7 @@ export function HuntingSessionCard() {
         
         setDoc(sessionDocRef, docData).then(() => {
              setSession({ id: code, ...docData });
+             setIsParticipating(true);
              toast({
                 title: 'Session créée !',
                 description: `Le code de votre session est : ${code}`,
@@ -318,6 +372,7 @@ export function HuntingSessionCard() {
       }
 
       setSession({ id: sessionDoc.id, ...sessionData });
+      setIsParticipating(true);
 
     } catch (e: any) {
         if (e.name === 'FirebaseError' || e.code === 'permission-denied') {
@@ -347,6 +402,7 @@ export function HuntingSessionCard() {
        await deleteDoc(participantDocRef);
        setSession(null);
        setIsParticipating(false);
+       setUserLocation(null);
        toast({ title: 'Vous avez quitté la session.' });
      } catch (e: any) {
         if (e.name === 'FirebaseError' || e.code === 'permission-denied') {
@@ -396,6 +452,13 @@ export function HuntingSessionCard() {
   }
 
   if (session) {
+    const ZOOM_DIAMETER_KM = 10;
+    const currentUserParticipant = participants?.find(p => p.id === user?.uid);
+    const centerLocation = currentUserParticipant?.location ?? userLocation;
+    const viewBox = centerLocation
+        ? getZoomedViewBox(centerLocation.latitude, centerLocation.longitude, ZOOM_DIAMETER_KM)
+        : "0 0 200 200";
+
     return (
       <Card>
         <CardHeader>
@@ -419,10 +482,31 @@ export function HuntingSessionCard() {
             {error && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertTitle>{error}</AlertTitle></Alert>}
 
             <div className="relative w-full aspect-square rounded-lg overflow-hidden border bg-blue-50 dark:bg-blue-900/20">
-                <div className="absolute inset-0 text-muted-foreground/10 dark:text-muted-foreground/5">
-                    <NewCaledoniaMap />
-                </div>
-                 {participants?.map(p => <ParticipantMarker key={p.id} participant={p} />)}
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox={viewBox}
+                    className="absolute inset-0 w-full h-full transition-all duration-1000 ease-linear"
+                    fill="currentColor"
+                    preserveAspectRatio="xMidYMid meet"
+                >
+                    <g className="text-muted-foreground/10 dark:text-muted-foreground/5">
+                        <NewCaledoniaPaths />
+                    </g>
+                </svg>
+
+                 <div className="absolute inset-0">
+                    {centerLocation && participants?.map(p => (
+                        <ParticipantMarker
+                            key={p.id}
+                            participant={p}
+                            centerLat={centerLocation.latitude}
+                            centerLon={centerLocation.longitude}
+                            viewDiameterKm={ZOOM_DIAMETER_KM}
+                            isCurrentUser={p.id === user?.uid}
+                        />
+                    ))}
+                 </div>
+                 
                  <Button onClick={handleUpdatePosition} variant="secondary" size="icon" className="absolute top-2 right-2 z-10"><LocateFixed /></Button>
             </div>
 
