@@ -27,11 +27,11 @@ import { FishingLogCard } from '@/components/ui/fishing-log-card';
 
 function PecheSkeleton() {
   return (
-     <div className="space-y-6">
+     <div className="space-y-6 w-full max-w-full">
       <Skeleton className="h-20 w-full" />
       <Skeleton className="h-16 w-full" />
       <Skeleton className="h-44 w-full" />
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-2">
+      <div className="space-y-6">
         <Skeleton className="h-64 w-full" />
         <Skeleton className="h-64 w-full" />
         <Skeleton className="h-64 w-full" />
@@ -91,10 +91,10 @@ export default function PechePage() {
   const { fishing, pelagicInfo, crabAndLobster } = data;
 
   return (
-    <div className="space-y-6">
-      <Card>
+    <div className="w-full max-w-full overflow-x-hidden space-y-6 pb-8">
+      <Card className="w-full">
         <CardHeader>
-          <CardTitle>Prévisions de Pêche à la Ligne</CardTitle>
+          <CardTitle className="text-xl sm:text-2xl">Prévisions de Pêche à la Ligne</CardTitle>
           <CardDescription>
             Meilleurs moments et espèces à cibler pour la pêche à {selectedLocation} le {dateString}.
           </CardDescription>
@@ -102,78 +102,78 @@ export default function PechePage() {
       </Card>
       
       {pelagicInfo && pelagicInfo.inSeason && (
-        <Alert>
+        <Alert className="w-full">
           <Star className="h-4 w-4" />
           <AlertTitle>Saison des Pélagiques Ouverte !</AlertTitle>
           <AlertDescription>{pelagicInfo.message}</AlertDescription>
         </Alert>
       )}
 
-      <Card>
+      <Card className="w-full">
         <CardHeader>
-          <CardTitle>Autres Captures</CardTitle>
+          <CardTitle className="text-lg">Autres Captures</CardTitle>
           <CardDescription>
             Prévisions basées sur le cycle lunaire pour le {dateString}.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-6 md:grid-cols-3">
-          <div className="flex items-start gap-4">
-            <CrabIcon className="h-8 w-8 text-primary mt-1" />
-            <div>
-              <div className="flex items-center gap-2">
-                <h4 className="font-semibold">Crabe de palétuvier</h4>
+        <CardContent className="flex flex-col gap-6">
+          <div className="flex items-start gap-4 p-2 rounded-lg bg-muted/30">
+            <CrabIcon className="h-8 w-8 text-primary mt-1 shrink-0" />
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <h4 className="font-semibold text-sm sm:text-base">Crabe de palétuvier</h4>
                 <Badge variant={crabAndLobster.crabStatus === 'Plein' ? 'default' : crabAndLobster.crabStatus === 'Mout' ? 'destructive' : 'secondary'}>
                   {crabAndLobster.crabStatus}
                 </Badge>
               </div>
-              <p className="text-sm text-muted-foreground">{crabAndLobster.crabMessage}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">{crabAndLobster.crabMessage}</p>
             </div>
           </div>
-          <div className="flex items-start gap-4">
-            <LobsterIcon className="h-8 w-8 text-primary mt-1" />
-            <div>
-              <div className="flex items-center gap-2">
-                <h4 className="font-semibold">Langouste</h4>
+          <div className="flex items-start gap-4 p-2 rounded-lg bg-muted/30">
+            <LobsterIcon className="h-8 w-8 text-primary mt-1 shrink-0" />
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <h4 className="font-semibold text-sm sm:text-base">Langouste</h4>
                   <Badge variant={crabAndLobster.lobsterActivity === 'Élevée' ? 'default' : 'secondary'}>
                   {crabAndLobster.lobsterActivity}
                 </Badge>
               </div>
-              <p className="text-sm text-muted-foreground">{crabAndLobster.lobsterMessage}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground">{crabAndLobster.lobsterMessage}</p>
             </div>
           </div>
            {crabAndLobster.octopusActivity && (
-            <div className="flex items-start gap-4">
-              <OctopusIcon className="h-8 w-8 text-primary mt-1" />
-              <div>
-                <div className="flex items-center gap-2">
-                  <h4 className="font-semibold">Poulpe</h4>
+            <div className="flex items-start gap-4 p-2 rounded-lg bg-muted/30">
+              <OctopusIcon className="h-8 w-8 text-primary mt-1 shrink-0" />
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <h4 className="font-semibold text-sm sm:text-base">Poulpe</h4>
                     <Badge variant={crabAndLobster.octopusActivity === 'Élevée' ? 'default' : crabAndLobster.octopusActivity === 'Moyenne' ? 'secondary' : 'outline'}>
                     {crabAndLobster.octopusActivity}
                   </Badge>
                 </div>
-                <p className="text-sm text-muted-foreground">{crabAndLobster.octopusMessage}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">{crabAndLobster.octopusMessage}</p>
               </div>
             </div>
           )}
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-2">
+      <div className="flex flex-col gap-6 w-full">
         {fishing.map((slot, index) => (
-          <Card key={index}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-xl">
+          <Card key={index} className="w-full">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
                 <Clock className="h-5 w-5" />
                 {slot.timeOfDay}
               </CardTitle>
-              <div className="text-sm text-muted-foreground flex items-center gap-4 pt-1">
+              <div className="text-xs sm:text-sm text-muted-foreground flex flex-wrap items-center gap-3 pt-1">
                   <div className="flex items-center gap-1">
                     <Waves className="h-4 w-4" />
                     <span>{slot.tide} à {slot.tideTime}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     {slot.tideMovement === 'étale' ? (
-                      <Badge variant={slot.tide.includes('haute') ? 'default' : 'destructive'} className="capitalize text-xs font-semibold">
+                      <Badge variant={slot.tide.includes('haute') ? 'default' : 'destructive'} className="capitalize text-[10px] font-semibold">
                           {slot.tide.includes('haute') ? 'Pleine Mer' : 'Basse Mer'}
                       </Badge>
                     ) : (
@@ -188,43 +188,43 @@ export default function PechePage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <h4 className="font-semibold flex items-center gap-2">
+              <h4 className="font-semibold text-sm flex items-center gap-2">
                 <Fish className="h-5 w-5 text-primary" />
                 Potentiel par espèce
               </h4>
-              <Accordion type="single" collapsible className="w-full space-y-2">
+              <Accordion type="single" collapsible className="w-full space-y-3">
                 {slot.fish.filter(f => f.rating >= 9).map((f, i) => (
-                  <AccordionItem value={`item-${i}`} key={i} className="border-b-0">
-                    <div className="border rounded-lg overflow-hidden bg-card">
-                      <AccordionTrigger className="p-3 hover:no-underline text-sm [&[data-state=open]]:bg-muted/50 [&[data-state=open]]:border-b">
+                  <AccordionItem value={`item-${i}`} key={i} className="border-none">
+                    <div className="border rounded-lg overflow-hidden bg-card shadow-sm">
+                      <AccordionTrigger className="p-4 hover:no-underline text-sm [&[data-state=open]]:bg-muted/50 [&[data-state=open]]:border-b">
                         <div className="flex justify-between items-center w-full">
-                          <div className="flex items-center gap-2 text-left">
-                            <span className="font-medium">{f.name}</span>
-                            {f.location && <Badge variant={f.location === 'Large' ? 'destructive' : 'secondary'} className="text-xs font-semibold">{f.location}</Badge>}
+                          <div className="flex flex-col items-start gap-1 text-left">
+                            <span className="font-bold">{f.name}</span>
+                            {f.location && <Badge variant={f.location === 'Large' ? 'destructive' : 'secondary'} className="text-[10px] h-4 px-1.5 font-semibold">{f.location}</Badge>}
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-col items-end gap-1">
                             <RatingStars rating={f.rating} />
-                            <Badge variant="outline" className="w-12 justify-center">{f.rating}/10</Badge>
+                            <span className="text-[10px] font-mono text-muted-foreground font-bold">{f.rating}/10</span>
                           </div>
                         </div>
                       </AccordionTrigger>
-                      <AccordionContent className="p-3 text-sm bg-muted/50">
-                        <ul className="space-y-2 text-muted-foreground">
-                          <li className="flex items-start gap-2">
-                            <strong className="w-24 shrink-0 font-semibold text-card-foreground/80">Activité:</strong>
-                            <span>{f.advice.activity}</span>
+                      <AccordionContent className="p-4 text-xs sm:text-sm bg-muted/20">
+                        <ul className="space-y-3 text-muted-foreground">
+                          <li className="flex flex-col gap-1">
+                            <strong className="font-bold text-card-foreground/90 uppercase text-[10px]">Activité:</strong>
+                            <span className="leading-relaxed">{f.advice.activity}</span>
                           </li>
-                          <li className="flex items-start gap-2">
-                            <strong className="w-24 shrink-0 font-semibold text-card-foreground/80">Alimentation:</strong>
-                            <span>{f.advice.feeding}</span>
+                          <li className="flex flex-col gap-1">
+                            <strong className="font-bold text-card-foreground/90 uppercase text-[10px]">Alimentation:</strong>
+                            <span className="leading-relaxed">{f.advice.feeding}</span>
                           </li>
-                          <li className="flex items-start gap-2">
-                            <strong className="w-24 shrink-0 font-semibold text-card-foreground/80">Spot:</strong>
-                            <span>{f.advice.location_specific}</span>
+                          <li className="flex flex-col gap-1">
+                            <strong className="font-bold text-card-foreground/90 uppercase text-[10px]">Spot idéal:</strong>
+                            <span className="leading-relaxed">{f.advice.location_specific}</span>
                           </li>
-                          <li className="flex items-start gap-2">
-                            <strong className="w-24 shrink-0 font-semibold text-card-foreground/80">Profondeur:</strong>
-                            <span>{f.advice.depth}</span>
+                          <li className="flex flex-col gap-1">
+                            <strong className="font-bold text-card-foreground/90 uppercase text-[10px]">Profondeur:</strong>
+                            <span className="leading-relaxed font-semibold text-primary">{f.advice.depth}</span>
                           </li>
                         </ul>
                       </AccordionContent>
@@ -236,7 +236,10 @@ export default function PechePage() {
           </Card>
         ))}
       </div>
-      <FishingLogCard data={data} />
+      
+      <div className="w-full">
+        <FishingLogCard data={data} />
+      </div>
     </div>
   );
 }
