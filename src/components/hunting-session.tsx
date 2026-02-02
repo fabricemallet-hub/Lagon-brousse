@@ -90,13 +90,6 @@ export function HuntingSessionCard() {
   const updateIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isParticipating, setIsParticipating] = useState(false);
   const [map, setMap] = useState<google.maps.Map | null>(null);
-
-  const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-
-  const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: googleMapsApiKey || "",
-    preventGoogleFontsLoading: true,
-  });
   
   const handleLeaveSession = useCallback(async () => {
      if (updateIntervalRef.current) {
@@ -382,29 +375,77 @@ export function HuntingSessionCard() {
   }
 
   if (session) {
+    const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+    const { isLoaded, loadError } = useJsApiLoader({
+        googleMapsApiKey: googleMapsApiKey || "",
+        preventGoogleFontsLoading: true,
+    });
+
     if (!googleMapsApiKey) {
         return (
             <Card>
-                <CardHeader><CardTitle>Session de Chasse Active</CardTitle></CardHeader>
+                <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                         <div className="flex items-center gap-2">
+                            <Users className="size-5 text-primary" />
+                            Session de Chasse Active
+                        </div>
+                        <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isLoading}><LogOut/> Quitter</Button>
+                    </CardTitle>
+                    <CardDescription>Partagez votre position avec votre groupe en temps réel.</CardDescription>
+                </CardHeader>
                 <CardContent>
                     <Alert variant="destructive">
                         <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>Configuration Requise</AlertTitle>
-                        <AlertDescription>La clé API Google Maps n'est pas configurée. Veuillez ajouter `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` à votre fichier `.env.local`.</AlertDescription>
+                        <AlertTitle>Clé API Google Maps manquante</AlertTitle>
+                        <AlertDescription>
+                            La variable d'environnement `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` n'est pas définie dans votre fichier `.env`. La carte ne peut pas se charger sans elle.
+                        </AlertDescription>
                     </Alert>
                 </CardContent>
             </Card>
         );
     }
+
     if (loadError) {
       return (
         <Card>
-            <CardHeader><CardTitle>Session de Chasse Active</CardTitle></CardHeader>
+            <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <Users className="size-5 text-primary" />
+                        Session de Chasse Active
+                    </div>
+                    <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isLoading}><LogOut/> Quitter</Button>
+                </CardTitle>
+                <CardDescription>Partagez votre position avec votre groupe en temps réel.</CardDescription>
+            </CardHeader>
             <CardContent>
                  <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Erreur de chargement de la carte</AlertTitle>
-                    <AlertDescription>La carte n'a pas pu être chargée. L'erreur la plus probable est une clé API invalide (InvalidKeyMapError) ou des restrictions incorrectes sur votre console Google Cloud. Veuillez vérifier votre configuration API.</AlertDescription>
+                    <AlertTitle>Erreur : Impossible de charger la carte</AlertTitle>
+                    <AlertDescription className="space-y-2">
+                        <p>L'erreur `InvalidKeyMapError` signifie que votre clé API n'est pas acceptée par Google. Veuillez suivre ces étapes :</p>
+                        <ol className="list-decimal list-inside text-xs space-y-1">
+                            <li>
+                                **Vérifiez la clé :** Assurez-vous que la clé dans votre fichier `.env` est correcte et ne contient pas de fautes de frappe.
+                            </li>
+                            <li>
+                                **Vérifiez les restrictions d'API :** Allez sur votre <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="underline">console Google Cloud</a> et vérifiez que votre clé API a bien les restrictions suivantes sous "Restrictions liées aux sites Web":
+                                <ul className="list-disc list-inside pl-4 mt-1">
+                                    <li><code>*.cloudworkstations.dev/*</code></li>
+                                    <li><code>studio.firebase.google.com/*</code></li>
+                                </ul>
+                            </li>
+                            <li>
+                                **Activez l'API :** Dans la console Google, assurez-vous que l'API "Maps JavaScript API" est bien activée pour votre projet.
+                            </li>
+                            <li>
+                                **Redémarrez le serveur :** Après avoir modifié le fichier `.env` ou les restrictions, il est parfois nécessaire de redémarrer le serveur de développement.
+                            </li>
+                        </ol>
+                    </AlertDescription>
                 </Alert>
             </CardContent>
         </Card>
