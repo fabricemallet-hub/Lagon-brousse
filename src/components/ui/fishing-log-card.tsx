@@ -435,7 +435,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         setSelectedSpotIds(prev =>
             prev.includes(spotId)
                 ? prev.filter(id => id !== spotId)
-                : [...prev, id]
+                : [...prev, spotId]
         );
     };
 

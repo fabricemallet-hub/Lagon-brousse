@@ -1,21 +1,21 @@
 {
-    "name": "Lagon & Brousse NC",
-    "short_name": "L&B NC",
-    "description": "Votre guide pour la mer et la terre en Nouvelle-Calédonie.",
-    "start_url": "/",
-    "display": "standalone",
-    "background_color": "#e8ebf0",
-    "theme_color": "#4f9ee4",
-    "icons": [
-        {
-            "src": "/icon-192x192.png",
-            "sizes": "192x192",
-            "type": "image/png"
-        },
-        {
-            "src": "/icon-512x512.png",
-            "sizes": "512x512",
-            "type": "image/png"
-        }
-    ]
+  "name": "Lagon & Brousse NC",
+  "short_name": "LagonBrousse",
+  "description": "Votre guide pour la mer et la terre en Nouvelle-Calédonie.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "icons": [
+    {
+      "src": "https://picsum.photos/seed/pwa1/192/192",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://picsum.photos/seed/pwa2/512/512",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
 }
