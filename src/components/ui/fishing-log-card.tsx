@@ -87,6 +87,9 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     const [analysisResult, setAnalysisResult] = useState<FishingAnalysisOutput | null>(null);
     const [isAnalysisDialogOpen, setIsAnalysisDialogOpen] = useState(false);
     const [selectedSpotIds, setSelectedSpotIds] = useState<string[]>([]);
+    
+    const [openSpotId, setOpenSpotId] = useState<string | undefined>(undefined);
+    const spotRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
     const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     const { isLoaded, loadError } = useJsApiLoader({ googleMapsApiKey: googleMapsApiKey || "", mapIds: ['satellite_id'] });
@@ -96,6 +99,13 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         return query(collection(firestore, 'users', user.uid, 'fishing_spots'), orderBy('createdAt', 'desc'));
     }, [user, firestore]);
     const { data: savedSpots, isLoading: areSpotsLoading } = useCollection<FishingSpot>(fishingSpotsRef);
+
+    const handleSpotClick = (spotId: string) => {
+        setOpenSpotId(prevId => (prevId === spotId ? undefined : spotId));
+        setTimeout(() => {
+            spotRefs.current[spotId]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 300);
+    };
 
     const onLoad = useCallback(function callback(mapInstance: google.maps.Map) {
         setMap(mapInstance);
@@ -111,32 +121,31 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     }, []);
 
     const startWatchingPosition = useCallback(() => {
-        if (!navigator.geolocation || watchId.current !== null) {
+        if (!navigator.geolocation) {
             return;
         }
+        
+        navigator.permissions?.query({ name: 'geolocation' }).then(status => {
+            if (status.state === 'granted') {
+                 if (watchId.current !== null) return;
+                 watchId.current = navigator.geolocation.watchPosition(
+                    (position) => {
+                        const { latitude, longitude } = position.coords;
+                        const newLocation = { lat: latitude, lng: longitude };
+                        setUserLocation(newLocation);
 
-        watchId.current = navigator.geolocation.watchPosition(
-            (position) => {
-                const { latitude, longitude } = position.coords;
-                const newLocation = { lat: latitude, lng: longitude };
-                setUserLocation(newLocation);
-
-                if (map && !initialZoomDone) {
-                    map.panTo(newLocation);
-                    map.setZoom(16);
-                    setInitialZoomDone(true);
-                }
-            },
-            () => {
-                 toast({
-                    variant: 'destructive',
-                    title: 'Position non disponible',
-                    description: "Impossible d'obtenir votre position.",
-                });
-            },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
-    }, [map, initialZoomDone, toast]);
+                        if (map && !initialZoomDone) {
+                            map.panTo(newLocation);
+                            map.setZoom(16);
+                            setInitialZoomDone(true);
+                        }
+                    },
+                    () => { /* Error handled by recenter button */ },
+                    { enableHighAccuracy: true }
+                );
+            }
+        });
+    }, [map, initialZoomDone]);
 
     const handleRecenter = () => {
         if (!navigator.geolocation) {
@@ -156,9 +165,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                     map.panTo(newLocation);
                     map.setZoom(16);
                 }
-                if (watchId.current === null) {
-                    startWatchingPosition();
-                }
+                startWatchingPosition();
             },
             (err) => {
                  toast({
@@ -172,12 +179,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     };
 
     useEffect(() => {
-        navigator.permissions?.query({ name: 'geolocation' }).then(status => {
-            if (status.state === 'granted') {
-                startWatchingPosition();
-            }
-        });
-
+        startWatchingPosition();
         return () => {
             if (watchId.current !== null) {
                 navigator.geolocation.clearWatch(watchId.current);
@@ -406,6 +408,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                             scaledSize: new window.google.maps.Size(32, 32),
                                             anchor: new window.google.maps.Point(16, 16),
                                         }}
+                                        onClick={() => handleSpotClick(spot.id)}
                                     />
                                     <OverlayView
                                         position={{ lat: spot.location.latitude, lng: spot.location.longitude }}
@@ -413,7 +416,8 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                     >
                                         <div 
                                             style={{ transform: 'translate(-50%, -150%)' }} 
-                                            className="flex flex-col items-center gap-1"
+                                            className="flex flex-col items-center gap-1 cursor-pointer"
+                                            onClick={() => handleSpotClick(spot.id)}
                                         >
                                             <div className="flex flex-col items-center gap-1 px-2 py-1 bg-card/90 border border-border rounded-md shadow text-xs font-bold text-card-foreground whitespace-nowrap">
                                                 <span>{spot.name}</span>
@@ -542,11 +546,22 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         <h4 className="font-semibold text-lg mb-2">Historique des prises</h4>
                         {areSpotsLoading && <Skeleton className="h-24 w-full" />}
                         {!areSpotsLoading && savedSpots && savedSpots.length > 0 ? (
-                            <AccordionPrimitive.Root type="single" collapsible className="w-full">
+                            <AccordionPrimitive.Root 
+                                type="single" 
+                                collapsible 
+                                className="w-full"
+                                value={openSpotId}
+                                onValueChange={setOpenSpotId}
+                            >
                                {savedSpots.map(spot => (
-                                   <AccordionPrimitive.Item value={spot.id} key={spot.id} className="border-b">
+                                   <AccordionPrimitive.Item 
+                                        ref={(el) => (spotRefs.current[spot.id] = el)}
+                                        value={spot.id} 
+                                        key={spot.id} 
+                                        className="border-b"
+                                    >
                                        <div className="flex items-center w-full">
-                                            <span className="pl-4 py-4" onClick={(e) => e.stopPropagation()}>
+                                           <span className="pl-4 py-4" onClick={(e) => e.stopPropagation()}>
                                                <Checkbox
                                                    id={`select-spot-${spot.id}`}
                                                    className="size-5"
@@ -554,20 +569,22 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                    onCheckedChange={() => handleSpotSelection(spot.id)}
                                                />
                                            </span>
-                                            <AccordionPrimitive.Trigger className={cn("flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180", "pl-2 pr-4")}>
-                                               <div className="flex items-center gap-3">
-                                                   <div className="p-1 rounded-md" style={{backgroundColor: spot.color + '20'}}>
-                                                       {React.createElement(mapIcons[spot.icon as keyof typeof mapIcons] || MapPin, { className: 'size-5', style: {color: spot.color} })}
+                                           <AccordionPrimitive.Header className="flex flex-1">
+                                                <AccordionPrimitive.Trigger className={cn("flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180", "pl-2 pr-4")}>
+                                                   <div className="flex items-center gap-3">
+                                                       <div className="p-1 rounded-md" style={{backgroundColor: spot.color + '20'}}>
+                                                           {React.createElement(mapIcons[spot.icon as keyof typeof mapIcons] || MapPin, { className: 'size-5', style: {color: spot.color} })}
+                                                       </div>
+                                                       <div>
+                                                           <p className="font-bold text-left">{spot.name}</p>
+                                                           <p className="text-xs text-muted-foreground text-left">
+                                                               {spot.createdAt ? format(spot.createdAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr }) : 'Enregistrement...'}
+                                                           </p>
+                                                       </div>
                                                    </div>
-                                                   <div>
-                                                       <p className="font-bold text-left">{spot.name}</p>
-                                                        <p className="text-xs text-muted-foreground text-left">
-                                                            {spot.createdAt ? format(spot.createdAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr }) : 'Enregistrement...'}
-                                                        </p>
-                                                   </div>
-                                               </div>
-                                               <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
-                                           </AccordionPrimitive.Trigger>
+                                                   <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
+                                               </AccordionPrimitive.Trigger>
+                                           </AccordionPrimitive.Header>
                                        </div>
                                        <AccordionPrimitive.Content className="overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
                                            <div className="pb-4 pl-12 pr-4 space-y-4">
