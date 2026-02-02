@@ -54,6 +54,7 @@ import {
   deleteDoc,
   Timestamp,
   updateDoc,
+  writeBatch,
 } from 'firebase/firestore';
 import type { WithId } from '@/firebase';
 import type { HuntingSession, SessionParticipant } from '@/lib/types';
@@ -90,10 +91,11 @@ export function HuntingSessionCard() {
   const [isParticipating, setIsParticipating] = useState(false);
   const [map, setMap] = useState<google.maps.Map | null>(null);
 
-  const googleMapsApiKey = "AIzaSyDCkKWAl86pviQm3jdH07CqQkJeqHL62JM";
+  const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
   const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: googleMapsApiKey,
+    googleMapsApiKey: googleMapsApiKey || "",
+    preventGoogleFontsLoading: true,
   });
   
   const handleLeaveSession = useCallback(async () => {
@@ -130,13 +132,6 @@ export function HuntingSessionCard() {
         toast({ title: 'Vous avez quitté la session.' });
      }
   }, [user, session, firestore, toast]);
-
-  const participantsCollectionRef = useMemoFirebase(() => {
-    if (!firestore || !session || !isParticipating) return null;
-    return collection(firestore, 'hunting_sessions', session.id, 'participants');
-  }, [firestore, session, isParticipating]);
-
-  const { data: participants, isLoading: areParticipantsLoading } = useCollection<SessionParticipant>(participantsCollectionRef);
   
   const handleUpdatePosition = useCallback(async () => {
     if (!user || !session || !firestore || !isParticipating) return;
@@ -161,12 +156,13 @@ export function HuntingSessionCard() {
 
         const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
         const participantData: Partial<SessionParticipant> = {
+            displayName: user.displayName || user.email || 'Chasseur',
             location: { latitude, longitude },
             battery: batteryData,
             updatedAt: serverTimestamp(),
         };
 
-        await updateDoc(participantDocRef, participantData)
+        await setDoc(participantDocRef, participantData, { merge: true });
 
     } catch (err: any) {
         console.error("Error during periodic position update:", err);
@@ -182,23 +178,24 @@ export function HuntingSessionCard() {
   }, [user, session, firestore, isParticipating, handleLeaveSession, toast]);
 
   useEffect(() => {
-    if (!session || !user || !firestore) {
-        return;
-    }
+    if (isParticipating && user && session) {
+      handleUpdatePosition(); // Initial update
+      const intervalId = setInterval(handleUpdatePosition, 30000);
+      updateIntervalRef.current = intervalId;
 
-    if (isParticipating) {
-      if (!updateIntervalRef.current) {
-          updateIntervalRef.current = setInterval(handleUpdatePosition, 30000);
-      }
-    }
-  
-    return () => {
-      if (updateIntervalRef.current) {
-        clearInterval(updateIntervalRef.current);
+      return () => {
+        clearInterval(intervalId);
         updateIntervalRef.current = null;
-      }
-    };
-  }, [session, user, firestore, isParticipating, handleUpdatePosition]);
+      };
+    }
+  }, [isParticipating, user, session, handleUpdatePosition]);
+
+  const participantsCollectionRef = useMemoFirebase(() => {
+    if (!firestore || !session || !isParticipating) return null;
+    return collection(firestore, 'hunting_sessions', session.id, 'participants');
+  }, [firestore, session, isParticipating]);
+
+  const { data: participants, isLoading: areParticipantsLoading } = useCollection<SessionParticipant>(participantsCollectionRef);
 
   const generateUniqueCode = async (): Promise<string> => {
     if (!firestore) throw new Error("Firestore not initialized");
@@ -221,45 +218,53 @@ export function HuntingSessionCard() {
     throw new Error('Impossible de générer un code unique.');
   };
 
-  const handleCreateSession = () => {
+  const handleCreateSession = async () => {
     if (!user || !firestore) return;
     setIsLoading(true);
     setError(null);
 
-    const create = async () => {
+    try {
         const code = await generateUniqueCode();
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + 24);
 
-        const docData: Omit<HuntingSession, 'id'> = {
+        const sessionDocData: Omit<HuntingSession, 'id'> = {
           organizerId: user.uid,
           createdAt: serverTimestamp(),
           expiresAt: Timestamp.fromDate(expiresAt),
         };
-        const sessionDocRef = doc(firestore, 'hunting_sessions', code);
         
-        await setDoc(sessionDocRef, docData);
+        const participantDocData: Omit<SessionParticipant, 'id'> = {
+            displayName: user.displayName || user.email || 'Chasseur',
+            updatedAt: serverTimestamp()
+        };
 
-        setSession({ id: code, ...docData });
+        const batch = writeBatch(firestore);
+        const sessionDocRef = doc(firestore, 'hunting_sessions', code);
+        const participantDocRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
+        
+        batch.set(sessionDocRef, sessionDocData);
+        batch.set(participantDocRef, participantDocData);
+        await batch.commit();
+
+        setSession({ id: code, ...sessionDocData });
+        setIsParticipating(true);
         
         toast({
             title: 'Session créée !',
             description: `Le code de votre session est : ${code}`,
         });
-        setIsLoading(false);
-        setIsParticipating(true);
 
-    }
-
-    create().catch(e => {
+    } catch (e: any) {
         setError(e.message);
         toast({
             variant: 'destructive',
             title: 'Erreur de création',
             description: e.message,
         });
+    } finally {
         setIsLoading(false);
-    });
+    }
   };
   
   const handleJoinSession = async () => {
@@ -267,7 +272,8 @@ export function HuntingSessionCard() {
     setIsLoading(true);
     setError(null);
     try {
-      const sessionDocRef = doc(firestore, 'hunting_sessions', joinCode.toUpperCase());
+      const sessionId = joinCode.toUpperCase();
+      const sessionDocRef = doc(firestore, 'hunting_sessions', sessionId);
       const sessionDoc = await getDoc(sessionDocRef);
 
       if (!sessionDoc.exists()) {
@@ -278,6 +284,14 @@ export function HuntingSessionCard() {
       if (sessionData.expiresAt && (sessionData.expiresAt as Timestamp).toDate() < new Date()) {
          throw new Error('Cette session a expiré.');
       }
+      
+      const participantDocRef = doc(firestore, 'hunting_sessions', sessionId, 'participants', user.uid);
+      const participantData: Omit<SessionParticipant, 'id'> = {
+          displayName: user.displayName || user.email || 'Chasseur',
+          updatedAt: serverTimestamp(),
+      };
+      
+      await setDoc(participantDocRef, participantData);
       
       setSession({ id: sessionDoc.id, ...sessionData });
       setIsParticipating(true);
@@ -368,6 +382,20 @@ export function HuntingSessionCard() {
   }
 
   if (session) {
+    if (!googleMapsApiKey) {
+        return (
+            <Card>
+                <CardHeader><CardTitle>Session de Chasse Active</CardTitle></CardHeader>
+                <CardContent>
+                    <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Configuration Requise</AlertTitle>
+                        <AlertDescription>La clé API Google Maps n'est pas configurée. Veuillez ajouter `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` à votre fichier `.env.local`.</AlertDescription>
+                    </Alert>
+                </CardContent>
+            </Card>
+        );
+    }
     if (loadError) {
       return (
         <Card>
@@ -457,7 +485,7 @@ export function HuntingSessionCard() {
                 <CollapsibleTrigger asChild>
                     <Button variant="outline" className="w-full">
                         <Users className="mr-2"/>
-                        {isParticipating ? (participants?.length ?? 1) : 0} Participant(s)
+                        {isParticipating ? (participants?.length ?? 0) : 0} Participant(s)
                         <ChevronUp className="ml-auto h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
                     </Button>
                 </CollapsibleTrigger>
@@ -532,3 +560,5 @@ export function HuntingSessionCard() {
     </Card>
   );
 }
+
+    
