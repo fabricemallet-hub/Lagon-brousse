@@ -85,7 +85,7 @@ export default function AdminPage() {
 
   // Route protection
   useEffect(() => {
-    if (!isUserLoading && user?.email !== 'f.mallet@gmail.com') {
+    if (!isUserLoading && user?.email !== 'f.mallet81@outlook.com') {
       router.push('/compte'); // Redirect non-admins
     }
   }, [user, isUserLoading, router]);
@@ -137,7 +137,7 @@ export default function AdminPage() {
 
 
   const isLoading = isUserLoading || areUsersLoading || areTokensLoading;
-  const isAdminUser = user?.email === 'f.mallet@gmail.com';
+  const isAdminUser = user?.email === 'f.mallet81@outlook.com';
 
   if (!isAdminUser) {
     return (

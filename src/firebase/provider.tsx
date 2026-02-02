@@ -102,7 +102,7 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       const userDocRef = doc(firestore, 'users', user.uid);
       getDoc(userDocRef).then(docSnap => {
         const { uid, email, displayName } = user;
-        const isAdmin = email === 'f.mallet@gmail.com';
+        const isAdmin = email === 'f.mallet81@outlook.com';
 
         if (isAdmin) {
           // This user is an admin. Ensure their document reflects this.
