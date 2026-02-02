@@ -450,9 +450,12 @@ function ChampsDetailDialogContent({
 
   useEffect(() => {
     setIsLoading(true);
-    const fetchedData = getDataForDate(location, day);
-    setData(fetchedData);
-    setIsLoading(false);
+    const timeoutId = setTimeout(() => {
+      const fetchedData = getDataForDate(location, day);
+      setData(fetchedData);
+      setIsLoading(false);
+    }, 0);
+    return () => clearTimeout(timeoutId);
   }, [location, day]);
 
   const dateString = format(day, 'eeee d MMMM yyyy', { locale: fr });
@@ -574,10 +577,12 @@ function PecheDetailDialogContent({
 
   useEffect(() => {
     setIsLoading(true);
-    if (!day) return;
-    const fetchedData = getDataForDate(location, day);
-    setData(fetchedData);
-    setIsLoading(false);
+    const timeoutId = setTimeout(() => {
+      const fetchedData = getDataForDate(location, day);
+      setData(fetchedData);
+      setIsLoading(false);
+    }, 0);
+    return () => clearTimeout(timeoutId);
   }, [location, day]);
 
   const dateString = day ? format(day, 'eeee d MMMM yyyy', { locale: fr }) : '';
