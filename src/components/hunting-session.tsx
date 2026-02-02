@@ -69,6 +69,43 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from './ui/skeleton';
 import { GoogleMap, useJsApiLoader, OverlayView, MarkerF } from '@react-google-maps/api';
 
+const playSound = (type: 'position' | 'battue' | 'gibier') => {
+  const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  if (!audioCtx) return;
+
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+  oscillator.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+
+  gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+  gainNode.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 0.05);
+
+  switch (type) {
+    case 'position':
+      oscillator.frequency.setValueAtTime(600, audioCtx.currentTime);
+      oscillator.type = 'sine';
+      oscillator.start();
+      gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.2);
+      oscillator.stop(audioCtx.currentTime + 0.2);
+      break;
+    case 'battue':
+      oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
+      oscillator.type = 'square';
+      oscillator.start();
+      gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.3);
+      oscillator.stop(audioCtx.currentTime + 0.3);
+      break;
+    case 'gibier':
+      oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
+      oscillator.type = 'triangle';
+      oscillator.start();
+      gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.4);
+      oscillator.stop(audioCtx.currentTime + 0.4);
+      break;
+  }
+};
+
 
 // --- Icon Map ---
 const iconMap = { Navigation, UserIcon, Crosshair, Footprints, Mountain };
@@ -120,9 +157,12 @@ function HuntingSessionContent() {
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
   // Status state
-  const [currentStatus, setCurrentStatus] = useState<SessionParticipant['status'] | null>(null);
+  const [baseStatus, setBaseStatus] = useState<SessionParticipant['baseStatus']>(undefined);
+  const [isGibierEnVue, setIsGibierEnVue] = useState(false);
   const [flashingStatus, setFlashingStatus] = useState<{text: string; color: string} | null>(null);
   const flashTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const previousParticipantsRef = useRef<WithId<SessionParticipant>[] | null>(null);
 
 
   const userDocRef = useMemoFirebase(() => {
@@ -244,7 +284,7 @@ function HuntingSessionContent() {
         const newLocation = { latitude, longitude };
         setUserLocation(newLocation);
 
-        if (isFirstUpdate && map) {
+        if (isFirstUpdate && map && latitude && longitude) {
             map.panTo({ lat: latitude, lng: longitude });
             map.setZoom(16);
             setInitialZoomDone(true);
@@ -304,20 +344,58 @@ function HuntingSessionContent() {
   
   const myParticipant = useMemo(() => participants?.find(p => p.id === user?.uid), [participants, user]);
   const otherParticipants = useMemo(() => participants?.filter(p => p.id !== user?.uid), [participants, user]);
+  
+  useEffect(() => {
+      // Don't play sounds for initial load.
+      if (!participants || areParticipantsLoading || !previousParticipantsRef.current) {
+        previousParticipantsRef.current = participants;
+        return;
+      }
+      
+      const prevParts = new Map(previousParticipantsRef.current.map(p => [p.id, p]));
+
+      participants.forEach(currentPart => {
+        // Don't play sound for my own status changes or new users.
+        const prevPart = prevParts.get(currentPart.id);
+        if (!prevPart || currentPart.id === user?.uid) {
+            return;
+        }
+
+        // Play sound for gibier en vue (only when it becomes true)
+        if (currentPart.isGibierEnVue && !prevPart.isGibierEnVue) {
+            playSound('gibier');
+            return; // Prioritize gibier sound
+        }
+
+        // Play sound for base status change
+        if (currentPart.baseStatus && currentPart.baseStatus !== prevPart.baseStatus) {
+            if (currentPart.baseStatus === 'En position') {
+                playSound('position');
+            } else if (currentPart.baseStatus === 'Battue en cours') {
+                playSound('battue');
+            }
+        }
+      });
+      
+      previousParticipantsRef.current = participants;
+
+    }, [participants, areParticipantsLoading, user?.uid]);
+
 
   useEffect(() => {
     if (myParticipant) {
-      const isSameLocation = userLocation && myParticipant.location &&
-          Math.abs(myParticipant.location.latitude - userLocation.latitude) < 0.000001 &&
-          Math.abs(myParticipant.location.longitude - userLocation.longitude) < 0.000001;
-
-      if (myParticipant.location && !isSameLocation) {
-          setUserLocation(myParticipant.location);
+      if (myParticipant.location && userLocation &&
+          (Math.abs(myParticipant.location.latitude - userLocation.latitude) > 0.000001 ||
+           Math.abs(myParticipant.location.longitude - userLocation.longitude) > 0.000001)) {
+        setUserLocation(myParticipant.location);
+      } else if (myParticipant.location && !userLocation) {
+        setUserLocation(myParticipant.location)
       }
       
-      setCurrentStatus(myParticipant.status || null);
+      setBaseStatus(myParticipant.baseStatus);
+      setIsGibierEnVue(!!myParticipant.isGibierEnVue);
     }
-  }, [myParticipant, userLocation]);
+  }, [myParticipant]);
 
   useEffect(() => {
     if (isParticipating && session && !updateIntervalRef.current) {
@@ -341,7 +419,7 @@ function HuntingSessionContent() {
   }, [isParticipating, session, fetchAndSetUserPosition]);
 
   useEffect(() => {
-    if (map && initialCenter && !initialZoomDone) {
+    if (map && initialCenter && !initialZoomDone && initialCenter.lat && initialCenter.lng) {
         map.panTo(initialCenter);
         map.setZoom(16);
         setInitialZoomDone(true);
@@ -350,7 +428,7 @@ function HuntingSessionContent() {
   }, [map, initialCenter, initialZoomDone]);
 
   useEffect(() => {
-    if (map && userLocation && !initialZoomDone) {
+    if (map && userLocation && !initialZoomDone && userLocation.latitude && userLocation.longitude) {
       map.panTo({ lat: userLocation.latitude, lng: userLocation.longitude });
       map.setZoom(16);
       setInitialZoomDone(true);
@@ -540,52 +618,74 @@ function HuntingSessionContent() {
     }
   };
 
-  const handleStatusChange = async (status: NonNullable<SessionParticipant['status']>) => {
+  const updateStatusInFirestore = async (updateData: Partial<SessionParticipant>) => {
     if (!user || !firestore || !session) return;
-
-    const newStatus = currentStatus === status ? null : status;
-    setCurrentStatus(newStatus);
-
-    if (flashTimeoutRef.current) {
-        clearTimeout(flashTimeoutRef.current);
-    }
-
-    if (newStatus) {
-        let color = '';
-        if (newStatus === 'En position') color = 'text-green-500';
-        if (newStatus === 'Battue en cours') color = 'text-blue-500';
-        if (newStatus === 'Gibier en vue') color = 'text-red-500';
-        setFlashingStatus({ text: newStatus, color });
-        flashTimeoutRef.current = setTimeout(() => {
-            setFlashingStatus(null);
-            flashTimeoutRef.current = null;
-        }, 2000);
-    }
-
     const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
     try {
-        await updateDoc(participantDocRef, { status: newStatus });
+        await updateDoc(participantDocRef, updateData);
     } catch (e: any) {
-        setCurrentStatus(currentStatus); // Revert on failure
         toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de mettre à jour le statut.' });
         if (e.code === 'permission-denied') {
             const permissionError = new FirestorePermissionError({
                 path: participantDocRef.path,
                 operation: 'update',
-                requestResourceData: { status: newStatus }
+                requestResourceData: updateData
             });
             errorEmitter.emit('permission-error', permissionError);
+        } else {
+            console.error(e);
         }
     }
   };
 
-  const getStatusClass = (status: SessionParticipant['status']) => {
-    switch (status) {
-        case 'En position': return 'text-green-400';
-        case 'Battue en cours': return 'text-blue-400';
-        case 'Gibier en vue': return 'text-red-500';
-        default: return '';
+  const triggerFlash = (text: string, color: string) => {
+    if (flashTimeoutRef.current) {
+        clearTimeout(flashTimeoutRef.current);
     }
+    setFlashingStatus({ text, color });
+    flashTimeoutRef.current = setTimeout(() => {
+        setFlashingStatus(null);
+        flashTimeoutRef.current = null;
+    }, 2000);
+  };
+  
+  const handleBaseStatusChange = (status: NonNullable<SessionParticipant['baseStatus']>) => {
+    const newBaseStatus = baseStatus === status ? undefined : status;
+    setBaseStatus(newBaseStatus);
+    updateStatusInFirestore({ baseStatus: newBaseStatus });
+    if(newBaseStatus) {
+        triggerFlash(newBaseStatus, newBaseStatus === 'En position' ? 'text-green-500' : 'text-blue-500');
+    }
+  };
+  
+  const handleGibierEnVueToggle = () => {
+    const newGibierStatus = !isGibierEnVue;
+    setIsGibierEnVue(newGibierStatus);
+    updateStatusInFirestore({ isGibierEnVue: newGibierStatus });
+     if(newGibierStatus) {
+        triggerFlash('Gibier en vue', 'text-red-500');
+    }
+  };
+
+
+  const getStatusDisplay = (p: SessionParticipant) => {
+    const parts = [];
+    if (p.baseStatus) parts.push(p.baseStatus);
+    if (p.isGibierEnVue) parts.push('Gibier en vue');
+    
+    let colorClass = '';
+    if (p.isGibierEnVue) {
+      colorClass = 'text-red-500';
+    } else if (p.baseStatus === 'En position') {
+      colorClass = 'text-green-400';
+    } else if (p.baseStatus === 'Battue en cours') {
+      colorClass = 'text-blue-400';
+    }
+
+    return {
+      text: parts.join(', '),
+      colorClass: colorClass,
+    };
   };
 
   const copyToClipboard = () => {
@@ -638,6 +738,7 @@ function HuntingSessionContent() {
         (position) => {
             const { latitude, longitude } = position.coords;
             const newLocation = { lat: latitude, lng: longitude };
+            if (!latitude || !longitude) return;
 
             // Update state for immediate UI feedback
             setUserLocation({latitude, longitude});
@@ -782,14 +883,17 @@ function HuntingSessionContent() {
                                 position={{ lat: userLocation.latitude, lng: userLocation.longitude }}
                                 mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                             >
-                                <div style={{ transform: 'translate(-50%, -150%)' }}>
+                                <div style={{ transform: 'translate(-50%, -150%)' }} className="flex flex-col items-center">
                                   <div className="flex items-baseline gap-2 px-2 py-0.5 text-xs font-bold text-white [text-shadow:0_1px_3px_rgb(0_0_0_/_70%)] whitespace-nowrap">
                                       <span>{myParticipant.displayName}</span>
-                                       {myParticipant.status && (
-                                            <span className={cn('font-semibold', getStatusClass(myParticipant.status))}>
-                                                {myParticipant.status}
+                                       {(() => {
+                                        const statusDisplay = getStatusDisplay(myParticipant);
+                                        return statusDisplay.text && (
+                                            <span className={cn('font-semibold', statusDisplay.colorClass)}>
+                                                ({statusDisplay.text})
                                             </span>
-                                        )}
+                                        );
+                                       })()}
                                   </div>
                                 </div>
                             </OverlayView>
@@ -799,7 +903,7 @@ function HuntingSessionContent() {
                         {otherParticipants?.map(p => {
                             if (!p.location || typeof p.location.latitude !== 'number' || typeof p.location.longitude !== 'number') return null;
                             const IconComponent = iconMap[p.mapIcon as keyof typeof iconMap] || Navigation;
-                            const iconColor = p.mapColor || '#3b82f6';
+                            
                             return (
                                 <OverlayView
                                     key={p.id}
@@ -809,15 +913,18 @@ function HuntingSessionContent() {
                                     <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center">
                                         <div className="flex items-baseline gap-2 px-2 pb-0.5 text-xs font-bold text-white [text-shadow:0_1px_3px_rgb(0_0_0_/_70%)] whitespace-nowrap" style={{ transform: 'translateY(-20px)'}}>
                                             <span>{p.displayName}</span>
-                                            {p.status && (
-                                                <span className={cn(getStatusClass(p.status))}>
-                                                    {p.status}
-                                                </span>
-                                            )}
+                                            {(() => {
+                                              const statusDisplay = getStatusDisplay(p);
+                                              return statusDisplay.text && (
+                                                  <span className={cn('font-semibold', statusDisplay.colorClass)}>
+                                                      ({statusDisplay.text})
+                                                  </span>
+                                              );
+                                            })()}
                                         </div>
                                         <div
                                             className="p-1.5 rounded-full flex flex-col items-center justify-center shadow-lg border"
-                                            style={{ backgroundColor: iconColor }}
+                                            style={{ backgroundColor: p.mapColor || '#3b82f6' }}
                                         >
                                             <IconComponent
                                                 className="size-5 drop-shadow-md text-white"
@@ -830,28 +937,28 @@ function HuntingSessionContent() {
                     </GoogleMap>
                     <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 flex gap-2">
                         <Button
-                            onClick={() => handleStatusChange('En position')}
+                            onClick={() => handleBaseStatusChange('En position')}
                             className={cn(
                                 'shadow-lg text-white bg-green-600 hover:bg-green-700',
-                                currentStatus === 'En position' && 'ring-2 ring-offset-2 ring-green-500'
+                                baseStatus === 'En position' && 'ring-2 ring-offset-2 ring-green-500'
                             )}
                         >
                             <MapPin className="mr-2 h-4 w-4" /> En position
                         </Button>
                         <Button
-                            onClick={() => handleStatusChange('Battue en cours')}
+                            onClick={() => handleBaseStatusChange('Battue en cours')}
                             className={cn(
                                 'shadow-lg text-white bg-blue-600 hover:bg-blue-700',
-                                currentStatus === 'Battue en cours' && 'ring-2 ring-offset-2 ring-blue-500'
+                                baseStatus === 'Battue en cours' && 'ring-2 ring-offset-2 ring-blue-500'
                             )}
                         >
                             <Footprints className="mr-2 h-4 w-4" /> Battue en cours
                         </Button>
                         <Button
-                            onClick={() => handleStatusChange('Gibier en vue')}
+                            onClick={handleGibierEnVueToggle}
                             className={cn(
                                 'shadow-lg text-white bg-red-600 hover:bg-red-700',
-                                currentStatus === 'Gibier en vue' && 'ring-2 ring-offset-2 ring-red-500'
+                                isGibierEnVue && 'ring-2 ring-offset-2 ring-red-500'
                             )}
                         >
                             <Eye className="mr-2 h-4 w-4" /> Gibier en vue

@@ -79,10 +79,14 @@
         "displayName": { "type": "string", "description": "The display name of the participant." },
         "mapIcon": { "type": "string", "description": "The participant's chosen icon for the hunting map." },
         "mapColor": { "type": "string", "description": "The participant's chosen color for their map icon." },
-        "status": {
+        "baseStatus": {
           "type": "string",
-          "description": "Current status of the participant.",
-          "enum": ["En position", "Battue en cours", "Gibier en vue"]
+          "description": "The participant's main action status.",
+          "enum": ["En position", "Battue en cours"]
+        },
+        "isGibierEnVue": {
+            "type": "boolean",
+            "description": "Indicates if the participant has game in sight."
         },
         "location": {
           "type": "object",
