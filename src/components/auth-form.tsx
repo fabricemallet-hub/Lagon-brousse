@@ -36,6 +36,7 @@ type AuthFormProps = {
 const loginSchema = z.object({
   email: z.string().email({ message: 'Veuillez entrer une adresse email valide.' }),
   password: z.string().min(6, { message: 'Le mot de passe doit contenir au moins 6 caractères.' }),
+  token: z.string().optional(),
 });
 
 // Schéma pour l'inscription
@@ -86,13 +87,32 @@ export function AuthForm({ mode }: AuthFormProps) {
 
     try {
       if (mode === 'login') {
-        await signInWithEmailAndPassword(auth, values.email, values.password);
+        const loginValues = values as z.infer<typeof loginSchema>;
+        const userCredential = await signInWithEmailAndPassword(auth, loginValues.email, loginValues.password);
+
+        if (userCredential.user && loginValues.token) {
+            const result = await redeemAccessToken(firestore, userCredential.user, loginValues.token);
+            if (result.success) {
+              toast({
+                title: 'Jeton validé !',
+                description: result.message,
+              });
+            } else {
+              toast({
+                variant: 'destructive',
+                title: 'Erreur de jeton',
+                description: result.message,
+              });
+            }
+        }
+        
         toast({
             title: 'Connexion réussie!',
             description: "Vous allez être redirigé vers la page d'accueil.",
         });
         router.push('/');
-      } else {
+
+      } else { // mode === 'signup'
         const signupValues = values as z.infer<typeof signupSchema>;
         const userCredential = await createUserWithEmailAndPassword(auth, signupValues.email, signupValues.password);
         
@@ -238,26 +258,24 @@ export function AuthForm({ mode }: AuthFormProps) {
           )}
         />
         
-        {mode === 'signup' && (
-          <FormField
-            control={form.control}
-            name="token"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Jeton d'accès (Optionnel)</FormLabel>
-                <FormControl>
-                  <div className="relative">
-                    <Input placeholder="LBN-XXXX-XXXX" {...field} autoComplete="off" className="pl-10 font-mono tracking-wider" />
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
-                      <Ticket className="h-5 w-5" />
-                    </div>
+        <FormField
+          control={form.control}
+          name="token"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Jeton d'accès (Optionnel)</FormLabel>
+              <FormControl>
+                <div className="relative">
+                  <Input placeholder="LBN-XXXX-XXXX" {...field} autoComplete="off" className="pl-10 font-mono tracking-wider" />
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
+                    <Ticket className="h-5 w-5" />
                   </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
+                </div>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <div className="pt-4">
           <Button 
