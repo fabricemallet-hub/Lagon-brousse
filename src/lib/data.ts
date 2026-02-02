@@ -234,17 +234,30 @@ function calculateHourlyTides(location: string, baseDate: Date): Pick<HourlyFore
 
             const maxTideRange = Math.abs(prevTide.height - nextTide.height);
             const strengthValue = Math.abs(Math.sin(phase)) * maxTideRange;
+            
+            // Check proximity to any peak to set the peak type
+            let closestPeak: (typeof allTideEvents[0]) | null = null;
+            let minDiff = Infinity;
+            allTideEvents.forEach(peak => {
+                const diff = Math.abs(peak.timeMinutes - totalMinutes);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestPeak = peak;
+                }
+            });
+
+            if (minDiff < 45 && closestPeak) { // If within 45 minutes of a peak, flag it as such.
+                tidePeakType = closestPeak.type;
+            }
 
             if (strengthValue > 1.0) tideCurrent = 'Fort';
             else if (strengthValue > 0.5) tideCurrent = 'Modéré';
             else if (strengthValue > 0.1) tideCurrent = 'Faible';
             else {
                 tideCurrent = 'Nul';
-                // We are at a slack tide, determine if it's high or low
-                if (Math.abs(tideHeight - prevTide.height) < 0.1) {
-                    tidePeakType = prevTide.type;
-                } else if (Math.abs(tideHeight - nextTide.height) < 0.1) {
-                    tidePeakType = nextTide.type;
+                 // Ensure peak type is set at slack tide
+                if (!tidePeakType && closestPeak) {
+                   tidePeakType = closestPeak.type
                 }
             }
         }
