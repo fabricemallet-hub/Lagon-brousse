@@ -745,7 +745,7 @@ function HuntingSessionContent() {
                  <div className={cn("relative w-full rounded-lg overflow-hidden border", isFullscreen ? "flex-grow" : "h-80 mb-4")}>
                     <GoogleMap
                         mapContainerClassName="w-full h-full"
-                        center={(userLocation && userLocation.latitude && userLocation.longitude) ? { lat: userLocation.latitude, lng: userLocation.longitude } : { lat: -21.45, lng: 165.5 }}
+                        center={(userLocation && typeof userLocation.latitude === 'number' && typeof userLocation.longitude === 'number') ? { lat: userLocation.latitude, lng: userLocation.longitude } : { lat: -21.45, lng: 165.5 }}
                         zoom={initialZoomDone ? zoom : 8}
                         onLoad={onLoad}
                         onUnmount={onUnmount}
@@ -765,7 +765,7 @@ function HuntingSessionContent() {
                                 </h2>
                             </div>
                         )}
-                        {myParticipant && userLocation?.latitude && userLocation?.longitude && (
+                        {myParticipant && userLocation && typeof userLocation.latitude === 'number' && typeof userLocation.longitude === 'number' && (
                           <Fragment>
                             <MarkerF
                               position={{ lat: userLocation.latitude, lng: userLocation.longitude }}
@@ -797,7 +797,7 @@ function HuntingSessionContent() {
                         )}
 
                         {otherParticipants?.map(p => {
-                            if (!p.location) return null;
+                            if (!p.location || typeof p.location.latitude !== 'number' || typeof p.location.longitude !== 'number') return null;
                             const IconComponent = iconMap[p.mapIcon as keyof typeof iconMap] || Navigation;
                             const iconColor = p.mapColor || '#3b82f6';
                             return (
@@ -806,7 +806,7 @@ function HuntingSessionContent() {
                                     position={{ lat: p.location.latitude, lng: p.location.longitude }}
                                     mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                                 >
-                                    <div className="flex flex-col items-center" style={{ transform: 'translate(-50%, -100%)' }}>
+                                    <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center">
                                         <div className="flex items-baseline gap-2 px-2 pb-0.5 text-xs font-bold text-white [text-shadow:0_1px_3px_rgb(0_0_0_/_70%)] whitespace-nowrap" style={{ transform: 'translateY(-20px)'}}>
                                             <span>{p.displayName}</span>
                                             {p.status && (
@@ -816,11 +816,11 @@ function HuntingSessionContent() {
                                             )}
                                         </div>
                                         <div
-                                            className="p-1.5 rounded-full flex flex-col items-center justify-center shadow-lg border bg-white"
+                                            className="p-1.5 rounded-full flex flex-col items-center justify-center shadow-lg border"
+                                            style={{ backgroundColor: iconColor }}
                                         >
                                             <IconComponent
-                                                className="size-5 drop-shadow-md"
-                                                style={{color: iconColor}}
+                                                className="size-5 drop-shadow-md text-white"
                                             />
                                         </div>
                                     </div>
