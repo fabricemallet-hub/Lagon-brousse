@@ -90,8 +90,10 @@ export function HuntingSessionCard() {
   const [isParticipating, setIsParticipating] = useState(false);
   const [map, setMap] = useState<google.maps.Map | null>(null);
 
+  const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
   const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
+    googleMapsApiKey: googleMapsApiKey || '',
   });
   
   const handleLeaveSession = useCallback(async () => {
@@ -136,109 +138,67 @@ export function HuntingSessionCard() {
 
   const { data: participants, isLoading: areParticipantsLoading } = useCollection<SessionParticipant>(participantsCollectionRef);
   
-  useEffect(() => {
-    if (!session || !user || !firestore) {
-        return;
-    }
+  const handleUpdatePosition = useCallback(async () => {
+    if (!user || !session || !firestore || !isParticipating) return;
 
-    let isCancelled = false;
-
-    const performPeriodicUpdate = async () => {
-        if (isCancelled || !session) return;
-
-        try {
-            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-                navigator.geolocation.getCurrentPosition(resolve, reject, {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 0,
-                });
-            });
-            if (isCancelled) return;
-            
-            const { latitude, longitude } = position.coords;
-            setUserLocation({ latitude, longitude });
-
-            let batteryData: SessionParticipant['battery'] | undefined = undefined;
-            if ('getBattery' in navigator) {
-                const battery = await (navigator as any).getBattery();
-                if (isCancelled) return;
-                batteryData = { level: battery.level, charging: battery.charging };
-            }
-
-            const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
-            const participantData: Partial<SessionParticipant> = {
-                location: { latitude, longitude },
-                battery: batteryData,
-                updatedAt: serverTimestamp(),
-            };
-
-            await updateDoc(participantDocRef, participantData)
-
-        } catch (err: any) {
-            console.error("Error during periodic position update:", err);
-        }
-    };
-  
-    const joinAndSubscribe = async () => {
-      
-      try {
+    try {
         const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0,
+            });
         });
-        if (isCancelled) return;
         
         const { latitude, longitude } = position.coords;
         setUserLocation({ latitude, longitude });
 
         let batteryData: SessionParticipant['battery'] | undefined = undefined;
         if ('getBattery' in navigator) {
-          const battery = await (navigator as any).getBattery();
-          if (isCancelled) return;
-          batteryData = { level: battery.level, charging: battery.charging };
+            const battery = await (navigator as any).getBattery();
+            batteryData = { level: battery.level, charging: battery.charging };
         }
 
-        const initialParticipantData: SessionParticipant = {
-          id: user.uid,
-          displayName: user.displayName || 'Chasseur Anonyme',
-          location: { latitude, longitude },
-          battery: batteryData,
-          updatedAt: serverTimestamp(),
-        };
-        
         const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
-        await setDoc(participantDocRef, initialParticipantData);
-        
-        if (!isCancelled) {
-          setIsParticipating(true);
-          performPeriodicUpdate(); // Initial update
-          if (!updateIntervalRef.current) {
-            updateIntervalRef.current = setInterval(performPeriodicUpdate, 30000);
-          }
-        }
+        const participantData: Partial<SessionParticipant> = {
+            location: { latitude, longitude },
+            battery: batteryData,
+            updatedAt: serverTimestamp(),
+        };
 
-      } catch (err: any) {
-        if (isCancelled) return;
-        console.error("Error joining session:", err);
-        if (err.code === 1) {
-          setError("La géolocalisation est requise. Veuillez l'activer pour rejoindre une session.");
-        } else {
-          setError("Une erreur est survenue en rejoignant la session.");
+        await updateDoc(participantDocRef, participantData)
+
+    } catch (err: any) {
+        console.error("Error during periodic position update:", err);
+        if (err.code === 1) { // User denied Geolocation
+          toast({
+            variant: "destructive",
+            title: "Géolocalisation refusée",
+            description: "Vous avez été déconnecté de la session car la géolocalisation est requise.",
+          });
+          handleLeaveSession();
         }
-        handleLeaveSession();
+    }
+  }, [user, session, firestore, isParticipating, handleLeaveSession, toast]);
+
+  useEffect(() => {
+    if (!session || !user || !firestore) {
+        return;
+    }
+
+    if (isParticipating) {
+      if (!updateIntervalRef.current) {
+          updateIntervalRef.current = setInterval(handleUpdatePosition, 30000);
       }
-    };
-  
-    joinAndSubscribe();
+    }
   
     return () => {
-      isCancelled = true;
       if (updateIntervalRef.current) {
         clearInterval(updateIntervalRef.current);
         updateIntervalRef.current = null;
       }
     };
-  }, [session, user, firestore, handleLeaveSession]);
+  }, [session, user, firestore, isParticipating, handleUpdatePosition]);
 
   const generateUniqueCode = async (): Promise<string> => {
     if (!firestore) throw new Error("Firestore not initialized");
@@ -287,6 +247,7 @@ export function HuntingSessionCard() {
             description: `Le code de votre session est : ${code}`,
         });
         setIsLoading(false);
+        setIsParticipating(true);
 
     }
 
@@ -319,6 +280,7 @@ export function HuntingSessionCard() {
       }
       
       setSession({ id: sessionDoc.id, ...sessionData });
+      setIsParticipating(true);
 
     } catch (e: any) {
         if (e.name === 'FirebaseError' || e.code === 'permission-denied') {
@@ -406,12 +368,37 @@ export function HuntingSessionCard() {
   }
 
   if (session) {
+    if (!googleMapsApiKey) {
+      return (
+        <Card>
+          <CardHeader>
+              <CardTitle>Configuration Requise</CardTitle>
+          </CardHeader>
+          <CardContent>
+              <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Clé API Google Maps manquante</AlertTitle>
+                  <AlertDescription>
+                      La variable d'environnement <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> n'est pas définie. Veuillez l'ajouter à votre fichier <code>.env</code>.
+                  </AlertDescription>
+              </Alert>
+          </CardContent>
+        </Card>
+      )
+    }
+    
     if (loadError) {
       return (
-        <Alert variant="destructive">
-          <AlertTitle>Erreur de chargement</AlertTitle>
-          <AlertDescription>La carte n'a pas pu être chargée. Vérifiez votre clé API Google Maps et sa configuration.</AlertDescription>
-        </Alert>
+        <Card>
+            <CardHeader><CardTitle>Session de Chasse Active</CardTitle></CardHeader>
+            <CardContent>
+                 <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Erreur de chargement de la carte</AlertTitle>
+                    <AlertDescription>La carte n'a pas pu être chargée. L'erreur la plus probable est une clé API invalide (InvalidKeyMapError) ou des restrictions incorrectes sur votre console Google Cloud. Veuillez vérifier votre configuration API.</AlertDescription>
+                </Alert>
+            </CardContent>
+        </Card>
       );
     }
 
