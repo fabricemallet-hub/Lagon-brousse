@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef, useCallback, Fragment, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, Fragment } from 'react';
 import {
   Card,
   CardContent,
@@ -119,6 +119,17 @@ const iconSvgs: Record<string, string> = {
   Crosshair: `<circle cx="12" cy="12" r="10"/><line x1="22" x2="18" y1="12" y2="12"/><line x1="6" x2="2" y1="12" y2="12"/><line x1="12" x2="12" y1="6" y2="2"/><line x1="12" x2="12" y1="22" y2="18"/>`,
   Footprints: `<path d="M4 16v-2.38c0-1.4.9-2.62 2.24-2.62s2.24 1.22 2.24 2.62V16"/><path d="M10.24 13.38v2.38c0 1.4-.9 2.62-2.24 2.62S5.76 17.18 5.76 15.78v-2.4"/><path d="M14.76 13.38v2.38c0 1.4.9 2.62 2.24 2.62s2.24-1.22 2.24-2.62v-2.4"/><path d="M20 16v-2.38c0-1.4-.9-2.62-2.24-2.62s-2.24 1.22-2.24 2.62V16"/>`,
   Mountain: `<path d="m8 3 4 8 5-5 5 15H2L8 3z"/>`,
+};
+
+const createMarkerIcon = (color: string, iconName: string) => {
+    const iconSvgPath = iconSvgs[iconName] || iconSvgs['Navigation'];
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+      <circle cx="20" cy="20" r="16" fill="${color}" stroke="white" stroke-width="2"/>
+      <g transform="translate(8, 8) scale(1)" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        ${iconSvgPath}
+      </g>
+    </svg>`;
+    return `data:image/svg+xml;base64,${btoa(svg)}`;
 };
 
 // --- Helper Components ---
@@ -304,7 +315,7 @@ function HuntingSessionContent() {
         const newLocation = { latitude, longitude };
         setUserLocation(newLocation);
 
-        if (isFirstUpdate && map && latitude && longitude) {
+        if (isFirstUpdate && map && typeof latitude === 'number' && typeof longitude === 'number') {
             map.panTo({ lat: latitude, lng: longitude });
             map.setZoom(16);
             setInitialZoomDone(true);
@@ -429,7 +440,7 @@ function HuntingSessionContent() {
   }, [isParticipating, session, fetchAndSetUserPosition]);
 
   useEffect(() => {
-    if (map && initialCenter && !initialZoomDone && initialCenter.lat && initialCenter.lng) {
+    if (map && initialCenter && !initialZoomDone && typeof initialCenter.lat === 'number' && typeof initialCenter.lng === 'number') {
         map.panTo(initialCenter);
         map.setZoom(16);
         setInitialZoomDone(true);
@@ -672,7 +683,7 @@ function HuntingSessionContent() {
     setBaseStatus(newBaseStatus);
   
     const updatePayload = {
-      baseStatus: newBaseStatus || deleteField()
+      baseStatus: newBaseStatus ? newBaseStatus : deleteField()
     };
     
     updateStatusInFirestore(updatePayload);
@@ -790,17 +801,6 @@ function HuntingSessionContent() {
     );
   };
 
-  const createMarkerIcon = (color: string, iconName: string) => {
-    const iconSvgPath = iconSvgs[iconName] || iconSvgs['Navigation'];
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
-      <circle cx="20" cy="20" r="16" fill="${color}" stroke="white" stroke-width="2"/>
-      <g transform="translate(8, 8) scale(1)" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        ${iconSvgPath}
-      </g>
-    </svg>`;
-    return `data:image/svg+xml;base64,${btoa(svg)}`;
-  };
-
   if (session) {
      if (loadError) {
         return (
@@ -900,8 +900,8 @@ function HuntingSessionContent() {
                                 mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                             >
                                 <div style={{ transform: 'translate(-50%, -150%)' }} className="flex flex-col items-center">
-                                  <div className="flex items-baseline gap-2 px-2 py-0.5 text-xs font-bold text-white [text-shadow:0_1px_3px_rgb(0_0_0_/_70%)] whitespace-nowrap">
-                                      <span>{myParticipant.displayName}</span>
+                                  <div className="px-2 pb-0.5 text-xs font-bold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.7)] whitespace-nowrap">
+                                      <span className="mr-1">{myParticipant.displayName}</span>
                                        {(() => {
                                         const statusDisplay = getStatusDisplay(myParticipant);
                                         return statusDisplay.text && (
