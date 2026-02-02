@@ -1,3 +1,4 @@
+
 import { LocationData, Tide, WindDirection, WindForecast, HourlyForecast } from './types';
 import { locations } from './locations';
 import { Firestore, doc, getDoc, collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
@@ -99,6 +100,8 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation'> = {
     {
       timeOfDay: 'Aube (05:00 - 07:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
+        { name: 'Wahoo', rating: 9, location: 'Large', advice: { activity: 'Très forte activité à l\'aube. Vitesse et agressivité maximales.', feeding: 'Excellente heure de chasse pour les proies rapides.', location_specific: 'Tombants extérieurs, DCP, et zones de courant fort.', depth: 'Surface.' } },
+        { name: 'Mahi-mahi', rating: 8, location: 'Large', advice: { activity: 'Très actif, en chasse autour des objets flottants.', feeding: 'Excellente heure, se nourrit de tout ce qui passe à portée.', location_specific: 'Sous les débris, bouées ou nappes d\'algues sargasses.', depth: 'Surface.' } },
         { name: 'Carangue', rating: 8, location: 'Lagon', advice: { activity: 'Très active, en chasse près de la surface.', feeding: 'Excellente heure, prédateurs affamés.', location_specific: 'Cibler les passes, les tombants et les patates de corail.', depth: 'Surface à 15m.' } },
         { name: 'Mérou', rating: 7, location: 'Lagon', advice: { activity: 'Sort de son abri, activité modérée.', feeding: 'Bonne heure, opportuniste.', location_specific: 'Proche des structures rocheuses et des grottes.', depth: '10-30m.' } },
         { name: 'Bec de cane', rating: 9, location: 'Lagon', advice: { activity: 'En bancs, très actif.', feeding: 'Très bonne heure, se nourrit agressivement.', location_specific: 'Sur les platiers, bords de chenaux.', depth: '2-10m.' } },
@@ -433,7 +436,7 @@ export function generateProceduralData(location: string, date: Date): LocationDa
       locationData.weather.trend = 'Averses';
       locationData.weather.uvIndex = Math.min(locationData.weather.uvIndex, 5);
   } else { // No rain
-      if (locationData.weather.uvIndex > 7) {
+      if (uvSeed > 0.85) { // Lower threshold for "Ensoleillé"
           locationData.weather.trend = 'Ensoleillé';
       } else {
           locationData.weather.trend = 'Nuageux';
@@ -566,7 +569,7 @@ export function generateProceduralData(location: string, date: Date): LocationDa
         if (isNight) {
             condition = conditionSeed > 0.6 ? 'Nuit claire' : 'Peu nuageux';
         } else {
-            if (conditionSeed > 0.8) condition = 'Ensoleillé';
+            if (conditionSeed > 0.85) condition = 'Ensoleillé';
             else if (conditionSeed > 0.4) condition = 'Peu nuageux';
             else if (conditionSeed > 0.2) condition = 'Nuageux';
             else condition = 'Averses';
