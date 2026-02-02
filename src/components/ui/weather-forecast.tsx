@@ -232,32 +232,34 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
           </h3>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
            <div className="flex flex-col items-center justify-center text-center">
                 <WeatherConditionIcon
                 condition={selectedForecast.condition}
                 isNight={selectedForecast.isNight}
-                className="size-16"
+                className="size-12"
                 />
                 <p className="font-medium text-lg mt-2">
                 {selectedForecast.condition}
                 </p>
-                <div className="flex items-center gap-2 text-base text-white/90 mt-1">
-                <Thermometer className="size-5" />
-                <span>{selectedForecast.temp}°</span>
-                </div>
             </div>
             <div className="flex flex-col items-center justify-center text-center">
-                <p className="font-bold text-6xl">{selectedForecast.windSpeed}</p>
-                <p className="font-medium text-lg -mt-2">nœuds</p>
-                <div className="flex items-center gap-2 mt-2">
-                <WindArrowIcon direction={selectedForecast.windDirection} className="size-6" />
-                <p className="text-base text-white/80">Vent de {selectedForecast.windDirection}</p>
+                <div className="flex items-baseline gap-1">
+                    <p className="font-bold text-6xl">{selectedForecast.windSpeed}</p>
+                    <p className="font-medium text-lg">nœuds</p>
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                    <WindArrowIcon direction={selectedForecast.windDirection} className="size-5" />
+                    <p className="text-base text-white/80">Vent de {selectedForecast.windDirection}</p>
+                </div>
+                <div className="flex items-center gap-2 text-base text-white/90 mt-2">
+                    <Thermometer className="size-5" />
+                    <span>{selectedForecast.temp}°C</span>
                 </div>
             </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mt-6 text-sm">
+        <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
           <div className="flex items-center gap-2 justify-center">
             <Thermometer className="size-5" />
             <p>
@@ -271,18 +273,18 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
         </div>
       </div>
 
-      <div className="p-4">
+      <div className="p-2 sm:p-4">
         <Carousel setApi={setApi} opts={{ align: 'start' }}>
-          <CarouselContent>
+          <CarouselContent className="-ml-2">
             {weather.hourly.slice(0, 24).map((forecast, index) => (
               <CarouselItem
                 key={index}
-                className="basis-1/3 sm:basis-1/4 md:basis-1/5 lg:basis-1/6"
+                className="basis-1/4 sm:basis-1/5 md:basis-1/6 lg:basis-[12.5%] pl-2"
                 onClick={() => api?.scrollTo(index)}
               >
                 <div
                   className={cn(
-                    'flex flex-col items-center justify-between p-2 cursor-pointer rounded-lg border h-full space-y-1 text-center',
+                    'flex flex-col items-center justify-between p-1.5 cursor-pointer rounded-lg border h-full space-y-1 text-center',
                     selectedIndex === index
                       ? 'bg-blue-100 border-blue-200 dark:bg-blue-900/50 dark:border-blue-700'
                       : 'bg-card hover:bg-muted/50'
@@ -294,29 +296,29 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
                   <WeatherConditionIcon
                     condition={forecast.condition}
                     isNight={forecast.isNight}
-                    className="size-8 my-1"
+                    className="size-7 my-0.5"
                   />
                   
                   <div className="flex flex-col items-center">
-                    <p className="font-bold text-xl">{forecast.windSpeed}</p>
-                    <p className="text-xs text-muted-foreground -mt-1">nœuds</p>
+                    <p className="font-bold text-lg">{forecast.windSpeed}</p>
+                    <p className="text-[10px] text-muted-foreground -mt-1">nœuds</p>
                   </div>
                   
-                  <div className="border-t w-full my-1"></div>
+                  <div className="border-t w-full my-0.5"></div>
 
-                  <div className="w-full space-y-1 text-xs">
-                    <div className="flex items-center justify-center gap-1.5" title="Hauteur de la marée">
+                  <div className="w-full space-y-0.5 text-[10px]">
+                    <div className="flex items-center justify-center gap-1" title="Hauteur de la marée">
                         <Waves className="size-3 text-muted-foreground" />
                         <span className="font-semibold">{forecast.tideHeight.toFixed(1)}m</span>
                     </div>
-                    <div className="flex items-center justify-center gap-1.5 h-5" title="Force du courant">
+                    <div className="flex items-center justify-center gap-1 h-5" title="Force du courant">
                         <Zap className="size-3 text-muted-foreground" />
                         {forecast.tidePeakType ? (
-                            <Badge variant={forecast.tidePeakType === 'haute' ? 'default' : 'destructive'} className="h-5 px-1.5 text-[9px] font-semibold leading-none">
+                            <Badge variant={forecast.tidePeakType === 'haute' ? 'default' : 'destructive'} className="h-4 px-1 text-[9px] font-semibold leading-none">
                                 {forecast.tidePeakType === 'haute' ? 'Pleine' : 'Basse'}
                             </Badge>
                         ) : forecast.tideCurrent === 'Nul' ? (
-                            <Badge variant="secondary" className="h-5 px-1.5 text-[9px] font-semibold leading-none">Étale</Badge>
+                            <Badge variant="secondary" className="h-4 px-1 text-[9px] font-semibold leading-none">Étale</Badge>
                         ) : (
                             <span className="font-semibold">{forecast.tideCurrent}</span>
                         )}
