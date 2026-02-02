@@ -135,8 +135,8 @@ export function HuntingSessionCard() {
     }
   }, [user, session, firestore, toast]);
 
-  const handleUpdatePosition = useCallback(async (currentSessionId: string) => {
-    if (!user || !firestore) return;
+ const handleUpdatePosition = useCallback(async (currentSessionId: string) => {
+    if (!user || !firestore || !navigator.geolocation) return;
 
     try {
         const position = await new Promise<GeolocationPosition>((resolve, reject) => {
@@ -152,21 +152,36 @@ export function HuntingSessionCard() {
 
         let batteryData: SessionParticipant['battery'] | undefined = undefined;
         if ('getBattery' in navigator) {
-            const battery = await (navigator as any).getBattery();
-            batteryData = { level: battery.level, charging: battery.charging };
+            try {
+                const battery = await (navigator as any).getBattery();
+                batteryData = { level: battery.level, charging: battery.charging };
+            } catch (batteryError) {
+                console.warn("Could not retrieve battery status:", batteryError);
+            }
         }
-
+        
         const participantDocRef = doc(firestore, 'hunting_sessions', currentSessionId, 'participants', user.uid);
         
-        await updateDoc(participantDocRef, {
+        // Non-blocking update
+        updateDoc(participantDocRef, {
             location: { latitude, longitude },
             battery: batteryData,
             updatedAt: serverTimestamp(),
+        }).catch(err => {
+            console.error("Error updating position:", err);
+             if (err.code === 'permission-denied') {
+                const permissionError = new FirestorePermissionError({
+                    path: participantDocRef.path,
+                    operation: 'update',
+                    requestResourceData: { location: { latitude, longitude } }
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            }
         });
 
     } catch (err: any) {
-        console.error("Error during periodic position update:", err);
-        if (err.code === 1) {
+        console.error("Error getting geolocation:", err);
+        if (err.code === 1) { // User denied Geolocation
           toast({
             variant: "destructive",
             title: "Géolocalisation refusée",
@@ -175,7 +190,7 @@ export function HuntingSessionCard() {
           handleLeaveSession();
         }
     }
-  }, [user, firestore, handleLeaveSession, toast]);
+  }, [user, firestore, toast, handleLeaveSession]);
   
   const participantsCollectionRef = useMemoFirebase(() => {
     if (!firestore || !session || !isParticipating) return null;
@@ -188,7 +203,7 @@ export function HuntingSessionCard() {
     let intervalId: NodeJS.Timeout | null = null;
     if (isParticipating && session) {
         handleUpdatePosition(session.id); // Initial update
-        intervalId = setInterval(() => handleUpdatePosition(session.id), 30000);
+        intervalId = setInterval(() => handleUpdatePosition(session.id), 30000); // 30 seconds
     }
     return () => {
         if (intervalId) {
@@ -227,6 +242,7 @@ export function HuntingSessionCard() {
         updatedAt: serverTimestamp(),
     };
     await setDoc(participantDocRef, participantData);
+    return getDoc(participantDocRef); // Return promise to wait for creation
 }, [user, firestore]);
 
   const handleCreateSession = async () => {
@@ -246,15 +262,8 @@ export function HuntingSessionCard() {
         };
         
         const sessionDocRef = doc(firestore, 'hunting_sessions', code);
-        const participantDocRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
-
-        const batch = writeBatch(firestore);
-        batch.set(sessionDocRef, newSessionData);
-        batch.set(participantDocRef, {
-            displayName: user.displayName || user.email || 'Chasseur',
-            updatedAt: serverTimestamp(),
-        });
-        await batch.commit();
+        await setDoc(sessionDocRef, newSessionData);
+        await createParticipantDocument(code); // Wait for participant doc to be created
         
         setSession({ id: code, ...newSessionData });
         setIsParticipating(true);
@@ -294,7 +303,7 @@ export function HuntingSessionCard() {
          throw new Error('Cette session a expiré et a été supprimée.');
       }
       
-      await createParticipantDocument(sessionId);
+      await createParticipantDocument(sessionId); // Wait for participant doc to be created
 
       setSession({ id: sessionDoc.id, ...sessionData });
       setIsParticipating(true);
@@ -379,7 +388,7 @@ export function HuntingSessionCard() {
   }
 
   if (session) {
-    if (!googleMapsApiKey) {
+     if (!googleMapsApiKey) {
         return (
             <Card>
                 <CardHeader>
@@ -392,7 +401,7 @@ export function HuntingSessionCard() {
                      <Alert variant="destructive">
                         <AlertTitle>Clé API Google Maps manquante</AlertTitle>
                         <AlertDescription>
-                            <p>La clé API pour Google Maps n'est pas configurée. Veuillez l'ajouter à votre fichier <code>.env</code> sous le nom <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> et redémarrer votre environnement.</p>
+                            <p>La clé API pour Google Maps n'est pas configurée. Veuillez l'ajouter à votre fichier <code>.env</code> sous le nom <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> et redémarrer votre environnement de développement.</p>
                         </AlertDescription>
                     </Alert>
                 </CardContent>
@@ -418,20 +427,23 @@ export function HuntingSessionCard() {
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>Action requise : Erreur de configuration de Google Maps</AlertTitle>
                     <AlertDescription className="space-y-3">
-                        <p>L'API Google Maps continue de rejeter votre clé API (Erreur : <strong>InvalidKeyMapError</strong>). Le code de l'application est correct, le problème se situe donc dans la configuration de votre projet Google Cloud.</p>
-                        <p>Veuillez vérifier les trois points suivants dans votre <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" className="underline font-semibold">Console Google Cloud</a> :</p>
-                        <ol className="list-decimal list-inside space-y-2 text-xs">
+                        <p>L'API Google Maps continue de rejeter votre clé API. Le code de l'application est correct ; le problème vient de la configuration de votre projet Google Cloud.</p>
+                        <p className="font-bold">La cause la plus probable est que le compte de facturation n'est pas activé pour votre projet.</p>
+                        <p>Veuillez vérifier les points suivants dans votre <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" className="underline font-semibold">Console Google Cloud</a> :</p>
+                        <ol className="list-decimal list-inside space-y-2 text-sm">
                             <li>
-                                <strong>Compte de facturation activé :</strong> C'est la cause la plus probable. L'API Google Maps <strong>ne fonctionne pas</strong> sans un compte de facturation valide associé à votre projet, même si votre usage reste dans la limite gratuite.
+                                <strong>Compte de facturation :</strong> L'API Google Maps <strong>ne fonctionne pas</strong> sans un compte de facturation valide associé à votre projet. C'est la cause la plus fréquente de cette erreur.
+                                <Button size="sm" variant="link" asChild><a href="https://console.cloud.google.com/billing" target="_blank" rel="noopener noreferrer">Vérifier la facturation</a></Button>
                             </li>
                             <li>
                                 <strong>API "Maps JavaScript API" activée :</strong> Assurez-vous que cette API spécifique est bien activée pour votre projet.
                             </li>
                             <li>
-                                <strong>Restrictions de la clé API :</strong> Vous avez confirmé que c'était correct, mais vérifiez une dernière fois que les domaines <code>studio.firebase.google.com/*</code> et <code>*.cloudworkstations.dev/*</code> sont bien autorisés.
+                                <strong>Restrictions de la clé API :</strong> Assurez-vous que <code>*.cloudworkstations.dev/*</code> et <code>studio.firebase.google.com/*</code> sont bien autorisés.
+                                 <Button size="sm" variant="link" asChild><a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">Vérifier les restrictions</a></Button>
                             </li>
                         </ol>
-                        <p className="pt-2">Après avoir vérifié et corrigé ces points (en particulier la facturation), attendez quelques minutes puis rafraîchissez la page. L'erreur devrait disparaître.</p>
+                        <p className="pt-2">Après avoir vérifié et corrigé ces points, attendez 5 minutes puis rafraîchissez la page. L'erreur devrait disparaître.</p>
                     </AlertDescription>
                 </Alert>
             </CardContent>
