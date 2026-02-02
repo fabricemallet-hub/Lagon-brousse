@@ -100,16 +100,11 @@ export function HuntingSessionCard() {
 
   const { data: participants, isLoading: areParticipantsLoading } = useCollection<SessionParticipant>(participantsCollectionRef);
   
-  useEffect(() => {
-    return () => {
-      if (updateIntervalRef.current) {
-        clearInterval(updateIntervalRef.current);
-      }
-    };
-  }, []);
-
-  const handleUpdatePosition = async () => {
+  const handleUpdatePosition = useCallback(async () => {
     if (!user || !session || !firestore) return;
+
+    let participantData: Omit<SessionParticipant, 'id'> | null = null;
+    const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
 
     try {
         const position = await new Promise<GeolocationPosition>((resolve, reject) => {
@@ -132,22 +127,14 @@ export function HuntingSessionCard() {
             };
         }
 
-        const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
-        const participantData: Omit<SessionParticipant, 'id'> = {
+        participantData = {
             displayName: user.displayName || 'Chasseur Anonyme',
             location: { latitude, longitude },
             battery: batteryData,
             updatedAt: serverTimestamp(),
         };
-
-        setDoc(participantDocRef, participantData, { merge: true }).catch((serverError) => {
-             const permissionError = new FirestorePermissionError({
-                path: participantDocRef.path,
-                operation: 'write',
-                requestResourceData: participantData,
-             });
-             errorEmitter.emit('permission-error', permissionError);
-        });
+        
+        await setDoc(participantDocRef, participantData, { merge: true });
 
         if (!isParticipating) {
             setIsParticipating(true);
@@ -157,34 +144,34 @@ export function HuntingSessionCard() {
         console.error("Error updating position:", err);
         if (err.name === 'FirebaseError' && err.code === 'permission-denied') {
              const permissionError = new FirestorePermissionError({
-                path: `hunting_sessions/${session?.id}/participants/${user.uid}`,
+                path: participantDocRef.path,
                 operation: 'write',
+                requestResourceData: participantData,
              });
              errorEmitter.emit('permission-error', permissionError);
-        } else if (err.code === 1) { // PERMISSION_DENIED
+        } else if (err.code === 1) { // PERMISSION_DENIED for geolocation
           setError("La géolocalisation est requise. Veuillez l'activer dans les paramètres de votre navigateur.");
           handleLeaveSession();
         }
     }
-  };
+  }, [user, session, firestore, isParticipating, setIsParticipating, handleLeaveSession]);
   
   useEffect(() => {
-    if (session && isParticipating) {
+    if (session && !isParticipating) {
       handleUpdatePosition();
-      updateIntervalRef.current = setInterval(handleUpdatePosition, 30000); // Update every 30s
-    } else {
+    }
+    
+    if (session && isParticipating) {
+      updateIntervalRef.current = setInterval(handleUpdatePosition, 30000);
+    }
+
+    return () => {
       if (updateIntervalRef.current) {
         clearInterval(updateIntervalRef.current);
         updateIntervalRef.current = null;
       }
-    }
-    return () => {
-      if (updateIntervalRef.current) {
-        clearInterval(updateIntervalRef.current);
-      }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, isParticipating]);
+  }, [session, isParticipating, handleUpdatePosition]);
 
 
   const generateUniqueCode = async (): Promise<string> => {
@@ -227,7 +214,6 @@ export function HuntingSessionCard() {
         
         setDoc(sessionDocRef, docData).then(() => {
              setSession({ id: code, ...docData });
-             setIsParticipating(true);
              toast({
                 title: 'Session créée !',
                 description: `Le code de votre session est : ${code}`,
@@ -273,7 +259,6 @@ export function HuntingSessionCard() {
       }
 
       setSession({ id: sessionDoc.id, ...sessionData });
-      setIsParticipating(true);
 
     } catch (e: any) {
         if (e.name === 'FirebaseError' || e.code === 'permission-denied') {
@@ -295,7 +280,7 @@ export function HuntingSessionCard() {
     }
   };
 
-  const handleLeaveSession = async () => {
+  const handleLeaveSession = useCallback(async () => {
      if (!user || !session || !firestore) return;
      setIsLoading(true);
      try {
@@ -318,7 +303,7 @@ export function HuntingSessionCard() {
      } finally {
         setIsLoading(false);
      }
-  };
+  }, [user, session, firestore, toast]);
   
   const copyToClipboard = () => {
     if(!session) return;
@@ -327,13 +312,33 @@ export function HuntingSessionCard() {
   }
 
   const onLoad = useCallback(function callback(mapInstance: google.maps.Map) {
-    const ncBounds = new window.google.maps.LatLngBounds(
-      new window.google.maps.LatLng(-22.8, 163.5),
-      new window.google.maps.LatLng(-19.6, 168.1)
-    );
-    mapInstance.fitBounds(ncBounds);
+    if (userLocation) {
+      const bounds = new window.google.maps.LatLngBounds();
+      bounds.extend(new window.google.maps.LatLng(userLocation.latitude, userLocation.longitude));
+      
+      if (participants) {
+          participants.forEach(p => {
+              if (p.location) {
+                  bounds.extend(new window.google.maps.LatLng(p.location.latitude, p.location.longitude));
+              }
+          });
+      }
+      mapInstance.fitBounds(bounds);
+
+      const listener = window.google.maps.event.addListener(mapInstance, 'idle', () => {
+        if (mapInstance.getZoom()! > 15) mapInstance.setZoom(15);
+        window.google.maps.event.removeListener(listener);
+      });
+
+    } else {
+       const ncBounds = new window.google.maps.LatLngBounds(
+        new window.google.maps.LatLng(-22.8, 163.5),
+        new window.google.maps.LatLng(-19.6, 168.1)
+      );
+      mapInstance.fitBounds(ncBounds);
+    }
     setMap(mapInstance);
-  }, []);
+  }, [userLocation, participants]);
 
   const onUnmount = useCallback(function callback(map: google.maps.Map) {
     setMap(null);
@@ -416,8 +421,8 @@ export function HuntingSessionCard() {
               <div className="relative w-full aspect-square rounded-lg overflow-hidden border">
                 <GoogleMap
                   mapContainerStyle={{ width: '100%', height: '100%' }}
-                  center={{ lat: -21.5, lng: 165.5 }}
-                  zoom={7}
+                  center={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : { lat: -21.5, lng: 165.5 }}
+                  zoom={userLocation ? 15 : 7}
                   onLoad={onLoad}
                   onUnmount={onUnmount}
                   options={{
