@@ -555,6 +555,12 @@ function HuntingSessionContent() {
           }
         } catch (e) {
           console.error("Could not fetch organizer's location", e);
+             if ((e as any).code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: `hunting_sessions/${sessionId}/participants/${organizerId}`,
+                    operation: 'get',
+                }));
+            }
         }
       }
 
@@ -656,7 +662,7 @@ function HuntingSessionContent() {
     setBaseStatus(newBaseStatus);
   
     const updatePayload = {
-      baseStatus: isTogglingOff ? deleteField() : status
+      baseStatus: newBaseStatus || deleteField()
     };
     
     updateStatusInFirestore(updatePayload);
@@ -745,7 +751,7 @@ function HuntingSessionContent() {
     navigator.geolocation.getCurrentPosition(
         (position) => {
             const { latitude, longitude } = position.coords;
-            if (!latitude || !longitude) return;
+            if (typeof latitude !== 'number' || typeof longitude !== 'number') return;
             const newLocation = { lat: latitude, lng: longitude };
             
             setUserLocation({latitude, longitude});
@@ -912,8 +918,8 @@ function HuntingSessionContent() {
                                     position={{ lat: p.location.latitude, lng: p.location.longitude }}
                                     mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                                 >
-                                    <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center">
-                                        <div className="px-2 pb-0.5 text-xs font-bold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.7)] whitespace-nowrap" style={{ transform: 'translateY(-20px)'}}>
+                                    <div style={{ transform: 'translate(-50%, -150%)' }} className="flex flex-col items-center">
+                                        <div className="px-2 pb-0.5 text-xs font-bold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.7)] whitespace-nowrap">
                                             <span className="mr-1">{p.displayName}</span>
                                             {(() => {
                                               const statusDisplay = getStatusDisplay(p);
@@ -925,7 +931,7 @@ function HuntingSessionContent() {
                                             })()}
                                         </div>
                                         <div
-                                            className="p-1.5 rounded-full flex items-center justify-center shadow-lg border"
+                                            className="p-1.5 rounded-full flex items-center justify-center shadow-lg"
                                             style={{ backgroundColor: p.mapColor || '#3b82f6' }}
                                         >
                                             <UserIcon
@@ -977,54 +983,58 @@ function HuntingSessionContent() {
                     </div>
                 </div>
                 <div className={cn("space-y-4", isFullscreen ? "flex-shrink-0 overflow-y-auto" : "")}>
-                    <div className="space-y-4 rounded-lg border p-4">
-                        <h4 className="font-semibold text-sm">Personnalisation</h4>
-                        <div className="space-y-1">
-                            <Label htmlFor="nickname">Surnom</Label>
-                            <Input id="nickname" value={nickname} onChange={e => setNickname(e.target.value)} />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label>Icône</Label>
-                                <div className="flex flex-wrap gap-2">
-                                    {availableIcons.map(iconName => {
-                                        const Icon = iconMap[iconName as keyof typeof iconMap];
-                                        return (
-                                            <Button key={iconName} variant="outline" size="icon" onClick={() => setSelectedIcon(iconName)} className={cn(selectedIcon === iconName && "ring-2 ring-primary")}>
-                                                <Icon className="size-5" />
-                                            </Button>
-                                        )
-                                    })}
+                    {!isFullscreen && (
+                        <>
+                            <div className="space-y-4 rounded-lg border p-4">
+                                <h4 className="font-semibold text-sm">Personnalisation</h4>
+                                <div className="space-y-1">
+                                    <Label htmlFor="nickname">Surnom</Label>
+                                    <Input id="nickname" value={nickname} onChange={e => setNickname(e.target.value)} />
                                 </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Couleur</Label>
-                                <div className="flex flex-wrap gap-2">
-                                    {availableColors.map(color => (
-                                        <button key={color} onClick={() => setSelectedColor(color)} className={cn("w-8 h-8 rounded-full border-2", selectedColor === color ? "border-primary ring-2 ring-primary" : "border-transparent")} style={{ backgroundColor: color }} />
-                                    ))}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label>Icône</Label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {availableIcons.map(iconName => {
+                                                const Icon = iconMap[iconName as keyof typeof iconMap];
+                                                return (
+                                                    <Button key={iconName} variant="outline" size="icon" onClick={() => setSelectedIcon(iconName)} className={cn(selectedIcon === iconName && "ring-2 ring-primary")}>
+                                                        <Icon className="size-5" />
+                                                    </Button>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Couleur</Label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {availableColors.map(color => (
+                                                <button key={color} onClick={() => setSelectedColor(color)} className={cn("w-8 h-8 rounded-full border-2", selectedColor === color ? "border-primary ring-2 ring-primary" : "border-transparent")} style={{ backgroundColor: color }} />
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
+                                <Button onClick={handleSavePreferences} size="sm" disabled={isSavingPrefs} className="w-full">
+                                    <Save className="mr-2" /> 
+                                    {isSavingPrefs ? 'Sauvegarde...' : 'Sauvegarder mes préférences'}
+                                </Button>
                             </div>
-                        </div>
-                         <Button onClick={handleSavePreferences} size="sm" disabled={isSavingPrefs} className="w-full">
-                            <Save className="mr-2" /> 
-                            {isSavingPrefs ? 'Sauvegarde...' : 'Sauvegarder mes préférences'}
-                        </Button>
-                    </div>
-                    <Alert>
-                        <Download className="h-4 w-4" />
-                        <AlertTitle>Mode Hors Ligne</AlertTitle>
-                        <AlertDescription>
-                        La carte peut être utilisée hors ligne. Pour mettre une zone en cache, naviguez simplement sur la carte lorsque vous êtes connecté. Les tuiles seront automatiquement sauvegardées. Les positions se synchroniseront au retour du réseau.
-                        </AlertDescription>
-                    </Alert>
-                    <div className="flex flex-col sm:flex-row items-center gap-4">
-                        <div className="space-y-1 flex-grow">
-                            <Label htmlFor="session-code-display">Code de session</Label>
-                            <Input id="session-code-display" readOnly value={session.id} className="font-mono text-center text-lg tracking-widest" />
-                        </div>
-                        <Button onClick={copyToClipboard} size="sm" className="w-full sm:w-auto self-end"><Copy className="mr-2"/> Copier</Button>
-                    </div>
+                            <Alert>
+                                <Download className="h-4 w-4" />
+                                <AlertTitle>Mode Hors Ligne</AlertTitle>
+                                <AlertDescription>
+                                La carte peut être utilisée hors ligne. Pour mettre une zone en cache, naviguez simplement sur la carte lorsque vous êtes connecté. Les tuiles seront automatiquement sauvegardées. Les positions se synchroniseront au retour du réseau.
+                                </AlertDescription>
+                            </Alert>
+                            <div className="flex flex-col sm:flex-row items-center gap-4">
+                                <div className="space-y-1 flex-grow">
+                                    <Label htmlFor="session-code-display">Code de session</Label>
+                                    <Input id="session-code-display" readOnly value={session.id} className="font-mono text-center text-lg tracking-widest" />
+                                </div>
+                                <Button onClick={copyToClipboard} size="sm" className="w-full sm:w-auto self-end"><Copy className="mr-2"/> Copier</Button>
+                            </div>
+                        </>
+                    )}
                     <div className="space-y-2">
                         <h4 className="font-semibold">Participants ({participants?.length || 0})</h4>
                         {areParticipantsLoading ? (
