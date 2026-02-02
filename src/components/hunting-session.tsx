@@ -172,6 +172,25 @@ function HuntingSessionContent() {
   }, [user, firestore]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
+  const participantsCollectionRef = useMemoFirebase(() => {
+    if (!firestore || !session || !isParticipating) return null;
+    return collection(firestore, 'hunting_sessions', session.id, 'participants');
+  }, [firestore, session, isParticipating]);
+
+  const { data: participants, isLoading: areParticipantsLoading } = useCollection<SessionParticipant>(participantsCollectionRef);
+  
+  const myParticipant = useMemo(() => participants?.find(p => p.id === user?.uid), [participants, user]);
+  const otherParticipants = useMemo(() => participants?.filter(p => p.id !== user?.uid), [participants, user]);
+
+  const myMarkerIcon = useMemo(() => {
+    if (!myParticipant) return undefined;
+    return {
+        url: createMarkerIcon(myParticipant.mapColor || '#3b82f6', myParticipant.mapIcon || 'Navigation'),
+        scaledSize: new window.google.maps.Size(40, 40),
+        anchor: new window.google.maps.Point(20, 20),
+    };
+  }, [myParticipant]);
+  
   useEffect(() => {
     if (userProfile) {
       setNickname(userProfile.displayName || user?.displayName || user?.email?.split('@')[0] || '');
@@ -335,16 +354,6 @@ function HuntingSessionContent() {
         }
     }
   }, [user, firestore, session, toast, map]);
-  
-  const participantsCollectionRef = useMemoFirebase(() => {
-    if (!firestore || !session || !isParticipating) return null;
-    return collection(firestore, 'hunting_sessions', session.id, 'participants');
-  }, [firestore, session, isParticipating]);
-
-  const { data: participants, isLoading: areParticipantsLoading } = useCollection<SessionParticipant>(participantsCollectionRef);
-  
-  const myParticipant = useMemo(() => participants?.find(p => p.id === user?.uid), [participants, user]);
-  const otherParticipants = useMemo(() => participants?.filter(p => p.id !== user?.uid), [participants, user]);
   
   useEffect(() => {
       // Don't play sounds for initial load.
@@ -631,6 +640,7 @@ function HuntingSessionContent() {
     try {
         await updateDoc(participantDocRef, updateData);
     } catch (e: any) {
+        console.error(e)
         toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de mettre à jour le statut.' });
         if (e.code === 'permission-denied') {
             const permissionError = new FirestorePermissionError({
@@ -882,11 +892,7 @@ function HuntingSessionContent() {
                               position={{ lat: userLocation.latitude, lng: userLocation.longitude }}
                               draggable={true}
                               onDragEnd={handleDragEnd}
-                              icon={{
-                                url: createMarkerIcon(myParticipant.mapColor || '#3b82f6', myParticipant.mapIcon || 'Navigation'),
-                                scaledSize: new window.google.maps.Size(40, 40),
-                                anchor: new window.google.maps.Point(20, 20),
-                              }}
+                              icon={myMarkerIcon}
                               zIndex={99}
                             />
                              <OverlayView
