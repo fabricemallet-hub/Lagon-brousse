@@ -1,0 +1,129 @@
+/**
+ * Core Philosophy: This ruleset enforces a strict user-ownership model for private data, 
+ * while providing public read access to shared application data. The primary goal is to
+ * ensure that users can only access and manage their own information, preventing any
+ * cross-user data access or enumeration.
+ *
+ * Data Structure:
+ * - /users/{userId}: Contains private user account information.
+ * - /locations/{locationId}: Contains public location data.
+ * - /stations/{stationId}: Contains public tide station data.
+ * - /stations/{stationId}/tides/{date}: Contains archived tide data.
+ * - /hunting_sessions/{sessionId}: Contains metadata for a hunting session.
+ * - /hunting_sessions/{sessionId}/participants/{userId}: Contains real-time data for a participant.
+ *
+ * Key Security Decisions:
+ * - User Isolation: A user can only interact with their own document at /users/{userId}.
+ * - No User Listing for non-admins: Listing the entire /users collection is disallowed for privacy.
+ * - Admin Listing: The administrator is allowed to list users.
+ * - Public Read-Only Data: /locations is globally readable but not client-writable.
+ * - Hunting Sessions:
+ *   - Any authenticated user can create a session.
+ *   - Only the organizer can delete the session document.
+ *   - Session participants can read each other's data in real-time.
+ *   - Users can only create, update, or delete their own participant document.
+ * - Default Secure: Any path not explicitly defined denies all access.
+ */
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ----------------------------------------------------------------------
+    // Helper Functions
+    // ----------------------------------------------------------------------
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == 'f.mallet@gmail.com';
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    function isCreatingOwnAccount(userId) {
+      return isOwner(userId) 
+        && request.resource.data.id == userId;
+    }
+
+    function isMaintainingOwnAccount(userId) {
+      return isExistingOwner(userId);
+    }
+
+    // ----------------------------------------------------------------------
+    // Collection Rules
+    // ----------------------------------------------------------------------
+
+    match /users/{userId} {
+      allow read: if isAdmin();
+      allow get: if isOwner(userId);
+      allow create: if isCreatingOwnAccount(userId);
+      allow update: if isMaintainingOwnAccount(userId) || isAdmin();
+      allow delete: if isExistingOwner(userId);
+    }
+
+    match /locations/{locationId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false; 
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /stations/{stationId} {
+      allow get: if true;
+      allow list: if true;
+      allow create, update, delete: if isAdmin();
+
+      match /tides/{date} {
+        allow get: if true;
+        allow list: if true; // Allows querying for date ranges
+        allow create, update, delete: if isAdmin();
+      }
+    }
+
+    /**
+     * @description Real-time hunting session data.
+     * @path /hunting_sessions/{sessionId}
+     */
+    match /hunting_sessions/{sessionId} {
+      allow create: if isSignedIn();
+      allow get: if isSignedIn();
+      allow delete: if isOwner(resource.data.organizerId);
+      allow list: if false;
+
+      /**
+       * @description Participant data within a session.
+       * @path /hunting_sessions/{sessionId}/participants/{userId}
+       */
+      match /participants/{userId} {
+        allow create: if isOwner(userId);
+        allow update, delete: if isOwner(userId);
+        allow get, list: if exists(/databases/$(database)/documents/hunting_sessions/$(sessionId)/participants/$(request.auth.uid));
+      }
+    }
+
+    match /access_tokens/{tokenId} {
+      allow read: if isAdmin();
+      allow get: if isSignedIn();
+      
+      allow create, delete: if isAdmin();
+      
+      function isRedeemingOwnToken() {
+        return request.resource.data.redeemedBy == request.auth.uid
+          && request.resource.data.status == 'redeemed'
+          && resource.data.status == 'active';
+      }
+      
+      allow update: if isAdmin() || isRedeemingOwnToken();
+    }
+  }
+}
