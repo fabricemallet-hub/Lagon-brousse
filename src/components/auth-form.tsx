@@ -13,7 +13,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useAuth } from '@/firebase';
+import { useAuth, useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -24,7 +24,9 @@ import {
   AuthError,
 } from 'firebase/auth';
 import { ForgotPasswordDialog } from './forgot-password-dialog';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Ticket } from 'lucide-react';
+import { ensureUserDocument } from '@/lib/user-utils';
+import { redeemAccessToken } from '@/lib/token-utils';
 
 type AuthFormProps = {
   mode: 'login' | 'signup';
@@ -41,11 +43,13 @@ const signupSchema = z.object({
   displayName: z.string().min(3, { message: 'Le nom doit contenir au moins 3 caractères.' }),
   email: z.string().email({ message: 'Veuillez entrer une adresse email valide.' }),
   password: z.string().min(6, { message: 'Le mot de passe doit contenir au moins 6 caractères.' }),
+  token: z.string().optional(),
 });
 
 
 export function AuthForm({ mode }: AuthFormProps) {
   const auth = useAuth();
+  const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -59,13 +63,18 @@ export function AuthForm({ mode }: AuthFormProps) {
       displayName: '',
       email: '',
       password: '',
+      token: '',
     },
   });
+
+  const onValidationErrors = (errors: any) => {
+    // This function can be used for debugging validation errors
+  };
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
 
-    if (!auth) {
+    if (!auth || !firestore) {
       toast({
         variant: "destructive",
         title: "Erreur d'initialisation",
@@ -86,11 +95,33 @@ export function AuthForm({ mode }: AuthFormProps) {
       } else {
         const signupValues = values as z.infer<typeof signupSchema>;
         const userCredential = await createUserWithEmailAndPassword(auth, signupValues.email, signupValues.password);
+        
         if (userCredential.user) {
-          await updateProfile(userCredential.user, {
+          const user = userCredential.user;
+          await updateProfile(user, {
               displayName: signupValues.displayName
           });
+
+          // Ensure user document is created BEFORE attempting to redeem a token.
+          await ensureUserDocument(firestore, user, signupValues.displayName);
+
+          if (signupValues.token) {
+            const result = await redeemAccessToken(firestore, user, signupValues.token);
+            if (result.success) {
+              toast({
+                title: 'Jeton validé !',
+                description: result.message,
+              });
+            } else {
+              toast({
+                variant: 'destructive',
+                title: 'Erreur de jeton',
+                description: result.message,
+              });
+            }
+          }
         }
+        
         toast({
           title: 'Inscription réussie!',
           description: "Vous allez être redirigé vers la page d'accueil.",
@@ -141,7 +172,7 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit, onValidationErrors)} className="flex flex-col space-y-4">
         {mode === 'signup' && (
           <FormField
             control={form.control}
@@ -207,6 +238,27 @@ export function AuthForm({ mode }: AuthFormProps) {
           )}
         />
         
+        {mode === 'signup' && (
+          <FormField
+            control={form.control}
+            name="token"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Jeton d'accès (Optionnel)</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Input placeholder="LBN-XXXX-XXXX" {...field} autoComplete="off" className="pl-10 font-mono tracking-wider" />
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
+                      <Ticket className="h-5 w-5" />
+                    </div>
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
         <div className="pt-4">
           <Button 
             type="submit" 

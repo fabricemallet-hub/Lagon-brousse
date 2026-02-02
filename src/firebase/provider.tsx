@@ -2,13 +2,12 @@
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
-import { Firestore, doc, getDoc, setDoc } from 'firebase/firestore';
+import { Firestore, doc } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
-import { UserAccount } from '@/lib/types';
+import { ensureUserDocument } from '@/lib/user-utils';
 import { FirestorePermissionError } from './errors';
 import { errorEmitter } from './error-emitter';
-import { addMonths } from 'date-fns';
 
 
 interface FirebaseProviderProps {
@@ -99,57 +98,17 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   // Effect to sync user document
   useEffect(() => {
     if (user && !isUserLoading && firestore) {
-      const userDocRef = doc(firestore, 'users', user.uid);
-
-      getDoc(userDocRef).then(docSnap => {
-        // Only create the document if it does not exist.
-        if (!docSnap.exists()) {
-          const { uid, email, displayName } = user;
-          const isAdminUser = email === 'f.mallet81@outlook.com';
-
-          let newUserDocument: UserAccount;
-
-          if (isAdminUser) {
-            newUserDocument = {
-              id: uid,
-              email: email || '',
-              displayName: displayName || 'Admin',
-              subscriptionStatus: 'admin',
-              favoriteLocationIds: [],
-            };
-          } else {
-            const trialStartDate = new Date();
-            const trialExpiryDate = addMonths(trialStartDate, 3);
-            
-            newUserDocument = {
-              id: uid,
-              email: email || '',
-              displayName: displayName || email?.split('@')[0] || 'Utilisateur',
-              subscriptionStatus: 'trial',
-              subscriptionStartDate: trialStartDate.toISOString(),
-              subscriptionExpiryDate: trialExpiryDate.toISOString(),
-              favoriteLocationIds: [],
-            };
+      ensureUserDocument(firestore, user)
+        .catch(error => {
+          console.error("Error ensuring user document:", error);
+          if (error.code === 'permission-denied') {
+             const userDocRef = doc(firestore, 'users', user.uid);
+             errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: userDocRef.path,
+                operation: 'write', // Could be create or get, 'write' is a safe bet
+             }));
           }
-
-          // Non-blocking write with proper error handling
-          setDoc(userDocRef, newUserDocument).catch(error => {
-              console.error("Error creating user document:", error);
-              // Emit a contextual error for debugging in the dev overlay
-              errorEmitter.emit('permission-error', new FirestorePermissionError({
-                  path: userDocRef.path,
-                  operation: 'create',
-                  requestResourceData: newUserDocument,
-              }));
-          });
-        }
-      }).catch(error => {
-        console.error("Error checking user document:", error);
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: userDocRef.path,
-            operation: 'get',
-        }));
-      });
+        });
     }
   }, [user, isUserLoading, firestore]);
 
