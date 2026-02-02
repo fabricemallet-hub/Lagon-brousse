@@ -72,7 +72,7 @@ service cloud.firestore {
       allow get: if isOwner(userId);
       allow list: if isAdmin();
       allow create: if isCreatingOwnAccount(userId);
-      allow update: if isMaintainingOwnAccount(userId);
+      allow update: if isMaintainingOwnAccount(userId) || isAdmin();
       allow delete: if isExistingOwner(userId);
     }
 
@@ -115,6 +115,20 @@ service cloud.firestore {
         allow update, delete: if isOwner(userId);
         allow get, list: if exists(/databases/$(database)/documents/hunting_sessions/$(sessionId)/participants/$(request.auth.uid));
       }
+    }
+
+    match /access_tokens/{tokenId} {
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      allow create, delete: if isAdmin();
+      
+      function isRedeemingOwnToken() {
+        return request.resource.data.redeemedBy == request.auth.uid
+          && request.resource.data.status == 'redeemed'
+          && resource.data.status == 'active';
+      }
+      
+      allow update: if isAdmin() || isRedeemingOwnToken();
     }
   }
 }

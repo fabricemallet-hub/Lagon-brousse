@@ -164,3 +164,12 @@ export interface HuntingSession {
   createdAt: any; // Firestore ServerTimestamp
   expiresAt: any; // Firestore ServerTimestamp for TTL
 }
+
+export interface AccessToken {
+  id: string;
+  durationMonths: number;
+  createdAt: any; // Firestore ServerTimestamp
+  status: 'active' | 'redeemed';
+  redeemedBy?: string;
+  redeemedAt?: any; // Firestore ServerTimestamp
+}

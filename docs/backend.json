@@ -92,6 +92,19 @@
         "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp." }
       },
       "required": ["displayName", "updatedAt"]
+    },
+     "AccessToken": {
+      "title": "AccessToken",
+      "type": "object",
+      "description": "Represents a generated access token for a limited-time subscription.",
+      "properties": {
+        "durationMonths": { "type": "number", "description": "The duration of the subscription in months granted by this token." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the token was created." },
+        "status": { "type": "string", "enum": ["active", "redeemed"], "description": "The current status of the token." },
+        "redeemedBy": { "type": "string", "description": "The UID of the user who redeemed the token." },
+        "redeemedAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the token was redeemed." }
+      },
+      "required": ["durationMonths", "createdAt", "status"]
     }
   },
   "auth": {
@@ -157,6 +170,15 @@
             { "name": "sessionId", "description": "The ID of the parent session." },
             { "name": "userId", "description": "The participant's user ID." }
           ]
+        }
+      },
+       {
+        "path": "/access_tokens/{tokenId}",
+        "definition": {
+          "entityName": "AccessToken",
+          "schema": { "$ref": "#/backend/entities/AccessToken" },
+          "description": "Stores access tokens that can be redeemed for subscriptions.",
+          "params": [{ "name": "tokenId", "description": "The unique ID of the access token." }]
         }
       }
     ],

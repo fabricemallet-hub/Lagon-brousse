@@ -1,21 +1,26 @@
 'use client';
-import { useUser, useFirestore, useDoc, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
-import { doc } from 'firebase/firestore';
-import type { UserAccount } from '@/lib/types';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { doc, getDoc, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
+import type { UserAccount, AccessToken } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, isBefore } from 'date-fns';
+import { format, isBefore, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Crown, Star, XCircle } from 'lucide-react';
+import { Crown, Star, XCircle, KeyRound, Ticket } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export default function ComptePage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const [accessToken, setAccessToken] = useState('');
+  const [isRedeeming, setIsRedeeming] = useState(false);
 
   const userDocRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -43,12 +48,66 @@ export default function ComptePage() {
     }
   };
 
-  const handleCancel = () => {
-    if (!userDocRef) return;
-    setDocumentNonBlocking(userDocRef, {
-        subscriptionStatus: 'inactive',
-    }, { merge: true });
-    toast({ title: "Abonnement résilié", description: "Votre accès est maintenant limité. Vous pouvez vous réabonner à tout moment.", variant: 'destructive' });
+  const handleRedeemToken = async () => {
+    if (!firestore || !user || !accessToken) {
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Veuillez entrer un jeton valide.' });
+      return;
+    }
+    setIsRedeeming(true);
+    const tokenRef = doc(firestore, 'access_tokens', accessToken.trim());
+    
+    try {
+      const tokenSnap = await getDoc(tokenRef);
+      if (!tokenSnap.exists() || tokenSnap.data()?.status !== 'active') {
+        throw new Error('Jeton invalide, expiré ou déjà utilisé.');
+      }
+      
+      const tokenData = tokenSnap.data() as AccessToken;
+      const userRef = doc(firestore, 'users', user.uid);
+
+      const now = new Date();
+      const expiryDate = addMonths(now, tokenData.durationMonths);
+
+      const batch = writeBatch(firestore);
+      batch.update(userRef, {
+        subscriptionStatus: 'active',
+        subscriptionStartDate: now.toISOString(),
+        subscriptionExpiryDate: expiryDate.toISOString(),
+      });
+      batch.update(tokenRef, {
+        status: 'redeemed',
+        redeemedBy: user.uid,
+        redeemedAt: serverTimestamp(),
+      });
+
+      await batch.commit();
+
+      toast({
+        title: 'Accès activé !',
+        description: `Votre abonnement est maintenant actif pour ${tokenData.durationMonths} mois.`,
+      });
+      setAccessToken('');
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Erreur',
+        description: error.message || 'Impossible de valider le jeton.',
+      });
+    } finally {
+      setIsRedeeming(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!userDocRef || !firestore) return;
+     try {
+      const batch = writeBatch(firestore);
+      batch.update(userDocRef, { subscriptionStatus: 'inactive' });
+      await batch.commit();
+      toast({ title: "Abonnement résilié", description: "Votre accès est maintenant limité. Vous pouvez vous réabonner à tout moment.", variant: 'destructive' });
+    } catch (e) {
+        toast({ title: "Erreur", description: "Impossible de résilier l'abonnement.", variant: 'destructive' });
+    }
   };
 
   const getStatusInfo = () => {
@@ -58,11 +117,16 @@ export default function ComptePage() {
       case 'admin':
         return { label: 'Administrateur', badgeVariant: 'default', icon: Crown, description: "Vous avez un accès complet et illimité à l'application." };
       case 'active':
-         return { label: 'Actif', badgeVariant: 'default', icon: Star, description: `Votre abonnement est actif. Prochain paiement le ${format(new Date(userProfile.subscriptionExpiryDate!), 'dd MMMM yyyy', { locale: fr })}.` };
+         const expiryDate = new Date(userProfile.subscriptionExpiryDate!);
+         const formattedDate = format(expiryDate, 'dd MMMM yyyy', { locale: fr });
+         if (isBefore(new Date(), expiryDate)) {
+             return { label: 'Actif', badgeVariant: 'default', icon: Star, description: `Votre abonnement est actif jusqu'au ${formattedDate}.` };
+         }
+         return { label: 'Expiré', badgeVariant: 'destructive', icon: XCircle, description: `Votre abonnement a expiré le ${formattedDate}.` };
       case 'trial':
-        const isTrialValid = isBefore(new Date(), new Date(userProfile.subscriptionExpiryDate!));
-        if (isTrialValid) {
-            return { label: 'Essai', badgeVariant: 'secondary', icon: Star, description: `Votre période d'essai se termine le ${format(new Date(userProfile.subscriptionExpiryDate!), 'dd MMMM yyyy', { locale: fr })}.` };
+        const trialExpiryDate = new Date(userProfile.subscriptionExpiryDate!);
+        if (isBefore(new Date(), trialExpiryDate)) {
+            return { label: 'Essai', badgeVariant: 'secondary', icon: Star, description: `Votre période d'essai se termine le ${format(trialExpiryDate, 'dd MMMM yyyy', { locale: fr })}.` };
         }
         return { label: 'Limité', badgeVariant: 'destructive', icon: XCircle, description: "Votre période d'essai est terminée. Passez à la version complète pour un accès illimité." };
       case 'inactive':
@@ -74,14 +138,14 @@ export default function ComptePage() {
 
   const statusInfo = getStatusInfo();
   const Icon = statusInfo.icon;
+  const isSubscribed = userProfile?.subscriptionStatus === 'active' && isBefore(new Date(), new Date(userProfile.subscriptionExpiryDate!));
   
   const renderButtons = () => {
     if (!userProfile) return null;
-    const status = userProfile.subscriptionStatus;
+    
+    if (userProfile.subscriptionStatus === 'admin') return null;
 
-    if (status === 'admin') return null;
-
-    if (status === 'active') {
+    if (isSubscribed) {
       return <Button variant="destructive" onClick={handleCancel}>Résilier l'abonnement</Button>;
     }
     
@@ -92,6 +156,7 @@ export default function ComptePage() {
     return (
       <div className="space-y-4">
         <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-48 w-full" />
         <Skeleton className="h-48 w-full" />
       </div>
     );
@@ -129,6 +194,33 @@ export default function ComptePage() {
             </div>
         </CardContent>
        </Card>
+
+      {!isSubscribed && userProfile?.subscriptionStatus !== 'admin' && (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Ticket /> Activer avec un jeton d'accès</CardTitle>
+                <CardDescription>Si vous avez reçu un jeton, saisissez-le ici pour activer votre accès.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="flex items-end gap-2">
+                    <div className="flex-grow space-y-1">
+                        <Label htmlFor="token-input">Jeton d'accès</Label>
+                        <Input 
+                            id="token-input" 
+                            placeholder="LBN-XXXX-XXXX" 
+                            value={accessToken}
+                            onChange={(e) => setAccessToken(e.target.value)}
+                            className="font-mono tracking-wider"
+                        />
+                    </div>
+                    <Button onClick={handleRedeemToken} disabled={isRedeeming}>
+                        {isRedeeming ? 'Activation...' : 'Activer'}
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+      )}
+
         <Card>
         <CardHeader>
           <CardTitle>Informations Personnelles</CardTitle>
