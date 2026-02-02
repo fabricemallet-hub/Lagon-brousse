@@ -432,7 +432,7 @@ export function HuntingSessionCard() {
                     <AlertTitle>Action requise : Erreur de configuration de Google Maps</AlertTitle>
                     <AlertDescription className="space-y-3">
                         <p>L'API Google Maps continue de rejeter votre clé API. Le code de l'application est correct ; le problème vient de la configuration de votre projet Google Cloud.</p>
-                        <p className="font-bold">La cause la plus probable est que le compte de facturation n'est pas activé pour votre projet.</p>
+                        <p className="font-bold">La cause la plus fréquente est que le compte de facturation n'est pas activé pour votre projet.</p>
                         <p>Veuillez vérifier les points suivants dans votre <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" className="underline font-semibold">Console Google Cloud</a> :</p>
                         <ol className="list-decimal list-inside space-y-2 text-sm">
                             <li>
