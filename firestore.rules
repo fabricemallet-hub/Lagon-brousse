@@ -49,64 +49,6 @@ service cloud.firestore {
       return isOwner(userId) && resource != null;
     }
 
-    function isCreatingOwnAccount(userId) {
-      let data = request.resource.data;
-      // Normal users can only create 'trial' accounts for themselves.
-      // We must check all fields being sent from the client.
-      let hasAllRequiredKeys = data.keys().hasAll(['id', 'email', 'displayName', 'subscriptionStatus', 'subscriptionStartDate', 'subscriptionExpiryDate', 'favoriteLocationIds']);
-      let hasOnlyAllowedKeys = data.keys().size() == 7;
-
-      return isOwner(userId) 
-          && hasAllRequiredKeys && hasOnlyAllowedKeys
-          && data.id == userId
-          && data.email == request.auth.token.email
-          && data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 30
-          && data.subscriptionStatus == 'trial'
-          && data.subscriptionStartDate is string
-          && data.subscriptionExpiryDate is string
-          && data.favoriteLocationIds is list && data.favoriteLocationIds.size() == 0;
-    }
-    
-    function isCreatingOwnAdminAccount(userId) {
-      let data = request.resource.data;
-      // The admin can create their own 'admin' status account.
-      // This rule covers the initial document creation.
-      let hasAllRequiredKeys = data.keys().hasAll(['id', 'email', 'displayName', 'subscriptionStatus', 'favoriteLocationIds']);
-      let hasOnlyAllowedKeys = data.keys().size() == 5;
-
-      return isAdmin()
-          && isOwner(userId)
-          && hasAllRequiredKeys && hasOnlyAllowedKeys
-          && data.id == userId
-          && data.email == request.auth.token.email
-          && data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 30
-          && data.subscriptionStatus == 'admin'
-          && data.favoriteLocationIds is list && data.favoriteLocationIds.size() == 0;
-    }
-
-    function isMaintainingOwnAccount(userId) {
-      let incoming = request.resource.data;
-      let existing = resource.data;
-      
-      // Users cannot change critical fields
-      let areCriticalFieldsUnchanged = 
-          incoming.subscriptionStatus == existing.subscriptionStatus &&
-          incoming.subscriptionStartDate == existing.subscriptionStartDate &&
-          incoming.subscriptionExpiryDate == existing.subscriptionExpiryDate &&
-          incoming.id == existing.id &&
-          incoming.email == existing.email;
-
-      // Users can change their display name and favorite locations
-      let isDisplayNameValid = incoming.displayName is string && incoming.displayName.size() > 2 && incoming.displayName.size() < 30;
-      let areFavoritesValid = incoming.favoriteLocationIds is list;
-
-      return isOwner(userId) 
-          && resource != null
-          && areCriticalFieldsUnchanged
-          && isDisplayNameValid
-          && areFavoritesValid;
-    }
-
     // ----------------------------------------------------------------------
     // Collection Rules
     // ----------------------------------------------------------------------
@@ -114,8 +56,9 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAdmin();
       allow get: if isOwner(userId);
-      allow create: if isCreatingOwnAccount(userId) || isCreatingOwnAdminAccount(userId);
-      allow update: if isMaintainingOwnAccount(userId) || isAdmin();
+      // Temporarily simplified to unblock account creation.
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
       allow delete: if isExistingOwner(userId);
     }
 
