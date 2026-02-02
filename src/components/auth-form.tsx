@@ -22,8 +22,6 @@ import {
   createUserWithEmailAndPassword, 
   updateProfile, 
   AuthError,
-  setPersistence,
-  browserLocalPersistence
 } from 'firebase/auth';
 import { ForgotPasswordDialog } from './forgot-password-dialog';
 import { Eye, EyeOff } from 'lucide-react';
@@ -49,6 +47,8 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  console.log(`--- [AuthForm] Rendering. Mode: ${mode}, IsLoading: ${isLoading} ---`);
+
   const form = useForm<z.infer<ReturnType<typeof formSchema>>>({
     resolver: zodResolver(formSchema(mode)),
     defaultValues: {
@@ -59,9 +59,11 @@ export function AuthForm({ mode }: AuthFormProps) {
   });
 
   async function onSubmit(values: z.infer<ReturnType<typeof formSchema>>) {
+    console.log('--- [AuthForm] onSubmit started. ---', values);
     setIsLoading(true);
 
     if (!auth) {
+      console.error("--- [AuthForm] Auth service is not available. ---");
       toast({
         variant: "destructive",
         title: "Erreur d'initialisation",
@@ -72,21 +74,25 @@ export function AuthForm({ mode }: AuthFormProps) {
     }
     
     try {
-      await setPersistence(auth, browserLocalPersistence);
       if (mode === 'login') {
+        console.log('--- [AuthForm] Calling signInWithEmailAndPassword with:', values.email);
         await signInWithEmailAndPassword(auth, values.email, values.password);
+        console.log('--- [AuthForm] signInWithEmailAndPassword SUCCESS. ---');
         toast({
             title: 'Connexion réussie!',
             description: "Vous allez être redirigé vers la page d'accueil.",
         });
         router.push('/');
       } else {
+        console.log('--- [AuthForm] Calling createUserWithEmailAndPassword... ---');
         const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
         if (values.displayName) {
+            console.log('--- [AuthForm] Calling updateProfile... ---');
             await updateProfile(userCredential.user, {
                 displayName: values.displayName
             });
         }
+        console.log('--- [AuthForm] Sign up SUCCESS. ---');
         toast({
           title: 'Inscription réussie!',
           description: "Vous allez être redirigé vers la page d'accueil.",
@@ -95,6 +101,8 @@ export function AuthForm({ mode }: AuthFormProps) {
       }
     } catch (error) {
       const authError = error as AuthError;
+      console.error("--- [AuthForm] Authentication failed. ---", authError);
+
       let errorMessage = "Une erreur inattendue est survenue. Veuillez réessayer.";
 
       if (authError && authError.code) {
@@ -130,6 +138,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         description: errorMessage,
       });
     } finally {
+      console.log('--- [AuthForm] onSubmit finished. ---');
       setIsLoading(false);
     }
   }
@@ -203,7 +212,12 @@ export function AuthForm({ mode }: AuthFormProps) {
         />
         
         <div className="pt-4">
-          <Button type="submit" className="w-full" disabled={isLoading}>
+          <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={isLoading}
+            onClick={() => console.log('--- [AuthForm] Login button clicked. ---')}
+          >
             {isLoading ? "Chargement..." : (mode === 'login' ? 'Se connecter' : "S'inscrire")}
           </Button>
         </div>
