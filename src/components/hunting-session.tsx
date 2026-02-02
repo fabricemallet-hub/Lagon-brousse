@@ -90,10 +90,10 @@ export function HuntingSessionCard() {
   const [isParticipating, setIsParticipating] = useState(false);
   const [map, setMap] = useState<google.maps.Map | null>(null);
 
-  const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const googleMapsApiKey = "AIzaSyDCkKWAl86pviQm3jdH07CqQkJeqHL62JM";
 
   const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: googleMapsApiKey || '',
+    googleMapsApiKey: googleMapsApiKey,
   });
   
   const handleLeaveSession = useCallback(async () => {
@@ -368,25 +368,6 @@ export function HuntingSessionCard() {
   }
 
   if (session) {
-    if (!googleMapsApiKey) {
-      return (
-        <Card>
-          <CardHeader>
-              <CardTitle>Configuration Requise</CardTitle>
-          </CardHeader>
-          <CardContent>
-              <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Clé API Google Maps manquante</AlertTitle>
-                  <AlertDescription>
-                      La variable d'environnement <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> n'est pas définie. Veuillez l'ajouter à votre fichier <code>.env</code>.
-                  </AlertDescription>
-              </Alert>
-          </CardContent>
-        </Card>
-      )
-    }
-    
     if (loadError) {
       return (
         <Card>
