@@ -82,8 +82,9 @@ export function HuntingSessionCard() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
+  
   const [session, setSession] = useState<WithId<HuntingSession> | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSessionLoading, setIsSessionLoading] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number} | null>(null);
@@ -92,6 +93,7 @@ export function HuntingSessionCard() {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   
   const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
   const { isLoaded, loadError } = useJsApiLoader({
       googleMapsApiKey: googleMapsApiKey || "",
       preventGoogleFontsLoading: true,
@@ -103,7 +105,6 @@ export function HuntingSessionCard() {
         updateIntervalRef.current = null;
     }
     
-    // Immediately update UI state
     const previousSessionId = session?.id;
     setSession(null);
     setIsParticipating(false);
@@ -113,13 +114,12 @@ export function HuntingSessionCard() {
         return;
     }
 
-    setIsLoading(true);
+    setIsSessionLoading(true);
     try {
         const participantDocRef = doc(firestore, 'hunting_sessions', previousSessionId, 'participants', user.uid);
         await deleteDoc(participantDocRef);
         toast({ title: 'Vous avez quitté la session.' });
     } catch (e: any) {
-        // Error handling for deletion
         if (e.code === 'permission-denied') {
             const permissionError = new FirestorePermissionError({
                 path: `hunting_sessions/${previousSessionId}/participants/${user.uid}`,
@@ -131,9 +131,9 @@ export function HuntingSessionCard() {
             setError("Erreur lors de la déconnexion de la session.");
         }
     } finally {
-        setIsLoading(false);
+        setIsSessionLoading(false);
     }
-}, [user, session, firestore, toast]);
+  }, [user, session, firestore, toast]);
 
   const handleUpdatePosition = useCallback(async (currentSessionId: string) => {
     if (!user || !firestore) return;
@@ -158,7 +158,6 @@ export function HuntingSessionCard() {
 
         const participantDocRef = doc(firestore, 'hunting_sessions', currentSessionId, 'participants', user.uid);
         
-        // Use a non-blocking update to prevent UI lag.
         await updateDoc(participantDocRef, {
             location: { latitude, longitude },
             battery: batteryData,
@@ -167,7 +166,7 @@ export function HuntingSessionCard() {
 
     } catch (err: any) {
         console.error("Error during periodic position update:", err);
-        if (err.code === 1) { // User denied Geolocation
+        if (err.code === 1) {
           toast({
             variant: "destructive",
             title: "Géolocalisation refusée",
@@ -178,33 +177,25 @@ export function HuntingSessionCard() {
     }
   }, [user, firestore, handleLeaveSession, toast]);
   
-  const setupAndStartUpdates = useCallback((sessionToUpdate: WithId<HuntingSession>) => {
-    const sessionId = sessionToUpdate.id;
-    handleUpdatePosition(sessionId); // Initial update
-    const intervalId = setInterval(() => handleUpdatePosition(sessionId), 30000);
-    updateIntervalRef.current = intervalId;
-    
-    return () => {
-        if (updateIntervalRef.current) {
-            clearInterval(updateIntervalRef.current);
-            updateIntervalRef.current = null;
-        }
-    };
-}, [handleUpdatePosition]);
-
-  useEffect(() => {
-    if (isParticipating && session) {
-      const cleanup = setupAndStartUpdates(session);
-      return cleanup;
-    }
-  }, [isParticipating, session, setupAndStartUpdates]);
-
   const participantsCollectionRef = useMemoFirebase(() => {
     if (!firestore || !session || !isParticipating) return null;
     return collection(firestore, 'hunting_sessions', session.id, 'participants');
   }, [firestore, session, isParticipating]);
 
   const { data: participants, isLoading: areParticipantsLoading } = useCollection<SessionParticipant>(participantsCollectionRef);
+
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+    if (isParticipating && session) {
+        handleUpdatePosition(session.id); // Initial update
+        intervalId = setInterval(() => handleUpdatePosition(session.id), 30000);
+    }
+    return () => {
+        if (intervalId) {
+            clearInterval(intervalId);
+        }
+    };
+  }, [isParticipating, session, handleUpdatePosition]);
 
   const generateUniqueCode = async (): Promise<string> => {
     if (!firestore) throw new Error("Firestore not initialized");
@@ -240,7 +231,7 @@ export function HuntingSessionCard() {
 
   const handleCreateSession = async () => {
     if (!user || !firestore) return;
-    setIsLoading(true);
+    setIsSessionLoading(true);
     setError(null);
 
     try {
@@ -254,8 +245,16 @@ export function HuntingSessionCard() {
           expiresAt: Timestamp.fromDate(expiresAt),
         };
         
-        await setDoc(doc(firestore, 'hunting_sessions', code), newSessionData);
-        await createParticipantDocument(code);
+        const sessionDocRef = doc(firestore, 'hunting_sessions', code);
+        const participantDocRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
+
+        const batch = writeBatch(firestore);
+        batch.set(sessionDocRef, newSessionData);
+        batch.set(participantDocRef, {
+            displayName: user.displayName || user.email || 'Chasseur',
+            updatedAt: serverTimestamp(),
+        });
+        await batch.commit();
         
         setSession({ id: code, ...newSessionData });
         setIsParticipating(true);
@@ -272,13 +271,13 @@ export function HuntingSessionCard() {
             description: e.message,
         });
     } finally {
-        setIsLoading(false);
+        setIsSessionLoading(false);
     }
   };
   
   const handleJoinSession = async () => {
     if (!user || !firestore || !joinCode) return;
-    setIsLoading(true);
+    setIsSessionLoading(true);
     setError(null);
     try {
       const sessionId = joinCode.toUpperCase();
@@ -291,7 +290,7 @@ export function HuntingSessionCard() {
       const sessionData = sessionDoc.data() as HuntingSession;
 
       if (sessionData.expiresAt && (sessionData.expiresAt as Timestamp).toDate() < new Date()) {
-         await deleteDoc(sessionDocRef); // Clean up expired session
+         await deleteDoc(sessionDocRef);
          throw new Error('Cette session a expiré et a été supprimée.');
       }
       
@@ -316,7 +315,7 @@ export function HuntingSessionCard() {
              });
         }
     } finally {
-        setIsLoading(false);
+        setIsSessionLoading(false);
     }
   };
 
@@ -393,33 +392,12 @@ export function HuntingSessionCard() {
                      <Alert variant="destructive">
                         <AlertTitle>Clé API Google Maps manquante</AlertTitle>
                         <AlertDescription>
-                            <p>La clé API pour Google Maps n'est pas configurée. Veuillez l'ajouter à votre fichier <code>.env</code> sous le nom <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code>.</p>
+                            <p>La clé API pour Google Maps n'est pas configurée. Veuillez l'ajouter à votre fichier <code>.env</code> sous le nom <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> et redémarrer votre environnement.</p>
                         </AlertDescription>
                     </Alert>
                 </CardContent>
             </Card>
         );
-    }
-
-    if (!isLoaded) {
-      return (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Users className="size-5 text-primary" />
-                Session de Chasse Active
-              </div>
-              <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isLoading}><LogOut/> Quitter</Button>
-            </CardTitle>
-            <CardDescription>Partagez votre position avec votre groupe en temps réel.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="w-full aspect-square rounded-lg" />
-            <p className="text-sm text-center text-muted-foreground mt-2">Chargement de la carte...</p>
-          </CardContent>
-        </Card>
-      )
     }
 
     if (loadError) {
@@ -431,37 +409,55 @@ export function HuntingSessionCard() {
                         <Users className="size-5 text-primary" />
                         Session de Chasse Active
                     </div>
-                    <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isLoading}><LogOut/> Quitter</Button>
+                    <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isSessionLoading}><LogOut/> Quitter</Button>
                 </CardTitle>
                  <CardDescription>Partagez votre position avec votre groupe en temps réel.</CardDescription>
             </CardHeader>
             <CardContent>
                  <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Erreur : Impossible de charger la carte Google</AlertTitle>
-                    <AlertDescription className="space-y-2">
-                        <p>Google Maps a rejeté votre clé API. Cela est généralement dû à une mauvaise configuration sur la console Google Cloud. Veuillez vérifier les points suivants :</p>
-                        <ol className="list-decimal list-inside text-xs space-y-1">
+                    <AlertTitle>Action requise : Erreur de configuration de Google Maps</AlertTitle>
+                    <AlertDescription className="space-y-3">
+                        <p>L'API Google Maps continue de rejeter votre clé API (Erreur : <strong>InvalidKeyMapError</strong>). Le code de l'application est correct, le problème se situe donc dans la configuration de votre projet Google Cloud.</p>
+                        <p>Veuillez vérifier les trois points suivants dans votre <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" className="underline font-semibold">Console Google Cloud</a> :</p>
+                        <ol className="list-decimal list-inside space-y-2 text-xs">
                             <li>
-                                **API Activée :** Assurez-vous que l'API **"Maps JavaScript API"** est bien activée pour votre projet.
+                                <strong>Compte de facturation activé :</strong> C'est la cause la plus probable. L'API Google Maps <strong>ne fonctionne pas</strong> sans un compte de facturation valide associé à votre projet, même si votre usage reste dans la limite gratuite.
                             </li>
                             <li>
-                                **Restrictions de site web :** Si vous avez mis en place des restrictions, vérifiez qu'elles autorisent bien les domaines suivants :
-                                <ul className="list-disc list-inside pl-4 mt-1 font-mono">
-                                    <li><code>*.cloudworkstations.dev/*</code></li>
-                                    <li><code>studio.firebase.google.com/*</code></li>
-                                </ul>
+                                <strong>API "Maps JavaScript API" activée :</strong> Assurez-vous que cette API spécifique est bien activée pour votre projet.
                             </li>
-                             <li>
-                                **Facturation :** Un compte de facturation doit être associé à votre projet Google Cloud pour utiliser l'API Maps.
+                            <li>
+                                <strong>Restrictions de la clé API :</strong> Vous avez confirmé que c'était correct, mais vérifiez une dernière fois que les domaines <code>studio.firebase.google.com/*</code> et <code>*.cloudworkstations.dev/*</code> sont bien autorisés.
                             </li>
                         </ol>
-                        <p className="pt-2">Après avoir corrigé la configuration, attendez quelques minutes puis rafraîchissez la page.</p>
+                        <p className="pt-2">Après avoir vérifié et corrigé ces points (en particulier la facturation), attendez quelques minutes puis rafraîchissez la page. L'erreur devrait disparaître.</p>
                     </AlertDescription>
                 </Alert>
             </CardContent>
         </Card>
       );
+    }
+    
+    if (!isLoaded) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="size-5 text-primary" />
+                Session de Chasse Active
+              </div>
+              <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isSessionLoading}><LogOut/> Quitter</Button>
+            </CardTitle>
+            <CardDescription>Partagez votre position avec votre groupe en temps réel.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="w-full aspect-square rounded-lg" />
+            <p className="text-sm text-center text-muted-foreground mt-2">Chargement de la carte...</p>
+          </CardContent>
+        </Card>
+      )
     }
 
     return (
@@ -472,7 +468,7 @@ export function HuntingSessionCard() {
               <Users className="size-5 text-primary" />
               Session de Chasse Active
             </div>
-            <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isLoading}><LogOut/> Quitter</Button>
+            <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isSessionLoading}><LogOut/> Quitter</Button>
           </CardTitle>
            <CardDescription>Partagez votre position avec votre groupe en temps réel.</CardDescription>
         </CardHeader>
@@ -587,9 +583,9 @@ export function HuntingSessionCard() {
                 className="font-mono text-center text-lg tracking-widest"
               />
             </div>
-            <Button onClick={handleJoinSession} className="w-full" disabled={isLoading}>
+            <Button onClick={handleJoinSession} className="w-full" disabled={isSessionLoading}>
               <LogIn className="mr-2" />
-              {isLoading ? 'Connexion...' : 'Rejoindre la session'}
+              {isSessionLoading ? 'Connexion...' : 'Rejoindre la session'}
             </Button>
           </TabsContent>
           <TabsContent value="create" className="space-y-4 pt-4">
@@ -597,9 +593,9 @@ export function HuntingSessionCard() {
               Créez une nouvelle session et partagez le code avec votre groupe. La
               session expirera automatiquement dans 24 heures.
             </p>
-            <Button onClick={handleCreateSession} className="w-full" disabled={isLoading}>
+            <Button onClick={handleCreateSession} className="w-full" disabled={isSessionLoading}>
               <Share2 className="mr-2" />
-              {isLoading ? 'Création...' : 'Créer une nouvelle session'}
+              {isSessionLoading ? 'Création...' : 'Créer une nouvelle session'}
             </Button>
           </TabsContent>
         </Tabs>
