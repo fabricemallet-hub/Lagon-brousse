@@ -98,7 +98,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     const [spotToEdit, setSpotToEdit] = useState<FishingSpot | null>(null);
 
     const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-    const { isLoaded, loadError } = useJsApiLoader({ googleMapsApiKey: googleMapsApiKey || "", mapIds: ['satellite_id'] });
+    const { isLoaded, loadError } = useJsApiLoader({ googleMapsApiKey: googleMapsApiKey || "", mapIds: ['satellite_id'], preventGoogleFontsLoading: true });
 
     const fishingSpotsRef = useMemoFirebase(() => {
         if (!user || !firestore) return null;
@@ -155,6 +155,10 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         });
     }, [map, initialZoomDone]);
 
+    useEffect(() => {
+        startWatchingPosition();
+    }, [startWatchingPosition]);
+
     const handleRecenter = () => {
         if (!navigator.geolocation) {
             toast({
@@ -176,7 +180,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         setInitialZoomDone(true);
                     }
                 }
-                startWatchingPosition();
+                startWatchingPosition(); // Attempt to start watching again after a successful manual fetch
             },
             (err) => {
                  toast({
@@ -662,21 +666,21 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                     onCheckedChange={() => handleSpotSelection(spot.id)}
                                                 />
                                             </span>
-                                            <AccordionPrimitive.Header className="flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180 pl-2 pr-4 cursor-pointer">
-                                                <AccordionPrimitive.Trigger className='text-left'>
+                                            <AccordionPrimitive.Header className="flex flex-1">
+                                                <AccordionPrimitive.Trigger className='flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180 pl-2 pr-4 text-left'>
                                                     <div className="flex items-center gap-3">
                                                         <div className="p-1 rounded-md" style={{backgroundColor: spot.color + '20'}}>
                                                             {React.createElement(mapIcons[spot.icon as keyof typeof mapIcons] || MapPin, { className: 'size-5', style: {color: spot.color} })}
                                                         </div>
                                                         <div>
-                                                            <p className="font-bold text-left">{spot.name}</p>
-                                                            <p className="text-xs text-muted-foreground text-left">
+                                                            <p className="font-bold">{spot.name}</p>
+                                                            <p className="text-xs text-muted-foreground">
                                                                 {spot.createdAt ? format(spot.createdAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr }) : 'Enregistrement...'}
                                                             </p>
                                                         </div>
                                                     </div>
+                                                    <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
                                                 </AccordionPrimitive.Trigger>
-                                                <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
                                             </AccordionPrimitive.Header>
                                        </div>
                                        <AccordionPrimitive.Content className="overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">

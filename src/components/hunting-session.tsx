@@ -217,6 +217,7 @@ function HuntingSessionContent() {
   const { isLoaded, loadError } = useJsApiLoader({
       googleMapsApiKey: googleMapsApiKey || "",
       preventGoogleFontsLoading: true,
+      mapIds: ['satellite_id']
   });
 
   useEffect(() => {
