@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef, useCallback, Fragment } from 'react';
+import { useState, useEffect, useRef, useCallback, Fragment, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -86,8 +86,8 @@ const iconSvgs: Record<string, string> = {
 const BatteryIcon = ({ level, charging }: { level: number; charging: boolean }) => {
   const props = { className: 'w-4 h-4 inline-block' };
   if (charging) return <BatteryCharging {...props} className="text-blue-500" />;
-  if (level > 0.15) return <BatteryFull {...props} className="text-green-500" />;
-  return <BatteryLow {...props} className="text-red-500" />;
+  if (level < 0.15) return <BatteryLow {...props} className="text-red-500" />;
+  return <BatteryFull {...props} className="text-green-500" />;
 };
 
 
@@ -285,8 +285,8 @@ function HuntingSessionContent() {
 
   const { data: participants, isLoading: areParticipantsLoading } = useCollection<SessionParticipant>(participantsCollectionRef);
   
-  const myParticipant = React.useMemo(() => participants?.find(p => p.id === user?.uid), [participants, user]);
-  const otherParticipants = React.useMemo(() => participants?.filter(p => p.id !== user?.uid), [participants, user]);
+  const myParticipant = useMemo(() => participants?.find(p => p.id === user?.uid), [participants, user]);
+  const otherParticipants = useMemo(() => participants?.filter(p => p.id !== user?.uid), [participants, user]);
 
   useEffect(() => {
     if (myParticipant?.location) {
@@ -302,7 +302,10 @@ function HuntingSessionContent() {
 
   useEffect(() => {
     if (isParticipating && session) {
-      updateIntervalRef.current = setInterval(() => fetchAndSetUserPosition(), 30000); // 30 seconds
+      // Don't start interval immediately, wait for initial fetch to be triggered by user gesture
+      if (updateIntervalRef.current === null) {
+        updateIntervalRef.current = setInterval(() => fetchAndSetUserPosition(), 30000); // 30 seconds
+      }
     } else if (updateIntervalRef.current) {
       clearInterval(updateIntervalRef.current);
       updateIntervalRef.current = null;
@@ -355,6 +358,9 @@ function HuntingSessionContent() {
         updatedAt: serverTimestamp(),
     };
     
+    // Initial user gesture triggers first location fetch
+    await fetchAndSetUserPosition(true);
+
     setDoc(participantDocRef, participantData, { merge: true }).catch(e => {
         if (e.code === 'permission-denied') {
             const permissionError = new FirestorePermissionError({
@@ -367,8 +373,6 @@ function HuntingSessionContent() {
             console.error("Error creating participant document:", e);
         }
     });
-    
-    await fetchAndSetUserPosition(true);
 }, [user, firestore, fetchAndSetUserPosition, nickname, selectedIcon, selectedColor]);
 
   const handleCreateSession = async () => {
@@ -666,11 +670,11 @@ function HuntingSessionContent() {
                                             {p.displayName}
                                         </div>
                                         <div
-                                            className="p-1.5 rounded-full flex flex-col items-center shadow-lg bg-card border"
+                                            className="p-1.5 rounded-full flex flex-col items-center shadow-lg border"
+                                            style={{backgroundColor: iconColor}}
                                         >
                                             <IconComponent
-                                                className="size-5 drop-shadow-md"
-                                                style={{ color: iconColor }}
+                                                className="size-5 drop-shadow-md text-white"
                                             />
                                         </div>
                                     </div>
