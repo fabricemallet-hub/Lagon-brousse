@@ -23,7 +23,6 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 function PecheSkeleton() {
   return (
@@ -190,48 +189,46 @@ export default function PechePage() {
                 <Fish className="h-5 w-5 text-primary" />
                 Potentiel par espèce
               </h4>
-               <ScrollArea className="h-72">
-                <Accordion type="single" collapsible className="w-full space-y-2 pr-4">
-                  {slot.fish.filter(f => f.rating >= 9).map((f, i) => (
-                    <AccordionItem value={`item-${i}`} key={i} className="border-b-0">
-                      <div className="border rounded-lg overflow-hidden bg-card">
-                        <AccordionTrigger className="p-3 hover:no-underline text-sm [&[data-state=open]]:bg-muted/50 [&[data-state=open]]:border-b">
-                          <div className="flex justify-between items-center w-full">
-                            <div className="flex items-center gap-2 text-left">
-                              <span className="font-medium">{f.name}</span>
-                              {f.location && <Badge variant={f.location === 'Large' ? 'destructive' : 'secondary'} className="text-xs font-semibold">{f.location}</Badge>}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <RatingStars rating={f.rating} />
-                              <Badge variant="outline" className="w-12 justify-center">{f.rating}/10</Badge>
-                            </div>
+              <Accordion type="single" collapsible className="w-full space-y-2">
+                {slot.fish.filter(f => f.rating >= 9).map((f, i) => (
+                  <AccordionItem value={`item-${i}`} key={i} className="border-b-0">
+                    <div className="border rounded-lg overflow-hidden bg-card">
+                      <AccordionTrigger className="p-3 hover:no-underline text-sm [&[data-state=open]]:bg-muted/50 [&[data-state=open]]:border-b">
+                        <div className="flex justify-between items-center w-full">
+                          <div className="flex items-center gap-2 text-left">
+                            <span className="font-medium">{f.name}</span>
+                            {f.location && <Badge variant={f.location === 'Large' ? 'destructive' : 'secondary'} className="text-xs font-semibold">{f.location}</Badge>}
                           </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="p-3 text-sm bg-muted/50">
-                          <ul className="space-y-2 text-muted-foreground">
-                            <li className="flex items-start gap-2">
-                              <strong className="w-24 shrink-0 font-semibold text-card-foreground/80">Activité:</strong>
-                              <span>{f.advice.activity}</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                              <strong className="w-24 shrink-0 font-semibold text-card-foreground/80">Alimentation:</strong>
-                              <span>{f.advice.feeding}</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                              <strong className="w-24 shrink-0 font-semibold text-card-foreground/80">Spot:</strong>
-                              <span>{f.advice.location_specific}</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                              <strong className="w-24 shrink-0 font-semibold text-card-foreground/80">Profondeur:</strong>
-                              <span>{f.advice.depth}</span>
-                            </li>
-                          </ul>
-                        </AccordionContent>
-                      </div>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-               </ScrollArea>
+                          <div className="flex items-center gap-2">
+                            <RatingStars rating={f.rating} />
+                            <Badge variant="outline" className="w-12 justify-center">{f.rating}/10</Badge>
+                          </div>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="p-3 text-sm bg-muted/50">
+                        <ul className="space-y-2 text-muted-foreground">
+                          <li className="flex items-start gap-2">
+                            <strong className="w-24 shrink-0 font-semibold text-card-foreground/80">Activité:</strong>
+                            <span>{f.advice.activity}</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <strong className="w-24 shrink-0 font-semibold text-card-foreground/80">Alimentation:</strong>
+                            <span>{f.advice.feeding}</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <strong className="w-24 shrink-0 font-semibold text-card-foreground/80">Spot:</strong>
+                            <span>{f.advice.location_specific}</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <strong className="w-24 shrink-0 font-semibold text-card-foreground/80">Profondeur:</strong>
+                            <span>{f.advice.depth}</span>
+                          </li>
+                        </ul>
+                      </AccordionContent>
+                    </div>
+                  </AccordionItem>
+                ))}
+              </Accordion>
             </CardContent>
           </Card>
         ))}
