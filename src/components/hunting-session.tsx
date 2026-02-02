@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, Fragment } from 'react';
 import {
   Card,
   CardContent,
@@ -65,7 +65,7 @@ import type { HuntingSession, SessionParticipant, UserAccount } from '@/lib/type
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Skeleton } from './ui/skeleton';
-import { GoogleMap, useJsApiLoader, OverlayView } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, OverlayView, MarkerF } from '@react-google-maps/api';
 
 
 // --- Icon Map ---
@@ -73,6 +73,13 @@ const iconMap = { Navigation, UserIcon, Crosshair, Footprints, Mountain };
 const availableIcons = Object.keys(iconMap);
 const availableColors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
 
+const iconSvgs: Record<string, string> = {
+  Navigation: `<polygon points="3 11 22 2 13 21 11 13 3 11"/>`,
+  UserIcon: `<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>`,
+  Crosshair: `<circle cx="12" cy="12" r="10"/><line x1="22" x2="18" y1="12" y2="12"/><line x1="6" x2="2" y1="12" y2="12"/><line x1="12" x2="12" y1="6" y2="2"/><line x1="12" x2="12" y1="22" y2="18"/>`,
+  Footprints: `<path d="M4 16v-2.38c0-1.4.9-2.62 2.24-2.62s2.24 1.22 2.24 2.62V16"/><path d="M10.24 13.38v2.38c0 1.4-.9 2.62-2.24 2.62S5.76 17.18 5.76 15.78v-2.4"/><path d="M14.76 13.38v2.38c0 1.4.9 2.62 2.24 2.62s2.24-1.22 2.24-2.62v-2.4"/><path d="M20 16v-2.38c0-1.4-.9-2.62-2.24-2.62s-2.24 1.22-2.24 2.62V16"/>`,
+  Mountain: `<path d="m8 3 4 8 5-5 5 15H2L8 3z"/>`,
+};
 
 // --- Helper Components ---
 
@@ -175,8 +182,44 @@ function HuntingSessionContent() {
     }
   }, [user, session, firestore, toast]);
 
- const handleUpdatePosition = useCallback(async (currentSessionId: string, isFirstUpdate = false) => {
-    if (!user || !firestore || !navigator.geolocation) return;
+ const updateFirestorePosition = useCallback((latitude: number, longitude: number) => {
+    if (!user || !firestore || !session?.id) return;
+
+    const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
+    const dataToUpdate: any = {
+        'location.latitude': latitude,
+        'location.longitude': longitude,
+        updatedAt: serverTimestamp(),
+    };
+    
+    // Non-blocking update.
+    updateDoc(participantDocRef, dataToUpdate).catch(err => {
+        if (err.code === 'permission-denied') {
+            const permissionError = new FirestorePermissionError({
+                path: participantDocRef.path,
+                operation: 'update',
+                requestResourceData: { location: { latitude, longitude } }
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        } else {
+            console.error("Error updating position in Firestore:", err);
+        }
+    });
+}, [user, firestore, session]);
+
+ const handleDragEnd = (e: google.maps.MapMouseEvent) => {
+    if (e.latLng) {
+        const newLocation = {
+            latitude: e.latLng.lat(),
+            longitude: e.latLng.lng(),
+        };
+        setUserLocation(newLocation); // Optimistic UI update
+        updateFirestorePosition(newLocation.latitude, newLocation.longitude);
+    }
+  };
+
+  const fetchAndSetUserPosition = useCallback(async (isFirstUpdate = false) => {
+    if (!user || !firestore || !navigator.geolocation || !session?.id) return;
 
     try {
         const position = await new Promise<GeolocationPosition>((resolve, reject) => {
@@ -200,20 +243,23 @@ function HuntingSessionContent() {
             }
         }
         
-        const participantDocRef = doc(firestore, 'hunting_sessions', currentSessionId, 'participants', user.uid);
+        const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
+        const dataToUpdate: any = {
+            location: { latitude, longitude },
+            updatedAt: serverTimestamp(),
+        };
+        if (batteryData) {
+            dataToUpdate.battery = batteryData;
+        }
         
         // Non-blocking update
-        updateDoc(participantDocRef, {
-            location: { latitude, longitude },
-            battery: batteryData,
-            updatedAt: serverTimestamp(),
-        }).catch(err => {
+        updateDoc(participantDocRef, dataToUpdate).catch(err => {
             console.error("Error updating position:", err);
              if (err.code === 'permission-denied') {
                 const permissionError = new FirestorePermissionError({
                     path: participantDocRef.path,
                     operation: 'update',
-                    requestResourceData: { location: { latitude, longitude } }
+                    requestResourceData: dataToUpdate
                 });
                 errorEmitter.emit('permission-error', permissionError);
             }
@@ -230,7 +276,7 @@ function HuntingSessionContent() {
           // Do not leave session, just inform the user.
         }
     }
-  }, [user, firestore, toast]);
+  }, [user, firestore, session, toast]);
   
   const participantsCollectionRef = useMemoFirebase(() => {
     if (!firestore || !session || !isParticipating) return null;
@@ -238,13 +284,25 @@ function HuntingSessionContent() {
   }, [firestore, session, isParticipating]);
 
   const { data: participants, isLoading: areParticipantsLoading } = useCollection<SessionParticipant>(participantsCollectionRef);
+  
+  const myParticipant = React.useMemo(() => participants?.find(p => p.id === user?.uid), [participants, user]);
+  const otherParticipants = React.useMemo(() => participants?.filter(p => p.id !== user?.uid), [participants, user]);
 
   useEffect(() => {
-    // This effect now only sets up the recurring interval.
-    // The initial position update is a one-off action triggered
-    // by the user gesture of creating or joining a session.
+    if (myParticipant?.location) {
+        const isSameLocation = userLocation &&
+            Math.abs(myParticipant.location.latitude - userLocation.latitude) < 0.000001 &&
+            Math.abs(myParticipant.location.longitude - userLocation.longitude) < 0.000001;
+
+        if (!isSameLocation) {
+            setUserLocation(myParticipant.location);
+        }
+    }
+  }, [myParticipant]);
+
+  useEffect(() => {
     if (isParticipating && session) {
-      updateIntervalRef.current = setInterval(() => handleUpdatePosition(session.id), 30000); // 30 seconds
+      updateIntervalRef.current = setInterval(() => fetchAndSetUserPosition(), 30000); // 30 seconds
     } else if (updateIntervalRef.current) {
       clearInterval(updateIntervalRef.current);
       updateIntervalRef.current = null;
@@ -255,7 +313,7 @@ function HuntingSessionContent() {
         clearInterval(updateIntervalRef.current);
       }
     };
-  }, [isParticipating, session, handleUpdatePosition]);
+  }, [isParticipating, session, fetchAndSetUserPosition]);
 
   useEffect(() => {
     if (map && userLocation && !initialZoomDone) {
@@ -297,7 +355,6 @@ function HuntingSessionContent() {
         updatedAt: serverTimestamp(),
     };
     
-    // Using setDoc with merge to avoid overwriting if doc somehow exists
     setDoc(participantDocRef, participantData, { merge: true }).catch(e => {
         if (e.code === 'permission-denied') {
             const permissionError = new FirestorePermissionError({
@@ -311,9 +368,8 @@ function HuntingSessionContent() {
         }
     });
     
-    // Explicitly trigger the first position update as a user gesture.
-    await handleUpdatePosition(sessionId, true);
-}, [user, firestore, handleUpdatePosition, nickname, selectedIcon, selectedColor]);
+    await fetchAndSetUserPosition(true);
+}, [user, firestore, fetchAndSetUserPosition, nickname, selectedIcon, selectedColor]);
 
   const handleCreateSession = async () => {
     if (!user || !firestore) return;
@@ -331,25 +387,8 @@ function HuntingSessionContent() {
           expiresAt: Timestamp.fromDate(expiresAt),
         };
         
-        const sessionDocRef = doc(firestore, 'hunting_sessions', code);
-        
-        // Use a batch to ensure session and participant are created together
-        const batch = writeBatch(firestore);
-        batch.set(sessionDocRef, newSessionData);
-        
-        const participantDocRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
-        const participantData: Omit<SessionParticipant, 'id' | 'location' | 'battery'> = {
-            displayName: nickname,
-            mapIcon: selectedIcon,
-            mapColor: selectedColor,
-            updatedAt: serverTimestamp(),
-        };
-        batch.set(participantDocRef, participantData);
-        
-        await batch.commit();
-        
-        // This will now be called after the user clicks "Create"
-        await handleUpdatePosition(code, true);
+        await setDoc(doc(firestore, 'hunting_sessions', code), newSessionData);
+        await createParticipantDocument(code);
 
         setSession({ id: code, ...newSessionData });
         setIsParticipating(true);
@@ -497,6 +536,17 @@ function HuntingSessionContent() {
     }
   };
 
+  const createMarkerIcon = (color: string, iconName: string) => {
+    const iconSvgPath = iconSvgs[iconName] || iconSvgs['Navigation'];
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+      <circle cx="20" cy="20" r="16" fill="${color}" stroke="white" stroke-width="2"/>
+      <g transform="translate(8, 8) scale(1)" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        ${iconSvgPath}
+      </g>
+    </svg>`;
+    return `data:image/svg+xml;base64,${btoa(svg)}`;
+  };
+
   if (session) {
      if (loadError) {
         return (
@@ -575,9 +625,34 @@ function HuntingSessionContent() {
                             mapTypeId: mapTypeId as google.maps.MapTypeId
                         }}
                     >
-                        {participants?.map(p => {
+                        {myParticipant && userLocation && (
+                          <Fragment>
+                            <MarkerF
+                              position={userLocation}
+                              draggable={true}
+                              onDragEnd={handleDragEnd}
+                              icon={{
+                                url: createMarkerIcon(myParticipant.mapColor || '#3b82f6', myParticipant.mapIcon || 'Navigation'),
+                                scaledSize: new window.google.maps.Size(40, 40),
+                                anchor: new window.google.maps.Point(20, 40),
+                              }}
+                              zIndex={99}
+                            />
+                             <OverlayView
+                                position={userLocation}
+                                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                            >
+                                <div className="transform -translate-x-1/2 -translate-y-[calc(100%+45px)]">
+                                  <div className="px-2 py-0.5 rounded-md text-xs font-bold text-white bg-black/60 whitespace-nowrap">
+                                      {myParticipant.displayName}
+                                  </div>
+                                </div>
+                            </OverlayView>
+                          </Fragment>
+                        )}
+
+                        {otherParticipants?.map(p => {
                             if (!p.location) return null;
-                            const isCurrentUser = p.id === user.uid;
                             const IconComponent = iconMap[p.mapIcon as keyof typeof iconMap] || Navigation;
                             const iconColor = p.mapColor || '#3b82f6';
                             return (
@@ -591,15 +666,11 @@ function HuntingSessionContent() {
                                             {p.displayName}
                                         </div>
                                         <div
-                                            className={cn(
-                                                "p-1.5 rounded-full flex flex-col items-center shadow-lg",
-                                                !isCurrentUser && "bg-card border"
-                                            )}
-                                            style={isCurrentUser ? { backgroundColor: iconColor } : undefined}
+                                            className="p-1.5 rounded-full flex flex-col items-center shadow-lg bg-card border"
                                         >
                                             <IconComponent
-                                                className={cn("size-5 drop-shadow-md")}
-                                                style={{ color: isCurrentUser ? 'white' : iconColor }}
+                                                className="size-5 drop-shadow-md"
+                                                style={{ color: iconColor }}
                                             />
                                         </div>
                                     </div>
@@ -776,3 +847,5 @@ export function HuntingSessionCard() {
 
   return <HuntingSessionContent />;
 }
+
+    
