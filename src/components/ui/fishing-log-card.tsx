@@ -110,80 +110,81 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         }
     }, []);
 
-    const startWatchingPosition = useCallback((centerMap: boolean) => {
-        if (!navigator.geolocation) {
+    const startWatchingPosition = useCallback(() => {
+        if (!navigator.geolocation || watchId.current !== null) {
             return;
         }
 
-        if (watchId.current !== null) {
-            navigator.geolocation.clearWatch(watchId.current);
-        }
+        watchId.current = navigator.geolocation.watchPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                const newLocation = { lat: latitude, lng: longitude };
+                setUserLocation(newLocation);
 
-        navigator.permissions?.query({name: 'geolocation'}).then(status => {
-            if (status.state === 'prompt') {
-                if (centerMap) { 
-                     navigator.geolocation.getCurrentPosition(position => {
-                        const { latitude, longitude } = position.coords;
-                        const newLocation = { lat: latitude, lng: longitude };
-                        setUserLocation(newLocation);
-                        if (map) {
-                            map.panTo(newLocation);
-                            map.setZoom(16);
-                            setInitialZoomDone(true);
-                        }
-                     },
-                     () => {
-                         toast({
-                            variant: 'destructive',
-                            title: 'Position non disponible',
-                            description: "Veuillez autoriser l'accès à votre position.",
-                        });
-                     });
+                if (map && !initialZoomDone) {
+                    map.panTo(newLocation);
+                    map.setZoom(16);
+                    setInitialZoomDone(true);
                 }
-                return;
-            }
-            if (status.state === 'denied') {
+            },
+            () => {
+                 toast({
+                    variant: 'destructive',
+                    title: 'Position non disponible',
+                    description: "Impossible d'obtenir votre position.",
+                });
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    }, [map, initialZoomDone, toast]);
+
+    const handleRecenter = () => {
+        if (!navigator.geolocation) {
+            toast({
+                variant: 'destructive',
+                title: 'Géolocalisation non supportée',
+            });
+            return;
+        }
+        
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                const newLocation = { lat: latitude, lng: longitude };
+                setUserLocation(newLocation);
+                if (map) {
+                    map.panTo(newLocation);
+                    map.setZoom(16);
+                }
+                if (watchId.current === null) {
+                    startWatchingPosition();
+                }
+            },
+            (err) => {
                  toast({
                     variant: 'destructive',
                     title: 'Géolocalisation refusée',
                     description: "Veuillez l'activer dans les paramètres de votre navigateur pour utiliser cette fonctionnalité.",
                 });
-                return;
-            }
-            
-            watchId.current = navigator.geolocation.watchPosition(
-                (position) => {
-                    const { latitude, longitude } = position.coords;
-                    const newLocation = { lat: latitude, lng: longitude };
-                    setUserLocation(newLocation);
-
-                    if (map && centerMap && !initialZoomDone) {
-                        map.panTo(newLocation);
-                        map.setZoom(16);
-                        setInitialZoomDone(true);
-                    }
-                },
-                () => {
-                     toast({
-                        variant: 'destructive',
-                        title: 'Position non disponible',
-                        description: "Veuillez autoriser l'accès à votre position.",
-                    });
-                },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-            );
-        });
-    }, [map, initialZoomDone, toast]);
-
-    const handleRecenter = () => {
-        if (userLocation) {
-            map?.panTo(userLocation);
-            map?.setZoom(16);
-        } else {
-            startWatchingPosition(true);
-        }
+            },
+            { enableHighAccuracy: true }
+        );
     };
-    
+
+    useEffect(() => {
+        navigator.permissions?.query({ name: 'geolocation' }).then(status => {
+            if (status.state === 'granted') {
+                startWatchingPosition();
+            }
+        });
+
+        return () => {
+            if (watchId.current !== null) {
+                navigator.geolocation.clearWatch(watchId.current);
+            }
+        };
+    }, [startWatchingPosition]);
+
     const handleMapClick = (e: google.maps.MapMouseEvent) => {
         if (e.latLng) {
             setNewSpotLocation({ lat: e.latLng.lat(), lng: e.latLng.lng() });
@@ -447,7 +448,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         <Button size="icon" onClick={handleRecenter} className="absolute top-2 right-2 shadow-lg h-9 w-9 z-10">
                             <LocateFixed className="h-5 w-5" />
                         </Button>
-                        <div className={cn("absolute bottom-4 left-1/2 -translate-x-1/2 z-10 w-[calc(100%-2rem)] max-w-sm")}>
+                         <div className={cn("absolute bottom-4 left-1/2 -translate-x-1/2 z-10 w-[calc(100%-2rem)] max-w-sm")}>
                             <Button 
                                 className="shadow-lg w-full" 
                                 onClick={() => { if (newSpotLocation) setIsAddSpotOpen(true); }}
@@ -544,7 +545,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                             <AccordionPrimitive.Root type="single" collapsible className="w-full">
                                {savedSpots.map(spot => (
                                    <AccordionPrimitive.Item value={spot.id} key={spot.id} className="border-b">
-                                       <AccordionPrimitive.Header className="flex items-center w-full">
+                                       <div className="flex items-center w-full">
                                             <span className="pl-4 py-4" onClick={(e) => e.stopPropagation()}>
                                                <Checkbox
                                                    id={`select-spot-${spot.id}`}
@@ -553,7 +554,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                    onCheckedChange={() => handleSpotSelection(spot.id)}
                                                />
                                            </span>
-                                           <AccordionPrimitive.Trigger className={cn("flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180", "pr-4")}>
+                                            <AccordionPrimitive.Trigger className={cn("flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180", "pl-2 pr-4")}>
                                                <div className="flex items-center gap-3">
                                                    <div className="p-1 rounded-md" style={{backgroundColor: spot.color + '20'}}>
                                                        {React.createElement(mapIcons[spot.icon as keyof typeof mapIcons] || MapPin, { className: 'size-5', style: {color: spot.color} })}
@@ -561,13 +562,13 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                    <div>
                                                        <p className="font-bold text-left">{spot.name}</p>
                                                         <p className="text-xs text-muted-foreground text-left">
-                                                          {spot.createdAt ? format(spot.createdAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr }) : 'Enregistrement...'}
+                                                            {spot.createdAt ? format(spot.createdAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr }) : 'Enregistrement...'}
                                                         </p>
                                                    </div>
                                                </div>
                                                <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
                                            </AccordionPrimitive.Trigger>
-                                       </AccordionPrimitive.Header>
+                                       </div>
                                        <AccordionPrimitive.Content className="overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
                                            <div className="pb-4 pl-12 pr-4 space-y-4">
                                             {spot.fishingTypes && spot.fishingTypes.length > 0 && (
