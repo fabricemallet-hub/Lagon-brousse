@@ -68,7 +68,7 @@ import type { HuntingSession, SessionParticipant, UserAccount } from '@/lib/type
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Skeleton } from './ui/skeleton';
-import { GoogleMap, OverlayView, MarkerF } from '@react-google-maps/api';
+import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 
 const playSound = (type: 'position' | 'battue' | 'gibier') => {
@@ -114,24 +114,6 @@ const iconMap = { Navigation, UserIcon, Crosshair, Footprints, Mountain };
 const availableIcons = Object.keys(iconMap);
 const availableColors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
 
-const iconSvgs: Record<string, string> = {
-  Navigation: `<polygon points="3 11 22 2 13 21 11 13 3 11"/>`,
-  UserIcon: `<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>`,
-  Crosshair: `<circle cx="12" cy="12" r="10"/><line x1="22" x2="18" y1="12" y2="12"/><line x1="6" x2="2" y1="12" y2="12"/><line x1="12" x2="12" y1="6" y2="2"/><line x1="12" x2="12" y1="22" y2="18"/>`,
-  Footprints: `<path d="M4 16v-2.38c0-1.4.9-2.62 2.24-2.62s2.24 1.22 2.24 2.62V16"/><path d="M10.24 13.38v2.38c0 1.4-.9 2.62-2.24 2.62S5.76 17.18 5.76 15.78v-2.4"/><path d="M14.76 13.38v2.38c0 1.4.9 2.62 2.24 2.62s2.24-1.22 2.24-2.62v-2.4"/><path d="M20 16v-2.38c0-1.4-.9-2.62-2.24-2.62s-2.24 1.22-2.24 2.62V16"/>`,
-  Mountain: `<path d="m8 3 4 8 5-5 5 15H2L8 3z"/>`,
-};
-
-const createMarkerIcon = (color: string, iconName: string) => {
-    const iconSvgPath = iconSvgs[iconName] || iconSvgs['Navigation'];
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
-      <circle cx="20" cy="20" r="16" fill="${color}" stroke="white" stroke-width="2"/>
-      <g transform="translate(8, 8) scale(1)" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        ${iconSvgPath}
-      </g>
-    </svg>`;
-    return `data:image/svg+xml;base64,${btoa(svg)}`;
-};
 
 // --- Helper Components ---
 
@@ -193,15 +175,6 @@ function HuntingSessionContent() {
   
   const myParticipant = useMemo(() => participants?.find(p => p.id === user?.uid), [participants, user]);
   const otherParticipants = useMemo(() => participants?.filter(p => p.id !== user?.uid), [participants, user]);
-
-  const myMarkerIcon = useMemo(() => {
-    if (!myParticipant) return undefined;
-    return {
-        url: createMarkerIcon(myParticipant.mapColor || '#3b82f6', myParticipant.mapIcon || 'Navigation'),
-        scaledSize: new window.google.maps.Size(40, 40),
-        anchor: new window.google.maps.Point(20, 20),
-    };
-  }, [myParticipant]);
   
   useEffect(() => {
     if (userProfile) {
@@ -284,16 +257,6 @@ function HuntingSessionContent() {
     });
 }, [user, firestore, session]);
 
- const handleDragEnd = (e: google.maps.MapMouseEvent) => {
-    if (e.latLng) {
-        const newLocation = {
-            latitude: e.latLng.lat(),
-            longitude: e.latLng.lng(),
-        };
-        setUserLocation(newLocation); // Optimistic UI update
-        updateFirestorePosition(newLocation.latitude, newLocation.longitude);
-    }
-  };
 
   const fetchAndSetUserPosition = useCallback(async (isFirstUpdate = false) => {
     if (!user || !firestore || !navigator.geolocation || !session?.id) return;
@@ -893,33 +856,30 @@ function HuntingSessionContent() {
                             </div>
                         )}
                         {myParticipant && userLocation && typeof userLocation.latitude === 'number' && typeof userLocation.longitude === 'number' && (
-                          <Fragment>
-                            <MarkerF
-                              position={{ lat: userLocation.latitude, lng: userLocation.longitude }}
-                              draggable={true}
-                              onDragEnd={handleDragEnd}
-                              icon={myMarkerIcon}
-                              zIndex={99}
-                            />
-                             <OverlayView
+                            <OverlayView
                                 position={{ lat: userLocation.latitude, lng: userLocation.longitude }}
                                 mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                             >
-                                <div style={{ transform: 'translate(-50%, -150%)' }} className="flex flex-col items-center">
-                                  <div className="px-2 pb-0.5 text-xs font-bold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.7)] whitespace-nowrap">
-                                      <span className="mr-1">{myParticipant.displayName}</span>
-                                       {(() => {
-                                        const statusDisplay = getStatusDisplay(myParticipant);
-                                        return statusDisplay.text && (
-                                            <span className={cn('font-semibold', statusDisplay.colorClass)}>
-                                                ({statusDisplay.text})
-                                            </span>
-                                        );
-                                       })()}
-                                  </div>
+                                <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
+                                    <div className="px-2 pb-0.5 text-xs font-bold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.7)] whitespace-nowrap">
+                                        <span className="mr-1">{myParticipant.displayName}</span>
+                                        {(() => {
+                                            const statusDisplay = getStatusDisplay(myParticipant);
+                                            return statusDisplay.text && (
+                                                <span className={cn('font-semibold', statusDisplay.colorClass)}>
+                                                    ({statusDisplay.text})
+                                                </span>
+                                            );
+                                        })()}
+                                    </div>
+                                    <div
+                                        className="p-1.5 rounded-full flex items-center justify-center shadow-lg"
+                                        style={{ backgroundColor: myParticipant.mapColor || '#3b82f6' }}
+                                    >
+                                        {React.createElement(iconMap[myParticipant.mapIcon as keyof typeof iconMap] || Navigation, { className: "size-5 drop-shadow-md text-white" })}
+                                    </div>
                                 </div>
                             </OverlayView>
-                          </Fragment>
                         )}
 
                         {otherParticipants?.map(p => {
@@ -930,7 +890,7 @@ function HuntingSessionContent() {
                                     position={{ lat: p.location.latitude, lng: p.location.longitude }}
                                     mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                                 >
-                                    <div style={{ transform: 'translate(-50%, -150%)' }} className="flex flex-col items-center">
+                                    <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
                                         <div className="px-2 pb-0.5 text-xs font-bold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.7)] whitespace-nowrap">
                                             <span className="mr-1">{p.displayName}</span>
                                             {(() => {
@@ -946,9 +906,7 @@ function HuntingSessionContent() {
                                             className="p-1.5 rounded-full flex items-center justify-center shadow-lg"
                                             style={{ backgroundColor: p.mapColor || '#3b82f6' }}
                                         >
-                                            <UserIcon
-                                                className="size-5 drop-shadow-md text-white"
-                                            />
+                                            {React.createElement(iconMap[p.mapIcon as keyof typeof iconMap] || UserIcon, { className: "size-5 drop-shadow-md text-white" })}
                                         </div>
                                     </div>
                                 </OverlayView>
