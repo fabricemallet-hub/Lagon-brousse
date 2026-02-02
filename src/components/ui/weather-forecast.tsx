@@ -26,6 +26,7 @@ import {
   CarouselPrevious,
   type CarouselApi,
 } from '@/components/ui/carousel';
+import { Badge } from './badge';
 
 const WeatherConditionIcon = ({
   condition,
@@ -195,7 +196,7 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
             {weather.hourly.slice(0, 24).map((forecast, index) => (
               <CarouselItem
                 key={index}
-                className="basis-1/4 sm:basis-1/5 md:basis-1/6"
+                className="basis-1/4 sm:basis-1/5 md:basis-[14%]"
                 onClick={() => api?.scrollTo(index)}
               >
                 <div
@@ -225,8 +226,12 @@ export function WeatherForecast({ weather }: { weather: WeatherData }) {
                       <span className="font-semibold text-sm">{forecast.tideHeight.toFixed(1)}m</span>
                   </div>
                   <div className="flex items-center justify-center gap-1 h-5" title="Force du courant">
-                    {forecast.tideCurrent === 'Nul' ? (
-                        <span className="text-xs font-bold text-primary px-2 py-0.5 rounded-full bg-primary/10">Étale</span>
+                    {forecast.tidePeakType ? (
+                        <Badge variant={forecast.tidePeakType === 'haute' ? 'default' : 'destructive'} className="capitalize text-xs font-semibold">
+                            {forecast.tidePeakType === 'haute' ? 'Pleine Mer' : 'Basse Mer'}
+                        </Badge>
+                    ) : forecast.tideCurrent === 'Nul' ? (
+                        <Badge variant="secondary" className="text-xs">Étale</Badge>
                     ) : (
                         <>
                             <Zap className="size-4" />

@@ -157,11 +157,15 @@ export default function PechePage() {
                     <span>{slot.tide} à {slot.tideTime}</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    {getTideIcon(slot.tideMovement)}
                     {slot.tideMovement === 'étale' ? (
-                      <Badge variant="secondary" className="capitalize">{slot.tideMovement}</Badge>
+                      <Badge variant={slot.tide.includes('haute') ? 'default' : 'destructive'} className="capitalize text-xs font-semibold">
+                          {slot.tide.includes('haute') ? 'Pleine Mer' : 'Basse Mer'}
+                      </Badge>
                     ) : (
-                      <span className="capitalize">{slot.tideMovement}</span>
+                      <>
+                        {getTideIcon(slot.tideMovement)}
+                        <span className="capitalize">{slot.tideMovement}</span>
+                      </>
                     )}
                   </div>
               </div>

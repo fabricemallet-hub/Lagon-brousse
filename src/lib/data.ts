@@ -1,6 +1,6 @@
 import { LocationData, Tide, WindDirection, WindForecast, HourlyForecast } from './types';
 import { locations } from './locations';
-import { Firestore, doc, getDoc } from 'firebase/firestore';
+import { Firestore, doc, getDoc, collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
 
 // Data from https://www.meteo.nc/nouvelle-caledonie/mer/previsions-site
 const tideStations = {
@@ -155,7 +155,7 @@ function formatTime(unixTimestamp: number, timezoneOffset: number): string {
     return date.toISOString().substr(11, 5);
 }
 
-function calculateHourlyTides(location: string, baseDate: Date): Pick<HourlyForecast, 'date' | 'tideHeight' | 'tideCurrent'>[] {
+function calculateHourlyTides(location: string, baseDate: Date): Pick<HourlyForecast, 'date' | 'tideHeight' | 'tideCurrent' | 'tidePeakType'>[] {
     const getTidesForDay = (date: Date): Tide[] => {
         const dayOfMonth = date.getDate();
         const month = date.getMonth();
@@ -203,7 +203,7 @@ function calculateHourlyTides(location: string, baseDate: Date): Pick<HourlyFore
         ...tidesNext.map(t => ({ ...t, timeMinutes: timeToMinutes(t.time) + 24 * 60 })),
     ].sort((a, b) => a.timeMinutes - b.timeMinutes);
 
-    const hourlyTides: Pick<HourlyForecast, 'date' | 'tideHeight' | 'tideCurrent'>[] = [];
+    const hourlyTides: Pick<HourlyForecast, 'date' | 'tideHeight' | 'tideCurrent' | 'tidePeakType'>[] = [];
     const startDate = new Date(baseDate);
     startDate.setHours(0, 0, 0, 0);
 
@@ -220,6 +220,7 @@ function calculateHourlyTides(location: string, baseDate: Date): Pick<HourlyFore
 
         let tideHeight = prevTide.height;
         let tideCurrent: 'Nul' | 'Faible' | 'Modéré' | 'Fort' = 'Nul';
+        let tidePeakType: 'haute' | 'basse' | undefined = undefined;
 
         const tideDuration = nextTide.timeMinutes - prevTide.timeMinutes;
 
@@ -237,13 +238,22 @@ function calculateHourlyTides(location: string, baseDate: Date): Pick<HourlyFore
             if (strengthValue > 1.0) tideCurrent = 'Fort';
             else if (strengthValue > 0.5) tideCurrent = 'Modéré';
             else if (strengthValue > 0.1) tideCurrent = 'Faible';
-            else tideCurrent = 'Nul';
+            else {
+                tideCurrent = 'Nul';
+                // We are at a slack tide, determine if it's high or low
+                if (Math.abs(tideHeight - prevTide.height) < 0.1) {
+                    tidePeakType = prevTide.type;
+                } else if (Math.abs(tideHeight - nextTide.height) < 0.1) {
+                    tidePeakType = nextTide.type;
+                }
+            }
         }
 
         hourlyTides.push({
             date: currentHourDate.toISOString(),
             tideHeight: tideHeight,
-            tideCurrent: tideCurrent
+            tideCurrent: tideCurrent,
+            tidePeakType: tidePeakType
         });
     }
 
@@ -340,7 +350,9 @@ export function generateProceduralData(location: string, date: Date): LocationDa
             nextTide = firstTideNextDay;
         }
 
-        if (nextTide) {
+        if (minDiff < 30) {
+            slot.tideMovement = 'étale';
+        } else if (nextTide) {
             if (nextTide.type === 'haute') {
                 slot.tideMovement = 'montante';
             } else {
@@ -529,7 +541,7 @@ export function generateProceduralData(location: string, date: Date): LocationDa
             else if (conditionSeed > 0.2) condition = 'Nuageux';
             else condition = 'Averses';
         }
-        locationData.weather.hourly.push({ date: forecastDate.toISOString(), condition: condition, windSpeed: windSpeed, windDirection: windDirection, stability: 'Stable', isNight: isNight, temp: temp, tideHeight: 0, tideCurrent: 'Nul' });
+        locationData.weather.hourly.push({ date: forecastDate.toISOString(), condition: condition, windSpeed: windSpeed, windDirection: windDirection, stability: 'Stable', isNight: isNight, temp: temp, tideHeight: 0, tideCurrent: 'Nul', tidePeakType: undefined });
     }
     const currentHourForecast = locationData.weather.hourly.find(f => new Date(f.date).getHours() === effectiveDate.getHours());
     if (currentHourForecast) { locationData.weather.temp = currentHourForecast.temp; }
@@ -568,6 +580,7 @@ export function generateProceduralData(location: string, date: Date): LocationDa
         if (correspondingTide) {
             forecast.tideHeight = correspondingTide.tideHeight;
             forecast.tideCurrent = correspondingTide.tideCurrent;
+            forecast.tidePeakType = correspondingTide.tidePeakType;
         }
     });
 
@@ -576,15 +589,45 @@ export function generateProceduralData(location: string, date: Date): LocationDa
 
 
 export async function getDataForDate(firestore: Firestore, location: string, date: Date): Promise<LocationData> {
-  // Always generate procedural data first as a base. This includes the hardcoded tides.
-  const proceduralData = generateProceduralData(location, date);
+  const dateStr = date.toISOString().split('T')[0];
+  const tideStation = communeToTideStationMap[location] || 'Nouméa';
+  const tideDocRef = doc(firestore, `stations/${tideStation}/tides/${dateStr}`);
+
+  let proceduralData = generateProceduralData(location, date);
+  
+  try {
+      const tideDocSnap = await getDoc(tideDocRef);
+      if (tideDocSnap.exists()) {
+          const archivedTides: Omit<Tide, 'current'>[] = tideDocSnap.data().tides;
+          if (archivedTides && archivedTides.length > 0) {
+            // Replace procedural tides with archived tides
+            proceduralData.tides = archivedTides.map(t => ({...t, current: 'Modéré'}));
+            // Recalculate hourly data with the new tides
+            const hourlyTideData = calculateHourlyTides(location, date);
+            proceduralData.weather.hourly.forEach(forecast => {
+                const forecastDate = new Date(forecast.date);
+                const correspondingTide = hourlyTideData.find(t => {
+                    const tideDate = new Date(t.date);
+                    return tideDate.getDate() === forecastDate.getDate() && tideDate.getHours() === forecastDate.getHours();
+                });
+                if (correspondingTide) {
+                    forecast.tideHeight = correspondingTide.tideHeight;
+                    forecast.tideCurrent = correspondingTide.tideCurrent;
+                    forecast.tidePeakType = correspondingTide.tidePeakType;
+                }
+            });
+          }
+      }
+  } catch (error) {
+      console.error("Failed to fetch archived tides, using procedural data.", error);
+  }
 
   // Then, fetch real-time weather from OpenWeatherMap
   const apiKey = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY;
   const locationCoords = locations[location];
 
-  if (!apiKey || !locationCoords) {
-    console.warn("API key or location coordinates are missing. Using only procedural data.");
+  if (!apiKey || !locationCoords || apiKey === "6d514194-0b92-4f0f-a0ed-698b92076c94") {
+    console.warn("API key or location coordinates are missing/invalid. Using only procedural data.");
     return proceduralData;
   }
 
@@ -632,6 +675,7 @@ export async function getDataForDate(firestore: Firestore, location: string, dat
             temp: Math.round(h.temp),
             tideHeight: 0, // Placeholder
             tideCurrent: 'Nul', // Placeholder
+            tidePeakType: undefined,
         }
     }).slice(0, 48);
     
@@ -646,6 +690,7 @@ export async function getDataForDate(firestore: Firestore, location: string, dat
         if (correspondingTide) {
             forecast.tideHeight = correspondingTide.tideHeight;
             forecast.tideCurrent = correspondingTide.tideCurrent;
+            forecast.tidePeakType = correspondingTide.tidePeakType;
         }
     });
 
@@ -673,4 +718,34 @@ export async function getDataForDate(firestore: Firestore, location: string, dat
 
 export function getAvailableLocations(): string[] {
   return Object.keys(communeToTideStationMap).sort();
+}
+
+
+export async function getTideArchiveStatus(firestore: Firestore): Promise<{ lastDate: string | null, stationCount: number }> {
+    const stations = [...new Set(Object.values(communeToTideStationMap))];
+    let latestDate: Date | null = null;
+
+    for (const stationName of stations) {
+        try {
+            const tidesColRef = collection(firestore, `stations/${stationName}/tides`);
+            const q = query(tidesColRef, orderBy('__name__', 'desc'), limit(1));
+            const querySnapshot = await getDocs(q);
+            
+            if (!querySnapshot.empty) {
+                const lastDocId = querySnapshot.docs[0].id;
+                const docDate = new Date(lastDocId);
+                 if (!latestDate || docDate > latestDate) {
+                    latestDate = docDate;
+                }
+            }
+        } catch (error) {
+            console.error(`Failed to check tide archive for ${stationName}:`, error);
+            // This might be a missing index error, but we continue to check other stations
+        }
+    }
+
+    return {
+        lastDate: latestDate ? latestDate.toISOString().split('T')[0] : null,
+        stationCount: stations.length,
+    };
 }

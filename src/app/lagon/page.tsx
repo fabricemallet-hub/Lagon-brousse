@@ -158,35 +158,31 @@ export default function LagonPage() {
         <CardContent className="space-y-4">
           <div className="space-y-3">
             {sortedTides.map((tide, i) => {
-              const isHighTideHighlight = tide.type === 'haute' && tide.height >= 1.7;
-              const isLowTideHighlight = tide.type === 'basse' && tide.height <= 0.23;
               const TideIcon = tide.type === 'haute' ? TrendingUp : TrendingDown;
               
               return (
                   <div key={i} className={cn(
                       "flex items-center justify-between p-3 rounded-lg border bg-background transition-all",
-                      isHighTideHighlight && "border-purple-500/50 bg-purple-50/50 dark:bg-purple-900/20",
-                      isLowTideHighlight && "border-destructive/50 bg-destructive/10",
+                      tide.type === 'haute' && "border-primary/50 bg-primary/10",
+                      tide.type === 'basse' && "border-destructive/50 bg-destructive/10",
                   )}>
                       <div className="flex items-center gap-4">
                           <TideIcon className={cn(
                               "size-8 shrink-0",
-                              tide.type === 'haute' ? 'text-blue-500' : 'text-orange-500',
-                              isHighTideHighlight && "text-purple-600",
-                              isLowTideHighlight && "text-destructive",
+                              tide.type === 'haute' ? 'text-primary' : 'text-destructive',
                           )} />
                           <div>
                               <p className="font-semibold text-lg capitalize">{`Marée ${tide.type}`}</p>
                               <div className="flex items-center gap-2">
                                 <p className="text-muted-foreground font-mono">{tide.time}</p>
-                                <Badge variant="secondary" className="text-xs">Étale</Badge>
+                                <Badge variant={tide.type === 'haute' ? 'default' : 'destructive'} className="text-xs capitalize">{tide.type === 'haute' ? 'Pleine Mer' : 'Basse Mer'}</Badge>
                               </div>
                           </div>
                       </div>
                       <div className={cn(
                           "font-bold text-xl",
-                          isHighTideHighlight && "text-purple-700 dark:text-purple-400",
-                          isLowTideHighlight && "text-destructive",
+                          tide.type === 'haute' && "text-primary",
+                          tide.type === 'basse' && "text-destructive",
                       )}>
                           {tide.height.toFixed(2)}m
                       </div>

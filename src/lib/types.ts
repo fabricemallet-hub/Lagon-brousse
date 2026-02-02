@@ -23,6 +23,7 @@ export interface HourlyForecast {
   temp: number;
   tideHeight: number;
   tideCurrent: 'Nul' | 'Faible' | 'Modéré' | 'Fort';
+  tidePeakType?: 'haute' | 'basse';
 }
 
 export interface WeatherData {

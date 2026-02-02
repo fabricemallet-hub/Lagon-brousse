@@ -104,28 +104,24 @@ export default function Home() {
           </CardHeader>
           <CardContent className="space-y-2">
             {sortedTides.map((tide, index) => {
-              const isHighTideHighlight = tide.type === 'haute' && tide.height >= 1.7;
-              const isLowTideHighlight = tide.type === 'basse' && tide.height <= 0.23;
               const TideIcon = tide.type === 'haute' ? TrendingUp : TrendingDown;
               return (
               <div key={index} className={cn(
                   "flex items-center justify-between rounded-md p-2 -mx-2 transition-colors",
-                  isHighTideHighlight && "bg-purple-50/50 dark:bg-purple-900/20",
-                  isLowTideHighlight && "bg-destructive/10",
+                  tide.type === 'haute' && "bg-primary/10",
+                  tide.type === 'basse' && "bg-destructive/10",
                 )}>
                 <div className="flex items-center gap-2">
                     <TideIcon className={cn(
                       "size-5 shrink-0",
-                      tide.type === 'haute' ? 'text-blue-500' : 'text-orange-500',
-                      isHighTideHighlight && "text-purple-600",
-                      isLowTideHighlight && "text-destructive",
+                      tide.type === 'haute' ? 'text-primary' : 'text-destructive',
                     )} />
                     <span className="text-muted-foreground capitalize text-sm">{`Marée ${tide.type}`}</span>
                 </div>
                 <span className={cn(
                     "font-mono font-medium text-sm",
-                    isHighTideHighlight && "text-purple-700 dark:text-purple-400 font-bold",
-                    isLowTideHighlight && "text-destructive font-bold",
+                    tide.type === 'haute' && "text-primary font-bold",
+                    tide.type === 'basse' && "text-destructive font-bold",
                   )}>
                   {tide.time} ({tide.height.toFixed(2)}m)
                 </span>
