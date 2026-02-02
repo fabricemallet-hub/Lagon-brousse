@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from './alert';
 import { useLocation } from '@/context/location-context';
 import { findSimilarDay, analyzeBestDay } from '@/ai/flows/find-best-fishing-day';
-import type { FishingAnalysisOutput } from '@/ai/flows/find-best-fishing-day';
+import type { FishingAnalysisOutput } from '@/ai/schemas';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 
@@ -116,44 +116,62 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
 
         if (navigator.permissions && navigator.permissions.query) {
             navigator.permissions.query({name: 'geolocation'}).then(status => {
-                if (status.state === 'granted') {
-                     watchId.current = navigator.geolocation.watchPosition(
-                        (position) => {
-                            const { latitude, longitude } = position.coords;
-                            const newLocation = { lat: latitude, lng: longitude };
-                            setUserLocation(newLocation);
-
-                            if (map && centerMap && !initialZoomDone) {
-                                map.panTo(newLocation);
-                                map.setZoom(16);
-                                setInitialZoomDone(true);
-                            }
-                        },
-                        () => {
-                             toast({
-                                variant: 'destructive',
-                                title: 'Position non disponible',
-                                description: "Veuillez autoriser l'accès à votre position.",
-                            });
-                        },
-                        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-                    );
-                } else if (status.state === 'prompt') {
+                if (status.state === 'prompt') {
                     // Prompt will be shown by handleRecenter if user clicks it
-                } else if (status.state === 'denied') {
+                    return;
+                }
+                if (status.state === 'denied') {
                      toast({
                         variant: 'destructive',
                         title: 'Géolocalisation refusée',
                         description: "Veuillez l'activer dans les paramètres de votre navigateur pour utiliser cette fonctionnalité.",
                     });
+                    return;
                 }
+                // 'granted'
+                watchId.current = navigator.geolocation.watchPosition(
+                    (position) => {
+                        const { latitude, longitude } = position.coords;
+                        const newLocation = { lat: latitude, lng: longitude };
+                        setUserLocation(newLocation);
+
+                        if (map && centerMap && !initialZoomDone) {
+                            map.panTo(newLocation);
+                            map.setZoom(16);
+                            setInitialZoomDone(true);
+                        }
+                    },
+                    () => {
+                         toast({
+                            variant: 'destructive',
+                            title: 'Position non disponible',
+                            description: "Veuillez autoriser l'accès à votre position.",
+                        });
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
             });
+        } else {
+            // Fallback for older browsers
+             watchId.current = navigator.geolocation.watchPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    const newLocation = { lat: latitude, lng: longitude };
+                    setUserLocation(newLocation);
+
+                    if (map && centerMap && !initialZoomDone) {
+                        map.panTo(newLocation);
+                        map.setZoom(16);
+                        setInitialZoomDone(true);
+                    }
+                }, () => {}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
         }
     }, [map, initialZoomDone, toast]);
 
     useEffect(() => {
         if (isLoaded && map) {
-           startWatchingPosition(true);
+           startWatchingPosition(false); // don't auto-center on initial load
         }
         return () => {
             if (watchId.current !== null) {
@@ -410,14 +428,16 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         <Button size="icon" onClick={handleRecenter} className="absolute top-2 right-2 shadow-lg h-9 w-9 z-10">
                             <LocateFixed className="h-5 w-5" />
                         </Button>
-                        <Button 
-                            className="absolute bottom-4 left-1/2 -translate-x-1/2 shadow-lg z-10" 
-                            onClick={() => { if (newSpotLocation) setIsAddSpotOpen(true); }}
-                            disabled={!newSpotLocation}
-                        >
-                            <Plus className="mr-2" /> 
-                            {newSpotLocation ? 'Ajouter ce coin de pêche' : 'Cliquez sur la carte pour placer un repère'}
-                        </Button>
+                        {(!isFullscreen || newSpotLocation) && (
+                            <Button 
+                                className="absolute bottom-4 left-1/2 -translate-x-1/2 shadow-lg z-10" 
+                                onClick={() => { if (newSpotLocation) setIsAddSpotOpen(true); }}
+                                disabled={!newSpotLocation}
+                            >
+                                <Plus className="mr-2" /> 
+                                {newSpotLocation ? 'Ajouter ce coin de pêche' : 'Cliquez sur la carte pour placer un repère'}
+                            </Button>
+                        )}
                     </div>
                 )}
                 
