@@ -19,7 +19,6 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, AuthError } from 'firebase/auth';
 import { ForgotPasswordDialog } from './forgot-password-dialog';
-import { Eye, EyeOff } from 'lucide-react';
 
 type AuthFormProps = {
   mode: 'login' | 'signup';
@@ -40,7 +39,6 @@ export function AuthForm({ mode }: AuthFormProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<z.infer<ReturnType<typeof formSchema>>>({
     resolver: zodResolver(formSchema(mode)),
@@ -53,6 +51,8 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   async function onSubmit(values: z.infer<ReturnType<typeof formSchema>>) {
     setIsLoading(true);
+    toast({ title: 'Tentative de connexion...', description: `Connexion en cours pour ${values.email}` });
+
     if (!auth) {
       toast({
         variant: "destructive",
@@ -111,6 +111,8 @@ export function AuthForm({ mode }: AuthFormProps) {
             errorMessage = `Une erreur est survenue (code: ${authError.code}). Veuillez contacter le support si le problème persiste.`;
             break;
         }
+      } else {
+        errorMessage = (error as Error).message || "Une erreur inconnue est survenue lors de la tentative de connexion.";
       }
       
       toast({
@@ -169,26 +171,13 @@ export function AuthForm({ mode }: AuthFormProps) {
                    </ForgotPasswordDialog>
                 )}
               </div>
-              <div className="relative">
-                <FormControl>
-                  <Input 
-                    type={showPassword ? "text" : "password"} 
-                    placeholder="********" {...field} 
-                    autoComplete={mode === 'login' ? 'current-password' : 'new-password'} 
-                    className="pr-10"
-                  />
-                </FormControl>
-                <Button 
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute inset-y-0 right-0 h-full w-10 text-muted-foreground hover:bg-transparent"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                    <span className="sr-only">{showPassword ? "Cacher le mot de passe" : "Afficher le mot de passe"}</span>
-                </Button>
-              </div>
+              <FormControl>
+                <Input 
+                  type="password" 
+                  placeholder="********" {...field} 
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'} 
+                />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
