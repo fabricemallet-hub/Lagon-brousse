@@ -488,7 +488,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                             className="flex flex-col items-center gap-1 cursor-pointer"
                                             onClick={(e) => { e.stopPropagation(); handleSpotClick(spot.id); }}
                                         >
-                                            <div className="flex flex-col items-center gap-1 px-2 py-1 bg-card/90 border border-border rounded-md shadow">
+                                            <div className="flex flex-col items-center gap-0.5 px-2 py-1 bg-card/90 backdrop-blur-sm border border-border rounded-md shadow">
                                                 <span className="text-xs font-bold text-card-foreground whitespace-nowrap">{spot.name}</span>
                                                 {spot.fishingTypes && spot.fishingTypes.length > 0 && (
                                                     <div className="flex gap-1">
