@@ -113,31 +113,32 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     }, []);
 
     const startWatchingPosition = useCallback(() => {
-        if (!navigator.geolocation) {
-            return;
-        }
-        navigator.permissions.query({ name: 'geolocation' }).then(permissionStatus => {
-            if (permissionStatus.state === 'granted') {
-                 if (watchId.current !== null) {
-                    navigator.geolocation.clearWatch(watchId.current);
-                }
-                watchId.current = navigator.geolocation.watchPosition(
-                    (position) => {
-                        const { latitude, longitude } = position.coords;
-                        const newLocation = { lat: latitude, lng: longitude };
-                        setUserLocation(newLocation);
-                        if (map && !initialZoomDone) {
-                            map.panTo(newLocation);
-                            map.setZoom(16);
-                            setInitialZoomDone(true);
-                        }
-                    },
-                    () => { /* Error can be handled silently or with a toast */ },
-                    { enableHighAccuracy: true }
-                );
+    if (!navigator.geolocation) {
+        return;
+    }
+    // Only start watching if permission is already granted.
+    navigator.permissions.query({ name: 'geolocation' }).then(permissionStatus => {
+        if (permissionStatus.state === 'granted') {
+             if (watchId.current !== null) {
+                navigator.geolocation.clearWatch(watchId.current);
             }
-        });
-    }, [map, initialZoomDone]);
+            watchId.current = navigator.geolocation.watchPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    const newLocation = { lat: latitude, lng: longitude };
+                    setUserLocation(newLocation);
+                    if (map && !initialZoomDone) {
+                        map.panTo(newLocation);
+                        map.setZoom(16);
+                        setInitialZoomDone(true);
+                    }
+                },
+                () => { /* Error can be handled silently or with a toast */ },
+                { enableHighAccuracy: true }
+            );
+        }
+    });
+}, [map, initialZoomDone]);
 
      useEffect(() => {
         if (map && isLoaded) {
@@ -488,7 +489,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                             onClick={(e) => { e.stopPropagation(); handleSpotClick(spot.id); }}
                                         >
                                             <div className="flex flex-col items-center gap-1 px-2 py-1 bg-card/90 border border-border rounded-md shadow">
-                                                <span className="text-xs font-bold text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.5)] whitespace-nowrap">{spot.name}</span>
+                                                <span className="text-xs font-bold text-card-foreground whitespace-nowrap">{spot.name}</span>
                                                 {spot.fishingTypes && spot.fishingTypes.length > 0 && (
                                                     <div className="flex gap-1">
                                                         {spot.fishingTypes.map(type => {
