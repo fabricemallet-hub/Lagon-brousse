@@ -298,17 +298,21 @@ function HuntingSessionContent() {
             setUserLocation(myParticipant.location);
         }
     }
-  }, [myParticipant]);
+  }, [myParticipant, userLocation]);
 
   useEffect(() => {
-    if (isParticipating && session) {
-      // Don't start interval immediately, wait for initial fetch to be triggered by user gesture
-      if (updateIntervalRef.current === null) {
-        updateIntervalRef.current = setInterval(() => fetchAndSetUserPosition(), 30000); // 30 seconds
-      }
-    } else if (updateIntervalRef.current) {
-      clearInterval(updateIntervalRef.current);
-      updateIntervalRef.current = null;
+    if (isParticipating && session && !updateIntervalRef.current) {
+        // Don't start interval immediately, wait for initial fetch to be triggered by user gesture
+        updateIntervalRef.current = setInterval(() => {
+            if (navigator.geolocation) {
+                fetchAndSetUserPosition();
+            }
+        }, 30000); // 30 seconds
+    } else if (!isParticipating || !session) {
+        if (updateIntervalRef.current) {
+            clearInterval(updateIntervalRef.current);
+            updateIntervalRef.current = null;
+        }
     }
     
     return () => {
@@ -358,10 +362,7 @@ function HuntingSessionContent() {
         updatedAt: serverTimestamp(),
     };
     
-    // Initial user gesture triggers first location fetch
-    await fetchAndSetUserPosition(true);
-
-    setDoc(participantDocRef, participantData, { merge: true }).catch(e => {
+    await setDoc(participantDocRef, participantData, { merge: true }).catch(e => {
         if (e.code === 'permission-denied') {
             const permissionError = new FirestorePermissionError({
                 path: participantDocRef.path,
@@ -373,6 +374,9 @@ function HuntingSessionContent() {
             console.error("Error creating participant document:", e);
         }
     });
+
+    // Initial user gesture triggers first location fetch
+    await fetchAndSetUserPosition(true);
 }, [user, firestore, fetchAndSetUserPosition, nickname, selectedIcon, selectedColor]);
 
   const handleCreateSession = async () => {
@@ -528,16 +532,50 @@ function HuntingSessionContent() {
   }, [map]);
 
   const handleRecenter = () => {
-    if (map && userLocation) {
-        map.panTo({ lat: userLocation.latitude, lng: userLocation.longitude });
-        map.setZoom(16);
-    } else {
+    if (!navigator.geolocation) {
         toast({
             variant: "destructive",
-            title: "Localisation introuvable",
-            description: "Impossible de vous recentrer sans votre position.",
-        })
+            title: "Géolocalisation non supportée",
+            description: "Votre navigateur ne supporte pas la géolocalisation.",
+        });
+        return;
     }
+
+    toast({ description: "Mise à jour de votre position..." });
+
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const { latitude, longitude } = position.coords;
+            const newLocation = { latitude, longitude };
+
+            // Update state for immediate UI feedback
+            setUserLocation(newLocation);
+            
+            // Update Firestore in the background
+            updateFirestorePosition(latitude, longitude);
+
+            // Pan the map to the new location
+            if (map) {
+                map.panTo(newLocation);
+                if(map.getZoom()! < 14) { // only zoom in if user is zoomed out
+                    map.setZoom(16);
+                }
+            }
+        },
+        (err) => {
+            console.error("Error getting geolocation for recenter:", err);
+            let description = "Impossible d'obtenir votre position actuelle.";
+            if (err.code === 1) { // User denied Geolocation
+              description = "Veuillez activer la géolocalisation dans les paramètres de votre navigateur.";
+            }
+            toast({
+                variant: "destructive",
+                title: "Erreur de localisation",
+                description: description,
+            });
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
   };
 
   const createMarkerIcon = (color: string, iconName: string) => {
@@ -612,7 +650,7 @@ function HuntingSessionContent() {
                 </CardTitle>
                  <CardDescription>Partagez votre position avec votre groupe en temps réel.</CardDescription>
             </CardHeader>
-            <CardContent className={cn("flex-grow flex flex-col", isFullscreen ? "p-2 gap-2 overflow-hidden" : "")}>
+            <CardContent className={cn("flex-grow flex flex-col", isFullscreen ? "p-2 gap-2 overflow-hidden" : "p-6 pt-0")}>
                  <div className={cn("relative w-full rounded-lg overflow-hidden border", isFullscreen ? "flex-grow" : "h-80 mb-4")}>
                     <GoogleMap
                         mapContainerClassName="w-full h-full"
@@ -638,7 +676,7 @@ function HuntingSessionContent() {
                               icon={{
                                 url: createMarkerIcon(myParticipant.mapColor || '#3b82f6', myParticipant.mapIcon || 'Navigation'),
                                 scaledSize: new window.google.maps.Size(40, 40),
-                                anchor: new window.google.maps.Point(20, 40),
+                                anchor: new window.google.maps.Point(20, 20),
                               }}
                               zIndex={99}
                             />
@@ -646,7 +684,7 @@ function HuntingSessionContent() {
                                 position={userLocation}
                                 mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                             >
-                                <div className="transform -translate-x-1/2 -translate-y-[calc(100%+45px)]">
+                                <div className="transform -translate-x-1/2 -translate-y-[calc(100%+25px)]">
                                   <div className="px-2 py-0.5 rounded-md text-xs font-bold text-white bg-black/60 whitespace-nowrap">
                                       {myParticipant.displayName}
                                   </div>
@@ -670,11 +708,11 @@ function HuntingSessionContent() {
                                             {p.displayName}
                                         </div>
                                         <div
-                                            className="p-1.5 rounded-full flex flex-col items-center shadow-lg border"
-                                            style={{backgroundColor: iconColor}}
+                                            className="p-1.5 rounded-full flex flex-col items-center shadow-lg border bg-white"
                                         >
                                             <IconComponent
-                                                className="size-5 drop-shadow-md text-white"
+                                                className="size-5 drop-shadow-md"
+                                                style={{color: iconColor}}
                                             />
                                         </div>
                                     </div>
@@ -749,7 +787,10 @@ function HuntingSessionContent() {
                             <div className="max-h-48 overflow-y-auto space-y-2 pr-2">
                             {participants?.map(p => (
                                 <div key={p.id} className="flex items-center justify-between p-2 border rounded-lg">
-                                    <p className="font-medium text-sm">{p.displayName}</p>
+                                    <div className="flex items-center gap-2">
+                                        <div style={{color: p.mapColor}} className="p-1 bg-white rounded-full border"><UserIcon className="size-4" /></div>
+                                        <p className="font-medium text-sm">{p.displayName}</p>
+                                    </div>
                                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
                                         {p.battery && (
                                             <div className="flex items-center gap-1">
@@ -851,5 +892,3 @@ export function HuntingSessionCard() {
 
   return <HuntingSessionContent />;
 }
-
-    
