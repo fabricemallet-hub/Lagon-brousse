@@ -274,7 +274,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                             {savedSpots?.map(spot => (
                                 <MarkerF 
                                     key={spot.id} 
-                                    position={spot.location} 
+                                    position={{ lat: spot.location.latitude, lng: spot.location.longitude }}
                                     icon={{
                                         url: createMarkerIconSvg(spot.color, spot.icon as keyof typeof mapIcons),
                                         scaledSize: new window.google.maps.Size(32, 32),
@@ -387,5 +387,3 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         </Card>
     );
 }
-
-    
