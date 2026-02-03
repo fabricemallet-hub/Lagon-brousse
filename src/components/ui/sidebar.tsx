@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -518,14 +519,26 @@ const sidebarMenuButtonVariants = cva(
   }
 )
 
-const SidebarMenuButton = React.forwardRef<
-  HTMLButtonElement,
-  React.ComponentProps<"button"> & {
-    asChild?: boolean
-    isActive?: boolean
-    tooltip?: string | React.ComponentProps<typeof TooltipContent>
-  } & VariantProps<typeof sidebarMenuButtonVariants>
->(({ asChild = false, isActive = false, variant = "default", size = "default", tooltip, className, onClick, ...props }, ref) => {
+interface SidebarMenuButtonProps
+  extends React.ComponentProps<"button">,
+    VariantProps<typeof sidebarMenuButtonVariants> {
+  asChild?: boolean
+  isActive?: boolean
+  tooltip?: string | React.ComponentProps<typeof TooltipContent>
+}
+
+const SidebarMenuButton = React.forwardRef<HTMLButtonElement, SidebarMenuButtonProps>(
+  (props, ref) => {
+    const {
+      asChild = false,
+      isActive = false,
+      variant = "default",
+      size = "default",
+      tooltip,
+      className,
+      onClick,
+      ...rest
+    } = props
     const Comp = asChild ? Slot : "button"
     const { setOpen, setOpenMobile, isMobile } = useSidebar()
 
@@ -535,7 +548,7 @@ const SidebarMenuButton = React.forwardRef<
         data-sidebar="menu-button"
         data-size={size}
         data-active={isActive}
-        className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
+        className={cn(sidebarMenuButtonVariants({ variant, size, className }))}
         onClick={(event) => {
           if (isMobile) {
             setOpenMobile(false)
@@ -544,7 +557,7 @@ const SidebarMenuButton = React.forwardRef<
           }
           onClick?.(event)
         }}
-        {...props}
+        {...rest}
       />
     )
 
@@ -552,20 +565,12 @@ const SidebarMenuButton = React.forwardRef<
       return button
     }
 
-    if (typeof tooltip === "string") {
-      tooltip = {
-        children: tooltip,
-      }
-    }
+    const tooltipProps = typeof tooltip === "string" ? { children: tooltip } : tooltip
 
     return (
       <Tooltip>
         <TooltipTrigger asChild>{button}</TooltipTrigger>
-        <TooltipContent
-          side="right"
-          align="center"
-          {...tooltip}
-        />
+        <TooltipContent side="right" align="center" {...tooltipProps} />
       </Tooltip>
     )
   }

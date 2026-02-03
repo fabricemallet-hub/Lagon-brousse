@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -144,7 +145,6 @@ export function WeatherForecast({
     }
     const windSentence = `Vent de ${_selectedForecast.windSpeed} nœuds de ${translateWindDirection(_selectedForecast.windDirection)}, tendance ${windTrend}.`;
 
-    // SORT BY HOUR: 00h to 23h
     const sortedForecasts = [...weather.hourly].sort((a, b) => 
       new Date(a.date).getHours() - new Date(b.date).getHours()
     );
@@ -158,11 +158,14 @@ export function WeatherForecast({
 
   useEffect(() => {
     if (isClient && isToday && scrollRef.current) {
-        const currentHour = now.getHours();
-        const element = scrollRef.current.querySelector(`[data-hour="${currentHour}"]`);
-        if (element) {
-            element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-        }
+        // Optimization: Use requestAnimationFrame to avoid forced reflow violation
+        requestAnimationFrame(() => {
+            const currentHour = now.getHours();
+            const element = scrollRef.current?.querySelector(`[data-hour="${currentHour}"]`) as HTMLElement;
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            }
+        });
     }
   }, [isClient, isToday, now]);
 
