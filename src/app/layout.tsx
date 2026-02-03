@@ -1,3 +1,4 @@
+
 'use client';
 
 import { AppShell } from '@/components/app-shell';
@@ -13,17 +14,15 @@ import { GoogleMapsProvider } from '@/context/google-maps-context';
 
 function AppContent({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    // Enregistrement du Service Worker PWA
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .then((registration) => {
-            console.log('Service Worker PWA enregistré :', registration.scope);
-          })
-          .catch((err) => {
-            console.error('Échec de l\'enregistrement du SW :', err);
-          });
-      });
+    // Enregistrement optimisé du Service Worker
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        .then((registration) => {
+          console.log('L&B NC: Service Worker actif (scope:', registration.scope, ')');
+        })
+        .catch((err) => {
+          console.error('L&B NC: Erreur SW:', err);
+        });
     }
   }, []);
 
