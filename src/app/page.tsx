@@ -24,16 +24,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 function HomeSkeleton() {
   return (
-    <div className="flex flex-col gap-8">
-      <div>
-        <Skeleton className="h-9 w-48 mb-2" />
-        <Skeleton className="h-5 w-full max-w-sm" />
+    <div className="flex flex-col gap-6 w-full max-w-full">
+      <div className="px-1">
+        <Skeleton className="h-8 w-32 mb-2" />
+        <Skeleton className="h-4 w-full max-w-xs" />
       </div>
-      <Skeleton className="h-[420px] w-full" />
-      <div className="grid gap-6 md:grid-cols-2">
-        <Skeleton className="h-56 w-full" />
-        <Skeleton className="h-56 w-full" />
-      </div>
+      <Skeleton className="h-[300px] w-full" />
+      <Skeleton className="h-48 w-full" />
+      <Skeleton className="h-48 w-full" />
     </div>
   );
 }
@@ -74,70 +72,70 @@ export default function Home() {
   const { weather, farming, tideStation } = data;
 
   return (
-    <div className="flex flex-col gap-8">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Bonjour!</h1>
-        <p className="text-muted-foreground">
-          Voici le résumé pour {selectedLocation} du{' '}
-          <span className="font-semibold">{dateString}</span>.
+    <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden">
+      <div className="px-1">
+        <h1 className="text-2xl font-black tracking-tight">Bonjour!</h1>
+        <p className="text-xs text-muted-foreground mt-1">
+          Résumé pour <span className="font-bold text-primary">{selectedLocation}</span> le {dateString}.
         </p>
       </div>
 
       <WeatherForecast weather={weather} tides={sortedTides} />
 
-      <div className="grid gap-6 sm:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl md:text-2xl">
+      <div className="flex flex-col gap-6 w-full">
+        <Card className="w-full">
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
               <Waves className="size-5 text-primary" />
-              Marées
+              Prochaines Marées
             </CardTitle>
-            <CardDescription>
-              Données de marée de la station de {tideStation}.
+            <CardDescription className="text-xs">
+              Station de {tideStation}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="p-4 space-y-2">
             {sortedTides.map((tide, index) => {
               const TideIcon = tide.type === 'haute' ? TrendingUp : TrendingDown;
               return (
               <div key={index} className={cn(
-                  "flex items-center justify-between rounded-md p-3 border",
-                  tide.type === 'haute' && "border-primary/50 bg-primary/10 text-primary",
-                  tide.type === 'basse' && "border-destructive/50 bg-destructive/10 text-destructive",
+                  "flex items-center justify-between rounded-lg p-3 border h-14",
+                  tide.type === 'haute' && "border-primary/30 bg-primary/5 text-primary",
+                  tide.type === 'basse' && "border-destructive/30 bg-destructive/5 text-destructive",
                 )}>
                 <div className="flex items-center gap-3">
-                    <TideIcon className="size-6 shrink-0" />
+                    <TideIcon className="size-5 shrink-0" />
                     <div>
-                      <span className="font-semibold capitalize text-base">{`Marée ${tide.type}`}</span>
-                      <p className="text-sm font-mono text-current/80">{tide.time}</p>
+                      <span className="font-black uppercase text-[10px]">{`Marée ${tide.type}`}</span>
+                      <p className="text-sm font-black leading-none">{tide.time}</p>
                     </div>
                 </div>
-                <span className="font-mono font-bold text-lg">
+                <span className="font-black text-lg">
                   {tide.height.toFixed(2)}m
                 </span>
               </div>
             )})}
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl md:text-2xl">
-              <Spade className="size-5 text-primary" />
-              Conseil du Jardinier
+
+        <Card className="w-full border-l-4 border-l-accent">
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Spade className="size-5 text-accent" />
+              Conseil Jardinier
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Phase Lunaire</span>
-              <span className="font-medium flex items-center gap-2">
-                <Moon className="size-4" /> {farming.lunarPhase}
+          <CardContent className="p-4 space-y-4">
+            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+              <span className="text-[10px] font-black uppercase text-muted-foreground">Phase Lunaire</span>
+              <span className="font-bold text-sm flex items-center gap-2 bg-card px-2 py-1 rounded shadow-sm border">
+                <Moon className="size-4 text-primary" /> {farming.lunarPhase}
               </span>
             </div>
-            <div className="flex flex-col">
-              <span className="text-muted-foreground">
-                Aujourd'hui est un bon jour pour :
+            <div className="p-3 bg-accent/5 border border-accent/10 rounded-lg">
+              <span className="text-[10px] font-black uppercase text-accent leading-none block mb-1">
+                Idéal aujourd'hui :
               </span>
-              <span className="font-medium">{farming.recommendation}</span>
+              <span className="font-bold text-sm leading-snug block">{farming.recommendation}</span>
             </div>
           </CardContent>
         </Card>

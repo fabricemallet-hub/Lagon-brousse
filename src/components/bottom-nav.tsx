@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -8,7 +7,7 @@ import { navLinks } from '@/lib/nav-links';
 import { cn } from '@/lib/utils';
 import { doc } from 'firebase/firestore';
 import type { UserAccount } from '@/lib/types';
-import { LogIn } from 'lucide-react';
+import { LogIn, User } from 'lucide-react';
 
 
 export function BottomNav() {
@@ -22,53 +21,53 @@ export function BottomNav() {
   }, [user, firestore]);
 
   const { data: userProfile } = useDoc<UserAccount>(userDocRef);
-  const isAdmin = userProfile?.subscriptionStatus === 'admin';
 
-  // Filter out admin link for simplicity on mobile, and contact link for admin
+  // Mobile navigation filters
   const visibleLinks = navLinks.filter(link => {
-    if (link.href === '/admin') return false;
-    if (link.href === '/contact' && isAdmin) return false;
-    return true;
+    // List of 5 main tabs for mobile
+    const mobileTabs = ['/', '/lagon', '/peche', '/chasse', '/champs'];
+    return mobileTabs.includes(link.href);
   });
 
-  return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-card border-t border-border shadow-t-lg pb-[env(safe-area-inset-bottom)]">
-      <div className="flex justify-around items-center h-16">
-        {visibleLinks.map(link => {
-          const requiresAuth = link.href === '/compte' || link.href === '/contact';
-          const isActive = pathname === link.href;
+  // Find the icon for the account page or fallback to default User icon
+  const accountLink = navLinks.find(l => l.href === '/compte');
+  const AccountIcon = accountLink?.icon || User;
 
-          if (requiresAuth && !user) {
-            if (link.href === '/compte') {
-              return (
-                <Link
-                    href="/login"
-                    key="login-link"
-                    className='flex flex-col items-center justify-center text-center w-full h-full text-muted-foreground hover:text-primary transition-colors'
-                    >
-                    <LogIn className="size-6" />
-                    <span className="text-[10px] font-medium mt-1">Connexion</span>
-                </Link>
-              );
-            }
-            // For other auth-requiring links like /contact, we just won't render them if logged out, to avoid clutter.
-            return null;
-          }
+  return (
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-[40] bg-card border-t border-border shadow-[0_-4px_10px_rgba(0,0,0,0.05)] pb-[env(safe-area-inset-bottom)] h-[calc(4.5rem+env(safe-area-inset-bottom))]">
+      <div className="flex justify-around items-center h-16 px-1">
+        {visibleLinks.map(link => {
+          const isActive = pathname === link.href;
           
           return (
             <Link
               href={link.href}
               key={link.label}
               className={cn(
-                'flex flex-col items-center justify-center text-center w-full h-full text-muted-foreground hover:text-primary transition-colors',
-                isActive && 'text-primary'
+                'flex flex-col items-center justify-center text-center w-full h-full text-muted-foreground transition-all active:scale-90',
+                isActive && 'text-primary font-bold'
               )}
             >
-              <link.icon className="size-6" />
-              <span className="text-[10px] font-medium mt-1">{link.label}</span>
+              <link.icon className={cn("size-6 mb-1", isActive && "scale-110")} />
+              <span className="text-[9px] uppercase tracking-tighter leading-none">{link.label}</span>
             </Link>
           );
         })}
+        
+        <Link
+          href={user ? "/compte" : "/login"}
+          className={cn(
+            'flex flex-col items-center justify-center text-center w-full h-full text-muted-foreground transition-all active:scale-90',
+            (pathname === '/compte' || pathname === '/login') && 'text-primary font-bold'
+          )}
+        >
+          {user ? (
+            <AccountIcon className="size-6 mb-1" />
+          ) : (
+            <LogIn className="size-6 mb-1" />
+          )}
+          <span className="text-[9px] uppercase tracking-tighter leading-none">{user ? 'Profil' : 'Log'}</span>
+        </Link>
       </div>
     </nav>
   );

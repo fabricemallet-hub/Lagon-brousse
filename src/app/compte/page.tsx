@@ -9,15 +9,20 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, isBefore, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Crown, Star, XCircle, KeyRound, Ticket, Gift } from 'lucide-react';
+import { Crown, Star, XCircle, KeyRound, Ticket, Gift, LogOut, Mail, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useAuth } from '@/firebase';
+import { signOut } from 'firebase/auth';
+import { useRouter } from 'next/navigation';
 
 export default function ComptePage() {
   const { user, isUserLoading } = useUser();
+  const auth = useAuth();
   const firestore = useFirestore();
+  const router = useRouter();
   const { toast } = useToast();
   const [accessToken, setAccessToken] = useState('');
   const [isRedeeming, setIsRedeeming] = useState(false);
@@ -37,215 +42,134 @@ export default function ComptePage() {
 
   const isSharedAccessActive = sharedToken && sharedToken.expiresAt && isBefore(new Date(), sharedToken.expiresAt.toDate());
 
+  const handleLogout = async () => {
+    if (!auth) return;
+    await signOut(auth);
+    router.push('/login');
+  };
+
   const handleSubscribe = () => {
     const paypalLink = process.env.NEXT_PUBLIC_PAYPAL_LINK;
-    if (paypalLink && paypalLink !== 'https://www.paypal.com/paypalme/YOUR_PAYPAL_ID_HERE') {
-      toast({
-        title: 'Redirection vers PayPal',
-        description: "Un nouvel onglet va s'ouvrir pour finaliser votre abonnement.",
-      });
-      window.open(paypalLink, '_blank');
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Configuration requise",
-        description: "Le lien de paiement PayPal n'a pas été configuré par l'administrateur.",
-      });
-    }
+    if (paypalLink) window.open(paypalLink, '_blank');
+    else toast({ variant: "destructive", title: "Erreur", description: "Lien non configuré." });
   };
 
   const handleRedeemToken = async () => {
-    if (!firestore || !user || !accessToken) {
-      toast({ variant: 'destructive', title: 'Erreur', description: 'Veuillez entrer un jeton valide.' });
-      return;
-    }
+    if (!firestore || !user || !accessToken) return;
     setIsRedeeming(true);
-    const tokenRef = doc(firestore, 'access_tokens', accessToken.trim());
-    
+    const tokenRef = doc(firestore, 'access_tokens', accessToken.trim().toUpperCase());
     try {
       const tokenSnap = await getDoc(tokenRef);
-      if (!tokenSnap.exists() || tokenSnap.data()?.status !== 'active') {
-        throw new Error('Jeton invalide, expiré ou déjà utilisé.');
-      }
-      
+      if (!tokenSnap.exists() || tokenSnap.data()?.status !== 'active') throw new Error('Jeton invalide.');
       const tokenData = tokenSnap.data() as AccessToken;
-      const userRef = doc(firestore, 'users', user.uid);
-
       const now = new Date();
       const expiryDate = addMonths(now, tokenData.durationMonths);
-
       const batch = writeBatch(firestore);
-      batch.update(userRef, {
+      batch.update(doc(firestore, 'users', user.uid), {
         subscriptionStatus: 'active',
-        subscriptionStartDate: now.toISOString(),
         subscriptionExpiryDate: expiryDate.toISOString(),
       });
-      batch.update(tokenRef, {
-        status: 'redeemed',
-        redeemedBy: user.uid,
-        redeemedAt: serverTimestamp(),
-      });
-
+      batch.update(tokenRef, { status: 'redeemed', redeemedBy: user.uid, redeemedAt: serverTimestamp() });
       await batch.commit();
-
-      toast({
-        title: 'Accès activé !',
-        description: `Votre abonnement est maintenant actif pour ${tokenData.durationMonths} mois.`,
-      });
+      toast({ title: 'Accès activé !' });
       setAccessToken('');
     } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Erreur',
-        description: error.message || 'Impossible de valider le jeton.',
-      });
+      toast({ variant: 'destructive', title: 'Erreur', description: error.message });
     } finally {
       setIsRedeeming(false);
     }
   };
 
-  const handleCancel = async () => {
-    if (!userDocRef || !firestore) return;
-     try {
-      const batch = writeBatch(firestore);
-      batch.update(userDocRef, { subscriptionStatus: 'inactive' });
-      await batch.commit();
-      toast({ title: "Abonnement résilié", description: "Votre accès est maintenant limité. Vous pouvez vous réabonner à tout moment.", variant: 'destructive' });
-    } catch (e) {
-        toast({ title: "Erreur", description: "Impossible de résilier l'abonnement.", variant: 'destructive' });
-    }
-  };
-
   const getStatusInfo = () => {
-    if (!userProfile) return { label: 'Chargement', badgeVariant: 'secondary', icon: Skeleton, description: '' };
-
-    if (isSharedAccessActive) {
-      return {
-        label: 'Accès Partagé',
-        badgeVariant: 'default',
-        icon: Gift,
-        description: `Un accès global est offert à tous les utilisateurs jusqu'au ${format(sharedToken!.expiresAt.toDate(), 'dd MMMM yyyy', { locale: fr })}.`
-      };
-    }
+    if (!userProfile) return { label: 'Chargement', variant: 'secondary', icon: Star, desc: '' };
+    if (isSharedAccessActive) return { label: 'Accès Offert', variant: 'default', icon: Gift, desc: `Accès global jusqu'au ${format(sharedToken!.expiresAt.toDate(), 'dd/MM/yyyy', { locale: fr })}.` };
     
     switch (userProfile.subscriptionStatus) {
-      case 'admin':
-        return { label: 'Administrateur', badgeVariant: 'default', icon: Crown, description: "Vous avez un accès complet et illimité à l'application." };
+      case 'admin': return { label: 'Administrateur', variant: 'default', icon: Crown, desc: "Accès illimité." };
       case 'active':
-         const expiryDate = new Date(userProfile.subscriptionExpiryDate!);
-         const formattedDate = format(expiryDate, 'dd MMMM yyyy', { locale: fr });
-         if (isBefore(new Date(), expiryDate)) {
-             return { label: 'Actif', badgeVariant: 'default', icon: Star, description: `Votre abonnement est actif jusqu'au ${formattedDate}.` };
-         }
-         return { label: 'Expiré', badgeVariant: 'destructive', icon: XCircle, description: `Votre abonnement a expiré le ${formattedDate}. Vous disposez maintenant d'un accès limité à une minute par jour.` };
-      case 'trial':
-        const trialExpiryDate = new Date(userProfile.subscriptionExpiryDate!);
-        if (isBefore(new Date(), trialExpiryDate)) {
-            return { label: 'Essai', badgeVariant: 'secondary', icon: Star, description: `Votre période d'essai se termine le ${format(trialExpiryDate, 'dd MMMM yyyy', { locale: fr })}.` };
-        }
-        return { label: 'Limité', badgeVariant: 'destructive', icon: XCircle, description: "Votre période d'essai est terminée. Vous disposez maintenant d'un accès limité à une minute par jour. Passez à la version complète pour un accès illimité." };
-      case 'inactive':
-        return { label: 'Limité', badgeVariant: 'destructive', icon: XCircle, description: "Votre abonnement est inactif. Vous disposez d'un accès limité à une minute par jour. Réabonnez-vous pour profiter de toutes les fonctionnalités." };
-      default:
-        return { label: 'Limité', badgeVariant: 'destructive', icon: XCircle, description: "Votre accès est limité à une minute par jour. Passez à la version complète pour un accès illimité." };
+         const exp = new Date(userProfile.subscriptionExpiryDate!);
+         return isBefore(new Date(), exp) 
+            ? { label: 'Abonné', variant: 'default', icon: Star, desc: `Actif jusqu'au ${format(exp, 'dd MMMM yyyy', { locale: fr })}.` }
+            : { label: 'Expiré', variant: 'destructive', icon: XCircle, desc: "Abonnement terminé." };
+      default: return { label: 'Mode Limité', variant: 'destructive', icon: XCircle, desc: "Accès 1 minute / jour." };
     }
   };
 
-  const statusInfo = getStatusInfo();
-  const Icon = statusInfo.icon;
-  const isSubscribed = userProfile?.subscriptionStatus === 'active' && userProfile.subscriptionExpiryDate && isBefore(new Date(), new Date(userProfile.subscriptionExpiryDate));
-  
-  const renderButtons = () => {
-    if (!userProfile || isSharedAccessActive) return null;
-    if (userProfile.subscriptionStatus === 'admin') return null;
+  const status = getStatusInfo();
 
-    if (isSubscribed) {
-      return <Button variant="destructive" onClick={handleCancel}>Résilier l'abonnement</Button>;
-    }
-    
-    return <Button onClick={handleSubscribe}>S'abonner pour 4.19 euro/mois</Button>;
-  }
-
-  if (isUserLoading || isProfileLoading || isSharedTokenLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-48 w-full" />
-        <Skeleton className="h-48 w-full" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Non connecté</CardTitle>
-          <CardDescription>Veuillez vous connecter pour gérer votre compte.</CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  }
+  if (isUserLoading || isProfileLoading || isSharedTokenLoading) return <div className="space-y-6 px-1"><Skeleton className="h-48 w-full" /><Skeleton className="h-48 w-full" /></div>;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Gestion du Compte</span>
-             <Badge variant={statusInfo.badgeVariant as any}>{statusInfo.label}</Badge>
-          </CardTitle>
-          <CardDescription>Gérez votre abonnement et consultez votre statut.</CardDescription>
+    <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1">
+       <Card className="w-full shadow-none border-2">
+        <CardHeader className="p-6 border-b bg-muted/10">
+          <div className="flex flex-col items-center text-center gap-4">
+            <div className="size-20 rounded-full bg-primary/10 flex items-center justify-center border-4 border-background shadow-lg">
+              <User className="size-10 text-primary" />
+            </div>
+            <div className="space-y-1">
+              <CardTitle className="text-xl font-black uppercase tracking-tighter">{user?.email?.split('@')[0]}</CardTitle>
+              <Badge variant={status.variant as any} className="font-black uppercase tracking-widest text-[10px]">
+                {status.label}
+              </Badge>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-6">
-            <Alert>
-                <Icon className="h-5 w-5" />
-                <AlertTitle className="font-semibold">{statusInfo.label}</AlertTitle>
-                <AlertDescription>{statusInfo.description}</AlertDescription>
-            </Alert>
-            <div className="flex justify-center pt-4">
-                {renderButtons()}
+        <CardContent className="p-6 space-y-6">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-xl border">
+                <div className="p-2 bg-background rounded-lg shadow-sm"><status.icon className="size-5 text-primary" /></div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase text-muted-foreground">Statut Compte</span>
+                  <span className="text-sm font-bold">{status.desc || "Limité"}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-xl border">
+                <div className="p-2 bg-background rounded-lg shadow-sm"><Mail className="size-5 text-muted-foreground" /></div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase text-muted-foreground">Email</span>
+                  <span className="text-xs font-bold truncate max-w-[200px]">{user?.email}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 flex flex-col gap-3">
+              {userProfile?.subscriptionStatus !== 'active' && userProfile?.subscriptionStatus !== 'admin' && !isSharedAccessActive && (
+                <Button onClick={handleSubscribe} className="w-full h-14 text-base font-black uppercase tracking-widest shadow-lg">
+                  S'abonner (4.19€ / mois)
+                </Button>
+              )}
+              <Button variant="outline" onClick={handleLogout} className="w-full h-12 font-black uppercase text-xs tracking-widest border-2">
+                <LogOut className="mr-2 size-4" /> Déconnexion
+              </Button>
             </div>
         </CardContent>
        </Card>
 
-      {!isSubscribed && userProfile?.subscriptionStatus !== 'admin' && !isSharedAccessActive && (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Ticket /> Activer avec un jeton d'accès</CardTitle>
-                <CardDescription>Si vous avez reçu un jeton, saisissez-le ici pour activer votre accès.</CardDescription>
+      {!isSharedAccessActive && userProfile?.subscriptionStatus !== 'admin' && (
+        <Card className="w-full shadow-none border-2">
+            <CardHeader className="p-6 pb-2">
+                <CardTitle className="text-lg font-black uppercase tracking-tighter flex items-center gap-2"><Ticket className="text-primary" /> Activer un jeton</CardTitle>
             </CardHeader>
-            <CardContent>
-                <div className="flex items-end gap-2">
-                    <div className="flex-grow space-y-1">
-                        <Label htmlFor="token-input">Jeton d'accès</Label>
+            <CardContent className="p-6 pt-2 space-y-4">
+                <div className="flex flex-col gap-3">
+                    <div className="space-y-1">
+                        <Label htmlFor="token-input" className="text-[10px] font-black uppercase ml-1">Code Jeton</Label>
                         <Input 
                             id="token-input" 
                             placeholder="LBN-XXXX-XXXX" 
                             value={accessToken}
                             onChange={(e) => setAccessToken(e.target.value)}
-                            className="font-mono tracking-wider"
+                            className="h-14 font-black text-center uppercase tracking-[0.2em] text-lg border-2"
                         />
                     </div>
-                    <Button onClick={handleRedeemToken} disabled={isRedeeming}>
-                        {isRedeeming ? 'Activation...' : 'Activer'}
+                    <Button onClick={handleRedeemToken} disabled={isRedeeming || !accessToken} className="w-full h-12 font-black uppercase tracking-widest">
+                        {isRedeeming ? 'Validation...' : 'Valider le code'}
                     </Button>
                 </div>
             </CardContent>
         </Card>
       )}
-
-        <Card>
-        <CardHeader>
-          <CardTitle>Informations Personnelles</CardTitle>
-        </CardHeader>
-        <CardContent>
-            <div className="space-y-2">
-                <p className="text-sm font-medium">Adresse e-mail</p>
-                <p className="text-muted-foreground">{user.email}</p>
-            </div>
-        </CardContent>
-       </Card>
     </div>
   );
 }

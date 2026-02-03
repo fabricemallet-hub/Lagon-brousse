@@ -23,20 +23,7 @@
     --border: 210 10% 80%;
     --input: 210 10% 80%;
     --ring: 207 70% 53%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
     --radius: 0.5rem;
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 215 25% 27%;
-    --sidebar-primary: 207 70% 53%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 17% 93%;
-    --sidebar-accent-foreground: 215 25% 27%;
-    --sidebar-border: 210 10% 88%;
-    --sidebar-ring: 207 70% 53%;
   }
   .dark {
     --background: 216 18% 13%;
@@ -58,28 +45,21 @@
     --border: 216 15% 24%;
     --input: 216 15% 24%;
     --ring: 207 70% 53%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-    --sidebar-background: 216 18% 13%;
-    --sidebar-foreground: 210 17% 93%;
-    --sidebar-primary: 207 70% 53%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 216 15% 24%;
-    --sidebar-accent-foreground: 210 17% 93%;
-    --sidebar-border: 216 15% 24%;
-    --sidebar-ring: 207 70% 53%;
   }
 }
 
 @layer base {
   * {
     @apply border-border;
+    -webkit-tap-highlight-color: transparent;
   }
-  body {
-    @apply bg-background text-foreground overflow-x-hidden;
+  html, body {
+    @apply bg-background text-foreground;
+    width: 100vw;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+    touch-action: manipulation;
   }
 }
 
@@ -89,37 +69,7 @@
   }
 
   @keyframes glow {
-    0%,
-    100% {
-      filter: drop-shadow(0 0 2px hsl(var(--accent)))
-        drop-shadow(0 0 5px hsl(var(--accent)));
-    }
-    50% {
-      filter: drop-shadow(0 0 5px hsl(var(--accent)))
-        drop-shadow(0 0 10px hsl(var(--accent)));
-    }
-  }
-
-  .status-flash-animation {
-    animation: status-flash 2s ease-out;
-  }
-
-  @keyframes status-flash {
-    0% {
-      opacity: 0;
-      transform: scale(0.5);
-    }
-    20% {
-      opacity: 1;
-      transform: scale(1.1);
-    }
-    80% {
-      opacity: 1;
-      transform: scale(1);
-    }
-    100% {
-      opacity: 0;
-      transform: scale(1.2);
-    }
+    0%, 100% { filter: drop-shadow(0 0 2px hsl(var(--accent))) drop-shadow(0 0 5px hsl(var(--accent))); }
+    50% { filter: drop-shadow(0 0 5px hsl(var(--accent))) drop-shadow(0 0 10px hsl(var(--accent))); }
   }
 }

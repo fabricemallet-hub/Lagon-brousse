@@ -1,4 +1,3 @@
-
 'use client';
 import {
   Sidebar,
@@ -103,8 +102,8 @@ const UsageTimer = React.memo(({ status, auth }: { status: string, auth: any }) 
   if (status !== 'limited') return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 h-10 bg-destructive/90 text-destructive-foreground flex items-center justify-center text-sm font-bold z-50 shadow-md">
-        <AlertCircle className="size-4 mr-2" />
+    <div className="fixed top-0 left-0 right-0 h-10 bg-destructive/90 text-destructive-foreground flex items-center justify-center text-[10px] font-bold z-[100] shadow-md px-4 text-center">
+        <AlertCircle className="size-3 mr-2 shrink-0" />
         Mode Limité : {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')} restant.
     </div>
   );
@@ -157,12 +156,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const handlePrevDay = useCallback(() => setSelectedDate(subDays(selectedDate, 1)), [selectedDate, setSelectedDate]);
   const handleNextDay = useCallback(() => setSelectedDate(addDays(selectedDate, 1)), [selectedDate, setSelectedDate]);
 
-  if (isAuthPage) return <>{children}</>;
+  if (isAuthPage) return <div className="w-full min-h-screen overflow-x-hidden">{children}</div>;
 
   const showDayNavigator = ['/', '/lagon', '/peche', '/champs', '/chasse', '/calendrier'].includes(pathname);
 
   return (
-    <div>
+    <div className="w-full max-w-full overflow-x-hidden">
       <SidebarProvider>
         <Sidebar>
           <SidebarHeader><div className="flex items-center gap-3 p-2"><AppLogo className="size-8 text-primary" /><h1 className="font-bold text-lg group-data-[collapsible=icon]:hidden">Lagon & Brousse</h1></div></SidebarHeader>
@@ -188,60 +187,62 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             )}
           </SidebarFooter>
         </Sidebar>
-        <main className="flex-1 flex flex-col min-h-screen">
+        <main className="flex-1 flex flex-col min-h-screen w-full max-w-full overflow-x-hidden">
           <UsageTimer status={status} auth={auth} />
-          <header className={cn("flex h-auto min-h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30 py-2", status === 'limited' && 'mt-10')}>
-            <SidebarTrigger />
-            <div className="w-full flex-1 flex items-center justify-between flex-wrap gap-y-2">
-              <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-                {status === 'trial' && <Badge variant="secondary">Essai</Badge>}
-                {status === 'limited' && <Badge variant="destructive">Limité</Badge>}
-                {isLocationLoading ? <Skeleton className="h-10 w-[180px]" /> : (
-                  <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-                    <SelectTrigger className="w-[150px] sm:w-[180px]"><SelectValue placeholder="Commune" /></SelectTrigger>
-                    <SelectContent>{locations.map((loc) => <SelectItem key={loc} value={loc}>{loc}</SelectItem>)}</SelectContent>
-                  </Select>
-                )}
-                {showDayNavigator && (
-                  <div className="flex items-center gap-1 rounded-md border bg-background p-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handlePrevDay}><ChevronLeft className="h-4 w-4" /></Button>
-                    <Popover open={isDatePickerOpen} onOpenChange={setDatePickerOpen}>
-                      <PopoverTrigger asChild>
-                        <Button variant={'outline'} className="w-[150px] sm:w-[180px] justify-start text-left font-normal h-8">
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {format(selectedDate, 'PPP', { locale: fr })}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(d) => { if(d) { setSelectedDate(d); setDatePickerOpen(false); } }} initialFocus /></PopoverContent>
-                    </Popover>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleNextDay}><ChevronRight className="h-4 w-4" /></Button>
-                  </div>
-                )}
+          <header className={cn("flex flex-col gap-2 border-b bg-card px-4 sticky top-0 z-30 py-3", status === 'limited' && 'mt-10')}>
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-2">
+                <SidebarTrigger />
+                {status === 'trial' && <Badge variant="secondary" className="text-[10px] h-5">Essai</Badge>}
+                {status === 'limited' && <Badge variant="destructive" className="text-[10px] h-5">Limité</Badge>}
               </div>
+              {isLocationLoading ? <Skeleton className="h-9 w-[120px]" /> : (
+                <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+                  <SelectTrigger className="w-[130px] h-9 text-xs"><SelectValue placeholder="Commune" /></SelectTrigger>
+                  <SelectContent>{locations.map((loc) => <SelectItem key={loc} value={loc}>{loc}</SelectItem>)}</SelectContent>
+                </Select>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between w-full gap-2">
+              {showDayNavigator && (
+                <div className="flex flex-1 items-center gap-1 rounded-md border bg-background p-1 h-9">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handlePrevDay}><ChevronLeft className="h-4 w-4" /></Button>
+                  <Popover open={isDatePickerOpen} onOpenChange={setDatePickerOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant={'ghost'} className="flex-1 justify-center text-center font-bold h-7 text-xs px-1">
+                        {format(selectedDate, 'dd MMM yyyy', { locale: fr })}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="center"><Calendar mode="single" selected={selectedDate} onSelect={(d) => { if(d) { setSelectedDate(d); setDatePickerOpen(false); } }} initialFocus /></PopoverContent>
+                  </Popover>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleNextDay}><ChevronRight className="h-4 w-4" /></Button>
+                </div>
+              )}
 
               {pathname === '/calendrier' && (
-                <div className="flex items-center gap-1 bg-muted p-1 rounded-lg h-9">
+                <div className="flex items-center gap-1 bg-muted p-1 rounded-lg h-9 ml-auto">
                   <Button 
                     variant={calendarView === 'peche' ? 'secondary' : 'ghost'} 
                     size="sm" 
-                    className={cn("h-7 px-3 text-xs font-bold", calendarView === 'peche' && "bg-background shadow-sm")}
+                    className={cn("h-7 px-3 text-[10px] font-bold", calendarView === 'peche' && "bg-background shadow-sm")}
                     onClick={() => setCalendarView('peche')}
                   >
-                    <Fish className="mr-2 size-3" /> Pêche
+                    <Fish className="mr-1 size-3" /> Pêche
                   </Button>
                   <Button 
                     variant={calendarView === 'champs' ? 'secondary' : 'ghost'} 
                     size="sm" 
-                    className={cn("h-7 px-3 text-xs font-bold", calendarView === 'champs' && "bg-background shadow-sm")}
+                    className={cn("h-7 px-3 text-[10px] font-bold", calendarView === 'champs' && "bg-background shadow-sm")}
                     onClick={() => setCalendarView('champs')}
                   >
-                    <Leaf className="mr-2 size-3" /> Champs
+                    <Leaf className="mr-1 size-3" /> Champs
                   </Button>
                 </div>
               )}
             </div>
           </header>
-          <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 pb-36 md:pb-12">{children}</div>
+          <div className="flex flex-1 flex-col gap-6 p-4 pb-32 md:pb-12 w-full max-w-full overflow-x-hidden">{children}</div>
           <BottomNav />
         </main>
       </SidebarProvider>
