@@ -1,71 +1,83 @@
 
 import { LocationData, SwellForecast, Tide, WindDirection, WindForecast, HourlyForecast } from './types';
 import { locations } from './locations';
-import { Firestore, doc, getDoc, collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
 
 // Cache simple pour éviter les calculs procéduraux redondants
 const proceduralCache = new Map<string, LocationData>();
 
 /**
  * STATIONS DE RÉFÉRENCE (Source: Météo NC / SHOM)
- * Ces données servent de base moyenne pour les calculs.
- * Ajustées pour permettre d'atteindre les seuils critiques lors des vives-eaux.
+ * Données moyennes annuelles pour définir les seuils automatiques.
  */
 const tideStations = {
   'Nouméa': {
+    avgHigh: 1.45,
+    avgLow: 0.35,
     tides: [
-      { type: 'haute', time: '07:20', height: 1.52, current: 'Fort' },
-      { type: 'basse', time: '13:45', height: 0.28, current: 'Modéré' },
-      { type: 'haute', time: '19:30', height: 1.35, current: 'Fort' },
-      { type: 'basse', time: '01:20', height: 0.32, current: 'Modéré' },
+      { type: 'haute', time: '07:20', height: 1.45, current: 'Fort' },
+      { type: 'basse', time: '13:45', height: 0.35, current: 'Modéré' },
+      { type: 'haute', time: '19:30', height: 1.30, current: 'Fort' },
+      { type: 'basse', time: '01:20', height: 0.40, current: 'Modéré' },
     ]
   },
   'Bourail': {
+    avgHigh: 1.50,
+    avgLow: 0.40,
     tides: [
-      { type: 'haute', time: '08:40', height: 1.58, current: 'Fort' },
-      { type: 'basse', time: '15:00', height: 0.35, current: 'Modéré' },
-      { type: 'haute', time: '20:30', height: 1.30, current: 'Fort' },
-      { type: 'basse', time: '02:00', height: 0.22, current: 'Modéré' },
+      { type: 'haute', time: '08:40', height: 1.50, current: 'Fort' },
+      { type: 'basse', time: '15:00', height: 0.40, current: 'Modéré' },
+      { type: 'haute', time: '20:30', height: 1.35, current: 'Fort' },
+      { type: 'basse', time: '02:00', height: 0.35, current: 'Modéré' },
     ]
   },
   'Koné': {
-     tides: [
-      { type: 'haute', time: '10:30', height: 1.62, current: 'Fort' },
-      { type: 'basse', time: '16:45', height: 0.42, current: 'Modéré' },
-      { type: 'haute', time: '23:00', height: 1.55, current: 'Fort' },
-      { type: 'basse', time: '04:15', height: 0.38, current: 'Modéré' },
+    avgHigh: 1.55,
+    avgLow: 0.45,
+    tides: [
+      { type: 'haute', time: '10:30', height: 1.55, current: 'Fort' },
+      { type: 'basse', time: '16:45', height: 0.45, current: 'Modéré' },
+      { type: 'haute', time: '23:00', height: 1.45, current: 'Fort' },
+      { type: 'basse', time: '04:15', height: 0.40, current: 'Modéré' },
     ]
   },
   'Thio': {
+    avgHigh: 1.35,
+    avgLow: 0.30,
     tides: [
-      { type: 'haute', time: '10:10', height: 1.45, current: 'Fort' },
-      { type: 'basse', time: '16:20', height: 0.25, current: 'Modéré' },
-      { type: 'haute', time: '22:40', height: 1.38, current: 'Fort' },
-      { type: 'basse', time: '03:50', height: 0.28, current: 'Modéré' },
+      { type: 'haute', time: '10:10', height: 1.35, height_avg: 1.35, current: 'Fort' },
+      { type: 'basse', time: '16:20', height: 0.30, height_avg: 0.30, current: 'Modéré' },
+      { type: 'haute', time: '22:40', height: 1.25, height_avg: 1.25, current: 'Fort' },
+      { type: 'basse', time: '03:50', height: 0.35, height_avg: 0.35, current: 'Modéré' },
     ]
   },
   'Koumac': {
+    avgHigh: 1.65,
+    avgLow: 0.50,
     tides: [
-      { type: 'haute', time: '10:20', height: 1.72, current: 'Fort' },
-      { type: 'basse', time: '17:00', height: 0.48, current: 'Modéré' },
-      { type: 'haute', time: '22:50', height: 1.65, current: 'Fort' },
+      { type: 'haute', time: '10:20', height: 1.65, current: 'Fort' },
+      { type: 'basse', time: '17:00', height: 0.50, current: 'Modéré' },
+      { type: 'haute', time: '22:50', height: 1.55, current: 'Fort' },
       { type: 'basse', time: '03:50', height: 0.45, current: 'Modéré' },
     ]
   },
   'Hienghène': {
+    avgHigh: 1.20,
+    avgLow: 0.30,
     tides: [
-      { type: 'haute', time: '09:30', height: 1.28, current: 'Fort' },
-      { type: 'basse', time: '15:45', height: 0.28, current: 'Modéré' },
-      { type: 'haute', time: '21:40', height: 1.22, current: 'Fort' },
-      { type: 'basse', time: '03:15', height: 0.32, current: 'Modéré' },
+      { type: 'haute', time: '09:30', height: 1.20, current: 'Fort' },
+      { type: 'basse', time: '15:45', height: 0.30, current: 'Modéré' },
+      { type: 'haute', time: '21:40', height: 1.15, current: 'Fort' },
+      { type: 'basse', time: '03:15', height: 0.35, current: 'Modéré' },
     ]
   },
   'Ouvéa': {
+    avgHigh: 1.25,
+    avgLow: 0.35,
     tides: [
-      { type: 'haute', time: '09:00', height: 1.35, current: 'Fort' },
-      { type: 'basse', time: '15:15', height: 0.32, current: 'Modéré' },
-      { type: 'haute', time: '20:50', height: 1.18, current: 'Fort' },
-      { type: 'basse', time: '02:30', height: 0.38, current: 'Modéré' },
+      { type: 'haute', time: '09:00', height: 1.25, current: 'Fort' },
+      { type: 'basse', time: '15:15', height: 0.35, current: 'Modéré' },
+      { type: 'haute', time: '20:50', height: 1.15, current: 'Fort' },
+      { type: 'basse', time: '02:30', height: 0.40, current: 'Modéré' },
     ]
   }
 };
@@ -109,7 +121,7 @@ export const communeToTideStationMap: { [key: string]: string } = {
 };
 
 // Données de base par défaut
-const baseData: Omit<LocationData, 'tides' | 'tideStation'> = {
+const baseData: Omit<LocationData, 'tides' | 'tideStation' | 'tideThresholds'> = {
   weather: {
     wind: [
       { time: '03:00', speed: 0, direction: 'N', stability: 'Stable' },
@@ -200,25 +212,35 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   const daysSinceKnownNewMoon = (effectiveDate.getTime() - knownNewMoon.getTime()) / (1000 * 3600 * 24);
   const dayInCycle = daysSinceKnownNewMoon % 29.53;
   
-  // Facteur d'amplitude pour les vives-eaux
-  const springFactor = 1 + 0.42 * Math.abs(Math.cos((dayInCycle / 29.53) * 2 * Math.PI));
+  // Facteur d'amplitude astronomique réaliste (Vives-eaux vs Mortes-eaux)
+  // Marnage max en NC environ 1.6m, min environ 0.8m.
+  const springFactor = 1 + 0.28 * Math.abs(Math.cos((dayInCycle / 29.53) * 2 * Math.PI));
 
-  const tideStation = communeToTideStationMap[location] || 'Nouméa';
-  const stationTides = tideStations[tideStation as keyof typeof tideStations] || tideStations['Nouméa'];
+  const tideStationName = communeToTideStationMap[location] || 'Nouméa';
+  const stationInfo = tideStations[tideStationName as keyof typeof tideStations] || tideStations['Nouméa'];
+
+  // Définition automatique des seuils de "Grandes Marées" pour cette station
+  // Basé sur une moyenne annuelle simulée : on met en évidence les 10% extrêmes.
+  const tideThresholds = {
+    high: parseFloat((stationInfo.avgHigh * 1.15).toFixed(2)), // +15% au dessus de la moyenne
+    low: parseFloat((stationInfo.avgLow * 0.65).toFixed(2)),   // -35% en dessous de la moyenne
+  };
 
   const locationData: LocationData = {
       ...JSON.parse(JSON.stringify(baseData)),
-      tides: JSON.parse(JSON.stringify(stationTides.tides)),
-      tideStation: tideStation
+      tides: JSON.parse(JSON.stringify(stationInfo.tides)),
+      tideStation: tideStationName,
+      tideThresholds: tideThresholds
   };
 
   locationData.tides.forEach((tide: Tide, i: number) => {
-    const baseTide = stationTides.tides[i % stationTides.tides.length];
-    const variation = Math.sin((dateSeed * (1 + i * 0.1) + locationSeed * 0.2)) * 0.04;
+    const baseTide = stationInfo.tides[i % stationInfo.tides.length];
+    const variation = Math.sin((dateSeed * (1 + i * 0.1) + locationSeed * 0.2)) * 0.03;
     
     if (tide.type === 'haute') {
         tide.height = parseFloat((baseTide.height * springFactor + variation).toFixed(2));
     } else {
+        // En vive-eau, la basse mer descend plus bas (inversement proportionnel)
         tide.height = parseFloat((baseTide.height / springFactor + variation).toFixed(2));
     }
     tide.time = varyTime(baseTide.time, i + 5);

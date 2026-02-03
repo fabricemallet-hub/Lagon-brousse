@@ -41,23 +41,18 @@ import {
   Leaf,
   Scissors,
   RefreshCw,
-  Sprout,
-  Wheat,
   Info,
   TrendingUp,
   TrendingDown,
   Star,
   Waves,
   Clock,
-  CalendarDays,
 } from 'lucide-react';
 import { Button } from './button';
 import { cn } from '@/lib/utils';
 import { useCalendarView } from '@/context/calendar-view-context';
-import type { FishRating } from '@/lib/types';
-import { Badge } from '@/components/ui/badge';
-import { CrabIcon, LobsterIcon, OctopusIcon } from '../icons';
-import { Separator } from './separator';
+import type { FishRating, Tide } from '@/lib/types';
+import { CrabIcon, LobsterIcon } from '../icons';
 import { Skeleton } from './skeleton';
 
 export const MoonPhaseIcon = ({
@@ -142,7 +137,8 @@ const DayCell = React.memo(({
     const highest = [...data.tides].sort((a, b) => b.height - a.height)[0];
     const lowest = [...data.tides].sort((a, b) => a.height - b.height)[0];
     const range = highest.height - lowest.height;
-    const isGrandeMaree = range > 1.35;
+    // Une grande marée est détectée si le marnage est supérieur à la normale pour cette station
+    const isGrandeMaree = range > 1.30;
     return { highest, lowest, range, isGrandeMaree };
   }, [data.tides]);
 
@@ -181,8 +177,8 @@ const DayCell = React.memo(({
           </div>
           <div className="mt-auto w-full flex flex-col items-center gap-0 pb-0.5">
             {sortedTides.map((tide, idx) => {
-              const isLargeHigh = tide.type === 'haute' && tide.height > 1.65;
-              const isLargeLow = tide.type === 'basse' && tide.height < 0.2;
+              const isHighPeak = tide.type === 'haute' && tide.height >= data.tideThresholds.high;
+              const isLowPeak = tide.type === 'basse' && tide.height <= data.tideThresholds.low;
               
               return (
                 <div 
@@ -190,8 +186,8 @@ const DayCell = React.memo(({
                   className={cn(
                     "text-[6px] font-black leading-[1.1] flex items-center justify-between w-full px-0.5 rounded-[1px] transition-all",
                     tide.type === 'haute' 
-                      ? (isLargeHigh ? "bg-primary text-white ring-1 ring-primary" : "text-primary")
-                      : (isLargeLow ? "bg-destructive text-white ring-1 ring-destructive opacity-100" : "text-blue-800 opacity-80")
+                      ? (isHighPeak ? "bg-primary text-white ring-1 ring-primary" : "text-primary")
+                      : (isLowPeak ? "bg-destructive text-white ring-1 ring-destructive opacity-100" : "text-blue-800 opacity-80")
                   )}
                 >
                   <span>{tide.time}</span>
@@ -200,7 +196,7 @@ const DayCell = React.memo(({
               );
             })}
             {tideInfo?.isGrandeMaree && (
-              <span className="text-[5px] uppercase tracking-tighter font-black text-primary animate-pulse">Gr. Marée</span>
+              <span className="text-[5px] uppercase tracking-tighter font-black text-primary animate-pulse">Grande Marée</span>
             )}
           </div>
         </div>
@@ -291,9 +287,10 @@ export function LunarCalendar() {
             <div className="flex flex-wrap gap-x-4 gap-y-2 p-3 bg-primary/5 border border-primary/20 rounded-lg">
               <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-primary"><Waves className="size-4"/> Heure/Hauteur</div>
               <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-primary"><Star className="size-3 fill-primary" /> Grandes Marées</div>
-              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><span className="bg-primary text-white px-1 rounded-[2px]">Haute {'>'} 1.65m</span></div>
-              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><span className="bg-destructive text-white px-1 rounded-[2px]">Basse {'<'} 0.2m</span></div>
+              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><span className="bg-primary text-white px-1 rounded-[2px]">Haute Exceptionnelle</span></div>
+              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><span className="bg-destructive text-white px-1 rounded-[2px]">Basse Exceptionnelle</span></div>
             </div>
+            <p className="text-[10px] text-muted-foreground italic px-1">Les seuils d'exception sont calculés automatiquement selon la station sélectionnée.</p>
           </div>
         )}
       </div>

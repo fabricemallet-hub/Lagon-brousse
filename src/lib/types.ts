@@ -139,6 +139,10 @@ export interface LocationData {
   pelagicInfo?: PelagicInfo;
   crabAndLobster: CrabLobsterData;
   tideStation: string;
+  tideThresholds: {
+    high: number;
+    low: number;
+  };
 }
 
 export interface UserAccount {
