@@ -20,7 +20,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
 
   if (docSnap.exists()) {
     const currentData = docSnap.data() as UserAccount;
-    // Mise à jour forcée du statut admin si nécessaire
+    // Mise à jour forcée du statut admin si nécessaire pour Gmail ou Outlook
     if (isAdminUser && currentData.subscriptionStatus !== 'admin') {
         await setDoc(userDocRef, { ...currentData, subscriptionStatus: 'admin' }, { merge: true });
     }

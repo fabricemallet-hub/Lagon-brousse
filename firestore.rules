@@ -4,7 +4,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ----------------------------------------------------------------------
-    // DEPLOY_ID: 20240524_1315_FORCE_SYNC_STABLE_V1
+    // DEPLOY_ID: 20240524_1330_FINAL_FORCE_RESYNC_V2
     // ----------------------------------------------------------------------
 
     function isSignedIn() {
@@ -13,12 +13,12 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.email == 'f.mallet81@outlook.com' || 
-        request.auth.token.email == 'f.mallet81@gmail.com'
+        request.auth.token.email.lower() == 'f.mallet81@outlook.com' || 
+        request.auth.token.email.lower() == 'f.mallet81@gmail.com'
       );
     }
 
-    // SESSIONS DE CHASSE - Autorisation de lecture complète pour les utilisateurs connectés
+    // SESSIONS DE CHASSE - Autorisation de lecture et création pour tous les connectés
     match /hunting_sessions/{sessionId} {
       allow read, create: if isSignedIn();
       allow update, delete: if isAdmin() || (isSignedIn() && resource.data.organizerId == request.auth.uid);
