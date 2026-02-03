@@ -42,7 +42,7 @@ export default function LagonPage() {
   const { selectedDate } = useDate();
   const [data, setData] = useState<LocationData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedTime, setSelectedTime] = useState('12:00');
+  const [selectedTime, setSelectedTime] = useState('09:00');
 
   useEffect(() => {
     setIsLoading(true);
@@ -63,8 +63,8 @@ export default function LagonPage() {
   }, [data]);
 
   const selectedSwell = useMemo(() => {
-    if (!data?.weather?.swell) return null;
-    return data.weather.swell.find(s => s.time === selectedTime) || data.weather.swell[2];
+    if (!data?.weather?.swell || data.weather.swell.length === 0) return null;
+    return data.weather.swell.find(s => s.time === selectedTime) || data.weather.swell[1]; // Fallback to 09:00 if exists
   }, [data, selectedTime]);
 
   if (isLoading || !data) {
@@ -98,7 +98,7 @@ export default function LagonPage() {
                       key={index} 
                       onClick={() => setSelectedTime(forecast.time)}
                       className={cn(
-                          "flex justify-between items-center py-3 px-4 border rounded-lg transition-all",
+                          "flex justify-between items-center py-3 px-4 border rounded-lg transition-all cursor-pointer",
                           selectedTime === forecast.time ? "bg-primary text-primary-foreground border-primary scale-[1.02] shadow-md" : "bg-card hover:bg-muted/50"
                       )}
                     >
@@ -136,7 +136,10 @@ export default function LagonPage() {
                     </div>
                   </div>
                 ) : (
-                    <Skeleton className="h-20 w-full" />
+                    <div className="flex flex-col items-center justify-center py-4 text-muted-foreground italic text-xs">
+                        <Waves className="size-8 opacity-20 mb-2" />
+                        Chargement des données de houle...
+                    </div>
                 )}
               </div>
 

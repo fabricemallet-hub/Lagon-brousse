@@ -373,6 +373,19 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     forecast.stability = (Math.sin(dateSeed + index) > 0) ? 'Stable' : 'Tournant';
   });
 
+  // GÉNERATION DE LA HOULE
+  locationData.weather.swell = locationData.weather.wind.map((w, idx) => {
+    const insideBase = 0.3 + Math.abs(Math.sin(dateSeed * 0.15 + locationSeed + idx)) * 0.6;
+    const outsideBase = 1.0 + Math.abs(Math.cos(dateSeed * 0.1 + locationSeed * 0.3 + idx)) * 2.0;
+    const period = 7 + Math.floor(Math.abs(Math.sin(dateSeed * 0.05 + idx)) * 8);
+    return {
+      time: w.time,
+      inside: `${insideBase.toFixed(1)}m`,
+      outside: `${outsideBase.toFixed(1)}m`,
+      period
+    };
+  });
+
   const rainChance = (Math.sin(dateSeed * 0.4 + locationSeed * 0.2) + 1) / 2;
   locationData.weather.rain = rainChance < 0.98 ? 'Aucune' : (rainChance < 0.995 ? 'Fine' : 'Forte');
   
