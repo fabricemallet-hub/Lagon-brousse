@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -225,13 +226,11 @@ export function LunarCalendar() {
   const days = eachDayOfInterval({ start: startDate, end: endDate });
   const weekdays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
-  // Centrage automatique sur le jour actuel
   useEffect(() => {
     const timer = setTimeout(() => {
       const todayEl = document.querySelector('.calendar-today-cell');
       if (todayEl) {
         const rect = todayEl.getBoundingClientRect();
-        // On scroll la fenêtre pour centrer l'élément horizontalement
         const scrollX = rect.left + window.scrollX - (window.innerWidth / 2) + (rect.width / 2);
         window.scrollTo({
           left: scrollX,
@@ -313,14 +312,20 @@ export function LunarCalendar() {
       </div>
 
       <Dialog open={!!detailedDay} onOpenChange={(isOpen) => !isOpen && setDetailedDay(null)}>
-        <DialogContent className="w-[95vw] max-w-lg h-[90vh] overflow-y-auto p-0 flex flex-col rounded-xl">
+        <DialogContent className="w-[95vw] max-w-lg h-[90vh] p-0 flex flex-col rounded-xl overflow-hidden shadow-2xl border-none">
           <DialogHeader className="p-6 shrink-0 bg-muted/10 border-b">
             <DialogTitle className="text-lg font-black uppercase tracking-tighter">
               {detailedDay ? format(detailedDay, 'eeee d MMMM', { locale: fr }) : ''}
             </DialogTitle>
           </DialogHeader>
           
-          <div className="flex-grow p-6 overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div 
+            className="flex-grow p-6 overflow-y-auto overscroll-contain" 
+            style={{ 
+              WebkitOverflowScrolling: 'touch',
+              touchAction: 'pan-y'
+            }}
+          >
             {calendarView === 'peche' 
               ? (detailedDay && <PecheDetailDialogContent day={detailedDay} location={selectedLocation} />)
               : (detailedDay && <ChampsDetailDialogContent day={detailedDay} location={selectedLocation} />)
@@ -329,7 +334,7 @@ export function LunarCalendar() {
 
           <DialogFooter className="p-4 bg-muted/20 border-t shrink-0">
             <DialogClose asChild>
-              <Button variant="outline" className="w-full h-12 font-black uppercase text-xs">Fermer</Button>
+              <Button variant="outline" className="w-full h-12 font-black uppercase text-xs shadow-sm">Fermer</Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
