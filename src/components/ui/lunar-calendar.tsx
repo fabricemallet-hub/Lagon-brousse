@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -234,7 +233,7 @@ const DayCell = React.memo(({
           <div className="space-y-1 text-xs font-semibold self-stretch">
             {isGoodForPruning && <div className="flex items-center gap-1.5 text-orange-600"><Scissors className="size-3 shrink-0" /><span>Taille</span></div>}
             {isGoodForCuttings && <div className="flex items-center gap-1.5 text-pink-600"><RefreshCw className="size-3 shrink-0" /><span>Bouture</span></div>}
-            {isGoodForMowing && <div className="flex items-center gap-1.5 text-green-600"><Scissors className="size-3 shrink-0" /><span>Tonte</span></div>}
+            {isGoodForMowing && <div className="flex items-center gap-1.5 text-green-600"><Scissors className="size-3 shrink-0" /><span>Tonte pelouse</span></div>}
             {sow.length > 0 && <div className="flex items-center gap-1.5 text-blue-600"><Sprout className="size-3 shrink-0" /><span className="truncate">Semis</span></div>}
             {harvest.length > 0 && <div className="flex items-center gap-1.5 text-purple-600"><Wheat className="size-3 shrink-0" /><span className="truncate">Récolte</span></div>}
           </div>
@@ -253,7 +252,7 @@ function GardeningLegend() {
     { icon: Leaf, label: 'Jours Feuilles', color: 'text-primary' },
     { icon: Scissors, label: 'Taille', color: 'text-orange-600' },
     { icon: RefreshCw, label: 'Bouturage', color: 'text-pink-600' },
-    { icon: Scissors, label: 'Tonte', color: 'text-green-600' },
+    { icon: Scissors, label: 'Tonte pelouse', color: 'text-green-600' },
     { icon: Sprout, label: 'Semis', color: 'text-blue-600' },
     { icon: Wheat, label: 'Récolte', color: 'text-purple-600' },
   ];

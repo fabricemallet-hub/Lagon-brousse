@@ -124,7 +124,7 @@ const sectionContent: Record<string, {
     steps: [
       "Identifiez la tendance du jour : Lune Montante (pour ce qui pousse hors de terre) ou Descendante (pour les racines).",
       "Consultez le signe du zodiaque : Jour Fruits, Racines, Fleurs ou Feuilles.",
-      "Lisez les tâches recommandées : taille, bouturage, tonte ou plantation.",
+      "Lisez les tâches recommandées : taille, bouturage, tonte de la pelouse ou plantation.",
       "Accédez à l'onglet 'Mes Semis' pour enregistrer vos travaux."
     ],
     tips: [
@@ -175,7 +175,7 @@ const sectionContent: Record<string, {
     role: "Le calendrier lunaire complet pour organiser les travaux du jardin sur le mois.",
     steps: [
       "Repérez visuellement les jours Fruits (Pique), Racines (Carotte), etc.",
-      "Les symboles de ciseaux indiquent les jours propices à la taille ou à la tonte.",
+      "Les symboles de ciseaux indiquent les jours propices à la taille ou à la tonte de la pelouse.",
       "Le symbole de recyclage indique les jours de bouturage.",
       "Cliquez sur une date pour lire la recommandation complète de l'IA."
     ],
