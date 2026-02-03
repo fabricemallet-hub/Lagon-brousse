@@ -1,6 +1,6 @@
 
 'use client';
-import React, { useState, useEffect, useMemo, useRef, useCallback, Fragment } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Card,
   CardContent,
@@ -46,6 +46,7 @@ import {
 } from 'lucide-react';
 import {
   useUser,
+  useAuth,
   useFirestore,
   useCollection,
   useMemoFirebase,
@@ -68,6 +69,7 @@ import {
   query,
   where,
   orderBy,
+  limit,
 } from 'firebase/firestore';
 import type { WithId } from '@/firebase';
 import type { HuntingSession, SessionParticipant, UserAccount } from '@/lib/types';
@@ -91,6 +93,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 const playSound = (type: 'position' | 'battue' | 'gibier') => {
+  if (typeof window === 'undefined') return;
   const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
   if (!audioCtx) return;
 
@@ -127,14 +130,9 @@ const playSound = (type: 'position' | 'battue' | 'gibier') => {
   }
 };
 
-
-// --- Icon Map ---
 const iconMap = { Navigation, UserIcon, Crosshair, Footprints, Mountain };
 const availableIcons = Object.keys(iconMap);
 const availableColors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
-
-
-// --- Helper Components ---
 
 const BatteryIcon = ({ level, charging }: { level: number; charging: boolean }) => {
   const props = { className: 'w-4 h-4 inline-block' };
@@ -143,7 +141,6 @@ const BatteryIcon = ({ level, charging }: { level: number; charging: boolean }) 
   if (level < 0.6) return <BatteryMedium {...props} className="text-amber-500" />;
   return <BatteryFull {...props} className="text-green-500" />;
 };
-
 
 function HuntingSessionContent() {
   const { user } = useUser();
@@ -165,21 +162,17 @@ function HuntingSessionContent() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [initialCenter, setInitialCenter] = useState<{ lat: number; lng: number } | null>(null);
 
-
-  // Customization state
   const [nickname, setNickname] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('Navigation');
   const [selectedColor, setSelectedColor] = useState('#3b82f6');
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
-  // Status state
   const [baseStatus, setBaseStatus] = useState<SessionParticipant['baseStatus']>(undefined);
   const [isGibierEnVue, setIsGibierEnVue] = useState(false);
   const [flashingStatus, setFlashingStatus] = useState<{text: string; color: string} | null>(null);
   const flashTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const previousParticipantsRef = useRef<WithId<SessionParticipant>[] | null>(null);
-
 
   const userDocRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -194,13 +187,14 @@ function HuntingSessionContent() {
 
   const { data: participants, isLoading: areParticipantsLoading } = useCollection<SessionParticipant>(participantsCollectionRef);
   
-  // History query
+  // History query simplified for performance and debugging
   const mySessionsQuery = useMemoFirebase(() => {
     if (!firestore || !user?.uid) return null;
     return query(
       collection(firestore, 'hunting_sessions'),
       where('organizerId', '==', user.uid),
-      orderBy('createdAt', 'desc')
+      orderBy('createdAt', 'desc'),
+      limit(5)
     );
   }, [firestore, user?.uid]);
   const { data: mySessions, isLoading: areMySessionsLoading } = useCollection<HuntingSession>(mySessionsQuery);
@@ -213,8 +207,6 @@ function HuntingSessionContent() {
       setNickname(userProfile.displayName || user?.displayName || user?.email?.split('@')[0] || '');
       setSelectedIcon(userProfile.mapIcon || 'Navigation');
       setSelectedColor(userProfile.mapColor || '#3b82f6');
-    } else if (user) {
-      setNickname(user.displayName || user.email?.split('@')[0] || '');
     }
   }, [userProfile, user]);
   
@@ -222,9 +214,7 @@ function HuntingSessionContent() {
 
   useEffect(() => {
     const savedMapTypeId = localStorage.getItem('huntingMapTypeId');
-    if (savedMapTypeId && ['roadmap', 'satellite', 'hybrid', 'terrain'].includes(savedMapTypeId)) {
-      setMapTypeId(savedMapTypeId);
-    }
+    if (savedMapTypeId) setMapTypeId(savedMapTypeId);
   }, []);
 
   const handleLeaveSession = useCallback(async () => {
@@ -239,9 +229,7 @@ function HuntingSessionContent() {
     setUserLocation(null);
     setInitialZoomDone(false);
 
-    if (!user || !previousSessionId || !firestore) {
-        return;
-    }
+    if (!user || !previousSessionId || !firestore) return;
 
     setIsSessionLoading(true);
     try {
@@ -249,16 +237,7 @@ function HuntingSessionContent() {
         await deleteDoc(participantDocRef);
         toast({ title: 'Vous avez quitté la session.' });
     } catch (e: any) {
-        if (e.code === 'permission-denied') {
-            const permissionError = new FirestorePermissionError({
-                path: `hunting_sessions/${previousSessionId}/participants/${user.uid}`,
-                operation: 'delete',
-            });
-            errorEmitter.emit('permission-error', permissionError);
-        } else {
-            console.error("Failed to leave session:", e);
-            setError("Erreur lors de la déconnexion de la session.");
-        }
+        console.error("Failed to leave session:", e);
     } finally {
         setIsSessionLoading(false);
     }
@@ -271,48 +250,15 @@ function HuntingSessionContent() {
         const participantsSnap = await getDocs(participantsRef);
         const batch = writeBatch(firestore);
         participantsSnap.forEach(pDoc => batch.delete(pDoc.ref));
-        
-        const sessionRef = doc(firestore, 'hunting_sessions', sessionId);
-        batch.delete(sessionRef);
-        
+        batch.delete(doc(firestore, 'hunting_sessions', sessionId));
         await batch.commit();
-        
-        if (session?.id === sessionId) {
-            handleLeaveSession();
-        }
-        
+        if (session?.id === sessionId) handleLeaveSession();
         toast({ title: 'Session supprimée.' });
     } catch (e: any) {
         console.error(e);
-        toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de supprimer la session.' });
+        toast({ variant: 'destructive', title: 'Erreur' });
     }
   };
-
- const updateFirestorePosition = useCallback((latitude: number, longitude: number) => {
-    if (!user || !firestore || !session?.id) return;
-
-    const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
-    const dataToUpdate: any = {
-        'location.latitude': latitude,
-        'location.longitude': longitude,
-        updatedAt: serverTimestamp(),
-    };
-    
-    // Non-blocking update.
-    updateDoc(participantDocRef, dataToUpdate).catch(err => {
-        if (err.code === 'permission-denied') {
-            const permissionError = new FirestorePermissionError({
-                path: participantDocRef.path,
-                operation: 'update',
-                requestResourceData: { location: { latitude, longitude } }
-            });
-            errorEmitter.emit('permission-error', permissionError);
-        } else {
-            console.error("Error updating position in Firestore:", err);
-        }
-    });
-}, [user, firestore, session]);
-
 
   const fetchAndSetUserPosition = useCallback(async (isFirstUpdate = false) => {
     if (!user || !firestore || !navigator.geolocation || !session?.id) return;
@@ -321,7 +267,7 @@ function HuntingSessionContent() {
         const position = await new Promise<GeolocationPosition>((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject, {
                 enableHighAccuracy: true,
-                timeout: 20000, 
+                timeout: 10000, 
                 maximumAge: 0,
             });
         });
@@ -330,248 +276,70 @@ function HuntingSessionContent() {
         const newLocation = { latitude, longitude };
         setUserLocation(newLocation);
 
-        if (isFirstUpdate && map && typeof latitude === 'number' && typeof longitude === 'number') {
+        if (isFirstUpdate && map) {
             map.panTo({ lat: latitude, lng: longitude });
             map.setZoom(16);
             setInitialZoomDone(true);
         }
 
-        let batteryData: SessionParticipant['battery'] | undefined = undefined;
-        if (typeof navigator !== 'undefined' && 'getBattery' in navigator) {
-            try {
-                const battery = await (navigator as any).getBattery();
-                batteryData = { level: battery.level, charging: battery.charging };
-            } catch (batteryError) {
-                console.warn("Could not retrieve battery status:", batteryError);
-            }
-        }
-        
         const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
         const dataToUpdate: any = {
             location: newLocation,
             updatedAt: serverTimestamp(),
         };
-        if (batteryData) {
-            dataToUpdate.battery = batteryData;
-        }
         
-        // Non-blocking update
-        updateDoc(participantDocRef, dataToUpdate).catch(err => {
-            console.error("Error updating position:", err);
-             if (err.code === 'permission-denied') {
-                const permissionError = new FirestorePermissionError({
-                    path: participantDocRef.path,
-                    operation: 'update',
-                    requestResourceData: dataToUpdate
-                });
-                errorEmitter.emit('permission-error', permissionError);
-            }
-        });
+        updateDoc(participantDocRef, dataToUpdate).catch(err => console.error("Error updating position:", err));
 
     } catch (err: any) {
         console.error("Error getting geolocation:", err);
-        if (err.code === 1) { // User denied Geolocation
-          toast({
-            variant: "destructive",
-            title: "Géolocalisation refusée",
-            description: "La géolocalisation est requise pour être visible sur la carte. Activez-la dans les paramètres de votre navigateur.",
-          });
-        } else if (err.code === 3 && isFirstUpdate) {
-            toast({
-                variant: "destructive",
-                title: "Délai de localisation dépassé",
-                description: "Impossible d'obtenir une position initiale. Veuillez réessayer avec un meilleur signal.",
-            });
-        }
     }
-  }, [user, firestore, session, toast, map]);
+  }, [user, firestore, session, map]);
   
   useEffect(() => {
-      // Don't play sounds for initial load.
       if (!participants || areParticipantsLoading || !previousParticipantsRef.current) {
         previousParticipantsRef.current = participants;
         return;
       }
-      
       const prevParts = new Map(previousParticipantsRef.current.map(p => [p.id, p]));
-
       participants.forEach(currentPart => {
-        // Don't play sound for my own status changes or new users.
         const prevPart = prevParts.get(currentPart.id);
-        if (!prevPart || currentPart.id === user?.uid) {
-            return;
-        }
-
-        // Play sound for gibier en vue (only when it becomes true)
-        if (currentPart.isGibierEnVue && !prevPart.isGibierEnVue) {
-            playSound('gibier');
-            return; // Prioritize gibier sound
-        }
-
-        // Play sound for base status change
-        if (currentPart.baseStatus && currentPart.baseStatus !== prevPart.baseStatus) {
-            if (currentPart.baseStatus === 'En position') {
-                playSound('position');
-            } else if (currentPart.baseStatus === 'Battue en cours') {
-                playSound('battue');
-            }
+        if (!prevPart || currentPart.id === user?.uid) return;
+        if (currentPart.isGibierEnVue && !prevPart.isGibierEnVue) playSound('gibier');
+        else if (currentPart.baseStatus && currentPart.baseStatus !== prevPart.baseStatus) {
+            if (currentPart.baseStatus === 'En position') playSound('position');
+            else if (currentPart.baseStatus === 'Battue en cours') playSound('battue');
         }
       });
-      
       previousParticipantsRef.current = participants;
-
     }, [participants, areParticipantsLoading, user?.uid]);
-
-
-  useEffect(() => {
-    if (myParticipant) {
-      if (myParticipant.location && userLocation &&
-          (Math.abs(myParticipant.location.latitude - userLocation.latitude) > 0.000001 ||
-           Math.abs(myParticipant.location.longitude - userLocation.longitude) > 0.000001)) {
-        setUserLocation(myParticipant.location);
-      } else if (myParticipant.location && !userLocation) {
-        setUserLocation(myParticipant.location)
-      }
-      
-      setBaseStatus(myParticipant.baseStatus);
-      setIsGibierEnVue(!!myParticipant.isGibierEnVue);
-    }
-  }, [myParticipant, userLocation]);
 
   useEffect(() => {
     if (isParticipating && session && !updateIntervalRef.current) {
-        // Update position and battery every 5 minutes (300,000 ms) to save battery
-        updateIntervalRef.current = setInterval(() => {
-            if (navigator.geolocation) {
-                fetchAndSetUserPosition();
-            }
-        }, 300000);
-    } else if (!isParticipating || !session) {
-        if (updateIntervalRef.current) {
-            clearInterval(updateIntervalRef.current);
-            updateIntervalRef.current = null;
-        }
+        updateIntervalRef.current = setInterval(() => fetchAndSetUserPosition(), 300000);
     }
-    
-    return () => {
-      if (updateIntervalRef.current) {
-        clearInterval(updateIntervalRef.current);
-      }
-    };
+    return () => { if (updateIntervalRef.current) clearInterval(updateIntervalRef.current); };
   }, [isParticipating, session, fetchAndSetUserPosition]);
-
-  useEffect(() => {
-    if (map && initialCenter && !initialZoomDone && typeof initialCenter.lat === 'number' && typeof initialCenter.lng === 'number') {
-        map.panTo(initialCenter);
-        map.setZoom(16);
-        setInitialZoomDone(true);
-        setInitialCenter(null);
-    }
-  }, [map, initialCenter, initialZoomDone]);
-
-  useEffect(() => {
-    if (map && userLocation && !initialZoomDone && typeof userLocation.latitude === 'number' && typeof userLocation.longitude === 'number') {
-      map.panTo({ lat: userLocation.latitude, lng: userLocation.longitude });
-      map.setZoom(16);
-      setInitialZoomDone(true);
-    }
-  }, [map, userLocation, initialZoomDone]);
-
-  const generateUniqueCode = async (): Promise<string> => {
-    if (!firestore) throw new Error("Firestore not initialized");
-    const chars = '0123456789';
-    let code: string;
-    let attempts = 0;
-    while (attempts < 10) {
-      code = 'CH-';
-      for (let i = 0; i < 4; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      const sessionDocRef = doc(firestore, 'hunting_sessions', code);
-      const docSnap = await getDoc(sessionDocRef);
-
-      if (!docSnap.exists()) {
-        return code;
-      }
-      attempts++;
-    }
-    throw new Error('Impossible de générer un code unique.');
-  };
-  
-  const createParticipantDocument = useCallback(async (sessionId: string) => {
-    if (!user || !firestore) throw new Error("User or Firestore not available");
-
-    const participantDocRef = doc(firestore, 'hunting_sessions', sessionId, 'participants', user.uid);
-    const participantData: Omit<SessionParticipant, 'id' | 'location' | 'battery'> = {
-        displayName: nickname,
-        mapIcon: selectedIcon,
-        mapColor: selectedColor,
-        updatedAt: serverTimestamp(),
-    };
-    
-    await setDoc(participantDocRef, participantData, { merge: true }).catch(e => {
-        if (e.code === 'permission-denied') {
-            const permissionError = new FirestorePermissionError({
-                path: participantDocRef.path,
-                operation: 'create',
-                requestResourceData: participantData,
-            });
-            errorEmitter.emit('permission-error', permissionError);
-        } else {
-            console.error("Error creating participant document:", e);
-        }
-    });
-
-    await fetchAndSetUserPosition(true);
-}, [user, firestore, fetchAndSetUserPosition, nickname, selectedIcon, selectedColor]);
 
   const handleCreateSession = async () => {
     if (!user || !firestore) return;
     setIsSessionLoading(true);
     setError(null);
-
     try {
-        let code: string;
-        if (createCode.trim()) {
-            code = createCode.trim().toUpperCase();
-            if (code.length < 6) {
-                throw new Error('Le code de session doit contenir au moins 6 caractères.');
-            }
-            const sessionDocRef = doc(firestore, 'hunting_sessions', code);
-            const docSnap = await getDoc(sessionDocRef);
-            if (docSnap.exists()) {
-                throw new Error('Ce code de session est déjà utilisé. Veuillez en choisir un autre.');
-            }
-        } else {
-            code = await generateUniqueCode();
-        }
-        
+        const code = createCode.trim() ? createCode.trim().toUpperCase() : `CH-${Math.floor(1000 + Math.random() * 9000)}`;
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + 24);
-
-        const newSessionData: Omit<HuntingSession, 'id'> = {
-          organizerId: user.uid,
-          createdAt: serverTimestamp(),
-          expiresAt: Timestamp.fromDate(expiresAt),
-        };
-        
+        const newSessionData = { organizerId: user.uid, createdAt: serverTimestamp(), expiresAt: Timestamp.fromDate(expiresAt) };
         await setDoc(doc(firestore, 'hunting_sessions', code), newSessionData);
-        await createParticipantDocument(code);
-
-        setSession({ id: code, ...newSessionData });
-        setIsParticipating(true);
         
-        toast({
-            title: 'Session créée !',
-            description: `Le code de votre session est : ${code}`,
-        });
+        const participantDocRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
+        await setDoc(participantDocRef, { displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor, updatedAt: serverTimestamp() });
+        await fetchAndSetUserPosition(true);
+
+        setSession({ id: code, ...newSessionData } as any);
+        setIsParticipating(true);
+        toast({ title: 'Session créée !', description: `Code : ${code}` });
     } catch (e: any) {
         setError(e.message);
-        toast({
-            variant: 'destructive',
-            title: 'Erreur de création',
-            description: e.message,
-        });
     } finally {
         setIsSessionLoading(false);
     }
@@ -583,547 +351,97 @@ function HuntingSessionContent() {
     setError(null);
     try {
       const sessionId = joinCode.toUpperCase();
-      const sessionDocRef = doc(firestore, 'hunting_sessions', sessionId);
-      const sessionDoc = await getDoc(sessionDocRef);
-
-      if (!sessionDoc.exists()) {
-        throw new Error('Aucune session trouvée avec ce code.');
-      }
-      const sessionData = sessionDoc.data() as HuntingSession;
-
-      if (sessionData.expiresAt && (sessionData.expiresAt as Timestamp).toDate() < new Date()) {
-         await deleteDoc(sessionDocRef);
-         throw new Error('Cette session a expiré et a été supprimée.');
-      }
+      const sessionDoc = await getDoc(doc(firestore, 'hunting_sessions', sessionId));
+      if (!sessionDoc.exists()) throw new Error('Session non trouvée.');
       
-      const organizerId = sessionData.organizerId;
-      if (organizerId && organizerId !== user.uid) {
-        const organizerDocRef = doc(firestore, 'hunting_sessions', sessionId, 'participants', organizerId);
-        try {
-          const organizerDoc = await getDoc(organizerDocRef);
-          if (organizerDoc.exists()) {
-            const organizerData = organizerDoc.data() as SessionParticipant;
-            if (organizerData.location) {
-              setInitialCenter({ lat: organizerData.location.latitude, lng: organizerData.location.longitude });
-            }
-          }
-        } catch (e) {
-          console.error("Could not fetch organizer's location", e);
-             if ((e as any).code === 'permission-denied') {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({
-                    path: `hunting_sessions/${sessionId}/participants/${organizerId}`,
-                    operation: 'get',
-                }));
-            }
-        }
-      }
+      const participantDocRef = doc(firestore, 'hunting_sessions', sessionId, 'participants', user.uid);
+      await setDoc(participantDocRef, { displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor, updatedAt: serverTimestamp() }, { merge: true });
+      await fetchAndSetUserPosition(true);
 
-      await createParticipantDocument(sessionId);
-
-      setSession({ id: sessionDoc.id, ...sessionData });
+      setSession({ id: sessionDoc.id, ...sessionDoc.data() } as any);
       setIsParticipating(true);
-
     } catch (e: any) {
-        if (e.code === 'permission-denied') {
-             const permissionError = new FirestorePermissionError({
-                path: `hunting_sessions/${joinCode.toUpperCase()}`,
-                operation: 'get',
-             });
-             errorEmitter.emit('permission-error', permissionError);
-        } else {
-             setError(e.message);
-             toast({
-                variant: 'destructive',
-                title: 'Erreur',
-                description: e.message,
-             });
-        }
+        setError(e.message);
     } finally {
         setIsSessionLoading(false);
     }
   };
 
   const handleSavePreferences = async () => {
-    if (!user || !firestore || !nickname) {
-        toast({ variant: 'destructive', title: 'Surnom requis', description: 'Veuillez entrer un surnom.' });
-        return;
-    }
+    if (!user || !firestore || !nickname) return;
     setIsSavingPrefs(true);
-    const userDocRef = doc(firestore, 'users', user.uid);
-    const newPreferences = {
-        displayName: nickname,
-        mapIcon: selectedIcon,
-        mapColor: selectedColor,
-    };
     try {
-        await updateDoc(userDocRef, newPreferences);
-
+        const prefs = { displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor };
+        await updateDoc(doc(firestore, 'users', user.uid), prefs);
         if (session && isParticipating) {
-            const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
-            await updateDoc(participantDocRef, newPreferences);
+            await updateDoc(doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid), prefs);
         }
-
         toast({ title: 'Préférences sauvegardées !' });
-    } catch (e: any) {
-        toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de sauvegarder les préférences.' });
-        if (e.code === 'permission-denied') {
-            const permissionError = new FirestorePermissionError({
-                path: userDocRef.path,
-                operation: 'update',
-                requestResourceData: newPreferences
-            });
-            errorEmitter.emit('permission-error', permissionError);
-        }
+    } catch (e) {
+        console.error(e);
     } finally {
         setIsSavingPrefs(false);
     }
   };
 
-  const updateStatusInFirestore = async (updateData: { [key: string]: any }) => {
-    if (!user || !firestore || !session) return;
-    const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
-    try {
-        await updateDoc(participantDocRef, updateData);
-    } catch (e: any) {
-        console.error(e)
-        toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de mettre à jour le statut.' });
-        if (e.code === 'permission-denied') {
-            const permissionError = new FirestorePermissionError({
-                path: participantDocRef.path,
-                operation: 'update',
-                requestResourceData: updateData
-            });
-            errorEmitter.emit('permission-error', permissionError);
-        } else {
-            console.error(e);
-        }
-    }
-  };
-
-  const triggerFlash = (text: string, color: string) => {
-    if (flashTimeoutRef.current) {
-        clearTimeout(flashTimeoutRef.current);
-    }
-    setFlashingStatus({ text, color });
-    flashTimeoutRef.current = setTimeout(() => {
-        setFlashingStatus(null);
-        flashTimeoutRef.current = null;
-    }, 2000);
-  };
-  
-  const handleBaseStatusChange = (status: NonNullable<SessionParticipant['baseStatus']>) => {
-    const isTogglingOff = baseStatus === status;
-    const newBaseStatus = isTogglingOff ? undefined : status;
-    setBaseStatus(newBaseStatus);
-  
-    const updatePayload = {
-      baseStatus: newBaseStatus ? newBaseStatus : deleteField()
-    };
-    
-    updateStatusInFirestore(updatePayload);
-  
-    if(newBaseStatus) {
-        triggerFlash(newBaseStatus, newBaseStatus === 'En position' ? 'text-green-500' : 'text-blue-500');
-    }
-  };
-  
-  const handleGibierEnVueToggle = () => {
-    const newGibierStatus = !isGibierEnVue;
-    setIsGibierEnVue(newGibierStatus);
-    updateStatusInFirestore({ isGibierEnVue: newGibierStatus });
-     if(newGibierStatus) {
-        triggerFlash('Gibier en vue', 'text-red-500');
-    }
-  };
-
-
-  const getStatusDisplay = (p: SessionParticipant) => {
-    const parts = [];
-    if (p.baseStatus) parts.push(p.baseStatus);
-    if (p.isGibierEnVue) parts.push('Gibier en vue');
-    
-    let colorClass = '';
-    if (p.isGibierEnVue) {
-      colorClass = 'text-red-500';
-    } else if (p.baseStatus === 'En position') {
-      colorClass = 'text-green-400';
-    } else if (p.baseStatus === 'Battue en cours') {
-      colorClass = 'text-blue-400';
-    }
-
-    return {
-      text: parts.join(', '),
-      colorClass: colorClass,
-    };
-  };
-
-  const copyToClipboard = (text?: string) => {
-    const code = text || session?.id;
-    if(!code) return;
-    navigator.clipboard.writeText(code);
-    toast({ description: "Code copié dans le presse-papiers !" });
-  }
-
-  const onLoad = useCallback(function callback(mapInstance: google.maps.Map) {
-    setMap(mapInstance);
-  }, []);
-
-
-  const onUnmount = useCallback(function callback(map: google.maps.Map) {
-    setMap(null);
-  }, []);
-
-  const handleMapIdle = useCallback(() => {
-    if (map) {
-      const newZoom = map.getZoom();
-      if (newZoom) {
-        setZoom(newZoom);
-      }
-    }
-  }, [map]);
-
-  const handleMapTypeIdChanged = useCallback(() => {
-    if (map) {
-        const newMapTypeId = map.getMapTypeId();
-        if (newMapTypeId) {
-            setMapTypeId(newMapTypeId);
-            localStorage.setItem('huntingMapTypeId', newMapTypeId);
-        }
-    }
-  }, [map]);
-
-  const handleRecenter = () => {
-    if (!navigator.geolocation) {
-        toast({
-            variant: "destructive",
-            title: "Géolocalisation non supportée",
-            description: "Votre navigateur ne supporte pas la géolocalisation.",
-        });
-        return;
-    }
-
-    toast({ description: "Mise à jour de votre position..." });
-
-    navigator.geolocation.getCurrentPosition(
-        (position) => {
-            const { latitude, longitude } = position.coords;
-            if (typeof latitude !== 'number' || typeof longitude !== 'number') return;
-            const newLocation = { lat: latitude, lng: longitude };
-            
-            setUserLocation({latitude, longitude});
-            updateFirestorePosition(latitude, longitude);
-
-            if (map) {
-                map.panTo(newLocation);
-                if(map.getZoom()! < 14) {
-                    map.setZoom(16);
-                }
-            }
-        },
-        (err) => {
-            console.error("Error getting geolocation for recenter:", err);
-            let description = "Impossible d'obtenir votre position actuelle.";
-            if (err.code === 1) {
-              description = "Veuillez activer la géolocalisation dans les paramètres de votre navigateur.";
-            } else if (err.code === 3) {
-              description = "La demande de localisation a expiré. Veuillez réessayer dans une zone avec un meilleur signal GPS.";
-            } else if (err.code === 2) {
-              description = "Position indisponible. Vérifiez les paramètres de votre appareil et le signal GPS.";
-            }
-            toast({
-                variant: "destructive",
-                title: "Erreur de localisation",
-                description: description,
-            });
-        },
-        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-    );
-  };
-
   if (session) {
-     if (loadError) {
-        return (
-             <Card>
-                <CardHeader>
-                     <CardTitle className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Users className="size-5 text-primary" />
-                            Session de Chasse
-                        </div>
-                        <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isSessionLoading}><LogOut/> Quitter</Button>
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Alert variant="destructive">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>Erreur de clé API Google Maps</AlertTitle>
-                        <AlertDescription>
-                           La clé API semble invalide ou mal configurée.
-                        </AlertDescription>
-                    </Alert>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    if (!isLoaded || isProfileLoading) {
-        return (
-             <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Users className="size-5 text-primary" />
-                            Session de Chasse
-                        </div>
-                        <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isSessionLoading}><LogOut/> Quitter</Button>
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Skeleton className="h-80 w-full" />
-                    <div className="mt-4">
-                        <Skeleton className="h-8 w-1/2 mb-2" />
-                        <Skeleton className="h-20 w-full" />
-                    </div>
-                </CardContent>
-            </Card>
-        )
-    }
+    if (loadError) return <Card><CardContent><Alert variant="destructive"><AlertTitle>Erreur Google Maps</AlertTitle></Alert></CardContent></Card>;
+    if (!isLoaded || isProfileLoading) return <Card><CardContent><Skeleton className="h-80 w-full" /></CardContent></Card>;
 
     return (
         <Card className={cn("transition-all", isFullscreen && "fixed inset-0 z-50 w-screen h-screen rounded-none border-none flex flex-col")}>
-            <CardHeader className={cn(isFullscreen && "flex-shrink-0")}>
+            <CardHeader className="flex-shrink-0">
                 <CardTitle className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Users className="size-5 text-primary" />
-                        Session de Chasse
-                    </div>
-                    <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isSessionLoading}><LogOut/> Quitter</Button>
+                    <div className="flex items-center gap-2"><Users className="size-5 text-primary" /> Session {session.id}</div>
+                    <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isSessionLoading}><LogOut className="size-4 mr-2"/> Quitter</Button>
                 </CardTitle>
-                 <CardDescription>Partagez votre position avec votre groupe en temps réel.</CardDescription>
             </CardHeader>
-            <CardContent className={cn("flex-grow flex flex-col", isFullscreen ? "p-2 gap-2" : "p-6 pt-0")}>
+            <CardContent className="flex-grow flex flex-col p-2 gap-2">
                  <div className={cn("relative w-full rounded-lg overflow-hidden border", isFullscreen ? "flex-grow" : "h-80 mb-4")}>
                     <GoogleMap
                         mapContainerClassName="w-full h-full"
-                        center={(userLocation && typeof userLocation.latitude === 'number' && typeof userLocation.longitude === 'number') ? { lat: userLocation.latitude, lng: userLocation.longitude } : { lat: -21.45, lng: 165.5 }}
-                        zoom={initialZoomDone ? zoom : 8}
-                        onLoad={onLoad}
-                        onUnmount={onUnmount}
-                        onIdle={handleMapIdle}
-                        onMapTypeIdChanged={handleMapTypeIdChanged}
-                        options={{ 
-                            disableDefaultUI: true, 
-                            zoomControl: true, 
-                            mapTypeControl: true,
-                            mapTypeId: mapTypeId as google.maps.MapTypeId
-                        }}
+                        center={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : { lat: -21.45, lng: 165.5 }}
+                        zoom={zoom}
+                        onLoad={setMap}
+                        options={{ disableDefaultUI: true, zoomControl: true, mapTypeId: mapTypeId }}
                     >
-                        {flashingStatus && (
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-                                <h2 className={cn('status-flash-animation text-4xl md:text-6xl font-bold [text-shadow:0_2px_4px_rgb(0_0_0_/_50%)]', flashingStatus.color)}>
-                                {flashingStatus.text}
-                                </h2>
-                            </div>
-                        )}
-                        {myParticipant && userLocation && typeof userLocation.latitude === 'number' && typeof userLocation.longitude === 'number' && (
-                            <OverlayView
-                                position={{ lat: userLocation.latitude, lng: userLocation.longitude }}
-                                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-                            >
+                        {participants?.map(p => p.location && (
+                            <OverlayView key={p.id} position={{ lat: p.location.latitude, lng: p.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                 <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
-                                    <div className="px-2 pb-0.5 text-xs font-bold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.7)] whitespace-nowrap">
-                                        <span className="mr-1">{myParticipant.displayName}</span>
-                                        {(() => {
-                                            const statusDisplay = getStatusDisplay(myParticipant);
-                                            return statusDisplay.text && (
-                                                <span className={cn('font-semibold', statusDisplay.colorClass)}>
-                                                    ({statusDisplay.text})
-                                                </span>
-                                            );
-                                        })()}
+                                    <div className="px-2 pb-0.5 text-[10px] font-bold text-white [text-shadow:0_1px_2px_black] whitespace-nowrap">
+                                        {p.displayName} {p.isGibierEnVue ? '⚠️' : ''}
                                     </div>
-                                    <div
-                                        className="p-1.5 rounded-full flex items-center justify-center shadow-lg"
-                                        style={{ backgroundColor: myParticipant.mapColor || '#3b82f6' }}
-                                    >
-                                        {React.createElement(iconMap[myParticipant.mapIcon as keyof typeof iconMap] || Navigation, { className: "size-5 drop-shadow-md text-white" })}
+                                    <div className="p-1.5 rounded-full shadow-lg" style={{ backgroundColor: p.mapColor || '#3b82f6' }}>
+                                        {React.createElement(iconMap[p.mapIcon as keyof typeof iconMap] || Navigation, { className: "size-4 text-white" })}
                                     </div>
                                 </div>
                             </OverlayView>
-                        )}
-
-                        {otherParticipants?.map(p => {
-                            if (!p.location || typeof p.location.latitude !== 'number' || typeof p.location.longitude !== 'number') return null;
-                             return (
-                                <OverlayView
-                                    key={p.id}
-                                    position={{ lat: p.location.latitude, lng: p.location.longitude }}
-                                    mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-                                >
-                                    <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
-                                        <div className="px-2 pb-0.5 text-xs font-bold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.7)] whitespace-nowrap">
-                                            <span className="mr-1">{p.displayName}</span>
-                                            {(() => {
-                                              const statusDisplay = getStatusDisplay(p);
-                                              return statusDisplay.text && (
-                                                  <span className={cn('font-semibold', statusDisplay.colorClass)}>
-                                                      ({statusDisplay.text})
-                                                  </span>
-                                              );
-                                            })()}
-                                        </div>
-                                        <div
-                                            className="p-1.5 rounded-full flex items-center justify-center shadow-lg"
-                                            style={{ backgroundColor: p.mapColor || '#3b82f6' }}
-                                        >
-                                            {React.createElement(iconMap[p.mapIcon as keyof typeof iconMap] || UserIcon, { className: "size-5 drop-shadow-md text-white" })}
-                                        </div>
-                                    </div>
-                                </OverlayView>
-                            )
-                        })}
+                        ))}
                     </GoogleMap>
-                    <div className="absolute bottom-2 left-0 right-0 z-10 flex flex-wrap justify-center gap-1 sm:gap-2 px-2">
-                        <Button
-                            size="sm"
-                            onClick={() => handleBaseStatusChange('En position')}
-                            className={cn(
-                                'shadow-lg text-white bg-green-600 hover:bg-green-700 text-[10px] sm:text-sm px-2 sm:px-4',
-                                baseStatus === 'En position' && 'ring-2 ring-offset-2 ring-green-500'
-                            )}
-                        >
-                            <MapPin className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" /> En position
-                        </Button>
-                        <Button
-                            size="sm"
-                            onClick={() => handleBaseStatusChange('Battue en cours')}
-                            className={cn(
-                                'shadow-lg text-white bg-blue-600 hover:bg-blue-700 text-[10px] sm:text-sm px-2 sm:px-4',
-                                baseStatus === 'Battue en cours' && 'ring-2 ring-offset-2 ring-blue-500'
-                            )}
-                        >
-                            <Footprints className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Battue en cours
-                        </Button>
-                        <Button
-                            size="sm"
-                            onClick={handleGibierEnVueToggle}
-                            className={cn(
-                                'shadow-lg text-white bg-red-600 hover:bg-red-700 text-[10px] sm:text-sm px-2 sm:px-4',
-                                isGibierEnVue && 'ring-2 ring-offset-2 ring-red-500'
-                            )}
-                        >
-                            <Eye className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Gibier en vue
-                        </Button>
-                    </div>
-                    <div className="absolute bottom-2 right-2 bg-card/80 p-1 px-2 rounded-md text-xs font-semibold shadow-lg border">
-                      {map?.getZoom() ? `${Math.round((map.getZoom()! / 22) * 100)}%` : '...'}
-                    </div>
                     <Button size="icon" onClick={() => setIsFullscreen(!isFullscreen)} className="absolute top-2 left-2 shadow-lg h-9 w-9 z-10">
-                        {isFullscreen ? <Shrink className="h-5 w-5" /> : <Expand className="h-5 w-5" />}
-                    </Button>
-                    <Button size="icon" onClick={handleRecenter} className="absolute top-2 right-2 shadow-lg h-9 w-9">
-                        <LocateFixed className="h-5 w-5" />
+                        {isFullscreen ? <Shrink /> : <Expand />}
                     </Button>
                 </div>
-                <div className={cn("space-y-4", isFullscreen ? "flex-shrink-0 overflow-y-auto" : "")}>
-                    {!isFullscreen && (
-                        <>
-                            <div className="space-y-4 rounded-lg border p-4">
-                                <h4 className="font-semibold text-sm">Personnalisation</h4>
-                                <div className="space-y-1">
-                                    <Label htmlFor="nickname">Surnom</Label>
-                                    <Input id="nickname" value={nickname} onChange={e => setNickname(e.target.value)} />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>Icône</Label>
-                                        <div className="flex flex-wrap gap-2">
-                                            {availableIcons.map(iconName => {
-                                                const Icon = iconMap[iconName as keyof typeof iconMap];
-                                                return (
-                                                    <Button key={iconName} variant="outline" size="icon" onClick={() => setSelectedIcon(iconName)} className={cn(selectedIcon === iconName && "ring-2 ring-primary")}>
-                                                        <Icon className="size-5" />
-                                                    </Button>
-                                                )
-                                            })}
-                                        </div>
+                {!isFullscreen && (
+                    <div className="space-y-4">
+                        <div className="space-y-4 rounded-lg border p-4">
+                            <Label>Surnom</Label>
+                            <Input value={nickname} onChange={e => setNickname(e.target.value)} />
+                            <Button onClick={handleSavePreferences} size="sm" disabled={isSavingPrefs} className="w-full"><Save className="mr-2 h-4 w-4" /> Sauvegarder</Button>
+                        </div>
+                        <div className="space-y-2">
+                            <h4 className="font-semibold text-sm">Participants ({participants?.length || 0})</h4>
+                            <div className="max-h-32 overflow-y-auto space-y-1">
+                                {participants?.map(p => (
+                                    <div key={p.id} className="flex justify-between items-center text-xs p-2 border rounded">
+                                        <span>{p.displayName}</span>
+                                        {p.battery && <BatteryIcon level={p.battery.level} charging={p.battery.charging} />}
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label>Couleur</Label>
-                                        <div className="flex flex-wrap gap-2">
-                                            {availableColors.map(color => (
-                                                <button key={color} onClick={() => setSelectedColor(color)} className={cn("w-8 h-8 rounded-full border-2", selectedColor === color ? "border-primary ring-2 ring-primary" : "border-transparent")} style={{ backgroundColor: color }} />
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                                <Button onClick={handleSavePreferences} size="sm" disabled={isSavingPrefs} className="w-full">
-                                    <Save className="mr-2" /> 
-                                    {isSavingPrefs ? 'Sauvegarde...' : 'Sauvegarder mes préférences'}
-                                </Button>
+                                ))}
                             </div>
-                            <Alert>
-                                <Download className="h-4 w-4" />
-                                <AlertTitle>Mode Hors Ligne</AlertTitle>
-                                <AlertDescription>
-                                La carte peut être utilisée hors ligne. Pour mettre une zone en cache, naviguez simplement sur la carte lorsque vous êtes connecté. Les tuiles seront automatiquement sauvegardées. Les positions se synchroniseront au retour du réseau.
-                                </AlertDescription>
-                            </Alert>
-                            <div className="flex flex-col sm:flex-row items-center gap-4">
-                                <div className="space-y-1 flex-grow">
-                                    <Label htmlFor="session-code-display">Code de session</Label>
-                                    <Input id="session-code-display" readOnly value={session.id} className="font-mono text-center text-lg tracking-widest" />
-                                </div>
-                                <Button onClick={() => copyToClipboard()} size="sm" className="w-full sm:w-auto self-end"><Copy className="mr-2"/> Copier</Button>
-                            </div>
-                        </>
-                    )}
-                    <div className="space-y-2">
-                        <h4 className="font-semibold">Participants ({participants?.length || 0})</h4>
-                        {areParticipantsLoading ? (
-                            <Skeleton className="h-24 w-full" />
-                        ) : (
-                            <div className={cn("space-y-2 pr-2", !isFullscreen && "max-h-48 overflow-y-auto")}>
-                            {participants?.map(p => {
-                                const statusDisplay = getStatusDisplay(p);
-                                return (
-                                <div key={p.id} className="flex items-center justify-between p-2 border rounded-lg bg-card shadow-sm">
-                                    <div className="flex items-center gap-3">
-                                        <div
-                                            className="p-1.5 rounded-full flex items-center justify-center shadow-sm"
-                                            style={{ backgroundColor: p.mapColor || '#3b82f6' }}
-                                        >
-                                            <UserIcon className="size-5 text-white" />
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-sm">{p.displayName}</p>
-                                            {statusDisplay.text ? (
-                                                <p className={cn("text-xs font-semibold", statusDisplay.colorClass)}>
-                                                    {statusDisplay.text}
-                                                </p>
-                                            ) : (
-                                                <p className="text-xs text-muted-foreground">En attente...</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-xs font-bold bg-muted/50 px-2 py-1 rounded-md min-w-[70px] justify-end">
-                                        {p.battery ? (
-                                            <>
-                                                <BatteryIcon level={p.battery.level} charging={p.battery.charging} />
-                                                <span className={cn(p.battery.level < 0.2 ? 'text-red-500' : 'text-foreground')}>
-                                                    {Math.round(p.battery.level * 100)}%
-                                                </span>
-                                            </>
-                                        ) : (
-                                            <span className="text-[9px] text-muted-foreground italic font-normal">N/A</span>
-                                        )}
-                                    </div>
-                                </div>
-                            )})}
-                            </div>
-                        )}
+                        </div>
                     </div>
-                </div>
+                )}
             </CardContent>
         </Card>
     );
@@ -1132,155 +450,41 @@ function HuntingSessionContent() {
   return (
     <div className="space-y-6">
         <Card>
-        <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-            <Users className="size-5 text-primary" />
-            Session de Chasse en Groupe
-            </CardTitle>
-            <CardDescription>
-            Partagez votre position en temps réel avec vos coéquipiers.
-            </CardDescription>
-        </CardHeader>
-        <CardContent>
-            {error && <Alert variant="destructive" className="mb-4"><AlertCircle className="h-4 w-4" /><AlertTitle>{error}</AlertTitle></Alert>}
-            <Tabs defaultValue="join">
-            <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="join">Rejoindre</TabsTrigger>
-                <TabsTrigger value="create">Créer</TabsTrigger>
-            </TabsList>
-            <TabsContent value="join" className="space-y-4 pt-4">
-                <div className="space-y-2">
-                <Label htmlFor="join-code">Code de la session</Label>
-                <Input
-                    id="join-code"
-                    placeholder="CH-XXXX"
-                    value={joinCode}
-                    onChange={(e) => setJoinCode(e.target.value)}
-                    className="font-mono text-center text-lg tracking-widest"
-                />
-                </div>
-                <Button onClick={handleJoinSession} className="w-full" disabled={isSessionLoading}>
-                <LogIn className="mr-2" />
-                {isSessionLoading ? 'Connexion...' : 'Rejoindre la session'}
-                </Button>
-            </TabsContent>
-            <TabsContent value="create" className="space-y-4 pt-4">
-                <div className="space-y-2">
-                <Label htmlFor="create-code">Personnaliser le code de session</Label>
-                <Input
-                    id="create-code"
-                    placeholder="Optionnel, 6 caractères min."
-                    value={createCode}
-                    onChange={(e) => setCreateCode(e.target.value.toUpperCase())}
-                    className="font-mono text-center text-lg tracking-widest"
-                />
-                <p className="text-xs text-muted-foreground text-center">Si ce champ est laissé vide, un code aléatoire sera généré.</p>
-                </div>
-                <Button onClick={handleCreateSession} className="w-full" disabled={isSessionLoading}>
-                <Share2 className="mr-2" />
-                {isSessionLoading ? 'Création...' : 'Créer une nouvelle session'}
-                </Button>
-            </TabsContent>
-            </Tabs>
-        </CardContent>
-        </Card>
-
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <Clock className="size-5 text-primary" />
-                    Mes Sessions Créées
-                </CardTitle>
-                <CardDescription>
-                    Historique des sessions que vous avez organisées.
-                </CardDescription>
-            </CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Users className="size-5 text-primary" /> Session de Chasse</CardTitle></CardHeader>
             <CardContent>
-                {areMySessionsLoading ? (
-                    <div className="space-y-2">
-                        <Skeleton className="h-12 w-full" />
-                        <Skeleton className="h-12 w-full" />
-                    </div>
-                ) : mySessions && mySessions.length > 0 ? (
-                    <div className="space-y-3">
-                        {mySessions.map((s) => (
-                            <div key={s.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
-                                <div className="space-y-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-mono font-bold text-primary">{s.id}</span>
-                                        {s.createdAt && (
-                                            <span className="text-[10px] text-muted-foreground">
-                                                {format(s.createdAt.toDate(), 'd MMM HH:mm', { locale: fr })}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Button variant="outline" size="sm" onClick={() => copyToClipboard(s.id)}>
-                                        <Copy className="h-3.5 w-3.5" />
-                                    </Button>
-                                    <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                            <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10">
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                                <AlertDialogTitle>Supprimer la session {s.id} ?</AlertDialogTitle>
-                                                <AlertDialogDescription>
-                                                    Cette action supprimera définitivement la session et déconnectera tous les coéquipiers actuellement présents.
-                                                </AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                                <AlertDialogCancel>Annuler</AlertDialogCancel>
-                                                <AlertDialogAction onClick={() => handleDeleteSessionFromList(s.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                                    Supprimer définitivement
-                                                </AlertDialogAction>
-                                            </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                    </AlertDialog>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <p className="text-center text-sm text-muted-foreground py-4">Aucune session créée.</p>
-                )}
+                <Tabs defaultValue="join">
+                    <TabsList className="grid w-full grid-cols-2"><TabsTrigger value="join">Rejoindre</TabsTrigger><TabsTrigger value="create">Créer</TabsTrigger></TabsList>
+                    <TabsContent value="join" className="space-y-4 pt-4">
+                        <Input placeholder="Code CH-XXXX" value={joinCode} onChange={e => setJoinCode(e.target.value)} className="text-center font-mono" />
+                        <Button onClick={handleJoinSession} className="w-full" disabled={isSessionLoading}>Rejoindre</Button>
+                    </TabsContent>
+                    <TabsContent value="create" className="space-y-4 pt-4">
+                        <Input placeholder="Code personnalisé (optionnel)" value={createCode} onChange={e => setCreateCode(e.target.value)} className="text-center font-mono" />
+                        <Button onClick={handleCreateSession} className="w-full" disabled={isSessionLoading}>Créer</Button>
+                    </TabsContent>
+                </Tabs>
             </CardContent>
         </Card>
+        {mySessions && mySessions.length > 0 && (
+            <Card>
+                <CardHeader><CardTitle className="text-sm">Mes sessions récentes</CardTitle></CardHeader>
+                <CardContent className="space-y-2">
+                    {mySessions.map(s => (
+                        <div key={s.id} className="flex justify-between items-center p-2 border rounded text-xs font-mono">
+                            <span>{s.id}</span>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteSessionFromList(s.id)}><Trash2 className="h-3 w-3 text-destructive" /></Button>
+                        </div>
+                    ))}
+                </CardContent>
+            </Card>
+        )}
     </div>
   );
 }
 
 export function HuntingSessionCard() {
   const { user, isUserLoading } = useUser();
-
-  if (isUserLoading) {
-    return <Card><CardContent><Skeleton className="h-48 w-full" /></CardContent></Card>;
-  }
-
-  if (!user) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="size-5 text-primary" />
-            Session de Chasse en Groupe
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Fonctionnalité réservée</AlertTitle>
-            <AlertDescription>
-              Vous devez être connecté pour créer ou rejoindre une session de chasse.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
-    );
-  }
-
+  if (isUserLoading) return <Card><CardContent><Skeleton className="h-48 w-full" /></CardContent></Card>;
+  if (!user) return <Card><CardContent><Alert><AlertCircle /><AlertTitle>Connexion requise</AlertTitle></Alert></CardContent></Card>;
   return <HuntingSessionContent />;
 }

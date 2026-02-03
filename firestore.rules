@@ -1,78 +1,43 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // REVISION_ID: 20240524_1315_FINAL_SYNC
-    // Cette version simplifiée vise à résoudre les conflits de déploiement.
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isAdmin() {
-      return isSignedIn() && (
+    // REVISION_MEGA_SYNC_20240524_1325
+    
+    function isAuth() { return request.auth != null; }
+    function isAdmin() { 
+      return isAuth() && (
         request.auth.token.email.lower() == 'f.mallet81@gmail.com' || 
         request.auth.token.email.lower() == 'f.mallet81@outlook.com'
       );
     }
 
-    // RÈGLE PRIORITAIRE : SESSIONS DE CHASSE
-    match /hunting_sessions/{sessionId} {
-      allow read, create: if isSignedIn();
-      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.organizerId == request.auth.uid);
-      
-      match /participants/{participantId} {
-        allow read, write: if isSignedIn();
-      }
-    }
-
-    // PROFILS ET DONNÉES UTILISATEURS
+    // ACCÈS GLOBAL SIMPLIFIÉ POUR DÉBLOCAGE
     match /users/{userId} {
-      allow read, write: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
-      
-      match /{allPaths=**} {
-        allow read, write: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
-      }
+      allow read, write: if isAdmin() || (isAuth() && request.auth.uid == userId);
+      match /{allPaths=**} { allow read, write: if isAdmin() || (isAuth() && request.auth.uid == userId); }
     }
 
-    // MESSAGERIE
-    match /conversations/{userId} {
-      allow read, write: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
-      match /{allPaths=**} {
-        allow read, write: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
-      }
+    match /hunting_sessions/{sessionId} {
+      allow read, create: if isAuth();
+      allow update, delete: if isAdmin() || (isAuth() && resource.data.organizerId == request.auth.uid);
+      match /participants/{pId} { allow read, write: if isAuth(); }
     }
 
-    // JETONS D'ACCÈS
-    match /access_tokens/{tokenId} {
-      allow get: if isSignedIn();
-      allow read, write: if isAdmin();
-      allow update: if isSignedIn() && request.resource.data.status == 'redeemed';
+    match /vessels/{vId} {
+      allow read: if isAuth();
+      allow write: if isAdmin() || (isAuth() && request.auth.uid == vId);
+      match /{allPaths=**} { allow read, write: if isAuth(); }
     }
 
-    match /shared_access_tokens/{tokenId} {
-      allow read: if isSignedIn();
+    match /conversations/{cId} {
+      allow read, write: if isAdmin() || (isAuth() && request.auth.uid == cId);
+      match /{allPaths=**} { allow read, write: if isAdmin() || (isAuth() && request.auth.uid == cId); }
+    }
+
+    match /{allPaths=**} {
+      allow read: if isAuth();
       allow write: if isAdmin();
-    }
-
-    // TRACKER ET NAVIRES
-    match /vessels/{vesselId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin() || (isSignedIn() && request.auth.uid == vesselId);
-      match /{allPaths=**} {
-        allow read, write: if isSignedIn();
-      }
-    }
-
-    // DONNÉES STATIQUES (MÉTÉO/MARÉES)
-    match /locations/{locationId} { allow read: if true; }
-    match /stations/{stationId} {
-      allow read: if true;
-      allow write: if isAdmin();
-      match /{allPaths=**} {
-        allow read: if true;
-        allow write: if isAdmin();
-      }
     }
   }
 }

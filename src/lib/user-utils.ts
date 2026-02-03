@@ -1,3 +1,4 @@
+
 'use client';
 import { doc, getDoc, setDoc, Firestore } from 'firebase/firestore';
 import { User } from 'firebase/auth';
@@ -10,16 +11,14 @@ import { addMonths } from 'date-fns';
  */
 export async function ensureUserDocument(firestore: Firestore, user: User, displayName?: string): Promise<void> {
   const userDocRef = doc(firestore, 'users', user.uid);
-  
-  const docSnap = await getDoc(userDocRef);
-  
-  // Reconnaissance robuste des comptes administrateurs par e-mail
   const email = user.email?.toLowerCase();
   const isAdminUser = email === 'f.mallet81@outlook.com' || email === 'f.mallet81@gmail.com';
 
+  const docSnap = await getDoc(userDocRef);
+
   if (docSnap.exists()) {
     const currentData = docSnap.data() as UserAccount;
-    // Mise à jour forcée du statut admin si nécessaire pour synchroniser avec les règles
+    // Mise à jour forcée du statut admin pour synchroniser avec les règles
     if (isAdminUser && currentData.subscriptionStatus !== 'admin') {
         await setDoc(userDocRef, { ...currentData, subscriptionStatus: 'admin' }, { merge: true });
     }
@@ -29,30 +28,18 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
   const { uid } = user;
   const effectiveDisplayName = displayName || user.displayName || email?.split('@')[0] || 'Utilisateur';
   
-  let newUserDocument: UserAccount;
+  const newUserDocument: UserAccount = {
+    id: uid,
+    email: user.email || '',
+    displayName: effectiveDisplayName,
+    subscriptionStatus: isAdminUser ? 'admin' : 'trial',
+    lastSelectedLocation: 'Nouméa',
+  };
 
-  if (isAdminUser) {
-    newUserDocument = {
-      id: uid,
-      email: user.email || '',
-      displayName: effectiveDisplayName,
-      subscriptionStatus: 'admin',
-      lastSelectedLocation: 'Nouméa',
-    };
-  } else {
-    // Période d'essai gratuite de 3 mois pour les nouveaux utilisateurs
+  if (!isAdminUser) {
     const trialStartDate = new Date();
-    const trialExpiryDate = addMonths(trialStartDate, 3);
-    
-    newUserDocument = {
-      id: uid,
-      email: user.email || '',
-      displayName: effectiveDisplayName,
-      subscriptionStatus: 'trial',
-      subscriptionStartDate: trialStartDate.toISOString(),
-      subscriptionExpiryDate: trialExpiryDate.toISOString(),
-      lastSelectedLocation: 'Nouméa',
-    };
+    newUserDocument.subscriptionStartDate = trialStartDate.toISOString();
+    newUserDocument.subscriptionExpiryDate = addMonths(trialStartDate, 3).toISOString();
   }
   
   await setDoc(userDocRef, newUserDocument);
