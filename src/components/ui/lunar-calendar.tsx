@@ -182,7 +182,7 @@ const DayCell = React.memo(({
           <div className="mt-auto w-full flex flex-col items-center gap-0 pb-0.5">
             {sortedTides.map((tide, idx) => {
               const isLargeHigh = tide.type === 'haute' && tide.height > 1.65;
-              const isLargeLow = tide.type === 'basse' && tide.height < 0.23;
+              const isLargeLow = tide.type === 'basse' && tide.height < 0.2;
               
               return (
                 <div 
@@ -292,7 +292,7 @@ export function LunarCalendar() {
               <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-primary"><Waves className="size-4"/> Heure/Hauteur</div>
               <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-primary"><Star className="size-3 fill-primary" /> Grandes Marées</div>
               <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><span className="bg-primary text-white px-1 rounded-[2px]">Haute {'>'} 1.65m</span></div>
-              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><span className="bg-destructive text-white px-1 rounded-[2px]">Basse {'<'} 0.23m</span></div>
+              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><span className="bg-destructive text-white px-1 rounded-[2px]">Basse {'<'} 0.2m</span></div>
             </div>
           </div>
         )}
