@@ -226,6 +226,7 @@ export function LunarCalendar() {
   const days = eachDayOfInterval({ start: startDate, end: endDate });
   const weekdays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
+  // Fonction de centrage automatique sur le jour actuel
   useEffect(() => {
     const timer = setTimeout(() => {
       const todayEl = document.querySelector('.calendar-today-cell');
@@ -239,7 +240,7 @@ export function LunarCalendar() {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [displayDate]);
+  }, [displayDate, calendarView]);
 
   return (
     <div className="flex flex-col items-start py-4">
@@ -312,20 +313,14 @@ export function LunarCalendar() {
       </div>
 
       <Dialog open={!!detailedDay} onOpenChange={(isOpen) => !isOpen && setDetailedDay(null)}>
-        <DialogContent className="w-[95vw] max-w-lg h-[90vh] p-0 flex flex-col rounded-xl overflow-hidden shadow-2xl border-none">
+        <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] p-0 flex flex-col rounded-xl overflow-hidden shadow-2xl border-none z-[100]">
           <DialogHeader className="p-6 shrink-0 bg-muted/10 border-b">
             <DialogTitle className="text-lg font-black uppercase tracking-tighter">
               {detailedDay ? format(detailedDay, 'eeee d MMMM', { locale: fr }) : ''}
             </DialogTitle>
           </DialogHeader>
           
-          <div 
-            className="flex-grow p-6 overflow-y-auto overscroll-contain" 
-            style={{ 
-              WebkitOverflowScrolling: 'touch',
-              touchAction: 'pan-y'
-            }}
-          >
+          <div className="flex-grow p-6 overflow-y-auto">
             {calendarView === 'peche' 
               ? (detailedDay && <PecheDetailDialogContent day={detailedDay} location={selectedLocation} />)
               : (detailedDay && <ChampsDetailDialogContent day={detailedDay} location={selectedLocation} />)
