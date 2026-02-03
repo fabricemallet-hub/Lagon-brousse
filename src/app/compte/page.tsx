@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, isBefore, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Crown, Star, XCircle, KeyRound, Ticket, Gift, LogOut, Mail, Calendar } from 'lucide-react';
+import { Crown, Star, XCircle, KeyRound, Ticket, Gift, LogOut, Mail, Calendar, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
