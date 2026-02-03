@@ -1,7 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // DEPLOY_ID: STABLE_FINAL_SYNC_V10
+    // REVISION: STABLE_SYNC_FINAL_V20
     
     function isAuth() { return request.auth != null; }
     function isAdmin() { 
@@ -11,29 +11,37 @@ service cloud.firestore {
       );
     }
 
-    // ACCÈS PRIORITAIRE SESSIONS CHASSE (Listage autorisé pour tous les connectés)
-    match /hunting_sessions/{sessionId} {
+    // Sessions de chasse - Priorité haute pour les fonctions de groupe
+    match /hunting_sessions/{sId} {
       allow read, write: if isAuth();
-      match /participants/{userId} {
+      match /participants/{pId} {
         allow read, write: if isAuth();
       }
     }
 
-    // PROFILS UTILISATEURS
-    match /users/{userId} {
-      allow read, write: if isAdmin() || (isAuth() && request.auth.uid == userId);
-      match /{allPaths=**} { 
-        allow read, write: if isAdmin() || (isAuth() && request.auth.uid == userId); 
+    // Profils utilisateurs
+    match /users/{uId} {
+      allow read, write: if isAdmin() || (isAuth() && request.auth.uid == uId);
+      match /{allPaths=**} {
+        allow read, write: if isAdmin() || (isAuth() && request.auth.uid == uId);
       }
     }
 
-    // VESSEL TRACKER
+    // Tracker maritime
     match /vessels/{vId} {
       allow read, write: if isAuth();
       match /{allPaths=**} { allow read, write: if isAuth(); }
     }
 
-    // GLOBALES ET ADMIN
+    // Jetons et Conversations
+    match /access_tokens/{tId} { allow read, write: if isAuth(); }
+    match /shared_access_tokens/{tId} { allow read: if isAuth(); allow write: if isAdmin(); }
+    match /conversations/{cId} {
+      allow read, write: if isAdmin() || (isAuth() && request.auth.uid == cId);
+      match /{allPaths=**} { allow read, write: if isAdmin() || (isAuth() && request.auth.uid == cId); }
+    }
+
+    // Règle par défaut
     match /{allPaths=**} {
       allow read: if isAuth();
       allow write: if isAdmin();

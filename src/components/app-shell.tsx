@@ -36,12 +36,9 @@ import {
 } from '@/components/ui/select';
 import { useLocation } from '@/context/location-context';
 import { useCalendarView } from '@/context/calendar-view-context';
-import { Switch } from './ui/switch';
-import { Label } from './ui/label';
 import { usePathname, useRouter } from 'next/navigation';
 import { useDate } from '@/context/date-context';
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
-import { Dialog, DialogContent, DialogTrigger } from './ui/dialog';
 import { Calendar } from './ui/calendar';
 import { format, addDays, subDays, isBefore } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -56,11 +53,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from './ui/badge';
 import { cn } from '@/lib/utils';
 import { BottomNav } from './bottom-nav';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 const USAGE_LIMIT_SECONDS = 60;
 
-// Separate component for timer to prevent shell re-renders
+// Composant Timer isolé pour éviter les re-renders massifs de l'AppShell
 const UsageTimer = React.memo(({ status, auth }: { status: string, auth: any }) => {
   const [timeLeft, setTimeLeft] = useState(USAGE_LIMIT_SECONDS);
   const { toast } = useToast();
@@ -117,14 +113,12 @@ UsageTimer.displayName = 'UsageTimer';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { locations, selectedLocation, setSelectedLocation, isLocationLoading } = useLocation();
-  const { calendarView, setCalendarView } = useCalendarView();
   const { selectedDate, setSelectedDate } = useDate();
   const pathname = usePathname();
   const router = useRouter();
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
   const firestore = useFirestore();
-  const isMobile = useIsMobile();
   const [isDatePickerOpen, setDatePickerOpen] = useState(false);
 
   const userDocRef = useMemoFirebase(() => {
