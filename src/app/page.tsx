@@ -79,7 +79,6 @@ export default function Home() {
     setIsLoading(true);
     const fetchedData = getDataForDate(selectedLocation, selectedDate);
     setData(fetchedData);
-    setIsLocationLoading(false);
     setIsLoading(false);
   }, [selectedLocation, selectedDate]);
 
