@@ -53,7 +53,6 @@ import {
   AlertCircle,
   Play,
   Settings,
-  Music
 } from 'lucide-react';
 import {
   useUser,
@@ -73,7 +72,6 @@ import {
   updateDoc,
   writeBatch,
   getDocs,
-  query,
 } from 'firebase/firestore';
 import type { WithId } from '@/firebase';
 import type { HuntingSession, SessionParticipant, UserAccount } from '@/lib/types';
@@ -91,7 +89,7 @@ const soundLibrary = [
   { id: 'cloche', label: 'Cloche Classique', url: 'https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3' },
   { id: 'alerte', label: 'Alerte Urgence', url: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' },
   { id: 'cor', label: 'Cor de chasse', url: 'https://assets.mixkit.co/active_storage/sfx/2701/2701-preview.mp3' },
-  { id: 'sifflet', label: 'Sifflet Arbitre', url: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3' },
+  { id: 'sifflet', label: 'Sifflet Arbitre', url: 'https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3' },
   { id: 'digital-1', label: 'Bip Digital 1', url: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3' },
   { id: 'digital-2', label: 'Bip Digital 2', url: 'https://assets.mixkit.co/active_storage/sfx/2562/2562-preview.mp3' },
   { id: 'ping', label: 'Ping Sonar', url: 'https://assets.mixkit.co/active_storage/sfx/2564/2564-preview.mp3' },
@@ -177,7 +175,9 @@ function HuntingSessionContent() {
     if (sound) {
         const audio = new Audio(sound.url);
         audio.volume = soundVolume;
-        audio.play().catch(() => {});
+        audio.play().catch(() => {
+          console.warn(`Could not play sound: ${soundId}`);
+        });
     }
   }, [isSoundEnabled, soundSettings, soundVolume]);
 
@@ -434,7 +434,7 @@ function HuntingSessionContent() {
             await updateDoc(doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid), prefs);
         }
         toast({ title: 'Préférences sauvegardées !' });
-        setPrefsSection(undefined); // Masquer après sauvegarde
+        setPrefsSection(undefined); 
     } catch (e) {
         console.error(e);
     } finally {
