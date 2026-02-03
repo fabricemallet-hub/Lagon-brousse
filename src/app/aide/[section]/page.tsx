@@ -81,19 +81,23 @@ const sectionContent: Record<string, {
     ]
   },
   'peche': {
-    title: 'Pêche à la ligne',
+    title: 'Pêche',
     icon: Fish,
     color: 'bg-indigo-500',
-    role: "Prédictions de succès basées sur l'heure, la marée et la lune pour chaque espèce emblématique du lagon et du large.",
+    role: "Optimisez vos sorties en mer grâce aux prévisions d'activité par espèce et à la mémorisation de vos spots secrets.",
     steps: [
-      "Consultez les indices de pêche (sur 10) pour chaque créneau horaire (Aube, Matin, etc.).",
-      "Déroulez une espèce pour obtenir les conseils spécifiques : activité, profondeur et spots idéaux.",
-      "Vérifiez l'état des pélagiques (Thon, Mahi-mahi) grâce au bandeaux saisonnier.",
-      "Consultez l'activité des crabes (pleins ou en mue), des langoustes et des poulpes."
+      "Consultez les indices de réussite (sur 10) calculés selon la marée, la lune et l'heure pour chaque poisson.",
+      "Déroulez une fiche espèce pour obtenir des conseils de profondeur et de technique.",
+      "Suivez l'activité des crabes, langoustes et poulpes selon le cycle lunaire.",
+      "Enregistrez vos 'Coins de Pêche' par GPS sur la carte satellite interactive.",
+      "Consultez l'historique détaillé de vos prises : l'application mémorise automatiquement le contexte exact (lune, marée, vent, température) au moment de l'enregistrement.",
+      "Utilisez l'IA 'Chercher un jour similaire' sur un spot : elle analyse votre succès passé pour trouver la date idéale dans les 30 prochains jours.",
+      "Sélectionnez plusieurs spots pour obtenir une tendance globale du meilleur jour de la semaine."
     ],
     tips: [
-      "Privilégiez les créneaux où la marée est 'Montante' ou 'Descendante', l'étale est souvent moins productive.",
-      "Un poisson avec une note de 9/10 scintille : c'est le moment idéal pour le traquer !"
+      "Le mode satellite de la carte est idéal pour repérer les patates de corail et les têtes de roche.",
+      "Un spot enregistré avec 9/10 d'indice est un précieux indicateur pour l'IA prédictive.",
+      "L'IA ignore météo et vent pour se concentrer sur les cycles immuables de la lune et des marées."
     ]
   },
   'chasse': {
