@@ -15,13 +15,11 @@ service cloud.firestore {
     }
     
     function isAdmin() {
-      // The admin's email is hardcoded for this application.
       return request.auth.token.email == 'f.mallet81@outlook.com';
     }
 
     // ----------------------------------------------------------------------
     // Collection: users
-    // Purpose: Stores private user account information.
     // ----------------------------------------------------------------------
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
@@ -40,8 +38,22 @@ service cloud.firestore {
     }
 
     // ----------------------------------------------------------------------
+    // Collection: vessels (Real-time tracking)
+    // ----------------------------------------------------------------------
+    match /vessels/{userId} {
+      // Owner can update their own vessel status
+      allow get, write: if isOwner(userId);
+      // Anyone can read a vessel's status if they know the ID (shareable link/code)
+      allow read: if isSignedIn();
+
+      match /history/{pointId} {
+        allow read: if isSignedIn();
+        allow write: if isOwner(userId);
+      }
+    }
+
+    // ----------------------------------------------------------------------
     // Collection: locations
-    // Purpose: Stores public, read-only location data.
     // ----------------------------------------------------------------------
     match /locations/{locationId} {
       allow read: if true;
@@ -50,7 +62,6 @@ service cloud.firestore {
     
     // ----------------------------------------------------------------------
     // Collection: stations & subcollections
-    // Purpose: Stores public tide data, writable only by an admin process.
     // ----------------------------------------------------------------------
     match /stations/{stationId} {
       allow read: if true;
@@ -64,14 +75,12 @@ service cloud.firestore {
     
     // ----------------------------------------------------------------------
     // Collection: hunting_sessions
-    // Purpose: Manages real-time group hunting sessions.
     // ----------------------------------------------------------------------
     match /hunting_sessions/{sessionId} {
       allow get: if isSignedIn();
       allow create: if isOwner(request.resource.data.organizerId);
       allow delete: if isOwner(resource.data.organizerId);
       
-      // Participants subcollection
       match /participants/{userId} {
         allow create, update, delete: if isOwner(userId);
         allow get: if isSignedIn();
@@ -81,7 +90,6 @@ service cloud.firestore {
 
     // ----------------------------------------------------------------------
     // Collection: access_tokens
-    // Purpose: Manages subscription access tokens.
     // ----------------------------------------------------------------------
     match /access_tokens/{tokenId} {
       allow read, write: if isAdmin();
@@ -98,7 +106,6 @@ service cloud.firestore {
     
     // ----------------------------------------------------------------------
     // Collection: shared_access_tokens
-    // Purpose: Manages a global access token for all users.
     // ----------------------------------------------------------------------
     match /shared_access_tokens/{tokenId} {
       allow write: if isAdmin();
@@ -107,7 +114,6 @@ service cloud.firestore {
 
     // ----------------------------------------------------------------------
     // Collection: conversations
-    // Purpose: Manages support conversations between users and admin.
     // ----------------------------------------------------------------------
     match /conversations/{userId} {
       allow read, write: if isOwner(userId) || isAdmin();

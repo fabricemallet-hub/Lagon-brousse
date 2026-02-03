@@ -20,6 +20,43 @@
       },
       "required": ["id", "email", "displayName", "subscriptionStatus"]
     },
+    "VesselStatus": {
+      "title": "VesselStatus",
+      "type": "object",
+      "description": "Represents the real-time tracking status of a boat/vessel.",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "location": {
+          "type": "object",
+          "properties": {
+            "latitude": { "type": "number" },
+            "longitude": { "type": "number" }
+          }
+        },
+        "status": { "type": "string", "enum": ["moving", "stationary", "offline"] },
+        "lastActive": { "type": "string", "format": "date-time" },
+        "isSharing": { "type": "boolean" },
+        "batteryLevel": { "type": "number" }
+      },
+      "required": ["userId", "location", "status", "lastActive"]
+    },
+    "VesselHistory": {
+      "title": "VesselHistory",
+      "type": "object",
+      "description": "Historical stationary points for a vessel.",
+      "properties": {
+        "timestamp": { "type": "string", "format": "date-time" },
+        "location": {
+          "type": "object",
+          "properties": {
+            "latitude": { "type": "number" },
+            "longitude": { "type": "number" }
+          }
+        },
+        "durationMinutes": { "type": "number" }
+      }
+    },
     "SowingRecord": {
       "title": "SowingRecord",
       "type": "object",
@@ -233,125 +270,31 @@
         "definition": {
           "entityName": "UserAccount",
           "schema": { "$ref": "#/backend/entities/UserAccount" },
-          "description": "Stores user account information. The 'userId' path parameter is used to enforce path-based ownership for data privacy. Includes 'favoriteLocationIds' array.",
+          "description": "Stores user account information.",
           "params": [{ "name": "userId", "description": "The unique identifier for the user account." }]
         }
       },
       {
-        "path": "/users/{userId}/fishing_spots/{spotId}",
+        "path": "/vessels/{userId}",
         "definition": {
-          "entityName": "FishingSpot",
-          "schema": { "$ref": "#/backend/entities/FishingSpot" },
-          "description": "Stores a user's saved fishing spots and the conditions of the catch.",
+          "entityName": "VesselStatus",
+          "schema": { "$ref": "#/backend/entities/VesselStatus" },
+          "description": "Real-time vessel status for tracking.",
+          "params": [{ "name": "userId", "description": "The UID of the vessel owner." }]
+        }
+      },
+      {
+        "path": "/vessels/{userId}/history/{pointId}",
+        "definition": {
+          "entityName": "VesselHistory",
+          "schema": { "$ref": "#/backend/entities/VesselHistory" },
+          "description": "Stationary points history.",
           "params": [
-            { "name": "userId", "description": "The user's ID." },
-            { "name": "spotId", "description": "The unique ID for the fishing spot." }
-          ]
-        }
-      },
-      {
-        "path": "/users/{userId}/sowings/{sowingId}",
-        "definition": {
-          "entityName": "SowingRecord",
-          "schema": { "$ref": "#/backend/entities/SowingRecord" },
-          "description": "Stores a user's gardening sowing records and AI advice.",
-          "params": [
-            { "name": "userId", "description": "The user's ID." },
-            { "name": "sowingId", "description": "The unique ID for the sowing entry." }
-          ]
-        }
-      },
-      {
-        "path": "/locations/{locationId}",
-        "definition": {
-          "entityName": "Location",
-          "schema": { "$ref": "#/backend/entities/Location" },
-          "description": "Stores location data (communes).",
-          "params": [{ "name": "locationId", "description": "The unique identifier for the location." }]
-        }
-      },
-      {
-        "path": "/stations/{stationId}",
-        "definition": {
-          "entityName": "Station",
-          "schema": { "$ref": "#/backend/entities/Station" },
-          "description": "Stores tide station metadata like name and coordinates.",
-          "params": [{ "name": "stationId", "description": "The unique identifier for the tide station (e.g., 'Noumea')." }]
-        }
-      },
-      {
-        "path": "/stations/{stationId}/tides/{date}",
-        "definition": {
-          "entityName": "TideArchive",
-          "schema": { "$ref": "#/backend/entities/TideArchive" },
-          "description": "A subcollection storing daily tide data for a station. The document ID is the date in YYYY-MM-DD format.",
-          "params": [
-            { "name": "stationId", "description": "The ID of the parent station." },
-            { "name": "date", "description": "The date of the tide data in YYYY-MM-DD format." }
-          ]
-        }
-      },
-      {
-        "path": "/hunting_sessions/{sessionId}",
-        "definition": {
-          "entityName": "HuntingSession",
-          "schema": { "$ref": "#/backend/entities/HuntingSession" },
-          "description": "Stores hunting session metadata. Documents have a TTL based on the 'expiresAt' field.",
-          "params": [{ "name": "sessionId", "description": "The unique, shareable code for the hunting session (e.g., 'CH-1234')." }]
-        }
-      },
-      {
-        "path": "/hunting_sessions/{sessionId}/participants/{userId}",
-        "definition": {
-          "entityName": "SessionParticipant",
-          "schema": { "$ref": "#/backend/entities/SessionParticipant" },
-          "description": "Stores real-time data for each participant in a session. The document ID is the user's UID.",
-          "params": [
-            { "name": "sessionId", "description": "The ID of the parent session." },
-            { "name": "userId", "description": "The participant's user ID." }
-          ]
-        }
-      },
-       {
-        "path": "/access_tokens/{tokenId}",
-        "definition": {
-          "entityName": "AccessToken",
-          "schema": { "$ref": "#/backend/entities/AccessToken" },
-          "description": "Stores access tokens that can be redeemed for subscriptions.",
-          "params": [{ "name": "tokenId", "description": "The unique ID of the access token." }]
-        }
-      },
-      {
-        "path": "/shared_access_tokens/{tokenId}",
-        "definition": {
-          "entityName": "SharedAccessToken",
-          "schema": { "$ref": "#/backend/entities/SharedAccessToken" },
-          "description": "Stores a single, globally shared access token. The document ID is typically a fixed value like 'GLOBAL'.",
-          "params": [{ "name": "tokenId", "description": "The unique ID for the shared token, e.g., 'GLOBAL'." }]
-        }
-      },
-      {
-        "path": "/conversations/{userId}",
-        "definition": {
-          "entityName": "Conversation",
-          "schema": { "$ref": "#/backend/entities/Conversation" },
-          "description": "Stores conversation threads between users and the admin. The document ID is the user's UID.",
-          "params": [{ "name": "userId", "description": "The user's unique ID." }]
-        }
-      },
-      {
-        "path": "/conversations/{userId}/messages/{messageId}",
-        "definition": {
-          "entityName": "ChatMessage",
-          "schema": { "$ref": "#/backend/entities/ChatMessage" },
-          "description": "Stores individual messages within a user's conversation thread.",
-          "params": [
-            { "name": "userId", "description": "The ID of the parent conversation (user's ID)." },
-            { "name": "messageId", "description": "The unique ID for the message." }
+            { "name": "userId", "description": "Vessel owner UID." },
+            { "name": "pointId", "description": "Point ID." }
           ]
         }
       }
-    ],
-    "reasoning": "This design prioritizes security and scalability for the Marées et Terroir Calédonien application, focusing on user authentication and location data. It leverages path-based ownership for user accounts and separates location data for efficient querying and management. The design emphasizes authorization independence by not relying on `get()` calls in security rules.\n\n**Authorization Independence:** User account data is stored under `/users/{userId}`, ensuring clear ownership and avoiding reliance on external document data for authorization. No data is denormalized as the only relationship is a N:N relationship between user and location and this handled within the user document as an array of IDs.\n\n**Structural Segregation:**  User account data is kept separate from location data, allowing for distinct security rules tailored to each data type.\n\n**QAPs (Query Across Partitions):** Because there are no list operations required for UserAccount collection and favoriteLocationIds only stores the references to existing locations, QAP is automatically supported. List operation on the location data is supported given there is no restriction on listing locations, thus no need to store the role in database."
+    ]
   }
 }

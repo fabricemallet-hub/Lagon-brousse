@@ -1,3 +1,4 @@
+
 export type WindDirection = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
 
 export interface WindForecast {
@@ -240,4 +241,28 @@ export interface ChatMessage {
   senderId: string; // user.uid or 'admin'
   content: string;
   createdAt: any; // Firestore ServerTimestamp
+}
+
+export interface VesselStatus {
+  id: string;
+  userId: string;
+  displayName: string;
+  location: {
+    latitude: number;
+    longitude: number;
+  };
+  status: 'moving' | 'stationary' | 'offline';
+  lastActive: any; // ServerTimestamp
+  isSharing: boolean;
+  batteryLevel?: number;
+}
+
+export interface VesselHistory {
+  id: string;
+  timestamp: any;
+  location: {
+    latitude: number;
+    longitude: number;
+  };
+  durationMinutes: number;
 }

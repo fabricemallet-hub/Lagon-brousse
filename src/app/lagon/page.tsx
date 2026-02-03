@@ -25,6 +25,8 @@ import { useDate } from '@/context/date-context';
 import { cn } from '@/lib/utils';
 import { useMemo, useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { VesselTracker } from '@/components/vessel-tracker';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 function LagonSkeleton() {
   return (
@@ -76,138 +78,151 @@ export default function LagonPage() {
   const { weather, tideStation } = data;
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Conditions en Mer</CardTitle>
-          <CardDescription>
-            Informations détaillées sur la météo et la mer pour {selectedLocation} le {dateString}.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-6 md:grid-cols-2">
-          <div className="space-y-2 rounded-lg border p-4 bg-card">
-            <h3 className="font-semibold flex items-center gap-2 mb-2">
-              <Wind className="text-primary" /> Vent
-            </h3>
-            <div className="space-y-1">
-              {weather.wind.map((forecast, index) => (
-                <div 
-                  key={index} 
-                  onClick={() => setSelectedTime(forecast.time)}
-                  className={cn(
-                      "flex justify-between items-center py-2 px-2 -mx-2 cursor-pointer transition-colors rounded-md",
-                      selectedTime === forecast.time ? "bg-muted" : "hover:bg-muted/50"
-                  )}
-                >
+    <div className="space-y-6 w-full max-w-full overflow-x-hidden">
+      <Tabs defaultValue="weather" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 h-12">
+          <TabsTrigger value="weather" className="text-base font-bold">Météo & Marées</TabsTrigger>
+          <TabsTrigger value="tracker" className="text-base font-bold">Vessel Tracker</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="weather" className="space-y-6 pt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Conditions en Mer</CardTitle>
+              <CardDescription>
+                Informations détaillées sur la météo et la mer pour {selectedLocation} le {dateString}.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-6 md:grid-cols-2">
+              <div className="space-y-2 rounded-lg border p-4 bg-card">
+                <h3 className="font-semibold flex items-center gap-2 mb-2">
+                  <Wind className="text-primary" /> Vent
+                </h3>
+                <div className="space-y-1">
+                  {weather.wind.map((forecast, index) => (
+                    <div 
+                      key={index} 
+                      onClick={() => setSelectedTime(forecast.time)}
+                      className={cn(
+                          "flex justify-between items-center py-2 px-2 -mx-2 cursor-pointer transition-colors rounded-md",
+                          selectedTime === forecast.time ? "bg-muted" : "hover:bg-muted/50"
+                      )}
+                    >
+                        <div>
+                            <p className="font-bold">{forecast.time}</p>
+                            <p className="text-sm text-muted-foreground">{forecast.stability}</p>
+                        </div>
+                        <div className="text-right">
+                            <p className="font-semibold">{forecast.speed} nœuds</p>
+                            <p className="text-sm text-muted-foreground">{forecast.direction}</p>
+                        </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-4 rounded-lg border p-4 bg-card">
+                <h3 className="font-semibold flex items-center gap-2 mb-2">
+                  <Waves className="text-primary" /> Houle
+                </h3>
+                {selectedSwell ? (
+                  <div className="flex flex-col gap-4">
                     <div>
-                        <p className="font-bold">{forecast.time}</p>
-                        <p className="text-sm text-muted-foreground">{forecast.stability}</p>
+                      <p className="font-bold text-xl">{selectedSwell.inside}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Dans le lagon
+                      </p>
                     </div>
-                    <div className="text-right">
-                        <p className="font-semibold">{forecast.speed} nœuds</p>
-                        <p className="text-sm text-muted-foreground">{forecast.direction}</p>
+                    <div>
+                      <p className="font-bold text-xl">{selectedSwell.outside}</p>
+                      <p className="text-sm text-muted-foreground">
+                        À l'extérieur du récif
+                      </p>
                     </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-4 rounded-lg border p-4 bg-card">
-            <h3 className="font-semibold flex items-center gap-2 mb-2">
-              <Waves className="text-primary" /> Houle
-            </h3>
-            {selectedSwell ? (
-              <div className="flex flex-col gap-4">
-                <div>
-                  <p className="font-bold text-xl">{selectedSwell.inside}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Dans le lagon
-                  </p>
-                </div>
-                <div>
-                  <p className="font-bold text-xl">{selectedSwell.outside}</p>
-                  <p className="text-sm text-muted-foreground">
-                    À l'extérieur du récif
-                  </p>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Période de {selectedSwell.period} secondes
-                </p>
+                    <p className="text-sm text-muted-foreground">
+                      Période de {selectedSwell.period} secondes
+                    </p>
+                  </div>
+                ) : (
+                    <div className="flex flex-col gap-4">
+                        <Skeleton className="h-7 w-20" />
+                        <Skeleton className="h-7 w-20" />
+                        <Skeleton className="h-4 w-32" />
+                    </div>
+                )}
               </div>
-            ) : (
-                <div className="flex flex-col gap-4">
-                    <Skeleton className="h-7 w-20" />
-                    <Skeleton className="h-7 w-20" />
-                    <Skeleton className="h-4 w-32" />
-                </div>
-            )}
-          </div>
-        </CardContent>
-        <CardContent>
-          <Separator className="my-4" />
-          <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                  <Sunrise className="size-5 text-accent" />
-                  <span>Lever soleil: {weather.sun.sunrise}</span>
+            </CardContent>
+            <CardContent>
+              <Separator className="my-4" />
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="flex items-center gap-2">
+                      <Sunrise className="size-5 text-accent" />
+                      <span>Lever soleil: {weather.sun.sunrise}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                      <Sunset className="size-5 text-accent" />
+                      <span>Coucher soleil: {weather.sun.sunset}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                      <Moon className="size-5 text-blue-300" />
+                      <span>Lever lune: {weather.moon.moonrise}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                      <Moon className="size-5 text-slate-400" />
+                      <span>Coucher lune: {weather.moon.moonset}</span>
+                  </div>
               </div>
-              <div className="flex items-center gap-2">
-                  <Sunset className="size-5 text-accent" />
-                  <span>Coucher soleil: {weather.sun.sunset}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                  <Moon className="size-5 text-blue-300" />
-                  <span>Lever lune: {weather.moon.moonrise}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                  <Moon className="size-5 text-slate-400" />
-                  <span>Coucher lune: {weather.moon.moonset}</span>
-              </div>
-          </div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Marées et Courants</CardTitle>
-          <CardDescription>
-            Données de marée basées sur la station de {tideStation}.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            {sortedTides.map((tide, i) => {
-              const TideIcon = tide.type === 'haute' ? TrendingUp : TrendingDown;
-              
-              return (
-                  <div key={i} className={cn(
-                      "flex items-center justify-between p-3 rounded-lg border bg-background transition-all",
-                      tide.type === 'haute' && "border-primary/50 bg-primary/10",
-                      tide.type === 'basse' && "border-destructive/50 bg-destructive/10",
-                  )}>
-                      <div className="flex items-center gap-4">
-                          <TideIcon className={cn(
-                              "size-8 shrink-0",
-                              tide.type === 'haute' ? 'text-primary' : 'text-destructive',
-                          )} />
-                          <div>
-                              <p className="font-semibold text-lg capitalize">{`Marée ${tide.type}`}</p>
-                              <div className="flex items-center gap-2">
-                                <p className="text-muted-foreground font-mono">{tide.time}</p>
-                                <Badge variant={tide.type === 'haute' ? 'default' : 'destructive'} className="text-xs capitalize">{tide.type === 'haute' ? 'Pleine Mer' : 'Basse Mer'}</Badge>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Marées et Courants</CardTitle>
+              <CardDescription>
+                Données de marée basées sur la station de {tideStation}.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                {sortedTides.map((tide, i) => {
+                  const TideIcon = tide.type === 'haute' ? TrendingUp : TrendingDown;
+                  
+                  return (
+                      <div key={i} className={cn(
+                          "flex items-center justify-between p-3 rounded-lg border bg-background transition-all",
+                          tide.type === 'haute' && "border-primary/50 bg-primary/10",
+                          tide.type === 'basse' && "border-destructive/50 bg-destructive/10",
+                      )}>
+                          <div className="flex items-center gap-4">
+                              <TideIcon className={cn(
+                                  "size-8 shrink-0",
+                                  tide.type === 'haute' ? 'text-primary' : 'text-destructive',
+                              )} />
+                              <div>
+                                  <p className="font-semibold text-lg capitalize">{`Marée ${tide.type}`}</p>
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-muted-foreground font-mono">{tide.time}</p>
+                                    <Badge variant={tide.type === 'haute' ? 'default' : 'destructive'} className="text-xs capitalize">{tide.type === 'haute' ? 'Pleine Mer' : 'Basse Mer'}</Badge>
+                                  </div>
                               </div>
                           </div>
+                          <div className={cn(
+                              "font-bold text-xl",
+                              tide.type === 'haute' && "text-primary",
+                              tide.type === 'basse' && "text-destructive",
+                          )}>
+                              {tide.height.toFixed(2)}m
+                          </div>
                       </div>
-                      <div className={cn(
-                          "font-bold text-xl",
-                          tide.type === 'haute' && "text-primary",
-                          tide.type === 'basse' && "text-destructive",
-                      )}>
-                          {tide.height.toFixed(2)}m
-                      </div>
-                  </div>
-              )
-            })}
-          </div>
-        </CardContent>
-      </Card>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="tracker" className="pt-4">
+          <VesselTracker />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
