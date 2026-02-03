@@ -1,57 +1,138 @@
-
 rules_version = '2';
+
+/**
+ * MARÉES ET TERROIR CALÉDONIEN - SECURITY POLICY
+ * 
+ * CORE PHILOSOPHY:
+ * This ruleset implements a hybrid security model. User-specific data (profiles, subscriptions, favorites) 
+ * follows a strict Ownership model where users can only access their own records. Meteorological, 
+ * geographic, and calendar data (Locations, Tides, Weather, Lunar, Agriculture) are treated as 
+ * authoritative public resources: they are readable by anyone (including anonymous users) but 
+ * strictly read-only for all client-side operations to prevent data corruption.
+ * 
+ * DATA STRUCTURE:
+ * - /users/{userId}: Private user profiles and app state.
+ * - /locations/{locationId}: Publicly accessible geographic reference data.
+ * - /locations/{locationId}/...: Sub-collections for Tides, Weather, and Fishing predictions.
+ * - /lunarData, /agricultureCalendar, /meteo_caledonie: Top-level public information collections.
+ * 
+ * KEY SECURITY DECISIONS:
+ * 1. User Privacy: Users cannot list other users or read their profiles.
+ * 2. Public Readability: All meteorological and agricultural data is publicly readable to support 
+ *    the app's core utility without requiring friction-heavy auth for basic info.
+ * 3. Write Protection: Only the /users collection allows client-side writes. All other collections 
+ *    are protected from client-side modification (managed via Admin SDK or automated ingest).
+ * 4. Relational Integrity: In the prototyping phase, we enforce that a User document's internal 
+ *    ID matches its path to ensure data consistency.
+ */
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // REVISION: STABLE_SYNC_FINAL_V26
-    
-    function isAuth() { return request.auth != null; }
-    function isAdmin() { 
-      return isAuth() && (
-        request.auth.token.email.lower() in ['f.mallet81@gmail.com', 'f.mallet81@outlook.com'] ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'admin'
-      );
+
+    // --- GLOBAL HELPER FUNCTIONS ---
+
+    /** @description Checks if the request is from a signed-in user. */
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    // Sessions de chasse
-    match /hunting_sessions/{sId} {
-      allow read, write: if isAuth();
-      match /participants/{pId} {
-        allow read, write: if isAuth();
+    /** @description Checks if the authenticated user's UID matches the provided userId. */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /** @description Checks ownership and ensures the document exists for updates/deletes. */
+    function isExistingOwner(userId) {
+      return resource != null && isOwner(userId);
+    }
+
+    // --- COLLECTION RULES ---
+
+    /**
+     * @description Rules for user profiles and subscription status.
+     * @path /users/{userId}
+     * @allow (create) if auth.uid matches userId.
+     * @deny (read) if trying to access another user's profile.
+     * @principle Enforces strict document ownership and self-creation.
+     */
+    match /users/{userId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Geographic location metadata.
+     * @path /locations/{locationId}
+     * @allow (get, list) for all users.
+     * @deny (write) for all users (Read-Only).
+     * @principle Publicly readable reference data.
+     */
+    match /locations/{locationId} {
+      allow get, list: if true;
+      allow create, update, delete: if false;
+
+      /**
+       * @description Tide data specific to a location.
+       * @path /locations/{locationId}/tideData/{tideDataId}
+       */
+      match /tideData/{tideDataId} {
+        allow get, list: if true;
+        allow create, update, delete: if false;
+      }
+
+      /**
+       * @description Weather data specific to a location.
+       * @path /locations/{locationId}/weatherData/{weatherDataId}
+       */
+      match /weatherData/{weatherDataId} {
+        allow get, list: if true;
+        allow create, update, delete: if false;
+      }
+
+      /**
+       * @description Fishing success predictions specific to a location.
+       * @path /locations/{locationId}/fishingPredictions/{fishingPredictionId}
+       */
+      match /fishingPredictions/{fishingPredictionId} {
+        allow get, list: if true;
+        allow create, update, delete: if false;
       }
     }
 
-    // Profils utilisateurs
-    match /users/{uId} {
-      allow read, write: if isAdmin() || (isAuth() && request.auth.uid == uId);
-      match /{allPaths=**} {
-        allow read, write: if isAdmin() || (isAuth() && request.auth.uid == uId);
-      }
+    /**
+     * @description Daily lunar phases and sunrise/sunset times.
+     * @path /lunarData/{date}
+     * @allow (list) for the daily dashboard.
+     * @principle Read-only public reference.
+     */
+    match /lunarData/{date} {
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
 
-    // Tracker maritime
-    match /vessels/{vId} {
-      allow read, write: if isAuth();
-      match /{allPaths=**} { allow read, write: if isAuth(); }
+    /**
+     * @description Agricultural recommendations based on lunar cycles.
+     * @path /agricultureCalendar/{date}
+     * @allow (get) by date document ID.
+     * @principle Read-only public reference.
+     */
+    match /agricultureCalendar/{date} {
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
 
-    // Jetons et Conversations
-    match /access_tokens/{tId} { allow read, write: if isAuth(); }
-    match /shared_access_tokens/{tId} { allow read: if isAuth(); allow write: if isAdmin(); }
-    match /conversations/{cId} {
-      allow read, write: if isAdmin() || (isAuth() && request.auth.uid == cId);
-      match /{allPaths=**} { allow read, write: if isAdmin() || (isAuth() && request.auth.uid == cId); }
-    }
-
-    // Configuration globale (Splash screen, etc.)
-    match /app_settings/{settingId} {
-      allow read: if true; // Tout le monde peut lire le splash screen
-      allow write: if isAdmin();
-    }
-
-    // Règle par défaut
-    match /{allPaths=**} {
-      allow read: if isAuth();
-      allow write: if isAdmin();
+    /**
+     * @description Live weather data for New Caledonia communes (StreamBuilder support).
+     * @path /meteo_caledonie/{communeId}
+     * @allow (list) for real-time map/list views.
+     * @deny (write) unauthorized data injection.
+     * @principle Facilitates real-time public data streaming.
+     */
+    match /meteo_caledonie/{communeId} {
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
   }
 }

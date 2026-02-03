@@ -2,13 +2,9 @@
 
 import React, { DependencyList, createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
-import { Firestore, doc } from 'firebase/firestore';
+import { Firestore } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
-import { ensureUserDocument } from '@/lib/user-utils';
-import { FirestorePermissionError } from './errors';
-import { errorEmitter } from './error-emitter';
-
 
 interface FirebaseProviderProps {
   children: ReactNode;
@@ -92,25 +88,6 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     );
     return () => unsubscribe(); // Cleanup
   }, [auth]); // Depends on the auth instance
-
-  const { user, isUserLoading } = userAuthState;
-
-  // Effect to sync user document
-  useEffect(() => {
-    if (user && !isUserLoading && firestore) {
-      ensureUserDocument(firestore, user)
-        .catch(error => {
-          console.error("Error ensuring user document:", error);
-          if (error.code === 'permission-denied') {
-             const userDocRef = doc(firestore, 'users', user.uid);
-             errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: userDocRef.path,
-                operation: 'write', // Could be create or get, 'write' is a safe bet
-             }));
-          }
-        });
-    }
-  }, [user, isUserLoading, firestore]);
 
   // Memoize the context value
   const contextValue = useMemo((): FirebaseContextState => {
