@@ -109,11 +109,14 @@ const sectionContent: Record<string, {
       "Consultez la période biologique (Brame, Chute des bois) pour adapter votre stratégie.",
       "Utilisez la carte du vent pour visualiser d'où vient l'air par rapport au relief.",
       "La 'Table de Tir' vous aide à estimer la correction de visée en fonction de la distance et du vent.",
-      "Activez une 'Session de Groupe' pour voir vos coéquipiers sur la carte en temps réel."
+      "Session de Groupe : Créez une session ou rejoignez-en une via un code unique (ex: CH-1234) pour partager votre position GPS en temps réel avec vos partenaires sur la carte satellite.",
+      "Alertes Tactiques : Informez instantanément votre groupe de votre statut ('En position', 'Battue en cours') ou signalez 'Gibier en vue' d'un clic. Une alerte visuelle et sonore préviendra immédiatement vos coéquipiers.",
+      "Sécurité & Matériel : Surveillez le niveau de batterie de chaque participant sur la carte pour éviter toute déconnexion imprévue dans les zones isolées."
     ],
     tips: [
       "En période de Brame, l'alerte orange vous rappelle que les cerfs sont plus actifs mais aussi plus vigilants.",
-      "Le mode hors-ligne de la carte de chasse permet de naviguer sans réseau si vous avez consulté la zone auparavant."
+      "Le mode hors-ligne de la carte de chasse permet de naviguer sans réseau si vous avez consulté la zone auparavant.",
+      "Personnalisez votre icône et votre couleur dans les paramètres de la session pour être identifié au premier coup d'œil."
     ]
   },
   'champs': {
