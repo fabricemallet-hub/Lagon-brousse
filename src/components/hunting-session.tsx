@@ -14,6 +14,14 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Slider } from '@/components/ui/slider';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Users,
   LogOut,
@@ -36,7 +44,8 @@ import {
   WifiOff,
   Volume2,
   VolumeX,
-  AlertCircle
+  AlertCircle,
+  Play
 } from 'lucide-react';
 import {
   useUser,
@@ -68,6 +77,14 @@ import { useGoogleMaps } from '@/context/google-maps-context';
 import Link from 'next/link';
 
 const iconMap = { Navigation, UserIcon, Crosshair, Footprints, Mountain, MapPin };
+
+const soundLibrary = [
+  { id: 'trompette', label: 'Fanfare Trompette (Aigu)', url: 'https://assets.mixkit.co/active_storage/sfx/2700/2700-preview.mp3' },
+  { id: 'cloche', label: 'Cloche', url: 'https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3' },
+  { id: 'alerte', label: 'Alerte Urgence', url: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' },
+  { id: 'cor', label: 'Cor de chasse', url: 'https://assets.mixkit.co/active_storage/sfx/2701/2701-preview.mp3' },
+  { id: 'sifflet', label: 'Sifflet', url: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3' },
+];
 
 const BatteryIcon = React.memo(({ level, charging }: { level: number; charging: boolean }) => {
   const props = { className: 'w-4 h-4 inline-block' };
@@ -106,6 +123,12 @@ function HuntingSessionContent() {
   const [selectedIcon, setSelectedIcon] = useState('Navigation');
   const [selectedColor, setSelectedColor] = useState('#3b82f6');
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
+  const [soundVolume, setSoundVolume] = useState(0.8);
+  const [soundSettings, setSoundSettings] = useState({
+    position: 'cloche',
+    battue: 'trompette',
+    gibier: 'alerte'
+  });
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
   const [mySessions, setMySessions] = useState<WithId<HuntingSession>[]>([]);
@@ -128,19 +151,28 @@ function HuntingSessionContent() {
 
   const playStatusSound = useCallback((status: string) => {
     if (!isSoundEnabled) return;
-    let url = '';
-    if (status === 'En position') {
-        url = 'https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3'; // Cloche claire
-    } else if (status === 'Battue en cours') {
-        url = 'https://assets.mixkit.co/active_storage/sfx/2700/2700-preview.mp3'; // Trompette Fanfare (3s)
-    } else if (status === 'gibier') {
-        url = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'; // Alerte urgente
-    }
-    if (url) {
-        const audio = new Audio(url);
+    
+    let soundId = '';
+    if (status === 'En position') soundId = soundSettings.position;
+    else if (status === 'Battue en cours') soundId = soundSettings.battue;
+    else if (status === 'gibier') soundId = soundSettings.gibier;
+
+    const sound = soundLibrary.find(s => s.id === soundId);
+    if (sound) {
+        const audio = new Audio(sound.url);
+        audio.volume = soundVolume;
         audio.play().catch(() => {});
     }
-  }, [isSoundEnabled]);
+  }, [isSoundEnabled, soundSettings, soundVolume]);
+
+  const previewSound = (soundId: string) => {
+    const sound = soundLibrary.find(s => s.id === soundId);
+    if (sound) {
+        const audio = new Audio(sound.url);
+        audio.volume = soundVolume;
+        audio.play().catch(() => {});
+    }
+  };
 
   useEffect(() => {
     if (!participants || !user) return;
@@ -200,6 +232,7 @@ function HuntingSessionContent() {
       setNickname(userProfile.displayName || user?.displayName || user?.email?.split('@')[0] || '');
       setSelectedIcon(userProfile.mapIcon || 'Navigation');
       setSelectedColor(userProfile.mapColor || '#3b82f6');
+      // On pourrait aussi charger volume/sons depuis le profil si on ajoute les champs au schema
     }
   }, [userProfile, user]);
   
@@ -293,7 +326,7 @@ function HuntingSessionContent() {
                 displayName: nickname, 
                 mapIcon: selectedIcon, 
                 mapColor: selectedColor, 
-                baseStatus: '', // Neutre par défaut
+                baseStatus: '', 
                 isGibierEnVue: false,
                 location: { latitude, longitude },
                 updatedAt: serverTimestamp() 
@@ -328,7 +361,7 @@ function HuntingSessionContent() {
               displayName: nickname, 
               mapIcon: selectedIcon, 
               mapColor: selectedColor, 
-              baseStatus: '', // Neutre par défaut
+              baseStatus: '', 
               isGibierEnVue: false,
               location: { latitude, longitude },
               updatedAt: serverTimestamp() 
@@ -413,7 +446,7 @@ function HuntingSessionContent() {
                     <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isSessionLoading}><LogOut className="size-4 mr-2"/> Quitter</Button>
                 </CardTitle>
             </CardHeader>
-            <CardContent className="flex-grow flex flex-col p-2 gap-4">
+            <CardContent className="flex-grow flex flex-col p-2 gap-4 overflow-y-auto">
                  <div className={cn("relative w-full rounded-lg overflow-hidden border", isFullscreen ? "flex-grow" : "h-80")}>
                     <GoogleMap
                         mapContainerClassName="w-full h-full"
@@ -484,27 +517,72 @@ function HuntingSessionContent() {
 
                 {!isFullscreen && (
                     <div className="space-y-4">
-                        <Alert className="bg-blue-50 border-blue-200">
-                            <WifiOff className="size-4 text-blue-600" />
-                            <AlertTitle className="text-blue-800 text-xs font-bold">Mode Hors Ligne</AlertTitle>
-                            <AlertDescription className="text-[10px] text-blue-700">
-                                Le fond de carte satellite est automatiquement mis en cache lorsque vous le consultez avec du réseau. Parcourez votre zone de chasse à la maison pour l'avoir sur le terrain sans internet.
-                            </AlertDescription>
-                        </Alert>
-                        
                         <div className="space-y-4 rounded-lg border p-4 bg-muted/30">
-                            <Label className="text-xs font-bold uppercase text-muted-foreground">Mon Profil de Session</Label>
+                            <Label className="text-xs font-bold uppercase text-muted-foreground">Paramètres de session</Label>
                             <Input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="Mon surnom..." />
                             
-                            <div className="flex items-center justify-between py-2 border-t border-border/50">
-                                <div className="flex items-center gap-2">
-                                    {isSoundEnabled ? <Volume2 className="size-4 text-primary" /> : <VolumeX className="size-4 text-muted-foreground" />}
-                                    <Label className="text-sm">Sons d'alerte</Label>
+                            <div className="space-y-4 pt-4 border-t border-border/50">
+                                <Label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-2">
+                                    <Volume2 className="size-4" /> Paramètres Audio
+                                </Label>
+                                
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        {isSoundEnabled ? <Volume2 className="size-4 text-primary" /> : <VolumeX className="size-4 text-muted-foreground" />}
+                                        <Label className="text-sm">Activer les sons</Label>
+                                    </div>
+                                    <Switch checked={isSoundEnabled} onCheckedChange={setIsSoundEnabled} />
                                 </div>
-                                <Switch checked={isSoundEnabled} onCheckedChange={setIsSoundEnabled} />
+
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-xs">
+                                        <span>Volume des alertes</span>
+                                        <span>{Math.round(soundVolume * 100)}%</span>
+                                    </div>
+                                    <Slider value={[soundVolume]} min={0} max={1} step={0.1} onValueChange={(val) => setSoundVolume(val[0])} />
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-3">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-[10px] font-bold uppercase">Son : En Position</Label>
+                                        <div className="flex gap-2">
+                                            <Select value={soundSettings.position} onValueChange={(val) => { setSoundSettings(prev => ({...prev, position: val})); previewSound(val); }}>
+                                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    {soundLibrary.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => previewSound(soundSettings.position)}><Play className="size-3" /></Button>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-[10px] font-bold uppercase">Son : En Battue</Label>
+                                        <div className="flex gap-2">
+                                            <Select value={soundSettings.battue} onValueChange={(val) => { setSoundSettings(prev => ({...prev, battue: val})); previewSound(val); }}>
+                                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    {soundLibrary.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => previewSound(soundSettings.battue)}><Play className="size-3" /></Button>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-[10px] font-bold uppercase text-destructive">Son : Gibier en vue</Label>
+                                        <div className="flex gap-2">
+                                            <Select value={soundSettings.gibier} onValueChange={(val) => { setSoundSettings(prev => ({...prev, gibier: val})); previewSound(val); }}>
+                                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    {soundLibrary.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => previewSound(soundSettings.gibier)}><Play className="size-3" /></Button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
-                            <Button onClick={handleSavePreferences} size="sm" disabled={isSavingPrefs} className="w-full"><Save className="mr-2 h-4 w-4" /> Sauvegarder</Button>
+                            <Button onClick={handleSavePreferences} size="sm" disabled={isSavingPrefs} className="w-full"><Save className="mr-2 h-4 w-4" /> Sauvegarder Profil</Button>
                         </div>
                         <div className="space-y-2">
                             <h4 className="font-bold text-sm flex items-center gap-2">
