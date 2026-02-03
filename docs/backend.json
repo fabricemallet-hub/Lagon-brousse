@@ -73,8 +73,7 @@
         "icon": { "type": "string" },
         "color": { "type": "string" },
         "fishingTypes": { "type": "array", "items": { "type": "string" } },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "context": { "type": "object" }
+        "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "name", "location", "createdAt"]
     }
@@ -98,6 +97,10 @@
     "/users/{userId}/fishing_spots/{spotId}": {
       "schema": { "$ref": "#/backend/entities/FishingSpot" },
       "description": "Coins de pêche sauvegardés."
+    },
+    "/users/{userId}/sowings/{sowingId}": {
+      "schema": { "type": "object" },
+      "description": "Historique des semis."
     }
   }
 }
