@@ -143,7 +143,7 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation' | 'tideThresholds'> =
       timeOfDay: 'Aube (05:00 - 07:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
         { name: 'Wahoo', rating: 9, location: 'Large', advice: { activity: 'Très forte activité à l\'aube.', feeding: 'Excellente heure.', location_specific: 'Tombants.', depth: 'Surface.' } },
-        { name: 'Bec de cane', rating: 9, location: 'Lagon', advice: { activity: 'En bancs.', feeding: 'Très bonne heure.', location_specific: 'Platiers.', depth: '2-10m.' } },
+        { name: 'Bec de cane', rating: 8, location: 'Lagon', advice: { activity: 'En bancs sur les platiers.', feeding: 'Très bonne heure.', location_specific: 'Zones sableuses près du corail.', depth: '2-10m.' } },
       ],
     },
     {
@@ -151,6 +151,7 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation' | 'tideThresholds'> =
       fish: [
         { name: 'Thon Jaune', rating: 6, location: 'Large', advice: { activity: 'Activité modérée, cherchez les courants.', feeding: 'Opportuniste.', location_specific: 'DCP.', depth: '20-50m.' } },
         { name: 'Bossu doré', rating: 6, location: 'Lagon', advice: { activity: 'Moins actif qu\'à l\'aube.', feeding: 'Prudence.', location_specific: 'Patates de corail.', depth: '5-15m.' } },
+        { name: 'Bec de cane', rating: 6, location: 'Lagon', advice: { activity: 'Activité continue.', feeding: 'Cherche la nourriture.', location_specific: 'Herbiers et sable.', depth: '5-12m.' } },
       ],
     },
     {
@@ -158,6 +159,7 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation' | 'tideThresholds'> =
       fish: [
         { name: 'Carangue', rating: 6, location: 'Lagon', advice: { activity: 'L\'activité reprend avec la marée.', feeding: 'Bonne heure.', location_specific: 'Passes.', depth: 'Surface à 15m.' } },
         { name: 'Loche truite', rating: 6, location: 'Lagon', advice: { activity: 'Affût.', feeding: 'Moment propice.', location_specific: 'Trous.', depth: '10-25m.' } },
+        { name: 'Bec de cane', rating: 6, location: 'Lagon', advice: { activity: 'Activité stable.', feeding: 'Morsure régulière.', location_specific: 'Débord de récif.', depth: '8-15m.' } },
       ],
     },
     {
@@ -165,6 +167,7 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation' | 'tideThresholds'> =
       fish: [
         { name: 'Carangue', rating: 9, location: 'Lagon', advice: { activity: 'Très forte activité.', feeding: 'Excellente heure.', location_specific: 'Passes.', depth: 'Surface à 10m.' } },
         { name: 'Rouget', rating: 9, location: 'Lagon', advice: { activity: 'Sortie de nuit.', feeding: 'Très actif.', location_specific: 'Fonds sableux.', depth: '3-8m.' } },
+        { name: 'Bec de cane', rating: 8, location: 'Lagon', advice: { activity: 'Se rapproche du bord.', feeding: 'Forte activité.', location_specific: 'Tombants peu profonds.', depth: '2-8m.' } },
       ],
     },
   ],
@@ -243,6 +246,9 @@ export function generateProceduralData(location: string, date: Date): LocationDa
       return hours * 60 + minutes;
   };
 
+  // Logique saisonnière (Hiver austral en NC : Mai à Septembre)
+  const isWinter = month >= 4 && month <= 8;
+
   locationData.fishing.forEach(slot => {
     const match = slot.timeOfDay.match(/(\d{2}):\d{2}/);
     if (!match) return;
@@ -276,10 +282,23 @@ export function generateProceduralData(location: string, date: Date): LocationDa
         else { slot.tideMovement = 'étale'; }
     }
 
-    // Dynamiser les indices de pêche selon le coefficient de marée (vives-eaux / mortes-eaux)
+    // Dynamiser les indices de pêche selon le coefficient de marée et la lune
     slot.fish.forEach(f => {
-      const moonImpact = (springFactor - 1.14) * 8; // Varie de -1.1 à +1.1 environ
-      f.rating = Math.max(1, Math.min(10, Math.round(f.rating + moonImpact)));
+      let rating = f.rating;
+      const moonImpact = (springFactor - 1.14) * 8; 
+      rating += moonImpact;
+
+      // Logique spécifique pour le Bec de cane (Lethrinus nebulosus)
+      if (f.name === 'Bec de cane') {
+        // Boost Hiver (Plus présent)
+        if (isWinter) rating += 1.5;
+        // Boost Pleine Lune (Morsure accrue entre jour 12 et 18 du cycle)
+        if (dayInCycle >= 12 && dayInCycle <= 18) {
+          rating += 2;
+        }
+      }
+
+      f.rating = Math.max(1, Math.min(10, Math.round(rating)));
     });
   });
   
