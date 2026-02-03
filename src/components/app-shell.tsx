@@ -63,8 +63,10 @@ const UsageTimer = React.memo(({ status, auth, userId }: { status: string, auth:
   const pathname = usePathname();
 
   useEffect(() => {
-    // Le décompte s'applique aux comptes limited ET trial (1min/jour)
-    if ((status !== 'limited' && status !== 'trial') || !auth || !userId) return;
+    // Reset timer state when status changes to trial/limited or user changes
+    if ((status !== 'limited' && status !== 'trial') || !auth || !userId) {
+      return;
+    }
 
     const today = new Date().toISOString().split('T')[0];
     const lastUsageDate = localStorage.getItem('lastUsageDate');
@@ -75,7 +77,7 @@ const UsageTimer = React.memo(({ status, auth, userId }: { status: string, auth:
     if (lastUsageDate !== today || lastUserId !== userId) {
       dailyUsage = 0;
       localStorage.setItem('lastUsageDate', today);
-      localStorage.setItem('lastUserId', userId);
+      localStorage.setItem('lastUserId', userId || '');
       localStorage.setItem('dailyUsage', '0');
     }
     

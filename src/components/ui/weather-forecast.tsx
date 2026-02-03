@@ -144,6 +144,7 @@ export function WeatherForecast({
     }
     const windSentence = `Vent de ${_selectedForecast.windSpeed} nœuds de ${translateWindDirection(_selectedForecast.windDirection)}, tendance ${windTrend}.`;
 
+    // SORT BY HOUR: 00h to 23h
     const sortedForecasts = [...weather.hourly].sort((a, b) => 
       new Date(a.date).getHours() - new Date(b.date).getHours()
     );
@@ -218,6 +219,8 @@ export function WeatherForecast({
              const forecastDate = new Date(forecast.date);
              const forecastHour = forecastDate.getHours();
              const currentHour = now.getHours();
+             
+             // Intensification du grisage pour les heures passées
              const isPast = isToday && forecastHour < currentHour;
              const isCurrent = isToday && forecastHour === currentHour;
              
