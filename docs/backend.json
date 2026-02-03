@@ -1,10 +1,9 @@
-
 {
   "entities": {
     "UserAccount": {
       "title": "UserAccount",
       "type": "object",
-      "description": "Profil utilisateur avec droits admin et préférences.",
+      "description": "Profil utilisateur complet.",
       "properties": {
         "id": { "type": "string" },
         "email": { "type": "string" },
@@ -12,7 +11,9 @@
         "subscriptionStatus": { "type": "string", "enum": ["active", "inactive", "trial", "admin"] },
         "subscriptionExpiryDate": { "type": "string" },
         "lastSelectedLocation": { "type": "string" },
-        "emergencyContact": { "type": "string" }
+        "emergencyContact": { "type": "string" },
+        "mapIcon": { "type": "string" },
+        "mapColor": { "type": "string" }
       },
       "required": ["id", "email", "subscriptionStatus"]
     },
@@ -24,6 +25,16 @@
         "createdAt": { "type": "string" },
         "expiresAt": { "type": "string" }
       }
+    },
+    "FishingSpot": {
+      "title": "FishingSpot",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "location": { "type": "object" },
+        "context": { "type": "object" }
+      }
     }
   },
   "auth": {
@@ -32,17 +43,24 @@
   "firestore": {
     "/users/{userId}": {
       "schema": { "$ref": "#/backend/entities/UserAccount" },
-      "description": "Données utilisateurs."
+      "description": "Données utilisateurs et préférences."
     },
     "/hunting_sessions/{sessionId}": {
       "schema": { "$ref": "#/backend/entities/HuntingSession" },
-      "description": "Sessions de chasse."
+      "description": "Sessions de chasse de groupe."
     },
     "/hunting_sessions/{sessionId}/participants/{userId}": {
-      "description": "Participants temps réel."
+      "description": "Statut temps réel des participants."
+    },
+    "/users/{userId}/fishing_spots/{spotId}": {
+      "schema": { "$ref": "#/backend/entities/FishingSpot" },
+      "description": "Carnet de pêche personnel."
     },
     "/vessels/{vesselId}": {
-      "description": "Tracker maritime."
+      "description": "Tracker maritime en temps réel."
+    },
+    "/conversations/{conversationId}": {
+      "description": "Support et messagerie admin."
     }
   }
 }

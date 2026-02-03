@@ -1,8 +1,7 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // REVISION_MEGA_SYNC_20240524_1325_SRC
+    // REVISION: FINAL_STABLE_RESYNC_SRC_20240524_1320
     
     function isAuth() { return request.auth != null; }
     function isAdmin() { 
@@ -12,21 +11,25 @@ service cloud.firestore {
       );
     }
 
+    match /hunting_sessions/{sessionId} {
+      allow read, write: if isAuth();
+      match /{allPaths=**} { allow read, write: if isAuth(); }
+    }
+
     match /users/{userId} {
       allow read, write: if isAdmin() || (isAuth() && request.auth.uid == userId);
       match /{allPaths=**} { allow read, write: if isAdmin() || (isAuth() && request.auth.uid == userId); }
-    }
-
-    match /hunting_sessions/{sessionId} {
-      allow read, create: if isAuth();
-      allow update, delete: if isAdmin() || (isAuth() && resource.data.organizerId == request.auth.uid);
-      match /participants/{pId} { allow read, write: if isAuth(); }
     }
 
     match /vessels/{vId} {
       allow read: if isAuth();
       allow write: if isAdmin() || (isAuth() && request.auth.uid == vId);
       match /{allPaths=**} { allow read, write: if isAuth(); }
+    }
+
+    match /conversations/{cId} {
+      allow read, write: if isAdmin() || (isAuth() && request.auth.uid == cId);
+      match /{allPaths=**} { allow read, write: if isAdmin() || (isAuth() && request.auth.uid == cId); }
     }
 
     match /{allPaths=**} {
