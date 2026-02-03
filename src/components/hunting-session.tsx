@@ -97,7 +97,7 @@ function HuntingSessionContent() {
   const [joinCode, setJoinCode] = useState('');
   const [createCode, setCreateCode] = useState('');
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number} | null>(null);
-  const updateIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const watchIdRef = useRef<number | null>(null);
   const [isParticipating, setIsParticipating] = useState(false);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [zoom, setZoom] = useState(12);
@@ -154,12 +154,12 @@ function HuntingSessionContent() {
     try {
       const q = query(
         collection(firestore, 'hunting_sessions'),
-        where('organizerId', '==', user.uid),
-        limit(10)
+        where('organizerId', '==', user.uid)
       );
       const querySnapshot = await getDocs(q);
       const sessions = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as WithId<HuntingSession>));
       
+      // Sort manually to avoid missing index errors
       sessions.sort((a, b) => {
         const timeA = a.createdAt?.toMillis?.() || 0;
         const timeB = b.createdAt?.toMillis?.() || 0;
@@ -189,9 +189,9 @@ function HuntingSessionContent() {
   const { isLoaded, loadError } = useGoogleMaps();
 
   const handleLeaveSession = useCallback(async () => {
-    if (updateIntervalRef.current) {
-        clearInterval(updateIntervalRef.current);
-        updateIntervalRef.current = null;
+    if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
     }
     
     const previousSessionId = session?.id;
@@ -214,53 +214,52 @@ function HuntingSessionContent() {
     }
   }, [user, session, firestore, toast]);
 
-  const fetchAndSetUserPosition = useCallback(async (isFirstUpdate = false) => {
+  const startTracking = useCallback(() => {
     if (!user || !firestore || !navigator.geolocation || !session?.id) return;
 
-    try {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-                enableHighAccuracy: true,
-                timeout: 10000, 
-                maximumAge: 0,
-            });
-        });
-        
-        const { latitude, longitude } = position.coords;
-        const newLocation = { latitude, longitude };
-        setUserLocation(newLocation);
-
-        if (isFirstUpdate && map) {
-            map.panTo({ lat: latitude, lng: longitude });
-            map.setZoom(16);
-            setInitialZoomDone(true);
-        }
-
-        const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
-        
-        let batteryData = null;
-        if ('getBattery' in navigator) {
-            const battery: any = await (navigator as any).getBattery();
-            batteryData = { level: battery.level, charging: battery.charging };
-        }
-
-        await updateDoc(participantDocRef, {
-            location: newLocation,
-            battery: batteryData,
-            updatedAt: serverTimestamp(),
-        });
-
-    } catch (err: any) {
-        console.error("Error getting geolocation:", err);
+    if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
     }
-  }, [user, firestore, session, map]);
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+        async (position) => {
+            const { latitude, longitude } = position.coords;
+            const newLocation = { latitude, longitude };
+            setUserLocation(newLocation);
+
+            // Handle initial camera centering
+            if (!initialZoomDone && map) {
+                map.panTo({ lat: latitude, lng: longitude });
+                map.setZoom(16);
+                setInitialZoomDone(true);
+            }
+
+            // Sync with Firestore
+            const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
+            
+            let batteryData = null;
+            if ('getBattery' in navigator) {
+                const battery: any = await (navigator as any).getBattery();
+                batteryData = { level: battery.level, charging: battery.charging };
+            }
+
+            updateDoc(participantDocRef, {
+                location: newLocation,
+                battery: batteryData,
+                updatedAt: serverTimestamp(),
+            }).catch(console.error);
+        },
+        (err) => console.error("Geolocation watch error:", err),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }, [user, firestore, session, map, initialZoomDone]);
   
   useEffect(() => {
-    if (isParticipating && session && !updateIntervalRef.current) {
-        updateIntervalRef.current = setInterval(() => fetchAndSetUserPosition(), 300000);
+    if (isParticipating && session) {
+        startTracking();
     }
-    return () => { if (updateIntervalRef.current) clearInterval(updateIntervalRef.current); };
-  }, [isParticipating, session, fetchAndSetUserPosition]);
+    return () => { if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current); };
+  }, [isParticipating, session, startTracking]);
 
   const handleCreateSession = async () => {
     if (!user || !firestore) return;
@@ -285,7 +284,6 @@ function HuntingSessionContent() {
         
         setSession({ id: code, ...newSessionData } as any);
         setIsParticipating(true);
-        await fetchAndSetUserPosition(true);
         fetchMySessions();
         toast({ title: 'Session créée !', description: `Code : ${code}` });
     } catch (e: any) {
@@ -316,7 +314,6 @@ function HuntingSessionContent() {
       
       setSession({ id: sessionDoc.id, ...sessionDoc.data() } as any);
       setIsParticipating(true);
-      await fetchAndSetUserPosition(true);
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'Erreur', description: e.message });
     } finally {
