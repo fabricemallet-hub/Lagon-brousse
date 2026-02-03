@@ -48,6 +48,7 @@ import {
   Star,
   Waves,
   Clock,
+  CalendarDays,
 } from 'lucide-react';
 import { Button } from './button';
 import { cn } from '@/lib/utils';
@@ -290,73 +291,194 @@ function PecheLegend() {
 
 function DetailDialogSkeleton() {
   return (
-    <>
-      <DialogHeader>
-        <DialogTitle><Skeleton className="h-7 w-3/4 mb-2" /></DialogTitle>
-        <div className="h-4 w-1/2 mb-4"><Skeleton className="h-full w-full" /></div>
-      </DialogHeader>
-      <div className="space-y-4 py-4">
-        <Skeleton className="h-16 w-full" />
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-24 w-full" />
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-3/4" />
+        <Skeleton className="h-4 w-1/2" />
       </div>
-    </>
+      <div className="space-y-4">
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-48 w-full" />
+      </div>
+    </div>
   );
 }
 
 function ChampsDetailDialogContent({ day, location }: { day: Date; location: string }) {
   const [data, setData] = useState<LocationData | null>(null);
+  
   useEffect(() => {
     const fetchedData = getDataForDate(location, day);
     setData(fetchedData);
   }, [location, day]);
+
   if (!data) return <DetailDialogSkeleton />;
+
   const { farming, weather } = data;
+  const GardeningIcon = { Fruits: Spade, Racines: Carrot, Fleurs: Flower, Feuilles: Leaf }[farming.zodiac];
+
   return (
-    <>
+    <div className="space-y-6">
       <DialogHeader>
-        <DialogTitle>Détails du {format(day, 'eeee d MMMM yyyy', { locale: fr })}</DialogTitle>
-        <DialogDescription>Recommandations agricoles basées sur le cycle lunaire.</DialogDescription>
+        <DialogTitle className="text-xl font-bold">Conseils Jardin du {format(day, 'eeee d MMMM yyyy', { locale: fr })}</DialogTitle>
+        <DialogDescription>Recommandations basées sur le cycle lunaire et les traditions locales.</DialogDescription>
       </DialogHeader>
-      <div className="space-y-4 py-4 text-sm">
-        <div className="flex justify-between items-center bg-muted/50 p-2 rounded-lg">
-          <div className="flex items-center gap-2"><MoonPhaseIcon phase={weather.moon.phase} className="size-5 text-primary" /><div><p className="font-semibold">{weather.moon.phase}</p></div></div>
-          <div className="flex items-center gap-2">{farming.lunarPhase === 'Lune Montante' ? <TrendingUp className="size-5 text-primary" /> : <TrendingDown className="size-5 text-primary" />}<p className="font-semibold">{farming.lunarPhase}</p></div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-xl bg-muted/50 border">
+        <div className="space-y-1">
+          <h3 className="font-bold text-[10px] uppercase text-muted-foreground">Lune</h3>
+          <p className="flex items-center gap-2 text-primary font-bold text-sm">
+            <MoonPhaseIcon phase={weather.moon.phase} className="size-4" />
+            {weather.moon.phase}
+          </p>
         </div>
-        <div className="text-center p-2 rounded-lg border"><p className="font-bold text-lg">Jour {farming.zodiac}</p></div>
-        <p className="text-muted-foreground">{farming.recommendation}</p>
+        <div className="space-y-1">
+          <h3 className="font-bold text-[10px] uppercase text-muted-foreground">Tendance</h3>
+          <p className="flex items-center gap-2 font-bold text-sm">
+            {farming.lunarPhase === 'Lune Montante' ? <TrendingUp className="size-4" /> : <TrendingDown className="size-4" />}
+            {farming.lunarPhase}
+          </p>
+        </div>
+        <div className="space-y-1">
+          <h3 className="font-bold text-[10px] uppercase text-muted-foreground">Signe</h3>
+          <p className="flex items-center gap-2 font-bold text-sm">
+            {GardeningIcon && <GardeningIcon className="size-4" />}
+            Jour {farming.zodiac}
+          </p>
+        </div>
       </div>
-    </>
+
+      <div className="bg-primary/5 border border-primary/10 p-4 rounded-xl flex gap-3">
+        <Info className="size-5 text-primary shrink-0 mt-0.5" />
+        <p className="text-sm font-medium leading-relaxed">{farming.recommendation}</p>
+      </div>
+
+      <div className="space-y-3">
+        <h4 className="font-bold text-sm flex items-center gap-2">
+          <CalendarDays className="size-4 text-primary" /> Travaux à prévoir
+        </h4>
+        <div className="grid gap-3">
+          {farming.details.map((item, index) => (
+            <div key={index} className="flex items-start gap-3 p-3 rounded-lg bg-card border shadow-sm">
+              <div className="p-2 rounded-full bg-muted">
+                {item.icon === 'Leaf' && <Leaf className="size-4" />}
+                {item.icon === 'Spade' && <Spade className="size-4" />}
+                {item.icon === 'Flower' && <Flower className="size-4" />}
+                {item.icon === 'RefreshCw' && <RefreshCw className="size-4" />}
+                {item.icon === 'Scissors' && <Scissors className="size-4" />}
+                {item.icon === 'Carrot' && <Carrot className="size-4" />}
+              </div>
+              <div>
+                <p className="font-bold text-sm">{item.task}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{item.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
 function PecheDetailDialogContent({ day, location }: { day: Date; location: string }) {
   const [data, setData] = useState<LocationData | null>(null);
+
   useEffect(() => {
     const fetchedData = getDataForDate(location, day);
     setData(fetchedData);
   }, [location, day]);
+
   if (!data) return <DetailDialogSkeleton />;
-  const { fishing, weather, pelagicInfo, crabAndLobster } = data;
+
+  const { fishing, weather, crabAndLobster } = data;
+
   return (
-    <>
+    <div className="space-y-6">
       <DialogHeader>
-        <DialogTitle>Détails de Pêche du {format(day, 'eeee d MMMM yyyy', { locale: fr })}</DialogTitle>
-        <DialogDescription>Prévisions maritimes et cycles de marées.</DialogDescription>
+        <DialogTitle className="text-xl font-bold">Prévisions Pêche du {format(day, 'eeee d MMMM yyyy', { locale: fr })}</DialogTitle>
+        <DialogDescription>Potentiel par espèce et conditions de marées.</DialogDescription>
       </DialogHeader>
-      <div className="space-y-6 py-4 text-sm">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <h4 className="font-semibold text-muted-foreground">Phase Lunaire</h4>
-            <div className="flex items-center gap-2 font-bold"><MoonPhaseIcon phase={weather.moon.phase} className="size-5" /><span>{weather.moon.phase}</span></div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="p-4 rounded-xl bg-muted/50 border space-y-3">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Moon className="size-4" />
+            <span className="text-[10px] font-bold uppercase">Phase Lunaire</span>
           </div>
-          <div className="space-y-2">
-            <h4 className="font-semibold text-muted-foreground">Marées</h4>
-            {data.tides.map((tide, i) => <div key={i} className="flex justify-between text-xs"><span>{tide.time}</span><span>{tide.height.toFixed(2)}m</span></div>)}
+          <div className="flex items-center gap-2 font-bold text-sm">
+            <MoonPhaseIcon phase={weather.moon.phase} className="size-5 text-primary" />
+            {weather.moon.phase}
+          </div>
+        </div>
+        <div className="p-4 rounded-xl bg-muted/50 border space-y-2">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Waves className="size-4" />
+            <span className="text-[10px] font-bold uppercase">Marées</span>
+          </div>
+          <div className="space-y-1">
+            {data.tides.map((tide, i) => (
+              <div key={i} className="flex justify-between text-xs font-mono">
+                <span className={cn(tide.type === 'haute' ? 'text-primary' : 'text-destructive')}>
+                  {tide.type === 'haute' ? 'H' : 'B'}
+                </span>
+                <span>{tide.time}</span>
+                <span className="font-bold">{tide.height.toFixed(2)}m</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
-    </>
+
+      <div className="space-y-4">
+        <h4 className="font-bold text-sm flex items-center gap-2">
+          <Fish className="size-4 text-primary" /> Potentiel de capture (Indices /10)
+        </h4>
+        <div className="space-y-3">
+          {fishing.map((slot, sIdx) => (
+            <div key={sIdx} className="space-y-2">
+              <p className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-2">
+                <Clock className="size-3" /> {slot.timeOfDay}
+              </p>
+              <div className="grid gap-2">
+                {slot.fish.filter(f => f.rating >= 8).map((f, fIdx) => (
+                  <div key={fIdx} className="flex items-center justify-between p-3 rounded-lg bg-card border shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <Fish className={cn("size-4", f.location === 'Large' ? 'text-destructive' : 'text-primary')} />
+                      <div>
+                        <p className="font-bold text-sm">{f.name}</p>
+                        <p className="text-[10px] text-muted-foreground">{f.advice.depth} • {f.location}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <RatingStars rating={f.rating} />
+                      <span className="text-[10px] font-mono font-bold">{f.rating}/10</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="p-4 rounded-xl bg-muted/30 border border-dashed space-y-3">
+        <h4 className="font-bold text-xs uppercase text-muted-foreground">Autres ressources</h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="flex items-center gap-3">
+            <CrabIcon className="size-5 text-green-600" />
+            <div className="text-xs">
+              <p className="font-bold">Crabe : {crabAndLobster.crabStatus}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <LobsterIcon className="size-5 text-blue-600" />
+            <div className="text-xs">
+              <p className="font-bold">Langouste : {crabAndLobster.lobsterActivity}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -380,14 +502,14 @@ export function LunarCalendar() {
 
   return (
     <div>
-      <div className="border rounded-lg">
-        <div className="flex justify-between items-center p-2">
+      <div className="border rounded-lg bg-card">
+        <div className="flex justify-between items-center p-2 border-b">
           <Button variant="ghost" size="icon" onClick={handlePrevMonth}><ChevronLeft /></Button>
-          <h2 className="text-lg font-semibold capitalize">{format(displayDate, 'MMMM yyyy', { locale: fr })}</h2>
+          <h2 className="text-lg font-bold capitalize">{format(displayDate, 'MMMM yyyy', { locale: fr })}</h2>
           <Button variant="ghost" size="icon" onClick={handleNextMonth}><ChevronRight /></Button>
         </div>
-        <div className="grid grid-cols-7 border-t">
-          {weekdays.map((day) => <div key={day} className="text-center text-xs font-medium text-muted-foreground p-2 border-l first:border-l-0">{day}</div>)}
+        <div className="grid grid-cols-7 bg-muted/20">
+          {weekdays.map((day) => <div key={day} className="text-center text-[10px] font-black uppercase text-muted-foreground p-2 border-l first:border-l-0">{day}</div>)}
         </div>
         <div className="overflow-x-auto">
           <div className="grid grid-cols-7 min-w-[672px]">
@@ -403,18 +525,24 @@ export function LunarCalendar() {
           </div>
         </div>
       </div>
-      {calendarView === 'champs' && <GardeningLegend />}
-      {calendarView === 'peche' && <PecheLegend />}
-      {detailedDay && (
-        <Dialog open={!!detailedDay} onOpenChange={(isOpen) => !isOpen && setDetailedDay(null)}>
-          <DialogContent className="md:max-w-xl flex flex-col max-h-[85vh]">
-            <div className="flex-grow overflow-y-auto">
-              {calendarView === 'peche' ? <PecheDetailDialogContent day={detailedDay} location={selectedLocation} /> : <ChampsDetailDialogContent day={detailedDay} location={selectedLocation} />}
-            </div>
-             <DialogFooter className="mt-auto pt-4 border-t sm:justify-start"><DialogClose asChild><Button type="button" variant="outline">Retour</Button></DialogClose></DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+      
+      {calendarView === 'champs' ? <GardeningLegend /> : <PecheLegend />}
+
+      <Dialog open={!!detailedDay} onOpenChange={(isOpen) => !isOpen && setDetailedDay(null)}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-0 border-none bg-background shadow-2xl">
+          <div className="p-6">
+            {calendarView === 'peche' 
+              ? (detailedDay && <PecheDetailDialogContent day={detailedDay} location={selectedLocation} />)
+              : (detailedDay && <ChampsDetailDialogContent day={detailedDay} location={selectedLocation} />)
+            }
+          </div>
+          <DialogFooter className="p-4 bg-muted/20 border-t flex-row justify-center sm:justify-center sticky bottom-0">
+            <DialogClose asChild>
+              <Button type="button" variant="outline" className="w-full sm:w-32 font-bold">Retour</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
