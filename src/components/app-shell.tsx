@@ -88,7 +88,12 @@ function UsageTimer({ status, auth }: { status: string, auth: any }) {
       const interval = setInterval(() => {
         setTimeLeft(prev => {
           const next = prev - 1;
-          localStorage.setItem('dailyUsage', String(USAGE_LIMIT_SECONDS - next));
+          
+          // Throttling: Only save to localStorage every 5 seconds to reduce blocking I/O
+          if (next % 5 === 0 || next <= 0) {
+            localStorage.setItem('dailyUsage', String(USAGE_LIMIT_SECONDS - next));
+          }
+
           if (next <= 0) {
             clearInterval(interval);
             toast({ variant: 'destructive', title: 'Limite quotidienne atteinte', description: 'Vous allez être déconnecté.' });
@@ -251,8 +256,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <Popover open={isDatePickerOpen} onOpenChange={setDatePickerOpen}>
                         <PopoverTrigger asChild>{datePickerTrigger}</PopoverTrigger>
                         <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(d) => { if(d) { setSelectedDate(d); setDatePickerOpen(false); } }} initialFocus /></PopoverContent>
-                      </Popover>
-                    )}
+                      )}
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleNextDay}><ChevronRight className="h-4 w-4" /></Button>
                   </div>
                 )}

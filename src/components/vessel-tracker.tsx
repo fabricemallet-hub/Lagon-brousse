@@ -33,6 +33,7 @@ import { Skeleton } from './ui/skeleton';
 const IMMOBILITY_THRESHOLD_METERS = 15;
 const IMMOBILITY_START_MINUTES = 5;
 const IMMOBILITY_UPDATE_MINUTES = 30;
+const THROTTLE_UPDATE_MS = 10000; // Update Firestore at most once every 10s during movement
 
 // Helper: Calculate distance between two points (Haversine)
 const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -66,7 +67,9 @@ export function VesselTracker() {
   const [isOnline, setIsOnline] = useState(true);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [hasInitialCentered, setHasInitialCentered] = useState(false);
+  
   const watchIdRef = useRef<number | null>(null);
+  const lastFirestoreUpdateRef = useRef<number>(0);
 
   // Firestore Sync (Receiver)
   const vesselRef = useMemoFirebase(() => {
@@ -142,7 +145,10 @@ export function VesselTracker() {
   // Monitor position and mobility
   useEffect(() => {
     if (!isSharing || !navigator.geolocation) {
-      if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
+      if (watchIdRef.current) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
       return;
     }
 
@@ -151,18 +157,19 @@ export function VesselTracker() {
         const newLat = position.coords.latitude;
         const newLng = position.coords.longitude;
         const newPos = { lat: newLat, lng: newLng };
+        const now = Date.now();
         
         setCurrentPos(newPos);
 
         if (!anchorPos) {
           setAnchorPos(newPos);
-          setLastMovementTime(Date.now());
+          setLastMovementTime(now);
           updateVesselInFirestore({ location: { latitude: newLat, longitude: newLng }, status: 'moving' });
+          lastFirestoreUpdateRef.current = now;
           return;
         }
 
         const dist = getDistance(newLat, newLng, anchorPos.lat, anchorPos.lng);
-        const now = Date.now();
 
         // Use a 15m threshold to avoid jitter updates
         if (dist > IMMOBILITY_THRESHOLD_METERS) {
@@ -173,7 +180,12 @@ export function VesselTracker() {
           setVesselStatus('moving');
           setAnchorPos(newPos);
           setLastMovementTime(now);
-          updateVesselInFirestore({ location: { latitude: newLat, longitude: newLng }, status: 'moving' });
+          
+          // THROTTLE: Only update Firestore during movement if enough time has passed
+          if (now - lastFirestoreUpdateRef.current > THROTTLE_UPDATE_MS) {
+            updateVesselInFirestore({ location: { latitude: newLat, longitude: newLng }, status: 'moving' });
+            lastFirestoreUpdateRef.current = now;
+          }
         } else {
           // IMMOBILE
           const idleTimeMinutes = (now - lastMovementTime) / 60000;
@@ -181,14 +193,16 @@ export function VesselTracker() {
           if (idleTimeMinutes >= IMMOBILITY_START_MINUTES && vesselStatus === 'moving') {
             setVesselStatus('stationary');
             updateVesselInFirestore({ status: 'stationary' });
-            addImmobilityHistory(newPos, IMMOBILITY_START_MINUTES);
+            addImmobilityHistory(newPos, Math.round(idleTimeMinutes));
             setLastHistoryUpdateTime(now);
+            lastFirestoreUpdateRef.current = now;
           } else if (vesselStatus === 'stationary') {
             const timeSinceLastLog = (now - lastHistoryUpdateTime) / 60000;
             if (timeSinceLastLog >= IMMOBILITY_UPDATE_MINUTES) {
               addImmobilityHistory(newPos, Math.round(idleTimeMinutes));
               setLastHistoryUpdateTime(now);
               updateVesselInFirestore({ lastActive: serverTimestamp() });
+              lastFirestoreUpdateRef.current = now;
             }
           }
         }
@@ -198,7 +212,10 @@ export function VesselTracker() {
     );
 
     return () => {
-      if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
+      if (watchIdRef.current) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
     };
   }, [isSharing, anchorPos, vesselStatus, lastMovementTime, lastHistoryUpdateTime, updateVesselInFirestore, addImmobilityHistory, toast]);
 
@@ -242,7 +259,8 @@ export function VesselTracker() {
     const bodyText = `URGENCE MER: ${cleanName} en detresse. Position: ${googleMapsUrl}. Appel via Lagon&Brousse NC.`;
     
     // Cross-platform SMS link formatting
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent);
+    const isAndroid = /Android/i.test(navigator.userAgent);
     const separator = isIOS ? '&' : '?';
     const smsUrl = `sms:16${separator}body=${encodeURIComponent(bodyText)}`;
     
@@ -252,7 +270,10 @@ export function VesselTracker() {
       description: "Ouverture de l'application SMS. Envoyez le message au 16 (MRCC)." 
     });
 
-    window.location.href = smsUrl;
+    // Only attempt to launch the protocol if we're on mobile
+    if (isIOS || isAndroid) {
+      window.location.href = smsUrl;
+    }
   };
 
   if (loadError) return <Alert variant="destructive"><AlertTitle>Erreur de carte</AlertTitle></Alert>;
