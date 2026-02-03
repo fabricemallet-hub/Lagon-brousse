@@ -67,38 +67,39 @@ const sectionContent: Record<string, {
     title: 'Météo Live',
     icon: Sun,
     color: 'bg-yellow-500',
-    role: "Un outil de surveillance météo haute précision qui combine les relevés en temps réel des stations NC et une analyse prévisionnelle stratégique sur 7 jours, assistée par intelligence artificielle.",
+    role: "Un outil de surveillance météo haute précision qui combine les relevés en temps réel des stations NC et une analyse prévisionnelle stratégique sur 7 jours, assistée par l'IA.",
     steps: [
-      "Recherche & Proximité : Trouvez votre commune ou laissez le système trier automatiquement les stations par distance GPS.",
-      "Lecture Live : Visualisez instantanément le vent (force et direction exacte), la température et l'indice UV actuel issus des capteurs réels.",
+      "Recherche & Proximité : Les stations sont triées automatiquement par distance GPS par rapport à votre commune favorite.",
+      "Lecture Live : Visualisez instantanément le vent (force et direction exacte via la flèche), la température et l'indice UV actuel.",
       "Tableau de Bord J+7 : Accédez à une vue complète sur une semaine incluant codes météo, températures extrêmes et probabilités de pluie.",
-      "Bilan Stratégique IA : L'assistant analyse la cohérence des prévisions (ex: vent vs soleil) pour rédiger une synthèse globale de l'évolution du temps.",
-      "Optimisation des Activités : Recevez des conseils personnalisés pour la pêche (selon les vents et marées), la chasse (selon l'humidité) et le terroir.",
-      "Vigilance & Sécurité : L'IA identifie pour vous les dangers potentiels comme les pics d'UV extrêmes, les fortes rafales ou les passages pluvieux soudains."
+      "Bilan Stratégique IA : L'assistant analyse la cohérence des prévisions pour rédiger une synthèse globale de l'évolution du temps.",
+      "Optimisation des Activités : Recevez des conseils personnalisés pour la pêche (selon les vents/marées), la chasse (humidité) et le jardinage.",
+      "Vigilance & Sécurité : L'IA identifie les dangers comme les pics d'UV extrêmes, les fortes rafales ou les passages pluvieux soudains."
     ],
     tips: [
       "L'assistant IA ne se contente pas de lire les chiffres : il vous aide à identifier la 'meilleure fenêtre' de la semaine pour vos activités.",
-      "La flèche du vent dans la liste indique la provenance réelle de l'air : une flèche pointant vers le bas indique un vent de Nord.",
-      "Le bilan IA est généré dynamiquement à chaque consultation pour refléter les changements de prévisions les plus récents."
+      "La flèche du vent indique la provenance réelle de l'air : une flèche pointant vers le bas indique un vent de Nord.",
+      "Le bilan IA est régénéré à chaque consultation pour refléter les changements les plus récents de votre base de données."
     ]
   },
   'vessel-tracker': {
     title: 'Vessel Tracker',
     icon: Navigation,
     color: 'bg-blue-600',
-    role: "Un outil de sécurité haute-fidélité pour partager votre position GPS en temps réel avec un proche resté à terre.",
+    role: "Un système de sécurité maritime haute-fidélité conçu pour rassurer vos proches à terre en partageant votre position GPS exacte et votre statut d'activité en mer.",
     steps: [
-      "Utilisateur A (Émetteur) : Activez 'Partager ma position'. Votre ID s'affiche.",
-      "Copiez et envoyez cet ID à votre contact de confiance.",
-      "Surveillance d'arrêt : Si vous ne bougez plus pendant 5 min, le statut passe en 'Stationnaire'. La position se met ensuite à jour automatiquement toutes les 30 min pour rassurer le destinataire.",
-      "Reprise de route : Dès que vous bougez de nouveau, le système informe instantanément le récepteur que le bateau est en mouvement.",
-      "Utilisateur B (Récepteur) : Collez l'ID dans l'onglet 'Récepteur' pour suivre le navire sur la carte.",
-      "En cas de problème, utilisez le bouton 'ENVOYER ALERTE SMS' pour prévenir votre contact."
+      "Activation Émetteur : Activez 'Partager ma position'. Votre identifiant unique s'affiche instantanément.",
+      "Partage de l'ID : Envoyez cet ID par SMS ou WhatsApp à votre contact de confiance resté à terre.",
+      "Détection d'Immobilité : Si le système détecte une absence de mouvement (>15m) pendant 5 min, votre statut passe en 'Stationnaire' (Mouillage/Dérive).",
+      "Mises à jour Auto : En mode stationnaire, le tracker rafraîchit votre position toutes les 30 min pour rassurer le récepteur sans vider votre batterie.",
+      "Reprise de Route : Dès que vous reprenez de la vitesse, le système repasse immédiatement en mode 'Mouvement' et informe le récepteur.",
+      "ALERTE SMS CRITIQUE : En cas de détresse, le bouton rouge génère un message complet incluant : votre lien Google Maps, vos coordonnées GPS décimales, et les rappels des secours (SNSM, CROSS 196)."
     ],
     tips: [
-      "Sauvegardez votre contact d'urgence dans votre profil via l'icône disquette pour ne plus avoir à le saisir.",
-      "Le système fonctionne même si vous perdez internet temporairement : la position est stockée et renvoyée dès que le réseau revient.",
-      "Branchez votre téléphone sur une batterie externe, le GPS en continu est gourmand."
+      "Configuration Préalable : Enregistrez le numéro de votre contact via l'icône 'Disquette' pour que le bouton d'alerte soit opérationnel immédiatement.",
+      "Gestion de la Zone Blanche : Si vous perdez internet, le tracker stocke vos positions. Elles seront envoyées en bloc dès que vous retrouverez une barre de réseau.",
+      "Conseil Batterie : Le GPS haute précision est gourmand. Prévoyez une batterie externe ou une prise 12V sur le bateau pour les longues sorties.",
+      "Le récepteur peut copier vos coordonnées GPS d'un clic pour les transmettre aux secours ou les entrer dans un GPS de bord."
     ]
   },
   'peche': {
