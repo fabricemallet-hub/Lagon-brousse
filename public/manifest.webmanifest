@@ -2,14 +2,16 @@
   "id": "nc.lagonbrousse.app",
   "name": "Lagon & Brousse NC",
   "short_name": "L&B NC",
-  "description": "Assistant intelligent pour la pêche, la chasse et le jardinage en Nouvelle-Calédonie.",
+  "description": "L'assistant intelligent pour la pêche, la chasse et le jardinage en Nouvelle-Calédonie.",
+  "version": "2.0.0",
+  "lang": "fr",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f3f4f6",
-  "theme_color": "#3b82f6",
   "orientation": "portrait",
-  "lang": "fr-FR",
-  "categories": ["weather", "sports", "utilities"],
+  "background_color": "#3b82f6",
+  "theme_color": "#3b82f6",
+  "categories": ["weather", "lifestyle", "navigation"],
+  "iarc_rating_id": "e10+",
   "icons": [
     {
       "src": "/icon-192x192.png",
@@ -28,6 +30,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "screenshots": [
@@ -36,20 +44,14 @@
       "sizes": "1080x1920",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Accueil de l'application mobile"
+      "label": "Accueil Mobile"
     },
     {
       "src": "https://picsum.photos/seed/pwa2/1920/1080",
       "sizes": "1920x1080",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Tableau de bord sur ordinateur"
-    }
-  ],
-  "related_applications": [
-    {
-      "platform": "webapp",
-      "url": "https://lagon-brousse-nc.web.app/manifest.webmanifest"
+      "label": "Tableau de bord"
     }
   ]
 }
