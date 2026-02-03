@@ -25,22 +25,22 @@ function Calendar({
       className={cn("p-3 bg-card", className)}
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
-        month: "space-y-4",
+        month: "space-y-4 relative",
         caption: "flex justify-center pt-1 relative items-center",
         caption_label: "text-sm font-black uppercase tracking-tighter text-primary",
-        nav: "space-x-1 flex items-center",
+        nav: "flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
           "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 border-primary/20"
         ),
         nav_button_previous: "absolute left-1",
         nav_button_next: "absolute right-1",
-        table: "w-full border-collapse space-y-1",
-        head_row: "flex",
+        table: "w-full border-collapse",
+        head_row: "grid grid-cols-7 w-full",
         head_cell:
-          "text-muted-foreground rounded-md w-9 font-black text-[10px] uppercase tracking-widest",
-        row: "flex w-full mt-2",
-        cell: "h-9 w-9 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
+          "text-muted-foreground font-black text-[10px] uppercase tracking-widest text-center flex items-center justify-center h-9",
+        row: "grid grid-cols-7 w-full mt-2",
+        cell: "h-9 w-full text-center text-sm p-0 relative flex items-center justify-center focus-within:relative focus-within:z-20",
         day: cn(
           buttonVariants({ variant: "ghost" }),
           "h-9 w-9 p-0 font-bold aria-selected:opacity-100 hover:bg-primary/10 hover:text-primary rounded-lg transition-all"
