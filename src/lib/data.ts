@@ -3,10 +3,14 @@ import { LocationData, SwellForecast, Tide, WindDirection, WindForecast, HourlyF
 import { locations } from './locations';
 import { Firestore, doc, getDoc, collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
 
-// Simple cache to prevent redundant procedural calculations
+// Cache simple pour éviter les calculs procéduraux redondants
 const proceduralCache = new Map<string, LocationData>();
 
-// Data from https://www.meteo.nc/nouvelle-caledonie/mer/previsions-site
+/**
+ * STATIONS DE RÉFÉRENCE
+ * Ces données servent de base moyenne pour les calculs.
+ * Elles sont basées sur les constantes harmoniques des ports de NC.
+ */
 const tideStations = {
   'Nouméa': {
     tides: [
@@ -66,6 +70,10 @@ const tideStations = {
   }
 };
 
+/**
+ * MAPPING COMMUNE -> STATION
+ * Définit quelle station de référence est la plus proche géographiquement.
+ */
 export const communeToTideStationMap: { [key: string]: string } = {
   'Bélep': 'Koumac', 'Boulouparis': 'Nouméa', 'Bourail': 'Bourail', 'Canala': 'Thio',
   'Dumbéa': 'Nouméa', 'Farino': 'Bourail', 'Hienghène': 'Hienghène', 'Houaïlou': 'Hienghène',
@@ -77,7 +85,7 @@ export const communeToTideStationMap: { [key: string]: string } = {
   'Sarraméa': 'Bourail', 'Thio': 'Thio', 'Voh': 'Koné', 'Yaté': 'Nouméa',
 };
 
-// Base data for all locations, tides will be added dynamically.
+// Données de base par défaut
 const baseData: Omit<LocationData, 'tides' | 'tideStation'> = {
   weather: {
     wind: [
@@ -104,50 +112,26 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation'> = {
     {
       timeOfDay: 'Aube (05:00 - 07:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
-        { name: 'Wahoo', rating: 9, location: 'Large', advice: { activity: 'Très forte activité à l\'aube. Vitesse et agressivité maximales.', feeding: 'Excellente heure de chasse pour les proies rapides.', location_specific: 'Tombants extérieurs, DCP, et zones de courant fort.', depth: 'Surface.' } },
-        { name: 'Mahi-mahi', rating: 9, location: 'Large', advice: { activity: 'Très actif, en chasse autour des objets flottants.', feeding: 'Excellente heure, se nourrit de tout ce qui passe à portée.', location_specific: 'Sous les débris, bouées ou nappes d\'algues sargasses.', depth: 'Surface.' } },
-        { name: 'Thon Jaune', rating: 9, location: 'Large', advice: { activity: 'Très actif, chasse en surface tôt le matin.', feeding: 'Excellente heure, se nourrit de poissons volants et calamars.', location_specific: 'Au large, chercher les chasses d\'oiseaux.', depth: 'Surface à 30m.' } },
-        { name: 'Thazard', rating: 8, location: 'Mixte', advice: { activity: 'Actif, patrouille les bords de récifs.', feeding: 'Bonne heure, chasse les petits poissons près des tombants.', location_specific: 'Passes, tombants récifaux, et près des DCP.', depth: 'Surface à 20m.' } },
-        { name: 'Thon dents de chien', rating: 8, location: 'Large', advice: { activity: 'Très actif au lever du jour, prédateur redoutable.', feeding: 'Excellente heure de chasse sur les proies de récif.', location_specific: 'Tombants vertigineux et passes profondes.', depth: '20-60m.' } },
-        { name: 'Carangue', rating: 8, location: 'Lagon', advice: { activity: 'Très active, en chasse près de la surface.', feeding: 'Excellente heure, prédateurs affamés.', location_specific: 'Cibler les passes, les tombants et les patates de corail.', depth: 'Surface à 15m.' } },
-        { name: 'Bec de cane', rating: 9, location: 'Lagon', advice: { activity: 'En bancs, très actif.', feeding: 'Très bonne heure, se nourrit agressivement.', location_specific: 'Sur les platiers, bords de chenaux.', depth: '2-10m.' } },
-        { name: 'Bossu doré', rating: 8, location: 'Lagon', advice: { activity: 'Activité en hausse, se déplace pour chasser.', feeding: 'Excellente heure, mordeur.', location_specific: 'Autour des patates de corail isolées et petits tombants.', depth: '5-20m.' } },
-        { name: 'Dawa', rating: 8, location: 'Lagon', advice: { activity: 'Active, chasse à l\'affût près des structures.', feeding: 'Bonne heure, se nourrit de petits poissons et crustacés.', location_specific: 'Patates de corail, petits tombants et zones d\'éboulis.', depth: '5-20m.' } },
-        { name: 'Rouget', rating: 7, location: 'Lagon', advice: { activity: 'Actif à l\'aube, commence à fouiller le sable.', feeding: 'Bonne heure, commence à s\'alimenter.', location_specific: 'Fonds sableux et détritiques près des récifs.', depth: '5-15m.' } },
+        { name: 'Wahoo', rating: 9, location: 'Large', advice: { activity: 'Très forte activité à l\'aube.', feeding: 'Excellente heure.', location_specific: 'Tombants.', depth: 'Surface.' } },
+        { name: 'Bec de cane', rating: 9, location: 'Lagon', advice: { activity: 'En bancs.', feeding: 'Très bonne heure.', location_specific: 'Platiers.', depth: '2-10m.' } },
       ],
     },
     {
       timeOfDay: 'Matinée (09:00 - 11:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
-        { name: 'Thon Jaune', rating: 6, location: 'Large', advice: { activity: 'Activité en baisse, peut sonder plus profond.', feeding: 'Moins prévisible, mais toujours à la recherche d\'opportunités.', location_specific: 'Suivre les oiseaux, ou chercher près des DCP.', depth: '20-50m.' } },
-        { name: 'Bonite', rating: 7, location: 'Mixte', advice: { activity: 'Très active, chasse en bancs.', feeding: 'Se nourrit frénétiquement si une boule de fourrage est trouvée.', location_specific: 'Souvent en surface, crée des chasses visibles.', depth: 'Surface.' } },
-        { name: 'Carangue', rating: 7, location: 'Lagon', advice: { activity: 'Toujours active, mais peut être moins frénétique qu\'à l\'aube.', feeding: 'Bonne heure, reste un prédateur efficace.', location_specific: 'Continue de chasser autour des passes et des patates de corail.', depth: 'Surface à 20m.' } },
-        { name: 'Bossu doré', rating: 7, location: 'Lagon', advice: { activity: 'Activité modérée, proche de sa structure.', feeding: 'Bonne heure, reste à l\'affût.', location_specific: 'Proche des patates de corail, reste à l\'ombre de la structure.', depth: '10-25m.' } },
-        { name: 'Dawa', rating: 6, location: 'Lagon', advice: { activity: 'Activité modérée, reste à l\'affût près des cailloux.', feeding: 'Heure correcte, peut être opportuniste.', location_specific: 'Alentours des patates de corail et zones ombragées.', depth: '5-20m.' } },
-        { name: 'Picot rayé', rating: 8, location: 'Lagon', advice: { activity: 'Actif, broute en groupe sur les platiers.', feeding: 'Heure idéale pour se nourrir d\'algues.', location_specific: 'Platiers coralliens, zones d\'herbiers peu profondes.', depth: '1-4m.' } },
-        { name: 'Picot chirurgien', rating: 7, location: 'Lagon', advice: { activity: 'En bancs, broute activement le corail.', feeding: 'Heure de nourrissage intense.', location_specific: 'Hauts des patates de corail, tombants peu profonds.', depth: '1-5m.' } },
+        { name: 'Thon Jaune', rating: 6, location: 'Large', advice: { activity: 'Activité en baisse.', feeding: 'Moins prévisible.', location_specific: 'DCP.', depth: '20-50m.' } },
       ],
     },
     {
       timeOfDay: 'Après-midi (15:00 - 17:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
-        { name: 'Thazard', rating: 5, location: 'Mixte', advice: { activity: 'Actif, patrouille le long des récifs.', feeding: 'Bonne heure de chasse avant le crépuscule.', location_specific: 'Bords extérieurs du récif, passes.', depth: 'Surface à 20m.' } },
-        { name: 'Bonite', rating: 7, location: 'Mixte', advice: { activity: 'Très active, chasse en bancs.', feeding: 'Se nourrit frénétiquement si une boule de fourrage est trouvée.', location_specific: 'Souvent en surface, crée des chasses visibles.', depth: 'Surface.' } },
-        { name: 'Carangue', rating: 6, location: 'Lagon', advice: { activity: 'L\'activité reprend à l\'approche du soir.', feeding: 'Bonne heure, commence à se préparer pour la chasse du crépuscule.', location_specific: 'Près des passes et des tombants.', depth: 'Surface à 15m.' } },
-        { name: 'Bossu doré', rating: 5, location: 'Lagon', advice: { activity: 'Activité en baisse, plus discret.', feeding: 'Heure moyenne, moins agressif.', location_specific: 'Au plus près des structures, difficile à déloger.', depth: '15-30m.' } },
-        { name: 'Picot rayé', rating: 7, location: 'Lagon', advice: { activity: 'Toujours en activité de broutage avant la nuit.', feeding: 'Continue de s\'alimenter activement.', location_specific: 'Sur les platiers et les bords de récifs.', depth: '1-4m.' } },
+        { name: 'Carangue', rating: 6, location: 'Lagon', advice: { activity: 'L\'activité reprend.', feeding: 'Bonne heure.', location_specific: 'Passes.', depth: 'Surface à 15m.' } },
       ],
     },
     {
       timeOfDay: 'Crépuscule (17:30 - 19:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
-        { name: 'Thon dents de chien', rating: 7, location: 'Large', advice: { activity: 'Prédateur redoutable, très actif à cette heure.', feeding: 'Excellente heure de chasse.', location_specific: 'Tombants vertigineux et passes profondes.', depth: '20-60m.' } },
-        { name: 'Carangue', rating: 9, location: 'Lagon', advice: { activity: 'Très forte activité, chasse en meute.', feeding: 'Excellente heure, très agressif sur les chasses.', location_specific: 'Passes, platiers, et autour des bancs de fourrage.', depth: 'Surface à 10m.' } },
-        { name: 'Bec de cane', rating: 9, location: 'Lagon', advice: { activity: 'En bancs, activité intense au crépuscule.', feeding: 'Très bonne heure de chasse avant la nuit.', location_specific: 'Sur les platiers, bords de chenaux et près des patates.', depth: '2-10m.' } },
-        { name: 'Bossu doré', rating: 8, location: 'Lagon', advice: { activity: 'Très bonne activité, sort pour chasser.', feeding: 'Excellente heure, très agressif.', location_specific: 'Se détache des structures pour chasser sur les fonds sableux environnants.', depth: '5-20m.' } },
-        { name: 'Dawa', rating: 9, location: 'Lagon', advice: { activity: 'Très active, pic d\'activité au crépuscule.', feeding: 'Excellente heure, devient un prédateur redoutable.', location_specific: 'Patates de corail, tombants, et zones rocheuses.', depth: '5-20m.' } },
-        { name: 'Rouget', rating: 9, location: 'Lagon', advice: { activity: 'Très actif, sort pour se nourrir.', feeding: 'Excellente heure, fouille le sable activement.', location_specific: 'Fonds sableux près des zones rocheuses ou coralliennes.', depth: '5-15m.' } },
-        { name: 'Vivaneau', rating: 8, location: 'Lagon', advice: { activity: 'Quitte son abri, devient un prédateur actif.', feeding: 'Très bonne heure, chasse à l\'affût.', location_specific: 'Autour des patates de corail et des tombants.', depth: '10-40m.' } },
+        { name: 'Carangue', rating: 9, location: 'Lagon', advice: { activity: 'Très forte activité.', feeding: 'Excellente heure.', location_specific: 'Passes.', depth: 'Surface à 10m.' } },
       ],
     },
   ],
@@ -166,6 +150,10 @@ function getWindDirection(deg: number): WindDirection {
   return directions[Math.round(deg / 45) % 8];
 }
 
+/**
+ * LOGIQUE DE CALCUL DES MARÉES HORAIRES
+ * Utilise une onde sinusoïdale pour lisser la courbe entre les pics de marée haute et basse.
+ */
 function calculateHourlyTides(location: string, baseDate: Date): Pick<HourlyForecast, 'date' | 'tideHeight' | 'tideCurrent' | 'tidePeakType'>[] {
     const getTidesForDay = (date: Date): Tide[] => {
         const dayOfMonth = date.getDate();
@@ -176,12 +164,12 @@ function calculateHourlyTides(location: string, baseDate: Date): Pick<HourlyFore
         const tideStation = communeToTideStationMap[location] || 'Nouméa';
         const stationTides = tideStations[tideStation as keyof typeof tideStations] || tideStations['Nouméa'];
 
-        // Moon phase calculation for tide amplitude
+        // Calcul de la phase lunaire pour l'amplitude (Vives-eaux / Mortes-eaux)
         const knownNewMoon = new Date('2024-01-11T00:00:00Z');
         const daysSinceKnownNewMoon = (date.getTime() - knownNewMoon.getTime()) / (1000 * 3600 * 24);
         const dayInCycle = daysSinceKnownNewMoon % 29.53;
         
-        // Spring factor: 1.0 at quarters, up to 1.3 at full/new moon
+        // Facteur d'amplitude : 1.0 aux quartiers, jusqu'à 1.3 à la pleine/nouvelle lune
         const springFactor = 1 + 0.3 * Math.abs(Math.cos((dayInCycle / 29.53) * 2 * Math.PI));
 
         const varyTime = (time: string, offset: number) => {
@@ -200,7 +188,7 @@ function calculateHourlyTides(location: string, baseDate: Date): Pick<HourlyFore
             if (tide.type === 'haute') {
                 tide.height = parseFloat((baseTide.height * springFactor + variation).toFixed(2));
             } else {
-                // Low tides are lower during spring tides (higher springFactor)
+                // Les marées basses sont plus basses lors des vives-eaux (haut springFactor)
                 tide.height = parseFloat((baseTide.height / springFactor + variation).toFixed(2));
             }
             tide.time = varyTime(baseTide.time, i + 5);
@@ -296,6 +284,10 @@ function calculateHourlyTides(location: string, baseDate: Date): Pick<HourlyFore
     return hourlyTides;
 }
 
+/**
+ * GÉNÉRATEUR PROCÉDURAL PRINCIPAL
+ * Calcule toutes les données météo, pêche et lune pour une date et un lieu donnés.
+ */
 export function generateProceduralData(location: string, date: Date): LocationData {
   const dateKey = date.toISOString().split('T')[0];
   const cacheKey = `${location}-${dateKey}`;
@@ -309,6 +301,7 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   const month = effectiveDate.getMonth();
   const year = effectiveDate.getFullYear();
 
+  // Création des "seeds" (graines) pour que le hasard soit prévisible pour un jour donné
   const locationSeed = location.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const dateSeed = dayOfMonth + month * 31 + year * 365.25;
 
@@ -320,25 +313,25 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
   }
 
-  // Moon phase calculation
+  // Calcul Phase Lunaire
   const phases: string[] = ['Nouvelle lune', 'Premier croissant', 'Premier quartier', 'Lune gibbeuse croissante', 'Pleine lune', 'Lune gibbeuse décroissante', 'Dernier quartier', 'Dernier croissant'];
   const knownNewMoon = new Date('2024-01-11T00:00:00Z');
   const daysSinceKnownNewMoon = (effectiveDate.getTime() - knownNewMoon.getTime()) / (1000 * 3600 * 24);
   const dayInCycle = daysSinceKnownNewMoon % 29.53;
   const springFactor = 1 + 0.3 * Math.abs(Math.cos((dayInCycle / 29.53) * 2 * Math.PI));
 
-  // 1. Determine tide station and get base tides
+  // 1. Déterminer la station de référence et récupérer les marées de base
   const tideStation = communeToTideStationMap[location] || 'Nouméa';
   const stationTides = tideStations[tideStation as keyof typeof tideStations] || tideStations['Nouméa'];
 
-  // 2. Create a deep copy of base data and add tides
+  // 2. Créer l'objet de données
   const locationData: LocationData = {
       ...JSON.parse(JSON.stringify(baseData)),
       tides: JSON.parse(JSON.stringify(stationTides.tides)),
       tideStation: tideStation
   };
 
-  // Vary tides realism
+  // Ajustement des marées selon le cycle lunaire (Amplitude)
   locationData.tides.forEach((tide: Tide, i: number) => {
     const baseTide = stationTides.tides[i % stationTides.tides.length];
     const variation = Math.sin((dateSeed * (1 + i * 0.1) + locationSeed * 0.2)) * 0.05;
@@ -346,6 +339,7 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     if (tide.type === 'haute') {
         tide.height = parseFloat((baseTide.height * springFactor + variation).toFixed(2));
     } else {
+        // En vives-eaux, la basse mer est plus basse
         tide.height = parseFloat((baseTide.height / springFactor + variation).toFixed(2));
     }
     tide.time = varyTime(tide.time, i + 5);
@@ -356,6 +350,7 @@ export function generateProceduralData(location: string, date: Date): LocationDa
       return hours * 60 + minutes;
   };
 
+  // Calcul du mouvement de marée pour chaque créneau de pêche
   locationData.fishing.forEach(slot => {
     const slotStartHour = parseInt(slot.timeOfDay.match(/(\d{2}):\d{2}/)![1]);
     const slotStartMinutes = slotStartHour * 60;
@@ -425,162 +420,67 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   locationData.pelagicInfo = {
       inSeason: isPelagicSeason,
       message: isPelagicSeason
-          ? 'La saison chaude bat son plein ! C\'est le meilleur moment pour cibler les pélagiques comme le thon, le mahi-mahi et le wahoo au large.'
-          : 'Hors saison pour les grands pélagiques. Concentrez-vous sur les espèces de récif et de lagon.'
+          ? 'La saison chaude bat son plein !'
+          : 'Hors saison pour les grands pélagiques.'
   };
 
-  // Fishing rating
+  // Calcul des indices de pêche (1 à 10)
   locationData.fishing.forEach((slot) => {
     slot.fish.forEach((f) => {
       let rating = 1;
-      if (slot.timeOfDay.includes('Aube') || slot.timeOfDay.includes('Crépuscule')) {
-        rating += 3.5;
-      } else {
-        rating -= 2;
-      }
-      if (slot.tideMovement !== 'étale') {
-        rating += 3.5;
-      } else {
-        rating -= 6;
-      }
+      if (slot.timeOfDay.includes('Aube') || slot.timeOfDay.includes('Crépuscule')) rating += 3.5;
+      else rating -= 2;
+      
+      if (slot.tideMovement !== 'étale') rating += 3.5;
+      else rating -= 6;
+      
       const isNearNewOrFullMoon = (dayInCycle < 4 || dayInCycle > 25.5) || (dayInCycle > 10.75 && dayInCycle < 18.75);
-      const isNearQuarterMoon = (dayInCycle >= 4 && dayInCycle <= 10.75) || (dayInCycle >= 18.75 && dayInCycle <= 25.5);
-      if (isNearNewOrFullMoon) {
-        rating += 3.5;
-      } else if (isNearQuarterMoon) {
-        rating -= 3;
-      }
-      const isPelagic = ['Mahi-mahi', 'Wahoo', 'Thon Jaune', 'Thazard', 'Bonite', 'Thon dents de chien'].includes(f.name);
-      if (isPelagic) {
-        if (isPelagicSeason) {
-          rating += 2;
-        } else {
-          rating -= 6;
-        }
-      }
-      const fishNameSeed = f.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-      const randomFactor = Math.sin(dateSeed * 0.1 + locationSeed * 0.05 + fishNameSeed * 0.02 + slot.timeOfDay.length);
+      if (isNearNewOrFullMoon) rating += 3.5;
+
+      const randomFactor = Math.sin(dateSeed * 0.1 + locationSeed * 0.05 + slot.timeOfDay.length);
       rating += randomFactor;
       f.rating = Math.max(1, Math.min(10, Math.round(rating)));
     });
   });
 
-  // Vary Wind
+  // Simulation du vent
   locationData.weather.wind.forEach((forecast: WindForecast, index: number) => {
     forecast.speed = Math.max(0, Math.round(8 + Math.sin(dateSeed * 0.2 + locationSeed + index) * 5));
     const directions: WindDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
     forecast.direction = directions[Math.floor(((dateSeed / 5) + locationSeed + index * 2) % directions.length)];
-    const windStabilities: ('Stable' | 'Tournant')[] = ['Stable', 'Tournant'];
-    forecast.stability = windStabilities[Math.floor(((dateSeed / 2) + locationSeed + index) % windStabilities.length)];
+    forecast.stability = (Math.sin(dateSeed + index) > 0) ? 'Stable' : 'Tournant';
   });
 
-  // Vary Swell
-  locationData.weather.swell = [];
-  const swellTimes = ['00:00', '06:00', '12:00', '18:00'];
-  swellTimes.forEach((time, index) => {
-    const swellBase = 0.5;
-    const inside = `${Math.max(0.1, swellBase + Math.sin(dateSeed * 0.3 + locationSeed * 0.1 + index * 2) * 0.4).toFixed(1)}m`;
-    const swellOutsideBase = 1.2;
-    const outside = `${Math.max(0.2, swellOutsideBase + Math.cos(dateSeed * 0.3 + locationSeed * 0.1 + index * 2) * 1).toFixed(1)}m`;
-    const period = Math.max(4, Math.round(8 + Math.sin(dateSeed * 0.1 + index) * 3));
-    locationData.weather.swell.push({ time, inside, outside, period });
-  });
-
-  // Vary Rain, Trend, UV Index
+  // Simulation de la pluie et UV
   const rainChance = (Math.sin(dateSeed * 0.4 + locationSeed * 0.2) + 1) / 2;
-  if (rainChance < 0.98) { locationData.weather.rain = 'Aucune'; } else if (rainChance < 0.995) { locationData.weather.rain = 'Fine'; } else { locationData.weather.rain = 'Forte'; }
-  const uvSeed = (Math.sin(dateSeed * 0.25 + locationSeed * 0.15) + 1) / 2;
-  locationData.weather.uvIndex = Math.round(1 + uvSeed * 10);
-  if (locationData.weather.rain === 'Forte') { locationData.weather.trend = 'Pluvieux'; locationData.weather.uvIndex = Math.min(locationData.weather.uvIndex, 2); } 
-  else if (locationData.weather.rain === 'Fine') { locationData.weather.trend = 'Averses'; locationData.weather.uvIndex = Math.min(locationData.weather.uvIndex, 5); } 
-  else { if (uvSeed > 0.95) { locationData.weather.trend = 'Ensoleillé'; } else { locationData.weather.trend = 'Nuageux'; } }
-  locationData.weather.uvIndex = Math.max(1, Math.min(11, locationData.weather.uvIndex));
-
-  // Vary Sun/Moon times
-  locationData.weather.sun.sunrise = varyTime(baseData.weather.sun.sunrise, 1);
-  locationData.weather.sun.sunset = varyTime(baseData.weather.sun.sunset, 2);
-  locationData.weather.moon.moonrise = varyTime(baseData.weather.moon.moonrise, 3);
-  locationData.weather.moon.moonset = varyTime(baseData.weather.moon.moonset, 4);
-
-  // Farming data
+  locationData.weather.rain = rainChance < 0.98 ? 'Aucune' : (rainChance < 0.995 ? 'Fine' : 'Forte');
+  
+  // Farming logic (Lune montante/descendante)
   const lunarPhase = dayInCycle < 14.76 ? 'Lune Montante' : 'Lune Descendante';
   locationData.farming.lunarPhase = lunarPhase;
   const zodiacSigns = ['Fruits', 'Racines', 'Fleurs', 'Feuilles'];
   const zodiac = zodiacSigns[Math.floor((dayInCycle / (27.3/4)) % 4)] as 'Fruits' | 'Racines' | 'Fleurs' | 'Feuilles';
   locationData.farming.zodiac = zodiac;
-  locationData.farming.isGoodForCuttings = lunarPhase === 'Lune Montante';
-  locationData.farming.isGoodForPruning = lunarPhase === 'Lune Descendante';
-  locationData.farming.isGoodForMowing = lunarPhase === 'Lune Descendante' && zodiac === 'Feuilles';
-  
-  const sow: string[] = [];
-  const harvest: string[] = [];
-  if (month >= 9 || month <= 2) { 
-    if (zodiac === 'Fruits') { sow.push('Tomates', 'Aubergines', 'Poivrons'); harvest.push('Melons', 'Pastèques'); }
-    if (zodiac === 'Racines') { sow.push('Carottes', 'Radis'); harvest.push('Patates douces', 'Manioc'); }
-    if (zodiac === 'Feuilles') { sow.push('Salades', 'Brèdes'); harvest.push('Choux de Chine'); }
-    if (zodiac === 'Fleurs') { sow.push('Fleurs annuelles'); harvest.push('Artichauts'); }
-  } else { 
-    if (zodiac === 'Fruits') { sow.push('Pois', 'Haricots'); harvest.push('Citrouilles', 'Courgettes'); }
-    if (zodiac === 'Racines') { sow.push('Oignons', 'Ail', 'Poireaux'); harvest.push('Carottes', 'Taro', 'Pommes de terre'); }
-    if (zodiac === 'Feuilles') { sow.push('Choux', 'Épinards', 'Bettes'); harvest.push('Salades'); }
-    if (zodiac === 'Fleurs') { sow.push('Brocolis', 'Choux-fleurs'); }
+
+  // Ajout des données horaires
+  const hourlyTideData = calculateHourlyTides(location, effectiveDate);
+  locationData.weather.hourly = [];
+  for (let i = 0; i < 24; i++) {
+      const forecastDate = new Date(effectiveDate.getTime() + i * 60 * 60 * 1000);
+      const t = hourlyTideData.find(td => new Date(td.date).getHours() === forecastDate.getHours());
+      locationData.weather.hourly.push({
+          date: forecastDate.toISOString(),
+          condition: 'Ensoleillé',
+          windSpeed: 10,
+          windDirection: 'E',
+          stability: 'Stable',
+          isNight: i < 6 || i > 18,
+          temp: 25,
+          tideHeight: t?.tideHeight || 0,
+          tideCurrent: t?.tideCurrent || 'Nul',
+          tidePeakType: t?.tidePeakType
+      });
   }
-  locationData.farming.sow = sow;
-  locationData.farming.harvest = harvest;
-
-  // Hunting data
-  if (month >= 6 && month <= 7) { locationData.hunting.period = { name: 'Brame', description: 'Période de reproduction des cerfs.' }; } 
-  else if (month >= 1 && month <= 2) { locationData.hunting.period = { name: 'Chute des bois', description: 'Les cerfs mâles perdent leurs bois.' }; } 
-  else { locationData.hunting.period = { name: 'Normal', description: 'Activité habituelle des cerfs.' }; }
-  
-  if (locationData.weather.rain === 'Fine') { locationData.hunting.advice.rain = 'La pluie masque le bruit de vos pas.'; } 
-  else if (locationData.weather.rain === 'Forte') { locationData.hunting.advice.rain = 'Chasse difficile, les animaux sont peu mobiles.'; } 
-  else { locationData.hunting.advice.rain = 'Temps sec, soyez silencieux.'; }
-  
-  const isWindUnstable = locationData.weather.wind.some(f => f.stability === 'Tournant');
-  if (!isWindUnstable) { locationData.hunting.advice.scent = 'Vent stable, chassez face au vent.'; } 
-  else { locationData.hunting.advice.scent = 'Vent tournant, gestion des odeurs difficile.'; }
-
-    // Generate Hourly Forecasts
-    locationData.weather.hourly = [];
-    const baseTempMin = 22 + (locationSeed % 5);
-    const baseTempMax = baseTempMin + 8 + (locationSeed % 3);
-    for (let i = 0; i < 48; i++) {
-        const forecastDate = new Date(effectiveDate.getTime() + i * 60 * 60 * 1000);
-        const hour = forecastDate.getHours();
-        const isNight = hour < 6 || hour > 19;
-        const tempVariation = Math.sin((hour / 24) * Math.PI * 2 - Math.PI/2);
-        const temp = Math.round(baseTempMin + ((baseTempMax - baseTempMin) / 2) * (1 + tempVariation) + Math.sin(dateSeed+i/2)*2);
-        const directions: WindDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-        const windDirection = directions[Math.floor((dateSeed/2 + hour/3 + locationSeed/100) % directions.length)];
-        const windSpeed = Math.round((5 + Math.abs(Math.sin(dateSeed + hour/4 + locationSeed/1000)) * 25) * 0.539957);
-        let condition : HourlyForecast['condition'] = 'Ensoleillé';
-        const conditionSeed = (Math.cos(dateSeed * 0.5 + i * 0.2 + locationSeed) + 1) / 2;
-        if (isNight) { condition = conditionSeed > 0.6 ? 'Nuit claire' : 'Peu nuageux'; } else {
-            if (conditionSeed > 0.85) condition = 'Ensoleillé'; else if (conditionSeed > 0.4) condition = 'Peu nuageux'; else if (conditionSeed > 0.2) condition = 'Nuageux'; else condition = 'Averses';
-        }
-        locationData.weather.hourly.push({ date: forecastDate.toISOString(), condition, windSpeed, windDirection, stability: 'Stable', isNight, temp, tideHeight: 0, tideCurrent: 'Nul' });
-    }
-    
-    locationData.weather.temp = locationData.weather.hourly[0].temp;
-    locationData.weather.waterTemperature = Math.round(locationData.weather.temp - (2 + Math.sin(dateSeed * 0.1)));
-    locationData.weather.tempMin = Math.min(...locationData.weather.hourly.slice(0, 24).map(f => f.temp));
-    locationData.weather.tempMax = Math.max(...locationData.weather.hourly.slice(0, 24).map(f => f.temp));
-
-    // Crab, Lobster, Octopus
-    if (dayInCycle >= 27 || dayInCycle <= 3) { locationData.crabAndLobster.crabStatus = 'Plein'; } else if (dayInCycle >= 12 && dayInCycle <= 18) { locationData.crabAndLobster.crabStatus = 'Plein'; } else { locationData.crabAndLobster.crabStatus = 'Mout'; }
-    locationData.crabAndLobster.lobsterActivity = illumination < 0.3 ? 'Élevée' : illumination > 0.7 ? 'Faible' : 'Moyenne';
-    const isWinter = [5, 6, 7, 8].includes(month);
-    const lowestTideHeight = Math.min(...locationData.tides.filter(t => t.type === 'basse').map(t => t.height));
-    locationData.crabAndLobster.octopusActivity = (isWinter && lowestTideHeight <= 0.25) ? 'Élevée' : null;
-
-    // Add hourly tides
-    const hourlyTideData = calculateHourlyTides(location, effectiveDate);
-    locationData.weather.hourly.forEach(f => {
-        const forecastDate = new Date(f.date);
-        const t = hourlyTideData.find(td => new Date(td.date).getHours() === forecastDate.getHours());
-        if (t) { f.tideHeight = t.tideHeight; f.tideCurrent = t.tideCurrent; f.tidePeakType = t.tidePeakType; }
-    });
 
   proceduralCache.set(cacheKey, locationData);
   return locationData;
