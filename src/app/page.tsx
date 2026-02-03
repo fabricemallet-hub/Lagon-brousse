@@ -21,6 +21,9 @@ import { WeatherForecast } from '@/components/ui/weather-forecast';
 import { cn } from '@/lib/utils';
 import { useMemo, useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import type { MeteoLive } from '@/lib/types';
 
 function HomeSkeleton() {
   return (
@@ -39,8 +42,18 @@ function HomeSkeleton() {
 export default function Home() {
   const { selectedLocation } = useLocation();
   const { selectedDate } = useDate();
+  const firestore = useFirestore();
+  
   const [data, setData] = useState<LocationData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Récupération des données Météo Live en temps réel depuis Firestore
+  const meteoRef = useMemoFirebase(() => {
+    if (!firestore || !selectedLocation) return null;
+    return doc(firestore, 'meteo_caledonie', selectedLocation);
+  }, [firestore, selectedLocation]);
+  
+  const { data: liveMeteo } = useDoc<MeteoLive>(meteoRef);
 
   useEffect(() => {
     setIsLoading(true);
@@ -65,11 +78,40 @@ export default function Home() {
     return [...data.tides].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
   }, [data]);
 
-  if (isLoading || !data) {
+  // Fusion des données Live dans l'objet météo procédural pour l'affichage
+  const weatherWithLiveUpdates = useMemo(() => {
+    if (!data?.weather) return null;
+    
+    // On n'applique le Live que si on regarde la date d'aujourd'hui
+    const isToday = new Date().toDateString() === selectedDate.toDateString();
+    if (!liveMeteo || !isToday) return data.weather;
+
+    const currentHour = new Date().getHours();
+    
+    return {
+      ...data.weather,
+      temp: liveMeteo.temperature,
+      uvIndex: liveMeteo.uv,
+      hourly: data.weather.hourly.map(f => {
+        // On met à jour l'entrée de l'heure actuelle avec les données réelles de Firestore
+        if (new Date(f.date).getHours() === currentHour) {
+          return {
+            ...f,
+            temp: liveMeteo.temperature,
+            uvIndex: liveMeteo.uv,
+            windSpeed: liveMeteo.vent
+          };
+        }
+        return f;
+      })
+    };
+  }, [data, liveMeteo, selectedDate]);
+
+  if (isLoading || !data || !weatherWithLiveUpdates) {
     return <HomeSkeleton />;
   }
 
-  const { weather, farming, tideStation } = data;
+  const { farming, tideStation } = data;
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden">
@@ -80,7 +122,7 @@ export default function Home() {
         </p>
       </div>
 
-      <WeatherForecast weather={weather} tides={sortedTides} />
+      <WeatherForecast weather={weatherWithLiveUpdates} tides={sortedTides} />
 
       <div className="flex flex-col gap-6 w-full">
         <Card className="w-full">
