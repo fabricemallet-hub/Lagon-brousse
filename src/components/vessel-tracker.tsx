@@ -23,7 +23,8 @@ import {
   Copy, 
   LocateFixed, 
   ShieldAlert,
-  Wifi
+  Wifi,
+  Phone
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { VesselStatus } from '@/lib/types';
@@ -57,6 +58,7 @@ export function VesselTracker() {
   const [mode, setMode] = useState<'sender' | 'receiver'>('sender');
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
   const [isSharing, setIsSharing] = useState(false);
+  const [emergencyContact, setEmergencyContact] = useState('');
   
   // Tracking State (Sender)
   const [currentPos, setCurrentPos] = useState<google.maps.LatLngLiteral | null>(null);
@@ -251,28 +253,45 @@ export function VesselTracker() {
     toast({ title: "Coordonnées copiées", description: text });
   };
 
-  const contactRescue = (lat: number, lng: number, name: string) => {
+  const sendEmergencySms = (lat: number, lng: number, name: string) => {
+    if (!emergencyContact.trim()) {
+      toast({ 
+        variant: "destructive", 
+        title: "Numéro requis", 
+        description: "Veuillez saisir le numéro de téléphone du contact à prévenir." 
+      });
+      return;
+    }
+
     const coords = `${lat.toFixed(6)},${lng.toFixed(6)}`;
     const googleMapsUrl = `https://www.google.com/maps?q=${coords}`;
     const cleanName = name === 'Ma Position' ? (user?.displayName || 'Capitaine') : name;
     
-    const bodyText = `URGENCE MER: ${cleanName} en detresse. Position: ${googleMapsUrl}. Appel via Lagon&Brousse NC.`;
+    const bodyText = `ALERTE Lagon&Brousse NC : ${cleanName} est en difficulté en mer.
+Position : ${googleMapsUrl}
+GPS : ${coords}
+Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
     
     // Cross-platform SMS link formatting
     const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent);
     const isAndroid = /Android/i.test(navigator.userAgent);
+    const isMobile = isIOS || isAndroid;
     const separator = isIOS ? '&' : '?';
-    const smsUrl = `sms:16${separator}body=${encodeURIComponent(bodyText)}`;
+    
+    const target = emergencyContact.replace(/\s/g, '');
+    const smsUrl = `sms:${target}${separator}body=${encodeURIComponent(bodyText)}`;
     
     // Inform the user
     toast({ 
-      title: "Demande de secours", 
-      description: "Ouverture de l'application SMS. Envoyez le message au 16 (MRCC)." 
+      title: "Alerte en cours", 
+      description: `Ouverture de l'application SMS pour prévenir ${target}.` 
     });
 
     // Only attempt to launch the protocol if we're on mobile
-    if (isIOS || isAndroid) {
+    if (isMobile) {
       window.location.href = smsUrl;
+    } else {
+      console.log("Desktop fallback - SMS would be sent to:", target, "with body:", bodyText);
     }
   };
 
@@ -413,17 +432,55 @@ export function VesselTracker() {
               <LocateFixed className="size-5" />
             </Button>
           </div>
-          <CardFooter className="bg-muted/30 p-4 flex flex-col gap-3">
-            <div className="w-full grid grid-cols-2 gap-2">
-              <Button variant="outline" className="text-xs" onClick={() => copyCoordinates(displayVessel!.location.latitude, displayVessel!.location.longitude)}>
-                <Copy className="size-3 mr-2" /> Copier GPS
-              </Button>
-              <Button variant="destructive" className="text-xs bg-red-600 hover:bg-red-700" onClick={() => contactRescue(displayVessel!.location.latitude, displayVessel!.location.longitude, displayVessel!.displayName)}>
-                <ShieldAlert className="size-3 mr-2" /> SOS MRCC (16)
+          <CardFooter className="bg-muted/30 p-4 flex flex-col gap-4">
+            <div className="w-full grid grid-cols-1 gap-2">
+              <Button variant="outline" className="text-sm h-10" onClick={() => copyCoordinates(displayVessel!.location.latitude, displayVessel!.location.longitude)}>
+                <Copy className="size-4 mr-2" /> Copier les coordonnées GPS
               </Button>
             </div>
+
+            <div className="w-full space-y-3 border-t pt-4 border-border/50">
+              <div className="space-y-1.5">
+                <Label htmlFor="emergency-num" className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  Contact à prévenir (Proche / Famille)
+                </Label>
+                <div className="flex gap-2">
+                  <Input 
+                    id="emergency-num"
+                    type="tel"
+                    placeholder="Numéro SMS..."
+                    value={emergencyContact}
+                    onChange={e => setEmergencyContact(e.target.value)}
+                    className="bg-background h-12"
+                  />
+                </div>
+              </div>
+              
+              <Button 
+                variant="destructive" 
+                className="w-full h-14 bg-red-600 hover:bg-red-700 text-base font-bold shadow-lg flex items-center justify-center gap-3"
+                onClick={() => sendEmergencySms(displayVessel!.location.latitude, displayVessel!.location.longitude, displayVessel!.displayName)}
+              >
+                <ShieldAlert className="size-6" /> ENVOYER ALERTE SMS
+              </Button>
+
+              <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900 rounded-lg space-y-2">
+                <p className="text-[10px] font-bold text-red-800 dark:text-red-300 flex items-center gap-1">
+                  <AlertTriangle className="size-3" /> RAPPEL SECOURS EN MER :
+                </p>
+                <div className="grid grid-cols-1 gap-1.5 text-[11px] text-red-700 dark:text-red-400">
+                  <p className="flex items-center gap-2">
+                    <Phone className="size-3" /> SNSM : <span className="font-bold">+687 23.66.66</span>
+                  </p>
+                  <p className="flex items-center gap-2">
+                    <Phone className="size-3" /> Urgence CROSS : <span className="font-bold text-sm">196</span> (Gratuit)
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {mode === 'receiver' && (
-              <p className="text-[10px] text-center text-muted-foreground uppercase font-bold tracking-widest">
+              <p className="text-[10px] text-center text-muted-foreground uppercase font-bold tracking-widest pt-2">
                 Dernière activité : {remoteVessel?.lastActive ? new Date(remoteVessel.lastActive.toDate()).toLocaleTimeString('fr-FR') : 'Inconnue'}
               </p>
             )}
