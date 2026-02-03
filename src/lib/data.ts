@@ -1,4 +1,3 @@
-
 import { LocationData, SwellForecast, Tide, WindDirection, WindForecast, HourlyForecast } from './types';
 import { locations } from './locations';
 
@@ -44,10 +43,10 @@ const tideStations = {
     avgHigh: 1.35,
     avgLow: 0.30,
     tides: [
-      { type: 'haute', time: '10:10', height: 1.35, height_avg: 1.35, current: 'Fort' },
-      { type: 'basse', time: '16:20', height: 0.30, height_avg: 0.30, current: 'Modéré' },
-      { type: 'haute', time: '22:40', height: 1.25, height_avg: 1.25, current: 'Fort' },
-      { type: 'basse', time: '03:50', height: 0.35, height_avg: 0.35, current: 'Modéré' },
+      { type: 'haute', time: '10:10', height: 1.35, current: 'Fort' },
+      { type: 'basse', time: '16:20', height: 0.30, current: 'Modéré' },
+      { type: 'haute', time: '22:40', height: 1.25, current: 'Fort' },
+      { type: 'basse', time: '03:50', height: 0.35, current: 'Modéré' },
     ]
   },
   'Koumac': {
@@ -150,19 +149,22 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation' | 'tideThresholds'> =
     {
       timeOfDay: 'Matinée (09:00 - 11:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
-        { name: 'Thon Jaune', rating: 6, location: 'Large', advice: { activity: 'Activité en baisse.', feeding: 'Moins prévisible.', location_specific: 'DCP.', depth: '20-50m.' } },
+        { name: 'Thon Jaune', rating: 6, location: 'Large', advice: { activity: 'Activité modérée, cherchez les courants.', feeding: 'Opportuniste.', location_specific: 'DCP.', depth: '20-50m.' } },
+        { name: 'Bossu doré', rating: 6, location: 'Lagon', advice: { activity: 'Moins actif qu\'à l\'aube.', feeding: 'Prudence.', location_specific: 'Patates de corail.', depth: '5-15m.' } },
       ],
     },
     {
       timeOfDay: 'Après-midi (15:00 - 17:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
-        { name: 'Carangue', rating: 6, location: 'Lagon', advice: { activity: 'L\'activité reprend.', feeding: 'Bonne heure.', location_specific: 'Passes.', depth: 'Surface à 15m.' } },
+        { name: 'Carangue', rating: 6, location: 'Lagon', advice: { activity: 'L\'activité reprend avec la marée.', feeding: 'Bonne heure.', location_specific: 'Passes.', depth: 'Surface à 15m.' } },
+        { name: 'Loche truite', rating: 6, location: 'Lagon', advice: { activity: 'Affût.', feeding: 'Moment propice.', location_specific: 'Trous.', depth: '10-25m.' } },
       ],
     },
     {
       timeOfDay: 'Crépuscule (17:30 - 19:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
         { name: 'Carangue', rating: 9, location: 'Lagon', advice: { activity: 'Très forte activité.', feeding: 'Excellente heure.', location_specific: 'Passes.', depth: 'Surface à 10m.' } },
+        { name: 'Rouget', rating: 9, location: 'Lagon', advice: { activity: 'Sortie de nuit.', feeding: 'Très actif.', location_specific: 'Fonds sableux.', depth: '3-8m.' } },
       ],
     },
   ],
@@ -273,6 +275,12 @@ export function generateProceduralData(location: string, date: Date): LocationDa
         else if (nextTide) { slot.tideMovement = nextTide.type === 'haute' ? 'montante' : 'descendante'; } 
         else { slot.tideMovement = 'étale'; }
     }
+
+    // Dynamiser les indices de pêche selon le coefficient de marée (vives-eaux / mortes-eaux)
+    slot.fish.forEach(f => {
+      const moonImpact = (springFactor - 1.14) * 8; // Varie de -1.1 à +1.1 environ
+      f.rating = Math.max(1, Math.min(10, Math.round(f.rating + moonImpact)));
+    });
   });
   
   const phaseIndex = Math.floor((dayInCycle / 29.53) * 8 + 0.5) % 8;
@@ -282,10 +290,7 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   const isPelagicSeason = [8, 9, 10, 11, 0, 1, 2, 3].includes(month);
   locationData.pelagicInfo = { inSeason: isPelagicSeason, message: isPelagicSeason ? 'Saison des pélagiques ouverte !' : 'Hors saison pélagiques.' };
 
-  // --- Logique Crabes et Langoustes (Spécifique NC) ---
-  // Mue des crabes : Se produit préférentiellement lors des lunes de quartier (mortes-eaux)
   const isQuarterMoon = (dayInCycle >= 5.5 && dayInCycle <= 9.5) || (dayInCycle >= 20.2 && dayInCycle <= 24.2);
-  // Pleine Lune (~14.8j) et Nouvelle Lune (0j / 29.5j) : Les crabes sont généralement bien pleins
   const isFullOrNew = (dayInCycle <= 3.5 || (dayInCycle >= 12.8 && dayInCycle <= 16.8) || dayInCycle >= 26);
 
   if (isQuarterMoon) {
@@ -299,7 +304,6 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     locationData.crabAndLobster.crabMessage = "Phase de remplissage après la mue.";
   }
 
-  // Langoustes : Activité nocturne maximale par nuits sans lune
   if (dayInCycle <= 5.5 || dayInCycle >= 24) {
     locationData.crabAndLobster.lobsterActivity = 'Élevée';
     locationData.crabAndLobster.lobsterMessage = "Nuits noires (Nouvelle Lune) : Forte activité des langoustes au récif.";
@@ -311,7 +315,6 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     locationData.crabAndLobster.lobsterMessage = "Activité modérée en début/fin de nuit.";
   }
 
-  // Poulpes : Activité maximale lors des grandes marées (Vives-eaux) pour l'accès aux platiers
   if (isFullOrNew) {
     locationData.crabAndLobster.octopusActivity = 'Élevée';
     locationData.crabAndLobster.octopusMessage = "Vives-eaux : Excellente période pour le poulpe sur le platier lors des basses mers.";
@@ -336,12 +339,10 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   const currentZodiac = zodiacSigns[Math.floor((dayInCycle / (27.3/4)) % 4)] as any;
   locationData.farming.zodiac = currentZodiac;
 
-  // Calcul dynamique des booleans de jardinage
-  locationData.farming.isGoodForPruning = !isRising; // Taille en lune descendante
-  locationData.farming.isGoodForCuttings = isRising; // Bouturage en lune montante (sève monte)
-  locationData.farming.isGoodForMowing = !isRising; // Tonte en lune descendante pour freiner la repousse
+  locationData.farming.isGoodForPruning = !isRising; 
+  locationData.farming.isGoodForCuttings = isRising; 
+  locationData.farming.isGoodForMowing = !isRising; 
 
-  // Génération des recommandations
   if (isRising) {
     locationData.farming.recommendation = `Lune montante : la sève est active. Idéal pour le bouturage et la plantation des variétés ${currentZodiac}.`;
     locationData.farming.details = [

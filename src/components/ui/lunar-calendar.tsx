@@ -431,7 +431,8 @@ function PecheDetailDialogContent({ day, location }: { day: Date; location: stri
                 <Clock className="size-3" /> {slot.timeOfDay}
             </p>
             <div className="space-y-2">
-              {slot.fish.filter(f => f.rating >= 8).map((f, fi) => (
+              {/* Abaissement du seuil à 6 ici aussi */}
+              {slot.fish.filter(f => f.rating >= 6).map((f, fi) => (
                 <div key={fi} className="p-3 border rounded-lg bg-card shadow-sm space-y-2">
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
