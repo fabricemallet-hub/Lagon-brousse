@@ -129,7 +129,7 @@ const sectionContent: Record<string, {
       "Identifiez la tendance du jour : Lune Montante (pour ce qui pousse hors de terre) ou Descendante (pour les racines).",
       "Consultez le signe du zodiaque : Jour Fruits, Racines, Fleurs ou Feuilles.",
       "Suivez les recommandations : l'application vous guide pour la taille, le bouturage ou la tonte de la pelouse selon la sève.",
-      "Gérez votre potager avec 'Mes Semis' : l'application mémorise le contexte lunaire exact (phase et zodiaque), calcule les dates de récolte prévisionnelles et planifie les périodes de repiquage pour assurer la réussite de votre potager."
+      "Accédez à l'onglet 'Mes Semis' pour enregistrer vos travaux. L'application mémorise le contexte lunaire exact (phase et zodiaque), calcule les dates de récolte prévisionnelles et planifie les périodes de repiquage pour assurer la réussite de votre potager."
     ],
     tips: [
       "La spécialisation des travaux (Le Calendrier Lunaire) : Signes de Terre (Taur., Vierg., Capr.) = Racines ; Signes d'Eau (Canc., Scorp., Pois.) = Feuilles ; Signes d'Air (Gém., Bal., Vers.) = Fleurs ; Signes de Feu (Bél., Lion, Sag.) = Fruits.",
@@ -214,8 +214,7 @@ const sectionContent: Record<string, {
     steps: [
       "Consultez votre statut actuel (Essai, Actif, Limité).",
       "Si vous avez un code promo ou un jeton d'accès, saisissez-le dans le champ dédié.",
-      "Activez l'abonnement mensuel pour un accès illimité.",
-      "Modifiez votre nom d'affichage ou vos préférences d'icônes."
+      "Activez l'abonnement mensuel pour un accès illimité."
     ],
     tips: [
       "En mode 'Limité', vous disposez d'une minute d'accès par jour pour les consultations rapides."
