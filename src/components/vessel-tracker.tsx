@@ -2,8 +2,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, setDoc, updateDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
+import { useUser, useFirestore, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { doc, setDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -21,13 +21,9 @@ import {
   Move, 
   AlertTriangle, 
   Copy, 
-  MessageSquare, 
   LocateFixed, 
-  Share2, 
-  User, 
   ShieldAlert,
-  Wifi,
-  History
+  Wifi
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { VesselStatus } from '@/lib/types';
@@ -68,6 +64,8 @@ export function VesselTracker() {
   const [lastHistoryUpdateTime, setLastHistoryUpdateTime] = useState<number>(0);
   const [vesselStatus, setVesselStatus] = useState<'moving' | 'stationary'>('moving');
   const [isOnline, setIsOnline] = useState(true);
+  const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [hasInitialCentered, setHasInitialCentered] = useState(false);
   const watchIdRef = useRef<number | null>(null);
 
   // Firestore Sync (Receiver)
@@ -91,34 +89,55 @@ export function VesselTracker() {
 
   // --- SENDER LOGIC (USER A) ---
   
-  const updateVesselInFirestore = useCallback(async (data: Partial<VesselStatus>) => {
+  const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || !isSharing) return;
     const docRef = doc(firestore, 'vessels', user.uid);
-    try {
-      await setDoc(docRef, {
+    const updateData = {
         userId: user.uid,
         displayName: user.displayName || 'Capitaine',
         isSharing: true,
         lastActive: serverTimestamp(),
         ...data
-      }, { merge: true });
-    } catch (e) {
-      console.error("Sync error:", e);
-    }
+    };
+    
+    // CRITICAL: Non-blocking call with error emitter
+    setDoc(docRef, updateData, { merge: true }).catch(async (err) => {
+        const permissionError = new FirestorePermissionError({
+            path: docRef.path,
+            operation: 'write',
+            requestResourceData: updateData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    });
   }, [user, firestore, isSharing]);
 
-  const addImmobilityHistory = useCallback(async (pos: google.maps.LatLngLiteral, duration: number) => {
+  const addImmobilityHistory = useCallback((pos: google.maps.LatLngLiteral, duration: number) => {
     if (!user || !firestore) return;
-    try {
-      await addDoc(collection(firestore, 'vessels', user.uid, 'history'), {
+    const colRef = collection(firestore, 'vessels', user.uid, 'history');
+    const historyData = {
         timestamp: serverTimestamp(),
         location: { latitude: pos.lat, longitude: pos.lng },
         durationMinutes: duration
-      });
-    } catch (e) {
-      console.error("History sync error:", e);
-    }
+    };
+    
+    addDoc(colRef, historyData).catch(async (err) => {
+        const permissionError = new FirestorePermissionError({
+            path: colRef.path,
+            operation: 'create',
+            requestResourceData: historyData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    });
   }, [user, firestore]);
+
+  // Handle map centering
+  useEffect(() => {
+    if (isLoaded && map && currentPos && !hasInitialCentered) {
+        map.panTo(currentPos);
+        map.setZoom(15);
+        setHasInitialCentered(true);
+    }
+  }, [isLoaded, map, currentPos, hasInitialCentered]);
 
   // Monitor position and mobility
   useEffect(() => {
@@ -145,6 +164,7 @@ export function VesselTracker() {
         const dist = getDistance(newLat, newLng, anchorPos.lat, anchorPos.lng);
         const now = Date.now();
 
+        // Use a 10m threshold to avoid jitter updates
         if (dist > IMMOBILITY_THRESHOLD_METERS) {
           // SIGNIFICANT MOVEMENT
           if (vesselStatus === 'stationary') {
@@ -193,6 +213,21 @@ export function VesselTracker() {
 
   // --- UI HELPERS ---
 
+  const handleRecenter = () => {
+    if (currentPos && map) {
+        map.panTo(currentPos);
+        map.setZoom(15);
+    } else if (!navigator.geolocation) {
+        toast({ variant: "destructive", title: "Erreur", description: "GPS non disponible." });
+    } else {
+        navigator.geolocation.getCurrentPosition((pos) => {
+            const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            setCurrentPos(coords);
+            if (map) map.panTo(coords);
+        });
+    }
+  };
+
   const copyCoordinates = (lat: number, lng: number) => {
     const text = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
     navigator.clipboard.writeText(text);
@@ -224,14 +259,14 @@ export function VesselTracker() {
             <Button 
               variant={mode === 'sender' ? 'default' : 'ghost'} 
               className="flex-1" 
-              onClick={() => setMode('sender')}
+              onClick={() => { setMode('sender'); setHasInitialCentered(false); }}
             >
               Émetteur (A)
             </Button>
             <Button 
               variant={mode === 'receiver' ? 'default' : 'ghost'} 
               className="flex-1" 
-              onClick={() => setMode('receiver')}
+              onClick={() => { setMode('receiver'); setHasInitialCentered(false); }}
             >
               Récepteur (B)
             </Button>
@@ -263,7 +298,7 @@ export function VesselTracker() {
                 <div className="p-4 border rounded-lg space-y-2">
                   <p className="text-sm font-medium">Votre ID de partage :</p>
                   <div className="flex gap-2">
-                    <code className="flex-1 bg-muted p-2 rounded font-mono text-center">{user?.uid}</code>
+                    <code className="flex-1 bg-muted p-2 rounded font-mono text-center text-xs overflow-hidden truncate">{user?.uid}</code>
                     <Button variant="outline" size="icon" onClick={() => {
                       navigator.clipboard.writeText(user?.uid || '');
                       toast({ title: "ID copié !" });
@@ -316,6 +351,7 @@ export function VesselTracker() {
               mapContainerClassName="w-full h-full"
               center={displayVessel?.location ? { lat: displayVessel.location.latitude, lng: displayVessel.location.longitude } : { lat: -22.27, lng: 166.45 }}
               zoom={15}
+              onLoad={setMap}
               options={{ disableDefaultUI: true, mapTypeId: 'satellite' }}
             >
               {displayVessel?.location && (
@@ -335,7 +371,7 @@ export function VesselTracker() {
                 </OverlayView>
               )}
             </GoogleMap>
-            <Button size="icon" className="absolute top-4 right-4 shadow-lg" onClick={() => {}}>
+            <Button size="icon" className="absolute top-4 right-4 shadow-lg" onClick={handleRecenter}>
               <LocateFixed className="size-5" />
             </Button>
           </div>

@@ -41,14 +41,13 @@ service cloud.firestore {
     // Collection: vessels (Real-time tracking)
     // ----------------------------------------------------------------------
     match /vessels/{userId} {
-      // Owner can update their own vessel status
-      allow get, write: if isOwner(userId);
-      // Anyone can read a vessel's status if they know the ID (shareable link/code)
+      // Owner can fully manage their own vessel status
       allow read: if isSignedIn();
+      allow create, update, delete: if isOwner(userId);
 
       match /history/{pointId} {
         allow read: if isSignedIn();
-        allow write: if isOwner(userId);
+        allow create, update, delete: if isOwner(userId);
       }
     }
 
