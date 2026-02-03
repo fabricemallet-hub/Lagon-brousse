@@ -385,9 +385,9 @@ export default function SemisPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-muted/50 p-3 rounded-lg border">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground">Catégorie</p>
-                  <p className="font-bold text-sm flex items-center gap-2 mt-1">
+                  <div className="font-bold text-sm flex items-center gap-2 mt-1">
                     <Badge variant="outline" className="bg-primary/5">{aiAdvice.plantType}</Badge>
-                  </p>
+                  </div>
                 </div>
                 <div className="bg-muted/50 p-3 rounded-lg border">
                   <p className="text-[10px] font-bold uppercase text-muted-foreground">Récolte estimée</p>
