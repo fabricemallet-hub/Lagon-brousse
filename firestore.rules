@@ -33,6 +33,10 @@ service cloud.firestore {
       match /fishing_spots/{spotId} {
         allow read, write, delete: if isOwner(userId);
       }
+
+      match /sowings/{sowingId} {
+        allow read, write, delete: if isOwner(userId);
+      }
     }
 
     // ----------------------------------------------------------------------
@@ -131,5 +135,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
