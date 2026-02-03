@@ -14,7 +14,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
   const userDocRef = doc(firestore, 'users', user.uid);
   const email = user.email?.toLowerCase() || '';
   
-  // Reconnaissance administrative forcée pour vos deux comptes
+  // Reconnaissance administrative pour les comptes de Fabrice
   const isAdminUser = email === 'f.mallet81@outlook.com' || email === 'f.mallet81@gmail.com';
 
   try {
@@ -22,7 +22,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
 
     if (docSnap.exists()) {
       const currentData = docSnap.data() as UserAccount;
-      // Mise à jour forcée du statut admin pour synchroniser avec les règles
+      // Mise à jour forcée du statut admin pour synchroniser avec les règles de sécurité
       if (isAdminUser && currentData.subscriptionStatus !== 'admin') {
           await setDoc(userDocRef, { 
             ...currentData, 
