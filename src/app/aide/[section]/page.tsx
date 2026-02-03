@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
@@ -17,7 +18,8 @@ import {
   Scale, 
   Navigation, 
   User,
-  Home
+  Home,
+  Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -136,23 +138,21 @@ const sectionContent: Record<string, {
     ]
   },
   'semis': {
-    title: 'Gestion des Semis',
+    title: 'Guide Culture & IA',
     icon: Sprout,
     color: 'bg-emerald-500',
-    role: "Un assistant intelligent qui valide vos plantations et vous guide jusqu'à la récolte en analysant les traditions tropicales et les cycles lunaires.",
+    role: "Un assistant horticole intelligent propulsé par l'IA qui crée vos fiches de culture et optimise vos dates de semis selon les cycles de sève.",
     steps: [
-      "Choisissez votre graine dans la liste prédéfinie des variétés communes (Tomate, Salade, etc.).",
-      "Si votre plante est absente, sélectionnez 'Autre / Saisie manuelle' en bas de liste pour taper son nom.",
-      "Sélectionnez la date prévue pour la mise en terre ou en godet.",
-      "L'IA identifie le type de plante (Fruit, Racine, Feuille, Fleur) et génère des conseils spécifiques : arrosage, exposition et entretien.",
-      "Validation Lunaire : L'IA vérifie si le jour choisi est propice. Si ce n'est pas le cas, elle cherche dans les 30 prochains jours la date idéale réunissant les meilleures conditions (Phase + Zodiaque) et vous la recommande.",
-      "Planification : L'IA estime dynamiquement votre date de récolte et la période idéale pour le repiquage en pleine terre.",
-      "Validez pour enregistrer la fiche dans votre historique de cultures."
+      "Recherche & Identification : Tapez le nom de n'importe quelle graine. Si elle est absente du guide, l'IA créera instantanément sa fiche technique personnalisée.",
+      "Calcul de Fiche IA : L'intelligence artificielle analyse la plante, définit son type (Fruit, Racine...) et génère des conseils spécifiques (arrosage, exposition).",
+      "Optimisation Lunaire : L'IA vérifie votre date de semis. Si elle est déconseillée, elle scanne les 30 prochains jours pour vous suggérer la date idéale précise réunissant les meilleures conditions (Phase + Zodiaque).",
+      "Planification Dynamique : Obtenez des estimations pour la date de récolte et la période de repiquage en pleine terre basées sur les cycles biologiques.",
+      "Historique : Sauvegardez vos fiches pour suivre l'évolution de vos semis dans votre session personnelle."
     ],
     tips: [
-      "L'IA suggère toujours la date la plus proche respectant les 'règles d'or' (ex: Fruit en lune montante + jour Fruits).",
-      "Une alerte visuelle rouge apparaîtra dans votre historique si un semis a été fait hors période lunaire idéale.",
-      "L'IA ignore la météo changeante pour se concentrer sur les cycles de sève fondamentaux."
+      "L'IA suggère toujours la date la plus proche respectant les 'règles d'or' (ex: Légume Fruit = Lune Montante + Jour Fruit).",
+      "Le guide IA est capable d'analyser des variétés exotiques ou rares non listées dans la base de données standard.",
+      "Une alerte visuelle rouge dans votre historique vous signalera si une plantation a été effectuée hors de la période lunaire optimale."
     ]
   },
   'calendrier-peche': {

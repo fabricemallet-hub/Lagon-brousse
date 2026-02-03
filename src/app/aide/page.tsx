@@ -64,8 +64,8 @@ const helpSections = [
   },
   {
     id: 'semis',
-    title: 'Gestion des Semis',
-    description: 'Suivi intelligent par IA.',
+    title: 'Guide Culture',
+    description: 'Planification par IA.',
     icon: Sprout,
     color: 'bg-emerald-500',
   },
