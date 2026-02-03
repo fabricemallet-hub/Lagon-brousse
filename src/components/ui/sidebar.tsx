@@ -57,7 +57,7 @@ const SidebarProvider = React.forwardRef<
 >(
   (
     {
-      defaultOpen = true,
+      defaultOpen = false,
       open: openProp,
       onOpenChange: setOpenProp,
       className,
@@ -87,9 +87,10 @@ const SidebarProvider = React.forwardRef<
     )
 
     const toggleSidebar = React.useCallback(() => {
-      setOpenMobile((prev) => !prev)
-      setOpen((prev) => !prev)
-    }, [setOpen, setOpenMobile])
+      return isMobile
+        ? setOpenMobile((prev) => !prev)
+        : setOpen((prev) => !prev)
+    }, [isMobile, setOpen, setOpenMobile])
 
     React.useEffect(() => {
       const handleKeyDown = (event: KeyboardEvent) => {
@@ -167,7 +168,7 @@ const Sidebar = React.forwardRef<
     },
     ref
   ) => {
-    const { state } = useSidebar()
+    const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
 
     if (collapsible === "none") {
       return (
@@ -184,10 +185,25 @@ const Sidebar = React.forwardRef<
       )
     }
 
+    if (isMobile) {
+      return (
+        <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
+          <SheetContent
+            data-sidebar="sidebar"
+            data-mobile="true"
+            className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden z-[60]"
+            side={side}
+          >
+            <div className="flex h-full w-full flex-col">{children}</div>
+          </SheetContent>
+        </Sheet>
+      )
+    }
+
     return (
       <div
         ref={ref}
-        className="group peer text-sidebar-foreground"
+        className="group peer hidden md:block text-sidebar-foreground"
         data-state={state}
         data-collapsible={state === "collapsed" ? collapsible : ""}
         data-variant={variant}
@@ -205,7 +221,7 @@ const Sidebar = React.forwardRef<
         />
         <div
           className={cn(
-            "duration-200 fixed inset-y-0 z-50 h-svh w-[--sidebar-width] transition-[left,right,width] ease-linear flex flex-col bg-sidebar border-r shadow-2xl",
+            "duration-200 fixed inset-y-0 z-[50] h-svh w-[--sidebar-width] transition-[left,right,width] ease-linear flex flex-col bg-sidebar border-r shadow-2xl",
             side === "left"
               ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
               : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
@@ -521,7 +537,7 @@ const SidebarMenuButton = React.forwardRef<
     ...props
   }, ref) => {
     const Comp = asChild ? Slot : "button"
-    const { setOpen, setOpenMobile } = useSidebar()
+    const { setOpen, setOpenMobile, isMobile } = useSidebar()
 
     const button = (
       <Comp
@@ -531,8 +547,11 @@ const SidebarMenuButton = React.forwardRef<
         data-active={isActive}
         className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
         onClick={(event) => {
-          setOpen(false)
-          setOpenMobile(false)
+          if (isMobile) {
+            setOpenMobile(false)
+          } else {
+            setOpen(false)
+          }
           onClick?.(event)
         }}
         {...props}
@@ -683,7 +702,7 @@ const SidebarMenuSubButton = React.forwardRef<
   }
 >(({ asChild = false, size = "md", isActive, className, onClick, ...props }, ref) => {
   const Comp = asChild ? Slot : "a"
-  const { setOpen, setOpenMobile } = useSidebar()
+  const { setOpen, setOpenMobile, isMobile } = useSidebar()
 
   return (
     <Comp
@@ -700,8 +719,11 @@ const SidebarMenuSubButton = React.forwardRef<
         className
       )}
       onClick={(event) => {
-        setOpen(false)
-        setOpenMobile(false)
+        if (isMobile) {
+          setOpenMobile(false)
+        } else {
+          setOpen(false)
+        }
         onClick?.(event)
       }}
       {...props}

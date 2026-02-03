@@ -46,8 +46,8 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap"
           rel="stylesheet"
         />
-        {/* Configuration Viewport pour vue fixe 1200px (Desktop sur Mobile) */}
-        <meta name="viewport" content="width=1200, initial-scale=1" />
+        {/* Viewport responsive standard pour mobile */}
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
         <link rel="icon" href="/icon-192x192.png?v=2" />
         <link rel="apple-touch-icon" href="/icon-192x192.png?v=2" />
         <link rel="manifest" href="/manifest.webmanifest?v=2" />

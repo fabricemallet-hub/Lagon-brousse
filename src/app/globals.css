@@ -75,11 +75,8 @@
   }
   html, body {
     @apply bg-background text-foreground;
-    /* Forçage de la largeur minimale pour vue fixe desktop */
-    min-width: 1200px;
     min-height: 100vh;
     position: relative;
-    /* Autorise les gestes de zoom et manipulation tactile */
     touch-action: manipulation;
   }
 }
@@ -92,5 +89,13 @@
   @keyframes glow {
     0%, 100% { filter: drop-shadow(0 0 2px hsl(var(--accent))) drop-shadow(0 0 5px hsl(var(--accent))); }
     50% { filter: drop-shadow(0 0 5px hsl(var(--accent))) drop-shadow(0 0 10px hsl(var(--accent))); }
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }
