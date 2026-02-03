@@ -6,450 +6,66 @@
       "type": "object",
       "description": "Represents a user of the application with subscription details.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the user."
-        },
-        "email": {
-          "type": "string",
-          "description": "User's email address.",
-          "format": "email"
-        },
-        "subscriptionStartDate": {
-          "type": "string",
-          "description": "Date the user's subscription started.",
-          "format": "date-time"
-        },
-        "subscriptionExpiryDate": {
-          "type": "string",
-          "description": "Date the user's subscription expires.",
-          "format": "date-time"
-        },
-        "freeTrialUsed": {
-          "type": "boolean",
-          "description": "Indicates if the user has used their free trial."
-        },
-        "favoriteLocationIds": {
-          "type": "array",
-          "description": "References to Location. (Relationship: User 1:N Location)",
-          "items": {
-            "type": "string"
-          }
-        }
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "subscriptionStatus": { "type": "string", "enum": ["active", "inactive", "trial", "admin"] },
+        "subscriptionExpiryDate": { "type": "string", "format": "date-time" },
+        "lastSelectedLocation": { "type": "string" },
+        "emergencyContact": { "type": "string" }
       },
-      "required": [
-        "id",
-        "email",
-        "subscriptionStartDate",
-        "subscriptionExpiryDate",
-        "freeTrialUsed"
-      ]
+      "required": ["id", "email", "subscriptionStatus"]
     },
-    "Location": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Location",
+    "MeteoLive": {
+      "title": "MeteoLive",
       "type": "object",
-      "description": "Represents a location in New Caledonia for which tide and weather information is provided.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the location."
-        },
-        "name": {
-          "type": "string",
-          "description": "Name of the location (e.g., Nouméa)."
-        },
-        "latitude": {
-          "type": "number",
-          "description": "Latitude of the location."
-        },
-        "longitude": {
-          "type": "number",
-          "description": "Longitude of the location."
-        }
-      },
-      "required": [
-        "id",
-        "name",
-        "latitude",
-        "longitude"
-      ]
+        "id": { "type": "string", "description": "Nom de la commune" },
+        "vent": { "type": "number" },
+        "temperature": { "type": "number" },
+        "uv": { "type": "number" }
+      }
     },
-    "TideData": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "TideData",
+    "AppSetting": {
+      "title": "AppSetting",
       "type": "object",
-      "description": "Represents tide data for a specific location and time.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the tide data entry."
-        },
-        "locationId": {
-          "type": "string",
-          "description": "Reference to Location. (Relationship: Location 1:N TideData)"
-        },
-        "dateTime": {
-          "type": "string",
-          "description": "Date and time of the tide measurement.",
-          "format": "date-time"
-        },
-        "height": {
-          "type": "number",
-          "description": "Height of the tide at the specified time."
-        }
-      },
-      "required": [
-        "id",
-        "locationId",
-        "dateTime",
-        "height"
-      ]
-    },
-    "WeatherData": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "WeatherData",
-      "type": "object",
-      "description": "Represents weather data for a specific location and time.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the weather data entry."
-        },
-        "locationId": {
-          "type": "string",
-          "description": "Reference to Location. (Relationship: Location 1:N WeatherData)"
-        },
-        "dateTime": {
-          "type": "string",
-          "description": "Date and time of the weather measurement.",
-          "format": "date-time"
-        },
-        "temperature": {
-          "type": "number",
-          "description": "Temperature in Celsius."
-        },
-        "windSpeed": {
-          "type": "number",
-          "description": "Wind speed in knots."
-        },
-        "windDirection": {
-          "type": "number",
-          "description": "Wind direction in degrees."
-        },
-        "uvIndex": {
-          "type": "number",
-          "description": "UV index."
-        },
-        "waveHeight": {
-          "type": "number",
-          "description": "Wave height in meters."
-        },
-        "wavePeriod": {
-          "type": "number",
-          "description": "Wave period in seconds."
-        }
-      },
-      "required": [
-        "id",
-        "locationId",
-        "dateTime",
-        "temperature",
-        "windSpeed",
-        "windDirection",
-        "uvIndex",
-        "waveHeight",
-        "wavePeriod"
-      ]
-    },
-    "LunarData": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "LunarData",
-      "type": "object",
-      "description": "Represents lunar data for a specific date.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the lunar data entry."
-        },
-        "date": {
-          "type": "string",
-          "description": "Date for which the lunar data is recorded.",
-          "format": "date"
-        },
-        "sunriseTime": {
-          "type": "string",
-          "description": "Time of sunrise.",
-          "format": "date-time"
-        },
-        "sunsetTime": {
-          "type": "string",
-          "description": "Time of sunset.",
-          "format": "date-time"
-        },
-        "moonriseTime": {
-          "type": "string",
-          "description": "Time of moonrise.",
-          "format": "date-time"
-        },
-        "moonsetTime": {
-          "type": "string",
-          "description": "Time of moonset.",
-          "format": "date-time"
-        },
-        "moonPhase": {
-          "type": "string",
-          "description": "Phase of the moon (e.g., New Moon, Full Moon)."
-        }
-      },
-      "required": [
-        "id",
-        "date",
-        "sunriseTime",
-        "sunsetTime",
-        "moonriseTime",
-        "moonsetTime",
-        "moonPhase"
-      ]
-    },
-    "FishingPrediction": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "FishingPrediction",
-      "type": "object",
-      "description": "Represents a fishing prediction for a specific location and time, based on various factors.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the fishing prediction entry."
-        },
-        "locationId": {
-          "type": "string",
-          "description": "Reference to Location. (Relationship: Location 1:N FishingPrediction)"
-        },
-        "dateTime": {
-          "type": "string",
-          "description": "Date and time for the fishing prediction.",
-          "format": "date-time"
-        },
-        "fishingIndex": {
-          "type": "number",
-          "description": "Index representing the predicted fishing success (e.g., 0-100)."
-        },
-        "tidePhase": {
-          "type": "string",
-          "description": "Phase of the tide (e.g., rising, falling)."
-        },
-        "moonPhase": {
-          "type": "string",
-          "description": "Phase of the moon (e.g., New Moon, Full Moon)."
-        },
-        "timeOfDay": {
-          "type": "string",
-          "description": "Time of day (e.g., Dawn, Dusk, Day, Night)."
-        }
-      },
-      "required": [
-        "id",
-        "locationId",
-        "dateTime",
-        "fishingIndex",
-        "tidePhase",
-        "moonPhase",
-        "timeOfDay"
-      ]
-    },
-    "AgricultureCalendar": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "AgricultureCalendar",
-      "type": "object",
-      "description": "Represents agricultural recommendations based on the lunar calendar.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the agricultural calendar entry."
-        },
-        "date": {
-          "type": "string",
-          "description": "Date for which the agricultural recommendations are provided.",
-          "format": "date"
-        },
-        "lunarPhase": {
-          "type": "string",
-          "description": "Lunar phase for the given date (e.g., Waxing Crescent)."
-        },
-        "recommendedActivities": {
-          "type": "array",
-          "description": "Array of recommended agricultural activities.",
-          "items": {
-            "type": "string"
-          }
-        },
-        "plantTypes": {
-          "type": "array",
-          "description": "Array of recommended plant types to plant (e.g. leafy vegetables, root vegetables).",
-          "items": {
-            "type": "string"
-          }
-        }
-      },
-      "required": [
-        "id",
-        "date",
-        "lunarPhase",
-        "recommendedActivities",
-        "plantTypes"
-      ]
+        "splashMode": { "type": "string" },
+        "splashText": { "type": "string" },
+        "splashBgColor": { "type": "string" },
+        "splashDuration": { "type": "number" }
+      }
     }
   },
   "auth": {
-    "providers": [
-      "password",
-      "anonymous"
-    ]
+    "providers": ["password", "anonymous"]
   },
   "firestore": {
     "structure": [
       {
-        "path": "/users/{userId}",
+        "path": "/app_settings/{id}",
         "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Stores user profiles and subscription details. Access is restricted to the user themselves.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique identifier of the user."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/locations/{locationId}",
-        "definition": {
-          "entityName": "Location",
-          "schema": {
-            "$ref": "#/backend/entities/Location"
-          },
-          "description": "Contains information about specific locations in New Caledonia. This data is generally public.",
-          "params": [
-            {
-              "name": "locationId",
-              "description": "The unique identifier of the location."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/locations/{locationId}/tideData/{tideDataId}",
-        "definition": {
-          "entityName": "TideData",
-          "schema": {
-            "$ref": "#/backend/entities/TideData"
-          },
-          "description": "Stores tide data for each location. Nested under the locations collection to represent the 1:N relationship and allow for querying tide data by location.",
-          "params": [
-            {
-              "name": "locationId",
-              "description": "The unique identifier of the location."
-            },
-            {
-              "name": "tideDataId",
-              "description": "The unique identifier of the tide data entry."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/locations/{locationId}/weatherData/{weatherDataId}",
-        "definition": {
-          "entityName": "WeatherData",
-          "schema": {
-            "$ref": "#/backend/entities/WeatherData"
-          },
-          "description": "Stores weather data for each location, nested similarly to tide data.",
-          "params": [
-            {
-              "name": "locationId",
-              "description": "The unique identifier of the location."
-            },
-            {
-              "name": "weatherDataId",
-              "description": "The unique identifier of the weather data entry."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/locations/{locationId}/fishingPredictions/{fishingPredictionId}",
-        "definition": {
-          "entityName": "FishingPrediction",
-          "schema": {
-            "$ref": "#/backend/entities/FishingPrediction"
-          },
-          "description": "Stores fishing predictions, linked to locations.  This allows for querying fishing predictions for a given location.",
-          "params": [
-            {
-              "name": "locationId",
-              "description": "The unique identifier of the location."
-            },
-            {
-              "name": "fishingPredictionId",
-              "description": "The unique identifier of the fishing prediction entry."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/lunarData/{date}",
-        "definition": {
-          "entityName": "LunarData",
-          "schema": {
-            "$ref": "#/backend/entities/LunarData"
-          },
-          "description": "Stores daily lunar data. The `date` is used as the document ID for easy retrieval by date.",
-          "params": [
-            {
-              "name": "date",
-              "description": "The date for which the lunar data is recorded."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/agricultureCalendar/{date}",
-        "definition": {
-          "entityName": "AgricultureCalendar",
-          "schema": {
-            "$ref": "#/backend/entities/AgricultureCalendar"
-          },
-          "description": "Stores agricultural recommendations based on the lunar calendar. The `date` is used as the document ID for easy retrieval by date.",
-          "params": [
-            {
-              "name": "date",
-              "description": "The date for which the agricultural recommendations are provided."
-            }
-          ]
+          "entityName": "AppSetting",
+          "schema": { "$ref": "#/backend/entities/AppSetting" },
+          "description": "Configuration globale de l'application (Splash screen, etc.)"
         }
       },
       {
         "path": "/meteo_caledonie/{communeId}",
         "definition": {
-          "entityName": "WeatherData",
-          "schema": {
-            "$ref": "#/backend/entities/WeatherData"
-          },
-          "description": "Stores weather data for each commune. Used in original StreamBuilder.",
-          "params": [
-            {
-              "name": "communeId",
-              "description": "The name of the commune (e.g., Nouméa)."
-            }
-          ]
+          "entityName": "MeteoLive",
+          "schema": { "$ref": "#/backend/entities/MeteoLive" },
+          "description": "Données météo en temps réel pour les communes de NC"
+        }
+      },
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": { "$ref": "#/backend/entities/User" },
+          "description": "Profils utilisateurs et statut d'abonnement"
         }
       }
-    ],
-    "reasoning": "The Firestore data structure is designed to support the 'Marées et Terroir Calédonien' application, focusing on tide, weather, fishing, and agricultural data. The structure prioritizes authorization independence and efficient data retrieval. It uses structural segregation to simplify security rules.\n\n*   `/users/{userId}`: Stores user profiles and subscription details. Access is restricted to the user themselves.\n*   `/locations/{locationId}`: Contains information about specific locations in New Caledonia. This data is generally public.\n*   `/locations/{locationId}/tideData/{tideDataId}`: Stores tide data for each location. This is nested under the `locations` collection to represent the 1:N relationship and allow for querying tide data by location.\n*   `/locations/{locationId}/weatherData/{weatherDataId}`: Stores weather data for each location, nested similarly to tide data.\n*   `/locations/{locationId}/fishingPredictions/{fishingPredictionId}`: Stores fishing predictions, linked to locations.  This allows for querying fishing predictions for a given location.\n*   `/lunarData/{date}`: Stores daily lunar data.  The `date` is used as the document ID for easy retrieval by date.\n*   `/agricultureCalendar/{date}`: Stores agricultural recommendations based on the lunar calendar.  The `date` is used as the document ID for easy retrieval by date.\n\n**Authorization Independence:** This design achieves authorization independence by avoiding hierarchical authorization dependencies.  For example, access to `tideData` or `weatherData` does not require reading the parent `location` document.  User-specific data is stored under `/users/{userId}`, ensuring that security rules can be based solely on `request.auth.uid`.\n\n**QAPs Support:**\n*   Secure list operations are supported by the structural segregation.  Listing locations is generally public. Listing user data is restricted to the authenticated user.\n\nThis structure facilitates simple, robust, and easily debuggable security rules, while efficiently supporting the application's core features."
+    ]
   }
 }

@@ -14,12 +14,13 @@ service cloud.firestore {
     // --- COLLECTION RULES ---
 
     // Paramètres système (Splash screen, configuration globale)
+    // Autoriser la lecture publique pour que le splash s'affiche dès le chargement
     match /app_settings/{id} {
-      allow read: if true; // Public pour que le splash fonctionne dès le chargement
+      allow read: if true; 
       allow write: if isAdmin();
     }
 
-    // Météo en temps réel (Migration du StreamBuilder)
+    // Météo en temps réel (Données synchronisées par le StreamBuilder)
     match /meteo_caledonie/{communeId} {
       allow read: if true;
       allow write: if isAdmin();
@@ -33,7 +34,7 @@ service cloud.firestore {
       }
     }
 
-    // Profils utilisateurs
+    // Profils utilisateurs et données privées
     match /users/{uId} {
       allow read, write: if isAdmin() || (isAuth() && request.auth.uid == uId);
       match /{allPaths=**} {
@@ -41,23 +42,33 @@ service cloud.firestore {
       }
     }
 
-    // Tracker maritime
+    // Tracker maritime (Vessel Tracker)
     match /vessels/{vId} {
       allow read, write: if isAuth();
       match /{allPaths=**} { allow read, write: if isAuth(); }
     }
 
-    // Jetons et Accès
+    // Jetons d'accès et abonnements
     match /access_tokens/{tId} { allow read, write: if isAuth(); }
     match /shared_access_tokens/{tId} { allow read: if isAuth(); allow write: if isAdmin(); }
     
-    // Conversations Messagerie
+    // Messagerie (Support Admin)
     match /conversations/{cId} {
       allow read, write: if isAdmin() || (isAuth() && request.auth.uid == cId);
       match /{allPaths=**} { allow read, write: if isAdmin() || (isAuth() && request.auth.uid == cId); }
     }
 
-    // Règle par défaut pour les autres collections (stations, etc.)
+    // Stations de marée et archives (Lecture pour abonnés)
+    match /stations/{stationId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+      match /{allPaths=**} {
+        allow read: if isAuth();
+        allow write: if isAdmin();
+      }
+    }
+
+    // Règle par défaut : lecture pour abonnés, écriture pour admin
     match /{allPaths=**} {
       allow read: if isAuth();
       allow write: if isAdmin();
