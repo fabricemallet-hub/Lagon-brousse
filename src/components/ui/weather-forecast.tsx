@@ -93,9 +93,9 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
     return () => clearInterval(timer);
   }, []);
 
-  const { summary, selectedForecast, hourlyForecastsToShow } = useMemo(() => {
+  const { summary, selectedForecast, hourlyForecastsToShow, isSelectedDayToday } = useMemo(() => {
     if (!weather.hourly.length || !tides.length) {
-      return { summary: null, selectedForecast: null, hourlyForecastsToShow: [] };
+      return { summary: null, selectedForecast: null, hourlyForecastsToShow: [], isSelectedDayToday: false };
     }
 
     const timeToDate = (timeStr: string, date: Date) => {
@@ -129,10 +129,9 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
     const _selectedForecast = weather.hourly.find(f => new Date(f.date).getHours() === currentHour) || weather.hourly[0];
     
     const forecastIn3Hours = weather.hourly.find(f => new Date(f.date).getHours() === (currentHour + 3) % 24);
-    const forecastIn6Hours = weather.hourly.find(f => new Date(f.date).getHours() === (currentHour + 6) % 24);
     
     let windTrend = "stable";
-    if (forecastIn3Hours && forecastIn6Hours) {
+    if (forecastIn3Hours) {
         const currentSpeed = _selectedForecast.windSpeed;
         const speed3h = forecastIn3Hours.windSpeed;
         const upperThreshold = currentSpeed * 1.2;
@@ -143,22 +142,15 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
     const windSentence = `Vent de ${_selectedForecast.windSpeed} nœuds de ${translateWindDirection(_selectedForecast.windDirection)}, tendance ${windTrend}.`;
 
     const forecasts = weather.hourly.slice(0, 24);
-    const isToday = new Date(forecasts[0].date).toDateString() === now.toDateString();
-    
-    // Réorganisation chronologique roulante : on commence par l'heure actuelle
-    let sortedForecasts = forecasts;
-    if (isToday) {
-      const startIndex = forecasts.findIndex(f => new Date(f.date).getHours() === currentHour);
-      if (startIndex !== -1) {
-        // On effectue une rotation pour commencer par l'heure actuelle et finir par l'heure passée
-        sortedForecasts = [...forecasts.slice(startIndex), ...forecasts.slice(0, startIndex)];
-      }
-    }
+    // On s'assure que les prévisions sont triées de 00h à 23h
+    const sortedForecasts = [...forecasts].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const isToday = new Date(sortedForecasts[0].date).toDateString() === now.toDateString();
 
     return { 
       summary: {tideSentence, windSentence}, 
       selectedForecast: _selectedForecast, 
-      hourlyForecastsToShow: sortedForecasts 
+      hourlyForecastsToShow: sortedForecasts,
+      isSelectedDayToday: isToday
     };
   }, [now, weather, tides]);
 
@@ -212,33 +204,44 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
       <div className="p-2 w-full">
         <div className="flex flex-nowrap overflow-x-auto gap-2 pb-2 scrollbar-hide px-1">
           {hourlyForecastsToShow.map((forecast, index) => {
-             const isSelected = new Date(forecast.date).getHours() === new Date(selectedForecast.date).getHours();
+             const forecastDate = new Date(forecast.date);
+             const isPast = isSelectedDayToday && forecastDate.getHours() < now.getHours();
+             const isCurrent = isSelectedDayToday && forecastDate.getHours() === now.getHours();
+             
              return (
               <div 
                 key={index} 
                 className={cn(
                   'flex-shrink-0 w-20 flex flex-col items-center justify-between p-2 rounded-lg border h-full space-y-1 text-center bg-card transition-all',
-                   isSelected && 'bg-blue-50 border-blue-400 ring-1 ring-blue-400'
+                   isCurrent && 'bg-blue-50 border-blue-400 ring-1 ring-blue-400 scale-[1.02] z-10',
+                   isPast && 'opacity-40 grayscale bg-muted/10'
                 )}
               >
-                <p className="font-black text-[10px] uppercase text-muted-foreground">
-                  {format(new Date(forecast.date), "HH'h'", { locale: fr })}
+                <p className={cn(
+                  "font-black text-[10px] uppercase",
+                  isPast ? "text-muted-foreground/60" : "text-muted-foreground"
+                )}>
+                  {format(forecastDate, "HH'h'", { locale: fr })}
                 </p>
-                <WeatherConditionIcon condition={forecast.condition} isNight={forecast.isNight} className="size-6 my-1" />
+                <WeatherConditionIcon 
+                  condition={forecast.condition} 
+                  isNight={forecast.isNight} 
+                  className={cn("size-6 my-1", isPast && "opacity-50")} 
+                />
                 
                 <div className="flex items-baseline gap-0.5">
-                  <p className="font-black text-xs">{forecast.windSpeed}</p>
+                  <p className={cn("font-black text-xs", isPast && "text-muted-foreground")}>{forecast.windSpeed}</p>
                   <p className="text-[8px] font-bold uppercase opacity-60">nds</p>
                 </div>
                 
                 <div className="border-t w-full my-1 opacity-20"></div>
 
                 <div className="w-full space-y-1">
-                  <div className="flex items-center justify-center text-primary">
+                  <div className={cn("flex items-center justify-center", isPast ? "text-muted-foreground/60" : "text-primary")}>
                     <Waves className="size-3 mr-1" />
                     <span className="font-black text-[10px]">{forecast.tideHeight.toFixed(1)}m</span>
                   </div>
-                  <div className="flex items-center justify-center h-4 text-accent">
+                  <div className={cn("flex items-center justify-center h-4", isPast ? "text-muted-foreground/60" : "text-accent")}>
                       <Zap className="size-3 mr-1" />
                       <span className="font-black text-[8px] uppercase">
                           {forecast.tidePeakType ? (forecast.tidePeakType === 'haute' ? 'Mer' : 'Basse') : 
