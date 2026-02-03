@@ -111,7 +111,7 @@ const sectionContent: Record<string, {
       "La 'Table de Tir' vous aide à estimer la correction de visée en fonction de la distance et du vent.",
       "Session de Groupe : Créez une session ou rejoignez-en une via un code unique (ex: CH-1234) pour partager votre position GPS en temps réel avec vos partenaires sur la carte satellite.",
       "Alertes Tactiques : Informez instantanément votre groupe de votre statut ('En position', 'Battue en cours') ou signalez 'Gibier en vue' d'un clic. Une alerte visuelle et sonore préviendra immédiatement vos coéquipiers.",
-      "Sécurité & Matériel : Surveillez le niveau de batterie de chaque participant sur la carte pour éviter toute déconnexion imprévue dans les zones isolées."
+      "Sécurité & Batterie : Surveillez le niveau de batterie de chaque participant sur la carte. Les informations (GPS + Batterie) sont actualisées toutes les 5 minutes pour préserver l'autonomie de vos appareils en zone isolée."
     ],
     tips: [
       "En période de Brame, l'alerte orange vous rappelle que les cerfs sont plus actifs mais aussi plus vigilants.",

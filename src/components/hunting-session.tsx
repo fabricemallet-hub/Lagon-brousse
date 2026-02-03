@@ -120,7 +120,8 @@ const availableColors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', 
 const BatteryIcon = ({ level, charging }: { level: number; charging: boolean }) => {
   const props = { className: 'w-4 h-4 inline-block' };
   if (charging) return <BatteryCharging {...props} className="text-blue-500" />;
-  if (level < 0.15) return <BatteryLow {...props} className="text-red-500" />;
+  if (level < 0.2) return <BatteryLow {...props} className="text-red-500" />;
+  if (level < 0.6) return <BatteryMedium {...props} className="text-amber-500" />;
   return <BatteryFull {...props} className="text-green-500" />;
 };
 
@@ -266,7 +267,7 @@ function HuntingSessionContent() {
         const position = await new Promise<GeolocationPosition>((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject, {
                 enableHighAccuracy: true,
-                timeout: 20000, // Increased timeout
+                timeout: 20000, 
                 maximumAge: 0,
             });
         });
@@ -321,8 +322,7 @@ function HuntingSessionContent() {
             title: "Géolocalisation refusée",
             description: "La géolocalisation est requise pour être visible sur la carte. Activez-la dans les paramètres de votre navigateur.",
           });
-          // Do not leave session, just inform the user.
-        } else if (err.code === 3 && isFirstUpdate) { // Only show toast for timeout on initial fetch
+        } else if (err.code === 3 && isFirstUpdate) {
             toast({
                 variant: "destructive",
                 title: "Délai de localisation dépassé",
@@ -386,11 +386,12 @@ function HuntingSessionContent() {
 
   useEffect(() => {
     if (isParticipating && session && !updateIntervalRef.current) {
+        // Update position and battery every 5 minutes (300,000 ms) to save battery
         updateIntervalRef.current = setInterval(() => {
             if (navigator.geolocation) {
                 fetchAndSetUserPosition();
             }
-        }, 30000); // 30 seconds
+        }, 300000);
     } else if (!isParticipating || !session) {
         if (updateIntervalRef.current) {
             clearInterval(updateIntervalRef.current);
@@ -467,7 +468,6 @@ function HuntingSessionContent() {
         }
     });
 
-    // Initial user gesture triggers first location fetch
     await fetchAndSetUserPosition(true);
 }, [user, firestore, fetchAndSetUserPosition, nickname, selectedIcon, selectedColor]);
 
@@ -1055,7 +1055,9 @@ function HuntingSessionContent() {
                                         {p.battery && (
                                             <>
                                                 <BatteryIcon level={p.battery.level} charging={p.battery.charging} />
-                                                <span>{Math.round(p.battery.level * 100)}%</span>
+                                                <span className={cn(p.battery.level < 0.2 ? 'text-red-500' : 'text-foreground')}>
+                                                    {Math.round(p.battery.level * 100)}%
+                                                </span>
                                             </>
                                         )}
                                     </div>
