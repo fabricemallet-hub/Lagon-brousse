@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -62,7 +63,9 @@ export default function AdminPage() {
   const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
   const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
   
-  const isAdmin = useMemo(() => user?.email === 'f.mallet81@outlook.com', [user]);
+  const isAdmin = useMemo(() => 
+    user?.email === 'f.mallet81@outlook.com' || user?.email === 'f.mallet81@gmail.com', 
+  [user]);
 
   // Fetch all users for stats
   const usersCollectionRef = useMemoFirebase(() => {
@@ -209,10 +212,13 @@ export default function AdminPage() {
     try {
         const usersQuery = query(collection(firestore, 'users'));
         const querySnapshot = await getDocs(usersQuery);
-        const usersToDelete = querySnapshot.docs.filter(doc => doc.data().email !== 'f.mallet81@outlook.com');
+        const usersToDelete = querySnapshot.docs.filter(doc => {
+          const email = doc.data().email;
+          return email !== 'f.mallet81@outlook.com' && email !== 'f.mallet81@gmail.com';
+        });
 
         if (usersToDelete.length === 0) {
-            toast({ title: "Aucun utilisateur à supprimer", description: "Seul le compte administrateur a été trouvé." });
+            toast({ title: "Aucun utilisateur à supprimer", description: "Seuls les comptes administrateurs ont été trouvés." });
             setIsResetAlertOpen(false);
             return;
         }
@@ -236,7 +242,7 @@ export default function AdminPage() {
   
   const deletableUsersCount = useMemo(() => {
     if (!allUsers) return '...';
-    return allUsers.filter(u => u.email !== 'f.mallet81@outlook.com').length;
+    return allUsers.filter(u => u.email !== 'f.mallet81@outlook.com' && u.email !== 'f.mallet81@gmail.com').length;
   }, [allUsers]);
 
 
@@ -444,7 +450,7 @@ export default function AdminPage() {
                 Réinitialiser les utilisateurs
             </Button>
             <p className="text-xs text-muted-foreground mt-2">
-                Supprime de manière permanente tous les comptes utilisateurs sauf celui de l'administrateur.
+                Supprime de manière permanente tous les comptes utilisateurs sauf ceux des administrateurs.
             </p>
         </CardContent>
       </Card>
@@ -470,7 +476,7 @@ export default function AdminPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Êtes-vous absolument sûr ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action supprimera définitivement tous les utilisateurs ({deletableUsersCount}) sauf votre compte administrateur. Cette action est irréversible.
+              Cette action supprimera définitivement tous les utilisateurs ({deletableUsersCount}) sauf vos comptes administrateurs. Cette action est irréversible.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

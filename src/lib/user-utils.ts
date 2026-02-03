@@ -20,7 +20,8 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
   const docSnap = await getDoc(userDocRef);
   
   // Reconnaissance des comptes administrateurs par e-mail
-  const isAdminUser = user.email === 'f.mallet81@outlook.com' || user.email === 'f.mallet81@gmail.com';
+  const email = user.email?.toLowerCase();
+  const isAdminUser = email === 'f.mallet81@outlook.com' || email === 'f.mallet81@gmail.com';
 
   if (docSnap.exists()) {
     // Si l'utilisateur existe déjà mais qu'il s'agit d'un admin par e-mail,
@@ -33,7 +34,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
     return;
   }
 
-  const { uid, email } = user;
+  const { uid } = user;
   const effectiveDisplayName = displayName || user.displayName || email?.split('@')[0] || 'Utilisateur';
   
   let newUserDocument: UserAccount;
@@ -41,7 +42,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
   if (isAdminUser) {
     newUserDocument = {
       id: uid,
-      email: email || '',
+      email: user.email || '',
       displayName: effectiveDisplayName || 'Admin',
       subscriptionStatus: 'admin',
       favoriteLocationIds: [],
@@ -53,7 +54,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
     
     newUserDocument = {
       id: uid,
-      email: email || '',
+      email: user.email || '',
       displayName: effectiveDisplayName,
       subscriptionStatus: 'trial',
       subscriptionStartDate: trialStartDate.toISOString(),

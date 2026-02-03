@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, doc, orderBy, query, serverTimestamp, addDoc, setDoc, getDoc } from 'firebase/firestore';
-import type { WithId, ChatMessage, Conversation, UserAccount } from '@/lib/types';
+import type { ChatMessage, Conversation, UserAccount } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +26,9 @@ export default function AdminMessagePage() {
   const [targetUser, setTargetUser] = useState<UserAccount | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   
-  const isAdmin = useMemo(() => user?.email === 'f.mallet81@outlook.com', [user]);
+  const isAdmin = useMemo(() => 
+    user?.email === 'f.mallet81@outlook.com' || user?.email === 'f.mallet81@gmail.com', 
+  [user]);
   const conversationId = params.userId as string;
 
   const conversationRef = useMemoFirebase(() => {
