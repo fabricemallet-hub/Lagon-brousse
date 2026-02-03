@@ -225,12 +225,12 @@ export function LunarCalendar() {
   const weekdays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
   return (
-    <div className="w-full max-w-full overflow-x-auto flex flex-col items-center">
-      <div className="w-[1200px] border rounded-lg bg-card shadow-sm overflow-hidden flex flex-col">
-        <div className="flex justify-between items-center p-3 border-b bg-muted/10">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handlePrevMonth}><ChevronLeft className="size-5" /></Button>
-          <h2 className="text-sm font-black uppercase tracking-tighter capitalize">{format(displayDate, 'MMMM yyyy', { locale: fr })}</h2>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleNextMonth}><ChevronRight className="size-5" /></Button>
+    <div className="w-full max-w-full overflow-x-auto overflow-y-visible flex flex-col items-start sm:items-center py-4" style={{ WebkitOverflowScrolling: 'touch' }}>
+      <div className="w-[1200px] border rounded-lg bg-card shadow-lg overflow-hidden flex flex-col shrink-0">
+        <div className="flex justify-between items-center p-4 border-b bg-muted/10">
+          <Button variant="ghost" size="icon" className="h-10 w-10" onClick={handlePrevMonth}><ChevronLeft className="size-6" /></Button>
+          <h2 className="text-lg font-black uppercase tracking-tighter capitalize">{format(displayDate, 'MMMM yyyy', { locale: fr })}</h2>
+          <Button variant="ghost" size="icon" className="h-10 w-10" onClick={handleNextMonth}><ChevronRight className="size-6" /></Button>
         </div>
         
         <div className="grid grid-cols-7 bg-muted/30 border-b">
@@ -238,8 +238,8 @@ export function LunarCalendar() {
             <div 
               key={day} 
               className={cn(
-                "text-center text-[9px] font-black uppercase text-muted-foreground p-2 border-l border-transparent first:border-l-0",
-                idx > 0 && "border-l-border/0" // Maintient l'alignement avec les cellules
+                "text-center text-[10px] font-black uppercase text-muted-foreground p-3 border-l border-transparent first:border-l-0",
+                idx > 0 && "border-l-border/0"
               )}
             >
               {day}
@@ -262,36 +262,36 @@ export function LunarCalendar() {
         </div>
       </div>
       
-      <div className="mt-4 px-1 w-[1200px]">
+      <div className="mt-6 px-1 w-[1200px] shrink-0">
         {calendarView === 'champs' ? (
           <div className="space-y-3">
-            <div className="flex flex-wrap gap-x-4 gap-y-2 p-3 bg-muted/20 border rounded-lg">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><Spade className="size-4 text-primary"/> Fruits</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><Carrot className="size-4 text-primary"/> Racines</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><Flower className="size-4 text-primary"/> Fleurs</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><Leaf className="size-4 text-primary"/> Feuilles</div>
+            <div className="flex flex-wrap gap-x-4 gap-y-2 p-4 bg-muted/20 border rounded-xl shadow-sm">
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Spade className="size-5 text-primary"/> Fruits</div>
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Carrot className="size-5 text-primary"/> Racines</div>
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Flower className="size-5 text-primary"/> Fleurs</div>
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Leaf className="size-5 text-primary"/> Feuilles</div>
             </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-2 p-3 bg-muted/10 border border-dashed rounded-lg">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-muted-foreground"><Scissors className="size-4 text-orange-600"/> TAILLE</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-muted-foreground"><RefreshCw className="size-4 text-pink-600"/> BOUTURAGE</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-muted-foreground"><Leaf className="size-4 text-green-600"/> TONTE</div>
+            <div className="flex flex-wrap gap-x-4 gap-y-2 p-4 bg-muted/10 border border-dashed rounded-xl">
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase text-muted-foreground"><Scissors className="size-5 text-orange-600"/> TAILLE</div>
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase text-muted-foreground"><RefreshCw className="size-5 text-pink-600"/> BOUTURAGE</div>
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase text-muted-foreground"><Leaf className="size-5 text-green-600"/> TONTE</div>
             </div>
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="flex flex-wrap gap-x-4 gap-y-2 p-3 bg-muted/20 border rounded-lg">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><Fish className="size-4 text-primary"/> Lagon (Indice)</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><Fish className="size-4 text-orange-500"/><Star className="size-2 text-yellow-500 -ml-1 mr-1" /> Pélagiques</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><CrabIcon className="size-4 text-green-600"/> Crabe (Plein)</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><CrabIcon className="size-4 text-destructive"/> Crabe (Mout)</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><LobsterIcon className="size-4 text-blue-600"/> Langouste (Activité)</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><OctopusIcon className="size-4 text-purple-600"/> Poulpe (Activité)</div>
+            <div className="flex flex-wrap gap-x-4 gap-y-2 p-4 bg-muted/20 border rounded-xl shadow-sm">
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Fish className="size-5 text-primary"/> Lagon (Indice)</div>
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Fish className="size-5 text-orange-500"/><Star className="size-3 text-yellow-500 -ml-1 mr-1" /> Pélagiques</div>
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><CrabIcon className="size-5 text-green-600"/> Crabe (Plein)</div>
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><CrabIcon className="size-5 text-destructive"/> Crabe (Mout)</div>
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><LobsterIcon className="size-5 text-blue-600"/> Langouste (Activité)</div>
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><OctopusIcon className="size-5 text-purple-600"/> Poulpe (Activité)</div>
             </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-2 p-3 bg-primary/5 border border-primary/20 rounded-lg">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-primary"><Waves className="size-4"/> Heure/Hauteur</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-primary"><Star className="size-3 fill-primary" /> Grandes Marées</div>
-              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><span className="bg-primary text-white px-1 rounded-[2px]">Haute {'>'} Seuil</span></div>
-              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><span className="bg-destructive text-white px-1 rounded-[2px]">Basse {'<'} Seuil</span></div>
+            <div className="flex flex-wrap gap-x-4 gap-y-2 p-4 bg-primary/5 border border-primary/20 rounded-xl">
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase text-primary"><Waves className="size-5"/> Heure/Hauteur</div>
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase text-primary"><Star className="size-4 fill-primary" /> Grandes Marées</div>
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase"><span className="bg-primary text-white px-2 py-0.5 rounded-[2px]">Haute {'>'} Seuil</span></div>
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase"><span className="bg-destructive text-white px-2 py-0.5 rounded-[2px]">Basse {'<'} Seuil</span></div>
             </div>
           </div>
         )}
