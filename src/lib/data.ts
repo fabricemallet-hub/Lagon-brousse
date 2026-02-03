@@ -194,7 +194,8 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     return proceduralCache.get(cacheKey)!;
   }
 
-  const effectiveDate = new Date(dateKey);
+  // Force start of day in target location time
+  const effectiveDate = new Date(dateKey + 'T00:00:00');
   const dayOfMonth = effectiveDate.getDate();
   const month = effectiveDate.getMonth();
   const year = effectiveDate.getFullYear();
@@ -248,11 +249,6 @@ export function generateProceduralData(location: string, date: Date): LocationDa
       return hours * 60 + minutes;
   };
 
-  // Logique saisonnière (Hiver austral en NC : Mai à Septembre)
-  const isWinter = month >= 4 && month <= 8;
-  const isNorth = ['Bélep', 'Pouébo', 'Ouégoa', 'Koumac', 'Poum'].includes(location);
-  const isSouth = ['Thio', "L'Île-des-Pins", 'Yaté', 'Nouméa', 'Le Mont-Dore', 'Païta', 'Dumbéa'].includes(location);
-
   locationData.fishing.forEach(slot => {
     const match = slot.timeOfDay.match(/(\d{2}):\d{2}/);
     if (!match) return;
@@ -268,11 +264,9 @@ export function generateProceduralData(location: string, date: Date): LocationDa
         if (diff < minDiff) { minDiff = diff; closestTide = tide; }
     });
 
-    let currentTideCurrent = 'Modéré';
     if (closestTide) {
         slot.tide = `Marée ${closestTide.type}`;
         slot.tideTime = closestTide.time;
-        currentTideCurrent = closestTide.current;
         const slotEndMinutes = slotStartMinutes + 120;
         let nextTide: Tide | null = null;
         let minNextDiff = Infinity;
@@ -288,41 +282,9 @@ export function generateProceduralData(location: string, date: Date): LocationDa
         else { slot.tideMovement = 'étale'; }
     }
 
-    // Dynamiser les indices de pêche selon le coefficient de marée et la lune
     slot.fish.forEach(f => {
-      let rating = f.rating;
       const moonImpact = (springFactor - 1.14) * 8; 
-      rating += moonImpact;
-
-      // Logique spécifique pour le Bec de cane (Lethrinus nebulosus)
-      if (f.name === 'Bec de cane') {
-        if (isWinter) rating += 1.5;
-        if (dayInCycle >= 12 && dayInCycle <= 18) {
-          rating += 2;
-        }
-      }
-
-      // Logique spécifique pour le Tazard (Scomberomorus commerson)
-      if (f.name === 'Tazard') {
-        // Saisonnalité
-        if (month === 10 || month === 11) rating += 4; // Pic Nov/Dec
-        else if ([8, 9, 0].includes(month)) rating += 2; // Saison Sep/Oct/Jan
-        else if (month === 7 && isNorth) rating += 3; // Arrivée précoce Nord en Août
-        else if (month === 1) rating -= 5; // Disparition en Février
-        
-        // Bonus Sud (présence hivernale persistante)
-        if (isSouth && isWinter) rating += 1;
-
-        // Horaires (Prédateur visuel)
-        if (slot.timeOfDay.includes('Aube')) rating += 2;
-        if (slot.timeOfDay.includes('Après-midi')) rating += 1;
-
-        // Marée et Courant
-        if (currentTideCurrent === 'Fort') rating += 1;
-        if (slot.tideMovement === 'montante') rating += 1;
-      }
-
-      f.rating = Math.max(1, Math.min(10, Math.round(rating)));
+      f.rating = Math.max(1, Math.min(10, Math.round(f.rating + moonImpact)));
     });
   });
   
@@ -347,25 +309,6 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     locationData.crabAndLobster.crabMessage = "Phase de remplissage après la mue.";
   }
 
-  if (dayInCycle <= 5.5 || dayInCycle >= 24) {
-    locationData.crabAndLobster.lobsterActivity = 'Élevée';
-    locationData.crabAndLobster.lobsterMessage = "Nuits noires (Nouvelle Lune) : Forte activité des langoustes au récif.";
-  } else if (dayInCycle >= 12 && dayInCycle <= 17.5) {
-    locationData.crabAndLobster.lobsterActivity = 'Faible';
-    locationData.crabAndLobster.lobsterMessage = "Pleine lune : Les langoustes restent au trou (trop de lumière).";
-  } else {
-    locationData.crabAndLobster.lobsterActivity = 'Moyenne';
-    locationData.crabAndLobster.lobsterMessage = "Activité modérée en début/fin de nuit.";
-  }
-
-  if (isFullOrNew) {
-    locationData.crabAndLobster.octopusActivity = 'Élevée';
-    locationData.crabAndLobster.octopusMessage = "Vives-eaux : Excellente période pour le poulpe sur le platier lors des basses mers.";
-  } else {
-    locationData.crabAndLobster.octopusActivity = 'Moyenne';
-    locationData.crabAndLobster.octopusMessage = "Activité normale.";
-  }
-
   locationData.weather.wind.forEach((forecast: WindForecast, index: number) => {
     forecast.speed = Math.max(0, Math.round(8 + Math.sin(dateSeed * 0.2 + locationSeed + index) * 5));
     const directions: WindDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
@@ -373,7 +316,6 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     forecast.stability = (Math.sin(dateSeed + index) > 0) ? 'Stable' : 'Tournant';
   });
 
-  // GÉNERATION DE LA HOULE
   locationData.weather.swell = locationData.weather.wind.map((w, idx) => {
     const insideBase = 0.3 + Math.abs(Math.sin(dateSeed * 0.15 + locationSeed + idx)) * 0.6;
     const outsideBase = 1.0 + Math.abs(Math.cos(dateSeed * 0.1 + locationSeed * 0.3 + idx)) * 2.0;
@@ -386,7 +328,6 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     };
   });
 
-  const cloudFactor = (Math.sin(dateSeed * 0.7 + locationSeed * 0.5) + 1) / 2;
   const rainSeed = (Math.sin(dateSeed * 0.4 + locationSeed * 0.2) + 1) / 2;
   locationData.weather.rain = rainSeed < 0.95 ? 'Aucune' : (rainSeed < 0.99 ? 'Fine' : 'Forte');
   
@@ -400,56 +341,30 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   locationData.farming.isGoodForCuttings = isRising; 
   locationData.farming.isGoodForMowing = !isRising; 
 
-  if (isRising) {
-    locationData.farming.recommendation = `Lune montante : la sève est active. Idéal pour le bouturage et la plantation des variétés ${currentZodiac}.`;
-    locationData.farming.details = [
-      { task: 'Bouturage', description: 'La sève monte, favorisant la prise des tiges.', icon: 'RefreshCw' },
-      { task: `Semis ${currentZodiac}`, description: `Période favorable pour semer vos ${currentZodiac.toLowerCase()}.`, icon: 'Flower' }
-    ];
-  } else {
-    locationData.farming.recommendation = `Lune descendante : la sève descend vers les racines. Idéal pour la taille, la tonte et les légumes ${currentZodiac}.`;
-    locationData.farming.details = [
-      { task: 'Taille', description: 'Réduit les pertes de sève et favorise la cicatrisation.', icon: 'Scissors' },
-      { task: 'Tonte pelouse', description: 'La repousse sera plus lente et plus drue.', icon: 'Leaf' }
-    ];
-  }
+  locationData.farming.recommendation = isRising 
+    ? `Lune montante : la sève est active. Idéal pour le bouturage et la plantation des variétés ${currentZodiac}.`
+    : `Lune descendante : la sève descend vers les racines. Idéal pour la taille, la tonte et les légumes ${currentZodiac}.`;
 
   locationData.weather.hourly = [];
-  const tideDataForDay = calculateHourlyTidesForSimulation(locationData.tides, date);
-  
-  let maxUV = 0;
-  // Calcul de la température saisonnière NC (Moyenne 22-28°C selon mois)
-  const seasonalTempFactor = Math.cos(((month - 1) / 12) * 2 * Math.PI); // Pic en Janvier, Min en Juillet
+  const tideDataForDay = calculateHourlyTidesForSimulation(locationData.tides, effectiveDate);
+  const seasonalTempFactor = Math.cos(((month - 1) / 12) * 2 * Math.PI);
   const dailyBaseTemp = 22 + seasonalTempFactor * 4;
-
-  let dayHasRain = false;
-  let dayIsCloudy = false;
 
   for (let i = 0; i < 24; i++) {
       const forecastDate = new Date(effectiveDate.getTime() + i * 60 * 60 * 1000);
-      const tideAtHour = tideDataForDay.find(td => new Date(td.date).getHours() === i);
-      
-      // Facteurs horaires pour la pluie et les nuages
+      const tideAtHour = tideDataForDay[i];
       const hourCloud = (Math.sin(dateSeed * 0.7 + locationSeed * 0.5 + i * 0.3) + 1) / 2;
       const hourRain = (Math.sin(dateSeed * 0.4 + locationSeed * 0.2 + i * 0.25) + 1) / 2;
 
       let cond: HourlyForecast['condition'] = i < 6 || i > 18 ? 'Nuit claire' : 'Ensoleillé';
-      
-      if (hourRain > 0.96) { cond = 'Pluvieux'; dayHasRain = true; }
-      else if (hourRain > 0.92) { cond = 'Averses'; dayHasRain = true; }
-      else if (hourCloud > 0.8) { cond = 'Nuageux'; dayIsCloudy = true; }
-      else if (hourCloud > 0.5) { cond = 'Peu nuageux'; dayIsCloudy = true; }
+      if (hourRain > 0.96) cond = 'Pluvieux';
+      else if (hourRain > 0.92) cond = 'Averses';
+      else if (hourCloud > 0.8) cond = 'Nuageux';
+      else if (hourCloud > 0.5) cond = 'Peu nuageux';
 
-      // Température dynamique (Peak à 14h)
       const tempVariation = Math.sin(((i - 8) / 12) * Math.PI);
       const hourlyTemp = Math.round(dailyBaseTemp + tempVariation * 5);
-
-      // UV dynamique (Peak à 12h, 0 entre 18h et 6h)
-      let hourlyUV = 0;
-      if (i >= 6 && i <= 18) {
-          hourlyUV = Math.round(Math.sin(((i - 6) / 12) * Math.PI) * 11);
-      }
-      if (hourlyUV > maxUV) maxUV = hourlyUV;
+      const hourlyUV = (i >= 6 && i <= 18) ? Math.round(Math.sin(((i - 6) / 12) * Math.PI) * 11) : 0;
 
       locationData.weather.hourly.push({
           date: forecastDate.toISOString(),
@@ -466,14 +381,6 @@ export function generateProceduralData(location: string, date: Date): LocationDa
       });
   }
 
-  // Ajuster la tendance globale
-  if (dayHasRain) locationData.weather.trend = 'Averses';
-  else if (dayIsCloudy) locationData.weather.trend = 'Nuageux';
-  else locationData.weather.trend = 'Ensoleillé';
-
-  locationData.weather.uvIndex = maxUV;
-  locationData.weather.temp = locationData.weather.hourly[12].temp; // Température de référence à midi
-
   proceduralCache.set(cacheKey, locationData);
   return locationData;
 }
@@ -486,8 +393,6 @@ function calculateHourlyTidesForSimulation(dailyTides: Tide[], baseDate: Date): 
 
     const sortedTides = [...dailyTides].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
     const results = [];
-    const startDate = new Date(baseDate);
-    startDate.setHours(0, 0, 0, 0);
 
     for (let i = 0; i < 24; i++) {
         const currentMinutes = i * 60;
@@ -506,7 +411,6 @@ function calculateHourlyTidesForSimulation(dailyTides: Tide[], baseDate: Date): 
         const height = midline + amplitude * Math.cos(phase);
 
         results.push({
-            date: new Date(startDate.getTime() + i * 60 * 60 * 1000).toISOString(),
             tideHeight: height,
             tideCurrent: Math.abs(Math.sin(phase)) > 0.7 ? 'Fort' : 'Modéré',
             tidePeakType: Math.abs(currentMinutes - timeToMinutes(prevTide.time)) < 45 ? prevTide.type : undefined

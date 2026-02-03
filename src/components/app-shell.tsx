@@ -93,7 +93,7 @@ const UsageTimer = React.memo(({ status, auth }: { status: string, auth: any }) 
         const next = Math.max(0, prev - 1);
         const used = USAGE_LIMIT_SECONDS - next;
         
-        // Sauvegarde tous les 2 ticks pour plus de précision
+        // Sauvegarde de l'usage pour garder la trace en cas de rafraîchissement
         localStorage.setItem('dailyUsage', String(used));
         
         if (next <= 0) {
@@ -150,6 +150,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       case 'active':
         return isBefore(new Date(), new Date(userProfile.subscriptionExpiryDate!)) ? 'active' : 'limited';
       case 'trial':
+        // Un compte d'essai doit avoir accès mais être limité à 1min/jour
         return isBefore(new Date(), new Date(userProfile.subscriptionExpiryDate!)) ? 'trial' : 'limited';
       default: return 'limited';
     }

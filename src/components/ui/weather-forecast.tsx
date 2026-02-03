@@ -106,21 +106,18 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
       return newDate;
     };
 
-    const tideEventsToday = tides.map(tide => ({
+    const currentTideEvents = tides.map(tide => ({
       ...tide,
       date: timeToDate(tide.time, now),
     }));
     
-    const firstTideOfList = tides[0];
-    const firstTideEventTomorrow = {
-        ...firstTideOfList,
-        date: timeToDate(firstTideOfList.time, new Date(now.getTime() + 24 * 60 * 60 * 1000))
-    };
-
-    const allTideEvents = [...tideEventsToday, firstTideEventTomorrow].sort((a,b) => a.date.getTime() - b.date.getTime());
+    const sortedTideEvents = [...currentTideEvents].sort((a,b) => a.date.getTime() - b.date.getTime());
+    let nextTide = sortedTideEvents.find(tide => tide.date > now);
     
-    let nextTide = allTideEvents.find(tide => tide.date > now);
-    if (!nextTide) nextTide = firstTideEventTomorrow;
+    // Fallback if all tides today passed
+    if (!nextTide) {
+        nextTide = { ...sortedTideEvents[0], date: new Date(sortedTideEvents[0].date.getTime() + 24 * 60 * 60 * 1000) };
+    }
     
     const tideDirection = nextTide.type === 'haute' ? 'montante' : 'descendante';
     const remainingTime = formatDistanceToNow(nextTide.date, { locale: fr, addSuffix: true });
@@ -135,16 +132,19 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
     if (forecastIn3Hours) {
         const currentSpeed = _selectedForecast.windSpeed;
         const speed3h = forecastIn3Hours.windSpeed;
-        const upperThreshold = currentSpeed * 1.2;
-        const lowerThreshold = currentSpeed * 0.8;
-        if (speed3h < lowerThreshold) windTrend = "à la baisse";
-        else if (speed3h > upperThreshold) windTrend = "à la hausse";
+        if (speed3h < currentSpeed * 0.8) windTrend = "à la baisse";
+        else if (speed3h > currentSpeed * 1.2) windTrend = "à la hausse";
     }
     const windSentence = `Vent de ${_selectedForecast.windSpeed} nœuds de ${translateWindDirection(_selectedForecast.windDirection)}, tendance ${windTrend}.`;
 
-    // Strict 00h à 23h pour la journée sélectionnée
-    const sortedForecasts = [...weather.hourly].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    const isToday = new Date(sortedForecasts[0].date).toDateString() === now.toDateString();
+    // Ensure strict 00h to 23h order
+    const sortedForecasts = [...weather.hourly].sort((a, b) => {
+        const hA = new Date(a.date).getHours();
+        const hB = new Date(b.date).getHours();
+        return hA - hB;
+    });
+
+    const isToday = new Date(sortedForecasts[12].date).toDateString() === now.toDateString();
 
     return { 
       summary: {tideSentence, windSentence}, 
@@ -154,7 +154,7 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
     };
   }, [now, weather, tides]);
 
-  // Auto-scroll vers l'heure actuelle
+  // Auto-scroll to current hour on today's view
   useEffect(() => {
     if (isClient && isSelectedDayToday && scrollRef.current) {
         const currentHour = now.getHours();
@@ -170,50 +170,50 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
   }
 
   return (
-    <div className="w-full max-w-full overflow-x-hidden rounded-lg border bg-card shadow-sm">
-      <div className="bg-blue-600 text-white p-4 rounded-t-lg">
-        <div className="text-center mb-3 border-b border-white/20 pb-3">
+    <div className="w-full max-w-full overflow-x-hidden rounded-xl border bg-card shadow-md">
+      <div className="bg-blue-600 text-white p-5 rounded-t-xl">
+        <div className="text-center mb-4 border-b border-white/20 pb-4">
           {summary ? (
             <>
-              <p className="text-[11px] font-bold uppercase tracking-wider mb-1 opacity-80">Résumé du moment</p>
-              <p className="text-xs font-medium leading-relaxed">{summary.tideSentence}</p>
-              <p className="text-xs text-white/90 leading-relaxed mt-1">{summary.windSentence}</p>
+              <p className="text-[10px] font-black uppercase tracking-widest mb-1.5 opacity-70">Aperçu Immédiat</p>
+              <p className="text-sm font-bold leading-tight">{summary.tideSentence}</p>
+              <p className="text-xs text-blue-100 leading-tight mt-1.5">{summary.windSentence}</p>
             </>
           ) : (
-            <Skeleton className="h-10 w-full bg-white/20" />
+            <Skeleton className="h-12 w-full bg-white/10" />
           )}
         </div>
 
-        <div className="flex justify-around items-center gap-4 py-2">
+        <div className="flex justify-around items-center gap-4 py-1">
            <div className="flex flex-col items-center text-center">
-                <WeatherConditionIcon condition={selectedForecast.condition} isNight={selectedForecast.isNight} className="size-10 mb-1" />
-                <p className="font-bold text-xs">{selectedForecast.condition}</p>
+                <WeatherConditionIcon condition={selectedForecast.condition} isNight={selectedForecast.isNight} className="size-12 mb-1.5" />
+                <p className="font-black text-[10px] uppercase tracking-tighter">{selectedForecast.condition}</p>
             </div>
             <div className="flex flex-col items-center text-center">
                 <div className="flex items-baseline gap-1">
-                    <p className="font-black text-5xl">{selectedForecast.windSpeed}</p>
-                    <p className="font-bold text-sm">nds</p>
+                    <p className="font-black text-6xl leading-none">{selectedForecast.windSpeed}</p>
+                    <p className="font-black text-sm uppercase">nds</p>
                 </div>
-                <div className="flex items-center gap-1 mt-1">
-                    <WindArrowIcon direction={selectedForecast.windDirection} className="size-4" />
-                    <p className="text-[10px] font-bold uppercase">Vent de {translateWindDirection(selectedForecast.windDirection)}</p>
+                <div className="flex items-center gap-1.5 mt-2 bg-white/10 px-2 py-0.5 rounded-full">
+                    <WindArrowIcon direction={selectedForecast.windDirection} className="size-3.5" />
+                    <p className="text-[10px] font-black uppercase tracking-tighter">{translateWindDirection(selectedForecast.windDirection)}</p>
                 </div>
             </div>
-             <div className="flex flex-col items-center gap-2 text-xs font-bold">
-                <div className="flex items-center gap-2 bg-white/10 px-2 py-1 rounded">
-                    <Thermometer className="size-4" />
-                    <span>{selectedForecast.temp}°C</span>
+             <div className="flex flex-col items-center gap-2.5">
+                <div className="flex items-center gap-2 bg-white/15 px-3 py-1.5 rounded-lg border border-white/10 shadow-inner">
+                    <Thermometer className="size-4 text-orange-300" />
+                    <span className="font-black text-sm">{selectedForecast.temp}°C</span>
                 </div>
-                <div className="flex items-center gap-2 bg-white/10 px-2 py-1 rounded">
-                    <Sun className="size-4" />
-                    <span>UV: {selectedForecast.uvIndex}</span>
+                <div className="flex items-center gap-2 bg-white/15 px-3 py-1.5 rounded-lg border border-white/10 shadow-inner">
+                    <Sun className="size-4 text-yellow-300" />
+                    <span className="font-black text-sm text-yellow-50">UV: {selectedForecast.uvIndex}</span>
                 </div>
              </div>
         </div>
       </div>
 
-      <div className="p-2 w-full">
-        <div className="flex flex-nowrap overflow-x-auto gap-2 pb-2 scrollbar-hide px-1" ref={scrollRef}>
+      <div className="p-3 w-full bg-muted/5">
+        <div className="flex flex-nowrap overflow-x-auto gap-2.5 pb-3 scrollbar-hide px-1" ref={scrollRef}>
           {hourlyForecastsToShow.map((forecast, index) => {
              const forecastDate = new Date(forecast.date);
              const forecastHour = forecastDate.getHours();
@@ -225,40 +225,41 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
                 key={index} 
                 data-hour={forecastHour}
                 className={cn(
-                  'flex-shrink-0 w-20 flex flex-col items-center justify-between p-2 rounded-lg border h-full space-y-1 text-center bg-card transition-all',
-                   isCurrent && 'bg-blue-50 border-blue-400 ring-1 ring-blue-400 scale-[1.02] z-10',
-                   isPast && 'opacity-40 grayscale bg-muted/10'
+                  'flex-shrink-0 w-24 flex flex-col items-center justify-between p-3 rounded-xl border h-40 space-y-2 text-center transition-all duration-300',
+                   isCurrent ? 'bg-primary text-primary-foreground border-primary scale-[1.05] z-10 shadow-xl' : 'bg-card',
+                   isPast && 'opacity-30 grayscale pointer-events-none'
                 )}
               >
                 <p className={cn(
-                  "font-black text-[10px] uppercase",
-                  isPast ? "text-muted-foreground/60" : "text-muted-foreground"
+                  "font-black text-xs uppercase tracking-tighter",
+                  isCurrent ? "text-white" : "text-muted-foreground"
                 )}>
                   {format(forecastDate, "HH'h'", { locale: fr })}
                 </p>
+                
                 <WeatherConditionIcon 
                   condition={forecast.condition} 
                   isNight={forecast.isNight} 
-                  className={cn("size-6 my-1", isPast && "opacity-50")} 
+                  className={cn("size-8", isCurrent ? "text-white" : "")} 
                 />
                 
                 <div className="flex items-baseline gap-0.5">
-                  <p className={cn("font-black text-xs", isPast && "text-muted-foreground")}>{forecast.windSpeed}</p>
-                  <p className="text-[8px] font-bold uppercase opacity-60">nds</p>
+                  <p className="font-black text-base">{forecast.windSpeed}</p>
+                  <p className="text-[9px] font-black uppercase opacity-60">nds</p>
                 </div>
                 
-                <div className="border-t w-full my-1 opacity-20"></div>
+                <div className={cn("border-t w-full my-1", isCurrent ? "border-white/30" : "border-border")}></div>
 
-                <div className="w-full space-y-1">
-                  <div className={cn("flex items-center justify-center", isPast ? "text-muted-foreground/60" : "text-primary")}>
-                    <Waves className="size-3 mr-1" />
-                    <span className="font-black text-[10px]">{forecast.tideHeight.toFixed(1)}m</span>
+                <div className="w-full space-y-1.5">
+                  <div className={cn("flex items-center justify-center", isCurrent ? "text-white" : "text-primary")}>
+                    <Waves className="size-3.5 mr-1.5 shrink-0" />
+                    <span className="font-black text-xs">{forecast.tideHeight.toFixed(1)}m</span>
                   </div>
-                  <div className={cn("flex items-center justify-center h-4", isPast ? "text-muted-foreground/60" : "text-accent")}>
-                      <Zap className="size-3 mr-1" />
-                      <span className="font-black text-[8px] uppercase">
+                  <div className={cn("flex items-center justify-center", isCurrent ? "text-white/90" : "text-accent")}>
+                      <Zap className="size-3.5 mr-1.5 shrink-0" />
+                      <span className="font-black text-[9px] uppercase leading-none">
                           {forecast.tidePeakType ? (forecast.tidePeakType === 'haute' ? 'Mer' : 'Basse') : 
-                           forecast.tideCurrent === 'Nul' ? 'Ét' : forecast.tideCurrent.substring(0, 3)}
+                           forecast.tideCurrent === 'Nul' ? 'Étale' : forecast.tideCurrent}
                       </span>
                   </div>
                 </div>
@@ -268,9 +269,9 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
         </div>
       </div>
 
-      <div className="p-3 border-t bg-muted/30 flex justify-center items-center gap-8 text-[9px] font-black uppercase tracking-widest text-muted-foreground/80">
-        <div className="flex items-center gap-1.5"><Waves className="size-3" /><span>Hauteur</span></div>
-        <div className="flex items-center gap-1.5"><Zap className="size-3" /><span>Courant</span></div>
+      <div className="p-4 border-t bg-muted/20 flex justify-center items-center gap-10 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
+        <div className="flex items-center gap-2"><Waves className="size-4 text-primary/50" /><span>Hauteur Eau</span></div>
+        <div className="flex items-center gap-2"><Zap className="size-4 text-accent/50" /><span>Courant</span></div>
       </div>
     </div>
   );
