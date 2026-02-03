@@ -52,7 +52,8 @@ import {
   VolumeX,
   AlertCircle,
   Play,
-  Settings
+  Settings,
+  Music
 } from 'lucide-react';
 import {
   useUser,
@@ -86,11 +87,18 @@ import Link from 'next/link';
 const iconMap = { Navigation, UserIcon, Crosshair, Footprints, Mountain, MapPin };
 
 const soundLibrary = [
-  { id: 'trompette', label: 'Fanfare Trompette (Aigu)', url: 'https://assets.mixkit.co/active_storage/sfx/2700/2700-preview.mp3' },
-  { id: 'cloche', label: 'Cloche', url: 'https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3' },
+  { id: 'trompette', label: 'Fanfare Trompette', url: 'https://assets.mixkit.co/active_storage/sfx/2700/2700-preview.mp3' },
+  { id: 'cloche', label: 'Cloche Classique', url: 'https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3' },
   { id: 'alerte', label: 'Alerte Urgence', url: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' },
   { id: 'cor', label: 'Cor de chasse', url: 'https://assets.mixkit.co/active_storage/sfx/2701/2701-preview.mp3' },
-  { id: 'sifflet', label: 'Sifflet', url: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3' },
+  { id: 'sifflet', label: 'Sifflet Arbitre', url: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3' },
+  { id: 'digital-1', label: 'Bip Digital 1', url: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3' },
+  { id: 'digital-2', label: 'Bip Digital 2', url: 'https://assets.mixkit.co/active_storage/sfx/2562/2562-preview.mp3' },
+  { id: 'ping', label: 'Ping Sonar', url: 'https://assets.mixkit.co/active_storage/sfx/2564/2564-preview.mp3' },
+  { id: 'buzzer', label: 'Buzzer Grave', url: 'https://assets.mixkit.co/active_storage/sfx/2560/2560-preview.mp3' },
+  { id: 'bird', label: 'Chant d\'oiseau', url: 'https://assets.mixkit.co/active_storage/sfx/2558/2558-preview.mp3' },
+  { id: 'laser', label: 'Signal Laser', url: 'https://assets.mixkit.co/active_storage/sfx/2556/2556-preview.mp3' },
+  { id: 'magic', label: 'Chime Magique', url: 'https://assets.mixkit.co/active_storage/sfx/2554/2554-preview.mp3' },
 ];
 
 const BatteryIcon = React.memo(({ level, charging }: { level: number; charging: boolean }) => {
@@ -559,7 +567,9 @@ function HuntingSessionContent() {
 
                                             <div className="grid grid-cols-1 gap-3">
                                                 <div className="space-y-1.5">
-                                                    <Label className="text-[10px] font-bold uppercase">Son : En Position</Label>
+                                                    <Label className="text-[10px] font-bold uppercase flex items-center gap-1">
+                                                        <MapPin className="size-3" /> Son : En Position
+                                                    </Label>
                                                     <div className="flex gap-2">
                                                         <Select value={soundSettings.position} onValueChange={(val) => { setSoundSettings(prev => ({...prev, position: val})); previewSound(val); }}>
                                                             <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
@@ -571,7 +581,9 @@ function HuntingSessionContent() {
                                                     </div>
                                                 </div>
                                                 <div className="space-y-1.5">
-                                                    <Label className="text-[10px] font-bold uppercase">Son : En Battue</Label>
+                                                    <Label className="text-[10px] font-bold uppercase flex items-center gap-1">
+                                                        <Footprints className="size-3" /> Son : En Battue
+                                                    </Label>
                                                     <div className="flex gap-2">
                                                         <Select value={soundSettings.battue} onValueChange={(val) => { setSoundSettings(prev => ({...prev, battue: val})); previewSound(val); }}>
                                                             <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
@@ -583,7 +595,9 @@ function HuntingSessionContent() {
                                                     </div>
                                                 </div>
                                                 <div className="space-y-1.5">
-                                                    <Label className="text-[10px] font-bold uppercase text-destructive">Son : Gibier en vue</Label>
+                                                    <Label className="text-[10px] font-bold uppercase text-destructive flex items-center gap-1">
+                                                        <Target className="size-3" /> Son : Gibier en vue
+                                                    </Label>
                                                     <div className="flex gap-2">
                                                         <Select value={soundSettings.gibier} onValueChange={(val) => { setSoundSettings(prev => ({...prev, gibier: val})); previewSound(val); }}>
                                                             <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
