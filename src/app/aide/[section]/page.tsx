@@ -67,18 +67,19 @@ const sectionContent: Record<string, {
     title: 'Météo Live',
     icon: Sun,
     color: 'bg-yellow-500',
-    role: "Un outil de surveillance météo haute précision qui combine les relevés en temps réel des stations NC et une analyse prévisionnelle assistée par IA sur 7 jours.",
+    role: "Un outil de surveillance météo haute précision qui combine les relevés en temps réel des stations NC et une analyse prévisionnelle stratégique sur 7 jours, assistée par intelligence artificielle.",
     steps: [
-      "Recherche : Utilisez la barre de recherche pour trouver n'importe quelle commune de Nouvelle-Calédonie.",
-      "Tri Intelligent : Votre commune actuelle s'affiche en priorité, suivie des communes les plus proches. Bélep et les Loyauté ferment la liste.",
-      "Lecture Live : Visualisez instantanément le vent (force et direction exacte), la température et l'indice UV actuel.",
-      "Vue Détaillée J+7 : Cliquez sur une commune pour ouvrir son tableau de bord complet sur une semaine.",
-      "Analyse IA : Lisez le bilan stratégique rédigé par l'IA pour comprendre l'évolution du temps et adapter vos sorties."
+      "Recherche & Proximité : Trouvez votre commune ou laissez le système trier automatiquement les stations par distance GPS.",
+      "Lecture Live : Visualisez instantanément le vent (force et direction exacte), la température et l'indice UV actuel issus des capteurs réels.",
+      "Tableau de Bord J+7 : Accédez à une vue complète sur une semaine incluant codes météo, températures extrêmes et probabilités de pluie.",
+      "Bilan Stratégique IA : L'assistant analyse la cohérence des prévisions (ex: vent vs soleil) pour rédiger une synthèse globale de l'évolution du temps.",
+      "Optimisation des Activités : Recevez des conseils personnalisés pour la pêche (selon les vents et marées), la chasse (selon l'humidité) et le terroir.",
+      "Vigilance & Sécurité : L'IA identifie pour vous les dangers potentiels comme les pics d'UV extrêmes, les fortes rafales ou les passages pluvieux soudains."
     ],
     tips: [
-      "La flèche du vent indique la provenance réelle de l'air : une flèche pointant vers le bas indique un vent de Nord.",
-      "L'indice UV en direct vous aide à planifier votre protection solaire immédiate.",
-      "L'IA analyse les probabilités de pluie et les rafales pour vous donner des conseils spécifiques à la pêche et au terroir."
+      "L'assistant IA ne se contente pas de lire les chiffres : il vous aide à identifier la 'meilleure fenêtre' de la semaine pour vos activités.",
+      "La flèche du vent dans la liste indique la provenance réelle de l'air : une flèche pointant vers le bas indique un vent de Nord.",
+      "Le bilan IA est généré dynamiquement à chaque consultation pour refléter les changements de prévisions les plus récents."
     ]
   },
   'vessel-tracker': {
@@ -126,10 +127,10 @@ const sectionContent: Record<string, {
     color: 'bg-orange-600',
     role: "Optimisez vos sorties en brousse grâce à l'analyse du vent et au suivi de groupe en temps réel.",
     steps: [
-      "Consultez la période biologique (Brame, Chute des bois) pour adapter votre stratégie.",
+      "Consultez la période biologique (Brame, Chute des bois) pour adapter votre strategy.",
       "Utilisez la carte du vent pour visualiser d'où vient l'air par rapport au relief.",
       "La 'Table de Tir' vous aide à estimer la correction de visée en fonction de la distance et du vent.",
-      "Session de Groupe : Créez une session ou rejoignez-en une via un code unique (ex: CH-1234) pour partager votre position GPS en temps réel avec vos partenaires sur la carte satellite.",
+      "Session de Groupe : Créez une session ou rejoin-en une via un code unique (ex: CH-1234) pour partager votre position GPS en temps réel avec vos partenaires sur la carte satellite.",
       "Alertes Tactiques : Informez instantanément votre groupe de votre statut ('En position', 'Battue en cours') ou signalez 'Gibier en vue' d'un clic. Une alerte visuelle et sonore préviendra immédiatement vos coéquipiers.",
       "Sécurité & Batterie : Surveillez le niveau de batterie de chaque participant sur la carte. Les informations (GPS + Batterie) sont actualisées toutes les 5 minutes pour préserver l'autonomie de vos appareils en zone isolée."
     ],
