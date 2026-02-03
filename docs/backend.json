@@ -26,7 +26,21 @@
         "vent": { "type": "number" },
         "temperature": { "type": "number" },
         "uv": { "type": "number" },
-        "direction": { "type": "string", "enum": ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] }
+        "direction_vent": { "type": "number", "description": "Direction en degrés (0-360)" }
+      }
+    },
+    "MeteoForecast": {
+      "title": "MeteoForecast",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "jour_1, jour_2..." },
+        "code_meteo": { "type": "number" },
+        "date": { "type": "string" },
+        "prob_pluie": { "type": "number" },
+        "rafales_max": { "type": "number" },
+        "temp_max": { "type": "number" },
+        "temp_min": { "type": "number" },
+        "vent_max": { "type": "number" }
       }
     },
     "AppSetting": {
@@ -90,6 +104,14 @@
           "entityName": "MeteoLive",
           "schema": { "$ref": "#/backend/entities/MeteoLive" },
           "description": "Données météo en temps réel pour les communes de NC"
+        }
+      },
+      {
+        "path": "/meteo_caledonie/{communeId}/previsions/{prevId}",
+        "definition": {
+          "entityName": "MeteoForecast",
+          "schema": { "$ref": "#/backend/entities/MeteoForecast" },
+          "description": "Prévisions météo journalières sur 7 jours"
         }
       },
       {

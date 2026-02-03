@@ -14,16 +14,21 @@ service cloud.firestore {
     // --- COLLECTION RULES ---
 
     // Paramètres système (Splash screen, configuration globale)
-    // Autoriser la lecture publique pour que le splash s'affiche dès le chargement
     match /app_settings/{id} {
       allow read: if true; 
       allow write: if isAdmin();
     }
 
-    // Météo en temps réel (Données synchronisées par le StreamBuilder)
+    // Météo en temps réel et prévisions
     match /meteo_caledonie/{communeId} {
       allow read: if true;
       allow write: if isAdmin();
+      
+      // Autoriser l'accès aux sous-collections (prévisions)
+      match /{allPaths=**} {
+        allow read: if true;
+        allow write: if isAdmin();
+      }
     }
 
     // Sessions de chasse
