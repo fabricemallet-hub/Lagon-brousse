@@ -56,7 +56,7 @@ import { BottomNav } from './bottom-nav';
 
 const USAGE_LIMIT_SECONDS = 60;
 
-const UsageTimer = React.memo(({ status, auth }: { status: string, auth: any }) => {
+const UsageTimer = React.memo(({ status, auth, userId }: { status: string, auth: any, userId?: string }) => {
   const [timeLeft, setTimeLeft] = useState(USAGE_LIMIT_SECONDS);
   const { toast } = useToast();
   const router = useRouter();
@@ -64,15 +64,18 @@ const UsageTimer = React.memo(({ status, auth }: { status: string, auth: any }) 
 
   useEffect(() => {
     // Le décompte s'applique aux comptes limited ET trial (1min/jour)
-    if ((status !== 'limited' && status !== 'trial') || !auth) return;
+    if ((status !== 'limited' && status !== 'trial') || !auth || !userId) return;
 
     const today = new Date().toISOString().split('T')[0];
     const lastUsageDate = localStorage.getItem('lastUsageDate');
+    const lastUserId = localStorage.getItem('lastUserId');
     let dailyUsage = parseInt(localStorage.getItem('dailyUsage') || '0', 10);
 
-    if (lastUsageDate !== today) {
+    // Reset si nouveau jour OU changement d'utilisateur
+    if (lastUsageDate !== today || lastUserId !== userId) {
       dailyUsage = 0;
       localStorage.setItem('lastUsageDate', today);
+      localStorage.setItem('lastUserId', userId);
       localStorage.setItem('dailyUsage', '0');
     }
     
@@ -108,7 +111,7 @@ const UsageTimer = React.memo(({ status, auth }: { status: string, auth: any }) 
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [status, auth, toast, router, pathname]);
+  }, [status, auth, userId, toast, router, pathname]);
 
   if (status !== 'limited' && status !== 'trial') return null;
 
@@ -259,7 +262,7 @@ function InnerAppShell({
         </SidebarFooter>
       </Sidebar>
       <main className="flex-1 flex flex-col min-h-screen w-full">
-        <UsageTimer status={status} auth={auth} />
+        <UsageTimer status={status} auth={auth} userId={user?.uid} />
         <header className={cn("flex flex-col gap-2 border-b bg-card px-4 sticky top-0 z-30 py-3", (status === 'limited' || status === 'trial') && 'mt-10')}>
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-2">

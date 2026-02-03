@@ -135,6 +135,7 @@ export default function Home() {
   }
 
   const { farming, tideStation } = data;
+  const isToday = now.toDateString() === selectedDate.toDateString();
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden">
@@ -145,7 +146,7 @@ export default function Home() {
         </p>
       </div>
 
-      <WeatherForecast weather={weatherWithLiveUpdates} tides={sortedTides} />
+      <WeatherForecast weather={weatherWithLiveUpdates} tides={sortedTides} isToday={isToday} />
 
       <div className="flex flex-col gap-6 w-full">
         <Card className="w-full">

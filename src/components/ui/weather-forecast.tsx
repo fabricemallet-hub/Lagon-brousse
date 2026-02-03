@@ -83,7 +83,15 @@ const WindArrowIcon = ({ direction, className }: { direction: WindDirection, cla
   );
 };
 
-export function WeatherForecast({ weather, tides }: { weather: WeatherData; tides: Tide[] }) {
+export function WeatherForecast({ 
+  weather, 
+  tides,
+  isToday = false
+}: { 
+  weather: WeatherData; 
+  tides: Tide[];
+  isToday?: boolean;
+}) {
   const [isClient, setIsClient] = useState(false);
   const [now, setNow] = useState(new Date());
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -94,9 +102,9 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
     return () => clearInterval(timer);
   }, []);
 
-  const { summary, selectedForecast, hourlyForecastsToShow, isSelectedDayToday } = useMemo(() => {
+  const { summary, selectedForecast, hourlyForecastsToShow } = useMemo(() => {
     if (!weather.hourly.length || !tides.length) {
-      return { summary: null, selectedForecast: null, hourlyForecastsToShow: [], isSelectedDayToday: false };
+      return { summary: null, selectedForecast: null, hourlyForecastsToShow: [] };
     }
 
     const timeToDate = (timeStr: string, date: Date) => {
@@ -136,30 +144,27 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
     }
     const windSentence = `Vent de ${_selectedForecast.windSpeed} nœuds de ${translateWindDirection(_selectedForecast.windDirection)}, tendance ${windTrend}.`;
 
-    // Tri chronologique strict de 00h à 23h basé sur le timestamp
+    // Tri chronologique strict de 00h à 23h
     const sortedForecasts = [...weather.hourly].sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
+      new Date(a.date).getHours() - new Date(b.date).getHours()
     );
-
-    const isToday = isSameDay(new Date(weather.hourly[0].date), now);
 
     return { 
       summary: {tideSentence, windSentence}, 
       selectedForecast: _selectedForecast, 
-      hourlyForecastsToShow: sortedForecasts,
-      isSelectedDayToday: isToday
+      hourlyForecastsToShow: sortedForecasts
     };
   }, [now, weather, tides]);
 
   useEffect(() => {
-    if (isClient && isSelectedDayToday && scrollRef.current) {
+    if (isClient && isToday && scrollRef.current) {
         const currentHour = now.getHours();
         const element = scrollRef.current.querySelector(`[data-hour="${currentHour}"]`);
         if (element) {
             element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
         }
     }
-  }, [isClient, isSelectedDayToday, now]);
+  }, [isClient, isToday, now]);
 
   if (!isClient || !selectedForecast) {
     return <Skeleton className="h-96 w-full rounded-lg" />;
@@ -213,8 +218,9 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
           {hourlyForecastsToShow.map((forecast, index) => {
              const forecastDate = new Date(forecast.date);
              const forecastHour = forecastDate.getHours();
-             const isPast = isSelectedDayToday && forecastHour < now.getHours();
-             const isCurrent = isSelectedDayToday && forecastHour === now.getHours();
+             const currentHour = now.getHours();
+             const isPast = isToday && forecastHour < currentHour;
+             const isCurrent = isToday && forecastHour === currentHour;
              
              return (
               <div 
@@ -223,7 +229,7 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
                 className={cn(
                   'flex-shrink-0 w-24 flex flex-col items-center justify-between p-3 rounded-xl border h-40 space-y-2 text-center transition-all duration-300',
                    isCurrent ? 'bg-primary text-primary-foreground border-primary scale-[1.05] z-10 shadow-xl' : 'bg-card',
-                   isPast && 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 opacity-50 grayscale pointer-events-none'
+                   isPast && 'bg-muted/40 text-muted-foreground/50 border-muted opacity-60 grayscale pointer-events-none'
                 )}
               >
                 <p className={cn(
