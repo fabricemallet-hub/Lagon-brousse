@@ -1,4 +1,3 @@
-
 'use client';
 import {
   Sidebar,
@@ -256,7 +255,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <Popover open={isDatePickerOpen} onOpenChange={setDatePickerOpen}>
                         <PopoverTrigger asChild>{datePickerTrigger}</PopoverTrigger>
                         <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(d) => { if(d) { setSelectedDate(d); setDatePickerOpen(false); } }} initialFocus /></PopoverContent>
-                      )}
+                      </Popover>
+                    )}
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleNextDay}><ChevronRight className="h-4 w-4" /></Button>
                   </div>
                 )}
