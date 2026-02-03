@@ -52,7 +52,7 @@ import { Button } from './button';
 import { cn } from '@/lib/utils';
 import { useCalendarView } from '@/context/calendar-view-context';
 import type { FishRating, Tide } from '@/lib/types';
-import { CrabIcon, LobsterIcon } from '../icons';
+import { CrabIcon, LobsterIcon, OctopusIcon } from '../icons';
 import { Skeleton } from './skeleton';
 
 export const MoonPhaseIcon = ({
@@ -157,16 +157,18 @@ const DayCell = React.memo(({
 
       {calendarView === 'peche' ? (
         <div className="flex-grow flex flex-col justify-center items-center gap-0.5 pt-1">
-          {/* Ligne unique pour toutes les icônes d'activité */}
-          <div className="flex items-center justify-center gap-0.5 h-4 overflow-hidden flex-nowrap whitespace-nowrap w-full">
+          {/* Ligne 1 : Crustacés et Poulpes */}
+          <div className="flex items-center justify-center gap-0.5 h-3 overflow-hidden flex-nowrap whitespace-nowrap w-full">
             {data.crabAndLobster.crabStatus === 'Plein' && <CrabIcon className="size-2.5 text-green-600 shrink-0" />}
             {data.crabAndLobster.crabStatus === 'Mout' && <CrabIcon className="size-2.5 text-destructive shrink-0" />}
             {data.crabAndLobster.lobsterActivity === 'Élevée' && <LobsterIcon className="size-2.5 text-blue-600 shrink-0" />}
-            
-            <div className="flex items-center gap-0.5 ml-0.5 border-l border-muted-foreground/20 pl-0.5 shrink-0">
-                {fishingIcons?.lagon}
-                {fishingIcons?.pelagic}
-            </div>
+            {data.crabAndLobster.octopusActivity === 'Élevée' && <OctopusIcon className="size-2.5 text-purple-600 shrink-0" />}
+          </div>
+
+          {/* Ligne 2 : Poissons */}
+          <div className="flex items-center justify-center gap-0.5 h-3 overflow-hidden flex-nowrap whitespace-nowrap w-full">
+            {fishingIcons?.lagon}
+            {fishingIcons?.pelagic}
           </div>
 
           <div className="mt-auto w-full flex flex-col items-center gap-0 pb-0.5">
@@ -275,6 +277,7 @@ export function LunarCalendar() {
               <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><CrabIcon className="size-4 text-green-600"/> Crabe (Plein)</div>
               <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><CrabIcon className="size-4 text-destructive"/> Crabe (Mout)</div>
               <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><LobsterIcon className="size-4 text-blue-600"/> Langouste (Activité)</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><OctopusIcon className="size-4 text-purple-600"/> Poulpe (Activité)</div>
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-2 p-3 bg-primary/5 border border-primary/20 rounded-lg">
               <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-primary"><Waves className="size-4"/> Heure/Hauteur</div>

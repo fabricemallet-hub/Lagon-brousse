@@ -284,7 +284,6 @@ export function generateProceduralData(location: string, date: Date): LocationDa
 
   // --- Logique Crabes et Langoustes (Spécifique NC) ---
   // Mue des crabes : Se produit préférentiellement lors des lunes de quartier (mortes-eaux)
-  // Premier Quartier (~7.4j) et Dernier Quartier (~22.1j)
   const isQuarterMoon = (dayInCycle >= 5.5 && dayInCycle <= 9.5) || (dayInCycle >= 20.2 && dayInCycle <= 24.2);
   // Pleine Lune (~14.8j) et Nouvelle Lune (0j / 29.5j) : Les crabes sont généralement bien pleins
   const isFullOrNew = (dayInCycle <= 3.5 || (dayInCycle >= 12.8 && dayInCycle <= 16.8) || dayInCycle >= 26);
@@ -310,6 +309,15 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   } else {
     locationData.crabAndLobster.lobsterActivity = 'Moyenne';
     locationData.crabAndLobster.lobsterMessage = "Activité modérée en début/fin de nuit.";
+  }
+
+  // Poulpes : Activité maximale lors des grandes marées (Vives-eaux) pour l'accès aux platiers
+  if (isFullOrNew) {
+    locationData.crabAndLobster.octopusActivity = 'Élevée';
+    locationData.crabAndLobster.octopusMessage = "Vives-eaux : Excellente période pour le poulpe sur le platier lors des basses mers.";
+  } else {
+    locationData.crabAndLobster.octopusActivity = 'Moyenne';
+    locationData.crabAndLobster.octopusMessage = "Activité normale.";
   }
 
   locationData.weather.wind.forEach((forecast: WindForecast, index: number) => {
