@@ -37,7 +37,6 @@ import {
   Target,
   LocateFixed,
   MapPin,
-  Volume2,
   WifiOff
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -61,7 +60,6 @@ import {
   getDocs,
   query,
   where,
-  limit,
 } from 'firebase/firestore';
 import type { WithId } from '@/firebase';
 import type { HuntingSession, SessionParticipant, UserAccount } from '@/lib/types';
@@ -71,7 +69,7 @@ import { Skeleton } from './ui/skeleton';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 
-const iconMap = { Navigation, UserIcon, Crosshair, Footprints, Mountain };
+const iconMap = { Navigation, UserIcon, Crosshair, Footprints, Mountain, MapPin };
 
 const BatteryIcon = ({ level, charging }: { level: number; charging: boolean }) => {
   const props = { className: 'w-4 h-4 inline-block' };
@@ -101,7 +99,7 @@ function HuntingSessionContent() {
   const watchIdRef = useRef<number | null>(null);
   const [isParticipating, setIsParticipating] = useState(false);
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [zoom, setZoom] = useState(12);
+  const [zoom, setZoom] = useState(16);
   const [initialZoomDone, setInitialZoomDone] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -153,7 +151,6 @@ function HuntingSessionContent() {
     if (!firestore || !user?.uid) return;
     setAreMySessionsLoading(true);
     try {
-      // On retire le tri côté serveur pour éviter les erreurs d'index pendant la phase de stabilisation
       const q = query(
         collection(firestore, 'hunting_sessions'),
         where('organizerId', '==', user.uid)
@@ -161,7 +158,6 @@ function HuntingSessionContent() {
       const querySnapshot = await getDocs(q);
       const sessions = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as WithId<HuntingSession>));
       
-      // Tri manuel en mémoire pour plus de robustesse
       sessions.sort((a, b) => {
         const timeA = a.createdAt?.toMillis?.() || 0;
         const timeB = b.createdAt?.toMillis?.() || 0;
@@ -229,14 +225,11 @@ function HuntingSessionContent() {
             const newLocation = { latitude, longitude };
             setUserLocation(newLocation);
 
-            // Centrage automatique lors de la première détection
             if (!initialZoomDone && map) {
                 map.panTo({ lat: latitude, lng: longitude });
-                map.setZoom(16);
                 setInitialZoomDone(true);
             }
 
-            // Synchronisation Firestore
             const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
             
             let batteryData = null;
@@ -273,15 +266,21 @@ function HuntingSessionContent() {
         const newSessionData = { organizerId: user.uid, createdAt: serverTimestamp(), expiresAt: Timestamp.fromDate(expiresAt) };
         await setDoc(doc(firestore, 'hunting_sessions', code), newSessionData);
         
-        const participantDocRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
-        await setDoc(participantDocRef, { 
-            id: user.uid,
-            displayName: nickname, 
-            mapIcon: selectedIcon, 
-            mapColor: selectedColor, 
-            baseStatus: 'En position',
-            isGibierEnVue: false,
-            updatedAt: serverTimestamp() 
+        // Obtenir position initiale immédiate
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const { latitude, longitude } = pos.coords;
+            const participantDocRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
+            await setDoc(participantDocRef, { 
+                id: user.uid,
+                displayName: nickname, 
+                mapIcon: selectedIcon, 
+                mapColor: selectedColor, 
+                baseStatus: 'En position',
+                isGibierEnVue: false,
+                location: { latitude, longitude },
+                updatedAt: serverTimestamp() 
+            });
+            setUserLocation({ latitude, longitude });
         });
         
         setSession({ id: code, ...newSessionData } as any);
@@ -303,16 +302,21 @@ function HuntingSessionContent() {
       const sessionDoc = await getDoc(doc(firestore, 'hunting_sessions', sessionId));
       if (!sessionDoc.exists()) throw new Error('Session non trouvée.');
       
-      const participantDocRef = doc(firestore, 'hunting_sessions', sessionId, 'participants', user.uid);
-      await setDoc(participantDocRef, { 
-          id: user.uid,
-          displayName: nickname, 
-          mapIcon: selectedIcon, 
-          mapColor: selectedColor, 
-          baseStatus: 'En position',
-          isGibierEnVue: false,
-          updatedAt: serverTimestamp() 
-      }, { merge: true });
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+          const { latitude, longitude } = pos.coords;
+          const participantDocRef = doc(firestore, 'hunting_sessions', sessionId, 'participants', user.uid);
+          await setDoc(participantDocRef, { 
+              id: user.uid,
+              displayName: nickname, 
+              mapIcon: selectedIcon, 
+              mapColor: selectedColor, 
+              baseStatus: 'En position',
+              isGibierEnVue: false,
+              location: { latitude, longitude },
+              updatedAt: serverTimestamp() 
+          }, { merge: true });
+          setUserLocation({ latitude, longitude });
+      });
       
       setSession({ id: sessionDoc.id, ...sessionDoc.data() } as any);
       setIsParticipating(true);

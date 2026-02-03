@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import {
   Card,
   CardContent,
@@ -23,7 +24,12 @@ import {
 } from 'lucide-react';
 import { ShootingTableCard } from '@/components/ui/shooting-table-card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { HuntingSessionCard } from '@/components/hunting-session';
+
+// Import dynamique pour économiser la mémoire au démarrage
+const HuntingSessionCard = dynamic(() => import('@/components/hunting-session').then(mod => mod.HuntingSessionCard), { 
+  ssr: false,
+  loading: () => <Skeleton className="h-64 w-full" />
+});
 
 function ChasseSkeleton() {
   return (
@@ -70,7 +76,7 @@ export default function ChassePage() {
         <CardHeader>
           <CardTitle>Prévisions de Chasse au Cerf</CardTitle>
           <CardDescription>
-            Informations pour la chasse à {selectedLocation} le {dateString}.
+            Informations pour la la chasse à {selectedLocation} le {dateString}.
           </CardDescription>
         </CardHeader>
       </Card>

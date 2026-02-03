@@ -1,18 +1,17 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // DEPLOY_ID: OFFLINE_STABILITY_V1
+    // DEPLOY_ID: RECOVERY_STABLE_V6
     
     function isAuth() { return request.auth != null; }
     function isAdmin() { 
       return isAuth() && (
-        request.auth.token.email.lower() == 'f.mallet81@gmail.com' || 
-        request.auth.token.email.lower() == 'f.mallet81@outlook.com' ||
+        request.auth.token.email.lower() in ['f.mallet81@gmail.com', 'f.mallet81@outlook.com'] ||
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'admin'
       );
     }
 
-    // Sessions de chasse : Accès total pour garantir le fonctionnement en zone à faible réseau
+    // Sessions de chasse : Autorisation explicite de lecture/écriture pour tous les connectés
     match /hunting_sessions/{sessionId} {
       allow read, write: if isAuth();
       match /participants/{userId} {
@@ -23,7 +22,9 @@ service cloud.firestore {
     // Profils Utilisateurs
     match /users/{userId} {
       allow read, write: if isAdmin() || (isAuth() && request.auth.uid == userId);
-      match /{allPaths=**} { allow read, write: if isAdmin() || (isAuth() && request.auth.uid == userId); }
+      match /{allPaths=**} { 
+        allow read, write: if isAdmin() || (isAuth() && request.auth.uid == userId); 
+      }
     }
 
     // Vessel Tracker
@@ -32,7 +33,7 @@ service cloud.firestore {
       match /{allPaths=**} { allow read, write: if isAuth(); }
     }
 
-    // Règle par défaut
+    // Règle par défaut pour le reste (Aide, Conversations, Tokens)
     match /{allPaths=**} {
       allow read: if isAuth();
       allow write: if isAdmin();

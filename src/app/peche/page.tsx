@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import {
   Card,
   CardContent,
@@ -14,7 +15,6 @@ import { useDate } from '@/context/date-context';
 import { Clock, Waves, TrendingUp, TrendingDown, Fish, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { CrabIcon, LobsterIcon, OctopusIcon } from '@/components/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import {
@@ -23,7 +23,12 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { FishingLogCard } from '@/components/ui/fishing-log-card';
+
+// Import dynamique du carnet de pêche
+const FishingLogCard = dynamic(() => import('@/components/ui/fishing-log-card').then(mod => mod.FishingLogCard), { 
+  ssr: false,
+  loading: () => <Skeleton className="h-64 w-full" />
+});
 
 function PecheSkeleton() {
   return (
@@ -118,7 +123,6 @@ export default function PechePage() {
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
           <div className="flex items-start gap-4 p-2 rounded-lg bg-muted/30">
-            <CrabIcon className="h-8 w-8 text-primary mt-1 shrink-0" />
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <h4 className="font-semibold text-sm sm:text-base">Crabe de palétuvier</h4>
@@ -130,7 +134,6 @@ export default function PechePage() {
             </div>
           </div>
           <div className="flex items-start gap-4 p-2 rounded-lg bg-muted/30">
-            <LobsterIcon className="h-8 w-8 text-primary mt-1 shrink-0" />
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <h4 className="font-semibold text-sm sm:text-base">Langouste</h4>
@@ -141,20 +144,6 @@ export default function PechePage() {
               <p className="text-xs sm:text-sm text-muted-foreground">{crabAndLobster.lobsterMessage}</p>
             </div>
           </div>
-           {crabAndLobster.octopusActivity && (
-            <div className="flex items-start gap-4 p-2 rounded-lg bg-muted/30">
-              <OctopusIcon className="h-8 w-8 text-primary mt-1 shrink-0" />
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <h4 className="font-semibold text-sm sm:text-base">Poulpe</h4>
-                    <Badge variant={crabAndLobster.octopusActivity === 'Élevée' ? 'default' : crabAndLobster.octopusActivity === 'Moyenne' ? 'secondary' : 'outline'}>
-                    {crabAndLobster.octopusActivity}
-                  </Badge>
-                </div>
-                <p className="text-xs sm:text-sm text-muted-foreground">{crabAndLobster.octopusMessage}</p>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 

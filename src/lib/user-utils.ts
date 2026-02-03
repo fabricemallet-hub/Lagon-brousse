@@ -12,7 +12,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
   if (!user || !firestore) return;
 
   const userDocRef = doc(firestore, 'users', user.uid);
-  const email = user.email?.toLowerCase();
+  const email = user.email?.toLowerCase() || '';
   
   // Reconnaissance administrative forcée pour vos deux comptes
   const isAdminUser = email === 'f.mallet81@outlook.com' || email === 'f.mallet81@gmail.com';
@@ -33,11 +33,11 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
       return;
     }
 
-    const effectiveDisplayName = displayName || user.displayName || email?.split('@')[0] || 'Utilisateur';
+    const effectiveDisplayName = displayName || user.displayName || email.split('@')[0] || 'Utilisateur';
     
     const newUserDocument: UserAccount = {
       id: user.uid,
-      email: email || '',
+      email: email,
       displayName: effectiveDisplayName,
       subscriptionStatus: isAdminUser ? 'admin' : 'trial',
       lastSelectedLocation: 'Nouméa',
