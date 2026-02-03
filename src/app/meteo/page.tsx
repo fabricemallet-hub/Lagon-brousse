@@ -23,11 +23,11 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 // Helper: Calculate distance between two points (Haversine)
 const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371e3; // Earth radius in meters
-  const φ = (lat1 * Math.PI) / 180;
+  const φ1 = (lat1 * Math.PI) / 180;
   const φ2 = (lat2 * Math.PI) / 180;
   const Δφ = ((lat2 - lat1) * Math.PI) / 180;
   const Δλ = ((lon2 - lon1) * Math.PI) / 180;
-  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 };
@@ -165,9 +165,9 @@ export default function MeteoLivePage() {
 
       <Alert variant="destructive" className="bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950 dark:border-amber-900 dark:text-amber-100 py-3">
         <Info className="size-4 text-amber-600" />
-        <AlertTitle className="text-xs font-black uppercase tracking-wider mb-1">Avis de sécurité & Source</AlertTitle>
+        <AlertTitle className="text-xs font-black uppercase tracking-wider mb-1">Avis de sécurité</AlertTitle>
         <AlertDescription className="text-[10px] leading-relaxed font-medium">
-          Cette application <strong>ne remplace pas</strong> le site officiel <a href="https://www.meteo.nc/" target="_blank" rel="noopener noreferrer" className="underline inline-flex items-center gap-0.5 font-bold">meteo.nc <ExternalLink className="size-2" /></a>. Restez attentifs aux conditions locales avant toute sortie en mer. Les données proviennent d'une station australienne.
+          Cette application <strong>ne remplace pas</strong> le site officiel <a href="https://www.meteo.nc/" target="_blank" rel="noopener noreferrer" className="underline inline-flex items-center gap-0.5 font-bold">meteo.nc <ExternalLink className="size-2" /></a>. Restez attentifs aux conditions locales avant toute sortie en mer.
         </AlertDescription>
       </Alert>
 
@@ -314,7 +314,7 @@ function ForecastView({ communeId, liveData, onBack, now }: { communeId: string,
             <Alert className="bg-muted/50 border-2 py-3">
               <ShieldAlert className="size-4 text-muted-foreground" />
               <AlertDescription className="text-[10px] leading-relaxed italic text-muted-foreground font-medium">
-                Information : Les prévisions ci-dessous sont issues d'une station météorologique australienne. Consultez toujours <a href="https://www.meteo.nc/" target="_blank" rel="noopener noreferrer" className="underline font-bold">Météo NC</a> avant toute activité à risque.
+                Information : Consultez toujours <a href="https://www.meteo.nc/" target="_blank" rel="noopener noreferrer" className="underline font-bold">Météo NC</a> avant toute activité à risque.
               </AlertDescription>
             </Alert>
 

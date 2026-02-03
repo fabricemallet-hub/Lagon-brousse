@@ -80,7 +80,6 @@ const sectionContent: Record<string, {
     ],
     tips: [
       "AVERTISSEMENT CRITIQUE : Cette application ne remplace PAS le site officiel de Météo Nouvelle-Calédonie (meteo.nc). Consultez-le toujours avant de prévoir une sortie en mer.",
-      "Source des données : Les relevés techniques proviennent d'une station météorologique située en Australie.",
       "L'assistant IA vous aide à identifier la 'meilleure fenêtre' de la semaine pour vos activités, mais la décision finale et la sécurité vous incombent.",
       "La flèche du vent indique la provenance réelle de l'air : une flèche pointant vers le bas indique un vent de Nord."
     ]
