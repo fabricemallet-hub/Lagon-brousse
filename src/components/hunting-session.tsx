@@ -12,6 +12,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import {
   Users,
   LogOut,
@@ -32,9 +34,10 @@ import {
   LocateFixed,
   MapPin,
   WifiOff,
+  Volume2,
+  VolumeX,
   AlertCircle
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import {
   useUser,
   useFirestore,
@@ -102,6 +105,7 @@ function HuntingSessionContent() {
   const [nickname, setNickname] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('Navigation');
   const [selectedColor, setSelectedColor] = useState('#3b82f6');
+  const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
   const [mySessions, setMySessions] = useState<WithId<HuntingSession>[]>([]);
@@ -121,13 +125,14 @@ function HuntingSessionContent() {
   const { data: participants } = useCollection<SessionParticipant>(participantsCollectionRef);
 
   const playAlertSound = useCallback(() => {
+    if (!isSoundEnabled) return;
     try {
         const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
         audio.play();
     } catch (e) {
         console.warn("Audio play failed", e);
     }
-  }, []);
+  }, [isSoundEnabled]);
 
   useEffect(() => {
     if (!participants || !user) return;
@@ -460,6 +465,15 @@ function HuntingSessionContent() {
                         <div className="space-y-4 rounded-lg border p-4 bg-muted/30">
                             <Label className="text-xs font-bold uppercase text-muted-foreground">Mon Profil de Session</Label>
                             <Input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="Mon surnom..." />
+                            
+                            <div className="flex items-center justify-between py-2 border-t border-border/50">
+                                <div className="flex items-center gap-2">
+                                    {isSoundEnabled ? <Volume2 className="size-4 text-primary" /> : <VolumeX className="size-4 text-muted-foreground" />}
+                                    <Label className="text-sm">Sons d'alerte</Label>
+                                </div>
+                                <Switch checked={isSoundEnabled} onCheckedChange={setIsSoundEnabled} />
+                            </div>
+
                             <Button onClick={handleSavePreferences} size="sm" disabled={isSavingPrefs} className="w-full"><Save className="mr-2 h-4 w-4" /> Sauvegarder</Button>
                         </div>
                         <div className="space-y-2">
