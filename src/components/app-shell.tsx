@@ -156,12 +156,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const handlePrevDay = useCallback(() => setSelectedDate(subDays(selectedDate, 1)), [selectedDate, setSelectedDate]);
   const handleNextDay = useCallback(() => setSelectedDate(addDays(selectedDate, 1)), [selectedDate, setSelectedDate]);
 
-  if (isAuthPage) return <div className="w-full min-h-screen overflow-x-hidden">{children}</div>;
+  if (isAuthPage) return <div className="w-full min-h-screen">{children}</div>;
 
   const showDayNavigator = ['/', '/lagon', '/peche', '/champs', '/chasse', '/calendrier'].includes(pathname);
 
   return (
-    <div className="w-full max-w-full overflow-x-hidden">
+    <div className="w-full max-w-full">
       <SidebarProvider>
         <Sidebar>
           <SidebarHeader><div className="flex items-center gap-3 p-2"><AppLogo className="size-8 text-primary" /><h1 className="font-bold text-lg group-data-[collapsible=icon]:hidden">Lagon & Brousse</h1></div></SidebarHeader>
@@ -187,7 +187,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             )}
           </SidebarFooter>
         </Sidebar>
-        <main className="flex-1 flex flex-col min-h-screen w-full max-w-full overflow-x-hidden">
+        <main className="flex-1 flex flex-col min-h-screen w-full max-w-full">
           <UsageTimer status={status} auth={auth} />
           <header className={cn("flex flex-col gap-2 border-b bg-card px-4 sticky top-0 z-30 py-3", status === 'limited' && 'mt-10')}>
             <div className="flex items-center justify-between w-full">
@@ -242,7 +242,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               )}
             </div>
           </header>
-          <div className="flex flex-1 flex-col gap-6 p-4 pb-32 md:pb-12 w-full max-w-full overflow-x-hidden">{children}</div>
+          <div className="flex-1 flex flex-col gap-6 p-4 pb-32 md:pb-12 w-full max-w-full">{children}</div>
           <BottomNav />
         </main>
       </SidebarProvider>

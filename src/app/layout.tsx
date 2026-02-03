@@ -19,10 +19,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: '#000000',
-  width: 'device-width',
+  width: 1200,
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
 };
 
 function AppContent({ children }: { children: React.ReactNode }) {
@@ -60,7 +58,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className={cn('font-body antialiased', 'min-h-screen bg-background font-sans')}>
+      <body className={cn('font-body antialiased', 'min-h-screen bg-background font-sans overflow-x-auto')}>
         <Suspense fallback={null}>
          <AppContent>{children}</AppContent>
         </Suspense>

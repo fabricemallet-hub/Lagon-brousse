@@ -25,7 +25,7 @@
     --ring: 207 70% 53%;
     --radius: 0.5rem;
 
-    /* Sidebar Variables - Forced Opaque and High Contrast */
+    /* Sidebar Variables - Solid and Opaque */
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 215 25% 27%;
     --sidebar-primary: 207 70% 53%;
@@ -56,7 +56,7 @@
     --input: 216 15% 24%;
     --ring: 207 70% 53%;
 
-    /* Sidebar Variables Dark - Forced Opaque and High Contrast */
+    /* Sidebar Variables Dark - Solid and Opaque */
     --sidebar-background: 216 18% 13%;
     --sidebar-foreground: 210 17% 93%;
     --sidebar-primary: 207 70% 53%;
@@ -75,9 +75,8 @@
   }
   html, body {
     @apply bg-background text-foreground;
-    width: 100vw;
+    min-width: 1200px;
     min-height: 100vh;
-    overflow-x: hidden;
     position: relative;
     touch-action: manipulation;
   }
