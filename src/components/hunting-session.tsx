@@ -481,8 +481,8 @@ function HuntingSessionContent() {
                             <OverlayView key={p.id} position={{ lat: p.location.latitude, lng: p.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                 <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
                                     <div className={cn(
-                                        "px-2 py-0.5 rounded text-[10px] font-bold text-white shadow-md whitespace-nowrap border border-white/20",
-                                        p.isGibierEnVue ? "bg-red-600 animate-bounce" : "bg-black/60 backdrop-blur-sm"
+                                        "px-2.5 py-1 rounded text-[11px] font-black text-white shadow-lg whitespace-nowrap border border-white/30",
+                                        p.isGibierEnVue ? "bg-red-600 animate-bounce" : "bg-slate-900 backdrop-blur-md"
                                     )}>
                                         {p.displayName} {p.baseStatus ? `• ${p.baseStatus}` : ''}
                                     </div>

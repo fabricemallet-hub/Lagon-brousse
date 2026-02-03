@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -33,11 +32,11 @@ export function SplashScreen({ settings, isExiting }: SplashScreenProps) {
       <div className="relative w-full h-full flex items-center justify-center p-8">
         {splashMode === 'text' ? (
           <h1
-            className="font-bold text-center animate-in fade-in zoom-in duration-1000 px-4"
+            className="font-bold text-center animate-in fade-in zoom-in duration-1000 px-4 leading-tight"
             style={{
               color: splashTextColor,
               fontSize: `${splashFontSize}px`,
-              textShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              textShadow: '0 2px 10px rgba(0,0,0,0.5), 0 0 20px rgba(0,0,0,0.3)',
             }}
           >
             {splashText}

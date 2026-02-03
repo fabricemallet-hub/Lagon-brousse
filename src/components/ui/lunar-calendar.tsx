@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -174,10 +173,10 @@ const DayCell = React.memo(({
                 <div 
                   key={idx} 
                   className={cn(
-                    "text-[6px] font-black leading-[1.1] flex items-center justify-between w-full px-0.5 rounded-[1px] transition-all",
+                    "text-[8px] font-black leading-tight flex items-center justify-between w-full px-1 rounded-[2px] transition-all my-0.5",
                     tide.type === 'haute' 
-                      ? (isHighPeak ? "bg-primary text-white ring-1 ring-primary" : "text-primary")
-                      : (isLowPeak ? "bg-destructive text-white ring-1 ring-destructive opacity-100" : "text-blue-800 opacity-80")
+                      ? (isHighPeak ? "bg-primary text-white shadow-sm" : "text-primary")
+                      : (isLowPeak ? "bg-destructive text-white shadow-sm" : "text-blue-800")
                   )}
                 >
                   <span>{tide.time}</span>
@@ -273,8 +272,9 @@ export function LunarCalendar() {
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-2 p-3 bg-primary/5 border border-primary/20 rounded-lg">
               <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-primary"><Waves className="size-4"/> Heure/Hauteur</div>
-              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><span className="bg-primary text-white px-1 rounded-[2px]">H. Exceptionnelle</span></div>
-              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><span className="bg-destructive text-white px-1 rounded-[2px]">B. Exceptionnelle</span></div>
+              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-primary"><Star className="size-3 fill-primary" /> Grandes Marées</div>
+              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><span className="bg-primary text-white px-1 rounded-[2px]">Haute {'>'} Seuil</span></div>
+              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><span className="bg-destructive text-white px-1 rounded-[2px]">Basse {'<'} Seuil</span></div>
             </div>
           </div>
         )}

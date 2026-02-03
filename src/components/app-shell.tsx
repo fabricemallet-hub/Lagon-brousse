@@ -102,8 +102,8 @@ const UsageTimer = React.memo(({ status, auth }: { status: string, auth: any }) 
   if (status !== 'limited') return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 h-10 bg-destructive/90 text-destructive-foreground flex items-center justify-center text-[10px] font-bold z-[100] shadow-md px-4 text-center">
-        <AlertCircle className="size-3 mr-2 shrink-0" />
+    <div className="fixed top-0 left-0 right-0 h-10 bg-red-600 text-white flex items-center justify-center text-xs font-black z-[100] shadow-xl px-4 text-center border-b border-white/20">
+        <AlertCircle className="size-4 mr-2 shrink-0" />
         Mode Limité : {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')} restant.
     </div>
   );
