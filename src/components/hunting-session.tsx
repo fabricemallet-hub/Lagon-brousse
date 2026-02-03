@@ -16,6 +16,12 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -45,7 +51,8 @@ import {
   Volume2,
   VolumeX,
   AlertCircle,
-  Play
+  Play,
+  Settings
 } from 'lucide-react';
 import {
   useUser,
@@ -130,6 +137,7 @@ function HuntingSessionContent() {
     gibier: 'alerte'
   });
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
+  const [prefsSection, setPrefsSection] = useState<string | undefined>(undefined);
 
   const [mySessions, setMySessions] = useState<WithId<HuntingSession>[]>([]);
   const [areMySessionsLoading, setAreMySessionsLoading] = useState(false);
@@ -232,7 +240,6 @@ function HuntingSessionContent() {
       setNickname(userProfile.displayName || user?.displayName || user?.email?.split('@')[0] || '');
       setSelectedIcon(userProfile.mapIcon || 'Navigation');
       setSelectedColor(userProfile.mapColor || '#3b82f6');
-      // On pourrait aussi charger volume/sons depuis le profil si on ajoute les champs au schema
     }
   }, [userProfile, user]);
   
@@ -419,6 +426,7 @@ function HuntingSessionContent() {
             await updateDoc(doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid), prefs);
         }
         toast({ title: 'Préférences sauvegardées !' });
+        setPrefsSection(undefined); // Masquer après sauvegarde
     } catch (e) {
         console.error(e);
     } finally {
@@ -517,73 +525,84 @@ function HuntingSessionContent() {
 
                 {!isFullscreen && (
                     <div className="space-y-4">
-                        <div className="space-y-4 rounded-lg border p-4 bg-muted/30">
-                            <Label className="text-xs font-bold uppercase text-muted-foreground">Paramètres de session</Label>
-                            <Input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="Mon surnom..." />
-                            
-                            <div className="space-y-4 pt-4 border-t border-border/50">
-                                <Label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-2">
-                                    <Volume2 className="size-4" /> Paramètres Audio
-                                </Label>
-                                
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        {isSoundEnabled ? <Volume2 className="size-4 text-primary" /> : <VolumeX className="size-4 text-muted-foreground" />}
-                                        <Label className="text-sm">Activer les sons</Label>
-                                    </div>
-                                    <Switch checked={isSoundEnabled} onCheckedChange={setIsSoundEnabled} />
-                                </div>
+                        <Accordion type="single" collapsible value={prefsSection} onValueChange={setPrefsSection} className="w-full">
+                            <AccordionItem value="prefs" className="border-none">
+                                <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-2 bg-muted/50 rounded-lg px-4 mb-2">
+                                    <Settings className="size-4" />
+                                    <span>Mon Profil & Sons</span>
+                                </AccordionTrigger>
+                                <AccordionContent className="space-y-4 pt-2 px-1">
+                                    <div className="space-y-4 rounded-lg border p-4 bg-muted/30">
+                                        <Label className="text-xs font-bold uppercase text-muted-foreground">Paramètres de session</Label>
+                                        <Input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="Mon surnom..." />
+                                        
+                                        <div className="space-y-4 pt-4 border-t border-border/50">
+                                            <Label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-2">
+                                                <Volume2 className="size-4" /> Paramètres Audio
+                                            </Label>
+                                            
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    {isSoundEnabled ? <Volume2 className="size-4 text-primary" /> : <VolumeX className="size-4 text-muted-foreground" />}
+                                                    <Label className="text-sm">Activer les sons</Label>
+                                                </div>
+                                                <Switch checked={isSoundEnabled} onCheckedChange={setIsSoundEnabled} />
+                                            </div>
 
-                                <div className="space-y-2">
-                                    <div className="flex justify-between text-xs">
-                                        <span>Volume des alertes</span>
-                                        <span>{Math.round(soundVolume * 100)}%</span>
-                                    </div>
-                                    <Slider value={[soundVolume]} min={0} max={1} step={0.1} onValueChange={(val) => setSoundVolume(val[0])} />
-                                </div>
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between text-xs">
+                                                    <span>Volume des alertes</span>
+                                                    <span>{Math.round(soundVolume * 100)}%</span>
+                                                </div>
+                                                <Slider value={[soundVolume]} min={0} max={1} step={0.1} onValueChange={(val) => setSoundVolume(val[0])} />
+                                            </div>
 
-                                <div className="grid grid-cols-1 gap-3">
-                                    <div className="space-y-1.5">
-                                        <Label className="text-[10px] font-bold uppercase">Son : En Position</Label>
-                                        <div className="flex gap-2">
-                                            <Select value={soundSettings.position} onValueChange={(val) => { setSoundSettings(prev => ({...prev, position: val})); previewSound(val); }}>
-                                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                                                <SelectContent>
-                                                    {soundLibrary.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
-                                                </SelectContent>
-                                            </Select>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => previewSound(soundSettings.position)}><Play className="size-3" /></Button>
+                                            <div className="grid grid-cols-1 gap-3">
+                                                <div className="space-y-1.5">
+                                                    <Label className="text-[10px] font-bold uppercase">Son : En Position</Label>
+                                                    <div className="flex gap-2">
+                                                        <Select value={soundSettings.position} onValueChange={(val) => { setSoundSettings(prev => ({...prev, position: val})); previewSound(val); }}>
+                                                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                                            <SelectContent>
+                                                                {soundLibrary.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => previewSound(soundSettings.position)}><Play className="size-3" /></Button>
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <Label className="text-[10px] font-bold uppercase">Son : En Battue</Label>
+                                                    <div className="flex gap-2">
+                                                        <Select value={soundSettings.battue} onValueChange={(val) => { setSoundSettings(prev => ({...prev, battue: val})); previewSound(val); }}>
+                                                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                                            <SelectContent>
+                                                                {soundLibrary.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => previewSound(soundSettings.battue)}><Play className="size-3" /></Button>
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <Label className="text-[10px] font-bold uppercase text-destructive">Son : Gibier en vue</Label>
+                                                    <div className="flex gap-2">
+                                                        <Select value={soundSettings.gibier} onValueChange={(val) => { setSoundSettings(prev => ({...prev, gibier: val})); previewSound(val); }}>
+                                                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                                            <SelectContent>
+                                                                {soundLibrary.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => previewSound(soundSettings.gibier)}><Play className="size-3" /></Button>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label className="text-[10px] font-bold uppercase">Son : En Battue</Label>
-                                        <div className="flex gap-2">
-                                            <Select value={soundSettings.battue} onValueChange={(val) => { setSoundSettings(prev => ({...prev, battue: val})); previewSound(val); }}>
-                                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                                                <SelectContent>
-                                                    {soundLibrary.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
-                                                </SelectContent>
-                                            </Select>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => previewSound(soundSettings.battue)}><Play className="size-3" /></Button>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label className="text-[10px] font-bold uppercase text-destructive">Son : Gibier en vue</Label>
-                                        <div className="flex gap-2">
-                                            <Select value={soundSettings.gibier} onValueChange={(val) => { setSoundSettings(prev => ({...prev, gibier: val})); previewSound(val); }}>
-                                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                                                <SelectContent>
-                                                    {soundLibrary.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
-                                                </SelectContent>
-                                            </Select>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => previewSound(soundSettings.gibier)}><Play className="size-3" /></Button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
 
-                            <Button onClick={handleSavePreferences} size="sm" disabled={isSavingPrefs} className="w-full"><Save className="mr-2 h-4 w-4" /> Sauvegarder Profil</Button>
-                        </div>
+                                        <Button onClick={handleSavePreferences} size="sm" disabled={isSavingPrefs} className="w-full"><Save className="mr-2 h-4 w-4" /> Sauvegarder Profil</Button>
+                                    </div>
+                                </AccordionContent>
+                            </AccordionItem>
+                        </Accordion>
+
                         <div className="space-y-2">
                             <h4 className="font-bold text-sm flex items-center gap-2">
                                 <Users className="size-4" /> Équipe ({participants?.length || 0})
