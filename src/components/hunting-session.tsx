@@ -39,6 +39,7 @@ import {
   MapPin,
   Volume2
 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import {
   useUser,
   useFirestore,
@@ -124,7 +125,6 @@ function HuntingSessionContent() {
 
   const { data: participants } = useCollection<SessionParticipant>(participantsCollectionRef);
 
-  // Audio for alerts
   const playAlertSound = useCallback(() => {
     try {
         const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
@@ -134,7 +134,6 @@ function HuntingSessionContent() {
     }
   }, []);
 
-  // Monitor for "Gibier en vue" alerts from others
   useEffect(() => {
     if (!participants || !user) return;
     const others = participants.filter(p => p.id !== user.uid);
@@ -153,7 +152,6 @@ function HuntingSessionContent() {
     if (!firestore || !user?.uid) return;
     setAreMySessionsLoading(true);
     try {
-      // Simplified query to avoid missing index errors
       const q = query(
         collection(firestore, 'hunting_sessions'),
         where('organizerId', '==', user.uid),
@@ -162,7 +160,6 @@ function HuntingSessionContent() {
       const querySnapshot = await getDocs(q);
       const sessions = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as WithId<HuntingSession>));
       
-      // Memory sorting to avoid index requirements
       sessions.sort((a, b) => {
         const timeA = a.createdAt?.toMillis?.() || 0;
         const timeB = b.createdAt?.toMillis?.() || 0;
@@ -241,7 +238,6 @@ function HuntingSessionContent() {
 
         const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
         
-        // Get battery info if available
         let batteryData = null;
         if ('getBattery' in navigator) {
             const battery: any = await (navigator as any).getBattery();
