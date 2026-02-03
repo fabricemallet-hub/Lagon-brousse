@@ -63,7 +63,13 @@ export default function MeteoLivePage() {
   const communes = useMemo(() => {
     if (!rawCommunes) return [];
 
-    const isLoyaltyOrBelep = (id: string) => ['Bélep', 'Lifou', 'Maré', 'Ouvéa'].includes(id);
+    // Robust check for remote areas (ignoring accents and case)
+    const isLoyaltyOrBelep = (id: string) => {
+        const normalized = id.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const special = ['belep', 'lifou', 'mare', 'ouvea'];
+        return special.includes(normalized);
+    };
+
     const selectedCoords = locationsMap[selectedLocation];
 
     // Filter by search first
