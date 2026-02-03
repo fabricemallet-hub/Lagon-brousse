@@ -111,6 +111,8 @@ function HuntingSessionContent() {
   const [mySessions, setMySessions] = useState<WithId<HuntingSession>[]>([]);
   const [areMySessionsLoading, setAreMySessionsLoading] = useState(false);
 
+  const prevParticipantsRef = useRef<SessionParticipant[] | null>(null);
+
   const userDocRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return doc(firestore, 'users', user.uid);
@@ -124,29 +126,47 @@ function HuntingSessionContent() {
 
   const { data: participants } = useCollection<SessionParticipant>(participantsCollectionRef);
 
-  const playAlertSound = useCallback(() => {
+  const playStatusSound = useCallback((status: string) => {
     if (!isSoundEnabled) return;
-    try {
-        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-        audio.play();
-    } catch (e) {
-        console.warn("Audio play failed", e);
+    let url = '';
+    if (status === 'En position') {
+        url = 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3'; // Carillon doux
+    } else if (status === 'Battue en cours') {
+        url = 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'; // Clic action
+    } else if (status === 'gibier') {
+        url = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'; // Alerte urgente
+    }
+    if (url) {
+        const audio = new Audio(url);
+        audio.play().catch(() => {});
     }
   }, [isSoundEnabled]);
 
+  // Surveillance des coéquipiers pour les sons
   useEffect(() => {
     if (!participants || !user) return;
-    const others = participants.filter(p => p.id !== user.uid);
-    const anyGibier = others.some(p => p.isGibierEnVue);
-    if (anyGibier) {
-        playAlertSound();
-        toast({ 
-            title: "GIBIER EN VUE !", 
-            description: "Un coéquipier a signalé du gibier sur la carte.",
-            variant: "destructive" 
-        });
+    
+    if (prevParticipantsRef.current === null) {
+      prevParticipantsRef.current = participants;
+      return;
     }
-  }, [participants, user, playAlertSound, toast]);
+
+    participants.forEach(p => {
+      if (p.id === user.uid) return;
+      const prev = prevParticipantsRef.current?.find(old => old.id === p.id);
+      
+      if (p.isGibierEnVue && !prev?.isGibierEnVue) {
+        playStatusSound('gibier');
+        toast({ title: "GIBIER SIGNALÉ !", description: `Par ${p.displayName}`, variant: "destructive" });
+      }
+      
+      if (p.baseStatus !== prev?.baseStatus && p.baseStatus) {
+        playStatusSound(p.baseStatus);
+      }
+    });
+
+    prevParticipantsRef.current = participants;
+  }, [participants, user, playStatusSound, toast]);
 
   const fetchMySessions = useCallback(async () => {
     if (!firestore || !user?.uid) return;
@@ -274,7 +294,7 @@ function HuntingSessionContent() {
                 displayName: nickname, 
                 mapIcon: selectedIcon, 
                 mapColor: selectedColor, 
-                baseStatus: 'En position',
+                baseStatus: '', // Par défaut sans statut
                 isGibierEnVue: false,
                 location: { latitude, longitude },
                 updatedAt: serverTimestamp() 
@@ -309,7 +329,7 @@ function HuntingSessionContent() {
               displayName: nickname, 
               mapIcon: selectedIcon, 
               mapColor: selectedColor, 
-              baseStatus: 'En position',
+              baseStatus: '', // Par défaut sans statut
               isGibierEnVue: false,
               location: { latitude, longitude },
               updatedAt: serverTimestamp() 
@@ -329,8 +349,19 @@ function HuntingSessionContent() {
   const updateTacticalStatus = async (status: string) => {
     if (!user || !firestore || !session) return;
     const ref = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
-    await updateDoc(ref, { baseStatus: status });
-    toast({ title: `Statut : ${status}` });
+    const me = participants?.find(p => p.id === user.uid);
+    
+    const isDeactivating = me?.baseStatus === status;
+    const newStatus = isDeactivating ? '' : status;
+    
+    await updateDoc(ref, { baseStatus: newStatus });
+    
+    if (!isDeactivating) {
+        playStatusSound(status);
+        toast({ title: `Statut : ${status}` });
+    } else {
+        toast({ title: 'Statut retiré' });
+    }
   };
 
   const toggleGibierEnVue = async () => {
@@ -339,7 +370,7 @@ function HuntingSessionContent() {
     const me = participants?.find(p => p.id === user.uid);
     const newVal = !me?.isGibierEnVue;
     await updateDoc(ref, { isGibierEnVue: newVal });
-    if (newVal) playAlertSound();
+    if (newVal) playStatusSound('gibier');
     toast({ 
         title: newVal ? "Gibier signalé !" : "Alerte levée", 
         variant: newVal ? "destructive" : "default" 
@@ -485,24 +516,19 @@ function HuntingSessionContent() {
                                     <div key={p.id} className={cn("flex justify-between items-center p-3 text-sm", p.isGibierEnVue && "bg-red-50 dark:bg-red-950/20")}>
                                         <div className="flex items-center gap-3">
                                             <div className="size-3 rounded-full" style={{ backgroundColor: p.mapColor || '#3b82f6' }} />
-                                            <div className="flex flex-col">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-bold">{p.displayName}</span>
-                                                    {p.baseStatus && (
-                                                        <span className={cn(
-                                                            "text-[10px] font-black uppercase px-1.5 py-0.5 rounded-sm border shadow-sm",
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-bold">{p.displayName}</span>
+                                                {p.baseStatus && (
+                                                    <Badge 
+                                                        className={cn(
+                                                            "text-[10px] font-black uppercase px-1.5 py-0 shadow-sm border-none",
                                                             p.baseStatus === 'En position' 
-                                                                ? "bg-blue-600 text-white border-blue-700" 
-                                                                : "bg-orange-600 text-white border-orange-700"
-                                                        )}>
-                                                            {p.baseStatus}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                {p.isGibierEnVue && (
-                                                    <div className="flex items-center gap-1 mt-0.5 text-red-600 animate-pulse font-black text-[10px] uppercase">
-                                                        <Target className="size-3" /> Gibier signalé !
-                                                    </div>
+                                                                ? "bg-blue-600 hover:bg-blue-600 text-white" 
+                                                                : "bg-orange-600 hover:bg-orange-600 text-white"
+                                                        )}
+                                                    >
+                                                        {p.baseStatus}
+                                                    </Badge>
                                                 )}
                                             </div>
                                         </div>
