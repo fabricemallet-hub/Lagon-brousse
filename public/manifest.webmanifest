@@ -1,42 +1,47 @@
 {
-  "id": "lagon-brousse-nc",
+  "id": "nc.lagonetbrousse.app",
   "name": "Lagon & Brousse NC",
-  "short_name": "Lagon&Brousse",
-  "description": "Votre guide pour la mer et la terre en Nouvelle-Calédonie : météo, marées, chasse et jardinage.",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#f1f5f9",
-  "theme_color": "#3b82f6",
-  "orientation": "portrait",
-  "categories": ["weather", "sports", "lifestyle", "navigation"],
+  "short_name": "LB NC",
+  "description": "Météo, Pêche, Chasse et Terroir en Nouvelle-Calédonie avec Assistant IA et Sécurité Maritime.",
+  "version": "2.0.0",
   "icons": [
     {
       "src": "/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ],
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#3b82f6",
+  "categories": ["weather", "sports", "utilities"],
   "screenshots": [
     {
-      "src": "https://picsum.photos/seed/lbn1/390/844",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Tableau de bord météo et marées"
+      "src": "https://picsum.photos/seed/pwa1/1080/1920",
+      "sizes": "1080x1920",
+      "type": "image/jpeg",
+      "label": "Accueil Météo"
     },
     {
-      "src": "https://picsum.photos/seed/lbn2/1920/1080",
-      "sizes": "1920x1080",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Interface complète sur ordinateur"
+      "src": "https://picsum.photos/seed/pwa2/1080/1920",
+      "sizes": "1080x1920",
+      "type": "image/jpeg",
+      "label": "Vessel Tracker"
     }
   ]
 }

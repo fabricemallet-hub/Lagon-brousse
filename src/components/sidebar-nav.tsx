@@ -1,4 +1,3 @@
-
 'use client';
 
 import { usePathname } from 'next/navigation';
@@ -29,32 +28,40 @@ export function SidebarNav() {
   const isAdmin = userProfile?.subscriptionStatus === 'admin';
 
   return (
-    <SidebarMenu>
-      {navLinks.map((link) => {
-        if (link.adminOnly && !isAdmin) {
-          return null;
-        }
-        if (link.href === '/contact' && isAdmin) {
-          return null;
-        }
-        if (link.href === '/contact' && !user) {
-          return null;
-        }
-        return (
-          <SidebarMenuItem key={link.href}>
-            <SidebarMenuButton
-              asChild
-              isActive={pathname === link.href}
-              tooltip={link.label}
-            >
-              <Link href={link.href}>
-                <link.icon />
-                <span>{link.label}</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        );
-      })}
-    </SidebarMenu>
+    <div className="flex flex-col h-full">
+      <SidebarMenu className="flex-grow">
+        {navLinks.map((link) => {
+          if (link.adminOnly && !isAdmin) {
+            return null;
+          }
+          if (link.href === '/contact' && isAdmin) {
+            return null;
+          }
+          if (link.href === '/contact' && !user) {
+            return null;
+          }
+          return (
+            <SidebarMenuItem key={link.href}>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname === link.href}
+                tooltip={link.label}
+              >
+                <Link href={link.href}>
+                  <link.icon />
+                  <span>{link.label}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          );
+        })}
+      </SidebarMenu>
+      
+      <div className="px-4 py-4 mt-auto border-t border-sidebar-border bg-sidebar group-data-[collapsible=icon]:hidden">
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40">
+          Version 2.0.0
+        </p>
+      </div>
+    </div>
   );
 }
