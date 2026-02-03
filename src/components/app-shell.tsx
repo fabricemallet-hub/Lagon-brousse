@@ -244,16 +244,18 @@ function InnerAppShell({
           ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="w-full justify-start h-12 p-2 gap-3">
-                  <Avatar className="h-8 w-8"><AvatarFallback>{user.email?.[0].toUpperCase()}</AvatarFallback></Avatar>
-                  <div className="text-left group-data-[collapsible=icon]:hidden"><p className="font-medium text-xs truncate w-32">{user.email}</p></div>
+                <Button variant="ghost" className="w-full justify-start h-12 p-2 gap-3 bg-accent text-accent-foreground shadow-sm">
+                  <Avatar className="h-8 w-8 border-2 border-background"><AvatarFallback>{user.email?.[0].toUpperCase()}</AvatarFallback></Avatar>
+                  <div className="text-left group-data-[collapsible=icon]:hidden"><p className="font-bold text-xs truncate w-32">{user.email}</p></div>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuContent align="start" side="right" sideOffset={10} className="w-56">
                 <DropdownMenuItem asChild onClick={() => setOpenMobile(false)}>
                   <Link href="/compte" className="flex items-center"><User className="mr-2 h-4 w-4" />Compte</Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { handleLogout(); setOpenMobile(false); }}><LogOut className="mr-2 h-4 w-4" />Déconnexion</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { handleLogout(); setOpenMobile(false); }} className="text-destructive focus:text-destructive">
+                  <LogOut className="mr-2 h-4 w-4" />Déconnexion
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
