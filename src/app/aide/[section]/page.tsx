@@ -177,7 +177,7 @@ const sectionContent: Record<string, {
       "Repérez visuellement les jours Fruits (Pique), Racines (Carotte), etc.",
       "Les symboles de ciseaux indiquent les jours propices à la taille ou à la tonte de la pelouse.",
       "Le symbole de recyclage indique les jours de bouturage.",
-      "Cliquez sur une date pour lire la recommandation complète de l'IA."
+      "Cliquez sur une date pour ouvrir la fiche de recommandation complète : l'IA analyse pour vous la phase lunaire précise (montante/descendante), l'influence du zodiaque et vous délivre le conseil d'expert pour réussir vos travaux ce jour-là."
     ],
     tips: [
       "Basculez entre Calendrier Pêche et Champs grâce au bouton en haut du calendrier.",
