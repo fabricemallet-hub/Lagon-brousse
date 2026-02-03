@@ -84,6 +84,8 @@ service cloud.firestore {
     match /hunting_sessions/{sessionId} {
       allow get: if isSignedIn();
       allow create: if isOwner(request.resource.data.organizerId);
+      // Correction: Permettre à l'organisateur ou à l'admin de lister les sessions.
+      allow list: if isAdmin() || (isSignedIn() && resource.data.organizerId == request.auth.uid);
       allow delete: if isOwner(resource.data.organizerId);
       
       // Participants subcollection
