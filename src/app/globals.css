@@ -75,9 +75,11 @@
   }
   html, body {
     @apply bg-background text-foreground;
+    /* Forçage de la largeur minimale pour vue fixe desktop */
     min-width: 1200px;
     min-height: 100vh;
     position: relative;
+    /* Autorise les gestes de zoom et manipulation tactile */
     touch-action: manipulation;
   }
 }

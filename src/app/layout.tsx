@@ -46,14 +46,15 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap"
           rel="stylesheet"
         />
-        {/* Force refresh icons cache */}
+        {/* Configuration Viewport pour vue fixe 1200px (Desktop sur Mobile) */}
+        <meta name="viewport" content="width=1200, initial-scale=1" />
         <link rel="icon" href="/icon-192x192.png?v=2" />
         <link rel="apple-touch-icon" href="/icon-192x192.png?v=2" />
         <link rel="manifest" href="/manifest.webmanifest?v=2" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
-      <body className={cn('font-body antialiased', 'min-h-screen bg-background font-sans overflow-x-auto')}>
+      <body className={cn('font-body antialiased', 'min-h-screen bg-background font-sans')}>
         <Suspense fallback={null}>
          <AppContent>{children}</AppContent>
         </Suspense>

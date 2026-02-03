@@ -226,6 +226,7 @@ export function LunarCalendar() {
 
   return (
     <div className="w-full max-w-full overflow-x-auto flex flex-col items-center">
+      {/* Container principal forcé à 1200px pour éviter le wrapping sur mobile */}
       <div className="w-[1200px] border rounded-lg bg-card shadow-sm overflow-hidden flex flex-col">
         <div className="flex justify-between items-center p-3 border-b bg-muted/10">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handlePrevMonth}><ChevronLeft className="size-5" /></Button>
@@ -295,7 +296,8 @@ export function LunarCalendar() {
             </DialogTitle>
           </DialogHeader>
           
-          <div className="flex-grow p-6 overflow-y-auto">
+          {/* Zone de contenu optimisée pour le défilement tactile (finger navigation) */}
+          <div className="flex-grow p-6 overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
             {calendarView === 'peche' 
               ? (detailedDay && <PecheDetailDialogContent day={detailedDay} location={selectedLocation} />)
               : (detailedDay && <ChampsDetailDialogContent day={detailedDay} location={selectedLocation} />)
@@ -431,7 +433,7 @@ function PecheDetailDialogContent({ day, location }: { day: Date; location: stri
                 <Clock className="size-3" /> {slot.timeOfDay}
             </p>
             <div className="space-y-2">
-              {/* Seuil relevé à 8/10 également dans le calendrier détaillé */}
+              {/* Seuil 8/10 appliqué ici aussi pour cohérence */}
               {slot.fish.filter(f => f.rating >= 8).map((f, fi) => (
                 <div key={fi} className="p-3 border rounded-lg bg-card shadow-sm space-y-2">
                   <div className="flex justify-between items-center">
