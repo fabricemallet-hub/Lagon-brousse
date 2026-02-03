@@ -6,6 +6,7 @@ import {
   SidebarHeader,
   SidebarProvider,
   SidebarTrigger,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback } from './ui/avatar';
@@ -163,89 +164,148 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="w-full max-w-full">
       <SidebarProvider>
-        <Sidebar>
-          <SidebarHeader><div className="flex items-center gap-3 p-2"><AppLogo className="size-8 text-primary" /><h1 className="font-bold text-lg group-data-[collapsible=icon]:hidden">Lagon & Brousse</h1></div></SidebarHeader>
-          <SidebarContent><SidebarNav /></SidebarContent>
-          <SidebarFooter>
-            {isUserLoading || (user && isProfileLoading) ? (
-              <div className="flex items-center gap-3 p-2"><Skeleton className="h-8 w-8 rounded-full" /><div className="flex flex-col gap-1"><Skeleton className="h-4 w-20" /></div></div>
-            ) : user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="w-full justify-start h-12 p-2 gap-3">
-                    <Avatar className="h-8 w-8"><AvatarFallback>{user.email?.[0].toUpperCase()}</AvatarFallback></Avatar>
-                    <div className="text-left group-data-[collapsible=icon]:hidden"><p className="font-medium text-xs truncate w-32">{user.email}</p></div>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem asChild><Link href="/compte" className="flex items-center"><User className="mr-2 h-4 w-4" />Compte</Link></DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleLogout}><LogOut className="mr-2 h-4 w-4" />Déconnexion</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Button asChild variant="ghost" className="w-full justify-start h-12"><Link href="/login"><LogOut className="mr-2" />Connexion</Link></Button>
-            )}
-          </SidebarFooter>
-        </Sidebar>
-        <main className="flex-1 flex flex-col min-h-screen w-full max-w-full">
-          <UsageTimer status={status} auth={auth} />
-          <header className={cn("flex flex-col gap-2 border-b bg-card px-4 sticky top-0 z-30 py-3", status === 'limited' && 'mt-10')}>
-            <div className="flex items-center justify-between w-full">
-              <div className="flex items-center gap-2">
-                <SidebarTrigger />
-                {status === 'trial' && <Badge variant="secondary" className="text-[10px] h-5">Essai</Badge>}
-                {status === 'limited' && <Badge variant="destructive" className="text-[10px] h-5">Limité</Badge>}
-              </div>
-              {isLocationLoading ? <Skeleton className="h-9 w-[120px]" /> : (
-                <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-                  <SelectTrigger className="w-[130px] h-9 text-xs"><SelectValue placeholder="Commune" /></SelectTrigger>
-                  <SelectContent>{locations.map((loc) => <SelectItem key={loc} value={loc}>{loc}</SelectItem>)}</SelectContent>
-                </Select>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between w-full gap-2">
-              {showDayNavigator && (
-                <div className="flex flex-1 items-center gap-1 rounded-md border bg-background p-1 h-9">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handlePrevDay}><ChevronLeft className="h-4 w-4" /></Button>
-                  <Popover open={isDatePickerOpen} onOpenChange={setDatePickerOpen}>
-                    <PopoverTrigger asChild>
-                      <Button variant={'ghost'} className="flex-1 justify-center text-center font-bold h-7 text-xs px-1">
-                        {format(selectedDate, 'dd MMM yyyy', { locale: fr })}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="center"><Calendar mode="single" selected={selectedDate} onSelect={(d) => { if(d) { setSelectedDate(d); setDatePickerOpen(false); } }} initialFocus /></PopoverContent>
-                  </Popover>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleNextDay}><ChevronRight className="h-4 w-4" /></Button>
-                </div>
-              )}
-
-              {pathname === '/calendrier' && (
-                <div className="flex items-center gap-1 bg-muted p-1 rounded-lg h-9 ml-auto">
-                  <Button 
-                    variant={calendarView === 'peche' ? 'secondary' : 'ghost'} 
-                    size="sm" 
-                    className={cn("h-7 px-3 text-[10px] font-bold", calendarView === 'peche' && "bg-background shadow-sm")}
-                    onClick={() => setCalendarView('peche')}
-                  >
-                    <Fish className="mr-1 size-3" /> Pêche
-                  </Button>
-                  <Button 
-                    variant={calendarView === 'champs' ? 'secondary' : 'ghost'} 
-                    size="sm" 
-                    className={cn("h-7 px-3 text-[10px] font-bold", calendarView === 'champs' && "bg-background shadow-sm")}
-                    onClick={() => setCalendarView('champs')}
-                  >
-                    <Leaf className="mr-1 size-3" /> Champs
-                  </Button>
-                </div>
-              )}
-            </div>
-          </header>
-          <div className="flex-1 flex flex-col gap-6 p-4 pb-32 md:pb-12 w-full max-w-full">{children}</div>
-          <BottomNav />
-        </main>
+        <InnerAppShell 
+          status={status} 
+          user={user} 
+          isUserLoading={isUserLoading}
+          isProfileLoading={isProfileLoading}
+          selectedLocation={selectedLocation}
+          setSelectedLocation={setSelectedLocation}
+          isLocationLoading={isLocationLoading}
+          locations={locations}
+          showDayNavigator={showDayNavigator}
+          selectedDate={selectedDate}
+          setSelectedDate={setSelectedDate}
+          isDatePickerOpen={isDatePickerOpen}
+          setDatePickerOpen={setDatePickerOpen}
+          handlePrevDay={handlePrevDay}
+          handleNextDay={handleNextDay}
+          pathname={pathname}
+          calendarView={calendarView}
+          setCalendarView={setCalendarView}
+          handleLogout={handleLogout}
+          auth={auth}
+        >
+          {children}
+        </InnerAppShell>
       </SidebarProvider>
     </div>
+  );
+}
+
+function InnerAppShell({ 
+  children, 
+  status, 
+  user, 
+  isUserLoading, 
+  isProfileLoading,
+  selectedLocation,
+  setSelectedLocation,
+  isLocationLoading,
+  locations,
+  showDayNavigator,
+  selectedDate,
+  setSelectedDate,
+  isDatePickerOpen,
+  setDatePickerOpen,
+  handlePrevDay,
+  handleNextDay,
+  pathname,
+  calendarView,
+  setCalendarView,
+  handleLogout,
+  auth
+}: any) {
+  const { setOpenMobile } = useSidebar();
+
+  return (
+    <>
+      <Sidebar>
+        <SidebarHeader><div className="flex items-center gap-3 p-2"><AppLogo className="size-8 text-primary" /><h1 className="font-bold text-lg group-data-[collapsible=icon]:hidden">Lagon & Brousse</h1></div></SidebarHeader>
+        <SidebarContent><SidebarNav /></SidebarContent>
+        <SidebarFooter>
+          {isUserLoading || (user && isProfileLoading) ? (
+            <div className="flex items-center gap-3 p-2"><Skeleton className="h-8 w-8 rounded-full" /><div className="flex flex-col gap-1"><Skeleton className="h-4 w-20" /></div></div>
+          ) : user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="w-full justify-start h-12 p-2 gap-3">
+                  <Avatar className="h-8 w-8"><AvatarFallback>{user.email?.[0].toUpperCase()}</AvatarFallback></Avatar>
+                  <div className="text-left group-data-[collapsible=icon]:hidden"><p className="font-medium text-xs truncate w-32">{user.email}</p></div>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem asChild onClick={() => setOpenMobile(false)}>
+                  <Link href="/compte" className="flex items-center"><User className="mr-2 h-4 w-4" />Compte</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { handleLogout(); setOpenMobile(false); }}><LogOut className="mr-2 h-4 w-4" />Déconnexion</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button asChild variant="ghost" className="w-full justify-start h-12" onClick={() => setOpenMobile(false)}>
+              <Link href="/login"><LogOut className="mr-2" />Connexion</Link>
+            </Button>
+          )}
+        </SidebarFooter>
+      </Sidebar>
+      <main className="flex-1 flex flex-col min-h-screen w-full max-w-full">
+        <UsageTimer status={status} auth={auth} />
+        <header className={cn("flex flex-col gap-2 border-b bg-card px-4 sticky top-0 z-30 py-3", status === 'limited' && 'mt-10')}>
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2">
+              <SidebarTrigger />
+              {status === 'trial' && <Badge variant="secondary" className="text-[10px] h-5">Essai</Badge>}
+              {status === 'limited' && <Badge variant="destructive" className="text-[10px] h-5">Limité</Badge>}
+            </div>
+            {isLocationLoading ? <Skeleton className="h-9 w-[120px]" /> : (
+              <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+                <SelectTrigger className="w-[130px] h-9 text-xs"><SelectValue placeholder="Commune" /></SelectTrigger>
+                <SelectContent>{locations.map((loc: string) => <SelectItem key={loc} value={loc}>{loc}</SelectItem>)}</SelectContent>
+              </Select>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between w-full gap-2">
+            {showDayNavigator && (
+              <div className="flex flex-1 items-center gap-1 rounded-md border bg-background p-1 h-9">
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handlePrevDay}><ChevronLeft className="h-4 w-4" /></Button>
+                <Popover open={isDatePickerOpen} onOpenChange={setDatePickerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant={'ghost'} className="flex-1 justify-center text-center font-bold h-7 text-xs px-1">
+                      {format(selectedDate, 'dd MMM yyyy', { locale: fr })}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="center"><Calendar mode="single" selected={selectedDate} onSelect={(d) => { if(d) { setSelectedDate(d); setDatePickerOpen(false); } }} initialFocus /></PopoverContent>
+                </Popover>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleNextDay}><ChevronRight className="h-4 w-4" /></Button>
+              </div>
+            )}
+
+            {pathname === '/calendrier' && (
+              <div className="flex items-center gap-1 bg-muted p-1 rounded-lg h-9 ml-auto">
+                <Button 
+                  variant={calendarView === 'peche' ? 'secondary' : 'ghost'} 
+                  size="sm" 
+                  className={cn("h-7 px-3 text-[10px] font-bold", calendarView === 'peche' && "bg-background shadow-sm")}
+                  onClick={() => setCalendarView('peche')}
+                >
+                  <Fish className="mr-1 size-3" /> Pêche
+                </Button>
+                <Button 
+                  variant={calendarView === 'champs' ? 'secondary' : 'ghost'} 
+                  size="sm" 
+                  className={cn("h-7 px-3 text-[10px] font-bold", calendarView === 'champs' && "bg-background shadow-sm")}
+                  onClick={() => setCalendarView('champs')}
+                >
+                  <Leaf className="mr-1 size-3" /> Champs
+                </Button>
+              </div>
+            )}
+          </div>
+        </header>
+        <div className="flex-1 flex flex-col gap-6 p-4 pb-32 md:pb-12 w-full max-w-full">{children}</div>
+        <BottomNav />
+      </main>
+    </>
   );
 }
