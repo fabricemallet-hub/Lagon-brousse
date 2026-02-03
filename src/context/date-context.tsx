@@ -44,11 +44,11 @@ export function DateProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [splashSettings]);
 
-  // Use a neutral default while loading to avoid "blue flash"
+  // Use a neutral default matching the native splash to avoid visual jumps
   const defaultSettings: SplashScreenSettings = {
     splashMode: 'text',
     splashText: '', 
-    splashBgColor: '#edf1f4', // Neutral off-white matching app background
+    splashBgColor: '#3b82f6', // Bleu Lagon par défaut
     splashTextColor: 'transparent',
     splashFontSize: '32',
   };
