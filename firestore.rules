@@ -15,7 +15,6 @@ service cloud.firestore {
     }
     
     function isAdmin() {
-      // Les emails administrateurs autorisés
       return isSignedIn() && (
         request.auth.token.email == 'f.mallet81@outlook.com' || 
         request.auth.token.email == 'f.mallet81@gmail.com'
@@ -24,21 +23,20 @@ service cloud.firestore {
 
     // ----------------------------------------------------------------------
     // Collection: users
-    // Purpose: Stores private user account information.
     // ----------------------------------------------------------------------
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
-      allow create: if isOwner(userId);
+      allow create: if isSignedIn();
       allow update: if isOwner(userId) || isAdmin();
-      allow delete: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
       
       match /fishing_spots/{spotId} {
-        allow read, write, delete: if isOwner(userId);
+        allow read, write: if isOwner(userId);
       }
 
       match /sowings/{sowingId} {
-        allow read, write, delete: if isOwner(userId);
+        allow read, write: if isOwner(userId);
       }
     }
 
@@ -64,7 +62,7 @@ service cloud.firestore {
     }
     
     // ----------------------------------------------------------------------
-    // Collection: stations & subcollections
+    // Collection: stations
     // ----------------------------------------------------------------------
     match /stations/{stationId} {
       allow read: if true;
@@ -78,25 +76,15 @@ service cloud.firestore {
     
     // ----------------------------------------------------------------------
     // Collection: hunting_sessions
-    // Purpose: Manages real-time group hunting sessions.
     // ----------------------------------------------------------------------
     match /hunting_sessions/{sessionId} {
-      // Lecture document et listage collection autorisés pour les membres connectés
-      allow get, list: if isSignedIn();
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.organizerId == request.auth.uid);
       
-      // Création réservée à l'organisateur déclaré
-      allow create: if isSignedIn() && request.resource.data.organizerId == request.auth.uid;
-      
-      // Mise à jour (statuts, etc.) par l'organisateur ou l'admin
-      allow update: if isAdmin() || (isSignedIn() && resource.data.organizerId == request.auth.uid);
-      
-      // Suppression réservée à l'organisateur ou l'admin
-      allow delete: if isAdmin() || (isSignedIn() && resource.data.organizerId == request.auth.uid);
-      
-      // Participants subcollection
       match /participants/{userId} {
-        allow get, list: if isSignedIn();
-        allow create, update, delete: if isOwner(userId) || isAdmin();
+        allow read: if isSignedIn();
+        allow write: if isOwner(userId) || isAdmin();
       }
     }
 
@@ -106,14 +94,7 @@ service cloud.firestore {
     match /access_tokens/{tokenId} {
       allow read, write: if isAdmin();
       allow get: if isSignedIn();
-      
-      function isRedeemingOwnToken() {
-        let isBecomingRedeemed = request.resource.data.status == 'redeemed';
-        let wasActive = resource.data.status == 'active';
-        let isRedeemer = request.resource.data.redeemedBy == request.auth.uid;
-        return isBecomingRedeemed && wasActive && isRedeemer;
-      }
-      allow update: if isRedeemingOwnToken();
+      allow update: if isSignedIn() && request.resource.data.status == 'redeemed';
     }
     
     // ----------------------------------------------------------------------

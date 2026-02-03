@@ -1,3 +1,4 @@
+
 'use client';
 import { doc, getDoc, setDoc, Firestore } from 'firebase/firestore';
 import { User } from 'firebase/auth';
@@ -23,7 +24,9 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
 
   const { uid, email } = user;
   const effectiveDisplayName = displayName || user.displayName || email?.split('@')[0] || 'Utilisateur';
-  const isAdminUser = email === 'f.mallet81@outlook.com';
+  
+  // Reconnaissance des deux comptes administrateurs
+  const isAdminUser = email === 'f.mallet81@outlook.com' || email === 'f.mallet81@gmail.com';
   
   let newUserDocument: UserAccount;
 
@@ -31,7 +34,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
     newUserDocument = {
       id: uid,
       email: email || '',
-      displayName: 'Admin',
+      displayName: effectiveDisplayName || 'Admin',
       subscriptionStatus: 'admin',
       favoriteLocationIds: [],
       lastSelectedLocation: 'Nouméa',
