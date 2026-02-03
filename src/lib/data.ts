@@ -176,6 +176,14 @@ function calculateHourlyTides(location: string, baseDate: Date): Pick<HourlyFore
         const tideStation = communeToTideStationMap[location] || 'Nouméa';
         const stationTides = tideStations[tideStation as keyof typeof tideStations] || tideStations['Nouméa'];
 
+        // Moon phase calculation for tide amplitude
+        const knownNewMoon = new Date('2024-01-11T00:00:00Z');
+        const daysSinceKnownNewMoon = (date.getTime() - knownNewMoon.getTime()) / (1000 * 3600 * 24);
+        const dayInCycle = daysSinceKnownNewMoon % 29.53;
+        
+        // Spring factor: 1.0 at quarters, up to 1.3 at full/new moon
+        const springFactor = 1 + 0.3 * Math.abs(Math.cos((dayInCycle / 29.53) * 2 * Math.PI));
+
         const varyTime = (time: string, offset: number) => {
             let [h, m] = time.split(':').map(Number);
             m += Math.floor(Math.sin(dateSeed * 0.05 + locationSeed + offset) * 15);
@@ -187,8 +195,14 @@ function calculateHourlyTides(location: string, baseDate: Date): Pick<HourlyFore
         const dailyTides: Tide[] = JSON.parse(JSON.stringify(stationTides.tides));
         dailyTides.forEach((tide: Tide, i: number) => {
             const baseTide = stationTides.tides[i % stationTides.tides.length];
-            const variation = Math.sin((dateSeed * (1 + i * 0.1) + locationSeed * 0.2)) * (baseTide.height * 0.1);
-            tide.height = parseFloat(Math.max(0.1, baseTide.height + variation).toFixed(2));
+            const variation = Math.sin((dateSeed * (1 + i * 0.1) + locationSeed * 0.2)) * 0.05;
+            
+            if (tide.type === 'haute') {
+                tide.height = parseFloat((baseTide.height * springFactor + variation).toFixed(2));
+            } else {
+                // Low tides are lower during spring tides (higher springFactor)
+                tide.height = parseFloat((baseTide.height / springFactor + variation).toFixed(2));
+            }
             tide.time = varyTime(baseTide.time, i + 5);
         });
         return dailyTides;
@@ -246,7 +260,6 @@ function calculateHourlyTides(location: string, baseDate: Date): Pick<HourlyFore
             const maxTideRange = Math.abs(prevTide.height - nextTide.height);
             const strengthValue = Math.abs(Math.sin(phase)) * maxTideRange;
             
-            // Check proximity to any peak to set the peak type
             let closestPeak: (typeof allTideEvents[0]) | null = null;
             let minDiff = Infinity;
             allTideEvents.forEach(peak => {
@@ -257,7 +270,7 @@ function calculateHourlyTides(location: string, baseDate: Date): Pick<HourlyFore
                 }
             });
 
-            if (minDiff < 45 && closestPeak) { // If within 45 minutes of a peak, flag it as such.
+            if (minDiff < 45 && closestPeak) {
                 tidePeakType = closestPeak.type;
             }
 
@@ -266,7 +279,6 @@ function calculateHourlyTides(location: string, baseDate: Date): Pick<HourlyFore
             else if (strengthValue > 0.1) tideCurrent = 'Faible';
             else {
                 tideCurrent = 'Nul';
-                 // Ensure peak type is set at slack tide
                 if (!tidePeakType && closestPeak) {
                    tidePeakType = closestPeak.type
                 }
@@ -308,6 +320,13 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
   }
 
+  // Moon phase calculation
+  const phases: string[] = ['Nouvelle lune', 'Premier croissant', 'Premier quartier', 'Lune gibbeuse croissante', 'Pleine lune', 'Lune gibbeuse décroissante', 'Dernier quartier', 'Dernier croissant'];
+  const knownNewMoon = new Date('2024-01-11T00:00:00Z');
+  const daysSinceKnownNewMoon = (effectiveDate.getTime() - knownNewMoon.getTime()) / (1000 * 3600 * 24);
+  const dayInCycle = daysSinceKnownNewMoon % 29.53;
+  const springFactor = 1 + 0.3 * Math.abs(Math.cos((dayInCycle / 29.53) * 2 * Math.PI));
+
   // 1. Determine tide station and get base tides
   const tideStation = communeToTideStationMap[location] || 'Nouméa';
   const stationTides = tideStations[tideStation as keyof typeof tideStations] || tideStations['Nouméa'];
@@ -319,11 +338,16 @@ export function generateProceduralData(location: string, date: Date): LocationDa
       tideStation: tideStation
   };
 
-  // Vary tides slightly for realism
+  // Vary tides realism
   locationData.tides.forEach((tide: Tide, i: number) => {
     const baseTide = stationTides.tides[i % stationTides.tides.length];
-    const variation = Math.sin((dateSeed * (1 + i * 0.1) + locationSeed * 0.2)) * (baseTide.height * 0.1); // Smaller variation
-    tide.height = parseFloat(Math.max(0.1, baseTide.height + variation).toFixed(2));
+    const variation = Math.sin((dateSeed * (1 + i * 0.1) + locationSeed * 0.2)) * 0.05;
+    
+    if (tide.type === 'haute') {
+        tide.height = parseFloat((baseTide.height * springFactor + variation).toFixed(2));
+    } else {
+        tide.height = parseFloat((baseTide.height / springFactor + variation).toFixed(2));
+    }
     tide.time = varyTime(tide.time, i + 5);
   });
   
@@ -352,8 +376,7 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     if (closestTide) {
         slot.tide = `Marée ${closestTide.type}`;
         slot.tideTime = closestTide.time;
-        // Determine tide movement based on the *next* tide
-        const slotEndMinutes = slotStartMinutes + 120; // 2 hour slot
+        const slotEndMinutes = slotStartMinutes + 120;
         let nextTide: Tide | null = null;
         let minNextDiff = Infinity;
 
@@ -366,7 +389,6 @@ export function generateProceduralData(location: string, date: Date): LocationDa
              }
         });
         
-        // If no next tide found for the day, check from the beginning of next day's tides
         if (!nextTide) {
             let firstTideNextDay: Tide | null = null;
             let minFirstDiff = Infinity;
@@ -384,22 +406,12 @@ export function generateProceduralData(location: string, date: Date): LocationDa
         if (minDiff < 30) {
             slot.tideMovement = 'étale';
         } else if (nextTide) {
-            if (nextTide.type === 'haute') {
-                slot.tideMovement = 'montante';
-            } else {
-                slot.tideMovement = 'descendante';
-            }
+            slot.tideMovement = nextTide.type === 'haute' ? 'montante' : 'descendante';
         } else {
              slot.tideMovement = 'étale';
         }
     }
   });
-  
-    // Moon phase calculation
-  const phases: string[] = ['Nouvelle lune', 'Premier croissant', 'Premier quartier', 'Lune gibbeuse croissante', 'Pleine lune', 'Lune gibbeuse décroissante', 'Dernier quartier', 'Dernier croissant'];
-  const knownNewMoon = new Date('2024-01-11T00:00:00Z');
-  const daysSinceKnownNewMoon = (effectiveDate.getTime() - knownNewMoon.getTime()) / (1000 * 3600 * 24);
-  const dayInCycle = daysSinceKnownNewMoon % 29.53;
   
   const phaseIndex = Math.floor((dayInCycle / 29.53) * 8 + 0.5) % 8;
   locationData.weather.moon.phase = phases[phaseIndex];
@@ -407,8 +419,7 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   const illumination = 0.5 * (1 - Math.cos((dayInCycle / 29.53) * 2 * Math.PI));
   locationData.weather.moon.percentage = Math.round(illumination * 100);
 
-  // Pelagic fish season logic
-  const warmSeasonMonths = [8, 9, 10, 11, 0, 1, 2, 3]; // Sep to Apr
+  const warmSeasonMonths = [8, 9, 10, 11, 0, 1, 2, 3];
   const isPelagicSeason = warmSeasonMonths.includes(month);
   
   locationData.pelagicInfo = {

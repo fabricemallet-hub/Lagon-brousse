@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -141,7 +142,7 @@ const DayCell = React.memo(({
     const highest = [...data.tides].sort((a, b) => b.height - a.height)[0];
     const lowest = [...data.tides].sort((a, b) => a.height - b.height)[0];
     const range = highest.height - lowest.height;
-    const isGrandeMaree = range > 1.35; // Seuil pour la NC
+    const isGrandeMaree = range > 1.35;
     return { highest, lowest, range, isGrandeMaree };
   }, [data.tides]);
 
@@ -187,14 +188,14 @@ const DayCell = React.memo(({
                 <div 
                   key={idx} 
                   className={cn(
-                    "text-[6px] font-black leading-[1.1] flex items-center justify-between w-full px-0.5 rounded-[1px]",
-                    tide.type === 'haute' ? "text-primary" : "text-blue-800 opacity-80",
-                    isLargeHigh && "bg-primary text-white ring-1 ring-primary",
-                    isLargeLow && "bg-destructive text-white ring-1 ring-destructive opacity-100"
+                    "text-[6px] font-black leading-[1.1] flex items-center justify-between w-full px-0.5 rounded-[1px] transition-all",
+                    tide.type === 'haute' 
+                      ? (isLargeHigh ? "bg-primary text-white ring-1 ring-primary" : "text-primary")
+                      : (isLargeLow ? "bg-destructive text-white ring-1 ring-destructive opacity-100" : "text-blue-800 opacity-80")
                   )}
                 >
                   <span>{tide.time}</span>
-                  <span>{tide.height.toFixed(1)}m</span>
+                  <span>{tide.height.toFixed(2)}m</span>
                 </div>
               );
             })}
@@ -249,7 +250,6 @@ export function LunarCalendar() {
           {weekdays.map((day) => <div key={day} className="text-center text-[9px] font-black uppercase text-muted-foreground p-2">{day}</div>)}
         </div>
 
-        {/* CALENDAR SCROLLABLE CONTAINER */}
         <div className="w-full overflow-x-auto scrollbar-hide touch-pan-x">
           <div className="grid grid-cols-7 min-w-[320px] w-full">
             {days.map((day) => (
