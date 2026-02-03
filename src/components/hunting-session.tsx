@@ -11,12 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Users,
   LogOut,
@@ -24,7 +19,6 @@ import {
   BatteryMedium,
   BatteryLow,
   BatteryCharging,
-  AlertCircle,
   Navigation,
   Expand,
   Shrink,
@@ -37,7 +31,8 @@ import {
   Target,
   LocateFixed,
   MapPin,
-  WifiOff
+  WifiOff,
+  AlertCircle
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -100,7 +95,6 @@ function HuntingSessionContent() {
   const watchIdRef = useRef<number | null>(null);
   const [isParticipating, setIsParticipating] = useState(false);
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [zoom, setZoom] = useState(16);
   const [initialZoomDone, setInitialZoomDone] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -152,7 +146,7 @@ function HuntingSessionContent() {
     if (!firestore || !user?.uid) return;
     setAreMySessionsLoading(true);
     try {
-      const q = query(collection(firestore, 'hunting_sessions'));
+      const q = collection(firestore, 'hunting_sessions');
       const querySnapshot = await getDocs(q);
       const sessions = querySnapshot.docs
         .map(doc => ({ ...doc.data(), id: doc.id } as WithId<HuntingSession>))
@@ -242,7 +236,7 @@ function HuntingSessionContent() {
                 location: newLocation,
                 battery: batteryData,
                 updatedAt: serverTimestamp(),
-            }).catch(() => {}); // Silent fail for background sync
+            }).catch(() => {});
         },
         (err) => console.error("Geolocation watch error:", err),
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -388,7 +382,7 @@ function HuntingSessionContent() {
                     <GoogleMap
                         mapContainerClassName="w-full h-full"
                         center={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : { lat: -21.45, lng: 165.5 }}
-                        zoom={zoom}
+                        zoom={16}
                         onLoad={setMap}
                         options={mapOptions}
                     >
@@ -552,7 +546,7 @@ export function HuntingSessionCard() {
             <CardDescription>Vous devez être connecté pour rejoindre ou créer une session de chasse de groupe.</CardDescription>
         </CardHeader>
         <CardContent>
-            <Button asChild className="w-full"><a href="/login">Se connecter</a></Button>
+            <Button asChild className="w-full"><Link href="/login">Se connecter</Link></Button>
         </CardContent>
     </Card>
   );

@@ -8,13 +8,11 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Button } from './ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { Avatar, AvatarFallback } from './ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import { AppLogo } from './icons';
@@ -35,7 +33,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useLocation } from '@/context/location-context';
-import { useCalendarView } from '@/context/calendar-view-context';
 import { usePathname, useRouter } from 'next/navigation';
 import { useDate } from '@/context/date-context';
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
@@ -56,7 +53,6 @@ import { BottomNav } from './bottom-nav';
 
 const USAGE_LIMIT_SECONDS = 60;
 
-// Composant Timer isolé pour éviter les re-renders massifs de l'AppShell
 const UsageTimer = React.memo(({ status, auth }: { status: string, auth: any }) => {
   const [timeLeft, setTimeLeft] = useState(USAGE_LIMIT_SECONDS);
   const { toast } = useToast();
@@ -160,10 +156,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const showDayNavigator = ['/', '/lagon', '/peche', '/champs', '/chasse'].includes(pathname);
 
-  const datePickerTrigger = (
-    <Button variant={'outline'} className="w-[150px] sm:w-[180px] justify-start text-left font-normal h-8"><CalendarIcon className="mr-2 h-4 w-4" />{format(selectedDate, 'PPP', { locale: fr })}</Button>
-  );
-
   return (
     <div>
       <SidebarProvider>
@@ -209,7 +201,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <div className="flex items-center gap-1 rounded-md border bg-background p-1">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handlePrevDay}><ChevronLeft className="h-4 w-4" /></Button>
                     <Popover open={isDatePickerOpen} onOpenChange={setDatePickerOpen}>
-                      <PopoverTrigger asChild>{datePickerTrigger}</PopoverTrigger>
+                      <PopoverTrigger asChild>
+                        <Button variant={'outline'} className="w-[150px] sm:w-[180px] justify-start text-left font-normal h-8">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {format(selectedDate, 'PPP', { locale: fr })}
+                        </Button>
+                      </PopoverTrigger>
                       <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(d) => { if(d) { setSelectedDate(d); setDatePickerOpen(false); } }} initialFocus /></PopoverContent>
                     </Popover>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleNextDay}><ChevronRight className="h-4 w-4" /></Button>
