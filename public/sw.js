@@ -1,5 +1,4 @@
-// Service Worker Lagon & Brousse NC
-const CACHE_NAME = 'lagon-brousse-v1';
+const CACHE_NAME = 'lagon-brousse-v2-cache';
 const ASSETS_TO_CACHE = [
   '/',
   '/manifest.webmanifest',
@@ -20,9 +19,9 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            return caches.delete(cache);
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
           }
         })
       );
@@ -32,10 +31,9 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Stratégie : Réseau d'abord, sinon cache
   event.respondWith(
-    fetch(event.request).catch(() => {
-      return caches.match(event.request);
+    caches.match(event.request).then((response) => {
+      return response || fetch(event.request);
     })
   );
 });
