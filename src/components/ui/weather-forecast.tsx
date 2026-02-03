@@ -13,7 +13,7 @@ import {
   Waves,
   Zap,
 } from 'lucide-react';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { WeatherData, HourlyForecast, WindDirection, Tide } from '@/lib/types';
 import { cn, translateWindDirection } from '@/lib/utils';
@@ -114,7 +114,6 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
     const sortedTideEvents = [...currentTideEvents].sort((a,b) => a.date.getTime() - b.date.getTime());
     let nextTide = sortedTideEvents.find(tide => tide.date > now);
     
-    // Fallback if all tides today passed
     if (!nextTide) {
         nextTide = { ...sortedTideEvents[0], date: new Date(sortedTideEvents[0].date.getTime() + 24 * 60 * 60 * 1000) };
     }
@@ -137,14 +136,12 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
     }
     const windSentence = `Vent de ${_selectedForecast.windSpeed} nœuds de ${translateWindDirection(_selectedForecast.windDirection)}, tendance ${windTrend}.`;
 
-    // Ensure strict 00h to 23h order
-    const sortedForecasts = [...weather.hourly].sort((a, b) => {
-        const hA = new Date(a.date).getHours();
-        const hB = new Date(b.date).getHours();
-        return hA - hB;
-    });
+    // Tri chronologique strict de 00h à 23h basé sur le timestamp
+    const sortedForecasts = [...weather.hourly].sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
 
-    const isToday = new Date(sortedForecasts[12].date).toDateString() === now.toDateString();
+    const isToday = isSameDay(new Date(weather.hourly[0].date), now);
 
     return { 
       summary: {tideSentence, windSentence}, 
@@ -154,7 +151,6 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
     };
   }, [now, weather, tides]);
 
-  // Auto-scroll to current hour on today's view
   useEffect(() => {
     if (isClient && isSelectedDayToday && scrollRef.current) {
         const currentHour = now.getHours();
@@ -227,7 +223,7 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
                 className={cn(
                   'flex-shrink-0 w-24 flex flex-col items-center justify-between p-3 rounded-xl border h-40 space-y-2 text-center transition-all duration-300',
                    isCurrent ? 'bg-primary text-primary-foreground border-primary scale-[1.05] z-10 shadow-xl' : 'bg-card',
-                   isPast && 'opacity-30 grayscale pointer-events-none'
+                   isPast && 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 opacity-50 grayscale pointer-events-none'
                 )}
               >
                 <p className={cn(

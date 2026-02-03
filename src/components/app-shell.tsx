@@ -76,10 +76,10 @@ const UsageTimer = React.memo(({ status, auth }: { status: string, auth: any }) 
       localStorage.setItem('dailyUsage', '0');
     }
     
-    const remaining = Math.max(0, USAGE_LIMIT_SECONDS - dailyUsage);
-    setTimeLeft(remaining);
+    const initialRemaining = Math.max(0, USAGE_LIMIT_SECONDS - dailyUsage);
+    setTimeLeft(initialRemaining);
 
-    if (remaining <= 0) {
+    if (initialRemaining <= 0) {
         toast({ variant: 'destructive', title: 'Limite atteinte', description: 'Votre minute quotidienne est épuisée.' });
         signOut(auth).then(() => {
             sessionStorage.clear();
@@ -93,7 +93,6 @@ const UsageTimer = React.memo(({ status, auth }: { status: string, auth: any }) 
         const next = Math.max(0, prev - 1);
         const used = USAGE_LIMIT_SECONDS - next;
         
-        // Sauvegarde de l'usage pour garder la trace en cas de rafraîchissement
         localStorage.setItem('dailyUsage', String(used));
         
         if (next <= 0) {
@@ -150,7 +149,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       case 'active':
         return isBefore(new Date(), new Date(userProfile.subscriptionExpiryDate!)) ? 'active' : 'limited';
       case 'trial':
-        // Un compte d'essai doit avoir accès mais être limité à 1min/jour
         return isBefore(new Date(), new Date(userProfile.subscriptionExpiryDate!)) ? 'trial' : 'limited';
       default: return 'limited';
     }
