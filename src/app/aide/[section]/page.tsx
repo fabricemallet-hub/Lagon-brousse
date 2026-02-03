@@ -88,7 +88,7 @@ const sectionContent: Record<string, {
     color: 'bg-blue-600',
     role: "Un système de sécurité maritime haute-fidélité conçu pour rassurer vos proches à terre en partageant votre position GPS exacte et votre statut d'activité en mer.",
     steps: [
-      "Activation Émetteur : Activez 'Partager ma position'. Votre identifiant unique s'affiche instantanément.",
+      "Activation Émetteur : Activer 'Partager ma position'. Votre identifiant unique s'affiche instantanément.",
       "Partage de l'ID : Envoyez cet ID par SMS ou WhatsApp à votre contact de confiance resté à terre.",
       "Détection d'Immobilité : Si le système détecte une absence de mouvement (>15m) pendant 5 min, votre statut passe en 'Stationnaire' (Mouillage/Dérive).",
       "Mises à jour Auto : En mode stationnaire, le tracker rafraîchit votre position toutes les 30 min pour rassurer le récepteur sans vider votre batterie.",
@@ -118,7 +118,7 @@ const sectionContent: Record<string, {
     ],
     tips: [
       "Le mode satellite de la carte est idéal pour repérer les patates de corail et les têtes de roche.",
-      "Un spot enregistré avec 9/10 d'indice est un précieux indicateur pour l'IA prédictive.",
+      "Un spot enregistré avec 9/10 d'indice est un précieux indicator pour l'IA prédictive.",
       "L'IA ignore météo et vent pour se concentrer sur les cycles immuables de la lune et des marées."
     ]
   },
@@ -186,7 +186,6 @@ const sectionContent: Record<string, {
       "Suivi des Crustacés : Repérez les jours 'Crabe Plein' (vives-eaux) ou 'Crabe Mout' (mortes-eaux/mue). Ne perdez plus de temps à poser des casiers durant la mue.",
       "Saisons Pélagiques : Identifiez les périodes de passage des espèces comme le Tazard (pic en Nov/Déc) via les alertes de saison intégrées aux fiches journalières.",
       "Analyse des Marées : Visualisez instantanément les marées les plus hautes et les plus basses du mois (grandes marées) pour cibler les platiers ou les passes.",
-      "Comportement des Espèces : Accédez aux fiches détaillées par jour pour connaître les habitudes alimentaires, les profondeurs idéales (ex: 2-10m pour le Bec de cane) et les spots stratégiques.",
       "Stratégie Langoustes : Adaptez votre sortie selon l'activité prévue. En lune noire (Nouvelle Lune), privilégiez le récif extérieur ; en lune claire, elles restent souvent à l'abri ou à l'intérieur."
     ],
     tips: [
