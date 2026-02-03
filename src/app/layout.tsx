@@ -1,4 +1,3 @@
-
 import type { Metadata, Viewport } from 'next';
 import { AppShell } from '@/components/app-shell';
 import { Toaster } from '@/components/ui/toaster';
@@ -19,7 +18,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#3b82f6',
+  themeColor: '#000000',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,

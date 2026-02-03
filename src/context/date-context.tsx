@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { ReactNode } from 'react';
@@ -48,7 +47,7 @@ export function DateProvider({ children }: { children: ReactNode }) {
   const defaultSettings: SplashScreenSettings = {
     splashMode: 'text',
     splashText: '', 
-    splashBgColor: '#3b82f6', // Bleu Lagon par défaut
+    splashBgColor: '#000000', // Noir par défaut
     splashTextColor: 'transparent',
     splashFontSize: '32',
   };
@@ -56,7 +55,7 @@ export function DateProvider({ children }: { children: ReactNode }) {
   // If loading, we use neutral settings. Once loaded, we use the Firestore settings.
   const finalSettings = isSettingsLoading 
     ? defaultSettings 
-    : (splashSettings || { ...defaultSettings, splashText: 'Lagon & Brousse NC', splashBgColor: '#3b82f6', splashTextColor: '#ffffff' });
+    : (splashSettings || { ...defaultSettings, splashText: 'Lagon & Brousse NC', splashBgColor: '#000000', splashTextColor: '#ffffff' });
 
   if (showSplash) {
     return <SplashScreen settings={finalSettings} isExiting={isExiting} />;
