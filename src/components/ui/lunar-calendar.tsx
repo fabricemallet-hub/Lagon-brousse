@@ -286,10 +286,6 @@ function PecheLegend() {
 function DetailDialogSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <Skeleton className="h-8 w-3/4" />
-        <Skeleton className="h-4 w-1/2" />
-      </div>
       <div className="space-y-4">
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-48 w-full" />
@@ -313,11 +309,6 @@ function ChampsDetailDialogContent({ day, location }: { day: Date; location: str
 
   return (
     <div className="space-y-6">
-      <DialogHeader>
-        <DialogTitle className="text-xl font-bold">Conseils Jardin du {format(day, 'eeee d MMMM yyyy', { locale: fr })}</DialogTitle>
-        <DialogDescription>Recommandations basées sur le cycle lunaire et les traditions locales.</DialogDescription>
-      </DialogHeader>
-
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-xl bg-muted/50 border">
         <div className="space-y-1">
           <h3 className="font-bold text-[10px] uppercase text-muted-foreground">Lune</h3>
@@ -388,11 +379,6 @@ function PecheDetailDialogContent({ day, location }: { day: Date; location: stri
 
   return (
     <div className="space-y-6">
-      <DialogHeader>
-        <DialogTitle className="text-xl font-bold">Prévisions Pêche du {format(day, 'eeee d MMMM yyyy', { locale: fr })}</DialogTitle>
-        <DialogDescription>Potentiel par espèce et conditions de marées.</DialogDescription>
-      </DialogHeader>
-
       <div className="grid grid-cols-2 gap-4">
         <div className="p-4 rounded-xl bg-muted/50 border space-y-3">
           <div className="flex items-center gap-2 text-muted-foreground">
@@ -524,7 +510,15 @@ export function LunarCalendar() {
 
       <Dialog open={!!detailedDay} onOpenChange={(isOpen) => !isOpen && setDetailedDay(null)}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto p-0 border-none bg-background shadow-2xl">
-          <div className="p-6">
+          <DialogHeader className="p-6 pb-0">
+            <DialogTitle className="text-xl font-bold">
+              {detailedDay ? format(detailedDay, 'eeee d MMMM yyyy', { locale: fr }) : 'Détails de la journée'}
+            </DialogTitle>
+            <DialogDescription>
+              {calendarView === 'peche' ? 'Prévisions pêche et marées' : 'Conseils de jardinage lunaire'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-6 pt-2">
             {calendarView === 'peche' 
               ? (detailedDay && <PecheDetailDialogContent day={detailedDay} location={selectedLocation} />)
               : (detailedDay && <ChampsDetailDialogContent day={detailedDay} location={selectedLocation} />)
