@@ -57,3 +57,25 @@ export const GardeningAdviceOutputSchema = z.object({
   transplantingAdvice: z.string().describe("Suggestion for ideal period to transplant to the ground."),
 });
 export type GardeningAdviceOutput = z.infer<typeof GardeningAdviceOutputSchema>;
+
+// Weather Summary Schemas
+export const WeatherSummaryInputSchema = z.object({
+  commune: z.string(),
+  forecasts: z.array(z.object({
+    date: z.string(),
+    tempMin: z.number(),
+    tempMax: z.number(),
+    windSpeed: z.number(),
+    windDirection: z.string(),
+    uvIndex: z.number(),
+    condition: z.string()
+  }))
+});
+export type WeatherSummaryInput = z.infer<typeof WeatherSummaryInputSchema>;
+
+export const WeatherSummaryOutputSchema = z.object({
+  summary: z.string().describe("Analyse concise de la tendance météo sur 7 jours."),
+  activities: z.string().describe("Conseils pratiques pour la pêche, la chasse ou le jardinage selon ces prévisions."),
+  precautions: z.string().describe("Avertissements de sécurité (UV forts, vents, pluie).")
+});
+export type WeatherSummaryOutput = z.infer<typeof WeatherSummaryOutputSchema>;

@@ -1,13 +1,14 @@
+
 'use client';
 
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Wind, Thermometer, Sun, MapPin, Search, ChevronLeft, CalendarDays, Waves, Info } from 'lucide-react';
+import { Wind, Thermometer, Sun, MapPin, Search, ChevronLeft, CalendarDays, Waves, Info, BrainCircuit, ShieldAlert, Sparkles, CloudSun, Cloud, CloudRain, Moon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { MeteoLive, LocationData } from '@/lib/types';
 import { translateWindDirection } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,20 @@ import { addDays, format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { MoonPhaseIcon } from '@/components/ui/lunar-calendar';
 import { cn } from '@/lib/utils';
+import { getWeatherSummary } from '@/ai/flows/weather-summary-flow';
+import type { WeatherSummaryOutput } from '@/ai/schemas';
+
+const WeatherIcon = ({ condition, className }: { condition: string, className?: string }) => {
+    const props = { className: cn('size-8', className) };
+    switch (condition) {
+        case 'Ensoleillé': return <Sun {...props} className={cn(props.className, "text-yellow-500")} />;
+        case 'Peu nuageux': return <CloudSun {...props} className={cn(props.className, "text-orange-400")} />;
+        case 'Nuageux': return <Cloud {...props} className={cn(props.className, "text-slate-400")} />;
+        case 'Averses': return <CloudRain {...props} className={cn(props.className, "text-blue-400")} />;
+        case 'Pluvieux': return <CloudRain {...props} className={cn(props.className, "text-blue-600")} />;
+        default: return <Sun {...props} />;
+    }
+};
 
 export default function MeteoLivePage() {
   const firestore = useFirestore();
@@ -33,7 +48,6 @@ export default function MeteoLivePage() {
     c.id.toLowerCase().includes(search.toLowerCase())
   ).sort((a, b) => a.id.localeCompare(b.id));
 
-  // Affichage de la vue détaillée si une commune est sélectionnée
   if (selectedCommuneId) {
     const liveData = rawCommunes?.find(c => c.id === selectedCommuneId);
     return (
@@ -53,7 +67,7 @@ export default function MeteoLivePage() {
             <Sun className="text-primary size-7" /> Météo NC Live
           </CardTitle>
           <CardDescription className="text-xs font-medium">
-            Choisissez une commune pour voir les prévisions à 7 jours.
+            Choisissez une commune pour voir les prévisions et l'analyse IA.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -99,12 +113,7 @@ export default function MeteoLivePage() {
                     </div>
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Indice UV</span>
-                  <Badge className="font-black h-7 px-3 text-xs bg-accent text-white border-none shadow-md">
-                    {commune.uv}
-                  </Badge>
-                </div>
+                <ChevronLeft className="rotate-180 size-5 text-muted-foreground/30" />
               </CardContent>
             </Card>
           ))}
@@ -120,6 +129,9 @@ export default function MeteoLivePage() {
 }
 
 function ForecastView({ communeId, liveData, onBack }: { communeId: string, liveData?: MeteoLive, onBack: () => void }) {
+    const [aiSummary, setAiSummary] = useState<WeatherSummaryOutput | null>(null);
+    const [isAiLoading, setIsAiLoading] = useState(false);
+
     const forecastDays = useMemo(() => {
         const days = [];
         const today = new Date();
@@ -130,6 +142,32 @@ function ForecastView({ communeId, liveData, onBack }: { communeId: string, live
         }
         return days;
     }, [communeId]);
+
+    useEffect(() => {
+        const fetchSummary = async () => {
+            setIsAiLoading(true);
+            try {
+                const summary = await getWeatherSummary({
+                    commune: communeId,
+                    forecasts: forecastDays.map(d => ({
+                        date: format(d.date, 'EEEE d MMMM', { locale: fr }),
+                        tempMin: d.data.weather.tempMin,
+                        tempMax: d.data.weather.tempMax,
+                        windSpeed: Math.max(...d.data.weather.wind.map(w => w.speed)),
+                        windDirection: translateWindDirection(d.data.weather.wind[0].direction),
+                        uvIndex: d.data.weather.uvIndex,
+                        condition: d.data.weather.trend
+                    }))
+                });
+                setAiSummary(summary);
+            } catch (error) {
+                console.error("AI Weather Summary error:", error);
+            } finally {
+                setIsAiLoading(false);
+            }
+        };
+        fetchSummary();
+    }, [communeId, forecastDays]);
 
     return (
         <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-12">
@@ -142,42 +180,52 @@ function ForecastView({ communeId, liveData, onBack }: { communeId: string, live
                 </h1>
             </div>
 
-            {liveData && (
-                <Card className="bg-primary text-primary-foreground border-none shadow-xl overflow-hidden relative">
-                    <div className="absolute right-0 top-0 opacity-10 -translate-y-4 translate-x-4">
-                        <Sun className="size-48" />
-                    </div>
-                    <CardHeader className="pb-2">
-                        <div className="flex justify-between items-center">
-                            <Badge className="bg-white/20 text-white border-none font-black text-[10px] uppercase tracking-widest">En Direct</Badge>
-                            <span className="text-[10px] font-bold opacity-80">{format(new Date(), 'HH:mm', { locale: fr })}</span>
+            {/* Analyse IA en haut */}
+            <Card className="bg-gradient-to-br from-indigo-600 to-blue-700 text-white border-none shadow-xl overflow-hidden relative">
+                <div className="absolute right-0 top-0 opacity-10 -translate-y-4 translate-x-4">
+                    <BrainCircuit className="size-48" />
+                </div>
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-lg font-black uppercase flex items-center gap-2">
+                        <Sparkles className="size-5 text-yellow-300" /> Bilan Assistant IA
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {isAiLoading ? (
+                        <div className="space-y-2">
+                            <Skeleton className="h-4 w-full bg-white/20" />
+                            <Skeleton className="h-4 w-3/4 bg-white/20" />
+                            <Skeleton className="h-4 w-5/6 bg-white/20" />
                         </div>
-                        <CardTitle className="text-4xl font-black mt-2">{liveData.temperature}°C</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="flex items-center gap-3 bg-white/10 p-3 rounded-xl border border-white/10">
-                                <Wind className="size-5" />
-                                <div>
-                                    <p className="text-[10px] font-black uppercase opacity-70">Vent</p>
-                                    <p className="font-black text-sm">{liveData.vent} ND {liveData.direction && `(${translateWindDirection(liveData.direction)})`}</p>
+                    ) : aiSummary ? (
+                        <>
+                            <div className="bg-white/10 p-3 rounded-lg border border-white/10">
+                                <p className="text-xs font-medium leading-relaxed italic">"{aiSummary.summary}"</p>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <p className="text-[10px] font-black uppercase text-blue-200 flex items-center gap-1">
+                                        <Waves className="size-3" /> Activités Terroir
+                                    </p>
+                                    <p className="text-[11px] leading-tight opacity-90">{aiSummary.activities}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-[10px] font-black uppercase text-orange-200 flex items-center gap-1">
+                                        <ShieldAlert className="size-3" /> Précautions
+                                    </p>
+                                    <p className="text-[11px] leading-tight opacity-90">{aiSummary.precautions}</p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3 bg-white/10 p-3 rounded-xl border border-white/10">
-                                <Sun className="size-5" />
-                                <div>
-                                    <p className="text-[10px] font-black uppercase opacity-70">Indice UV</p>
-                                    <p className="font-black text-sm">{liveData.uv}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
+                        </>
+                    ) : (
+                        <p className="text-xs opacity-60">Analyse impossible pour le moment.</p>
+                    )}
+                </CardContent>
+            </Card>
 
             <div className="space-y-4">
                 <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
-                    <CalendarDays className="size-4" /> Prévisions 7 jours
+                    <CalendarDays className="size-4" /> Évolution sur 7 jours
                 </h3>
                 
                 <div className="flex flex-col gap-4">
@@ -191,103 +239,60 @@ function ForecastView({ communeId, liveData, onBack }: { communeId: string, live
 }
 
 function DayForecastCard({ date, data, isToday: today, liveData }: { date: Date, data: LocationData, isToday?: boolean, liveData?: MeteoLive }) {
-    const { weather, tides, farming } = data;
+    const { weather } = data;
     
-    const sortedTides = [...tides].sort((a, b) => {
-        const t1 = a.time.split(':').map(Number);
-        const t2 = b.time.split(':').map(Number);
-        return (t1[0] * 60 + t1[1]) - (t2[0] * 60 + t2[1]);
-    });
-
     const tempMin = today && liveData ? Math.min(liveData.temperature, weather.tempMin) : weather.tempMin;
     const tempMax = today && liveData ? Math.max(liveData.temperature, weather.tempMax) : weather.tempMax;
+    const windSpeed = today && liveData ? liveData.vent : Math.max(...weather.wind.map(w => w.speed));
+    const windDir = today && liveData && liveData.direction ? translateWindDirection(liveData.direction) : translateWindDirection(weather.wind[0].direction);
+    const uv = today && liveData ? liveData.uv : weather.uvIndex;
 
     return (
         <Card className={cn("overflow-hidden border-2 shadow-sm", today && "border-primary/50 ring-1 ring-primary/20 bg-primary/5")}>
-            <CardContent className="p-4">
-                <div className="flex justify-between items-start mb-4">
+            <CardContent className="p-0">
+                <div className="bg-muted/30 px-4 py-2 flex justify-between items-center border-b">
                     <div className="flex flex-col">
                         <span className="text-[10px] font-black uppercase text-muted-foreground">{format(date, 'EEEE', { locale: fr })}</span>
-                        <span className="font-black text-lg leading-none">{format(date, 'd MMMM', { locale: fr })}</span>
+                        <span className="font-black text-base">{format(date, 'd MMMM', { locale: fr })}</span>
                     </div>
-                    {today && <Badge className="bg-primary text-white font-black text-[9px] h-5 uppercase">Aujourd'hui</Badge>}
+                    <WeatherIcon condition={weather.trend} />
                 </div>
 
-                <div className="grid grid-cols-2 gap-y-6 gap-x-4">
-                    <div className="flex items-center gap-3">
-                        <div className="size-10 rounded-xl bg-orange-500/10 flex items-center justify-center shrink-0">
-                            <Thermometer className="size-5 text-orange-600" />
-                        </div>
+                <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div className="space-y-1">
+                        <p className="text-[9px] font-black uppercase text-muted-foreground flex items-center gap-1">
+                            <Thermometer className="size-3 text-orange-500" /> Températures
+                        </p>
+                        <p className="font-black text-sm">{tempMin}° / {tempMax}°C</p>
+                    </div>
+
+                    <div className="space-y-1">
+                        <p className="text-[9px] font-black uppercase text-muted-foreground flex items-center gap-1">
+                            <Wind className="size-3 text-blue-500" /> Vent Max
+                        </p>
                         <div className="flex flex-col">
-                            <span className="text-[9px] font-black uppercase text-muted-foreground">Température</span>
-                            <span className="font-black text-sm">{tempMin}° / {tempMax}°</span>
+                            <p className="font-black text-sm">{windSpeed} ND</p>
+                            <p className="text-[9px] font-bold text-muted-foreground italic">{windDir}</p>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <div className="size-10 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
-                            <Wind className="size-5 text-blue-600" />
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-[9px] font-black uppercase text-muted-foreground">Vent Max</span>
-                            <span className="font-black text-sm">
-                                {today && liveData ? liveData.vent : Math.max(...weather.wind.map(w => w.speed))} ND
-                            </span>
-                        </div>
+                    <div className="space-y-1">
+                        <p className="text-[9px] font-black uppercase text-muted-foreground flex items-center gap-1">
+                            <Sun className="size-3 text-yellow-500" /> Indice UV
+                        </p>
+                        <Badge className={cn("font-black h-6 px-3 text-xs text-white border-none shadow-sm", uv > 8 ? "bg-red-500" : uv > 5 ? "bg-orange-500" : "bg-green-500")}>
+                            {uv}
+                        </Badge>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <div className="size-10 rounded-xl bg-yellow-500/10 flex items-center justify-center shrink-0">
-                            <Sun className="size-5 text-yellow-600" />
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-[9px] font-black uppercase text-muted-foreground">Indice UV</span>
-                            <span className="font-black text-sm">{today && liveData ? liveData.uv : weather.uvIndex}</span>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        <div className="size-10 rounded-xl bg-slate-500/10 flex items-center justify-center shrink-0">
-                            <MoonPhaseIcon phase={weather.moon.phase} className="size-5 text-slate-600" />
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-[9px] font-black uppercase text-muted-foreground">Lune</span>
+                    <div className="space-y-1">
+                        <p className="text-[9px] font-black uppercase text-muted-foreground flex items-center gap-1">
+                            <Moon className="size-3 text-slate-500" /> Lune
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <MoonPhaseIcon phase={weather.moon.phase} className="size-4 text-slate-600" />
                             <span className="text-[10px] font-bold truncate max-w-[80px]">{weather.moon.phase}</span>
                         </div>
-                    </div>
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-dashed">
-                    <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
-                            <Waves className="size-3" /> Marées du jour
-                        </h4>
-                        <span className="text-[9px] font-bold text-muted-foreground italic">Station : {data.tideStation}</span>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {sortedTides.map((tide, i) => {
-                            const IsHigh = tide.type === 'haute';
-                            return (
-                                <div key={i} className={cn(
-                                    "flex flex-col items-center p-2 rounded-lg border",
-                                    IsHigh ? "bg-primary/5 border-primary/10" : "bg-destructive/5 border-destructive/10"
-                                )}>
-                                    <span className={cn("text-[8px] font-black uppercase mb-1", IsHigh ? "text-primary" : "text-destructive")}>{tide.type}</span>
-                                    <span className="font-black text-xs leading-none">{tide.time}</span>
-                                    <span className="text-[10px] font-bold mt-1 opacity-60">{tide.height.toFixed(2)}m</span>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                <div className="mt-4 p-3 bg-accent/5 border border-accent/10 rounded-xl flex gap-3 items-start">
-                    <div className="p-1.5 rounded-lg bg-accent/10 shrink-0">
-                        <Info className="size-3 text-accent" />
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="text-[9px] font-black uppercase text-accent">Conseil Terroir</span>
-                        <p className="text-[11px] font-medium leading-tight">{farming.recommendation}</p>
                     </div>
                 </div>
             </CardContent>
