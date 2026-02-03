@@ -4,7 +4,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ----------------------------------------------------------------------
-    // DEPLOY_ID: 20240524_1310_FORCE_RESYNC_V4
+    // DEPLOY_ID: 20240524_1310_FORCE_RESYNC_FINAL_V1
     // ----------------------------------------------------------------------
 
     function isSignedIn() {
@@ -20,7 +20,8 @@ service cloud.firestore {
 
     // SESSIONS DE CHASSE
     match /hunting_sessions/{sessionId} {
-      allow read, create: if isSignedIn();
+      // Autorisation explicite de listage pour corriger l'erreur persistante
+      allow get, list, create: if isSignedIn();
       allow update, delete: if isAdmin() || (isSignedIn() && resource.data.organizerId == request.auth.uid);
       
       match /participants/{participantId} {

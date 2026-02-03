@@ -19,8 +19,8 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
   const isAdminUser = email === 'f.mallet81@outlook.com' || email === 'f.mallet81@gmail.com';
 
   if (docSnap.exists()) {
-    // Si l'utilisateur est admin mais que son statut n'est pas à jour dans la base
     const currentData = docSnap.data() as UserAccount;
+    // Mise à jour forcée du statut admin si nécessaire
     if (isAdminUser && currentData.subscriptionStatus !== 'admin') {
         await setDoc(userDocRef, { ...currentData, subscriptionStatus: 'admin' }, { merge: true });
     }
