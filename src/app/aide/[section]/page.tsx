@@ -130,9 +130,10 @@ const sectionContent: Record<string, {
       "Identifiez la tendance du jour : Lune Montante (pour ce qui pousse hors de terre) ou Descendante (pour les racines).",
       "Consultez le signe du zodiaque : Jour Fruits, Racines, Fleurs ou Feuilles.",
       "Suivez les recommandations : l'application vous guide pour la taille, le bouturage ou la tonte de la pelouse selon la sève.",
-      "Gérez votre potager avec 'Mes Semis' : enregistrez vos plantations pour mémoriser le contexte lunaire exact du jour. L'application calculera pour vous vos dates de récolte estimées et planifiera la période idéale pour le repiquage en pleine terre."
+      "Gérez votre potager avec 'Mes Semis' : enregistrez vos plantations pour mémoriser le contexte lunaire exact du jour. L'application calcule les dates de récolte estimées et planifie le repiquage."
     ],
     tips: [
+      "La spécialisation des travaux : Signes de Terre = Racines, Eau = Feuilles, Air = Fleurs, Feu = Fruits.",
       "Le signe du zodiaque change tous les 2 à 3 jours environ.",
       "Suivre le calendrier permet de réduire naturellement l'usage d'engrais et de pesticides.",
       "L'historique 'Mes Semis' vous permet de comparer la réussite de vos cultures d'une saison à l'autre."
@@ -146,14 +147,14 @@ const sectionContent: Record<string, {
     steps: [
       "Recherche & Identification : Tapez le nom de n'importe quelle graine. Si elle est absente du guide, l'IA créera instantanément sa fiche technique personnalisée.",
       "Calcul de Fiche IA : L'intelligence artificielle analyse la plante, définit son type (Fruit, Racine...) et génère des conseils spécifiques (arrosage, exposition).",
-      "Optimisation Lunaire : L'IA vérifie votre date de semis. Si elle est déconseillée, elle scanne les 30 prochains jours pour vous suggérer la date idéale précise réunissant les meilleures conditions (Phase + Zodiaque).",
+      "Optimisation Lunaire : L'IA vérifie votre date de semis. Si elle est déconseillée, elle scanne les 30 prochains jours pour vous suggérer la date idéale précise.",
       "Planification Dynamique : Obtenez des estimations pour la date de récolte et la période de repiquage en pleine terre basées sur les cycles biologiques.",
       "Historique : Sauvegardez vos fiches pour suivre l'évolution de vos semis dans votre session personnelle."
     ],
     tips: [
       "L'IA suggère toujours la date la plus proche respectant les 'règles d'or' (ex: Légume Fruit = Lune Montante + Jour Fruit).",
-      "Le guide IA est capable d'analyser des variétés exotiques ou rares non listées dans la base de données standard.",
-      "Une alerte visuelle rouge dans votre historique vous signalera si une plantation a été effectuée hors de la période lunaire optimale."
+      "Une alerte visuelle rouge dans votre historique vous signalera si une plantation a été effectuée hors de la période lunaire optimale.",
+      "Utilisez le bouton 'Calculer la fiche IA' avant d'enregistrer pour bénéficier du conseil lunaire."
     ]
   },
   'calendrier-peche': {
@@ -184,6 +185,8 @@ const sectionContent: Record<string, {
       "Cliquez sur une date pour ouvrir la fiche de recommandation complète : l'IA analyse pour vous la phase lunaire précise (montante/descendante), l'influence du zodiaque et vous délivre le conseil d'expert pour réussir vos travaux ce jour-là."
     ],
     tips: [
+      "La spécialisation (Zodiaque) : Terre (Taureau, Vierge, Capr.) = Racines ; Eau (Cancer, Scorp., Pois.) = Feuilles ; Air (Gém., Bal., Vers.) = Fleurs ; Feu (Bél., Lion, Sag.) = Fruits.",
+      "Le signe du zodiaque change tous les 2 à 3 jours environ.",
       "Basculez entre Calendrier Pêche et Champs grâce au bouton en haut du calendrier.",
       "Le jour actuel est toujours entouré d'un cercle bleu."
     ]
@@ -262,9 +265,9 @@ export default function AideSectionPage() {
               <h3 className="text-lg font-bold flex items-center gap-2 text-primary">
                 <Info className="size-5" /> À quoi ça sert ?
               </h3>
-              <p className="text-muted-foreground leading-relaxed italic">
+              <div className="text-muted-foreground leading-relaxed italic text-sm">
                 {content.role}
-              </p>
+              </div>
             </div>
 
             {/* Mode d'emploi */}
