@@ -38,7 +38,6 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
       email: user.email || '',
       displayName: effectiveDisplayName,
       subscriptionStatus: 'admin',
-      favoriteLocationIds: [],
       lastSelectedLocation: 'Nouméa',
     };
   } else {
@@ -53,7 +52,6 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
       subscriptionStatus: 'trial',
       subscriptionStartDate: trialStartDate.toISOString(),
       subscriptionExpiryDate: trialExpiryDate.toISOString(),
-      favoriteLocationIds: [],
       lastSelectedLocation: 'Nouméa',
     };
   }

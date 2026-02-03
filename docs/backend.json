@@ -57,6 +57,47 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["displayName", "updatedAt"]
+    },
+    "FishingSpot": {
+      "title": "FishingSpot",
+      "type": "object",
+      "description": "Point de pêche sauvegardé avec contexte météo/marée.",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "notes": { "type": "string" },
+        "location": {
+          "type": "object",
+          "properties": {
+            "latitude": { "type": "number" },
+            "longitude": { "type": "number" }
+          }
+        },
+        "icon": { "type": "string" },
+        "color": { "type": "string" },
+        "fishingTypes": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "context": { "type": "object" }
+      },
+      "required": ["userId", "name", "location", "createdAt"]
+    },
+    "SowingRecord": {
+      "title": "SowingRecord",
+      "type": "object",
+      "description": "Enregistrement d'un semis avec conseils IA.",
+      "properties": {
+        "userId": { "type": "string" },
+        "seedName": { "type": "string" },
+        "sowingDate": { "type": "string", "format": "date-time" },
+        "plantType": { "type": "string" },
+        "cultureAdvice": { "type": "string" },
+        "estimatedHarvestDate": { "type": "string" },
+        "transplantingAdvice": { "type": "string" },
+        "moonWarning": { "type": "string" },
+        "isValidForMoon": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "seedName", "sowingDate"]
     }
   },
   "auth": {
@@ -67,13 +108,39 @@
       "schema": { "$ref": "#/backend/entities/UserAccount" },
       "description": "Profils et préférences utilisateurs."
     },
+    "/users/{userId}/fishing_spots/{spotId}": {
+      "schema": { "$ref": "#/backend/entities/FishingSpot" },
+      "description": "Coins de pêche personnels."
+    },
+    "/users/{userId}/sowings/{sowingId}": {
+      "schema": { "$ref": "#/backend/entities/SowingRecord" },
+      "description": "Historique des semis."
+    },
     "/hunting_sessions/{sessionId}": {
       "schema": { "$ref": "#/backend/entities/HuntingSession" },
       "description": "Sessions de chasse actives."
     },
     "/hunting_sessions/{sessionId}/participants/{userId}": {
       "schema": { "$ref": "#/backend/entities/SessionParticipant" },
-      "description": "Données temps réel des participants à une session."
+      "description": "Données temps réel des participants."
+    },
+    "/access_tokens/{tokenId}": {
+      "description": "Jetons d'accès individuels."
+    },
+    "/shared_access_tokens/{tokenId}": {
+      "description": "Jeton d'accès global."
+    },
+    "/conversations/{userId}": {
+      "description": "Métadonnées des conversations de support."
+    },
+    "/conversations/{userId}/messages/{messageId}": {
+      "description": "Messages de chat."
+    },
+    "/vessels/{vesselId}": {
+      "description": "Statut temps réel des navires (Vessel Tracker)."
+    },
+    "/vessels/{vesselId}/history/{pointId}": {
+      "description": "Historique d'immobilité des navires."
     }
   }
 }
