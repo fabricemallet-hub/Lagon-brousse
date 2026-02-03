@@ -276,7 +276,23 @@ export interface SplashScreenSettings {
 export interface MeteoLive {
   id: string; // Document ID (Commune)
   vent: number;
+  rafales?: number;
   temperature: number;
   uv: number;
   direction?: WindDirection;
+  direction_vent?: number; // Nouveau: degrés (ex: 120)
+  meteo?: number; // Nouveau: code météo (ex: 1)
+  pression?: number;
+  derniere_maj?: any;
+}
+
+export interface MeteoForecast {
+  id: string; // jour_1, jour_2...
+  code_meteo: number;
+  date: string;
+  prob_pluie: number;
+  rafales_max: number;
+  temp_max: number;
+  temp_min: number;
+  vent_max: number;
 }

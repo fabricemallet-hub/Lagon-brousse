@@ -1,19 +1,18 @@
-
 'use client';
 
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { collection, orderBy, query } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Wind, Thermometer, Sun, MapPin, Search, ChevronLeft, CalendarDays, Waves, Info, BrainCircuit, ShieldAlert, Sparkles, CloudSun, Cloud, CloudRain, Moon, CloudMoon, ArrowUp } from 'lucide-react';
+import { Wind, Thermometer, Sun, MapPin, Search, ChevronLeft, CalendarDays, Waves, Info, BrainCircuit, ShieldAlert, Sparkles, CloudSun, Cloud, CloudRain, Moon, CloudMoon, ArrowUp, Droplets } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useState, useMemo, useEffect } from 'react';
-import type { MeteoLive, LocationData, HourlyForecast, WindDirection } from '@/lib/types';
-import { translateWindDirection } from '@/lib/utils';
+import type { MeteoLive, MeteoForecast, WindDirection } from '@/lib/types';
+import { translateWindDirection, degreesToCardinal, getMeteoCondition } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { generateProceduralData } from '@/lib/data';
-import { addDays, format } from 'date-fns';
+import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { MoonPhaseIcon } from '@/components/ui/lunar-calendar';
 import { cn } from '@/lib/utils';
@@ -40,6 +39,7 @@ const WeatherIcon = ({ condition, className }: { condition: string, className?: 
         case 'Ensoleillé': return <Sun {...props} className={cn(props.className, "text-yellow-500")} />;
         case 'Peu nuageux': return <CloudSun {...props} className={cn(props.className, "text-orange-400")} />;
         case 'Nuageux': return <Cloud {...props} className={cn(props.className, "text-slate-400")} />;
+        case 'Couvert': return <Cloud {...props} className={cn(props.className, "text-slate-600")} />;
         case 'Averses': return <CloudRain {...props} className={cn(props.className, "text-blue-400")} />;
         case 'Pluvieux': return <CloudRain {...props} className={cn(props.className, "text-blue-600")} />;
         case 'Nuit claire': return <Moon {...props} className={cn(props.className, "text-blue-200")} />;
@@ -47,8 +47,8 @@ const WeatherIcon = ({ condition, className }: { condition: string, className?: 
     }
 };
 
-const WindArrow = ({ direction, className }: { direction: string, className?: string }) => {
-  const rotation =
+const WindArrow = ({ direction, degrees, className }: { direction?: string, degrees?: number, className?: string }) => {
+  const rotation = degrees !== undefined ? degrees : (
     {
       N: 0,
       NE: 45,
@@ -58,7 +58,8 @@ const WindArrow = ({ direction, className }: { direction: string, className?: st
       SW: 225,
       W: 270,
       NW: 315,
-    }[direction as WindDirection] || 0;
+    }[direction as WindDirection] || 0
+  );
 
   return (
     <ArrowUp
@@ -84,7 +85,6 @@ export default function MeteoLivePage() {
   const communes = useMemo(() => {
     if (!rawCommunes) return [];
 
-    // Robust check for remote areas (ignoring accents and case)
     const isLoyaltyOrBelep = (id: string) => {
         const normalized = id.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         const special = ['belep', 'lifou', 'mare', 'ouvea'];
@@ -93,28 +93,21 @@ export default function MeteoLivePage() {
 
     const selectedCoords = locationsMap[selectedLocation];
 
-    // Filter by search first
     const filtered = rawCommunes.filter(c => 
       c.id.toLowerCase().includes(search.toLowerCase())
     );
 
-    // Sort by priority
     return [...filtered].sort((a, b) => {
-      // 1. Current selected location always first
       if (a.id === selectedLocation) return -1;
       if (b.id === selectedLocation) return 1;
 
-      // 2. Handle Loyalty Islands and Belep (at the end)
       const aSpecial = isLoyaltyOrBelep(a.id);
       const bSpecial = isLoyaltyOrBelep(b.id);
       
       if (aSpecial && !bSpecial) return 1;
       if (!aSpecial && bSpecial) return -1;
-      
-      // If both are special, sort alphabetically
       if (aSpecial && bSpecial) return a.id.localeCompare(b.id);
 
-      // 3. Proximity sort for others
       if (!selectedCoords) return a.id.localeCompare(b.id);
 
       const posA = locationsMap[a.id];
@@ -148,7 +141,7 @@ export default function MeteoLivePage() {
             <Sun className="text-primary size-7" /> Météo NC Live
           </CardTitle>
           <CardDescription className="text-xs font-medium">
-            Choisissez une commune pour voir les prévisions et l'analyse IA.
+            Données en direct de vos stations météo.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -197,7 +190,6 @@ export default function MeteoLivePage() {
                     </div>
                     
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2">
-                      {/* Vent agrandi avec flèche et texte direction */}
                       <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
                         <Wind className="size-4" />
                         <div className="flex items-center gap-2 leading-none">
@@ -205,21 +197,19 @@ export default function MeteoLivePage() {
                             {commune.vent} <span className="text-[10px]">ND</span>
                           </span>
                           <div className="flex items-center gap-1.5 border-l border-border/50 pl-2">
-                            <WindArrow direction={commune.direction || 'N'} className="size-4" />
+                            <WindArrow degrees={commune.direction_vent} direction={commune.direction} className="size-4" />
                             <span className="text-[10px] font-black text-muted-foreground uppercase whitespace-nowrap">
-                              {translateWindDirection(commune.direction || 'N')}
+                              {commune.direction_vent !== undefined ? degreesToCardinal(commune.direction_vent) : translateWindDirection(commune.direction || 'N')}
                             </span>
                           </div>
                         </div>
                       </div>
                       
-                      {/* Température agrandie */}
                       <div className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400 border-l border-border/50 pl-3">
                         <Thermometer className="size-4" />
                         <span className="text-lg font-black">{commune.temperature}°C</span>
                       </div>
 
-                      {/* UV agrandi */}
                       <div className="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-500 border-l border-border/50 pl-3">
                         <Sun className="size-4" />
                         <span className="text-base font-black">UV {commune.uv}</span>
@@ -243,34 +233,34 @@ export default function MeteoLivePage() {
 }
 
 function ForecastView({ communeId, liveData, onBack }: { communeId: string, liveData?: MeteoLive, onBack: () => void }) {
+    const firestore = useFirestore();
     const [aiSummary, setAiSummary] = useState<WeatherSummaryOutput | null>(null);
     const [isAiLoading, setIsAiLoading] = useState(false);
 
-    const forecastDays = useMemo(() => {
-        const days = [];
-        const today = new Date();
-        for (let i = 0; i < 7; i++) {
-            const date = addDays(today, i);
-            const data = generateProceduralData(communeId, date);
-            days.push({ date, data });
-        }
-        return days;
-    }, [communeId]);
+    // Fetch previsions from sub-collection
+    const forecastQuery = useMemoFirebase(() => {
+        if (!firestore || !communeId) return null;
+        return query(collection(firestore, 'meteo_caledonie', communeId, 'previsions'), orderBy('date', 'asc'));
+    }, [firestore, communeId]);
+
+    const { data: dbForecasts, isLoading: isForecastsLoading } = useCollection<MeteoForecast>(forecastQuery);
 
     useEffect(() => {
+        if (!dbForecasts || dbForecasts.length === 0) return;
+
         const fetchSummary = async () => {
             setIsAiLoading(true);
             try {
                 const summary = await getWeatherSummary({
                     commune: communeId,
-                    forecasts: forecastDays.map(d => ({
-                        date: format(d.date, 'EEEE d MMMM', { locale: fr }),
-                        tempMin: d.data.weather.tempMin,
-                        tempMax: d.data.weather.tempMax,
-                        windSpeed: Math.max(...d.data.weather.wind.map(w => w.speed)),
-                        windDirection: translateWindDirection(d.data.weather.wind[0].direction),
-                        uvIndex: d.data.weather.uvIndex,
-                        condition: d.data.weather.trend
+                    forecasts: dbForecasts.map(d => ({
+                        date: format(new Date(d.date.replace(/-/g, '/')), 'EEEE d MMMM', { locale: fr }),
+                        tempMin: d.temp_min,
+                        tempMax: d.temp_max,
+                        windSpeed: d.vent_max,
+                        windDirection: "Inconnue", // Pas stocké dans l'export prévision journalière
+                        uvIndex: 0, // Idem
+                        condition: getMeteoCondition(d.code_meteo)
                     }))
                 });
                 setAiSummary(summary);
@@ -281,7 +271,7 @@ function ForecastView({ communeId, liveData, onBack }: { communeId: string, live
             }
         };
         fetchSummary();
-    }, [communeId, forecastDays]);
+    }, [communeId, dbForecasts]);
 
     return (
         <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-12">
@@ -294,7 +284,6 @@ function ForecastView({ communeId, liveData, onBack }: { communeId: string, live
                 </h1>
             </div>
 
-            {/* Analyse IA en haut */}
             <Card className="bg-gradient-to-br from-indigo-600 to-blue-700 text-white border-none shadow-xl overflow-hidden relative">
                 <div className="absolute right-0 top-0 opacity-10 -translate-y-4 translate-x-4">
                     <BrainCircuit className="size-48" />
@@ -343,43 +332,49 @@ function ForecastView({ communeId, liveData, onBack }: { communeId: string, live
                 </h3>
                 
                 <div className="flex flex-col gap-4">
-                    {forecastDays.map(({ date, data }, index) => (
-                        <DayForecastCard key={index} date={date} data={data} isToday={index === 0} liveData={index === 0 ? liveData : undefined} />
-                    ))}
+                    {isForecastsLoading ? (
+                        <Skeleton className="h-32 w-full" />
+                    ) : dbForecasts && dbForecasts.length > 0 ? (
+                        dbForecasts.map((f, index) => (
+                            <DayForecastCard key={f.id} forecast={f} index={index} liveData={index === 0 ? liveData : undefined} />
+                        ))
+                    ) : (
+                        <p className="text-center text-xs text-muted-foreground py-10 italic">Aucune donnée de prévision disponible.</p>
+                    )}
                 </div>
             </div>
         </div>
     );
 }
 
-function DayForecastCard({ date, data, isToday: today, liveData }: { date: Date, data: LocationData, isToday?: boolean, liveData?: MeteoLive }) {
-    const { weather } = data;
+function DayForecastCard({ forecast, index, liveData }: { forecast: MeteoForecast, index: number, liveData?: MeteoLive }) {
+    const isToday = index === 0;
+    const condition = getMeteoCondition(forecast.code_meteo);
     
-    const tempMin = today && liveData ? Math.min(liveData.temperature, weather.tempMin) : weather.tempMin;
-    const tempMax = today && liveData ? Math.max(liveData.temperature, weather.tempMax) : weather.tempMax;
-    const windSpeed = today && liveData ? liveData.vent : Math.max(...weather.wind.map(w => w.speed));
-    const windDir = today && liveData && liveData.direction ? translateWindDirection(liveData.direction) : translateWindDirection(weather.wind[0].direction);
-    const uv = today && liveData ? liveData.uv : weather.uvIndex;
-
-    // Détection de la première heure de pluie ou averses
-    const rainForecast = weather.hourly.find(h => h.condition === 'Pluvieux' || h.condition === 'Averses');
-    const rainTime = rainForecast ? format(new Date(rainForecast.date), 'HH:mm') : null;
+    // Fusion avec le live pour aujourd'hui
+    const currentTemp = isToday && liveData ? liveData.temperature : null;
+    const currentVent = isToday && liveData ? liveData.vent : forecast.vent_max;
+    const currentUV = isToday && liveData ? liveData.uv : null;
 
     return (
-        <Card className={cn("overflow-hidden border-2 shadow-sm", today && "border-primary/50 ring-1 ring-primary/20 bg-primary/5")}>
+        <Card className={cn("overflow-hidden border-2 shadow-sm", isToday && "border-primary/50 ring-1 ring-primary/20 bg-primary/5")}>
             <CardContent className="p-0">
                 <div className="bg-muted/30 px-4 py-2 flex justify-between items-center border-b">
                     <div className="flex flex-col">
-                        <span className="text-[10px] font-black uppercase text-muted-foreground">{format(date, 'EEEE', { locale: fr })}</span>
-                        <span className="font-black text-base">{format(date, 'd MMMM', { locale: fr })}</span>
+                        <span className="text-[10px] font-black uppercase text-muted-foreground">
+                            {format(new Date(forecast.date.replace(/-/g, '/')), 'EEEE', { locale: fr })}
+                        </span>
+                        <span className="font-black text-base">
+                            {format(new Date(forecast.date.replace(/-/g, '/')), 'd MMMM', { locale: fr })}
+                        </span>
                     </div>
                     <div className="flex items-center gap-3">
-                        {rainTime && (
-                            <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200 text-[9px] font-black animate-pulse">
-                                Pluie à {rainTime}
+                        {isToday && liveData && (
+                            <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 text-[9px] font-black">
+                                EN DIRECT
                             </Badge>
                         )}
-                        <WeatherIcon condition={weather.trend} />
+                        <WeatherIcon condition={condition} />
                     </div>
                 </div>
 
@@ -388,7 +383,9 @@ function DayForecastCard({ date, data, isToday: today, liveData }: { date: Date,
                         <p className="text-[9px] font-black uppercase text-muted-foreground flex items-center gap-1">
                             <Thermometer className="size-3 text-orange-500" /> Températures
                         </p>
-                        <p className="font-black text-sm">{tempMin}° / {tempMax}°C</p>
+                        <p className="font-black text-sm">
+                            {currentTemp || forecast.temp_min}° / {forecast.temp_max}°C
+                        </p>
                     </div>
 
                     <div className="space-y-1">
@@ -396,28 +393,33 @@ function DayForecastCard({ date, data, isToday: today, liveData }: { date: Date,
                             <Wind className="size-3 text-blue-500" /> Vent Max
                         </p>
                         <div className="flex flex-col">
-                            <p className="font-black text-sm">{windSpeed} ND</p>
-                            <p className="text-[9px] font-bold text-muted-foreground italic">{windDir}</p>
+                            <p className="font-black text-sm">{currentVent} ND</p>
+                            {forecast.rafales_max > 0 && (
+                                <p className="text-[9px] font-bold text-orange-600 italic">Rafales {forecast.rafales_max} ND</p>
+                            )}
                         </div>
                     </div>
 
                     <div className="space-y-1">
                         <p className="text-[9px] font-black uppercase text-muted-foreground flex items-center gap-1">
-                            <Sun className="size-3 text-yellow-500" /> Indice UV
+                            <Sun className="size-3 text-yellow-500" /> {isToday ? 'Indice UV' : 'Pluie'}
                         </p>
-                        <Badge className={cn("font-black h-6 px-3 text-xs text-white border-none shadow-sm", uv > 8 ? "bg-red-500" : uv > 5 ? "bg-orange-500" : "bg-green-500")}>
-                            {uv}
-                        </Badge>
+                        {isToday ? (
+                            <Badge className={cn("font-black h-6 px-3 text-xs text-white border-none shadow-sm", (currentUV || 0) > 8 ? "bg-red-500" : (currentUV || 0) > 5 ? "bg-orange-500" : "bg-green-500")}>
+                                {currentUV || 'N/A'}
+                            </Badge>
+                        ) : (
+                            <div className="flex items-center gap-1 font-black text-sm text-blue-600">
+                                <Droplets className="size-3" /> {forecast.prob_pluie}%
+                            </div>
+                        )}
                     </div>
 
                     <div className="space-y-1">
                         <p className="text-[9px] font-black uppercase text-muted-foreground flex items-center gap-1">
-                            <Moon className="size-3 text-slate-500" /> Lune
+                            <Info className="size-3 text-slate-500" /> État
                         </p>
-                        <div className="flex items-center gap-2">
-                            <MoonPhaseIcon phase={weather.moon.phase} className="size-4 text-slate-600" />
-                            <span className="text-[10px] font-bold truncate max-w-[80px]">{weather.moon.phase}</span>
-                        </div>
+                        <span className="text-[10px] font-bold">{condition}</span>
                     </div>
                 </div>
             </CardContent>
