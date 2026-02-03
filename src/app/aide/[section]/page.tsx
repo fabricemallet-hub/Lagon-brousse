@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
@@ -130,10 +129,10 @@ const sectionContent: Record<string, {
       "Identifiez la tendance du jour : Lune Montante (pour ce qui pousse hors de terre) ou Descendante (pour les racines).",
       "Consultez le signe du zodiaque : Jour Fruits, Racines, Fleurs ou Feuilles.",
       "Suivez les recommandations : l'application vous guide pour la taille, le bouturage ou la tonte de la pelouse selon la sève.",
-      "Gérez votre potager avec 'Mes Semis' : enregistrez vos plantations pour mémoriser le contexte lunaire exact du jour. L'application calcule les dates de récolte estimées et planifie le repiquage."
+      "Gérez votre potager avec 'Mes Semis' : l'application mémorise le contexte lunaire exact (phase et zodiaque), calcule les dates de récolte prévisionnelles et planifie les périodes de repiquage pour assurer la réussite de votre potager."
     ],
     tips: [
-      "La spécialisation des travaux : Signes de Terre = Racines, Eau = Feuilles, Air = Fleurs, Feu = Fruits.",
+      "La spécialisation des travaux (Le Calendrier Lunaire) : Signes de Terre (Taur., Vierg., Capr.) = Racines ; Signes d'Eau (Canc., Scorp., Pois.) = Feuilles ; Signes d'Air (Gém., Bal., Vers.) = Fleurs ; Signes de Feu (Bél., Lion, Sag.) = Fruits.",
       "Le signe du zodiaque change tous les 2 à 3 jours environ.",
       "Suivre le calendrier permet de réduire naturellement l'usage d'engrais et de pesticides.",
       "L'historique 'Mes Semis' vous permet de comparer la réussite de vos cultures d'une saison à l'autre."
@@ -185,7 +184,7 @@ const sectionContent: Record<string, {
       "Cliquez sur une date pour ouvrir la fiche de recommandation complète : l'IA analyse pour vous la phase lunaire précise (montante/descendante), l'influence du zodiaque et vous délivre le conseil d'expert pour réussir vos travaux ce jour-là."
     ],
     tips: [
-      "La spécialisation (Zodiaque) : Terre (Taureau, Vierge, Capr.) = Racines ; Eau (Cancer, Scorp., Pois.) = Feuilles ; Air (Gém., Bal., Vers.) = Fleurs ; Feu (Bél., Lion, Sag.) = Fruits.",
+      "La spécialisation des travaux (Le Calendrier Lunaire) : Signes de Terre (Taur., Vierg., Capr.) = Racines ; Signes d'Eau (Canc., Scorp., Pois.) = Feuilles ; Signes d'Air (Gém., Bal., Vers.) = Fleurs ; Signes de Feu (Bél., Lion, Sag.) = Fruits.",
       "Le signe du zodiaque change tous les 2 à 3 jours environ.",
       "Basculez entre Calendrier Pêche et Champs grâce au bouton en haut du calendrier.",
       "Le jour actuel est toujours entouré d'un cercle bleu."
@@ -219,7 +218,6 @@ const sectionContent: Record<string, {
       "Modifiez votre nom d'affichage ou vos préférences d'icônes."
     ],
     tips: [
-      "La version gratuite dure 3 mois après votre inscription.",
       "En mode 'Limité', vous disposez d'une minute d'accès par jour pour les consultations rapides."
     ]
   }
