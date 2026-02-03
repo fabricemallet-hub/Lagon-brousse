@@ -291,8 +291,15 @@ function PecheLegend() {
 function DetailDialogSkeleton() {
   return (
     <>
-      <DialogHeader><DialogTitle><Skeleton className="h-7 w-3/4" /></DialogTitle><DialogDescription><Skeleton className="h-4 w-1/2" /></DialogDescription></DialogHeader>
-      <div className="space-y-4 py-4"><Skeleton className="h-16 w-full" /><Skeleton className="h-12 w-full" /><Skeleton className="h-24 w-full" /></div>
+      <DialogHeader>
+        <div className="h-7 w-3/4 mb-2"><Skeleton className="h-full w-full" /></div>
+        <div className="h-4 w-1/2"><Skeleton className="h-full w-full" /></div>
+      </DialogHeader>
+      <div className="space-y-4 py-4">
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-24 w-full" />
+      </div>
     </>
   );
 }
