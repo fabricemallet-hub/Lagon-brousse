@@ -39,6 +39,19 @@ function HomeSkeleton() {
   );
 }
 
+// Helper: Calculate progressive UV factor based on time of day (Zenith at 12:00, 0 before 6:00 and after 18:00)
+const getProgressiveUV = (maxUV: number, date: Date): number => {
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  const currentTimeInHours = hours + minutes / 60;
+
+  if (currentTimeInHours < 6 || currentTimeInHours > 18) return 0;
+
+  // Simple bell curve (sinusoidal) peaking at 12:00
+  const factor = Math.sin(((currentTimeInHours - 6) / 12) * Math.PI);
+  return parseFloat((maxUV * factor).toFixed(1));
+};
+
 export default function Home() {
   const { selectedLocation } = useLocation();
   const { selectedDate } = useDate();
@@ -46,6 +59,13 @@ export default function Home() {
   
   const [data, setData] = useState<LocationData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [now, setNow] = useState(new Date());
+
+  // Update time for real-time UV changes
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Récupération des données Météo Live en temps réel depuis Firestore
   const meteoRef = useMemoFirebase(() => {
@@ -59,6 +79,7 @@ export default function Home() {
     setIsLoading(true);
     const fetchedData = getDataForDate(selectedLocation, selectedDate);
     setData(fetchedData);
+    setIsLocationLoading(false);
     setIsLoading(false);
   }, [selectedLocation, selectedDate]);
 
@@ -83,15 +104,13 @@ export default function Home() {
     if (!data?.weather) return null;
     
     // On n'applique le Live que si on regarde la date d'aujourd'hui
-    const isToday = new Date().toDateString() === selectedDate.toDateString();
+    const isToday = now.toDateString() === selectedDate.toDateString();
     if (!liveMeteo || !isToday) return data.weather;
 
-    const currentHour = new Date().getHours();
+    const currentHour = now.getHours();
     
-    // Correction intelligence UV : Si c'est la nuit, l'UV est forcément 0
-    // même si la station rapporte le max de la journée.
-    const isDaylight = currentHour >= 6 && currentHour < 18;
-    const effectiveUV = isDaylight ? liveMeteo.uv : 0;
+    // Correction intelligence UV progressive
+    const effectiveUV = getProgressiveUV(liveMeteo.uv, now);
     
     return {
       ...data.weather,
@@ -110,7 +129,7 @@ export default function Home() {
         return f;
       })
     };
-  }, [data, liveMeteo, selectedDate]);
+  }, [data, liveMeteo, selectedDate, now]);
 
   if (isLoading || !data || !weatherWithLiveUpdates) {
     return <HomeSkeleton />;

@@ -31,6 +31,20 @@ const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => 
   return R * c;
 };
 
+// Helper: Calculate progressive UV factor based on time of day (Zenith at 12:00, 0 before 6:00 and after 18:00)
+const getProgressiveUV = (maxUV: number, date: Date): number => {
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  const currentTimeInHours = hours + minutes / 60;
+
+  if (currentTimeInHours < 6 || currentTimeInHours > 18) return 0;
+
+  // Simple bell curve (sinusoidal) peaking at 12:00
+  // (currentTimeInHours - 6) / 12 maps 6:00-18:00 to 0-1
+  const factor = Math.sin(((currentTimeInHours - 6) / 12) * Math.PI);
+  return parseFloat((maxUV * factor).toFixed(1));
+};
+
 const WeatherIcon = ({ condition, className }: { condition: string, className?: string }) => {
     const props = { className: cn('size-8', className) };
     switch (condition) {
@@ -43,23 +57,6 @@ const WeatherIcon = ({ condition, className }: { condition: string, className?: 
         default: return <Sun {...props} />;
     }
 };
-
-const Cloud = (props: any) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    {...props}
-  >
-    <path d="M17.5 19c2.5 0 4.5-2.5 4.5-5 0-3.7-3-6-7-6-1 0-2 .2-3 .5C10.5 6 8 8 8 11c0 .4.1.8.2 1.2C5 12.7 3 15 3 18c0 2.8 2.2 5 5 5h9.5z" />
-  </svg>
-);
 
 const WindArrow = ({ direction, degrees, className }: { direction?: string, degrees?: number, className?: string }) => {
   const rotation = degrees !== undefined ? degrees : (
@@ -88,6 +85,13 @@ export default function MeteoLivePage() {
   const { selectedLocation } = useLocation();
   const [search, setSearch] = useState('');
   const [selectedCommuneId, setSelectedCommuneId] = useState<string | null>(null);
+  const [now, setNow] = useState(new Date());
+
+  // Update "now" every minute for real-time UV progress
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
   
   const meteoQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -146,6 +150,7 @@ export default function MeteoLivePage() {
         communeId={selectedCommuneId} 
         liveData={liveData} 
         onBack={() => setSelectedCommuneId(null)} 
+        now={now}
       />
     );
   }
@@ -181,63 +186,66 @@ export default function MeteoLivePage() {
         </div>
       ) : communes && communes.length > 0 ? (
         <div className="flex flex-col gap-3">
-          {communes.map((commune) => (
-            <Card 
-              key={commune.id} 
-              className={cn(
-                "overflow-hidden border-2 shadow-sm active:scale-[0.98] transition-transform cursor-pointer hover:border-primary/30",
-                commune.id === selectedLocation && "border-primary/50 bg-primary/5"
-              )}
-              onClick={() => setSelectedCommuneId(commune.id)}
-            >
-              <CardContent className="p-4 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className={cn(
-                    "size-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm",
-                    commune.id === selectedLocation ? "bg-primary text-white" : "bg-primary/10 text-primary"
-                  )}>
-                    <MapPin className="size-7" />
-                  </div>
-                  <div className="flex flex-col min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-black uppercase tracking-tighter text-base leading-none truncate">{commune.id}</h3>
-                      {commune.id === selectedLocation && (
-                        <Badge variant="outline" className="text-[8px] h-4 font-black uppercase px-1.5 border-primary text-primary">Ma Commune</Badge>
-                      )}
+          {communes.map((commune) => {
+            const currentUV = getProgressiveUV(commune.uv, now);
+            return (
+              <Card 
+                key={commune.id} 
+                className={cn(
+                  "overflow-hidden border-2 shadow-sm active:scale-[0.98] transition-transform cursor-pointer hover:border-primary/30",
+                  commune.id === selectedLocation && "border-primary/50 bg-primary/5"
+                )}
+                onClick={() => setSelectedCommuneId(commune.id)}
+              >
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className={cn(
+                      "size-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm",
+                      commune.id === selectedLocation ? "bg-primary text-white" : "bg-primary/10 text-primary"
+                    )}>
+                      <MapPin className="size-7" />
                     </div>
-                    
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2">
-                      <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
-                        <Wind className="size-4" />
-                        <div className="flex items-center gap-2 leading-none">
-                          <span className="text-lg font-black whitespace-nowrap">
-                            {commune.vent} <span className="text-[10px]">ND</span>
-                          </span>
-                          <div className="flex items-center gap-1.5 border-l border-border/50 pl-2">
-                            <WindArrow degrees={commune.direction_vent} direction={commune.direction} className="size-4" />
-                            <span className="text-[10px] font-black text-muted-foreground uppercase whitespace-nowrap">
-                              {commune.direction_vent !== undefined ? degreesToCardinal(commune.direction_vent) : translateWindDirection(commune.direction || 'N')}
-                            </span>
-                          </div>
-                        </div>
+                    <div className="flex flex-col min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-black uppercase tracking-tighter text-base leading-none truncate">{commune.id}</h3>
+                        {commune.id === selectedLocation && (
+                          <Badge variant="outline" className="text-[8px] h-4 font-black uppercase px-1.5 border-primary text-primary">Ma Commune</Badge>
+                        )}
                       </div>
                       
-                      <div className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400 border-l border-border/50 pl-3">
-                        <Thermometer className="size-4" />
-                        <span className="text-lg font-black">{commune.temperature}°C</span>
-                      </div>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2">
+                        <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                          <Wind className="size-4" />
+                          <div className="flex items-center gap-2 leading-none">
+                            <span className="text-lg font-black whitespace-nowrap">
+                              {commune.vent} <span className="text-[10px]">ND</span>
+                            </span>
+                            <div className="flex items-center gap-1.5 border-l border-border/50 pl-2">
+                              <WindArrow degrees={commune.direction_vent} direction={commune.direction} className="size-4" />
+                              <span className="text-[10px] font-black text-muted-foreground uppercase whitespace-nowrap">
+                                {commune.direction_vent !== undefined ? degreesToCardinal(commune.direction_vent) : translateWindDirection(commune.direction || 'N')}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400 border-l border-border/50 pl-3">
+                          <Thermometer className="size-4" />
+                          <span className="text-lg font-black">{commune.temperature}°C</span>
+                        </div>
 
-                      <div className="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-500 border-l border-border/50 pl-3">
-                        <Sun className="size-4" />
-                        <span className="text-base font-black">UV {commune.uv}</span>
+                        <div className="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-500 border-l border-border/50 pl-3">
+                          <Sun className="size-4" />
+                          <span className="text-base font-black">UV {currentUV}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-                <ChevronLeft className="rotate-180 size-5 text-muted-foreground/30" />
-              </CardContent>
-            </Card>
-          ))}
+                  <ChevronLeft className="rotate-180 size-5 text-muted-foreground/30" />
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       ) : (
         <div className="text-center py-16 px-4 border-4 border-dashed rounded-3xl flex flex-col items-center gap-4 opacity-40">
@@ -249,7 +257,7 @@ export default function MeteoLivePage() {
   );
 }
 
-function ForecastView({ communeId, liveData, onBack }: { communeId: string, liveData?: MeteoLive, onBack: () => void }) {
+function ForecastView({ communeId, liveData, onBack, now }: { communeId: string, liveData?: MeteoLive, onBack: () => void, now: Date }) {
     const firestore = useFirestore();
     const [aiSummary, setAiSummary] = useState<WeatherSummaryOutput | null>(null);
     const [isAiLoading, setIsAiLoading] = useState(false);
@@ -353,7 +361,7 @@ function ForecastView({ communeId, liveData, onBack }: { communeId: string, live
                         <Skeleton className="h-32 w-full" />
                     ) : dbForecasts && dbForecasts.length > 0 ? (
                         dbForecasts.map((f, index) => (
-                            <DayForecastCard key={f.id} forecast={f} index={index} liveData={index === 0 ? liveData : undefined} />
+                            <DayForecastCard key={f.id} forecast={f} index={index} liveData={index === 0 ? liveData : undefined} now={now} />
                         ))
                     ) : (
                         <p className="text-center text-xs text-muted-foreground py-10 italic">Aucune donnée de prévision disponible.</p>
@@ -364,7 +372,7 @@ function ForecastView({ communeId, liveData, onBack }: { communeId: string, live
     );
 }
 
-function DayForecastCard({ forecast, index, liveData }: { forecast: MeteoForecast, index: number, liveData?: MeteoLive }) {
+function DayForecastCard({ forecast, index, liveData, now }: { forecast: MeteoForecast, index: number, liveData?: MeteoLive, now: Date }) {
     const isToday = index === 0;
     const condition = getMeteoCondition(forecast.code_meteo);
     
@@ -372,10 +380,8 @@ function DayForecastCard({ forecast, index, liveData }: { forecast: MeteoForecas
     const currentTemp = isToday && liveData ? liveData.temperature : null;
     const currentVent = isToday && liveData ? liveData.vent : forecast.vent_max;
     
-    // Correction intelligence UV : Si c'est la nuit, l'UV est forcément 0
-    const currentHour = new Date().getHours();
-    const isDaylight = currentHour >= 6 && currentHour < 18;
-    const currentUV = isToday && liveData ? (isDaylight ? liveData.uv : 0) : null;
+    // Correction intelligence UV progressive
+    const currentUV = isToday && liveData ? getProgressiveUV(liveData.uv, now) : null;
 
     return (
         <Card className={cn("overflow-hidden border-2 shadow-sm", isToday && "border-primary/50 ring-1 ring-primary/20 bg-primary/5")}>
