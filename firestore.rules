@@ -4,40 +4,13 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ----------------------------------------------------------------------
-    // SESSIONS DE CHASSE - PRIORITÉ CRITIQUE
-    // DEPLOY_ID: 20240524_1310_GLOBAL_REDEPLOY_FORCE
+    // SYNCHRONISATION GLOBALE - DEPLOY_ID: 20240524_1305_FORCE_CLEAN
     // ----------------------------------------------------------------------
-    match /hunting_sessions/{sessionId} {
-      // Lecture et création autorisées à tout utilisateur connecté
-      allow read, create: if request.auth != null;
-      // Modification/Suppression réservée à l'organisateur ou aux admins
-      allow update, delete: if request.auth != null && (
-        request.auth.token.email == 'f.mallet81@outlook.com' || 
-        request.auth.token.email == 'f.mallet81@gmail.com' ||
-        resource.data.organizerId == request.auth.uid
-      );
-      
-      match /participants/{participantId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null && (
-          request.auth.uid == participantId || 
-          request.auth.token.email == 'f.mallet81@outlook.com' || 
-          request.auth.token.email == 'f.mallet81@gmail.com'
-        );
-      }
-    }
 
-    // ----------------------------------------------------------------------
-    // FONCTIONS ET RÈGLES GÉNÉRALES
-    // ----------------------------------------------------------------------
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-    
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.email == 'f.mallet81@outlook.com' || 
@@ -45,6 +18,21 @@ service cloud.firestore {
       );
     }
 
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // SESSIONS DE CHASSE : Accès simplifié pour résoudre les erreurs de listage
+    match /hunting_sessions/{sessionId} {
+      allow read, create: if isSignedIn();
+      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.organizerId == request.auth.uid);
+      
+      match /participants/{participantId} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    // PROFILS UTILISATEURS
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
       allow create: if isSignedIn();
@@ -60,30 +48,7 @@ service cloud.firestore {
       }
     }
 
-    match /vessels/{vesselId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isOwner(vesselId) || isAdmin();
-
-      match /history/{pointId} {
-        allow read: if isSignedIn();
-        allow create, update, delete: if isOwner(vesselId) || isAdmin();
-      }
-    }
-
-    match /locations/{locationId} {
-      allow read: if true;
-    }
-    
-    match /stations/{stationId} {
-      allow read: if true;
-      allow write: if isAdmin();
-      
-      match /tides/{date} {
-        allow read: if true;
-        allow write: if isAdmin();
-      }
-    }
-    
+    // SÉCURITÉ ET JETONS
     match /access_tokens/{tokenId} {
       allow read, write: if isAdmin();
       allow get: if isSignedIn();
@@ -95,12 +60,32 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // MESSAGERIE
     match /conversations/{userId} {
       allow read, write: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
 
       match /messages/{messageId} {
         allow read, write: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // AUTRES COLLECTIONS
+    match /vessels/{vesselId} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(vesselId) || isAdmin();
+      match /history/{pointId} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    match /locations/{locationId} { allow read: if true; }
+    match /stations/{stationId} {
+      allow read: if true;
+      allow write: if isAdmin();
+      match /tides/{date} {
+        allow read: if true;
+        allow write: if isAdmin();
       }
     }
   }

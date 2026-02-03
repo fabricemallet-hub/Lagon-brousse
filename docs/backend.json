@@ -4,7 +4,7 @@
     "UserAccount": {
       "title": "UserAccount",
       "type": "object",
-      "description": "Représente un compte utilisateur dans l'application.",
+      "description": "Compte utilisateur avec statut d'abonnement et préférences.",
       "properties": {
         "id": { "type": "string" },
         "email": { "type": "string", "format": "email" },
@@ -22,7 +22,7 @@
     "HuntingSession": {
       "title": "HuntingSession",
       "type": "object",
-      "description": "Une session de chasse de groupe.",
+      "description": "Session de chasse de groupe avec expiration automatique.",
       "properties": {
         "organizerId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" },
@@ -33,6 +33,7 @@
     "SessionParticipant": {
       "title": "SessionParticipant",
       "type": "object",
+      "description": "Participant à une session de chasse avec position et statut en temps réel.",
       "properties": {
         "displayName": { "type": "string" },
         "mapIcon": { "type": "string" },
@@ -56,27 +57,6 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["displayName", "updatedAt"]
-    },
-    "FishingSpot": {
-      "title": "FishingSpot",
-      "type": "object",
-      "properties": {
-        "userId": { "type": "string" },
-        "name": { "type": "string" },
-        "location": {
-          "type": "object",
-          "properties": {
-            "latitude": { "type": "number" },
-            "longitude": { "type": "number" }
-          }
-        },
-        "icon": { "type": "string" },
-        "color": { "type": "string" },
-        "fishingTypes": { "type": "array", "items": { "type": "string" } },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "context": { "type": "object" }
-      },
-      "required": ["userId", "name", "location", "createdAt"]
     }
   },
   "auth": {
@@ -85,19 +65,15 @@
   "firestore": {
     "/users/{userId}": {
       "schema": { "$ref": "#/backend/entities/UserAccount" },
-      "description": "Profil et paramètres utilisateur."
+      "description": "Profils et préférences utilisateurs."
     },
     "/hunting_sessions/{sessionId}": {
       "schema": { "$ref": "#/backend/entities/HuntingSession" },
-      "description": "Sessions de chasse de groupe."
+      "description": "Sessions de chasse actives."
     },
     "/hunting_sessions/{sessionId}/participants/{userId}": {
       "schema": { "$ref": "#/backend/entities/SessionParticipant" },
-      "description": "Participant à une session de chasse."
-    },
-    "/users/{userId}/fishing_spots/{spotId}": {
-      "schema": { "$ref": "#/backend/entities/FishingSpot" },
-      "description": "Coins de pêche sauvegardés."
+      "description": "Données temps réel des participants à une session."
     }
   }
 }

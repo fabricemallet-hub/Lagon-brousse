@@ -6,13 +6,8 @@ import type { UserAccount } from '@/lib/types';
 import { addMonths } from 'date-fns';
 
 /**
- * Creates a user document in Firestore if it doesn't already exist.
- * This function encapsulates the logic for creating a new user profile,
- * including assigning admin status or a trial period.
- * @param firestore The Firestore instance.
- * @param user The Firebase Auth user object.
- * @param displayName Optional display name to set for the new user.
- * @returns A promise that resolves when the operation is complete.
+ * Gère la création et la mise à jour du document profil utilisateur dans Firestore.
+ * Assure que les administrateurs sont correctement identifiés par leur e-mail.
  */
 export async function ensureUserDocument(firestore: Firestore, user: User, displayName?: string): Promise<void> {
   const userDocRef = doc(firestore, 'users', user.uid);
@@ -24,7 +19,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
   const isAdminUser = email === 'f.mallet81@outlook.com' || email === 'f.mallet81@gmail.com';
 
   if (docSnap.exists()) {
-    // Mise à jour de sécurité : s'assurer que le statut admin est bien synchronisé
+    // Si l'utilisateur est admin mais que son statut n'est pas à jour dans la base
     const currentData = docSnap.data() as UserAccount;
     if (isAdminUser && currentData.subscriptionStatus !== 'admin') {
         await setDoc(userDocRef, { ...currentData, subscriptionStatus: 'admin' }, { merge: true });
@@ -41,12 +36,13 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
     newUserDocument = {
       id: uid,
       email: user.email || '',
-      displayName: effectiveDisplayName || 'Admin',
+      displayName: effectiveDisplayName,
       subscriptionStatus: 'admin',
       favoriteLocationIds: [],
       lastSelectedLocation: 'Nouméa',
     };
   } else {
+    // Période d'essai gratuite de 3 mois pour les nouveaux utilisateurs
     const trialStartDate = new Date();
     const trialExpiryDate = addMonths(trialStartDate, 3);
     
