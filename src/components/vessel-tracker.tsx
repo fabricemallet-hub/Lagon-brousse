@@ -164,7 +164,7 @@ export function VesselTracker() {
         const dist = getDistance(newLat, newLng, anchorPos.lat, anchorPos.lng);
         const now = Date.now();
 
-        // Use a 10m threshold to avoid jitter updates
+        // Use a 15m threshold to avoid jitter updates
         if (dist > IMMOBILITY_THRESHOLD_METERS) {
           // SIGNIFICANT MOVEMENT
           if (vesselStatus === 'stationary') {
@@ -229,21 +229,38 @@ export function VesselTracker() {
   };
 
   const copyCoordinates = (lat: number, lng: number) => {
-    const text = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    const text = `${lat.toFixed(6)},${lng.toFixed(6)}`;
     navigator.clipboard.writeText(text);
     toast({ title: "Coordonnées copiées", description: text });
   };
 
   const contactRescue = (lat: number, lng: number, name: string) => {
-    const coords = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-    const body = `URGENCE MER: ${name} en détresse. Position: https://www.google.com/maps?q=${coords}. Appel via Lagon&Brousse NC.`;
-    window.location.href = `sms:16?body=${encodeURIComponent(body)}`;
+    const coords = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+    const googleMapsUrl = `https://www.google.com/maps?q=${coords}`;
+    const cleanName = name === 'Ma Position' ? (user?.displayName || 'Capitaine') : name;
+    
+    const bodyText = `URGENCE MER: ${cleanName} en detresse. Position: ${googleMapsUrl}. Appel via Lagon&Brousse NC.`;
+    
+    // Cross-platform SMS link formatting
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const separator = isIOS ? '&' : '?';
+    const smsUrl = `sms:16${separator}body=${encodeURIComponent(bodyText)}`;
+    
+    // Inform the user
+    toast({ 
+      title: "Demande de secours", 
+      description: "Ouverture de l'application SMS. Envoyez le message au 16 (MRCC)." 
+    });
+
+    window.location.href = smsUrl;
   };
 
   if (loadError) return <Alert variant="destructive"><AlertTitle>Erreur de carte</AlertTitle></Alert>;
   if (!isLoaded) return <Skeleton className="h-96 w-full" />;
 
-  const displayVessel = mode === 'sender' ? (isSharing ? { location: { latitude: currentPos?.lat || 0, longitude: currentPos?.lng || 0 }, status: isOnline ? vesselStatus : 'offline', displayName: 'Ma Position' } : null) : remoteVessel;
+  const displayVessel = mode === 'sender' 
+    ? (isSharing ? { location: { latitude: currentPos?.lat || 0, longitude: currentPos?.lng || 0 }, status: isOnline ? vesselStatus : 'offline', displayName: 'Ma Position' } : null) 
+    : remoteVessel;
 
   return (
     <div className="space-y-6">
