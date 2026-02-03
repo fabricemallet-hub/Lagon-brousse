@@ -92,8 +92,8 @@ const sectionContent: Record<string, {
       "Partage de l'ID : Envoyez cet ID par SMS ou WhatsApp à votre contact de confiance resté à terre.",
       "Détection d'Immobilité : Si le système détecte une absence de mouvement (>15m) pendant 5 min, votre statut passe en 'Stationnaire' (Mouillage/Dérive).",
       "Mises à jour Auto : En mode stationnaire, le tracker rafraîchit votre position toutes les 30 min pour rassurer le récepteur sans vider votre batterie.",
-      "Reprise de Route : Dès que vous reprenez de la vitesse, le système repasse immédiatement en mode 'Mouvement' et informe le récepteur.",
-      "ALERTE SMS CRITIQUE : Saisissez le numéro de votre contact. En cas de détresse, le bouton rouge génère un message complet (GPS, lien Maps, secours) et ouvre l'application SMS de votre téléphone. Vous n'avez plus qu'à appuyer sur envoyer."
+      "ALERTE SMS CRITIQUE : Saisissez le numéro de votre contact. En cas de détresse, le bouton rouge génère un message complet (GPS, lien Maps, secours) et ouvre l'application SMS de votre téléphone pré-remplie. Vous n'avez plus qu'à appuyer sur envoyer.",
+      "Contenu de l'Alerte : Le SMS envoyé contient vos coordonnées GPS décimales, un lien direct Google Maps, votre nom et les numéros d'urgence NC (CROSS 196)."
     ],
     tips: [
       "Configuration Préalable : Enregistrez le numéro de votre contact via l'icône 'Disquette' pour que le bouton d'alerte soit opérationnel immédiatement lors de vos prochaines sorties.",
@@ -163,7 +163,7 @@ const sectionContent: Record<string, {
     title: 'Guide Culture & IA',
     icon: Sprout,
     color: 'bg-emerald-500',
-    role: "Un assistant horticole intelligent propulsé par l'IA qui crée vos fiches de culture et optimise vos dates de semis selon les cycles de sève.",
+    role: "Un assistant horticole intelligent propulsé par l'IA qui crée vos fiches de culture et occupe vos dates de semis selon les cycles de sève.",
     steps: [
       "Recherche & Identification : Tapez le nom de n'importe quelle graine. Si elle est absente du guide, l'IA créera instantanément sa fiche technique personnalisée.",
       "Calcul de Fiche IA : L'intelligence artificielle analyse la plante, définit son type (Fruit, Racine...) et génère des conseils spécifiques (arrosage, exposition).",
@@ -181,16 +181,19 @@ const sectionContent: Record<string, {
     title: 'Calendrier Pêche',
     icon: Calendar,
     color: 'bg-slate-700',
-    role: "Une vue mensuelle pour planifier vos futures sorties en mer.",
+    role: "Le Calendrier Pêche est un outil de planification stratégique à long terme. Il vous permet d'anticiper les cycles biologiques marins sur tout le mois pour choisir la technique de pêche la plus adaptée à chaque coefficient de marée et phase lunaire.",
     steps: [
-      "Identifiez les phases clés : Nouvelle lune et Pleine lune (fortes marées).",
-      "Les icônes de poissons indiquent le potentiel global de la journée.",
-      "Les icônes de crabes, langoustes et poulpes signalent les meilleures périodes de capture.",
-      "Cliquez sur un jour pour voir le détail des marées prévues."
+      "Suivi des Crustacés : Repérez les jours 'Crabe Plein' (vives-eaux) ou 'Crabe Mout' (mortes-eaux/mue). Ne perdez plus de temps à poser des casiers durant la mue.",
+      "Saisons Pélagiques : Identifiez les périodes de passage des espèces comme le Tazard (pic en Nov/Déc) via les alertes de saison intégrées aux fiches journalières.",
+      "Analyse des Marées : Visualisez instantanément les marées les plus hautes et les plus basses du mois (grandes marées) pour cibler les platiers ou les passes.",
+      "Comportement des Espèces : Accédez aux fiches détaillées par jour pour connaître les habitudes alimentaires, les profondeurs idéales (ex: 2-10m pour le Bec de cane) et les spots stratégiques.",
+      "Stratégie Langoustes : Adaptez votre sortie selon l'activité prévue. En lune noire (Nouvelle Lune), privilégiez le récif extérieur ; en lune claire, elles restent souvent à l'abri ou à l'intérieur."
     ],
     tips: [
-      "Les jours passés sont grisés pour une meilleure lisibilité.",
-      "Planifiez vos sorties 'Crabes' autour de la nouvelle lune pour maximiser vos chances."
+      "Un indice de poisson de 10/10 coïncide souvent avec les jours de grandes marées (Nouvelle ou Pleine lune).",
+      "Pour le Tazard, privilégiez les créneaux d'aube lors des marées montantes avec un fort courant.",
+      "Cliquez sur n'importe quel jour pour ouvrir la fiche 'Expert' qui synthétise tous les facteurs (Lune + Marée + Espèce).",
+      "Le calendrier affiche les hauteurs exactes pour détecter les marées 'records' du mois."
     ]
   },
   'calendrier-champs': {
