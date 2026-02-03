@@ -5,7 +5,7 @@ import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Wind, Thermometer, Sun, MapPin, Search, ChevronLeft, CalendarDays, Waves, Info, BrainCircuit, ShieldAlert, Sparkles, CloudSun, Cloud, CloudRain, Moon, CloudMoon, ArrowRight } from 'lucide-react';
+import { Wind, Thermometer, Sun, MapPin, Search, ChevronLeft, CalendarDays, Waves, Info, BrainCircuit, ShieldAlert, Sparkles, CloudSun, Cloud, CloudRain, Moon, CloudMoon, ArrowUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useState, useMemo, useEffect } from 'react';
@@ -50,18 +50,18 @@ const WeatherIcon = ({ condition, className }: { condition: string, className?: 
 const WindArrow = ({ direction, className }: { direction: string, className?: string }) => {
   const rotation =
     {
-      N: 180,
-      NE: 225,
-      E: 270,
-      SE: 315,
-      S: 0,
-      SW: 45,
-      W: 90,
-      NW: 135,
+      N: 0,
+      NE: 45,
+      E: 90,
+      SE: 135,
+      S: 180,
+      SW: 225,
+      W: 270,
+      NW: 315,
     }[direction as WindDirection] || 0;
 
   return (
-    <ArrowRight
+    <ArrowUp
       className={cn('size-4 text-blue-500 dark:text-blue-400', className)}
       style={{ transform: `rotate(${rotation}deg)` }}
     />
@@ -196,35 +196,33 @@ export default function MeteoLivePage() {
                       )}
                     </div>
                     
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2">
                       {/* Vent agrandi avec flèche et texte direction */}
                       <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
                         <Wind className="size-4" />
                         <div className="flex items-center gap-2 leading-none">
-                          <span className="text-base font-black whitespace-nowrap">
+                          <span className="text-lg font-black whitespace-nowrap">
                             {commune.vent} <span className="text-[10px]">ND</span>
                           </span>
-                          {commune.direction && (
-                            <div className="flex items-center gap-1.5 border-l border-border/50 pl-2">
-                              <WindArrow direction={commune.direction} className="size-3.5" />
-                              <span className="text-[9px] font-bold text-muted-foreground uppercase whitespace-nowrap">
-                                {translateWindDirection(commune.direction)}
-                              </span>
-                            </div>
-                          )}
+                          <div className="flex items-center gap-1.5 border-l border-border/50 pl-2">
+                            <WindArrow direction={commune.direction || 'N'} className="size-4" />
+                            <span className="text-[10px] font-black text-muted-foreground uppercase whitespace-nowrap">
+                              {translateWindDirection(commune.direction || 'N')}
+                            </span>
+                          </div>
                         </div>
                       </div>
                       
                       {/* Température agrandie */}
                       <div className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400 border-l border-border/50 pl-3">
                         <Thermometer className="size-4" />
-                        <span className="text-base font-black">{commune.temperature}°C</span>
+                        <span className="text-lg font-black">{commune.temperature}°C</span>
                       </div>
 
-                      {/* Ajout de l'UV */}
+                      {/* UV agrandi */}
                       <div className="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-500 border-l border-border/50 pl-3">
                         <Sun className="size-4" />
-                        <span className="text-sm font-black">UV {commune.uv}</span>
+                        <span className="text-base font-black">UV {commune.uv}</span>
                       </div>
                     </div>
                   </div>
