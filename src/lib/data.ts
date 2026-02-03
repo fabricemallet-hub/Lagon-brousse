@@ -386,8 +386,9 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     };
   });
 
-  const rainChance = (Math.sin(dateSeed * 0.4 + locationSeed * 0.2) + 1) / 2;
-  locationData.weather.rain = rainChance < 0.98 ? 'Aucune' : (rainChance < 0.995 ? 'Fine' : 'Forte');
+  const cloudFactor = (Math.sin(dateSeed * 0.7 + locationSeed * 0.5) + 1) / 2;
+  const rainSeed = (Math.sin(dateSeed * 0.4 + locationSeed * 0.2) + 1) / 2;
+  locationData.weather.rain = rainSeed < 0.95 ? 'Aucune' : (rainSeed < 0.99 ? 'Fine' : 'Forte');
   
   const isRising = dayInCycle < 14.76;
   locationData.farming.lunarPhase = isRising ? 'Lune Montante' : 'Lune Descendante';
@@ -421,10 +422,24 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   const seasonalTempFactor = Math.cos(((month - 1) / 12) * 2 * Math.PI); // Pic en Janvier, Min en Juillet
   const dailyBaseTemp = 22 + seasonalTempFactor * 4;
 
+  let dayHasRain = false;
+  let dayIsCloudy = false;
+
   for (let i = 0; i < 24; i++) {
       const forecastDate = new Date(effectiveDate.getTime() + i * 60 * 60 * 1000);
       const tideAtHour = tideDataForDay.find(td => new Date(td.date).getHours() === i);
       
+      // Facteurs horaires pour la pluie et les nuages
+      const hourCloud = (Math.sin(dateSeed * 0.7 + locationSeed * 0.5 + i * 0.3) + 1) / 2;
+      const hourRain = (Math.sin(dateSeed * 0.4 + locationSeed * 0.2 + i * 0.25) + 1) / 2;
+
+      let cond: HourlyForecast['condition'] = i < 6 || i > 18 ? 'Nuit claire' : 'Ensoleillé';
+      
+      if (hourRain > 0.96) { cond = 'Pluvieux'; dayHasRain = true; }
+      else if (hourRain > 0.92) { cond = 'Averses'; dayHasRain = true; }
+      else if (hourCloud > 0.8) { cond = 'Nuageux'; dayIsCloudy = true; }
+      else if (hourCloud > 0.5) { cond = 'Peu nuageux'; dayIsCloudy = true; }
+
       // Température dynamique (Peak à 14h)
       const tempVariation = Math.sin(((i - 8) / 12) * Math.PI);
       const hourlyTemp = Math.round(dailyBaseTemp + tempVariation * 5);
@@ -438,7 +453,7 @@ export function generateProceduralData(location: string, date: Date): LocationDa
 
       locationData.weather.hourly.push({
           date: forecastDate.toISOString(),
-          condition: i < 6 || i > 18 ? 'Nuit claire' : (rainChance > 0.98 ? 'Averses' : 'Ensoleillé'),
+          condition: cond,
           windSpeed: locationData.weather.wind[Math.floor(i/6)]?.speed || 10,
           windDirection: locationData.weather.wind[Math.floor(i/6)]?.direction || 'E',
           stability: locationData.weather.wind[Math.floor(i/6)]?.stability || 'Stable',
@@ -450,6 +465,12 @@ export function generateProceduralData(location: string, date: Date): LocationDa
           tidePeakType: tideAtHour?.tidePeakType
       });
   }
+
+  // Ajuster la tendance globale
+  if (dayHasRain) locationData.weather.trend = 'Averses';
+  else if (dayIsCloudy) locationData.weather.trend = 'Nuageux';
+  else locationData.weather.trend = 'Ensoleillé';
+
   locationData.weather.uvIndex = maxUV;
   locationData.weather.temp = locationData.weather.hourly[12].temp; // Température de référence à midi
 

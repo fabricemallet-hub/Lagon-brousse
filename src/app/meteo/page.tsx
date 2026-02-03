@@ -5,11 +5,11 @@ import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Wind, Thermometer, Sun, MapPin, Search, ChevronLeft, CalendarDays, Waves, Info, BrainCircuit, ShieldAlert, Sparkles, CloudSun, Cloud, CloudRain, Moon } from 'lucide-react';
+import { Wind, Thermometer, Sun, MapPin, Search, ChevronLeft, CalendarDays, Waves, Info, BrainCircuit, ShieldAlert, Sparkles, CloudSun, Cloud, CloudRain, Moon, CloudMoon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useState, useMemo, useEffect } from 'react';
-import type { MeteoLive, LocationData } from '@/lib/types';
+import type { MeteoLive, LocationData, HourlyForecast } from '@/lib/types';
 import { translateWindDirection } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { generateProceduralData } from '@/lib/data';
@@ -42,6 +42,7 @@ const WeatherIcon = ({ condition, className }: { condition: string, className?: 
         case 'Nuageux': return <Cloud {...props} className={cn(props.className, "text-slate-400")} />;
         case 'Averses': return <CloudRain {...props} className={cn(props.className, "text-blue-400")} />;
         case 'Pluvieux': return <CloudRain {...props} className={cn(props.className, "text-blue-600")} />;
+        case 'Nuit claire': return <Moon {...props} className={cn(props.className, "text-blue-200")} />;
         default: return <Sun {...props} />;
     }
 };
@@ -311,6 +312,10 @@ function DayForecastCard({ date, data, isToday: today, liveData }: { date: Date,
     const windDir = today && liveData && liveData.direction ? translateWindDirection(liveData.direction) : translateWindDirection(weather.wind[0].direction);
     const uv = today && liveData ? liveData.uv : weather.uvIndex;
 
+    // Détection de la première heure de pluie ou averses
+    const rainForecast = weather.hourly.find(h => h.condition === 'Pluvieux' || h.condition === 'Averses');
+    const rainTime = rainForecast ? format(new Date(rainForecast.date), 'HH:mm') : null;
+
     return (
         <Card className={cn("overflow-hidden border-2 shadow-sm", today && "border-primary/50 ring-1 ring-primary/20 bg-primary/5")}>
             <CardContent className="p-0">
@@ -319,7 +324,14 @@ function DayForecastCard({ date, data, isToday: today, liveData }: { date: Date,
                         <span className="text-[10px] font-black uppercase text-muted-foreground">{format(date, 'EEEE', { locale: fr })}</span>
                         <span className="font-black text-base">{format(date, 'd MMMM', { locale: fr })}</span>
                     </div>
-                    <WeatherIcon condition={weather.trend} />
+                    <div className="flex items-center gap-3">
+                        {rainTime && (
+                            <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200 text-[9px] font-black animate-pulse">
+                                Pluie à {rainTime}
+                            </Badge>
+                        )}
+                        <WeatherIcon condition={weather.trend} />
+                    </div>
                 </div>
 
                 <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
