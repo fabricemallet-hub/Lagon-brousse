@@ -285,14 +285,23 @@
         }
       },
       {
-        "path": "/vessels/{userId}/history/{pointId}",
+        "path": "/hunting_sessions/{sessionId}",
         "definition": {
-          "entityName": "VesselHistory",
-          "schema": { "$ref": "#/backend/entities/VesselHistory" },
-          "description": "Stationary points history.",
+          "entityName": "HuntingSession",
+          "schema": { "$ref": "#/backend/entities/HuntingSession" },
+          "description": "Real-time hunting session.",
+          "params": [{ "name": "sessionId", "description": "The session ID." }]
+        }
+      },
+      {
+        "path": "/hunting_sessions/{sessionId}/participants/{userId}",
+        "definition": {
+          "entityName": "SessionParticipant",
+          "schema": { "$ref": "#/backend/entities/SessionParticipant" },
+          "description": "A participant in a hunting session.",
           "params": [
-            { "name": "userId", "description": "Vessel owner UID." },
-            { "name": "pointId", "description": "Point ID." }
+            { "name": "sessionId", "description": "The session ID." },
+            { "name": "userId", "description": "The participant's UID." }
           ]
         }
       }

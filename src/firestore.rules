@@ -81,18 +81,19 @@ service cloud.firestore {
     // Purpose: Manages real-time group hunting sessions.
     // ----------------------------------------------------------------------
     match /hunting_sessions/{sessionId} {
-      // Lecture autorisée pour tous les connectés (nécessaire pour rejoindre via code)
-      allow get, list: if isSignedIn();
-      // Création réservée à l'organisateur déclaré
+      // Lecture globale autorisée pour permettre les requêtes filtrées
+      allow read: if isSignedIn();
+      
+      // Création réservée à l'organisateur
       allow create: if isSignedIn() && request.resource.data.organizerId == request.auth.uid;
-      // Suppression réservée à l'organisateur ou l'admin
+      
+      // Suppression par l'organisateur ou l'admin
       allow delete: if isAdmin() || (isSignedIn() && resource.data.organizerId == request.auth.uid);
       
       // Participants subcollection
       match /participants/{userId} {
-        allow create, update, delete: if isOwner(userId);
-        allow get: if isSignedIn();
-        allow list: if exists(/databases/$(database)/documents/hunting_sessions/$(sessionId)/participants/$(request.auth.uid)) || isAdmin();
+        allow read: if isSignedIn();
+        allow write: if isOwner(userId) || isAdmin();
       }
     }
 
