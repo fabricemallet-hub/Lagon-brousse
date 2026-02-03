@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   format,
   startOfMonth,
@@ -140,6 +140,7 @@ const DayCell = React.memo(({
       onClick={() => onDateSelect(day)}
       className={cn(
         'h-32 border-t border-l p-1 flex flex-col cursor-pointer transition-colors',
+        isTodayDay && 'calendar-today-cell', // Class used for auto-scrolling
         !isCurrentMonth && 'bg-muted/20 text-muted-foreground/50',
         isPastDay && 'bg-muted/5 opacity-60',
         isTodayDay && 'bg-primary/5 ring-1 ring-inset ring-primary/40',
@@ -212,6 +213,7 @@ export function LunarCalendar() {
   const { selectedLocation } = useLocation();
   const [displayDate, setDisplayDate] = useState(startOfMonth(selectedDate));
   const [detailedDay, setDetailedDay] = useState<Date | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const handleDayClick = (day: Date) => { setSelectedDate(day); setDetailedDay(day); };
   const handlePrevMonth = () => setDisplayDate((d) => subMonths(d, 1));
@@ -224,8 +226,23 @@ export function LunarCalendar() {
   const days = eachDayOfInterval({ start: startDate, end: endDate });
   const weekdays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
+  // Effet pour centrer sur aujourd'hui à l'ouverture ou au changement de mois
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const todayEl = document.querySelector('.calendar-today-cell');
+      if (todayEl) {
+        todayEl.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'center'
+        });
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [displayDate]);
+
   return (
-    <div className="w-full max-w-full overflow-x-auto overflow-y-visible flex flex-col items-start sm:items-center py-4" style={{ WebkitOverflowScrolling: 'touch' }}>
+    <div className="w-full max-w-full overflow-x-auto overflow-y-visible flex flex-col items-start sm:items-center py-4" style={{ WebkitOverflowScrolling: 'touch' }} ref={scrollContainerRef}>
       <div className="w-[1200px] border rounded-lg bg-card shadow-lg overflow-hidden flex flex-col shrink-0">
         <div className="flex justify-between items-center p-4 border-b bg-muted/10">
           <Button variant="ghost" size="icon" className="h-10 w-10" onClick={handlePrevMonth}><ChevronLeft className="size-6" /></Button>
