@@ -13,6 +13,7 @@ import {
   Moon,
   Waves,
   Zap,
+  Clock,
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -99,7 +100,7 @@ export function WeatherForecast({
 
   useEffect(() => {
     setIsClient(true);
-    const timer = setInterval(() => setNow(new Date()), 60 * 1000);
+    const timer = setInterval(() => setNow(new Date()), 1000); // Update every second for precise time display
     return () => clearInterval(timer);
   }, []);
 
@@ -158,7 +159,6 @@ export function WeatherForecast({
 
   useEffect(() => {
     if (isClient && isToday && scrollRef.current) {
-        // Optimization: Use requestAnimationFrame to avoid forced reflow violation
         requestAnimationFrame(() => {
             const currentHour = now.getHours();
             const element = scrollRef.current?.querySelector(`[data-hour="${currentHour}"]`) as HTMLElement;
@@ -203,10 +203,14 @@ export function WeatherForecast({
                     <p className="text-[10px] font-black uppercase tracking-tighter">{translateWindDirection(selectedForecast.windDirection)}</p>
                 </div>
             </div>
-             <div className="flex flex-col items-center gap-2.5">
+             <div className="flex flex-col items-center gap-2">
+                <div className="flex items-center gap-2 bg-white/15 px-3 py-1.5 rounded-lg border border-white/10 shadow-inner">
+                    <Clock className="size-4 text-blue-200" />
+                    <span className="font-black text-sm">{format(now, 'HH:mm')}</span>
+                </div>
                 <div className="flex items-center gap-2 bg-white/15 px-3 py-1.5 rounded-lg border border-white/10 shadow-inner">
                     <Thermometer className="size-4 text-orange-300" />
-                    <span className="font-black text-sm">{selectedForecast.temp}°C</span>
+                    <span className="font-black text-sm">{selectedForecast.temp.toFixed(1)}°C</span>
                 </div>
                 <div className="flex items-center gap-2 bg-white/15 px-3 py-1.5 rounded-lg border border-white/10 shadow-inner">
                     <Sun className="size-4 text-yellow-300" />
