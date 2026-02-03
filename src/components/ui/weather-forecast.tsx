@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   CloudMoon,
   CloudSun,
@@ -86,6 +86,7 @@ const WindArrowIcon = ({ direction, className }: { direction: WindDirection, cla
 export function WeatherForecast({ weather, tides }: { weather: WeatherData; tides: Tide[] }) {
   const [isClient, setIsClient] = useState(false);
   const [now, setNow] = useState(new Date());
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsClient(true);
@@ -141,9 +142,8 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
     }
     const windSentence = `Vent de ${_selectedForecast.windSpeed} nœuds de ${translateWindDirection(_selectedForecast.windDirection)}, tendance ${windTrend}.`;
 
-    const forecasts = weather.hourly.slice(0, 24);
-    // On s'assure que les prévisions sont triées de 00h à 23h
-    const sortedForecasts = [...forecasts].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // Strict 00h à 23h pour la journée sélectionnée
+    const sortedForecasts = [...weather.hourly].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     const isToday = new Date(sortedForecasts[0].date).toDateString() === now.toDateString();
 
     return { 
@@ -153,6 +153,17 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
       isSelectedDayToday: isToday
     };
   }, [now, weather, tides]);
+
+  // Auto-scroll vers l'heure actuelle
+  useEffect(() => {
+    if (isClient && isSelectedDayToday && scrollRef.current) {
+        const currentHour = now.getHours();
+        const element = scrollRef.current.querySelector(`[data-hour="${currentHour}"]`);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+    }
+  }, [isClient, isSelectedDayToday, now]);
 
   if (!isClient || !selectedForecast) {
     return <Skeleton className="h-96 w-full rounded-lg" />;
@@ -202,15 +213,17 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
       </div>
 
       <div className="p-2 w-full">
-        <div className="flex flex-nowrap overflow-x-auto gap-2 pb-2 scrollbar-hide px-1">
+        <div className="flex flex-nowrap overflow-x-auto gap-2 pb-2 scrollbar-hide px-1" ref={scrollRef}>
           {hourlyForecastsToShow.map((forecast, index) => {
              const forecastDate = new Date(forecast.date);
-             const isPast = isSelectedDayToday && forecastDate.getHours() < now.getHours();
-             const isCurrent = isSelectedDayToday && forecastDate.getHours() === now.getHours();
+             const forecastHour = forecastDate.getHours();
+             const isPast = isSelectedDayToday && forecastHour < now.getHours();
+             const isCurrent = isSelectedDayToday && forecastHour === now.getHours();
              
              return (
               <div 
                 key={index} 
+                data-hour={forecastHour}
                 className={cn(
                   'flex-shrink-0 w-20 flex flex-col items-center justify-between p-2 rounded-lg border h-full space-y-1 text-center bg-card transition-all',
                    isCurrent && 'bg-blue-50 border-blue-400 ring-1 ring-blue-400 scale-[1.02] z-10',

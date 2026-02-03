@@ -22,7 +22,6 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Calendar as CalendarIcon,
   User,
   AlertCircle,
   Fish,
@@ -64,7 +63,7 @@ const UsageTimer = React.memo(({ status, auth }: { status: string, auth: any }) 
   const pathname = usePathname();
 
   useEffect(() => {
-    // On applique le décompte si le statut est 'limited' OU 'trial' (essai 1min/jour)
+    // Le décompte s'applique aux comptes limited ET trial (1min/jour)
     if ((status !== 'limited' && status !== 'trial') || !auth) return;
 
     const today = new Date().toISOString().split('T')[0];
@@ -80,27 +79,36 @@ const UsageTimer = React.memo(({ status, auth }: { status: string, auth: any }) 
     const remaining = Math.max(0, USAGE_LIMIT_SECONDS - dailyUsage);
     setTimeLeft(remaining);
 
-    if (remaining > 0) {
-      const interval = setInterval(() => {
-        setTimeLeft(prev => {
-          const next = Math.max(0, prev - 1);
-          // Sauvegarde régulière
-          if (next % 5 === 0 || next <= 0) {
-            localStorage.setItem('dailyUsage', String(USAGE_LIMIT_SECONDS - next));
-          }
-          if (next <= 0) {
-            clearInterval(interval);
-            toast({ variant: 'destructive', title: 'Limite atteinte', description: 'Déconnexion automatique...' });
-            signOut(auth).then(() => {
-              sessionStorage.clear();
-              if (pathname !== '/login') router.push('/login');
-            });
-          }
-          return next;
+    if (remaining <= 0) {
+        toast({ variant: 'destructive', title: 'Limite atteinte', description: 'Votre minute quotidienne est épuisée.' });
+        signOut(auth).then(() => {
+            sessionStorage.clear();
+            if (pathname !== '/login') router.push('/login');
         });
-      }, 1000);
-      return () => clearInterval(interval);
+        return;
     }
+
+    const interval = setInterval(() => {
+      setTimeLeft(prev => {
+        const next = Math.max(0, prev - 1);
+        const used = USAGE_LIMIT_SECONDS - next;
+        
+        // Sauvegarde tous les 2 ticks pour plus de précision
+        localStorage.setItem('dailyUsage', String(used));
+        
+        if (next <= 0) {
+          clearInterval(interval);
+          toast({ variant: 'destructive', title: 'Limite atteinte', description: 'Déconnexion automatique...' });
+          signOut(auth).then(() => {
+            sessionStorage.clear();
+            if (pathname !== '/login') router.push('/login');
+          });
+        }
+        return next;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
   }, [status, auth, toast, router, pathname]);
 
   if (status !== 'limited' && status !== 'trial') return null;
@@ -108,7 +116,7 @@ const UsageTimer = React.memo(({ status, auth }: { status: string, auth: any }) 
   return (
     <div className="fixed top-0 left-0 right-0 h-10 bg-red-600 text-white flex items-center justify-center text-xs font-black z-[100] shadow-xl px-4 text-center border-b border-white/20">
         <AlertCircle className="size-4 mr-2 shrink-0" />
-        {status === 'trial' ? 'Session d\'essai' : 'Mode Limité'} : {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')} restant.
+        {status === 'trial' ? 'Session d\'essai' : 'Mode Limité'} : {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')} restant
     </div>
   );
 });
@@ -135,14 +143,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const status = useMemo(() => {
     if (isUserLoading || (user && isProfileLoading)) return 'loading';
     if (!user) return 'limited';
-    if (!userProfile) return 'loading';
+    if (!userProfile) return 'limited';
 
     switch (userProfile.subscriptionStatus) {
       case 'admin': return 'admin';
       case 'active':
         return isBefore(new Date(), new Date(userProfile.subscriptionExpiryDate!)) ? 'active' : 'limited';
       case 'trial':
-        // Pour répondre à la demande "essai 1min/jour", on garde le statut 'trial' mais UsageTimer le traitera comme limité
         return isBefore(new Date(), new Date(userProfile.subscriptionExpiryDate!)) ? 'trial' : 'limited';
       default: return 'limited';
     }
