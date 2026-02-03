@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "UserAccount": {
@@ -18,6 +19,29 @@
         "lastSelectedLocation": { "type": "string", "description": "The last location selected by the user." }
       },
       "required": ["id", "email", "displayName", "subscriptionStatus"]
+    },
+    "SowingRecord": {
+      "title": "SowingRecord",
+      "type": "object",
+      "description": "Represents a sowing entry saved by the user.",
+      "properties": {
+        "userId": { "type": "string" },
+        "seedName": { "type": "string" },
+        "sowingDate": { "type": "string", "format": "date-time" },
+        "plantType": { "type": "string" },
+        "cultureAdvice": { "type": "string" },
+        "estimatedHarvestDate": { "type": "string" },
+        "transplantingAdvice": { "type": "string" },
+        "lunarContext": {
+          "type": "object",
+          "properties": {
+            "phase": { "type": "string" },
+            "zodiac": { "type": "string" }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "seedName", "sowingDate"]
     },
     "Location": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -222,6 +246,18 @@
           "params": [
             { "name": "userId", "description": "The user's ID." },
             { "name": "spotId", "description": "The unique ID for the fishing spot." }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/sowings/{sowingId}",
+        "definition": {
+          "entityName": "SowingRecord",
+          "schema": { "$ref": "#/backend/entities/SowingRecord" },
+          "description": "Stores a user's gardening sowing records and AI advice.",
+          "params": [
+            { "name": "userId", "description": "The user's ID." },
+            { "name": "sowingId", "description": "The unique ID for the sowing entry." }
           ]
         }
       },

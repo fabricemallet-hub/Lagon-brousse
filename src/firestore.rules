@@ -22,16 +22,21 @@ service cloud.firestore {
     // ----------------------------------------------------------------------
     // Collection: users
     // Purpose: Stores private user account information.
-    // Rules:
-    // - A user can only read and write to their own document.
-    // - Only an admin can list all user documents.
     // ----------------------------------------------------------------------
     match /users/{userId} {
-      allow get: if isOwner(userId);
+      allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
       allow create: if isOwner(userId);
       allow update: if isOwner(userId) || isAdmin();
-      allow delete: if isOwner(userId);
+      allow delete: if isOwner(userId) || isAdmin();
+      
+      match /fishing_spots/{spotId} {
+        allow read, write, delete: if isOwner(userId);
+      }
+
+      match /sowings/{sowingId} {
+        allow read, write, delete: if isOwner(userId);
+      }
     }
 
     // ----------------------------------------------------------------------
@@ -68,11 +73,9 @@ service cloud.firestore {
       
       // Participants subcollection
       match /participants/{userId} {
-        // A user can only manage their own participant document.
         allow create, update, delete: if isOwner(userId);
-        
-        // Any valid participant in the session can read the participant list.
-        allow get, list: if exists(/databases/$(database)/documents/hunting_sessions/$(sessionId)/participants/$(request.auth.uid));
+        allow get: if isSignedIn();
+        allow list: if exists(/databases/$(database)/documents/hunting_sessions/$(sessionId)/participants/$(request.auth.uid));
       }
     }
 
@@ -81,13 +84,9 @@ service cloud.firestore {
     // Purpose: Manages subscription access tokens.
     // ----------------------------------------------------------------------
     match /access_tokens/{tokenId} {
-      // Admin has full control.
       allow read, write: if isAdmin();
-      
-      // An authenticated user can check if a token exists.
       allow get: if isSignedIn();
       
-      // A user can update a token ONLY to redeem it for themselves.
       function isRedeemingOwnToken() {
         let isBecomingRedeemed = request.resource.data.status == 'redeemed';
         let wasActive = resource.data.status == 'active';
@@ -95,6 +94,28 @@ service cloud.firestore {
         return isBecomingRedeemed && wasActive && isRedeemer;
       }
       allow update: if isRedeemingOwnToken();
+    }
+    
+    // ----------------------------------------------------------------------
+    // Collection: shared_access_tokens
+    // Purpose: Manages a global access token for all users.
+    // ----------------------------------------------------------------------
+    match /shared_access_tokens/{tokenId} {
+      allow write: if isAdmin();
+      allow read: if isSignedIn();
+    }
+
+    // ----------------------------------------------------------------------
+    // Collection: conversations
+    // Purpose: Manages support conversations between users and admin.
+    // ----------------------------------------------------------------------
+    match /conversations/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+
+      match /messages/{messageId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
     }
   }
 }
