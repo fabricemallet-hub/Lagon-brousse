@@ -1,4 +1,3 @@
-
 export type WindDirection = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
 
 export interface WindForecast {
@@ -272,4 +271,11 @@ export interface SplashScreenSettings {
   splashImageUrl?: string;
   splashImageFit?: 'cover' | 'contain';
   splashDuration?: number;
+}
+
+export interface MeteoLive {
+  id: string; // Document ID (Commune)
+  vent: number;
+  temperature: number;
+  uv: number;
 }

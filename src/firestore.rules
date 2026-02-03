@@ -1,14 +1,28 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // REVISION: STABLE_SYNC_FINAL_V23
-    
+    // HELPERS
     function isAuth() { return request.auth != null; }
     function isAdmin() { 
       return isAuth() && (
         request.auth.token.email.lower() in ['f.mallet81@gmail.com', 'f.mallet81@outlook.com'] ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'admin'
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'admin')
       );
+    }
+
+    // --- COLLECTION RULES ---
+
+    // Paramètres système (Splash screen, configuration globale)
+    match /app_settings/{id} {
+      allow read: if true; // Public pour que le splash fonctionne dès le chargement
+      allow write: if isAdmin();
+    }
+
+    // Météo en temps réel (Migration du StreamBuilder)
+    match /meteo_caledonie/{communeId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     // Sessions de chasse
@@ -33,15 +47,17 @@ service cloud.firestore {
       match /{allPaths=**} { allow read, write: if isAuth(); }
     }
 
-    // Jetons et Conversations
+    // Jetons et Accès
     match /access_tokens/{tId} { allow read, write: if isAuth(); }
     match /shared_access_tokens/{tId} { allow read: if isAuth(); allow write: if isAdmin(); }
+    
+    // Conversations Messagerie
     match /conversations/{cId} {
       allow read, write: if isAdmin() || (isAuth() && request.auth.uid == cId);
       match /{allPaths=**} { allow read, write: if isAdmin() || (isAuth() && request.auth.uid == cId); }
     }
 
-    // Règle par défaut
+    // Règle par défaut pour les autres collections (stations, etc.)
     match /{allPaths=**} {
       allow read: if isAuth();
       allow write: if isAdmin();
