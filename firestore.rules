@@ -4,26 +4,32 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ----------------------------------------------------------------------
-    // SESSIONS DE CHASSE - PRIORITÉ HAUTE
-    // DEPLOY_ID: FORCE_RELOAD_20240524_1310_ROOT_SYNC
+    // SESSIONS DE CHASSE - PRIORITÉ CRITIQUE
+    // DEPLOY_ID: 20240524_1315_FINAL_PERMISSION_FIX
     // ----------------------------------------------------------------------
     match /hunting_sessions/{sessionId} {
+      // Autoriser la lecture (get et list) à tout utilisateur connecté
       allow read: if request.auth != null;
       allow create: if request.auth != null;
-      allow update, delete: if (request.auth != null && (
+      // Modification/Suppression réservée à l'organisateur ou aux admins
+      allow update, delete: if request.auth != null && (
         request.auth.token.email == 'f.mallet81@outlook.com' || 
         request.auth.token.email == 'f.mallet81@gmail.com' ||
         resource.data.organizerId == request.auth.uid
-      ));
+      );
       
       match /participants/{participantId} {
         allow read: if request.auth != null;
-        allow write: if request.auth != null && (request.auth.uid == participantId || request.auth.token.email == 'f.mallet81@outlook.com' || request.auth.token.email == 'f.mallet81@gmail.com');
+        allow write: if request.auth != null && (
+          request.auth.uid == participantId || 
+          request.auth.token.email == 'f.mallet81@outlook.com' || 
+          request.auth.token.email == 'f.mallet81@gmail.com'
+        );
       }
     }
 
     // ----------------------------------------------------------------------
-    // FONCTIONS ET RÉGLES GÉNÉRALES
+    // FONCTIONS ET RÈGLES GÉNÉRALES
     // ----------------------------------------------------------------------
     function isSignedIn() {
       return request.auth != null;
