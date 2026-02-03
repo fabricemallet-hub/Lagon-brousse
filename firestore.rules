@@ -1,7 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // DEPLOY_ID: HUNTING_TACTICAL_RESTORE_V1
+    // DEPLOY_ID: HUNTING_TACTICAL_FINAL_STABLE
     
     function isAuth() { return request.auth != null; }
     function isAdmin() { 
@@ -12,7 +12,7 @@ service cloud.firestore {
       );
     }
 
-    // Accès global en lecture pour les membres (nécessaire pour le listage des sessions)
+    // Sessions de chasse : Accès read/write simplifié pour débloquer le listage
     match /hunting_sessions/{sessionId} {
       allow read, write: if isAuth();
       match /participants/{userId} {

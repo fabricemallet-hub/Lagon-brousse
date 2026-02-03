@@ -36,6 +36,7 @@ import {
   Trash2,
   Target,
   LocateFixed,
+  MapPin,
   Volume2
 } from 'lucide-react';
 import {
@@ -100,7 +101,6 @@ function HuntingSessionContent() {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [zoom, setZoom] = useState(12);
   const [initialZoomDone, setInitialZoomDone] = useState(false);
-  const [mapTypeId, setMapTypeId] = useState<string>('satellite');
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const [nickname, setNickname] = useState('');
@@ -153,6 +153,7 @@ function HuntingSessionContent() {
     if (!firestore || !user?.uid) return;
     setAreMySessionsLoading(true);
     try {
+      // Simplified query to avoid missing index errors
       const q = query(
         collection(firestore, 'hunting_sessions'),
         where('organizerId', '==', user.uid),
@@ -161,6 +162,7 @@ function HuntingSessionContent() {
       const querySnapshot = await getDocs(q);
       const sessions = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as WithId<HuntingSession>));
       
+      // Memory sorting to avoid index requirements
       sessions.sort((a, b) => {
         const timeA = a.createdAt?.toMillis?.() || 0;
         const timeB = b.createdAt?.toMillis?.() || 0;
@@ -378,7 +380,6 @@ function HuntingSessionContent() {
                 </CardTitle>
             </CardHeader>
             <CardContent className="flex-grow flex flex-col p-2 gap-4">
-                 {/* Map Section */}
                  <div className={cn("relative w-full rounded-lg overflow-hidden border", isFullscreen ? "flex-grow" : "h-80")}>
                     <GoogleMap
                         mapContainerClassName="w-full h-full"
@@ -423,7 +424,6 @@ function HuntingSessionContent() {
                     </Button>
                 </div>
 
-                {/* Tactical Buttons */}
                 <div className="grid grid-cols-2 gap-2">
                     <Button 
                         variant={me?.baseStatus === 'En position' ? 'default' : 'outline'} 
