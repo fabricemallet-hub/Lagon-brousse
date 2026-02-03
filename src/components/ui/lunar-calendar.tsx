@@ -121,7 +121,7 @@ const DayCell = React.memo(({
     const fishCount = Math.max(1, Math.round(lagonRating / 2));
 
     return {
-      lagon: Array.from({ length: fishCount }).map((_, i) => <Fish key={`lagon-${i}`} className="size-2 text-primary" />)
+      lagon: Array.from({ length: fishCount }).map((_, i) => <Fish key={`lagon-${i}`} className="size-3 text-primary" />)
     };
   }, [data, calendarView]);
 
@@ -150,11 +150,11 @@ const DayCell = React.memo(({
 
       {calendarView === 'peche' ? (
         <div className="flex-grow flex flex-col justify-center items-center gap-1">
-          <div className="flex items-center justify-center gap-0.5 flex-wrap h-4">
-            {data.crabAndLobster.crabStatus === 'Plein' && <CrabIcon className="size-2.5 text-green-600" />}
-            {data.crabAndLobster.lobsterActivity === 'Élevée' && <LobsterIcon className="size-2.5 text-blue-600" />}
+          <div className="flex items-center justify-center gap-1 flex-wrap h-5">
+            {data.crabAndLobster.crabStatus === 'Plein' && <CrabIcon className="size-3.5 text-green-600" />}
+            {data.crabAndLobster.lobsterActivity === 'Élevée' && <LobsterIcon className="size-3.5 text-blue-600" />}
           </div>
-          <div className="flex items-center justify-center gap-0.5 h-3 flex-wrap">
+          <div className="flex items-center justify-center gap-0.5 h-4 flex-wrap">
             {fishingIcons?.lagon}
           </div>
           <div className="text-[8px] font-black opacity-60 mt-auto">
@@ -162,12 +162,12 @@ const DayCell = React.memo(({
           </div>
         </div>
       ) : (
-        <div className="flex-grow flex flex-col items-center justify-center gap-1">
-          {GardeningIcon && <GardeningIcon className="size-3 text-primary opacity-80" />}
-          <div className="flex flex-wrap justify-center gap-0.5 h-4">
-            {isGoodForPruning && <Scissors className="size-2 text-orange-600" />}
-            {isGoodForCuttings && <RefreshCw className="size-2 text-pink-600" />}
-            {isGoodForMowing && <Leaf className="size-2 text-green-600" />}
+        <div className="flex-grow flex flex-col items-center justify-center gap-1.5">
+          {GardeningIcon && <GardeningIcon className="size-5 text-primary opacity-80" />}
+          <div className="flex flex-wrap justify-center gap-1 h-5">
+            {isGoodForPruning && <Scissors className="size-3.5 text-orange-600" />}
+            {isGoodForCuttings && <RefreshCw className="size-3.5 text-pink-600" />}
+            {isGoodForMowing && <Leaf className="size-3.5 text-green-600" />}
           </div>
         </div>
       )}
@@ -226,16 +226,16 @@ export function LunarCalendar() {
       <div className="mt-4 px-1">
         {calendarView === 'champs' ? (
           <div className="flex flex-wrap gap-3 p-3 bg-muted/20 border rounded-lg">
-            <div className="flex items-center gap-1 text-[9px] font-bold uppercase"><Spade className="size-3 text-primary"/> Fruits</div>
-            <div className="flex items-center gap-1 text-[9px] font-bold uppercase"><Carrot className="size-3 text-primary"/> Racines</div>
-            <div className="flex items-center gap-1 text-[9px] font-bold uppercase"><Flower className="size-3 text-primary"/> Fleurs</div>
-            <div className="flex items-center gap-1 text-[9px] font-bold uppercase"><Leaf className="size-3 text-primary"/> Feuilles</div>
+            <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><Spade className="size-4 text-primary"/> Fruits</div>
+            <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><Carrot className="size-4 text-primary"/> Racines</div>
+            <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><Flower className="size-4 text-primary"/> Fleurs</div>
+            <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><Leaf className="size-4 text-primary"/> Feuilles</div>
           </div>
         ) : (
           <div className="flex flex-wrap gap-3 p-3 bg-muted/20 border rounded-lg">
-            <div className="flex items-center gap-1 text-[9px] font-bold uppercase"><Fish className="size-3 text-primary"/> Poisson</div>
-            <div className="flex items-center gap-1 text-[9px] font-bold uppercase"><CrabIcon className="size-3 text-green-600"/> Crabe</div>
-            <div className="flex items-center gap-1 text-[9px] font-bold uppercase"><LobsterIcon className="size-3 text-blue-600"/> Langouste</div>
+            <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><Fish className="size-4 text-primary"/> Poisson</div>
+            <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><CrabIcon className="size-4 text-green-600"/> Crabe</div>
+            <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><LobsterIcon className="size-4 text-blue-600"/> Langouste</div>
           </div>
         )}
       </div>
