@@ -5,11 +5,11 @@ import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Wind, Thermometer, Sun, MapPin, Search, ChevronLeft, CalendarDays, Waves, Info, BrainCircuit, ShieldAlert, Sparkles, CloudSun, Cloud, CloudRain, Moon, CloudMoon } from 'lucide-react';
+import { Wind, Thermometer, Sun, MapPin, Search, ChevronLeft, CalendarDays, Waves, Info, BrainCircuit, ShieldAlert, Sparkles, CloudSun, Cloud, CloudRain, Moon, CloudMoon, ArrowRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useState, useMemo, useEffect } from 'react';
-import type { MeteoLive, LocationData, HourlyForecast } from '@/lib/types';
+import type { MeteoLive, LocationData, HourlyForecast, WindDirection } from '@/lib/types';
 import { translateWindDirection } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { generateProceduralData } from '@/lib/data';
@@ -45,6 +45,27 @@ const WeatherIcon = ({ condition, className }: { condition: string, className?: 
         case 'Nuit claire': return <Moon {...props} className={cn(props.className, "text-blue-200")} />;
         default: return <Sun {...props} />;
     }
+};
+
+const WindArrow = ({ direction, className }: { direction: string, className?: string }) => {
+  const rotation =
+    {
+      N: 180,
+      NE: 225,
+      E: 270,
+      SE: 315,
+      S: 0,
+      SW: 45,
+      W: 90,
+      NW: 135,
+    }[direction as WindDirection] || 0;
+
+  return (
+    <ArrowRight
+      className={cn('size-4 text-blue-500 dark:text-blue-400', className)}
+      style={{ transform: `rotate(${rotation}deg)` }}
+    />
+  );
 };
 
 export default function MeteoLivePage() {
@@ -176,14 +197,21 @@ export default function MeteoLivePage() {
                     </div>
                     
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
-                      {/* Vent agrandi */}
+                      {/* Vent agrandi avec flèche et texte direction */}
                       <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
                         <Wind className="size-4" />
-                        <div className="flex flex-col leading-none">
-                          <span className="text-base font-black">{commune.vent} <span className="text-[10px]">ND</span></span>
-                          <span className="text-[9px] font-bold text-muted-foreground uppercase truncate">
-                            {commune.direction ? translateWindDirection(commune.direction) : ''}
+                        <div className="flex items-center gap-2 leading-none">
+                          <span className="text-base font-black whitespace-nowrap">
+                            {commune.vent} <span className="text-[10px]">ND</span>
                           </span>
+                          {commune.direction && (
+                            <div className="flex items-center gap-1.5 border-l border-border/50 pl-2">
+                              <WindArrow direction={commune.direction} className="size-3.5" />
+                              <span className="text-[9px] font-bold text-muted-foreground uppercase whitespace-nowrap">
+                                {translateWindDirection(commune.direction)}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                       
