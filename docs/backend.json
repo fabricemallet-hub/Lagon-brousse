@@ -2,115 +2,44 @@
 {
   "entities": {
     "UserAccount": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "UserAccount",
       "type": "object",
       "description": "Represents a user account within the application.",
       "properties": {
-        "id": { "type": "string", "description": "Unique identifier for the user account." },
-        "email": { "type": "string", "description": "The user's email address.", "format": "email" },
-        "displayName": { "type": "string", "description": "The user's public display name." },
-        "subscriptionStatus": { "type": "string", "description": "The current subscription status of the user (e.g., 'active', 'inactive', 'trial', 'admin')." },
-        "subscriptionStartDate": { "type": "string", "description": "The date when the user's subscription started.", "format": "date-time" },
-        "subscriptionExpiryDate": { "type": "string", "description": "The date when the user's subscription expires.", "format": "date-time" },
-        "favoriteLocationIds": { "type": "array", "description": "References to Location. (Relationship: UserAccount N:N Location)", "items": { "type": "string" } },
-        "mapIcon": { "type": "string", "description": "The user's chosen icon for the hunting map." },
-        "mapColor": { "type": "string", "description": "The user's chosen color for their map icon." },
-        "lastSelectedLocation": { "type": "string", "description": "The last location selected by the user." },
-        "emergencyContact": { "type": "string", "description": "The user's saved emergency contact number." }
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "subscriptionStatus": { "type": "string", "enum": ["active", "inactive", "trial", "admin"] },
+        "subscriptionStartDate": { "type": "string", "format": "date-time" },
+        "subscriptionExpiryDate": { "type": "string", "format": "date-time" },
+        "favoriteLocationIds": { "type": "array", "items": { "type": "string" } },
+        "mapIcon": { "type": "string" },
+        "mapColor": { "type": "string" },
+        "lastSelectedLocation": { "type": "string" },
+        "emergencyContact": { "type": "string" }
       },
       "required": ["id", "email", "displayName", "subscriptionStatus"]
-    },
-    "VesselStatus": {
-      "title": "VesselStatus",
-      "type": "object",
-      "description": "Represents the real-time tracking status of a boat/vessel.",
-      "properties": {
-        "userId": { "type": "string" },
-        "displayName": { "type": "string" },
-        "location": {
-          "type": "object",
-          "properties": {
-            "latitude": { "type": "number" },
-            "longitude": { "type": "number" }
-          }
-        },
-        "status": { "type": "string", "enum": ["moving", "stationary", "offline"] },
-        "lastActive": { "type": "string", "format": "date-time" },
-        "isSharing": { "type": "boolean" },
-        "batteryLevel": { "type": "number" }
-      },
-      "required": ["userId", "location", "status", "lastActive"]
-    },
-    "VesselHistory": {
-      "title": "VesselHistory",
-      "type": "object",
-      "description": "Historical stationary points for a vessel.",
-      "properties": {
-        "timestamp": { "type": "string", "format": "date-time" },
-        "location": {
-          "type": "object",
-          "properties": {
-            "latitude": { "type": "number" },
-            "longitude": { "type": "number" }
-          }
-        },
-        "durationMinutes": { "type": "number" }
-      }
-    },
-    "SowingRecord": {
-      "title": "SowingRecord",
-      "type": "object",
-      "description": "Represents a sowing entry saved by the user.",
-      "properties": {
-        "userId": { "type": "string" },
-        "seedName": { "type": "string" },
-        "sowingDate": { "type": "string", "format": "date-time" },
-        "plantType": { "type": "string" },
-        "cultureAdvice": { "type": "string" },
-        "estimatedHarvestDate": { "type": "string" },
-        "transplantingAdvice": { "type": "string" },
-        "moonWarning": { "type": "string" },
-        "isValidForMoon": { "type": "boolean" },
-        "lunarContext": {
-          "type": "object",
-          "properties": {
-            "phase": { "type": "string" },
-            "zodiac": { "type": "string" }
-          }
-        },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["userId", "seedName", "sowingDate"]
     },
     "HuntingSession": {
       "title": "HuntingSession",
       "type": "object",
       "description": "Represents a real-time hunting session.",
       "properties": {
-        "organizerId": { "type": "string", "description": "The UID of the user who created the session." },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the session was created." },
-        "expiresAt": { "type": "string", "format": "date-time", "description": "Timestamp when the session expires and should be deleted by TTL." }
+        "organizerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" }
       },
       "required": ["organizerId", "createdAt", "expiresAt"]
     },
     "SessionParticipant": {
       "title": "SessionParticipant",
       "type": "object",
-      "description": "Represents a participant in a hunting session.",
       "properties": {
-        "displayName": { "type": "string", "description": "The display name of the participant." },
-        "mapIcon": { "type": "string", "description": "The participant's chosen icon for the hunting map." },
-        "mapColor": { "type": "string", "description": "The participant's chosen color for their map icon." },
-        "baseStatus": {
-          "type": "string",
-          "description": "The participant's main action status.",
-          "enum": ["En position", "Battue en cours"]
-        },
-        "isGibierEnVue": {
-            "type": "boolean",
-            "description": "Indicates if the participant has game in sight."
-        },
+        "displayName": { "type": "string" },
+        "mapIcon": { "type": "string" },
+        "mapColor": { "type": "string" },
+        "baseStatus": { "type": "string", "enum": ["En position", "Battue en cours"] },
+        "isGibierEnVue": { "type": "boolean" },
         "location": {
           "type": "object",
           "properties": {
@@ -121,21 +50,20 @@
         "battery": {
           "type": "object",
           "properties": {
-            "level": { "type": "number", "description": "Battery level from 0 to 1." },
-            "charging": { "type": "boolean", "description": "Is the device charging." }
+            "level": { "type": "number" },
+            "charging": { "type": "boolean" }
           }
         },
-        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp." }
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["displayName", "updatedAt"]
     },
     "FishingSpot": {
       "title": "FishingSpot",
       "type": "object",
-      "description": "Represents a saved fishing spot with its environmental context.",
       "properties": {
-        "userId": { "type": "string", "description": "The UID of the user who saved the spot." },
-        "name": { "type": "string", "description": "A name or comment for the spot." },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
         "location": {
           "type": "object",
           "properties": {
@@ -147,18 +75,9 @@
         "color": { "type": "string" },
         "fishingTypes": { "type": "array", "items": { "type": "string" } },
         "createdAt": { "type": "string", "format": "date-time" },
-        "context": {
-          "type": "object",
-          "properties": {
-            "timestamp": { "type": "string", "format": "date-time" },
-            "moonPhase": { "type": "string" },
-            "tideHeight": { "type": "number" },
-            "tideMovement": { "type": "string" },
-            "tideCurrent": { "type": "string" }
-          }
-        }
+        "context": { "type": "object" }
       },
-      "required": ["userId", "name", "location", "createdAt", "context"]
+      "required": ["userId", "name", "location", "createdAt"]
     }
   },
   "auth": {
@@ -167,27 +86,19 @@
   "firestore": {
     "/users/{userId}": {
       "schema": { "$ref": "#/backend/entities/UserAccount" },
-      "description": "Stores user account information."
-    },
-    "/vessels/{userId}": {
-      "schema": { "$ref": "#/backend/entities/VesselStatus" },
-      "description": "Real-time vessel status for tracking."
+      "description": "User profile and settings."
     },
     "/hunting_sessions/{sessionId}": {
       "schema": { "$ref": "#/backend/entities/HuntingSession" },
-      "description": "Real-time hunting session."
+      "description": "Group hunting sessions."
     },
     "/hunting_sessions/{sessionId}/participants/{userId}": {
       "schema": { "$ref": "#/backend/entities/SessionParticipant" },
-      "description": "A participant in a hunting session."
+      "description": "Participant in a hunting session."
     },
     "/users/{userId}/fishing_spots/{spotId}": {
       "schema": { "$ref": "#/backend/entities/FishingSpot" },
-      "description": "User's saved fishing spots."
-    },
-    "/users/{userId}/sowings/{sowingId}": {
-      "schema": { "$ref": "#/backend/entities/SowingRecord" },
-      "description": "User's saved sowing records."
+      "description": "Saved fishing spots."
     }
   }
 }

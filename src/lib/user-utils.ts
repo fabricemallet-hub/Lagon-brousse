@@ -18,13 +18,16 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
   const userDocRef = doc(firestore, 'users', user.uid);
   
   const docSnap = await getDoc(userDocRef);
+  
+  // Reconnaissance des comptes administrateurs par e-mail
+  const isAdminUser = user.email === 'f.mallet81@outlook.com' || user.email === 'f.mallet81@gmail.com';
+
   if (docSnap.exists()) {
     // Si l'utilisateur existe déjà mais qu'il s'agit d'un admin par e-mail,
     // on s'assure que son document reflète son statut admin s'il ne l'est pas encore.
     const currentData = docSnap.data() as UserAccount;
-    const isAdminEmail = user.email === 'f.mallet81@outlook.com' || user.email === 'f.mallet81@gmail.com';
     
-    if (isAdminEmail && currentData.subscriptionStatus !== 'admin') {
+    if (isAdminUser && currentData.subscriptionStatus !== 'admin') {
         await setDoc(userDocRef, { ...currentData, subscriptionStatus: 'admin' }, { merge: true });
     }
     return;
@@ -32,9 +35,6 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
 
   const { uid, email } = user;
   const effectiveDisplayName = displayName || user.displayName || email?.split('@')[0] || 'Utilisateur';
-  
-  // Reconnaissance des deux comptes administrateurs
-  const isAdminUser = email === 'f.mallet81@outlook.com' || email === 'f.mallet81@gmail.com';
   
   let newUserDocument: UserAccount;
 
