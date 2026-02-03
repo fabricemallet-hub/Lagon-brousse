@@ -18,7 +18,8 @@ import {
   Navigation, 
   User,
   Home,
-  Sparkles
+  Sparkles,
+  Sun
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -60,6 +61,24 @@ const sectionContent: Record<string, {
     tips: [
       "Cliquez sur une tranche horaire du vent pour mettre à jour les détails de la houle correspondants.",
       "Une houle de plus de 2m au récif annonce souvent une passe 'déferlante' ou dangereuse."
+    ]
+  },
+  'meteo': {
+    title: 'Météo Live',
+    icon: Sun,
+    color: 'bg-yellow-500',
+    role: "Un outil de surveillance météo haute précision qui combine les relevés en temps réel des stations NC et une analyse prévisionnelle assistée par IA sur 7 jours.",
+    steps: [
+      "Recherche : Utilisez la barre de recherche pour trouver n'importe quelle commune de Nouvelle-Calédonie.",
+      "Tri Intelligent : Votre commune actuelle s'affiche en priorité, suivie des communes les plus proches. Bélep et les Loyauté ferment la liste.",
+      "Lecture Live : Visualisez instantanément le vent (force et direction exacte), la température et l'indice UV actuel.",
+      "Vue Détaillée J+7 : Cliquez sur une commune pour ouvrir son tableau de bord complet sur une semaine.",
+      "Analyse IA : Lisez le bilan stratégique rédigé par l'IA pour comprendre l'évolution du temps et adapter vos sorties."
+    ],
+    tips: [
+      "La flèche du vent indique la provenance réelle de l'air : une flèche pointant vers le bas indique un vent de Nord.",
+      "L'indice UV en direct vous aide à planifier votre protection solaire immédiate.",
+      "L'IA analyse les probabilités de pluie et les rafales pour vous donner des conseils spécifiques à la pêche et au terroir."
     ]
   },
   'vessel-tracker': {
@@ -142,7 +161,7 @@ const sectionContent: Record<string, {
     title: 'Guide Culture & IA',
     icon: Sprout,
     color: 'bg-emerald-500',
-    role: "Un assistant horticole intelligent propulsé par l'IA qui crée vos fiches de culture et optimise vos dates de semis selon les cycles de sève.",
+    role: "Un assistant horticole intelligent propulsé par l'IA qui crée vos fiches de culture et occupe vos dates de semis selon les cycles de sève.",
     steps: [
       "Recherche & Identification : Tapez le nom de n'importe quelle graine. Si elle est absente du guide, l'IA créera instantanément sa fiche technique personnalisée.",
       "Calcul de Fiche IA : L'intelligence artificielle analyse la plante, définit son type (Fruit, Racine...) et génère des conseils spécifiques (arrosage, exposition).",

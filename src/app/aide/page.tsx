@@ -14,7 +14,8 @@ import {
   Home,
   MessageSquare,
   BookOpen,
-  ChevronRight
+  ChevronRight,
+  Sun
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -22,6 +23,7 @@ import { cn } from '@/lib/utils';
 const helpSections = [
   { id: 'accueil', title: 'Accueil', desc: 'Météo et résumé du jour.', icon: Home, color: 'bg-blue-500' },
   { id: 'lagon', title: 'Lagon', desc: 'Vent, marées et houle.', icon: Waves, color: 'bg-cyan-500' },
+  { id: 'meteo', title: 'Météo Live', desc: 'Stations en direct et prévisions J+7.', icon: Sun, color: 'bg-yellow-500' },
   { id: 'vessel-tracker', title: 'Vessel Tracker', desc: 'Sécurité et partage GPS.', icon: Navigation, color: 'bg-blue-600' },
   { id: 'peche', title: 'Pêche', desc: 'Indices et carnet de prises.', icon: Fish, color: 'bg-indigo-500' },
   { id: 'chasse', title: 'Chasse', desc: 'Cerf, vent et balistique.', icon: Crosshair, color: 'bg-orange-600' },
