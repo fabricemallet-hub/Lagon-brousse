@@ -30,17 +30,25 @@ DATE DE SEMIS : {{{sowingDate}}}
 PHASE LUNAIRE ACTUELLE : {{{lunarPhase}}}
 INFLUENCE DU ZODIAQUE : {{{zodiacSign}}}
 
-TES MISSIONS :
-1. Identifie précisément le type de plante.
-2. Évalue si le semis est judicieux aujourd'hui par rapport à la lune. Rappel :
-   - Lune Montante : Favorable aux parties aériennes (Feuilles, Fruits, Fleurs).
-   - Lune Descendante : Favorable aux parties souterraines (Racines) et à la plantation/repiquage.
-   - Les signes du Zodiaque (Fruits, Racines, Fleurs, Feuilles) doivent idéalement correspondre au type de plante.
-3. Génère des conseils de culture spécifiques au climat calédonien (arrosage, exposition).
-4. Calcule une date de récolte estimée réaliste.
-5. Suggère une période de repiquage (mise en terre) si applicable.
+CALENDRIER DES 30 PROCHAINS JOURS :
+{{{upcomingCalendar}}}
 
-Réponds avec bienveillance et expertise.`,
+TES MISSIONS :
+1. Identifie précisément le type de plante (Fruit, Racine, Fleur, ou Feuille).
+2. Évalue si le semis est judicieux AUJOURD'HUI. Rappel des règles d'or :
+   - Légumes FRUITS (Tomate, Poivron...) -> Jour FRUITS + Lune Montante.
+   - Légumes RACINES (Carotte, Oignon...) -> Jour RACINES + Lune Descendante.
+   - Légumes FEUILLES (Salade, Chou...) -> Jour FEUILLES + Lune Montante.
+   - FLEURS -> Jour FLEURS + Lune Montante.
+3. SI LE JOUR N'EST PAS OPTIMAL : 
+   - Détecte l'incompatibilité (ex: planter un fruit un jour Fleurs).
+   - Cherche dans le "CALENDRIER DES 30 PROCHAINS JOURS" la date la plus proche qui réunit les conditions idéales (Phase + Zodiaque) pour ce type de plante.
+   - Mentionne CLAIREMENT cette date recommandée dans le champ "moonWarning".
+4. Génère des conseils de culture spécifiques au climat calédonien.
+5. Calcule une date de récolte estimée réaliste.
+6. Suggère une période de repiquage.
+
+Réponds avec bienveillance et expertise en français.`,
 });
 
 const gardeningAdviceFlow = ai.defineFlow(

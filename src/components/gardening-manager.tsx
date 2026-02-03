@@ -4,7 +4,7 @@
 import { useState, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
-import { format, isSameDay, startOfDay } from 'date-fns';
+import { format, isSameDay, startOfDay, addDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,8 @@ import type { GardeningAdviceOutput } from '@/ai/schemas';
 import type { LocationData, SowingRecord } from '@/lib/types';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { generateProceduralData } from '@/lib/data';
+import { useLocation } from '@/context/location-context';
 
 const COMMON_SEEDS = [
   "Tomate", "Salade (Laitue)", "Carotte", "Haricot Vert", "Courgette", 
@@ -33,6 +35,7 @@ export function GardeningManager({ locationData }: { locationData: LocationData 
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const { selectedLocation } = useLocation();
   
   const [selectedSeed, setSelectedSeed] = useState<string>("");
   const [customSeed, setCustomSeed] = useState("");
@@ -53,6 +56,21 @@ export function GardeningManager({ locationData }: { locationData: LocationData 
 
   const seedName = selectedSeed === "AUTRE" ? customSeed : selectedSeed;
 
+  // Helper to generate upcoming calendar for AI
+  const getUpcomingGardeningCalendar = (location: string, startDate: Date, days: number = 30) => {
+    const schedule = [];
+    for (let i = 0; i < days; i++) {
+      const d = addDays(startDate, i);
+      const data = generateProceduralData(location, d);
+      schedule.push({
+        date: format(d, 'yyyy-MM-dd'),
+        phase: data.farming.lunarPhase,
+        zodiac: data.farming.zodiac
+      });
+    }
+    return schedule.map(s => `- ${s.date} : ${s.phase}, Jour ${s.zodiac}`).join('\n');
+  };
+
   const handleAddSowing = async () => {
     if (!user || !firestore || !seedName) {
       toast({ variant: 'destructive', title: 'Erreur', description: 'Veuillez sélectionner une graine.' });
@@ -61,11 +79,14 @@ export function GardeningManager({ locationData }: { locationData: LocationData 
 
     setIsAnalyzing(true);
     try {
+      const upcomingCalendar = getUpcomingGardeningCalendar(selectedLocation, sowingDate);
+
       const advice = await getGardeningAdvice({
         seedName,
         sowingDate: sowingDate.toISOString(),
         lunarPhase: locationData.farming.lunarPhase,
-        zodiacSign: locationData.farming.zodiac
+        zodiacSign: locationData.farming.zodiac,
+        upcomingCalendar
       });
 
       setIsSaving(true);
@@ -77,6 +98,8 @@ export function GardeningManager({ locationData }: { locationData: LocationData 
         cultureAdvice: advice.cultureAdvice,
         estimatedHarvestDate: advice.harvestDate,
         transplantingAdvice: advice.transplantingAdvice,
+        moonWarning: advice.moonWarning,
+        isValidForMoon: advice.isValidForMoon,
         lunarContext: {
           phase: locationData.farming.lunarPhase,
           zodiac: locationData.farming.zodiac
@@ -87,8 +110,9 @@ export function GardeningManager({ locationData }: { locationData: LocationData 
       await addDoc(collection(firestore, 'users', user.uid, 'sowings'), newSowing);
       
       toast({ 
-        title: 'Semis enregistré !', 
-        description: advice.isValidForMoon ? 'Timing parfait avec la lune.' : 'Semis enregistré malgré l\'alerte lunaire.'
+        title: advice.isValidForMoon ? 'Semis enregistré !' : 'Avertissement Lunaire', 
+        description: advice.moonWarning,
+        variant: advice.isValidForMoon ? 'default' : 'destructive'
       });
       
       setSelectedSeed("");
@@ -221,6 +245,14 @@ export function GardeningManager({ locationData }: { locationData: LocationData 
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4 pb-4">
+                  {record.moonWarning && !record.isValidForMoon && (
+                    <Alert variant="destructive" className="bg-destructive/5 text-destructive border-destructive/20">
+                      <AlertTriangle className="size-4" />
+                      <AlertDescription className="text-xs font-semibold">
+                        {record.moonWarning}
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="bg-muted/30 p-3 rounded-lg flex gap-3">
                       <Sun className="size-5 text-accent shrink-0 mt-0.5" />
