@@ -17,7 +17,7 @@
         "mapIcon": { "type": "string" },
         "mapColor": { "type": "string" }
       },
-      "required": ["id", "email", "displayName", "subscriptionStatus"]
+      "required": ["id", "email", "subscriptionStatus"]
     },
     "HuntingSession": {
       "title": "HuntingSession",
@@ -98,10 +98,6 @@
     "/users/{userId}/fishing_spots/{spotId}": {
       "schema": { "$ref": "#/backend/entities/FishingSpot" },
       "description": "Coins de pêche sauvegardés."
-    },
-    "/users/{userId}/sowings/{sowingId}": {
-      "schema": { "type": "object" },
-      "description": "Historique des semis."
     }
   }
 }

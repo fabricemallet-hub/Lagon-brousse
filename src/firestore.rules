@@ -5,11 +5,10 @@ service cloud.firestore {
 
     // ----------------------------------------------------------------------
     // SESSIONS DE CHASSE - PRIORITÉ CRITIQUE
-    // DEPLOY_ID: 20240524_1315_SRC_SYNC_FIX
+    // DEPLOY_ID: 20240524_1310_SRC_SYNC_FORCE
     // ----------------------------------------------------------------------
     match /hunting_sessions/{sessionId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
+      allow read, create: if request.auth != null;
       allow update, delete: if request.auth != null && (
         request.auth.token.email == 'f.mallet81@outlook.com' || 
         request.auth.token.email == 'f.mallet81@gmail.com' ||
