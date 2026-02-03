@@ -509,17 +509,35 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
                 <ShieldAlert className="size-6" /> ENVOYER ALERTE SMS
               </Button>
 
-              <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900 rounded-lg space-y-2">
-                <p className="text-[10px] font-bold text-red-800 dark:text-red-300 flex items-center gap-1">
-                  <AlertTriangle className="size-3" /> RAPPEL SECOURS EN MER :
-                </p>
-                <div className="grid grid-cols-1 gap-1.5 text-[11px] text-red-700 dark:text-red-400">
-                  <p className="flex items-center gap-2">
-                    <Phone className="size-3" /> SNSM : <span className="font-bold">+687 23.66.66</span>
+              <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900 rounded-lg space-y-3">
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-bold text-red-800 dark:text-red-300 flex items-center gap-1">
+                    <AlertTriangle className="size-3" /> RAPPEL SECOURS EN MER :
                   </p>
-                  <p className="flex items-center gap-2">
-                    <Phone className="size-3" /> Urgence CROSS : <span className="font-bold text-sm">196</span> (Gratuit)
+                  <div className="grid grid-cols-1 gap-1.5 text-[11px] text-red-700 dark:text-red-400">
+                    <p className="flex items-center gap-2">
+                      <Phone className="size-3" /> SNSM : <span className="font-bold">+687 23.66.66</span>
+                    </p>
+                    <p className="flex items-center gap-2">
+                      <Phone className="size-3" /> Urgence CROSS : <span className="font-bold text-sm">196</span> (Gratuit)
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 border-t border-red-200/50 dark:border-red-800/50 pt-2">
+                  <p className="text-[10px] font-bold text-red-800 dark:text-red-300 flex items-center gap-1">
+                    <AlertTriangle className="size-3" /> SECOURS TERRESTRES :
                   </p>
+                  <div className="grid grid-cols-1 gap-1.5 text-[11px] text-red-700 dark:text-red-400">
+                    <p className="flex items-start gap-2">
+                      <Phone className="size-3 mt-0.5" /> 
+                      <span><span className="font-bold">SAMU (15) :</span> Malaise cardiaque, urgence médicale.</span>
+                    </p>
+                    <p className="flex items-start gap-2">
+                      <Phone className="size-3 mt-0.5" /> 
+                      <span><span className="font-bold">Pompiers (18) :</span> Incendie, accident de la route.</span>
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
