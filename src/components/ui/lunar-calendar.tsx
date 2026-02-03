@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -119,7 +120,7 @@ const DayCell = React.memo(({
 
     return {
       lagon: Array.from({ length: fishCount }).map((_, i) => <Fish key={`lagon-${i}`} className="size-2.5 text-primary" />),
-      pelagic: isPelagicSeason ? <div className="flex items-center gap-0.5 ml-0.5 border-l pl-0.5 border-primary/20"><Star className="size-1.5 text-yellow-500 fill-yellow-500" /><Fish className="size-2.5 text-orange-500" /></div> : null
+      pelagic: isPelagicSeason ? <div className="flex items-center gap-0.5 ml-0.5 border-l pl-0.5 border-primary/20"><Star className="size-1.5 text-yellow-500 fill-yellow-500" /><Fish key="pelagic-icon" className="size-2.5 text-orange-500" /></div> : null
     };
   }, [data, calendarView]);
 
@@ -158,9 +159,10 @@ const DayCell = React.memo(({
         <div className="flex-grow flex flex-col justify-center items-center gap-0.5 pt-1">
           <div className="flex items-center justify-center gap-1 h-3.5">
             {data.crabAndLobster.crabStatus === 'Plein' && <CrabIcon className="size-2.5 text-green-600" />}
+            {data.crabAndLobster.crabStatus === 'Mout' && <CrabIcon className="size-2.5 text-destructive" />}
             {data.crabAndLobster.lobsterActivity === 'Élevée' && <LobsterIcon className="size-2.5 text-blue-600" />}
           </div>
-          <div className="flex items-center justify-center gap-0.5 h-3.5 overflow-hidden">
+          <div className="flex items-center justify-center gap-0.5 h-3.5 overflow-hidden flex-nowrap whitespace-nowrap">
             {fishingIcons?.lagon}
             {fishingIcons?.pelagic}
           </div>
@@ -268,6 +270,7 @@ export function LunarCalendar() {
               <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><Fish className="size-4 text-primary"/> Lagon (Indice)</div>
               <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><Fish className="size-4 text-orange-500"/><Star className="size-2 text-yellow-500 -ml-1 mr-1" /> Pélagiques</div>
               <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><CrabIcon className="size-4 text-green-600"/> Crabe (Plein)</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><CrabIcon className="size-4 text-destructive"/> Crabe (Mout)</div>
               <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><LobsterIcon className="size-4 text-blue-600"/> Langouste (Activité)</div>
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-2 p-3 bg-primary/5 border border-primary/20 rounded-lg">

@@ -282,6 +282,31 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   const isPelagicSeason = [8, 9, 10, 11, 0, 1, 2, 3].includes(month);
   locationData.pelagicInfo = { inSeason: isPelagicSeason, message: isPelagicSeason ? 'Saison des pélagiques ouverte !' : 'Hors saison pélagiques.' };
 
+  // --- Logique Crabes et Langoustes ---
+  // Les crabes de palétuvier muent autour de la pleine lune (Cycle ~14.76)
+  if (dayInCycle >= 12 && dayInCycle <= 18) {
+    locationData.crabAndLobster.crabStatus = 'Mout';
+    locationData.crabAndLobster.crabMessage = "Période de mue : les crabes sont 'mouts' (coque molle).";
+  } else if (dayInCycle <= 4 || dayInCycle >= 25) {
+    locationData.crabAndLobster.crabStatus = 'Plein';
+    locationData.crabAndLobster.crabMessage = "Les crabes sont bien pleins et lourds.";
+  } else {
+    locationData.crabAndLobster.crabStatus = 'Vide';
+    locationData.crabAndLobster.crabMessage = "Crabes en phase de remplissage.";
+  }
+
+  // Les langoustes sont plus actives par nuits sombres (Nouvelle lune)
+  if (dayInCycle <= 5 || dayInCycle >= 24) {
+    locationData.crabAndLobster.lobsterActivity = 'Élevée';
+    locationData.crabAndLobster.lobsterMessage = "Nuits sombres : forte activité des langoustes au récif.";
+  } else if (dayInCycle >= 12 && dayInCycle <= 18) {
+    locationData.crabAndLobster.lobsterActivity = 'Faible';
+    locationData.crabAndLobster.lobsterMessage = "Pleine lune : les langoustes sont peu actives dehors.";
+  } else {
+    locationData.crabAndLobster.lobsterActivity = 'Moyenne';
+    locationData.crabAndLobster.lobsterMessage = "Activité modérée des langoustes.";
+  }
+
   locationData.weather.wind.forEach((forecast: WindForecast, index: number) => {
     forecast.speed = Math.max(0, Math.round(8 + Math.sin(dateSeed * 0.2 + locationSeed + index) * 5));
     const directions: WindDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
