@@ -12,7 +12,9 @@
         "subscriptionStatus": { "type": "string", "enum": ["active", "inactive", "trial", "admin"] },
         "subscriptionExpiryDate": { "type": "string", "format": "date-time" },
         "lastSelectedLocation": { "type": "string" },
-        "emergencyContact": { "type": "string" }
+        "emergencyContact": { "type": "string" },
+        "mapIcon": { "type": "string" },
+        "mapColor": { "type": "string" }
       },
       "required": ["id", "email", "subscriptionStatus"]
     },
@@ -33,7 +35,38 @@
         "splashMode": { "type": "string" },
         "splashText": { "type": "string" },
         "splashBgColor": { "type": "string" },
-        "splashDuration": { "type": "number" }
+        "splashDuration": { "type": "number" },
+        "splashImageUrl": { "type": "string" },
+        "splashTextColor": { "type": "string" },
+        "splashFontSize": { "type": "string" },
+        "splashImageFit": { "type": "string" }
+      }
+    },
+    "HuntingSession": {
+      "title": "HuntingSession",
+      "type": "object",
+      "properties": {
+        "organizerId": { "type": "string" },
+        "createdAt": { "type": "object" },
+        "expiresAt": { "type": "object" }
+      }
+    },
+    "VesselStatus": {
+      "title": "VesselStatus",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "location": { 
+          "type": "object",
+          "properties": {
+            "latitude": { "type": "number" },
+            "longitude": { "type": "number" }
+          }
+        },
+        "status": { "type": "string", "enum": ["moving", "stationary", "offline"] },
+        "isSharing": { "type": "boolean" },
+        "lastActive": { "type": "object" }
       }
     }
   },
@@ -64,6 +97,22 @@
           "entityName": "User",
           "schema": { "$ref": "#/backend/entities/User" },
           "description": "Profils utilisateurs et statut d'abonnement"
+        }
+      },
+      {
+        "path": "/hunting_sessions/{sessionId}",
+        "definition": {
+          "entityName": "HuntingSession",
+          "schema": { "$ref": "#/backend/entities/HuntingSession" },
+          "description": "Sessions de chasse collective"
+        }
+      },
+      {
+        "path": "/vessels/{vesselId}",
+        "definition": {
+          "entityName": "VesselStatus",
+          "schema": { "$ref": "#/backend/entities/VesselStatus" },
+          "description": "Positions des navires en temps réel"
         }
       }
     ]
