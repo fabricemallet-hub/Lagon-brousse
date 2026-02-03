@@ -130,9 +130,9 @@ function HuntingSessionContent() {
     if (!isSoundEnabled) return;
     let url = '';
     if (status === 'En position') {
-        url = 'https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3'; // Cloche notification claire
+        url = 'https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3'; // Cloche claire
     } else if (status === 'Battue en cours') {
-        url = 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'; // Clic action
+        url = 'https://assets.mixkit.co/active_storage/sfx/2560/2560-preview.mp3'; // Clic métallique fort et sec
     } else if (status === 'gibier') {
         url = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'; // Alerte urgente
     }
@@ -142,7 +142,6 @@ function HuntingSessionContent() {
     }
   }, [isSoundEnabled]);
 
-  // Surveillance des coéquipiers pour les sons
   useEffect(() => {
     if (!participants || !user) return;
     

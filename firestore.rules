@@ -1,7 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // REVISION: STABLE_SYNC_FINAL_V21
+    // REVISION: STABLE_SYNC_FINAL_V24
     
     function isAuth() { return request.auth != null; }
     function isAdmin() { 
@@ -11,7 +11,7 @@ service cloud.firestore {
       );
     }
 
-    // Sessions de chasse - Structure simplifiée pour éviter les conflits
+    // Sessions de chasse
     match /hunting_sessions/{sId} {
       allow read, write: if isAuth();
       match /participants/{pId} {
