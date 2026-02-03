@@ -1,3 +1,4 @@
+
 'use client';
 import {
   Sidebar,
@@ -158,7 +159,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (isAuthPage) return <>{children}</>;
 
-  // Now including /calendrier to show the selected date in the banner
   const showDayNavigator = ['/', '/lagon', '/peche', '/champs', '/chasse', '/calendrier'].includes(pathname);
 
   return (
