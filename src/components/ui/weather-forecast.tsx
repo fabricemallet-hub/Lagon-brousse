@@ -144,9 +144,22 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
 
     const forecasts = weather.hourly.slice(0, 24);
     const isToday = new Date(forecasts[0].date).toDateString() === now.toDateString();
-    const forecastsToShow = isToday ? forecasts.filter(f => new Date(f.date).getHours() >= currentHour) : forecasts;
+    
+    // Réorganisation chronologique roulante : on commence par l'heure actuelle
+    let sortedForecasts = forecasts;
+    if (isToday) {
+      const startIndex = forecasts.findIndex(f => new Date(f.date).getHours() === currentHour);
+      if (startIndex !== -1) {
+        // On effectue une rotation pour commencer par l'heure actuelle et finir par l'heure passée
+        sortedForecasts = [...forecasts.slice(startIndex), ...forecasts.slice(0, startIndex)];
+      }
+    }
 
-    return { summary: {tideSentence, windSentence}, selectedForecast: _selectedForecast, hourlyForecastsToShow: forecastsToShow };
+    return { 
+      summary: {tideSentence, windSentence}, 
+      selectedForecast: _selectedForecast, 
+      hourlyForecastsToShow: sortedForecasts 
+    };
   }, [now, weather, tides]);
 
   if (!isClient || !selectedForecast) {
