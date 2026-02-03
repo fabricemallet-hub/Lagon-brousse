@@ -118,8 +118,8 @@ const DayCell = React.memo(({
     const isPelagicSeason = data.pelagicInfo?.inSeason;
 
     return {
-      lagon: Array.from({ length: fishCount }).map((_, i) => <Fish key={`lagon-${i}`} className="size-3.5 text-primary" />),
-      pelagic: isPelagicSeason ? <div className="flex items-center gap-0.5 ml-1 border-l pl-1 border-primary/20"><Star className="size-2 text-yellow-500 fill-yellow-500" /><Fish className="size-3.5 text-orange-500" /></div> : null
+      lagon: Array.from({ length: fishCount }).map((_, i) => <Fish key={`lagon-${i}`} className="size-2.5 text-primary" />),
+      pelagic: isPelagicSeason ? <div className="flex items-center gap-0.5 ml-0.5 border-l pl-0.5 border-primary/20"><Star className="size-1.5 text-yellow-500 fill-yellow-500" /><Fish className="size-2.5 text-orange-500" /></div> : null
     };
   }, [data, calendarView]);
 
@@ -156,11 +156,11 @@ const DayCell = React.memo(({
 
       {calendarView === 'peche' ? (
         <div className="flex-grow flex flex-col justify-center items-center gap-0.5 pt-1">
-          <div className="flex items-center justify-center gap-1 flex-wrap h-4">
-            {data.crabAndLobster.crabStatus === 'Plein' && <CrabIcon className="size-3.5 text-green-600" />}
-            {data.crabAndLobster.lobsterActivity === 'Élevée' && <LobsterIcon className="size-3.5 text-blue-600" />}
+          <div className="flex items-center justify-center gap-1 h-3.5">
+            {data.crabAndLobster.crabStatus === 'Plein' && <CrabIcon className="size-2.5 text-green-600" />}
+            {data.crabAndLobster.lobsterActivity === 'Élevée' && <LobsterIcon className="size-2.5 text-blue-600" />}
           </div>
-          <div className="flex items-center justify-center gap-0.5 h-4 flex-wrap">
+          <div className="flex items-center justify-center gap-0.5 h-3.5 overflow-hidden">
             {fishingIcons?.lagon}
             {fishingIcons?.pelagic}
           </div>
