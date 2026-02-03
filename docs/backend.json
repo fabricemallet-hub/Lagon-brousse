@@ -4,7 +4,7 @@
     "UserAccount": {
       "title": "UserAccount",
       "type": "object",
-      "description": "Represents a user account within the application.",
+      "description": "Représente un compte utilisateur dans l'application.",
       "properties": {
         "id": { "type": "string" },
         "email": { "type": "string", "format": "email" },
@@ -12,24 +12,23 @@
         "subscriptionStatus": { "type": "string", "enum": ["active", "inactive", "trial", "admin"] },
         "subscriptionStartDate": { "type": "string", "format": "date-time" },
         "subscriptionExpiryDate": { "type": "string", "format": "date-time" },
-        "favoriteLocationIds": { "type": "array", "items": { "type": "string" } },
-        "mapIcon": { "type": "string" },
-        "mapColor": { "type": "string" },
         "lastSelectedLocation": { "type": "string" },
-        "emergencyContact": { "type": "string" }
+        "emergencyContact": { "type": "string" },
+        "mapIcon": { "type": "string" },
+        "mapColor": { "type": "string" }
       },
       "required": ["id", "email", "displayName", "subscriptionStatus"]
     },
     "HuntingSession": {
       "title": "HuntingSession",
       "type": "object",
-      "description": "Represents a real-time hunting session.",
+      "description": "Une session de chasse de groupe.",
       "properties": {
         "organizerId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" },
         "expiresAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["organizerId", "createdAt", "expiresAt"]
+      "required": ["organizerId", "createdAt"]
     },
     "SessionParticipant": {
       "title": "SessionParticipant",
@@ -38,7 +37,7 @@
         "displayName": { "type": "string" },
         "mapIcon": { "type": "string" },
         "mapColor": { "type": "string" },
-        "baseStatus": { "type": "string", "enum": ["En position", "Battue en cours"] },
+        "baseStatus": { "type": "string" },
         "isGibierEnVue": { "type": "boolean" },
         "location": {
           "type": "object",
@@ -86,19 +85,19 @@
   "firestore": {
     "/users/{userId}": {
       "schema": { "$ref": "#/backend/entities/UserAccount" },
-      "description": "User profile and settings."
+      "description": "Profil et paramètres utilisateur."
     },
     "/hunting_sessions/{sessionId}": {
       "schema": { "$ref": "#/backend/entities/HuntingSession" },
-      "description": "Group hunting sessions."
+      "description": "Sessions de chasse de groupe."
     },
     "/hunting_sessions/{sessionId}/participants/{userId}": {
       "schema": { "$ref": "#/backend/entities/SessionParticipant" },
-      "description": "Participant in a hunting session."
+      "description": "Participant à une session de chasse."
     },
     "/users/{userId}/fishing_spots/{spotId}": {
       "schema": { "$ref": "#/backend/entities/FishingSpot" },
-      "description": "Saved fishing spots."
+      "description": "Coins de pêche sauvegardés."
     }
   }
 }

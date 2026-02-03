@@ -4,7 +4,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ----------------------------------------------------------------------
-    // Helper Functions
+    // Fonctions de base
     // ----------------------------------------------------------------------
     function isSignedIn() {
       return request.auth != null;
@@ -22,14 +22,13 @@ service cloud.firestore {
     }
 
     // ----------------------------------------------------------------------
-    // Collection: users
+    // Utilisateurs
     // ----------------------------------------------------------------------
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
-      allow list: if isAdmin();
       allow create: if isSignedIn();
       allow update: if isOwner(userId) || isAdmin();
-      allow delete: if isAdmin();
+      allow list, delete: if isAdmin();
       
       match /fishing_spots/{spotId} {
         allow read, write: if isOwner(userId);
@@ -41,29 +40,41 @@ service cloud.firestore {
     }
 
     // ----------------------------------------------------------------------
-    // Collection: vessels (Real-time tracking)
+    // Sessions de Chasse (FORCE REDEPLOY ID: 20240524-1300)
     // ----------------------------------------------------------------------
-    match /vessels/{userId} {
+    match /hunting_sessions/{sessionId} {
+      // Autoriser la lecture (get + list) à tout le monde pour permettre les recherches
       allow read: if isSignedIn();
-      allow create, update, delete: if isOwner(userId);
-
-      match /history/{pointId} {
+      allow create: if isSignedIn();
+      // Seuls l'organisateur ou l'admin peuvent modifier/supprimer
+      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.organizerId == request.auth.uid);
+      
+      match /participants/{participantId} {
         allow read: if isSignedIn();
-        allow create, update, delete: if isOwner(userId);
+        allow write: if isOwner(participantId) || isAdmin();
       }
     }
 
     // ----------------------------------------------------------------------
-    // Collection: locations
+    // Navires (Vessel Tracker)
+    // ----------------------------------------------------------------------
+    match /vessels/{vesselId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isOwner(vesselId) || isAdmin();
+
+      match /history/{pointId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isOwner(vesselId) || isAdmin();
+      }
+    }
+
+    // ----------------------------------------------------------------------
+    // Données publiques (Lecture seule)
     // ----------------------------------------------------------------------
     match /locations/{locationId} {
       allow read: if true;
-      allow write: if false;
     }
     
-    // ----------------------------------------------------------------------
-    // Collection: stations
-    // ----------------------------------------------------------------------
     match /stations/{stationId} {
       allow read: if true;
       allow write: if isAdmin();
@@ -75,24 +86,7 @@ service cloud.firestore {
     }
     
     // ----------------------------------------------------------------------
-    // Collection: hunting_sessions
-    // ----------------------------------------------------------------------
-    match /hunting_sessions/{sessionId} {
-      // Autoriser explicitement la lecture (get + list) à tout utilisateur connecté
-      // Synchronisation forcee pour deploiement: 2024-05-24T12:48:00
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      // Seuls l'organisateur ou l'admin peuvent modifier/supprimer
-      allow update, delete: if isAdmin() || (isSignedIn() && resource.data.organizerId == request.auth.uid);
-      
-      match /participants/{userId} {
-        allow read: if isSignedIn();
-        allow write: if isOwner(userId) || isAdmin();
-      }
-    }
-
-    // ----------------------------------------------------------------------
-    // Collection: access_tokens
+    // Administration et Jetons
     // ----------------------------------------------------------------------
     match /access_tokens/{tokenId} {
       allow read, write: if isAdmin();
@@ -100,17 +94,11 @@ service cloud.firestore {
       allow update: if isSignedIn() && request.resource.data.status == 'redeemed';
     }
     
-    // ----------------------------------------------------------------------
-    // Collection: shared_access_tokens
-    // ----------------------------------------------------------------------
     match /shared_access_tokens/{tokenId} {
-      allow write: if isAdmin();
       allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
-    // ----------------------------------------------------------------------
-    // Collection: conversations
-    // ----------------------------------------------------------------------
     match /conversations/{userId} {
       allow read, write: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();

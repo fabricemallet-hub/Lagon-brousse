@@ -196,13 +196,13 @@ function HuntingSessionContent() {
   
   // History query
   const mySessionsQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
+    if (!firestore || !user?.uid) return null;
     return query(
       collection(firestore, 'hunting_sessions'),
       where('organizerId', '==', user.uid),
       orderBy('createdAt', 'desc')
     );
-  }, [firestore, user]);
+  }, [firestore, user?.uid]);
   const { data: mySessions, isLoading: areMySessionsLoading } = useCollection<HuntingSession>(mySessionsQuery);
 
   const myParticipant = useMemo(() => participants?.find(p => p.id === user?.uid), [participants, user]);
@@ -1015,15 +1015,15 @@ function HuntingSessionContent() {
                             <Eye className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Gibier en vue
                         </Button>
                     </div>
+                    <div className="absolute bottom-2 right-2 bg-card/80 p-1 px-2 rounded-md text-xs font-semibold shadow-lg border">
+                      {map?.getZoom() ? `${Math.round((map.getZoom()! / 22) * 100)}%` : '...'}
+                    </div>
                     <Button size="icon" onClick={() => setIsFullscreen(!isFullscreen)} className="absolute top-2 left-2 shadow-lg h-9 w-9 z-10">
                         {isFullscreen ? <Shrink className="h-5 w-5" /> : <Expand className="h-5 w-5" />}
                     </Button>
                     <Button size="icon" onClick={handleRecenter} className="absolute top-2 right-2 shadow-lg h-9 w-9">
                         <LocateFixed className="h-5 w-5" />
                     </Button>
-                    <div className="absolute bottom-2 right-2 bg-card/80 p-1 px-2 rounded-md text-xs font-semibold shadow-lg border">
-                      {map?.getZoom() ? `${Math.round((map.getZoom()! / 22) * 100)}%` : '...'}
-                    </div>
                 </div>
                 <div className={cn("space-y-4", isFullscreen ? "flex-shrink-0 overflow-y-auto" : "")}>
                     {!isFullscreen && (
