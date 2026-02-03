@@ -72,7 +72,6 @@ const tideStations = {
 
 /**
  * MAPPING COMMUNE -> STATION
- * Définit quelle station de référence est la plus proche géographiquement.
  */
 export const communeToTideStationMap: { [key: string]: string } = {
   'Bélep': 'Koumac', 
@@ -169,14 +168,8 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation'> = {
   }
 };
 
-function getWindDirection(deg: number): WindDirection {
-  const directions: WindDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-  return directions[Math.round(deg / 45) % 8];
-}
-
 /**
  * GÉNÉRATEUR PROCÉDURAL PRINCIPAL
- * Calcule toutes les données météo, pêche et lune pour une date et un lieu donnés.
  */
 export function generateProceduralData(location: string, date: Date): LocationData {
   const dateKey = date.toISOString().split('T')[0];
@@ -191,7 +184,6 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   const month = effectiveDate.getMonth();
   const year = effectiveDate.getFullYear();
 
-  // Création des "seeds" (graines) pour que le hasard soit prévisible pour un jour donné
   const locationSeed = location.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const dateSeed = dayOfMonth + month * 31 + year * 365.25;
 
@@ -203,27 +195,23 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
   }
 
-  // Calcul Phase Lunaire
   const phases: string[] = ['Nouvelle lune', 'Premier croissant', 'Premier quartier', 'Lune gibbeuse croissante', 'Pleine lune', 'Lune gibbeuse décroissante', 'Dernier quartier', 'Dernier croissant'];
   const knownNewMoon = new Date('2024-01-11T00:00:00Z');
   const daysSinceKnownNewMoon = (effectiveDate.getTime() - knownNewMoon.getTime()) / (1000 * 3600 * 24);
   const dayInCycle = daysSinceKnownNewMoon % 29.53;
   
-  // Facteur d'amplitude boosté pour permettre d'atteindre les seuils critiques (>1.65 et <0.20)
+  // Facteur d'amplitude pour les vives-eaux
   const springFactor = 1 + 0.42 * Math.abs(Math.cos((dayInCycle / 29.53) * 2 * Math.PI));
 
-  // 1. Déterminer la station de référence et récupérer les marées de base
   const tideStation = communeToTideStationMap[location] || 'Nouméa';
   const stationTides = tideStations[tideStation as keyof typeof tideStations] || tideStations['Nouméa'];
 
-  // 2. Créer l'objet de données
   const locationData: LocationData = {
       ...JSON.parse(JSON.stringify(baseData)),
       tides: JSON.parse(JSON.stringify(stationTides.tides)),
       tideStation: tideStation
   };
 
-  // Ajustement des marées selon le cycle lunaire (Amplitude)
   locationData.tides.forEach((tide: Tide, i: number) => {
     const baseTide = stationTides.tides[i % stationTides.tides.length];
     const variation = Math.sin((dateSeed * (1 + i * 0.1) + locationSeed * 0.2)) * 0.04;
@@ -231,7 +219,6 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     if (tide.type === 'haute') {
         tide.height = parseFloat((baseTide.height * springFactor + variation).toFixed(2));
     } else {
-        // En vives-eaux, la basse mer est plus basse (division par le facteur)
         tide.height = parseFloat((baseTide.height / springFactor + variation).toFixed(2));
     }
     tide.time = varyTime(baseTide.time, i + 5);
@@ -242,7 +229,6 @@ export function generateProceduralData(location: string, date: Date): LocationDa
       return hours * 60 + minutes;
   };
 
-  // Calcul du mouvement de marée pour chaque créneau de pêche
   locationData.fishing.forEach(slot => {
     const slotStartHour = parseInt(slot.timeOfDay.match(/(\d{2}):\d{2}/)![1]);
     const slotStartMinutes = slotStartHour * 60;
@@ -253,11 +239,7 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     locationData.tides.forEach(tide => {
         const tideMinutes = timeToMinutes(tide.time);
         const diff = Math.abs(slotStartMinutes - tideMinutes);
-
-        if (diff < minDiff) {
-            minDiff = diff;
-            closestTide = tide;
-        }
+        if (diff < minDiff) { minDiff = diff; closestTide = tide; }
     });
 
     if (closestTide) {
@@ -270,72 +252,22 @@ export function generateProceduralData(location: string, date: Date): LocationDa
         locationData.tides.forEach(tide => {
              const tideMinutes = timeToMinutes(tide.time);
              const diff = tideMinutes - slotEndMinutes;
-             if (diff > 0 && diff < minNextDiff) {
-                 minNextDiff = diff;
-                 nextTide = tide;
-             }
+             if (diff > 0 && diff < minNextDiff) { minNextDiff = diff; nextTide = tide; }
         });
         
-        if (!nextTide) {
-            let firstTideNextDay: Tide | null = null;
-            let minFirstDiff = Infinity;
-            locationData.tides.forEach(tide => {
-                const tideMinutes = timeToMinutes(tide.time) + 24*60;
-                const diff = tideMinutes - slotEndMinutes;
-                if(diff > 0 && diff < minFirstDiff){
-                    minFirstDiff = diff;
-                    firstTideNextDay = tide;
-                }
-            });
-            nextTide = firstTideNextDay;
-        }
-
-        if (minDiff < 30) {
-            slot.tideMovement = 'étale';
-        } else if (nextTide) {
-            slot.tideMovement = nextTide.type === 'haute' ? 'montante' : 'descendante';
-        } else {
-             slot.tideMovement = 'étale';
-        }
+        if (minDiff < 30) { slot.tideMovement = 'étale'; } 
+        else if (nextTide) { slot.tideMovement = nextTide.type === 'haute' ? 'montante' : 'descendante'; } 
+        else { slot.tideMovement = 'étale'; }
     }
   });
   
   const phaseIndex = Math.floor((dayInCycle / 29.53) * 8 + 0.5) % 8;
   locationData.weather.moon.phase = phases[phaseIndex];
-  
-  const illumination = 0.5 * (1 - Math.cos((dayInCycle / 29.53) * 2 * Math.PI));
-  locationData.weather.moon.percentage = Math.round(illumination * 100);
+  locationData.weather.moon.percentage = Math.round(0.5 * (1 - Math.cos((dayInCycle / 29.53) * 2 * Math.PI)) * 100);
 
-  const warmSeasonMonths = [8, 9, 10, 11, 0, 1, 2, 3];
-  const isPelagicSeason = warmSeasonMonths.includes(month);
-  
-  locationData.pelagicInfo = {
-      inSeason: isPelagicSeason,
-      message: isPelagicSeason
-          ? 'La saison chaude bat son plein !'
-          : 'Hors saison pour les grands pélagiques.'
-  };
+  const isPelagicSeason = [8, 9, 10, 11, 0, 1, 2, 3].includes(month);
+  locationData.pelagicInfo = { inSeason: isPelagicSeason, message: isPelagicSeason ? 'Saison des pélagiques ouverte !' : 'Hors saison pélagiques.' };
 
-  // Calcul des indices de pêche (1 à 10)
-  locationData.fishing.forEach((slot) => {
-    slot.fish.forEach((f) => {
-      let rating = 1;
-      if (slot.timeOfDay.includes('Aube') || slot.timeOfDay.includes('Crépuscule')) rating += 3.5;
-      else rating -= 2;
-      
-      if (slot.tideMovement !== 'étale') rating += 3.5;
-      else rating -= 6;
-      
-      const isNearNewOrFullMoon = (dayInCycle < 4 || dayInCycle > 25.5) || (dayInCycle > 10.75 && dayInCycle < 18.75);
-      if (isNearNewOrFullMoon) rating += 3.5;
-
-      const randomFactor = Math.sin(dateSeed * 0.1 + locationSeed * 0.05 + slot.timeOfDay.length);
-      rating += randomFactor;
-      f.rating = Math.max(1, Math.min(10, Math.round(rating)));
-    });
-  });
-
-  // Simulation du vent
   locationData.weather.wind.forEach((forecast: WindForecast, index: number) => {
     forecast.speed = Math.max(0, Math.round(8 + Math.sin(dateSeed * 0.2 + locationSeed + index) * 5));
     const directions: WindDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
@@ -343,25 +275,19 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     forecast.stability = (Math.sin(dateSeed + index) > 0) ? 'Stable' : 'Tournant';
   });
 
-  // Simulation de la pluie et UV
   const rainChance = (Math.sin(dateSeed * 0.4 + locationSeed * 0.2) + 1) / 2;
   locationData.weather.rain = rainChance < 0.98 ? 'Aucune' : (rainChance < 0.995 ? 'Fine' : 'Forte');
   
-  // Farming logic (Lune montante/descendante)
-  const lunarPhase = dayInCycle < 14.76 ? 'Lune Montante' : 'Lune Descendante';
-  locationData.farming.lunarPhase = lunarPhase;
+  locationData.farming.lunarPhase = dayInCycle < 14.76 ? 'Lune Montante' : 'Lune Descendante';
   const zodiacSigns = ['Fruits', 'Racines', 'Fleurs', 'Feuilles'];
-  const zodiac = zodiacSigns[Math.floor((dayInCycle / (27.3/4)) % 4)] as 'Fruits' | 'Racines' | 'Fleurs' | 'Feuilles';
-  locationData.farming.zodiac = zodiac;
+  locationData.farming.zodiac = zodiacSigns[Math.floor((dayInCycle / (27.3/4)) % 4)] as any;
 
-  // Simulation des données horaires pour la courbe de marée
   locationData.weather.hourly = [];
   const tideDataForDay = calculateHourlyTidesForSimulation(locationData.tides, date);
   
   for (let i = 0; i < 24; i++) {
       const forecastDate = new Date(effectiveDate.getTime() + i * 60 * 60 * 1000);
       const tideAtHour = tideDataForDay.find(td => new Date(td.date).getHours() === i);
-      
       locationData.weather.hourly.push({
           date: forecastDate.toISOString(),
           condition: 'Ensoleillé',
@@ -380,9 +306,6 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   return locationData;
 }
 
-/**
- * Calcul de la courbe de marée horaire pour la simulation météo
- */
 function calculateHourlyTidesForSimulation(dailyTides: Tide[], baseDate: Date): any[] {
     const timeToMinutes = (timeStr: string) => {
         const [hours, minutes] = timeStr.split(':').map(Number);
@@ -394,12 +317,11 @@ function calculateHourlyTidesForSimulation(dailyTides: Tide[], baseDate: Date): 
     const startDate = new Date(baseDate);
     startDate.setHours(0, 0, 0, 0);
 
-    for (let h = 0; i < 24; i++) {
+    for (let i = 0; i < 24; i++) {
         const currentMinutes = i * 60;
         let prevTide = sortedTides.filter(t => timeToMinutes(t.time) <= currentMinutes).pop();
         let nextTide = sortedTides.find(t => timeToMinutes(t.time) > currentMinutes);
 
-        // Fallback si on est en début ou fin de journée
         if (!prevTide) prevTide = { ...sortedTides[sortedTides.length - 1], time: '00:00' };
         if (!nextTide) nextTide = { ...sortedTides[0], time: '23:59' };
 
@@ -423,21 +345,4 @@ function calculateHourlyTidesForSimulation(dailyTides: Tide[], baseDate: Date): 
 
 export function getDataForDate(location: string, date: Date): LocationData {
   return generateProceduralData(location, date);
-}
-
-export async function getTideArchiveStatus(firestore: Firestore): Promise<{ lastDate: string | null, stationCount: number }> {
-    const stations = [...new Set(Object.values(communeToTideStationMap))];
-    let latestDate: Date | null = null;
-    for (const stationName of stations) {
-        try {
-            const tidesColRef = collection(firestore, `stations/${stationName}/tides`);
-            const q = query(tidesColRef, orderBy('__name__', 'desc'), limit(1));
-            const querySnapshot = await getDocs(q);
-            if (!querySnapshot.empty) {
-                const docDate = new Date(querySnapshot.docs[0].id);
-                 if (!latestDate || docDate > latestDate) { latestDate = docDate; }
-            }
-        } catch (error) { console.error(`Failed to check tide archive for ${stationName}:`, error); }
-    }
-    return { lastDate: latestDate ? latestDate.toISOString().split('T')[0] : null, stationCount: stations.length };
 }
