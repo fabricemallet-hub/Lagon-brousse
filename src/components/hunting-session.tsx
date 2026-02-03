@@ -75,6 +75,13 @@ const BatteryIcon = ({ level, charging }: { level: number; charging: boolean }) 
   return <BatteryFull {...props} className="text-green-500" />;
 };
 
+const PulsingDot = () => (
+    <div className="absolute" style={{ transform: 'translate(-50%, -50%)' }}>
+      <div className="w-5 h-5 rounded-full bg-blue-500 opacity-75 animate-ping absolute"></div>
+      <div className="w-5 h-5 rounded-full bg-blue-500 border-2 border-white relative"></div>
+    </div>
+);
+
 function HuntingSessionContent() {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -90,7 +97,7 @@ function HuntingSessionContent() {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [zoom, setZoom] = useState(8);
   const [initialZoomDone, setInitialZoomDone] = useState(false);
-  const [mapTypeId, setMapTypeId] = useState<string>('terrain');
+  const [mapTypeId, setMapTypeId] = useState<string>('satellite');
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const [nickname, setNickname] = useState('');
@@ -114,21 +121,19 @@ function HuntingSessionContent() {
 
   const { data: participants } = useCollection<SessionParticipant>(participantsCollectionRef);
 
-  // CHANGEMENT DE MÉTHODE : Chargement ponctuel avec tri en mémoire pour éviter l'erreur d'index
   const fetchMySessions = useCallback(async () => {
     if (!firestore || !user?.uid) return;
     setAreMySessionsLoading(true);
     try {
-      // On retire orderBy('createdAt', 'desc') pour éviter l'erreur d'index composite
       const q = query(
         collection(firestore, 'hunting_sessions'),
         where('organizerId', '==', user.uid),
-        limit(20) // On en prend un peu plus pour trier
+        limit(10)
       );
       const querySnapshot = await getDocs(q);
       const sessions = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as WithId<HuntingSession>));
       
-      // Tri en mémoire (JavaScript)
+      // Sort in memory to avoid indexing errors
       sessions.sort((a, b) => {
         const timeA = a.createdAt?.toMillis?.() || 0;
         const timeB = b.createdAt?.toMillis?.() || 0;
@@ -325,6 +330,13 @@ function HuntingSessionContent() {
                         onLoad={setMap}
                         options={{ disableDefaultUI: true, zoomControl: true, mapTypeId: mapTypeId }}
                     >
+                        {/* Point local pour retour immédiat */}
+                        {userLocation && (
+                            <OverlayView position={{ lat: userLocation.latitude, lng: userLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                                <PulsingDot />
+                            </OverlayView>
+                        )}
+
                         {participants?.map(p => p.location && (
                             <OverlayView key={p.id} position={{ lat: p.location.latitude, lng: p.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                 <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">

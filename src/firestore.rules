@@ -1,17 +1,18 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ID DE DEPLOIEMENT : 20240524_INDEX_FIX_V1_SRC
+    // DEPLOY_ID: FINAL_EMERGENCY_FIX_V1
     
     function isAuth() { return request.auth != null; }
     function isAdmin() { 
       return isAuth() && (
         request.auth.token.email.lower() == 'f.mallet81@gmail.com' || 
-        request.auth.token.email.lower() == 'f.mallet81@outlook.com'
+        request.auth.token.email.lower() == 'f.mallet81@outlook.com' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'admin'
       );
     }
 
-    // Sessions de chasse : Accès ouvert à tout utilisateur connecté pour simplifier
+    // Sessions de chasse : Accès total pour les membres connectés
     match /hunting_sessions/{sessionId} {
       allow read, write: if isAuth();
       match /participants/{userId} {

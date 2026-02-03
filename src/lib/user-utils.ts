@@ -14,7 +14,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
   const userDocRef = doc(firestore, 'users', user.uid);
   const email = user.email?.toLowerCase();
   
-  // Forçage du statut admin pour vos deux comptes
+  // Forçage du statut admin pour vos deux comptes clés
   const isAdminUser = email === 'f.mallet81@outlook.com' || email === 'f.mallet81@gmail.com';
 
   try {
