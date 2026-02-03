@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { ReactNode } from 'react';
@@ -43,10 +44,10 @@ export function DateProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [splashSettings]);
 
-  // Default settings using the NEW logo to avoid showing an old version during load
+  // Default settings using the NEW logo
   const defaultSettings: SplashScreenSettings = {
     splashMode: 'image',
-    splashImageUrl: '/icon-512x512.png?v=2',
+    splashImageUrl: '/icon-512x512.png',
     splashBgColor: '#000000',
     splashImageFit: 'contain',
     splashDuration: 2.5

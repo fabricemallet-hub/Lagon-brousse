@@ -49,9 +49,9 @@ export default function RootLayout({
         />
         {/* Viewport optimisé : retrait de width=device-width pour permettre le zoom arrière sur le calendrier large */}
         <meta name="viewport" content="initial-scale=1, minimum-scale=0.1, maximum-scale=5, user-scalable=yes" />
-        <link rel="icon" href="/icon-192x192.png?v=2" />
-        <link rel="apple-touch-icon" href="/icon-192x192.png?v=2" />
-        <link rel="manifest" href="/manifest.webmanifest?v=2" />
+        <link rel="icon" href="/icon-192x192.png" />
+        <link rel="apple-touch-icon" href="/icon-192x192.png" />
+        <link rel="manifest" href="/manifest.webmanifest" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>

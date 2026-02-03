@@ -9,6 +9,12 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
+    localPatterns: [
+      {
+        pathname: '/**',
+        search: '',
+      },
+    ],
     remotePatterns: [
       {
         protocol: 'https',
