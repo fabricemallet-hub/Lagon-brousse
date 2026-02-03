@@ -120,10 +120,22 @@ const DayCell = React.memo(({
     const lagonRating = lagonRatings.length > 0 ? lagonRatings.reduce((acc, f) => acc + f.rating, 0) / lagonRatings.length : 0;
     const fishCount = Math.max(1, Math.round(lagonRating / 2));
 
+    const isPelagicSeason = data.pelagicInfo?.inSeason;
+
     return {
-      lagon: Array.from({ length: fishCount }).map((_, i) => <Fish key={`lagon-${i}`} className="size-3.5 text-primary" />)
+      lagon: Array.from({ length: fishCount }).map((_, i) => <Fish key={`lagon-${i}`} className="size-3 text-primary" />),
+      pelagic: isPelagicSeason ? <div className="flex items-center gap-0.5 ml-1 border-l pl-1 border-primary/20"><Star className="size-2 text-yellow-500 fill-yellow-500" /><Fish className="size-3 text-orange-500" /></div> : null
     };
   }, [data, calendarView]);
+
+  const tideInfo = useMemo(() => {
+    if (data.tides.length === 0) return null;
+    const highest = [...data.tides].sort((a, b) => b.height - a.height)[0];
+    const lowest = [...data.tides].sort((a, b) => a.height - b.height)[0];
+    const range = highest.height - lowest.height;
+    const isGrandeMaree = range > 1.35; // Seuil pour la NC
+    return { highest, lowest, range, isGrandeMaree };
+  }, [data.tides]);
 
   const { zodiac, isGoodForCuttings, isGoodForPruning, isGoodForMowing } = data.farming;
   const GardeningIcon = { Fruits: Spade, Racines: Carrot, Fleurs: Flower, Feuilles: Leaf }[zodiac];
@@ -156,9 +168,19 @@ const DayCell = React.memo(({
           </div>
           <div className="flex items-center justify-center gap-0.5 h-4 flex-wrap">
             {fishingIcons?.lagon}
+            {fishingIcons?.pelagic}
           </div>
-          <div className="text-[8px] font-black opacity-60 mt-auto">
-            {data.tides.length > 0 && <span>{data.tides[0].time}</span>}
+          <div className="mt-auto flex flex-col items-center">
+            {tideInfo && (
+              <div className={cn(
+                "text-[7px] font-black flex flex-col items-center leading-tight transition-all",
+                tideInfo.isGrandeMaree ? "text-primary scale-110" : "opacity-60"
+              )}>
+                <span className="flex items-center gap-0.5"><Waves className="size-1.5" /> {tideInfo.highest.time}</span>
+                <span>{tideInfo.highest.height.toFixed(2)}m</span>
+                {tideInfo.isGrandeMaree && <span className="text-[5px] uppercase tracking-tighter">Gr. Marée</span>}
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -239,10 +261,17 @@ export function LunarCalendar() {
             </div>
           </div>
         ) : (
-          <div className="flex flex-wrap gap-x-4 gap-y-2 p-3 bg-muted/20 border rounded-lg">
-            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><Fish className="size-4 text-primary"/> Poisson (Indice)</div>
-            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><CrabIcon className="size-4 text-green-600"/> Crabe (Plein)</div>
-            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><LobsterIcon className="size-4 text-blue-600"/> Langouste (Activité)</div>
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-x-4 gap-y-2 p-3 bg-muted/20 border rounded-lg">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><Fish className="size-4 text-primary"/> Lagon (Indice)</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><Fish className="size-4 text-orange-500"/><Star className="size-2 text-yellow-500 -ml-1 mr-1" /> Pélagiques</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><CrabIcon className="size-4 text-green-600"/> Crabe (Plein)</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><LobsterIcon className="size-4 text-blue-600"/> Langouste (Activité)</div>
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-2 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-primary"><Waves className="size-4"/> Heure/Hauteur</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-primary"><Star className="size-3 fill-primary" /> Grandes Marées</div>
+            </div>
           </div>
         )}
       </div>
