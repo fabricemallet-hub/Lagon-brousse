@@ -22,34 +22,34 @@ function Calendar({
       locale={fr}
       weekStartsOn={1}
       showOutsideDays={showOutsideDays}
-      className={cn("p-3", className)}
+      className={cn("p-3 bg-card", className)}
       classNames={{
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
         month: "space-y-4",
         caption: "flex justify-center pt-1 relative items-center",
-        caption_label: "text-lg font-medium",
+        caption_label: "text-sm font-black uppercase tracking-tighter text-primary",
         nav: "space-x-1 flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
-          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
+          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 border-primary/20"
         ),
         nav_button_previous: "absolute left-1",
         nav_button_next: "absolute right-1",
         table: "w-full border-collapse space-y-1",
         head_row: "flex",
         head_cell:
-          "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
+          "text-muted-foreground rounded-md w-9 font-black text-[10px] uppercase tracking-widest",
         row: "flex w-full mt-2",
         cell: "h-9 w-9 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
         day: cn(
           buttonVariants({ variant: "ghost" }),
-          "h-9 w-9 p-0 font-normal aria-selected:opacity-100"
+          "h-9 w-9 p-0 font-bold aria-selected:opacity-100 hover:bg-primary/10 hover:text-primary rounded-lg transition-all"
         ),
         day_selected:
-          "bg-foreground text-background hover:bg-foreground/90 focus:bg-foreground focus:text-background rounded-full",
-        day_today: "bg-muted rounded-full",
+          "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground rounded-lg shadow-md",
+        day_today: "bg-accent/10 text-accent ring-1 ring-inset ring-accent/30 rounded-lg",
         day_outside:
-          "day-outside text-muted-foreground opacity-50",
+          "day-outside text-muted-foreground opacity-30 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30",
         day_disabled: "text-muted-foreground opacity-50",
         day_range_middle:
           "aria-selected:bg-accent aria-selected:text-accent-foreground",
@@ -57,11 +57,11 @@ function Calendar({
         ...classNames,
       }}
       formatters={{
-        formatWeekdayName: (date) => format(date, 'EEEEEE', { locale: fr }).toLowerCase(),
+        formatWeekdayName: (date) => format(date, 'EEE', { locale: fr }).replace('.', '').toUpperCase(),
       }}
       components={{
-        IconLeft: ({ ...props }) => <ChevronLeft className="h-4 w-4" {...props} />,
-        IconRight: ({ ...props }) => <ChevronRight className="h-4 w-4" {...props} />,
+        IconLeft: ({ ...props }) => <ChevronLeft className="h-4 w-4" />,
+        IconRight: ({ ...props }) => <ChevronRight className="h-4 w-4" />,
       }}
       {...props}
     />
