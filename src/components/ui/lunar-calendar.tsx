@@ -119,8 +119,8 @@ const DayCell = React.memo(({
     const isPelagicSeason = data.pelagicInfo?.inSeason;
 
     return {
-      lagon: Array.from({ length: fishCount }).map((_, i) => <Fish key={`lagon-${i}`} className="size-2.5 text-primary" />),
-      pelagic: isPelagicSeason ? <div className="flex items-center gap-0.5 ml-0.5 border-l pl-0.5 border-primary/20"><Star className="size-1.5 text-yellow-500 fill-yellow-500" /><Fish key="pelagic-icon" className="size-2.5 text-orange-500" /></div> : null
+      lagon: Array.from({ length: fishCount }).map((_, i) => <Fish key={`lagon-${i}`} className="size-2.5 text-primary shrink-0" />),
+      pelagic: isPelagicSeason ? <div className="flex items-center gap-0.5 ml-0.5 border-l pl-0.5 border-primary/20 shrink-0"><Star className="size-1.5 text-yellow-500 fill-yellow-500" /><Fish key="pelagic-icon" className="size-2.5 text-orange-500" /></div> : null
     };
   }, [data, calendarView]);
 
@@ -157,15 +157,18 @@ const DayCell = React.memo(({
 
       {calendarView === 'peche' ? (
         <div className="flex-grow flex flex-col justify-center items-center gap-0.5 pt-1">
-          <div className="flex items-center justify-center gap-1 h-3.5">
-            {data.crabAndLobster.crabStatus === 'Plein' && <CrabIcon className="size-2.5 text-green-600" />}
-            {data.crabAndLobster.crabStatus === 'Mout' && <CrabIcon className="size-2.5 text-destructive" />}
-            {data.crabAndLobster.lobsterActivity === 'Élevée' && <LobsterIcon className="size-2.5 text-blue-600" />}
+          {/* Ligne unique pour toutes les icônes d'activité */}
+          <div className="flex items-center justify-center gap-0.5 h-4 overflow-hidden flex-nowrap whitespace-nowrap w-full">
+            {data.crabAndLobster.crabStatus === 'Plein' && <CrabIcon className="size-2.5 text-green-600 shrink-0" />}
+            {data.crabAndLobster.crabStatus === 'Mout' && <CrabIcon className="size-2.5 text-destructive shrink-0" />}
+            {data.crabAndLobster.lobsterActivity === 'Élevée' && <LobsterIcon className="size-2.5 text-blue-600 shrink-0" />}
+            
+            <div className="flex items-center gap-0.5 ml-0.5 border-l border-muted-foreground/20 pl-0.5 shrink-0">
+                {fishingIcons?.lagon}
+                {fishingIcons?.pelagic}
+            </div>
           </div>
-          <div className="flex items-center justify-center gap-0.5 h-3.5 overflow-hidden flex-nowrap whitespace-nowrap">
-            {fishingIcons?.lagon}
-            {fishingIcons?.pelagic}
-          </div>
+
           <div className="mt-auto w-full flex flex-col items-center gap-0 pb-0.5">
             {sortedTides.map((tide, idx) => {
               const isHighPeak = tide.type === 'haute' && tide.height >= data.tideThresholds.high;

@@ -282,29 +282,34 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   const isPelagicSeason = [8, 9, 10, 11, 0, 1, 2, 3].includes(month);
   locationData.pelagicInfo = { inSeason: isPelagicSeason, message: isPelagicSeason ? 'Saison des pélagiques ouverte !' : 'Hors saison pélagiques.' };
 
-  // --- Logique Crabes et Langoustes ---
-  // Les crabes de palétuvier muent autour de la pleine lune (Cycle ~14.76)
-  if (dayInCycle >= 12 && dayInCycle <= 18) {
+  // --- Logique Crabes et Langoustes (Spécifique NC) ---
+  // Mue des crabes : Se produit préférentiellement lors des lunes de quartier (mortes-eaux)
+  // Premier Quartier (~7.4j) et Dernier Quartier (~22.1j)
+  const isQuarterMoon = (dayInCycle >= 5.5 && dayInCycle <= 9.5) || (dayInCycle >= 20.2 && dayInCycle <= 24.2);
+  // Pleine Lune (~14.8j) et Nouvelle Lune (0j / 29.5j) : Les crabes sont généralement bien pleins
+  const isFullOrNew = (dayInCycle <= 3.5 || (dayInCycle >= 12.8 && dayInCycle <= 16.8) || dayInCycle >= 26);
+
+  if (isQuarterMoon) {
     locationData.crabAndLobster.crabStatus = 'Mout';
-    locationData.crabAndLobster.crabMessage = "Période de mue : les crabes sont 'mouts' (coque molle).";
-  } else if (dayInCycle <= 4 || dayInCycle >= 25) {
+    locationData.crabAndLobster.crabMessage = "Mortes-eaux (Quartier) : Période de mue des crabes (mouts).";
+  } else if (isFullOrNew) {
     locationData.crabAndLobster.crabStatus = 'Plein';
-    locationData.crabAndLobster.crabMessage = "Les crabes sont bien pleins et lourds.";
+    locationData.crabAndLobster.crabMessage = "Vives-eaux : Les crabes sont actifs et bien pleins.";
   } else {
     locationData.crabAndLobster.crabStatus = 'Vide';
-    locationData.crabAndLobster.crabMessage = "Crabes en phase de remplissage.";
+    locationData.crabAndLobster.crabMessage = "Phase de remplissage après la mue.";
   }
 
-  // Les langoustes sont plus actives par nuits sombres (Nouvelle lune)
-  if (dayInCycle <= 5 || dayInCycle >= 24) {
+  // Langoustes : Activité nocturne maximale par nuits sans lune
+  if (dayInCycle <= 5.5 || dayInCycle >= 24) {
     locationData.crabAndLobster.lobsterActivity = 'Élevée';
-    locationData.crabAndLobster.lobsterMessage = "Nuits sombres : forte activité des langoustes au récif.";
-  } else if (dayInCycle >= 12 && dayInCycle <= 18) {
+    locationData.crabAndLobster.lobsterMessage = "Nuits noires (Nouvelle Lune) : Forte activité des langoustes au récif.";
+  } else if (dayInCycle >= 12 && dayInCycle <= 17.5) {
     locationData.crabAndLobster.lobsterActivity = 'Faible';
-    locationData.crabAndLobster.lobsterMessage = "Pleine lune : les langoustes sont peu actives dehors.";
+    locationData.crabAndLobster.lobsterMessage = "Pleine lune : Les langoustes restent au trou (trop de lumière).";
   } else {
     locationData.crabAndLobster.lobsterActivity = 'Moyenne';
-    locationData.crabAndLobster.lobsterMessage = "Activité modérée des langoustes.";
+    locationData.crabAndLobster.lobsterMessage = "Activité modérée en début/fin de nuit.";
   }
 
   locationData.weather.wind.forEach((forecast: WindForecast, index: number) => {
