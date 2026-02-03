@@ -1,7 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // REVISION: STABLE_SYNC_FINAL_V24
+    // REVISION: STABLE_SYNC_FINAL_V25
     
     function isAuth() { return request.auth != null; }
     function isAdmin() { 

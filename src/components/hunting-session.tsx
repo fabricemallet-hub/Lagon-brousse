@@ -132,7 +132,7 @@ function HuntingSessionContent() {
     if (status === 'En position') {
         url = 'https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3'; // Cloche claire
     } else if (status === 'Battue en cours') {
-        url = 'https://assets.mixkit.co/active_storage/sfx/2560/2560-preview.mp3'; // Clic métallique fort et sec
+        url = 'https://assets.mixkit.co/active_storage/sfx/2700/2700-preview.mp3'; // Trompette Fanfare (3s)
     } else if (status === 'gibier') {
         url = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'; // Alerte urgente
     }
@@ -293,7 +293,7 @@ function HuntingSessionContent() {
                 displayName: nickname, 
                 mapIcon: selectedIcon, 
                 mapColor: selectedColor, 
-                baseStatus: '', 
+                baseStatus: '', // Neutre par défaut
                 isGibierEnVue: false,
                 location: { latitude, longitude },
                 updatedAt: serverTimestamp() 
@@ -328,7 +328,7 @@ function HuntingSessionContent() {
               displayName: nickname, 
               mapIcon: selectedIcon, 
               mapColor: selectedColor, 
-              baseStatus: '', 
+              baseStatus: '', // Neutre par défaut
               isGibierEnVue: false,
               location: { latitude, longitude },
               updatedAt: serverTimestamp() 
