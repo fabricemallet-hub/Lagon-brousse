@@ -93,10 +93,10 @@ const sectionContent: Record<string, {
       "Détection d'Immobilité : Si le système détecte une absence de mouvement (>15m) pendant 5 min, votre statut passe en 'Stationnaire' (Mouillage/Dérive).",
       "Mises à jour Auto : En mode stationnaire, le tracker rafraîchit votre position toutes les 30 min pour rassurer le récepteur sans vider votre batterie.",
       "Reprise de Route : Dès que vous reprenez de la vitesse, le système repasse immédiatement en mode 'Mouvement' et informe le récepteur.",
-      "ALERTE SMS CRITIQUE : En cas de détresse, le bouton rouge génère un message complet incluant : votre lien Google Maps, vos coordonnées GPS décimales, et les rappels des secours (SNSM, CROSS 196)."
+      "ALERTE SMS CRITIQUE : Saisissez le numéro de votre contact. En cas de détresse, le bouton rouge génère un message complet (GPS, lien Maps, secours) et ouvre l'application SMS de votre téléphone. Vous n'avez plus qu'à appuyer sur envoyer."
     ],
     tips: [
-      "Configuration Préalable : Enregistrez le numéro de votre contact via l'icône 'Disquette' pour que le bouton d'alerte soit opérationnel immédiatement.",
+      "Configuration Préalable : Enregistrez le numéro de votre contact via l'icône 'Disquette' pour que le bouton d'alerte soit opérationnel immédiatement lors de vos prochaines sorties.",
       "Gestion de la Zone Blanche : Si vous perdez internet, le tracker stocke vos positions. Elles seront envoyées en bloc dès que vous retrouverez une barre de réseau.",
       "Conseil Batterie : Le GPS haute précision est gourmand. Prévoyez une batterie externe ou une prise 12V sur le bateau pour les longues sorties.",
       "Le récepteur peut copier vos coordonnées GPS d'un clic pour les transmettre aux secours ou les entrer dans un GPS de bord."
@@ -128,10 +128,10 @@ const sectionContent: Record<string, {
     color: 'bg-orange-600',
     role: "Optimisez vos sorties en brousse grâce à l'analyse du vent et au suivi de groupe en temps réel.",
     steps: [
-      "Consultez la période biologique (Brame, Chute des bois) pour adapter votre strategy.",
+      "Consultez la période biologique (Brame, Chute des bois) pour adapter votre stratégie.",
       "Utilisez la carte du vent pour visualiser d'où vient l'air par rapport au relief.",
       "La 'Table de Tir' vous aide à estimer la correction de visée en fonction de la distance et du vent.",
-      "Session de Groupe : Créez une session ou rejoin-en une via un code unique (ex: CH-1234) pour partager votre position GPS en temps réel avec vos partenaires sur la carte satellite.",
+      "Session de Groupe : Créez une session ou rejoignez-en une via un code unique (ex: CH-1234) pour partager votre position GPS en temps réel avec vos partenaires sur la carte satellite.",
       "Alertes Tactiques : Informez instantanément votre groupe de votre statut ('En position', 'Battue en cours') ou signalez 'Gibier en vue' d'un clic. Une alerte visuelle et sonore préviendra immédiatement vos coéquipiers.",
       "Sécurité & Batterie : Surveillez le niveau de batterie de chaque participant sur la carte. Les informations (GPS + Batterie) sont actualisées toutes les 5 minutes pour préserver l'autonomie de vos appareils en zone isolée."
     ],
@@ -163,7 +163,7 @@ const sectionContent: Record<string, {
     title: 'Guide Culture & IA',
     icon: Sprout,
     color: 'bg-emerald-500',
-    role: "Un assistant horticole intelligent propulsé par l'IA qui crée vos fiches de culture et occupe vos dates de semis selon les cycles de sève.",
+    role: "Un assistant horticole intelligent propulsé par l'IA qui crée vos fiches de culture et optimise vos dates de semis selon les cycles de sève.",
     steps: [
       "Recherche & Identification : Tapez le nom de n'importe quelle graine. Si elle est absente du guide, l'IA créera instantanément sa fiche technique personnalisée.",
       "Calcul de Fiche IA : L'intelligence artificielle analyse la plante, définit son type (Fruit, Racine...) et génère des conseils spécifiques (arrosage, exposition).",
