@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
@@ -70,7 +69,8 @@ const sectionContent: Record<string, {
     steps: [
       "Utilisateur A (Émetteur) : Activez 'Partager ma position'. Votre ID s'affiche.",
       "Copiez et envoyez cet ID à votre contact de confiance.",
-      "L'application surveille votre mouvement : si vous ne bougez plus pendant 5 min, le statut passe en 'Stationnaire'.",
+      "Surveillance d'arrêt : Si vous ne bougez plus pendant 5 min, le statut passe en 'Stationnaire'. La position se met ensuite à jour automatiquement toutes les 30 min pour rassurer le destinataire.",
+      "Reprise de route : Dès que vous bougez de nouveau, le système informe instantanément le récepteur que le bateau est en mouvement.",
       "Utilisateur B (Récepteur) : Collez l'ID dans l'onglet 'Récepteur' pour suivre le navire sur la carte.",
       "En cas de problème, utilisez le bouton 'ENVOYER ALERTE SMS' pour prévenir votre contact."
     ],
