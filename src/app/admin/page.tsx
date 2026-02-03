@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { DollarSign, Users, Crown, KeyRound, Copy, Trash2, AlertCircle, Mail, Share2, Palette, Image as ImageIcon, Type, Eye, Save } from 'lucide-react';
+import { DollarSign, Users, Crown, KeyRound, Copy, Trash2, AlertCircle, Mail, Share2, Palette, Image as ImageIcon, Type, Eye, Save, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import {
@@ -98,6 +98,30 @@ export default function AdminPage() {
       setSplashImageFit(savedSplashSettings.splashImageFit || 'contain');
     }
   }, [savedSplashSettings]);
+
+  // Handle local file upload for splash image
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 800000) {
+      toast({ 
+        variant: 'destructive', 
+        title: "Image trop lourde", 
+        description: "Veuillez choisir une image de moins de 800 Ko pour garantir un chargement rapide." 
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setSplashImageUrl(base64);
+      setSplashMode('image');
+      toast({ title: "Image importée", description: "L'image a été chargée. N'oubliez pas de sauvegarder la configuration." });
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Fetch all users for stats
   const usersCollectionRef = useMemoFirebase(() => {
@@ -454,8 +478,22 @@ export default function AdminPage() {
                 ) : (
                   <div className="space-y-4">
                     <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Configuration Image</Label>
+                    
                     <div className="space-y-2">
-                      <Label htmlFor="img-url">URL de l'image / Logo</Label>
+                      <Label>Charger depuis mes documents</Label>
+                      <div className="flex items-center gap-2">
+                        <Input 
+                          type="file" 
+                          accept="image/*" 
+                          onChange={handleImageUpload} 
+                          className="cursor-pointer text-xs"
+                        />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground italic">L'image sera stockée directement (Max 800Ko).</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="img-url">Ou URL de l'image</Label>
                       <Input id="img-url" value={splashImageUrl} onChange={e => setSplashImageUrl(e.target.value)} placeholder="https://..." />
                     </div>
                     <div className="space-y-2">
