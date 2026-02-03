@@ -140,14 +140,15 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation' | 'tideThresholds'> =
   },
   fishing: [
     {
-      timeOfDay: 'Aube (05:00 - 07:00)', tide: '', tideTime: '', tideMovement: 'étale',
+      timeOfDay: 'Aube (05:00 - 09:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
         { name: 'Wahoo', rating: 9, location: 'Large', advice: { activity: 'Très forte activité à l\'aube.', feeding: 'Excellente heure.', location_specific: 'Tombants.', depth: 'Surface.' } },
         { name: 'Bec de cane', rating: 8, location: 'Lagon', advice: { activity: 'En bancs sur les platiers.', feeding: 'Très bonne heure.', location_specific: 'Zones sableuses près du corail.', depth: '2-10m.' } },
+        { name: 'Tazard', rating: 8, location: 'Mixte', advice: { activity: 'Le "coup de barre" du matin : moment idéal.', feeding: 'Chasse active près de la surface.', location_specific: 'Passes et pointes de récifs.', depth: '0-5m (Traîne rapide 6-9 nds).' } },
       ],
     },
     {
-      timeOfDay: 'Matinée (09:00 - 11:00)', tide: '', tideTime: '', tideMovement: 'étale',
+      timeOfDay: 'Matinée (09:00 - 12:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
         { name: 'Thon Jaune', rating: 6, location: 'Large', advice: { activity: 'Activité modérée, cherchez les courants.', feeding: 'Opportuniste.', location_specific: 'DCP.', depth: '20-50m.' } },
         { name: 'Bossu doré', rating: 6, location: 'Lagon', advice: { activity: 'Moins actif qu\'à l\'aube.', feeding: 'Prudence.', location_specific: 'Patates de corail.', depth: '5-15m.' } },
@@ -155,15 +156,16 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation' | 'tideThresholds'> =
       ],
     },
     {
-      timeOfDay: 'Après-midi (15:00 - 17:00)', tide: '', tideTime: '', tideMovement: 'étale',
+      timeOfDay: 'Après-midi (15:00 - 18:30)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
         { name: 'Carangue', rating: 6, location: 'Lagon', advice: { activity: 'L\'activité reprend avec la marée.', feeding: 'Bonne heure.', location_specific: 'Passes.', depth: 'Surface à 15m.' } },
         { name: 'Loche truite', rating: 6, location: 'Lagon', advice: { activity: 'Affût.', feeding: 'Moment propice.', location_specific: 'Trous.', depth: '10-25m.' } },
         { name: 'Bec de cane', rating: 6, location: 'Lagon', advice: { activity: 'Activité stable.', feeding: 'Morsure régulière.', location_specific: 'Débord de récif.', depth: '8-15m.' } },
+        { name: 'Tazard', rating: 7, location: 'Mixte', advice: { activity: 'Reprise de l\'activité avant le coucher du soleil.', feeding: 'Chasse visuelle.', location_specific: 'Zones agitées et passes.', depth: 'Surface (Traîne Rapala Magnum).' } },
       ],
     },
     {
-      timeOfDay: 'Crépuscule (17:30 - 19:00)', tide: '', tideTime: '', tideMovement: 'étale',
+      timeOfDay: 'Crépuscule (18:30 - 20:00)', tide: '', tideTime: '', tideMovement: 'étale',
       fish: [
         { name: 'Carangue', rating: 9, location: 'Lagon', advice: { activity: 'Très forte activité.', feeding: 'Excellente heure.', location_specific: 'Passes.', depth: 'Surface à 10m.' } },
         { name: 'Rouget', rating: 9, location: 'Lagon', advice: { activity: 'Sortie de nuit.', feeding: 'Très actif.', location_specific: 'Fonds sableux.', depth: '3-8m.' } },
@@ -248,6 +250,8 @@ export function generateProceduralData(location: string, date: Date): LocationDa
 
   // Logique saisonnière (Hiver austral en NC : Mai à Septembre)
   const isWinter = month >= 4 && month <= 8;
+  const isNorth = ['Bélep', 'Pouébo', 'Ouégoa', 'Koumac', 'Poum'].includes(location);
+  const isSouth = ['Thio', "L'Île-des-Pins", 'Yaté', 'Nouméa', 'Le Mont-Dore', 'Païta', 'Dumbéa'].includes(location);
 
   locationData.fishing.forEach(slot => {
     const match = slot.timeOfDay.match(/(\d{2}):\d{2}/);
@@ -264,9 +268,11 @@ export function generateProceduralData(location: string, date: Date): LocationDa
         if (diff < minDiff) { minDiff = diff; closestTide = tide; }
     });
 
+    let currentTideCurrent = 'Modéré';
     if (closestTide) {
         slot.tide = `Marée ${closestTide.type}`;
         slot.tideTime = closestTide.time;
+        currentTideCurrent = closestTide.current;
         const slotEndMinutes = slotStartMinutes + 120;
         let nextTide: Tide | null = null;
         let minNextDiff = Infinity;
@@ -290,12 +296,30 @@ export function generateProceduralData(location: string, date: Date): LocationDa
 
       // Logique spécifique pour le Bec de cane (Lethrinus nebulosus)
       if (f.name === 'Bec de cane') {
-        // Boost Hiver (Plus présent)
         if (isWinter) rating += 1.5;
-        // Boost Pleine Lune (Morsure accrue entre jour 12 et 18 du cycle)
         if (dayInCycle >= 12 && dayInCycle <= 18) {
           rating += 2;
         }
+      }
+
+      // Logique spécifique pour le Tazard (Scomberomorus commerson)
+      if (f.name === 'Tazard') {
+        // Saisonnalité
+        if (month === 10 || month === 11) rating += 4; // Pic Nov/Dec
+        else if ([8, 9, 0].includes(month)) rating += 2; // Saison Sep/Oct/Jan
+        else if (month === 7 && isNorth) rating += 3; // Arrivée précoce Nord en Août
+        else if (month === 1) rating -= 5; // Disparition en Février
+        
+        // Bonus Sud (présence hivernale persistante)
+        if (isSouth && isWinter) rating += 1;
+
+        // Horaires (Prédateur visuel)
+        if (slot.timeOfDay.includes('Aube')) rating += 2;
+        if (slot.timeOfDay.includes('Après-midi')) rating += 1;
+
+        // Marée et Courant
+        if (currentTideCurrent === 'Fort') rating += 1;
+        if (slot.tideMovement === 'montante') rating += 1;
       }
 
       f.rating = Math.max(1, Math.min(10, Math.round(rating)));
