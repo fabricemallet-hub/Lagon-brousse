@@ -1,4 +1,3 @@
-
 'use client';
 import {
   Sidebar,
@@ -25,6 +24,8 @@ import {
   Calendar as CalendarIcon,
   User,
   AlertCircle,
+  Fish,
+  Leaf,
 } from 'lucide-react';
 import {
   Select,
@@ -36,6 +37,7 @@ import {
 import { useLocation } from '@/context/location-context';
 import { usePathname, useRouter } from 'next/navigation';
 import { useDate } from '@/context/date-context';
+import { useCalendarView } from '@/context/calendar-view-context';
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { format, addDays, subDays, isBefore } from 'date-fns';
@@ -111,6 +113,7 @@ UsageTimer.displayName = 'UsageTimer';
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { locations, selectedLocation, setSelectedLocation, isLocationLoading } = useLocation();
   const { selectedDate, setSelectedDate } = useDate();
+  const { calendarView, setCalendarView } = useCalendarView();
   const pathname = usePathname();
   const router = useRouter();
   const { user, isUserLoading } = useUser();
@@ -188,7 +191,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <UsageTimer status={status} auth={auth} />
           <header className={cn("flex h-auto min-h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30 py-2", status === 'limited' && 'mt-10')}>
             <SidebarTrigger />
-            <div className="w-full flex-1 flex items-center flex-wrap gap-y-2">
+            <div className="w-full flex-1 flex items-center justify-between flex-wrap gap-y-2">
               <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
                 {status === 'trial' && <Badge variant="secondary">Essai</Badge>}
                 {status === 'limited' && <Badge variant="destructive">Limité</Badge>}
@@ -214,6 +217,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </div>
                 )}
               </div>
+
+              {pathname === '/calendrier' && (
+                <div className="flex items-center gap-1 bg-muted p-1 rounded-lg h-9">
+                  <Button 
+                    variant={calendarView === 'peche' ? 'secondary' : 'ghost'} 
+                    size="sm" 
+                    className={cn("h-7 px-3 text-xs font-bold", calendarView === 'peche' && "bg-background shadow-sm")}
+                    onClick={() => setCalendarView('peche')}
+                  >
+                    <Fish className="mr-2 size-3" /> Pêche
+                  </Button>
+                  <Button 
+                    variant={calendarView === 'champs' ? 'secondary' : 'ghost'} 
+                    size="sm" 
+                    className={cn("h-7 px-3 text-xs font-bold", calendarView === 'champs' && "bg-background shadow-sm")}
+                    onClick={() => setCalendarView('champs')}
+                  >
+                    <Leaf className="mr-2 size-3" /> Champs
+                  </Button>
+                </div>
+              )}
             </div>
           </header>
           <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 pb-24 md:pb-6">{children}</div>
