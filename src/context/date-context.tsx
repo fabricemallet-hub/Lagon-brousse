@@ -41,19 +41,20 @@ export function DateProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, []);
 
-  // Use a neutral default while loading to avoid "text flicker"
+  // Use a neutral default while loading to avoid "blue flash"
+  // We use the app background color or transparent to be seamless
   const defaultSettings: SplashScreenSettings = {
     splashMode: 'text',
-    splashText: '', // Neutral text while loading
-    splashBgColor: '#3b82f6',
-    splashTextColor: '#ffffff',
+    splashText: '', 
+    splashBgColor: '#edf1f4', // Neutral off-white matching app background
+    splashTextColor: 'transparent',
     splashFontSize: '32',
   };
 
-  // If loading, we use neutral settings. Once loaded, we use the Firestore settings or the full defaults.
+  // If loading, we use neutral settings. Once loaded, we use the Firestore settings.
   const finalSettings = isSettingsLoading 
     ? defaultSettings 
-    : (splashSettings || { ...defaultSettings, splashText: 'Lagon & Brousse NC' });
+    : (splashSettings || { ...defaultSettings, splashText: 'Lagon & Brousse NC', splashBgColor: '#3b82f6', splashTextColor: '#ffffff' });
 
   if (showSplash) {
     return <SplashScreen settings={finalSettings} isExiting={isExiting} />;
