@@ -230,7 +230,7 @@ export function WeatherForecast({
                 className={cn(
                   'flex-shrink-0 w-24 flex flex-col items-center justify-between p-3 rounded-xl border h-40 space-y-2 text-center transition-all duration-300',
                    isCurrent ? 'bg-primary text-primary-foreground border-primary scale-[1.05] z-10 shadow-xl' : 'bg-card',
-                   isPast && 'bg-slate-200/90 text-muted-foreground/30 border-muted opacity-30 grayscale pointer-events-none'
+                   isPast && 'bg-zinc-200/80 text-muted-foreground/40 border-zinc-300/50 opacity-30 grayscale pointer-events-none'
                 )}
               >
                 <p className={cn(
