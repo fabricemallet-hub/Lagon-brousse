@@ -1,4 +1,3 @@
-
 import { z } from 'zod';
 
 // Schemas for find-best-fishing-day flow
@@ -79,3 +78,20 @@ export const WeatherSummaryOutputSchema = z.object({
   precautions: z.string().describe("Avertissements de sécurité (UV forts, vents, pluie).")
 });
 export type WeatherSummaryOutput = z.infer<typeof WeatherSummaryOutputSchema>;
+
+// Fish Identification Schemas
+export const IdentifyFishInputSchema = z.object({
+  photoDataUri: z.string().describe("A photo of a fish as a data URI."),
+});
+export type IdentifyFishInput = z.infer<typeof IdentifyFishInputSchema>;
+
+export const IdentifyFishOutputSchema = z.object({
+  name: z.string().describe("Nom commun du poisson."),
+  scientificName: z.string().describe("Nom scientifique."),
+  gratteRisk: z.number().describe("Risque estimé de ciguatera en pourcentage (0-100)."),
+  isSafeToEat: z.boolean().describe("Si le poisson est généralement considéré comme sûr à la consommation."),
+  culinaryAdvice: z.string().describe("Conseils culinaires."),
+  fishingAdvice: z.string().describe("Conseils de pêche."),
+  description: z.string().describe("Brève description physique pour confirmation."),
+});
+export type IdentifyFishOutput = z.infer<typeof IdentifyFishOutputSchema>;

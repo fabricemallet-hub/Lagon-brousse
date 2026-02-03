@@ -296,3 +296,14 @@ export interface MeteoForecast {
   temp_min: number;
   vent_max: number;
 }
+
+export interface FishSpeciesInfo {
+  id: string;
+  name: string;
+  scientificName: string;
+  gratteRisk: number; // Percentage 0-100
+  culinaryAdvice: string;
+  fishingAdvice: string;
+  category: 'Lagon' | 'Large' | 'Recif';
+  imagePlaceholder?: string;
+}
