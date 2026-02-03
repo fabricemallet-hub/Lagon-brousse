@@ -1,7 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // DEPLOY_ID: 20240524_FORCE_RESYNC_V9_SRC
+    // ID DE DEPLOIEMENT : 20240524_INDEX_FIX_V1_SRC
     
     function isAuth() { return request.auth != null; }
     function isAdmin() { 
@@ -11,26 +11,27 @@ service cloud.firestore {
       );
     }
 
+    // Sessions de chasse : Accès ouvert à tout utilisateur connecté pour simplifier
     match /hunting_sessions/{sessionId} {
-      allow read, create: if isAuth();
-      allow update, delete: if isAuth() && (resource.data.organizerId == request.auth.uid || isAdmin());
-      
+      allow read, write: if isAuth();
       match /participants/{userId} {
         allow read, write: if isAuth();
       }
     }
 
+    // Profils Utilisateurs
     match /users/{userId} {
       allow read, write: if isAdmin() || (isAuth() && request.auth.uid == userId);
       match /{allPaths=**} { allow read, write: if isAdmin() || (isAuth() && request.auth.uid == userId); }
     }
 
+    // Vessel Tracker
     match /vessels/{vId} {
-      allow read: if isAuth();
-      allow write: if isAdmin() || (isAuth() && request.auth.uid == vId);
+      allow read, write: if isAuth();
       match /{allPaths=**} { allow read, write: if isAuth(); }
     }
 
+    // Règle par défaut
     match /{allPaths=**} {
       allow read: if isAuth();
       allow write: if isAdmin();

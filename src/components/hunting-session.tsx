@@ -55,7 +55,6 @@ import {
   getDocs,
   query,
   where,
-  orderBy,
   limit,
 } from 'firebase/firestore';
 import type { WithId } from '@/firebase';
@@ -115,20 +114,28 @@ function HuntingSessionContent() {
 
   const { data: participants } = useCollection<SessionParticipant>(participantsCollectionRef);
 
-  // CHANGEMENT DE MÉTHODE : Chargement ponctuel de l'historique
+  // CHANGEMENT DE MÉTHODE : Chargement ponctuel avec tri en mémoire pour éviter l'erreur d'index
   const fetchMySessions = useCallback(async () => {
     if (!firestore || !user?.uid) return;
     setAreMySessionsLoading(true);
     try {
+      // On retire orderBy('createdAt', 'desc') pour éviter l'erreur d'index composite
       const q = query(
         collection(firestore, 'hunting_sessions'),
         where('organizerId', '==', user.uid),
-        orderBy('createdAt', 'desc'),
-        limit(5)
+        limit(20) // On en prend un peu plus pour trier
       );
       const querySnapshot = await getDocs(q);
       const sessions = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as WithId<HuntingSession>));
-      setMySessions(sessions);
+      
+      // Tri en mémoire (JavaScript)
+      sessions.sort((a, b) => {
+        const timeA = a.createdAt?.toMillis?.() || 0;
+        const timeB = b.createdAt?.toMillis?.() || 0;
+        return timeB - timeA;
+      });
+
+      setMySessions(sessions.slice(0, 5));
     } catch (e) {
       console.error("Error fetching sessions:", e);
     } finally {
