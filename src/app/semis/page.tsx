@@ -58,8 +58,6 @@ import { useToast } from '@/hooks/use-toast';
 import { getGardeningAdvice } from '@/ai/flows/gardening-flow';
 import { useLocation } from '@/context/location-context';
 import { generateProceduralData, getDataForDate } from '@/lib/data';
-import { Calendar as CalendarUI } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import type { GardeningAdviceOutput } from '@/ai/schemas';
 
@@ -93,7 +91,7 @@ export default function SemisPage() {
   const [isPlanningOpen, setIsPlanningOpen] = useState(false);
   const [selectedVeg, setSelectedVeg] = useState<string | null>(null);
   const [customVeg, setCustomVeg] = useState('');
-  const [sowingDate, setSowingDate] = useState<Date>(new Date());
+  const [sowingDate, setSowingDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [aiAdvice, setAiAdvice] = useState<GardeningAdviceOutput | null>(null);
@@ -123,12 +121,13 @@ export default function SemisPage() {
     setIsAnalyzing(true);
     setAiAdvice(null);
     try {
-      const locationData = getDataForDate(selectedLocation, sowingDate);
-      const upcomingCalendar = getUpcomingGardeningCalendar(selectedLocation, sowingDate);
+      const dateObj = new Date(sowingDate);
+      const locationData = getDataForDate(selectedLocation, dateObj);
+      const upcomingCalendar = getUpcomingGardeningCalendar(selectedLocation, dateObj);
 
       const advice = await getGardeningAdvice({
         seedName: plantName,
-        sowingDate: sowingDate.toISOString(),
+        sowingDate: dateObj.toISOString(),
         lunarPhase: locationData.farming.lunarPhase,
         zodiacSign: locationData.farming.zodiac,
         upcomingCalendar
@@ -150,11 +149,12 @@ export default function SemisPage() {
 
     setIsSaving(true);
     try {
-      const locationData = getDataForDate(selectedLocation, sowingDate);
+      const dateObj = new Date(sowingDate);
+      const locationData = getDataForDate(selectedLocation, dateObj);
       const newSowing = {
         userId: user.uid,
         seedName: plantName,
-        sowingDate: sowingDate.toISOString(),
+        sowingDate: dateObj.toISOString(),
         plantType: aiAdvice.plantType,
         cultureAdvice: aiAdvice.cultureAdvice,
         estimatedHarvestDate: aiAdvice.harvestDate,
@@ -242,7 +242,7 @@ export default function SemisPage() {
             {filteredData.map((veg) => (
               <AccordionItem value={veg.name} key={veg.name}>
                 <AccordionTrigger className="text-lg hover:no-underline py-4">
-                  <div className="flex items-center justify-between w-full pr-4">
+                  <div className="flex items-center justify-between w-full pr-4 text-left">
                     <div className="flex items-center gap-4">
                       <span className="text-2xl">{veg.icon}</span>
                       <span className="font-bold">{veg.name}</span>
@@ -345,17 +345,15 @@ export default function SemisPage() {
             <div className="space-y-6 py-4">
               <div className="space-y-2">
                 <label className="text-sm font-bold uppercase text-muted-foreground">Date de mise en semis prévue</label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start text-left font-normal h-12">
-                      <CalendarDays className="mr-2 h-5 w-5 text-primary" />
-                      {sowingDate ? format(sowingDate, 'PPP', { locale: fr }) : "Choisir une date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarUI mode="single" selected={sowingDate} onSelect={(d) => d && setSowingDate(d)} initialFocus />
-                  </PopoverContent>
-                </Popover>
+                <div className="relative">
+                  <Input 
+                    type="date" 
+                    value={sowingDate}
+                    onChange={(e) => setSowingDate(e.target.value)}
+                    className="h-12 pl-10"
+                  />
+                  <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-primary pointer-events-none" />
+                </div>
               </div>
               <Button 
                 onClick={handleStartAnalysis} 
@@ -384,14 +382,14 @@ export default function SemisPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-muted/50 p-3 rounded-lg border">
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground">Catégorie</p>
+                  <div className="text-[10px] font-bold uppercase text-muted-foreground">Catégorie</div>
                   <div className="font-bold text-sm flex items-center gap-2 mt-1">
                     <Badge variant="outline" className="bg-primary/5">{aiAdvice.plantType}</Badge>
                   </div>
                 </div>
                 <div className="bg-muted/50 p-3 rounded-lg border">
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground">Récolte estimée</p>
-                  <p className="font-bold text-sm mt-1">{aiAdvice.harvestDate}</p>
+                  <div className="text-[10px] font-bold uppercase text-muted-foreground">Récolte estimée</div>
+                  <div className="font-bold text-sm mt-1">{aiAdvice.harvestDate}</div>
                 </div>
               </div>
 
