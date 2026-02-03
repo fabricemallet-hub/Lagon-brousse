@@ -129,12 +129,13 @@ const sectionContent: Record<string, {
     steps: [
       "Identifiez la tendance du jour : Lune Montante (pour ce qui pousse hors de terre) ou Descendante (pour les racines).",
       "Consultez le signe du zodiaque : Jour Fruits, Racines, Fleurs ou Feuilles.",
-      "Lisez les tâches recommandées : taille, bouturage, tonte de la pelouse ou plantation.",
-      "Accédez à l'onglet 'Mes Semis' pour enregistrer vos travaux."
+      "Suivez les recommandations : l'application vous guide pour la taille, le bouturage ou la tonte de la pelouse selon la sève.",
+      "Gérez votre potager avec 'Mes Semis' : enregistrez vos plantations pour mémoriser le contexte lunaire exact du jour. L'application calculera pour vous vos dates de récolte estimées et planifiera la période idéale pour le repiquage en pleine terre."
     ],
     tips: [
       "Le signe du zodiaque change tous les 2 à 3 jours environ.",
-      "Suivre le calendrier permet de réduire naturellement l'usage d'engrais et de pesticides."
+      "Suivre le calendrier permet de réduire naturellement l'usage d'engrais et de pesticides.",
+      "L'historique 'Mes Semis' vous permet de comparer la réussite de vos cultures d'une saison à l'autre."
     ]
   },
   'semis': {
