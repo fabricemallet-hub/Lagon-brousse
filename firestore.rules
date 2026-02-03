@@ -1,7 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // REVISION: FINAL_STABLE_RESYNC_20240524_1320
+    // DEPLOY_ID: 20240524_FORCE_RESYNC_V9
     
     function isAuth() { return request.auth != null; }
     function isAdmin() { 
@@ -11,13 +11,17 @@ service cloud.firestore {
       );
     }
 
-    // Sessions de Chasse : Autoriser Lecture/Ecriture pour tous les connectés pour debug
+    // Accès simplifié pour les sessions de chasse
     match /hunting_sessions/{sessionId} {
-      allow read, write: if isAuth();
-      match /{allPaths=**} { allow read, write: if isAuth(); }
+      allow read, create: if isAuth();
+      allow update, delete: if isAuth() && (resource.data.organizerId == request.auth.uid || isAdmin());
+      
+      match /participants/{userId} {
+        allow read, write: if isAuth();
+      }
     }
 
-    // Profils Utilisateurs : Propriétaire ou Admin
+    // Profils Utilisateurs
     match /users/{userId} {
       allow read, write: if isAdmin() || (isAuth() && request.auth.uid == userId);
       match /{allPaths=**} { allow read, write: if isAdmin() || (isAuth() && request.auth.uid == userId); }
@@ -30,13 +34,7 @@ service cloud.firestore {
       match /{allPaths=**} { allow read, write: if isAuth(); }
     }
 
-    // Messagerie
-    match /conversations/{cId} {
-      allow read, write: if isAdmin() || (isAuth() && request.auth.uid == cId);
-      match /{allPaths=**} { allow read, write: if isAdmin() || (isAuth() && request.auth.uid == cId); }
-    }
-
-    // Règle par défaut pour le reste
+    // Règle par défaut pour tout le reste
     match /{allPaths=**} {
       allow read: if isAuth();
       allow write: if isAdmin();

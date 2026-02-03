@@ -14,7 +14,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
   const userDocRef = doc(firestore, 'users', user.uid);
   const email = user.email?.toLowerCase();
   
-  // Vos deux adresses sont reconnues comme administrateurs
+  // Forçage du statut admin pour vos deux comptes
   const isAdminUser = email === 'f.mallet81@outlook.com' || email === 'f.mallet81@gmail.com';
 
   try {
@@ -27,7 +27,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
           await setDoc(userDocRef, { 
             ...currentData, 
             subscriptionStatus: 'admin',
-            email: email // Sécurité additionnelle
+            email: email
           }, { merge: true });
       }
       return;

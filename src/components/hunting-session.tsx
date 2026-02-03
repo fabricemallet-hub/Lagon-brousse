@@ -1,4 +1,3 @@
-
 'use client';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
@@ -19,19 +18,14 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs';
 import {
-  Share2,
-  LogIn,
-  LogOut,
-  Copy,
   Users,
+  LogOut,
   BatteryFull,
   BatteryMedium,
   BatteryLow,
   BatteryCharging,
-  LocateFixed,
   AlertCircle,
   Navigation,
-  Download,
   Expand,
   Shrink,
   User as UserIcon,
@@ -39,19 +33,13 @@ import {
   Footprints,
   Mountain,
   Save,
-  MapPin,
-  Eye,
   Trash2,
-  Clock,
 } from 'lucide-react';
 import {
   useUser,
-  useAuth,
   useFirestore,
   useCollection,
   useMemoFirebase,
-  errorEmitter,
-  FirestorePermissionError,
   useDoc,
 } from '@/firebase';
 import {
@@ -65,7 +53,6 @@ import {
   updateDoc,
   writeBatch,
   getDocs,
-  deleteField,
   query,
   where,
   orderBy,
@@ -78,61 +65,8 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from './ui/skeleton';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
-
-const playSound = (type: 'position' | 'battue' | 'gibier') => {
-  if (typeof window === 'undefined') return;
-  const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-  if (!audioCtx) return;
-
-  const oscillator = audioCtx.createOscillator();
-  const gainNode = audioCtx.createGain();
-  oscillator.connect(gainNode);
-  gainNode.connect(audioCtx.destination);
-
-  gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
-  gainNode.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 0.05);
-
-  switch (type) {
-    case 'position':
-      oscillator.frequency.setValueAtTime(600, audioCtx.currentTime);
-      oscillator.type = 'sine';
-      oscillator.start();
-      gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.2);
-      oscillator.stop(audioCtx.currentTime + 0.2);
-      break;
-    case 'battue':
-      oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
-      oscillator.type = 'square';
-      oscillator.start();
-      gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.3);
-      oscillator.stop(audioCtx.currentTime + 0.3);
-      break;
-    case 'gibier':
-      oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
-      oscillator.type = 'triangle';
-      oscillator.start();
-      gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.4);
-      oscillator.stop(audioCtx.currentTime + 0.4);
-      break;
-  }
-};
 
 const iconMap = { Navigation, UserIcon, Crosshair, Footprints, Mountain };
-const availableIcons = Object.keys(iconMap);
-const availableColors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
 
 const BatteryIcon = ({ level, charging }: { level: number; charging: boolean }) => {
   const props = { className: 'w-4 h-4 inline-block' };
@@ -151,7 +85,6 @@ function HuntingSessionContent() {
   const [isSessionLoading, setIsSessionLoading] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [createCode, setCreateCode] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number} | null>(null);
   const updateIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isParticipating, setIsParticipating] = useState(false);
@@ -160,19 +93,14 @@ function HuntingSessionContent() {
   const [initialZoomDone, setInitialZoomDone] = useState(false);
   const [mapTypeId, setMapTypeId] = useState<string>('terrain');
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [initialCenter, setInitialCenter] = useState<{ lat: number; lng: number } | null>(null);
 
   const [nickname, setNickname] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('Navigation');
   const [selectedColor, setSelectedColor] = useState('#3b82f6');
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
-  const [baseStatus, setBaseStatus] = useState<SessionParticipant['baseStatus']>(undefined);
-  const [isGibierEnVue, setIsGibierEnVue] = useState(false);
-  const [flashingStatus, setFlashingStatus] = useState<{text: string; color: string} | null>(null);
-  const flashTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const previousParticipantsRef = useRef<WithId<SessionParticipant>[] | null>(null);
+  const [mySessions, setMySessions] = useState<WithId<HuntingSession>[]>([]);
+  const [areMySessionsLoading, setAreMySessionsLoading] = useState(false);
 
   const userDocRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -185,22 +113,32 @@ function HuntingSessionContent() {
     return collection(firestore, 'hunting_sessions', session.id, 'participants');
   }, [firestore, session, isParticipating]);
 
-  const { data: participants, isLoading: areParticipantsLoading } = useCollection<SessionParticipant>(participantsCollectionRef);
-  
-  // History query simplified for performance and debugging
-  const mySessionsQuery = useMemoFirebase(() => {
-    if (!firestore || !user?.uid) return null;
-    return query(
-      collection(firestore, 'hunting_sessions'),
-      where('organizerId', '==', user.uid),
-      orderBy('createdAt', 'desc'),
-      limit(5)
-    );
-  }, [firestore, user?.uid]);
-  const { data: mySessions, isLoading: areMySessionsLoading } = useCollection<HuntingSession>(mySessionsQuery);
+  const { data: participants } = useCollection<SessionParticipant>(participantsCollectionRef);
 
-  const myParticipant = useMemo(() => participants?.find(p => p.id === user?.uid), [participants, user]);
-  const otherParticipants = useMemo(() => participants?.filter(p => p.id !== user?.uid), [participants, user]);
+  // CHANGEMENT DE MÉTHODE : Chargement ponctuel de l'historique
+  const fetchMySessions = useCallback(async () => {
+    if (!firestore || !user?.uid) return;
+    setAreMySessionsLoading(true);
+    try {
+      const q = query(
+        collection(firestore, 'hunting_sessions'),
+        where('organizerId', '==', user.uid),
+        orderBy('createdAt', 'desc'),
+        limit(5)
+      );
+      const querySnapshot = await getDocs(q);
+      const sessions = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as WithId<HuntingSession>));
+      setMySessions(sessions);
+    } catch (e) {
+      console.error("Error fetching sessions:", e);
+    } finally {
+      setAreMySessionsLoading(false);
+    }
+  }, [firestore, user?.uid]);
+
+  useEffect(() => {
+    fetchMySessions();
+  }, [fetchMySessions]);
   
   useEffect(() => {
     if (userProfile) {
@@ -211,11 +149,6 @@ function HuntingSessionContent() {
   }, [userProfile, user]);
   
   const { isLoaded, loadError } = useGoogleMaps();
-
-  useEffect(() => {
-    const savedMapTypeId = localStorage.getItem('huntingMapTypeId');
-    if (savedMapTypeId) setMapTypeId(savedMapTypeId);
-  }, []);
 
   const handleLeaveSession = useCallback(async () => {
     if (updateIntervalRef.current) {
@@ -253,6 +186,7 @@ function HuntingSessionContent() {
         batch.delete(doc(firestore, 'hunting_sessions', sessionId));
         await batch.commit();
         if (session?.id === sessionId) handleLeaveSession();
+        fetchMySessions();
         toast({ title: 'Session supprimée.' });
     } catch (e: any) {
         console.error(e);
@@ -283,36 +217,16 @@ function HuntingSessionContent() {
         }
 
         const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
-        const dataToUpdate: any = {
+        await updateDoc(participantDocRef, {
             location: newLocation,
             updatedAt: serverTimestamp(),
-        };
-        
-        updateDoc(participantDocRef, dataToUpdate).catch(err => console.error("Error updating position:", err));
+        });
 
     } catch (err: any) {
         console.error("Error getting geolocation:", err);
     }
   }, [user, firestore, session, map]);
   
-  useEffect(() => {
-      if (!participants || areParticipantsLoading || !previousParticipantsRef.current) {
-        previousParticipantsRef.current = participants;
-        return;
-      }
-      const prevParts = new Map(previousParticipantsRef.current.map(p => [p.id, p]));
-      participants.forEach(currentPart => {
-        const prevPart = prevParts.get(currentPart.id);
-        if (!prevPart || currentPart.id === user?.uid) return;
-        if (currentPart.isGibierEnVue && !prevPart.isGibierEnVue) playSound('gibier');
-        else if (currentPart.baseStatus && currentPart.baseStatus !== prevPart.baseStatus) {
-            if (currentPart.baseStatus === 'En position') playSound('position');
-            else if (currentPart.baseStatus === 'Battue en cours') playSound('battue');
-        }
-      });
-      previousParticipantsRef.current = participants;
-    }, [participants, areParticipantsLoading, user?.uid]);
-
   useEffect(() => {
     if (isParticipating && session && !updateIntervalRef.current) {
         updateIntervalRef.current = setInterval(() => fetchAndSetUserPosition(), 300000);
@@ -323,7 +237,6 @@ function HuntingSessionContent() {
   const handleCreateSession = async () => {
     if (!user || !firestore) return;
     setIsSessionLoading(true);
-    setError(null);
     try {
         const code = createCode.trim() ? createCode.trim().toUpperCase() : `CH-${Math.floor(1000 + Math.random() * 9000)}`;
         const expiresAt = new Date();
@@ -333,13 +246,14 @@ function HuntingSessionContent() {
         
         const participantDocRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
         await setDoc(participantDocRef, { displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor, updatedAt: serverTimestamp() });
-        await fetchAndSetUserPosition(true);
-
+        
         setSession({ id: code, ...newSessionData } as any);
         setIsParticipating(true);
+        await fetchAndSetUserPosition(true);
+        fetchMySessions();
         toast({ title: 'Session créée !', description: `Code : ${code}` });
     } catch (e: any) {
-        setError(e.message);
+        toast({ variant: 'destructive', title: 'Erreur', description: e.message });
     } finally {
         setIsSessionLoading(false);
     }
@@ -348,7 +262,6 @@ function HuntingSessionContent() {
   const handleJoinSession = async () => {
     if (!user || !firestore || !joinCode) return;
     setIsSessionLoading(true);
-    setError(null);
     try {
       const sessionId = joinCode.toUpperCase();
       const sessionDoc = await getDoc(doc(firestore, 'hunting_sessions', sessionId));
@@ -356,12 +269,12 @@ function HuntingSessionContent() {
       
       const participantDocRef = doc(firestore, 'hunting_sessions', sessionId, 'participants', user.uid);
       await setDoc(participantDocRef, { displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor, updatedAt: serverTimestamp() }, { merge: true });
-      await fetchAndSetUserPosition(true);
-
+      
       setSession({ id: sessionDoc.id, ...sessionDoc.data() } as any);
       setIsParticipating(true);
+      await fetchAndSetUserPosition(true);
     } catch (e: any) {
-        setError(e.message);
+        toast({ variant: 'destructive', title: 'Erreur', description: e.message });
     } finally {
         setIsSessionLoading(false);
     }
@@ -409,7 +322,7 @@ function HuntingSessionContent() {
                             <OverlayView key={p.id} position={{ lat: p.location.latitude, lng: p.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                 <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
                                     <div className="px-2 pb-0.5 text-[10px] font-bold text-white [text-shadow:0_1px_2px_black] whitespace-nowrap">
-                                        {p.displayName} {p.isGibierEnVue ? '⚠️' : ''}
+                                        {p.displayName}
                                     </div>
                                     <div className="p-1.5 rounded-full shadow-lg" style={{ backgroundColor: p.mapColor || '#3b82f6' }}>
                                         {React.createElement(iconMap[p.mapIcon as keyof typeof iconMap] || Navigation, { className: "size-4 text-white" })}
@@ -465,7 +378,7 @@ function HuntingSessionContent() {
                 </Tabs>
             </CardContent>
         </Card>
-        {mySessions && mySessions.length > 0 && (
+        {areMySessionsLoading ? <Skeleton className="h-24 w-full" /> : mySessions && mySessions.length > 0 && (
             <Card>
                 <CardHeader><CardTitle className="text-sm">Mes sessions récentes</CardTitle></CardHeader>
                 <CardContent className="space-y-2">
