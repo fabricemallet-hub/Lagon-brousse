@@ -186,6 +186,7 @@ const sectionContent: Record<string, {
       "Suivi des Crustacés : Repérez les jours 'Crabe Plein' (vives-eaux) ou 'Crabe Mout' (mortes-eaux/mue). Ne perdez plus de temps à poser des casiers durant la mue.",
       "Saisons Pélagiques : Identifiez les périodes de passage des espèces comme le Tazard (pic en Nov/Déc) via les alertes de saison intégrées aux fiches journalières.",
       "Analyse des Marées : Visualisez instantanément les marées les plus hautes et les plus basses du mois (grandes marées) pour cibler les platiers ou les passes.",
+      "Comportement des Espèces : Accédez aux fiches détaillées par jour pour connaître les habitudes alimentaires, les profondeurs idéales (ex: 2-10m pour le Bec de cane) et les spots stratégiques.",
       "Stratégie Langoustes : Adaptez votre sortie selon l'activité prévue. En lune noire (Nouvelle Lune), privilégiez le récif extérieur ; en lune claire, elles restent souvent à l'abri ou à l'intérieur."
     ],
     tips: [
