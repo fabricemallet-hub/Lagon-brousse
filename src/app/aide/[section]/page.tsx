@@ -88,8 +88,8 @@ const sectionContent: Record<string, {
     steps: [
       "Consultez les indices de pêche (sur 10) pour chaque créneau horaire (Aube, Matin, etc.).",
       "Déroulez une espèce pour obtenir les conseils spécifiques : activité, profondeur et spots idéaux.",
-      "Vérifiez l'état des pélagiques (Thon, Mahi-mahi) grâce au bandeau saisonnier.",
-      "Consultez l'activité des crabes (pleins ou en mue) et des langoustes."
+      "Vérifiez l'état des pélagiques (Thon, Mahi-mahi) grâce au bandeaux saisonnier.",
+      "Consultez l'activité des crabes (pleins ou en mue), des langoustes et des poulpes."
     ],
     tips: [
       "Privilégiez les créneaux où la marée est 'Montante' ou 'Descendante', l'étale est souvent moins productive.",
@@ -153,7 +153,7 @@ const sectionContent: Record<string, {
     steps: [
       "Identifiez les phases clés : Nouvelle lune et Pleine lune (fortes marées).",
       "Les icônes de poissons indiquent le potentiel global de la journée.",
-      "Les icônes de crabes et langoustes signalent les meilleures périodes de capture.",
+      "Les icônes de crabes, langoustes et poulpes signalent les meilleures périodes de capture.",
       "Cliquez sur un jour pour voir le détail des marées prévues."
     ],
     tips: [
