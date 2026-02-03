@@ -136,17 +136,20 @@ const sectionContent: Record<string, {
     title: 'Gestion des Semis',
     icon: Sprout,
     color: 'bg-emerald-500',
-    role: "Un assistant intelligent qui valide vos plantations et vous guide jusqu'à la récolte.",
+    role: "Un assistant intelligent qui valide vos plantations et vous guide jusqu'à la récolte en analysant les traditions tropicales et les cycles lunaires.",
     steps: [
-      "Sélectionnez une graine (ou saisissez son nom manuellement).",
-      "Choisissez la date de semis.",
-      "L'IA analyse instantanément : type de plante, conseils d'arrosage et exposition.",
-      "L'IA vérifie la lune : si le jour n'est pas bon, elle vous propose la prochaine date idéale.",
-      "Validez pour enregistrer la fiche dans votre historique."
+      "Choisissez votre graine dans la liste prédéfinie des variétés communes (Tomate, Salade, etc.).",
+      "Si votre plante est absente, sélectionnez 'Autre / Saisie manuelle' en bas de liste pour taper son nom.",
+      "Sélectionnez la date prévue pour la mise en terre ou en godet.",
+      "L'IA identifie le type de plante (Fruit, Racine, Feuille, Fleur) et génère des conseils spécifiques : arrosage, exposition et entretien.",
+      "Validation Lunaire : L'IA vérifie si le jour choisi est propice. Si ce n'est pas le cas, elle cherche dans les 30 prochains jours la date idéale réunissant les meilleures conditions (Phase + Zodiaque) et vous la recommande.",
+      "Planification : L'IA estime dynamiquement votre date de récolte et la période idéale pour le repiquage en pleine terre.",
+      "Validez pour enregistrer la fiche dans votre historique de cultures."
     ],
     tips: [
-      "Si vous semez un jour différent d'aujourd'hui, une alerte vous demande de confirmer pour éviter les erreurs de saisie.",
-      "La date de récolte estimée est calculée dynamiquement par l'IA en fonction de la variété."
+      "L'IA suggère toujours la date la plus proche respectant les 'règles d'or' (ex: Fruit en lune montante + jour Fruits).",
+      "Une alerte visuelle rouge apparaîtra dans votre historique si un semis a été fait hors période lunaire idéale.",
+      "L'IA ignore la météo changeante pour se concentrer sur les cycles de sève fondamentaux."
     ]
   },
   'calendrier-peche': {
