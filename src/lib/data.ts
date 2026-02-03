@@ -131,16 +131,12 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation' | 'tideThresholds'> =
     ],
     swell: [],
     sun: { sunrise: '06:31', sunset: '17:45' },
-    moon: { moonrise: '12:05', moonset: '23:55', phase: 'Premier quartier', percentage: 50 },
+    moon: { moonrise: '12:05', moonset: '23:55', phase: 'Nouvelle lune', percentage: 0 },
     rain: 'Aucune', trend: 'Ensoleillé', uvIndex: 7, temp: 26, tempMin: 23, tempMax: 33, waterTemperature: 24, hourly: [],
   },
   farming: {
-    lunarPhase: 'Lune Montante', zodiac: 'Feuilles', recommendation: 'Planter des légumes feuilles, bouturer.',
-    details: [
-      { task: 'Plantation de légumes feuilles', description: 'La sève monte, idéal pour les salades, brèdes et choux.', icon: 'Leaf' },
-      { task: 'Bouturage', description: 'Les boutures prennent plus facilement en lune montante.', icon: 'RefreshCw' },
-      { task: 'Semis de fleurs', description: 'Profitez de cette phase pour semer vos fleurs annuelles.', icon: 'Flower' },
-    ],
+    lunarPhase: 'Lune Montante', zodiac: 'Feuilles', recommendation: '',
+    details: [],
     isGoodForCuttings: false, isGoodForPruning: false, isGoodForMowing: false, sow: [], harvest: [],
   },
   fishing: [
@@ -212,18 +208,14 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   const daysSinceKnownNewMoon = (effectiveDate.getTime() - knownNewMoon.getTime()) / (1000 * 3600 * 24);
   const dayInCycle = daysSinceKnownNewMoon % 29.53;
   
-  // Facteur d'amplitude astronomique réaliste (Vives-eaux vs Mortes-eaux)
-  // Marnage max en NC environ 1.6m, min environ 0.8m.
   const springFactor = 1 + 0.28 * Math.abs(Math.cos((dayInCycle / 29.53) * 2 * Math.PI));
 
   const tideStationName = communeToTideStationMap[location] || 'Nouméa';
   const stationInfo = tideStations[tideStationName as keyof typeof tideStations] || tideStations['Nouméa'];
 
-  // Définition automatique des seuils de "Grandes Marées" pour cette station
-  // Basé sur une moyenne annuelle simulée : on met en évidence les 10% extrêmes.
   const tideThresholds = {
-    high: parseFloat((stationInfo.avgHigh * 1.15).toFixed(2)), // +15% au dessus de la moyenne
-    low: parseFloat((stationInfo.avgLow * 0.65).toFixed(2)),   // -35% en dessous de la moyenne
+    high: parseFloat((stationInfo.avgHigh * 1.15).toFixed(2)),
+    low: parseFloat((stationInfo.avgLow * 0.65).toFixed(2)),
   };
 
   const locationData: LocationData = {
@@ -236,11 +228,9 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   locationData.tides.forEach((tide: Tide, i: number) => {
     const baseTide = stationInfo.tides[i % stationInfo.tides.length];
     const variation = Math.sin((dateSeed * (1 + i * 0.1) + locationSeed * 0.2)) * 0.03;
-    
     if (tide.type === 'haute') {
         tide.height = parseFloat((baseTide.height * springFactor + variation).toFixed(2));
     } else {
-        // En vive-eau, la basse mer descend plus bas (inversement proportionnel)
         tide.height = parseFloat((baseTide.height / springFactor + variation).toFixed(2));
     }
     tide.time = varyTime(baseTide.time, i + 5);
@@ -252,7 +242,9 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   };
 
   locationData.fishing.forEach(slot => {
-    const slotStartHour = parseInt(slot.timeOfDay.match(/(\d{2}):\d{2}/)![1]);
+    const match = slot.timeOfDay.match(/(\d{2}):\d{2}/);
+    if (!match) return;
+    const slotStartHour = parseInt(match[1]);
     const slotStartMinutes = slotStartHour * 60;
 
     let closestTide: Tide | null = null;
@@ -300,9 +292,31 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   const rainChance = (Math.sin(dateSeed * 0.4 + locationSeed * 0.2) + 1) / 2;
   locationData.weather.rain = rainChance < 0.98 ? 'Aucune' : (rainChance < 0.995 ? 'Fine' : 'Forte');
   
-  locationData.farming.lunarPhase = dayInCycle < 14.76 ? 'Lune Montante' : 'Lune Descendante';
+  const isRising = dayInCycle < 14.76;
+  locationData.farming.lunarPhase = isRising ? 'Lune Montante' : 'Lune Descendante';
   const zodiacSigns = ['Fruits', 'Racines', 'Fleurs', 'Feuilles'];
-  locationData.farming.zodiac = zodiacSigns[Math.floor((dayInCycle / (27.3/4)) % 4)] as any;
+  const currentZodiac = zodiacSigns[Math.floor((dayInCycle / (27.3/4)) % 4)] as any;
+  locationData.farming.zodiac = currentZodiac;
+
+  // Calcul dynamique des booleans de jardinage
+  locationData.farming.isGoodForPruning = !isRising; // Taille en lune descendante
+  locationData.farming.isGoodForCuttings = isRising; // Bouturage en lune montante (sève monte)
+  locationData.farming.isGoodForMowing = !isRising; // Tonte en lune descendante pour freiner la repousse
+
+  // Génération des recommandations
+  if (isRising) {
+    locationData.farming.recommendation = `Lune montante : la sève est active. Idéal pour le bouturage et la plantation des variétés ${currentZodiac}.`;
+    locationData.farming.details = [
+      { task: 'Bouturage', description: 'La sève monte, favorisant la prise des tiges.', icon: 'RefreshCw' },
+      { task: `Semis ${currentZodiac}`, description: `Période favorable pour semer vos ${currentZodiac.toLowerCase()}.`, icon: 'Flower' }
+    ];
+  } else {
+    locationData.farming.recommendation = `Lune descendante : la sève descend vers les racines. Idéal pour la taille, la tonte et les légumes ${currentZodiac}.`;
+    locationData.farming.details = [
+      { task: 'Taille', description: 'Réduit les pertes de sève et favorise la cicatrisation.', icon: 'Scissors' },
+      { task: 'Tonte pelouse', description: 'La repousse sera plus lente et plus drue.', icon: 'Leaf' }
+    ];
+  }
 
   locationData.weather.hourly = [];
   const tideDataForDay = calculateHourlyTidesForSimulation(locationData.tides, date);

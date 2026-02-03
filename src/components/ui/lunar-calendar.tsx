@@ -119,8 +119,8 @@ const DayCell = React.memo(({
     const isPelagicSeason = data.pelagicInfo?.inSeason;
 
     return {
-      lagon: Array.from({ length: fishCount }).map((_, i) => <Fish key={`lagon-${i}`} className="size-3 text-primary" />),
-      pelagic: isPelagicSeason ? <div className="flex items-center gap-0.5 ml-1 border-l pl-1 border-primary/20"><Star className="size-2 text-yellow-500 fill-yellow-500" /><Fish className="size-3 text-orange-500" /></div> : null
+      lagon: Array.from({ length: fishCount }).map((_, i) => <Fish key={`lagon-${i}`} className="size-3.5 text-primary" />),
+      pelagic: isPelagicSeason ? <div className="flex items-center gap-0.5 ml-1 border-l pl-1 border-primary/20"><Star className="size-2 text-yellow-500 fill-yellow-500" /><Fish className="size-3.5 text-orange-500" /></div> : null
     };
   }, [data, calendarView]);
 
@@ -130,16 +130,6 @@ const DayCell = React.memo(({
         return hours * 60 + minutes;
     };
     return [...data.tides].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
-  }, [data.tides]);
-
-  const tideInfo = useMemo(() => {
-    if (data.tides.length === 0) return null;
-    const highest = [...data.tides].sort((a, b) => b.height - a.height)[0];
-    const lowest = [...data.tides].sort((a, b) => a.height - b.height)[0];
-    const range = highest.height - lowest.height;
-    // Une grande marée est détectée si le marnage est supérieur à la normale pour cette station
-    const isGrandeMaree = range > 1.30;
-    return { highest, lowest, range, isGrandeMaree };
   }, [data.tides]);
 
   const { zodiac, isGoodForCuttings, isGoodForPruning, isGoodForMowing } = data.farming;
@@ -168,10 +158,10 @@ const DayCell = React.memo(({
       {calendarView === 'peche' ? (
         <div className="flex-grow flex flex-col justify-center items-center gap-0.5 pt-1">
           <div className="flex items-center justify-center gap-1 flex-wrap h-4">
-            {data.crabAndLobster.crabStatus === 'Plein' && <CrabIcon className="size-3 text-green-600" />}
-            {data.crabAndLobster.lobsterActivity === 'Élevée' && <LobsterIcon className="size-3 text-blue-600" />}
+            {data.crabAndLobster.crabStatus === 'Plein' && <CrabIcon className="size-3.5 text-green-600" />}
+            {data.crabAndLobster.lobsterActivity === 'Élevée' && <LobsterIcon className="size-3.5 text-blue-600" />}
           </div>
-          <div className="flex items-center justify-center gap-0.5 h-3 flex-wrap">
+          <div className="flex items-center justify-center gap-0.5 h-4 flex-wrap">
             {fishingIcons?.lagon}
             {fishingIcons?.pelagic}
           </div>
@@ -195,15 +185,12 @@ const DayCell = React.memo(({
                 </div>
               );
             })}
-            {tideInfo?.isGrandeMaree && (
-              <span className="text-[5px] uppercase tracking-tighter font-black text-primary animate-pulse">Grande Marée</span>
-            )}
           </div>
         </div>
       ) : (
         <div className="flex-grow flex flex-col items-center justify-center gap-1.5">
           {GardeningIcon && <GardeningIcon className="size-5 text-primary opacity-80" />}
-          <div className="flex flex-wrap justify-center gap-1 h-5">
+          <div className="flex flex-wrap justify-center gap-1.5 h-5">
             {isGoodForPruning && <Scissors className="size-3.5 text-orange-600" />}
             {isGoodForCuttings && <RefreshCw className="size-3.5 text-pink-600" />}
             {isGoodForMowing && <Leaf className="size-3.5 text-green-600" />}
@@ -271,9 +258,9 @@ export function LunarCalendar() {
               <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase"><Leaf className="size-4 text-primary"/> Feuilles</div>
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-2 p-3 bg-muted/10 border border-dashed rounded-lg">
-              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase text-muted-foreground"><Scissors className="size-3.5 text-orange-600"/> Taille</div>
-              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase text-muted-foreground"><RefreshCw className="size-3.5 text-pink-600"/> Bouturage</div>
-              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase text-muted-foreground"><Leaf className="size-3.5 text-green-600"/> Tonte</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-muted-foreground"><Scissors className="size-4 text-orange-600"/> TAILLE</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-muted-foreground"><RefreshCw className="size-4 text-pink-600"/> BOUTURAGE</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-muted-foreground"><Leaf className="size-4 text-green-600"/> TONTE</div>
             </div>
           </div>
         ) : (
@@ -286,11 +273,9 @@ export function LunarCalendar() {
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-2 p-3 bg-primary/5 border border-primary/20 rounded-lg">
               <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-primary"><Waves className="size-4"/> Heure/Hauteur</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-primary"><Star className="size-3 fill-primary" /> Grandes Marées</div>
-              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><span className="bg-primary text-white px-1 rounded-[2px]">Haute Exceptionnelle</span></div>
-              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><span className="bg-destructive text-white px-1 rounded-[2px]">Basse Exceptionnelle</span></div>
+              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><span className="bg-primary text-white px-1 rounded-[2px]">H. Exceptionnelle</span></div>
+              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><span className="bg-destructive text-white px-1 rounded-[2px]">B. Exceptionnelle</span></div>
             </div>
-            <p className="text-[10px] text-muted-foreground italic px-1">Les seuils d'exception sont calculés automatiquement selon la station sélectionnée.</p>
           </div>
         )}
       </div>
