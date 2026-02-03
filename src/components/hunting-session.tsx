@@ -37,7 +37,8 @@ import {
   Target,
   LocateFixed,
   MapPin,
-  Volume2
+  Volume2,
+  WifiOff
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -152,6 +153,7 @@ function HuntingSessionContent() {
     if (!firestore || !user?.uid) return;
     setAreMySessionsLoading(true);
     try {
+      // On retire le tri côté serveur pour éviter les erreurs d'index pendant la phase de stabilisation
       const q = query(
         collection(firestore, 'hunting_sessions'),
         where('organizerId', '==', user.uid)
@@ -159,7 +161,7 @@ function HuntingSessionContent() {
       const querySnapshot = await getDocs(q);
       const sessions = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as WithId<HuntingSession>));
       
-      // Sort manually to avoid missing index errors
+      // Tri manuel en mémoire pour plus de robustesse
       sessions.sort((a, b) => {
         const timeA = a.createdAt?.toMillis?.() || 0;
         const timeB = b.createdAt?.toMillis?.() || 0;
@@ -227,14 +229,14 @@ function HuntingSessionContent() {
             const newLocation = { latitude, longitude };
             setUserLocation(newLocation);
 
-            // Handle initial camera centering
+            // Centrage automatique lors de la première détection
             if (!initialZoomDone && map) {
                 map.panTo({ lat: latitude, lng: longitude });
                 map.setZoom(16);
                 setInitialZoomDone(true);
             }
 
-            // Sync with Firestore
+            // Synchronisation Firestore
             const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
             
             let batteryData = null;
@@ -443,6 +445,14 @@ function HuntingSessionContent() {
 
                 {!isFullscreen && (
                     <div className="space-y-4">
+                        <Alert className="bg-blue-50 border-blue-200">
+                            <WifiOff className="size-4 text-blue-600" />
+                            <AlertTitle className="text-blue-800 text-xs font-bold">Mode Hors Ligne</AlertTitle>
+                            <AlertDescription className="text-[10px] text-blue-700">
+                                Le fond de carte satellite est automatiquement mis en cache lorsque vous le consultez avec du réseau. Parcourez votre zone de chasse à la maison pour l'avoir sur le terrain sans internet.
+                            </AlertDescription>
+                        </Alert>
+                        
                         <div className="space-y-4 rounded-lg border p-4 bg-muted/30">
                             <Label className="text-xs font-bold uppercase text-muted-foreground">Mon Profil de Session</Label>
                             <Input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="Mon surnom..." />
