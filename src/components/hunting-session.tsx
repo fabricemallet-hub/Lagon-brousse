@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState, useEffect, useMemo, useRef, useCallback, Fragment } from 'react';
 import {
@@ -40,6 +41,8 @@ import {
   Save,
   MapPin,
   Eye,
+  Trash2,
+  Clock,
 } from 'lucide-react';
 import {
   useUser,
@@ -62,6 +65,9 @@ import {
   writeBatch,
   getDocs,
   deleteField,
+  query,
+  where,
+  orderBy,
 } from 'firebase/firestore';
 import type { WithId } from '@/firebase';
 import type { HuntingSession, SessionParticipant, UserAccount } from '@/lib/types';
@@ -70,6 +76,19 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from './ui/skeleton';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 const playSound = (type: 'position' | 'battue' | 'gibier') => {
   const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -175,6 +194,17 @@ function HuntingSessionContent() {
 
   const { data: participants, isLoading: areParticipantsLoading } = useCollection<SessionParticipant>(participantsCollectionRef);
   
+  // History query
+  const mySessionsQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(
+      collection(firestore, 'hunting_sessions'),
+      where('organizerId', '==', user.uid),
+      orderBy('createdAt', 'desc')
+    );
+  }, [firestore, user]);
+  const { data: mySessions, isLoading: areMySessionsLoading } = useCollection<HuntingSession>(mySessionsQuery);
+
   const myParticipant = useMemo(() => participants?.find(p => p.id === user?.uid), [participants, user]);
   const otherParticipants = useMemo(() => participants?.filter(p => p.id !== user?.uid), [participants, user]);
   
@@ -233,6 +263,30 @@ function HuntingSessionContent() {
         setIsSessionLoading(false);
     }
   }, [user, session, firestore, toast]);
+
+  const handleDeleteSessionFromList = async (sessionId: string) => {
+    if (!firestore || !user) return;
+    try {
+        const participantsRef = collection(firestore, 'hunting_sessions', sessionId, 'participants');
+        const participantsSnap = await getDocs(participantsRef);
+        const batch = writeBatch(firestore);
+        participantsSnap.forEach(pDoc => batch.delete(pDoc.ref));
+        
+        const sessionRef = doc(firestore, 'hunting_sessions', sessionId);
+        batch.delete(sessionRef);
+        
+        await batch.commit();
+        
+        if (session?.id === sessionId) {
+            handleLeaveSession();
+        }
+        
+        toast({ title: 'Session supprimée.' });
+    } catch (e: any) {
+        console.error(e);
+        toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de supprimer la session.' });
+    }
+  };
 
  const updateFirestorePosition = useCallback((latitude: number, longitude: number) => {
     if (!user || !firestore || !session?.id) return;
@@ -703,9 +757,10 @@ function HuntingSessionContent() {
     };
   };
 
-  const copyToClipboard = () => {
-    if(!session) return;
-    navigator.clipboard.writeText(session.id);
+  const copyToClipboard = (text?: string) => {
+    const code = text || session?.id;
+    if(!code) return;
+    navigator.clipboard.writeText(code);
     toast({ description: "Code copié dans le presse-papiers !" });
   }
 
@@ -1019,7 +1074,7 @@ function HuntingSessionContent() {
                                     <Label htmlFor="session-code-display">Code de session</Label>
                                     <Input id="session-code-display" readOnly value={session.id} className="font-mono text-center text-lg tracking-widest" />
                                 </div>
-                                <Button onClick={copyToClipboard} size="sm" className="w-full sm:w-auto self-end"><Copy className="mr-2"/> Copier</Button>
+                                <Button onClick={() => copyToClipboard()} size="sm" className="w-full sm:w-auto self-end"><Copy className="mr-2"/> Copier</Button>
                             </div>
                         </>
                     )}
@@ -1075,59 +1130,126 @@ function HuntingSessionContent() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Users className="size-5 text-primary" />
-          Session de Chasse en Groupe
-        </CardTitle>
-        <CardDescription>
-          Partagez votre position en temps réel avec vos coéquipiers.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {error && <Alert variant="destructive" className="mb-4"><AlertCircle className="h-4 w-4" /><AlertTitle>{error}</AlertTitle></Alert>}
-        <Tabs defaultValue="join">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="join">Rejoindre</TabsTrigger>
-            <TabsTrigger value="create">Créer</TabsTrigger>
-          </TabsList>
-          <TabsContent value="join" className="space-y-4 pt-4">
-            <div className="space-y-2">
-              <Label htmlFor="join-code">Code de la session</Label>
-              <Input
-                id="join-code"
-                placeholder="CH-XXXX"
-                value={joinCode}
-                onChange={(e) => setJoinCode(e.target.value)}
-                className="font-mono text-center text-lg tracking-widest"
-              />
-            </div>
-            <Button onClick={handleJoinSession} className="w-full" disabled={isSessionLoading}>
-              <LogIn className="mr-2" />
-              {isSessionLoading ? 'Connexion...' : 'Rejoindre la session'}
-            </Button>
-          </TabsContent>
-          <TabsContent value="create" className="space-y-4 pt-4">
-            <div className="space-y-2">
-              <Label htmlFor="create-code">Personnaliser le code de session</Label>
-              <Input
-                id="create-code"
-                placeholder="Optionnel, 6 caractères min."
-                value={createCode}
-                onChange={(e) => setCreateCode(e.target.value.toUpperCase())}
-                className="font-mono text-center text-lg tracking-widest"
-              />
-               <p className="text-xs text-muted-foreground text-center">Si ce champ est laissé vide, un code aléatoire sera généré.</p>
-            </div>
-            <Button onClick={handleCreateSession} className="w-full" disabled={isSessionLoading}>
-              <Share2 className="mr-2" />
-              {isSessionLoading ? 'Création...' : 'Créer une nouvelle session'}
-            </Button>
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+    <div className="space-y-6">
+        <Card>
+        <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+            <Users className="size-5 text-primary" />
+            Session de Chasse en Groupe
+            </CardTitle>
+            <CardDescription>
+            Partagez votre position en temps réel avec vos coéquipiers.
+            </CardDescription>
+        </CardHeader>
+        <CardContent>
+            {error && <Alert variant="destructive" className="mb-4"><AlertCircle className="h-4 w-4" /><AlertTitle>{error}</AlertTitle></Alert>}
+            <Tabs defaultValue="join">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="join">Rejoindre</TabsTrigger>
+                <TabsTrigger value="create">Créer</TabsTrigger>
+            </TabsList>
+            <TabsContent value="join" className="space-y-4 pt-4">
+                <div className="space-y-2">
+                <Label htmlFor="join-code">Code de la session</Label>
+                <Input
+                    id="join-code"
+                    placeholder="CH-XXXX"
+                    value={joinCode}
+                    onChange={(e) => setJoinCode(e.target.value)}
+                    className="font-mono text-center text-lg tracking-widest"
+                />
+                </div>
+                <Button onClick={handleJoinSession} className="w-full" disabled={isSessionLoading}>
+                <LogIn className="mr-2" />
+                {isSessionLoading ? 'Connexion...' : 'Rejoindre la session'}
+                </Button>
+            </TabsContent>
+            <TabsContent value="create" className="space-y-4 pt-4">
+                <div className="space-y-2">
+                <Label htmlFor="create-code">Personnaliser le code de session</Label>
+                <Input
+                    id="create-code"
+                    placeholder="Optionnel, 6 caractères min."
+                    value={createCode}
+                    onChange={(e) => setCreateCode(e.target.value.toUpperCase())}
+                    className="font-mono text-center text-lg tracking-widest"
+                />
+                <p className="text-xs text-muted-foreground text-center">Si ce champ est laissé vide, un code aléatoire sera généré.</p>
+                </div>
+                <Button onClick={handleCreateSession} className="w-full" disabled={isSessionLoading}>
+                <Share2 className="mr-2" />
+                {isSessionLoading ? 'Création...' : 'Créer une nouvelle session'}
+                </Button>
+            </TabsContent>
+            </Tabs>
+        </CardContent>
+        </Card>
+
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <Clock className="size-5 text-primary" />
+                    Mes Sessions Créées
+                </CardTitle>
+                <CardDescription>
+                    Historique des sessions que vous avez organisées.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                {areMySessionsLoading ? (
+                    <div className="space-y-2">
+                        <Skeleton className="h-12 w-full" />
+                        <Skeleton className="h-12 w-full" />
+                    </div>
+                ) : mySessions && mySessions.length > 0 ? (
+                    <div className="space-y-3">
+                        {mySessions.map((s) => (
+                            <div key={s.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-mono font-bold text-primary">{s.id}</span>
+                                        {s.createdAt && (
+                                            <span className="text-[10px] text-muted-foreground">
+                                                {format(s.createdAt.toDate(), 'd MMM HH:mm', { locale: fr })}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Button variant="outline" size="sm" onClick={() => copyToClipboard(s.id)}>
+                                        <Copy className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10">
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Supprimer la session {s.id} ?</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    Cette action supprimera définitivement la session et déconnectera tous les coéquipiers actuellement présents.
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                                <AlertDialogAction onClick={() => handleDeleteSessionFromList(s.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                                    Supprimer définitivement
+                                                </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-center text-sm text-muted-foreground py-4">Aucune session créée.</p>
+                )}
+            </CardContent>
+        </Card>
+    </div>
   );
 }
 
