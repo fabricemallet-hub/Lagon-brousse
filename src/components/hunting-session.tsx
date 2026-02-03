@@ -34,6 +34,9 @@ import {
   Mountain,
   Save,
   Trash2,
+  Target,
+  LocateFixed,
+  Volume2
 } from 'lucide-react';
 import {
   useUser,
@@ -95,7 +98,7 @@ function HuntingSessionContent() {
   const updateIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isParticipating, setIsParticipating] = useState(false);
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [zoom, setZoom] = useState(8);
+  const [zoom, setZoom] = useState(12);
   const [initialZoomDone, setInitialZoomDone] = useState(false);
   const [mapTypeId, setMapTypeId] = useState<string>('satellite');
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -121,6 +124,31 @@ function HuntingSessionContent() {
 
   const { data: participants } = useCollection<SessionParticipant>(participantsCollectionRef);
 
+  // Audio for alerts
+  const playAlertSound = useCallback(() => {
+    try {
+        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+        audio.play();
+    } catch (e) {
+        console.warn("Audio play failed", e);
+    }
+  }, []);
+
+  // Monitor for "Gibier en vue" alerts from others
+  useEffect(() => {
+    if (!participants || !user) return;
+    const others = participants.filter(p => p.id !== user.uid);
+    const anyGibier = others.some(p => p.isGibierEnVue);
+    if (anyGibier) {
+        playAlertSound();
+        toast({ 
+            title: "GIBIER EN VUE !", 
+            description: "Un coéquipier a signalé du gibier sur la carte.",
+            variant: "destructive" 
+        });
+    }
+  }, [participants, user, playAlertSound, toast]);
+
   const fetchMySessions = useCallback(async () => {
     if (!firestore || !user?.uid) return;
     setAreMySessionsLoading(true);
@@ -133,7 +161,6 @@ function HuntingSessionContent() {
       const querySnapshot = await getDocs(q);
       const sessions = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as WithId<HuntingSession>));
       
-      // Sort in memory to avoid indexing errors
       sessions.sort((a, b) => {
         const timeA = a.createdAt?.toMillis?.() || 0;
         const timeB = b.createdAt?.toMillis?.() || 0;
@@ -188,24 +215,6 @@ function HuntingSessionContent() {
     }
   }, [user, session, firestore, toast]);
 
-  const handleDeleteSessionFromList = async (sessionId: string) => {
-    if (!firestore || !user) return;
-    try {
-        const participantsRef = collection(firestore, 'hunting_sessions', sessionId, 'participants');
-        const participantsSnap = await getDocs(participantsRef);
-        const batch = writeBatch(firestore);
-        participantsSnap.forEach(pDoc => batch.delete(pDoc.ref));
-        batch.delete(doc(firestore, 'hunting_sessions', sessionId));
-        await batch.commit();
-        if (session?.id === sessionId) handleLeaveSession();
-        fetchMySessions();
-        toast({ title: 'Session supprimée.' });
-    } catch (e: any) {
-        console.error(e);
-        toast({ variant: 'destructive', title: 'Erreur' });
-    }
-  };
-
   const fetchAndSetUserPosition = useCallback(async (isFirstUpdate = false) => {
     if (!user || !firestore || !navigator.geolocation || !session?.id) return;
 
@@ -229,8 +238,17 @@ function HuntingSessionContent() {
         }
 
         const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
+        
+        // Get battery info if available
+        let batteryData = null;
+        if ('getBattery' in navigator) {
+            const battery: any = await (navigator as any).getBattery();
+            batteryData = { level: battery.level, charging: battery.charging };
+        }
+
         await updateDoc(participantDocRef, {
             location: newLocation,
+            battery: batteryData,
             updatedAt: serverTimestamp(),
         });
 
@@ -257,7 +275,15 @@ function HuntingSessionContent() {
         await setDoc(doc(firestore, 'hunting_sessions', code), newSessionData);
         
         const participantDocRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
-        await setDoc(participantDocRef, { displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor, updatedAt: serverTimestamp() });
+        await setDoc(participantDocRef, { 
+            id: user.uid,
+            displayName: nickname, 
+            mapIcon: selectedIcon, 
+            mapColor: selectedColor, 
+            baseStatus: 'En position',
+            isGibierEnVue: false,
+            updatedAt: serverTimestamp() 
+        });
         
         setSession({ id: code, ...newSessionData } as any);
         setIsParticipating(true);
@@ -280,7 +306,15 @@ function HuntingSessionContent() {
       if (!sessionDoc.exists()) throw new Error('Session non trouvée.');
       
       const participantDocRef = doc(firestore, 'hunting_sessions', sessionId, 'participants', user.uid);
-      await setDoc(participantDocRef, { displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor, updatedAt: serverTimestamp() }, { merge: true });
+      await setDoc(participantDocRef, { 
+          id: user.uid,
+          displayName: nickname, 
+          mapIcon: selectedIcon, 
+          mapColor: selectedColor, 
+          baseStatus: 'En position',
+          isGibierEnVue: false,
+          updatedAt: serverTimestamp() 
+      }, { merge: true });
       
       setSession({ id: sessionDoc.id, ...sessionDoc.data() } as any);
       setIsParticipating(true);
@@ -290,6 +324,26 @@ function HuntingSessionContent() {
     } finally {
         setIsSessionLoading(false);
     }
+  };
+
+  const updateTacticalStatus = async (status: string) => {
+    if (!user || !firestore || !session) return;
+    const ref = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
+    await updateDoc(ref, { baseStatus: status });
+    toast({ title: `Statut : ${status}` });
+  };
+
+  const toggleGibierEnVue = async () => {
+    if (!user || !firestore || !session) return;
+    const ref = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
+    const me = participants?.find(p => p.id === user.uid);
+    const newVal = !me?.isGibierEnVue;
+    await updateDoc(ref, { isGibierEnVue: newVal });
+    if (newVal) playAlertSound();
+    toast({ 
+        title: newVal ? "Gibier signalé !" : "Alerte levée", 
+        variant: newVal ? "destructive" : "default" 
+    });
   };
 
   const handleSavePreferences = async () => {
@@ -313,6 +367,8 @@ function HuntingSessionContent() {
     if (loadError) return <Card><CardContent><Alert variant="destructive"><AlertTitle>Erreur Google Maps</AlertTitle></Alert></CardContent></Card>;
     if (!isLoaded || isProfileLoading) return <Card><CardContent><Skeleton className="h-80 w-full" /></CardContent></Card>;
 
+    const me = participants?.find(p => p.id === user?.uid);
+
     return (
         <Card className={cn("transition-all", isFullscreen && "fixed inset-0 z-50 w-screen h-screen rounded-none border-none flex flex-col")}>
             <CardHeader className="flex-shrink-0">
@@ -321,16 +377,16 @@ function HuntingSessionContent() {
                     <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isSessionLoading}><LogOut className="size-4 mr-2"/> Quitter</Button>
                 </CardTitle>
             </CardHeader>
-            <CardContent className="flex-grow flex flex-col p-2 gap-2">
-                 <div className={cn("relative w-full rounded-lg overflow-hidden border", isFullscreen ? "flex-grow" : "h-80 mb-4")}>
+            <CardContent className="flex-grow flex flex-col p-2 gap-4">
+                 {/* Map Section */}
+                 <div className={cn("relative w-full rounded-lg overflow-hidden border", isFullscreen ? "flex-grow" : "h-80")}>
                     <GoogleMap
                         mapContainerClassName="w-full h-full"
                         center={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : { lat: -21.45, lng: 165.5 }}
                         zoom={zoom}
                         onLoad={setMap}
-                        options={{ disableDefaultUI: true, zoomControl: true, mapTypeId: mapTypeId }}
+                        options={{ disableDefaultUI: true, zoomControl: true, mapTypeId: 'satellite' }}
                     >
-                        {/* Point local pour retour immédiat */}
                         {userLocation && (
                             <OverlayView position={{ lat: userLocation.latitude, lng: userLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                 <PulsingDot />
@@ -340,34 +396,81 @@ function HuntingSessionContent() {
                         {participants?.map(p => p.location && (
                             <OverlayView key={p.id} position={{ lat: p.location.latitude, lng: p.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                 <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
-                                    <div className="px-2 pb-0.5 text-[10px] font-bold text-white [text-shadow:0_1px_2px_black] whitespace-nowrap">
-                                        {p.displayName}
+                                    <div className={cn(
+                                        "px-2 py-0.5 rounded text-[10px] font-bold text-white shadow-md whitespace-nowrap border border-white/20",
+                                        p.isGibierEnVue ? "bg-red-600 animate-bounce" : "bg-black/60 backdrop-blur-sm"
+                                    )}>
+                                        {p.displayName} {p.baseStatus ? `• ${p.baseStatus}` : ''}
                                     </div>
-                                    <div className="p-1.5 rounded-full shadow-lg" style={{ backgroundColor: p.mapColor || '#3b82f6' }}>
+                                    <div 
+                                        className={cn(
+                                            "p-1.5 rounded-full shadow-lg border-2 border-white transition-all",
+                                            p.isGibierEnVue && "scale-125 ring-4 ring-red-500/50"
+                                        )} 
+                                        style={{ backgroundColor: p.isGibierEnVue ? '#ef4444' : (p.mapColor || '#3b82f6') }}
+                                    >
                                         {React.createElement(iconMap[p.mapIcon as keyof typeof iconMap] || Navigation, { className: "size-4 text-white" })}
                                     </div>
                                 </div>
                             </OverlayView>
                         ))}
                     </GoogleMap>
-                    <Button size="icon" onClick={() => setIsFullscreen(!isFullscreen)} className="absolute top-2 left-2 shadow-lg h-9 w-9 z-10">
+                    <Button size="icon" onClick={() => setIsFullscreen(!isFullscreen)} className="absolute top-2 left-2 shadow-lg h-9 w-9 z-10 bg-background/80 backdrop-blur-sm">
                         {isFullscreen ? <Shrink /> : <Expand />}
                     </Button>
+                    <Button size="icon" onClick={() => userLocation && map?.panTo({ lat: userLocation.latitude, lng: userLocation.longitude })} className="absolute top-2 right-2 shadow-lg h-9 w-9 z-10 bg-background/80 backdrop-blur-sm">
+                        <LocateFixed className="size-5" />
+                    </Button>
                 </div>
+
+                {/* Tactical Buttons */}
+                <div className="grid grid-cols-2 gap-2">
+                    <Button 
+                        variant={me?.baseStatus === 'En position' ? 'default' : 'outline'} 
+                        className="h-12 font-bold"
+                        onClick={() => updateTacticalStatus('En position')}
+                    >
+                        <MapPin className="mr-2 size-4" /> En Position
+                    </Button>
+                    <Button 
+                        variant={me?.baseStatus === 'Battue en cours' ? 'default' : 'outline'} 
+                        className="h-12 font-bold"
+                        onClick={() => updateTacticalStatus('Battue en cours')}
+                    >
+                        <Footprints className="mr-2 size-4" /> En Battue
+                    </Button>
+                    <Button 
+                        variant={me?.isGibierEnVue ? 'destructive' : 'secondary'} 
+                        className={cn("col-span-2 h-14 text-lg font-black shadow-lg", me?.isGibierEnVue && "animate-pulse")}
+                        onClick={toggleGibierEnVue}
+                    >
+                        <Target className="mr-2 size-6" /> {me?.isGibierEnVue ? 'GIBIER SIGNALÉ !' : 'SIGNALER GIBIER'}
+                    </Button>
+                </div>
+
                 {!isFullscreen && (
                     <div className="space-y-4">
-                        <div className="space-y-4 rounded-lg border p-4">
-                            <Label>Surnom</Label>
-                            <Input value={nickname} onChange={e => setNickname(e.target.value)} />
+                        <div className="space-y-4 rounded-lg border p-4 bg-muted/30">
+                            <Label className="text-xs font-bold uppercase text-muted-foreground">Mon Profil de Session</Label>
+                            <Input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="Mon surnom..." />
                             <Button onClick={handleSavePreferences} size="sm" disabled={isSavingPrefs} className="w-full"><Save className="mr-2 h-4 w-4" /> Sauvegarder</Button>
                         </div>
                         <div className="space-y-2">
-                            <h4 className="font-semibold text-sm">Participants ({participants?.length || 0})</h4>
-                            <div className="max-h-32 overflow-y-auto space-y-1">
+                            <h4 className="font-bold text-sm flex items-center gap-2">
+                                <Users className="size-4" /> Équipe ({participants?.length || 0})
+                            </h4>
+                            <div className="max-h-48 overflow-y-auto space-y-1 divide-y border rounded-lg bg-card">
                                 {participants?.map(p => (
-                                    <div key={p.id} className="flex justify-between items-center text-xs p-2 border rounded">
-                                        <span>{p.displayName}</span>
-                                        {p.battery && <BatteryIcon level={p.battery.level} charging={p.battery.charging} />}
+                                    <div key={p.id} className={cn("flex justify-between items-center p-3 text-sm", p.isGibierEnVue && "bg-red-50 dark:bg-red-950/20")}>
+                                        <div className="flex items-center gap-3">
+                                            <div className="size-3 rounded-full" style={{ backgroundColor: p.mapColor || '#3b82f6' }} />
+                                            <span className="font-semibold">{p.displayName}</span>
+                                            {p.isGibierEnVue && <Badge variant="destructive" className="animate-pulse text-[10px] h-5">GIBIER</Badge>}
+                                        </div>
+                                        <div className="flex items-center gap-3 text-muted-foreground">
+                                            <span className="text-[10px]">{p.baseStatus || '-'}</span>
+                                            {p.battery && <BatteryIcon level={p.battery.level} charging={p.battery.charging} />}
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -387,24 +490,37 @@ function HuntingSessionContent() {
                 <Tabs defaultValue="join">
                     <TabsList className="grid w-full grid-cols-2"><TabsTrigger value="join">Rejoindre</TabsTrigger><TabsTrigger value="create">Créer</TabsTrigger></TabsList>
                     <TabsContent value="join" className="space-y-4 pt-4">
-                        <Input placeholder="Code CH-XXXX" value={joinCode} onChange={e => setJoinCode(e.target.value)} className="text-center font-mono" />
-                        <Button onClick={handleJoinSession} className="w-full" disabled={isSessionLoading}>Rejoindre</Button>
+                        <Input placeholder="Code CH-XXXX" value={joinCode} onChange={e => setJoinCode(e.target.value)} className="text-center font-mono text-lg uppercase tracking-widest h-12" />
+                        <Button onClick={handleJoinSession} className="w-full h-12 text-lg font-bold" disabled={isSessionLoading}>Rejoindre le groupe</Button>
                     </TabsContent>
                     <TabsContent value="create" className="space-y-4 pt-4">
-                        <Input placeholder="Code personnalisé (optionnel)" value={createCode} onChange={e => setCreateCode(e.target.value)} className="text-center font-mono" />
-                        <Button onClick={handleCreateSession} className="w-full" disabled={isSessionLoading}>Créer</Button>
+                        <Input placeholder="Code personnalisé (optionnel)" value={createCode} onChange={e => setCreateCode(e.target.value)} className="text-center font-mono text-lg uppercase tracking-widest h-12" />
+                        <Button onClick={handleCreateSession} className="w-full h-12 text-lg font-bold" disabled={isSessionLoading}>Créer une session</Button>
                     </TabsContent>
                 </Tabs>
             </CardContent>
         </Card>
         {areMySessionsLoading ? <Skeleton className="h-24 w-full" /> : mySessions && mySessions.length > 0 && (
             <Card>
-                <CardHeader><CardTitle className="text-sm">Mes sessions récentes</CardTitle></CardHeader>
+                <CardHeader className="pb-2"><CardTitle className="text-sm font-bold uppercase text-muted-foreground">Mes sessions récentes</CardTitle></CardHeader>
                 <CardContent className="space-y-2">
                     {mySessions.map(s => (
-                        <div key={s.id} className="flex justify-between items-center p-2 border rounded text-xs font-mono">
-                            <span>{s.id}</span>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteSessionFromList(s.id)}><Trash2 className="h-3 w-3 text-destructive" /></Button>
+                        <div key={s.id} className="flex justify-between items-center p-3 border rounded-lg text-sm font-mono bg-card hover:bg-muted/50 transition-colors">
+                            <span className="font-bold">{s.id}</span>
+                            <div className="flex items-center gap-2">
+                                <Button variant="ghost" size="sm" onClick={() => setJoinCode(s.id)}>Sélectionner</Button>
+                                <Button variant="ghost" size="icon" onClick={() => {
+                                    if (confirm('Supprimer cette session et tous ses participants ?')) {
+                                        const participantsRef = collection(firestore!, 'hunting_sessions', s.id, 'participants');
+                                        getDocs(participantsRef).then(snap => {
+                                            const batch = writeBatch(firestore!);
+                                            snap.forEach(d => batch.delete(d.ref));
+                                            batch.delete(doc(firestore!, 'hunting_sessions', s.id));
+                                            batch.commit().then(() => fetchMySessions());
+                                        });
+                                    }
+                                }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                            </div>
                         </div>
                     ))}
                 </CardContent>
@@ -417,6 +533,16 @@ function HuntingSessionContent() {
 export function HuntingSessionCard() {
   const { user, isUserLoading } = useUser();
   if (isUserLoading) return <Card><CardContent><Skeleton className="h-48 w-full" /></CardContent></Card>;
-  if (!user) return <Card><CardContent><Alert><AlertCircle /><AlertTitle>Connexion requise</AlertTitle></Alert></CardContent></Card>;
+  if (!user) return (
+    <Card>
+        <CardHeader>
+            <CardTitle className="flex items-center gap-2"><AlertCircle className="text-destructive" /> Connexion requise</CardTitle>
+            <CardDescription>Vous devez être connecté pour rejoindre ou créer une session de chasse de groupe.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <Button asChild className="w-full"><a href="/login">Se connecter</a></Button>
+        </CardContent>
+    </Card>
+  );
   return <HuntingSessionContent />;
 }
