@@ -1,6 +1,5 @@
 'use client';
 
-import type { Metadata, Viewport } from 'next';
 import { AppShell } from '@/components/app-shell';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
@@ -14,16 +13,16 @@ import { GoogleMapsProvider } from '@/context/google-maps-context';
 
 function AppContent({ children }: { children: React.ReactNode }) {
   useEffect(() => {
+    // Enregistrement du Service Worker PWA
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').then(
-          (registration) => {
-            console.log('Service Worker enregistré avec succès:', registration.scope);
-          },
-          (err) => {
-            console.error('Échec de l\'enregistrement du Service Worker:', err);
-          }
-        );
+        navigator.serviceWorker.register('/sw.js')
+          .then((registration) => {
+            console.log('Service Worker PWA enregistré :', registration.scope);
+          })
+          .catch((err) => {
+            console.error('Échec de l\'enregistrement du SW :', err);
+          });
       });
     }
   }, []);
@@ -61,7 +60,7 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap"
           rel="stylesheet"
         />
-        <meta name="viewport" content="initial-scale=1, minimum-scale=0.1, maximum-scale=5, user-scalable=yes" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
         <link rel="icon" href="/icon-192x192.png" />
         <link rel="apple-touch-icon" href="/icon-192x192.png" />
         <link rel="manifest" href="/manifest.webmanifest" />

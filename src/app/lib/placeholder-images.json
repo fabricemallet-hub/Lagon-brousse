@@ -1,0 +1,16 @@
+{
+  "placeholderImages": [
+    {
+      "id": "pwa-screenshot-mobile",
+      "description": "Capture d'écran mobile pour le manifeste PWA",
+      "imageUrl": "https://picsum.photos/seed/pwa1/1080/1920",
+      "imageHint": "mobile app"
+    },
+    {
+      "id": "pwa-screenshot-desktop",
+      "description": "Capture d'écran desktop pour le manifeste PWA",
+      "imageUrl": "https://picsum.photos/seed/pwa2/1920/1080",
+      "imageHint": "desktop dashboard"
+    }
+  ]
+}
