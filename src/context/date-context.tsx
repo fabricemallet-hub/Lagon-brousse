@@ -41,22 +41,26 @@ export function DateProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, []);
 
+  // Use a neutral default while loading to avoid "text flicker"
   const defaultSettings: SplashScreenSettings = {
     splashMode: 'text',
-    splashText: 'Lagon & Brousse NC',
+    splashText: '', // Neutral text while loading
     splashBgColor: '#3b82f6',
     splashTextColor: '#ffffff',
     splashFontSize: '32',
   };
 
-  const finalSettings = splashSettings || defaultSettings;
+  // If loading, we use neutral settings. Once loaded, we use the Firestore settings or the full defaults.
+  const finalSettings = isSettingsLoading 
+    ? defaultSettings 
+    : (splashSettings || { ...defaultSettings, splashText: 'Lagon & Brousse NC' });
 
   if (showSplash) {
     return <SplashScreen settings={finalSettings} isExiting={isExiting} />;
   }
 
   if (!selectedDate) {
-    return null; // Brief blank state if needed while content finishes mounting
+    return null;
   }
 
   const value = {
