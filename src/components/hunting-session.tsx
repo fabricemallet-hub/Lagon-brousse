@@ -62,6 +62,7 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from './ui/skeleton';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
+import Link from 'next/link';
 
 const iconMap = { Navigation, UserIcon, Crosshair, Footprints, Mountain, MapPin };
 
@@ -470,11 +471,28 @@ function HuntingSessionContent() {
                                     <div key={p.id} className={cn("flex justify-between items-center p-3 text-sm", p.isGibierEnVue && "bg-red-50 dark:bg-red-950/20")}>
                                         <div className="flex items-center gap-3">
                                             <div className="size-3 rounded-full" style={{ backgroundColor: p.mapColor || '#3b82f6' }} />
-                                            <span className="font-semibold">{p.displayName}</span>
-                                            {p.isGibierEnVue && <Badge variant="destructive" className="animate-pulse text-[10px] h-5">GIBIER</Badge>}
+                                            <div className="flex flex-col">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold">{p.displayName}</span>
+                                                    {p.baseStatus && (
+                                                        <span className={cn(
+                                                            "text-[10px] font-black uppercase px-1.5 py-0.5 rounded-sm border shadow-sm",
+                                                            p.baseStatus === 'En position' 
+                                                                ? "bg-blue-600 text-white border-blue-700" 
+                                                                : "bg-orange-600 text-white border-orange-700"
+                                                        )}>
+                                                            {p.baseStatus}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {p.isGibierEnVue && (
+                                                    <div className="flex items-center gap-1 mt-0.5 text-red-600 animate-pulse font-black text-[10px] uppercase">
+                                                        <Target className="size-3" /> Gibier signalé !
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                         <div className="flex items-center gap-3 text-muted-foreground">
-                                            <span className="text-[10px]">{p.baseStatus || '-'}</span>
                                             {p.battery && <BatteryIcon level={p.battery.level} charging={p.battery.charging} />}
                                         </div>
                                     </div>
