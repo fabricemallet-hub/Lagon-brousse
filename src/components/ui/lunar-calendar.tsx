@@ -292,8 +292,8 @@ function DetailDialogSkeleton() {
   return (
     <>
       <DialogHeader>
-        <div className="h-7 w-3/4 mb-2"><Skeleton className="h-full w-full" /></div>
-        <div className="h-4 w-1/2"><Skeleton className="h-full w-full" /></div>
+        <DialogTitle><Skeleton className="h-7 w-3/4 mb-2" /></DialogTitle>
+        <div className="h-4 w-1/2 mb-4"><Skeleton className="h-full w-full" /></div>
       </DialogHeader>
       <div className="space-y-4 py-4">
         <Skeleton className="h-16 w-full" />
@@ -314,7 +314,10 @@ function ChampsDetailDialogContent({ day, location }: { day: Date; location: str
   const { farming, weather } = data;
   return (
     <>
-      <DialogHeader><DialogTitle>Détails du {format(day, 'eeee d MMMM yyyy', { locale: fr })}</DialogTitle></DialogHeader>
+      <DialogHeader>
+        <DialogTitle>Détails du {format(day, 'eeee d MMMM yyyy', { locale: fr })}</DialogTitle>
+        <DialogDescription>Recommandations agricoles basées sur le cycle lunaire.</DialogDescription>
+      </DialogHeader>
       <div className="space-y-4 py-4 text-sm">
         <div className="flex justify-between items-center bg-muted/50 p-2 rounded-lg">
           <div className="flex items-center gap-2"><MoonPhaseIcon phase={weather.moon.phase} className="size-5 text-primary" /><div><p className="font-semibold">{weather.moon.phase}</p></div></div>
@@ -337,7 +340,10 @@ function PecheDetailDialogContent({ day, location }: { day: Date; location: stri
   const { fishing, weather, pelagicInfo, crabAndLobster } = data;
   return (
     <>
-      <DialogHeader><DialogTitle>Détails de Pêche du {format(day, 'eeee d MMMM yyyy', { locale: fr })}</DialogTitle></DialogHeader>
+      <DialogHeader>
+        <DialogTitle>Détails de Pêche du {format(day, 'eeee d MMMM yyyy', { locale: fr })}</DialogTitle>
+        <DialogDescription>Prévisions maritimes et cycles de marées.</DialogDescription>
+      </DialogHeader>
       <div className="space-y-6 py-4 text-sm">
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
