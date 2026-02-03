@@ -152,6 +152,7 @@ export interface UserAccount {
   subscriptionExpiryDate?: string;
   favoriteLocationIds?: string[];
   lastSelectedLocation?: string;
+  emergencyContact?: string;
 }
 
 export interface FishingSpot {

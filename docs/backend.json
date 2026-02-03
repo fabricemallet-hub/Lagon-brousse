@@ -16,7 +16,8 @@
         "favoriteLocationIds": { "type": "array", "description": "References to Location. (Relationship: UserAccount N:N Location)", "items": { "type": "string" } },
         "mapIcon": { "type": "string", "description": "The user's chosen icon for the hunting map." },
         "mapColor": { "type": "string", "description": "The user's chosen color for their map icon." },
-        "lastSelectedLocation": { "type": "string", "description": "The last location selected by the user." }
+        "lastSelectedLocation": { "type": "string", "description": "The last location selected by the user." },
+        "emergencyContact": { "type": "string", "description": "The user's saved emergency contact number." }
       },
       "required": ["id", "email", "displayName", "subscriptionStatus"]
     },

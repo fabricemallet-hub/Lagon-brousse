@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { doc, setDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, addDoc, updateDoc } from 'firebase/firestore';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -24,10 +24,11 @@ import {
   LocateFixed, 
   ShieldAlert,
   Wifi,
-  Phone
+  Phone,
+  Save
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { VesselStatus } from '@/lib/types';
+import type { VesselStatus, UserAccount } from '@/lib/types';
 import { Skeleton } from './ui/skeleton';
 
 // Constants
@@ -59,6 +60,7 @@ export function VesselTracker() {
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
   const [isSharing, setIsSharing] = useState(false);
   const [emergencyContact, setEmergencyContact] = useState('');
+  const [isSavingContact, setIsSavingContact] = useState(false);
   
   // Tracking State (Sender)
   const [currentPos, setCurrentPos] = useState<google.maps.LatLngLiteral | null>(null);
@@ -72,6 +74,19 @@ export function VesselTracker() {
   
   const watchIdRef = useRef<number | null>(null);
   const lastFirestoreUpdateRef = useRef<number>(0);
+
+  // User Profile Sync
+  const userDocRef = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [user, firestore]);
+  const { data: userProfile } = useDoc<UserAccount>(userDocRef);
+
+  useEffect(() => {
+    if (userProfile?.emergencyContact) {
+      setEmergencyContact(userProfile.emergencyContact);
+    }
+  }, [userProfile]);
 
   // Firestore Sync (Receiver)
   const vesselRef = useMemoFirebase(() => {
@@ -91,6 +106,27 @@ export function VesselTracker() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  const handleSaveEmergencyContact = async () => {
+    if (!user || !firestore) return;
+    setIsSavingContact(true);
+    const docRef = doc(firestore, 'users', user.uid);
+    try {
+      await updateDoc(docRef, { emergencyContact: emergencyContact });
+      toast({ title: "Contact enregistré", description: "Le numéro sera conservé pour vos prochaines sorties." });
+    } catch (e: any) {
+      console.error(e);
+      if (e.code === 'permission-denied') {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: docRef.path,
+          operation: 'update',
+          requestResourceData: { emergencyContact: emergencyContact }
+        }));
+      }
+    } finally {
+      setIsSavingContact(false);
+    }
+  };
 
   // --- SENDER LOGIC (USER A) ---
   
@@ -272,23 +308,20 @@ Position : ${googleMapsUrl}
 GPS : ${coords}
 Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
     
-    // Cross-platform SMS link formatting
     const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent);
     const isAndroid = /Android/i.test(navigator.userAgent);
-    const isMobile = isIOS || isAndroid;
+    const isMobileDevice = isIOS || isAndroid;
     const separator = isIOS ? '&' : '?';
     
     const target = emergencyContact.replace(/\s/g, '');
     const smsUrl = `sms:${target}${separator}body=${encodeURIComponent(bodyText)}`;
     
-    // Inform the user
     toast({ 
       title: "Alerte en cours", 
       description: `Ouverture de l'application SMS pour prévenir ${target}.` 
     });
 
-    // Only attempt to launch the protocol if we're on mobile
-    if (isMobile) {
+    if (isMobileDevice) {
       window.location.href = smsUrl;
     } else {
       console.log("Desktop fallback - SMS would be sent to:", target, "with body:", bodyText);
@@ -441,9 +474,21 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
 
             <div className="w-full space-y-3 border-t pt-4 border-border/50">
               <div className="space-y-1.5">
-                <Label htmlFor="emergency-num" className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                  Contact à prévenir (Proche / Famille)
-                </Label>
+                <div className="flex justify-between items-center">
+                  <Label htmlFor="emergency-num" className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                    Contact à prévenir (Proche / Famille)
+                  </Label>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-6 w-6" 
+                    title="Sauvegarder ce numéro"
+                    onClick={handleSaveEmergencyContact}
+                    disabled={isSavingContact}
+                  >
+                    <Save className={cn("h-4 w-4", isSavingContact && "animate-pulse")} />
+                  </Button>
+                </div>
                 <div className="flex gap-2">
                   <Input 
                     id="emergency-num"
