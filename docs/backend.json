@@ -137,7 +137,7 @@
       "description": "Messages de chat."
     },
     "/vessels/{vesselId}": {
-      "description": "Statut temps réel des navires (Vessel Tracker)."
+      "description": "Statut temps réel des navires."
     },
     "/vessels/{vesselId}/history/{pointId}": {
       "description": "Historique d'immobilité des navires."
