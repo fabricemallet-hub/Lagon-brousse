@@ -128,6 +128,14 @@ const DayCell = React.memo(({
     };
   }, [data, calendarView]);
 
+  const sortedTides = useMemo(() => {
+    const timeToMinutes = (time: string) => {
+        const [hours, minutes] = time.split(':').map(Number);
+        return hours * 60 + minutes;
+    };
+    return [...data.tides].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+  }, [data.tides]);
+
   const tideInfo = useMemo(() => {
     if (data.tides.length === 0) return null;
     const highest = [...data.tides].sort((a, b) => b.height - a.height)[0];
@@ -144,7 +152,7 @@ const DayCell = React.memo(({
     <div
       onClick={() => onDateSelect(day)}
       className={cn(
-        'h-28 border-t border-l p-1 flex flex-col cursor-pointer transition-colors',
+        'h-32 border-t border-l p-1 flex flex-col cursor-pointer transition-colors',
         !isCurrentMonth && 'bg-muted/20 text-muted-foreground/50',
         isPastDay && 'bg-muted/5 opacity-60',
         isTodayDay && 'bg-primary/5 ring-1 ring-inset ring-primary/40',
@@ -154,32 +162,37 @@ const DayCell = React.memo(({
     >
       <div className="flex justify-between items-center px-0.5">
         <span className={cn(
-          "font-black text-xs flex items-center justify-center size-5 rounded-full",
+          "font-black text-[10px] flex items-center justify-center size-4 rounded-full",
           isTodayDay ? "bg-primary text-primary-foreground" : "text-foreground"
         )}>{format(day, 'd')}</span>
-        <MoonPhaseIcon phase={data.weather.moon.phase} className="size-2.5 opacity-60" />
+        <MoonPhaseIcon phase={data.weather.moon.phase} className="size-2 opacity-60" />
       </div>
 
       {calendarView === 'peche' ? (
-        <div className="flex-grow flex flex-col justify-center items-center gap-1">
-          <div className="flex items-center justify-center gap-1 flex-wrap h-5">
-            {data.crabAndLobster.crabStatus === 'Plein' && <CrabIcon className="size-3.5 text-green-600" />}
-            {data.crabAndLobster.lobsterActivity === 'Élevée' && <LobsterIcon className="size-3.5 text-blue-600" />}
+        <div className="flex-grow flex flex-col justify-center items-center gap-0.5 pt-1">
+          <div className="flex items-center justify-center gap-1 flex-wrap h-4">
+            {data.crabAndLobster.crabStatus === 'Plein' && <CrabIcon className="size-3 text-green-600" />}
+            {data.crabAndLobster.lobsterActivity === 'Élevée' && <LobsterIcon className="size-3 text-blue-600" />}
           </div>
-          <div className="flex items-center justify-center gap-0.5 h-4 flex-wrap">
+          <div className="flex items-center justify-center gap-0.5 h-3 flex-wrap">
             {fishingIcons?.lagon}
             {fishingIcons?.pelagic}
           </div>
-          <div className="mt-auto flex flex-col items-center">
-            {tideInfo && (
-              <div className={cn(
-                "text-[7px] font-black flex flex-col items-center leading-tight transition-all",
-                tideInfo.isGrandeMaree ? "text-primary scale-110" : "opacity-60"
-              )}>
-                <span className="flex items-center gap-0.5"><Waves className="size-1.5" /> {tideInfo.highest.time}</span>
-                <span>{tideInfo.highest.height.toFixed(2)}m</span>
-                {tideInfo.isGrandeMaree && <span className="text-[5px] uppercase tracking-tighter">Gr. Marée</span>}
+          <div className="mt-auto w-full flex flex-col items-center gap-0 pb-0.5">
+            {sortedTides.map((tide, idx) => (
+              <div 
+                key={idx} 
+                className={cn(
+                  "text-[6px] font-black leading-[1.1] flex items-center justify-between w-full px-0.5",
+                  tide.type === 'haute' ? "text-primary" : "text-blue-800 opacity-80"
+                )}
+              >
+                <span>{tide.time}</span>
+                <span>{tide.height.toFixed(1)}m</span>
               </div>
+            ))}
+            {tideInfo?.isGrandeMaree && (
+              <span className="text-[5px] uppercase tracking-tighter font-black text-primary animate-pulse">Gr. Marée</span>
             )}
           </div>
         </div>
