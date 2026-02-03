@@ -1,7 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // DEPLOY_ID: STABLE_FINAL_SYNC_V1
+    // DEPLOY_ID: STABLE_SYNC_FINAL_V1
     
     function isAuth() { return request.auth != null; }
     function isAdmin() { 
@@ -11,7 +11,7 @@ service cloud.firestore {
       );
     }
 
-    // Sessions de chasse : Autorisation totale pour les membres du groupe
+    // ACCÈS TOTAL SESSIONS CHASSE (Priorité)
     match /hunting_sessions/{sessionId} {
       allow read, write: if isAuth();
       match /participants/{userId} {
@@ -19,7 +19,7 @@ service cloud.firestore {
       }
     }
 
-    // Profils Utilisateurs
+    // PROFILS UTILISATEURS
     match /users/{userId} {
       allow read, write: if isAdmin() || (isAuth() && request.auth.uid == userId);
       match /{allPaths=**} { 
@@ -27,13 +27,13 @@ service cloud.firestore {
       }
     }
 
-    // Vessel Tracker
+    // VESSEL TRACKER
     match /vessels/{vId} {
       allow read, write: if isAuth();
       match /{allPaths=**} { allow read, write: if isAuth(); }
     }
 
-    // Réglementation, Jetons, Conversations
+    // GLOBALES ET ADMIN
     match /{allPaths=**} {
       allow read: if isAuth();
       allow write: if isAdmin();

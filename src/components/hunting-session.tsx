@@ -59,7 +59,6 @@ import {
   writeBatch,
   getDocs,
   query,
-  where,
 } from 'firebase/firestore';
 import type { WithId } from '@/firebase';
 import type { HuntingSession, SessionParticipant, UserAccount } from '@/lib/types';
@@ -71,20 +70,22 @@ import { useGoogleMaps } from '@/context/google-maps-context';
 
 const iconMap = { Navigation, UserIcon, Crosshair, Footprints, Mountain, MapPin };
 
-const BatteryIcon = ({ level, charging }: { level: number; charging: boolean }) => {
+const BatteryIcon = React.memo(({ level, charging }: { level: number; charging: boolean }) => {
   const props = { className: 'w-4 h-4 inline-block' };
   if (charging) return <BatteryCharging {...props} className="text-blue-500" />;
   if (level < 0.2) return <BatteryLow {...props} className="text-red-500" />;
   if (level < 0.6) return <BatteryMedium {...props} className="text-amber-500" />;
   return <BatteryFull {...props} className="text-green-500" />;
-};
+});
+BatteryIcon.displayName = 'BatteryIcon';
 
-const PulsingDot = () => (
+const PulsingDot = React.memo(() => (
     <div className="absolute" style={{ transform: 'translate(-50%, -50%)' }}>
       <div className="w-5 h-5 rounded-full bg-blue-500 opacity-75 animate-ping absolute"></div>
       <div className="w-5 h-5 rounded-full bg-blue-500 border-2 border-white relative"></div>
     </div>
-);
+));
+PulsingDot.displayName = 'PulsingDot';
 
 function HuntingSessionContent() {
   const { user } = useUser();
@@ -151,12 +152,11 @@ function HuntingSessionContent() {
     if (!firestore || !user?.uid) return;
     setAreMySessionsLoading(true);
     try {
-      const q = query(
-        collection(firestore, 'hunting_sessions'),
-        where('organizerId', '==', user.uid)
-      );
+      const q = query(collection(firestore, 'hunting_sessions'));
       const querySnapshot = await getDocs(q);
-      const sessions = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as WithId<HuntingSession>));
+      const sessions = querySnapshot.docs
+        .map(doc => ({ ...doc.data(), id: doc.id } as WithId<HuntingSession>))
+        .filter(s => s.organizerId === user.uid);
       
       sessions.sort((a, b) => {
         const timeA = a.createdAt?.toMillis?.() || 0;
@@ -242,7 +242,7 @@ function HuntingSessionContent() {
                 location: newLocation,
                 battery: batteryData,
                 updatedAt: serverTimestamp(),
-            }).catch(console.error);
+            }).catch(() => {}); // Silent fail for background sync
         },
         (err) => console.error("Geolocation watch error:", err),
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -266,7 +266,6 @@ function HuntingSessionContent() {
         const newSessionData = { organizerId: user.uid, createdAt: serverTimestamp(), expiresAt: Timestamp.fromDate(expiresAt) };
         await setDoc(doc(firestore, 'hunting_sessions', code), newSessionData);
         
-        // Obtenir position initiale immédiate
         navigator.geolocation.getCurrentPosition(async (pos) => {
             const { latitude, longitude } = pos.coords;
             const participantDocRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
@@ -364,6 +363,12 @@ function HuntingSessionContent() {
     }
   };
 
+  const mapOptions = useMemo(() => ({
+    disableDefaultUI: true, 
+    zoomControl: true, 
+    mapTypeId: 'satellite'
+  }), []);
+
   if (session) {
     if (loadError) return <Card><CardContent><Alert variant="destructive"><AlertTitle>Erreur Google Maps</AlertTitle></Alert></CardContent></Card>;
     if (!isLoaded || isProfileLoading) return <Card><CardContent><Skeleton className="h-80 w-full" /></CardContent></Card>;
@@ -385,7 +390,7 @@ function HuntingSessionContent() {
                         center={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : { lat: -21.45, lng: 165.5 }}
                         zoom={zoom}
                         onLoad={setMap}
-                        options={{ disableDefaultUI: true, zoomControl: true, mapTypeId: 'satellite' }}
+                        options={mapOptions}
                     >
                         {userLocation && (
                             <OverlayView position={{ lat: userLocation.latitude, lng: userLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>

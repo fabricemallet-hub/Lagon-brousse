@@ -24,9 +24,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar as CalendarIcon,
-  BookOpen,
-  AlertCircle,
   User,
+  AlertCircle,
 } from 'lucide-react';
 import {
   Select,
@@ -61,8 +60,8 @@ import { useIsMobile } from '@/hooks/use-mobile';
 
 const USAGE_LIMIT_SECONDS = 60;
 
-// Separate small component for timer to prevent re-rendering the whole shell every second.
-function UsageTimer({ status, auth }: { status: string, auth: any }) {
+// Separate component for timer to prevent shell re-renders
+const UsageTimer = React.memo(({ status, auth }: { status: string, auth: any }) => {
   const [timeLeft, setTimeLeft] = useState(USAGE_LIMIT_SECONDS);
   const { toast } = useToast();
   const router = useRouter();
@@ -87,15 +86,12 @@ function UsageTimer({ status, auth }: { status: string, auth: any }) {
       const interval = setInterval(() => {
         setTimeLeft(prev => {
           const next = prev - 1;
-          
-          // Throttling: Only save to localStorage every 5 seconds to reduce blocking I/O
           if (next % 5 === 0 || next <= 0) {
             localStorage.setItem('dailyUsage', String(USAGE_LIMIT_SECONDS - next));
           }
-
           if (next <= 0) {
             clearInterval(interval);
-            toast({ variant: 'destructive', title: 'Limite quotidienne atteinte', description: 'Vous allez être déconnecté.' });
+            toast({ variant: 'destructive', title: 'Limite atteinte', description: 'Déconnexion...' });
             signOut(auth).then(() => {
               sessionStorage.clear();
               if (pathname !== '/login') router.push('/login');
@@ -111,12 +107,13 @@ function UsageTimer({ status, auth }: { status: string, auth: any }) {
   if (status !== 'limited') return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 h-10 bg-destructive/90 text-destructive-foreground flex items-center justify-center text-sm font-bold z-50">
+    <div className="fixed top-0 left-0 right-0 h-10 bg-destructive/90 text-destructive-foreground flex items-center justify-center text-sm font-bold z-50 shadow-md">
         <AlertCircle className="size-4 mr-2" />
         Mode Limité : {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')} restant.
     </div>
   );
-}
+});
+UsageTimer.displayName = 'UsageTimer';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { locations, selectedLocation, setSelectedLocation, isLocationLoading } = useLocation();
@@ -137,78 +134,37 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
-  const [status, setStatus] = useState<'loading' | 'admin' | 'active' | 'trial' | 'limited'>('loading');
-
-  const isAuthPage = pathname === '/login' || pathname === '/signup';
-
-  useEffect(() => {
-    if (isUserLoading) { setStatus('loading'); return; }
-    if (!user) { setStatus('limited'); return; }
-    if (isProfileLoading || !userProfile) { setStatus('loading'); return; }
+  const status = useMemo(() => {
+    if (isUserLoading || (user && isProfileLoading)) return 'loading';
+    if (!user) return 'limited';
+    if (!userProfile) return 'loading';
 
     switch (userProfile.subscriptionStatus) {
-      case 'admin': setStatus('admin'); break;
+      case 'admin': return 'admin';
       case 'active':
-        const expiry = new Date(userProfile.subscriptionExpiryDate!);
-        setStatus(isBefore(new Date(), expiry) ? 'active' : 'limited');
-        break;
+        return isBefore(new Date(), new Date(userProfile.subscriptionExpiryDate!)) ? 'active' : 'limited';
       case 'trial':
-        const trialExpiry = new Date(userProfile.subscriptionExpiryDate!);
-        setStatus(isBefore(new Date(), trialExpiry) ? 'trial' : 'limited');
-        break;
-      default: setStatus('limited'); break;
+        return isBefore(new Date(), new Date(userProfile.subscriptionExpiryDate!)) ? 'trial' : 'limited';
+      default: return 'limited';
     }
   }, [user, isUserLoading, userProfile, isProfileLoading]);
 
+  const isAuthPage = pathname === '/login' || pathname === '/signup';
+
+  const handleLogout = useCallback(async () => { 
+    if (auth) { 
+      await signOut(auth); 
+      sessionStorage.clear(); 
+      router.push('/login'); 
+    } 
+  }, [auth, router]);
+
+  const handlePrevDay = useCallback(() => setSelectedDate(subDays(selectedDate, 1)), [selectedDate, setSelectedDate]);
+  const handleNextDay = useCallback(() => setSelectedDate(addDays(selectedDate, 1)), [selectedDate, setSelectedDate]);
+
   if (isAuthPage) return <>{children}</>;
-  
-  const handleLogout = async () => { if (auth) { await signOut(auth); sessionStorage.clear(); router.push('/login'); } };
-  const handlePrevDay = () => setSelectedDate(subDays(selectedDate, 1));
-  const handleNextDay = () => setSelectedDate(addDays(selectedDate, 1));
 
   const showDayNavigator = ['/', '/lagon', '/peche', '/champs', '/chasse'].includes(pathname);
-
-  const getStatusLabel = () => {
-    switch (status) {
-        case 'admin': return 'Admin';
-        case 'active': return 'Abonné';
-        case 'trial': return 'Essai';
-        case 'limited': return 'Limité';
-        default: return 'Chargement...';
-    }
-  }
-
-  const renderUserMenu = () => {
-    if (isUserLoading || (user && isProfileLoading)) {
-      return (
-        <div className="flex items-center gap-3 p-2">
-          <Skeleton className="h-8 w-8 rounded-full" /><div className="flex flex-col gap-1 group-data-[collapsible=icon]:hidden"><Skeleton className="h-4 w-20" /><Skeleton className="h-3 w-12" /></div>
-        </div>
-      )
-    }
-    if (!user) {
-      return (
-        <Button asChild className="w-full justify-start h-12 p-2 gap-3" variant="ghost">
-          <Link href="/login"><LogOut className="h-8 w-8" /><div className="text-left group-data-[collapsible=icon]:hidden"><p className="font-medium text-sm">Se connecter</p></div></Link>
-        </Button>
-      );
-    }
-    return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="w-full justify-start h-12 p-2 gap-3">
-            <Avatar className="h-8 w-8"><AvatarImage src={user.photoURL ?? `https://picsum.photos/seed/${user.uid}/40/40`} /><AvatarFallback>{user.email?.[0].toUpperCase() ?? 'U'}</AvatarFallback></Avatar>
-            <div className="text-left group-data-[collapsible=icon]:hidden"><p className="font-medium text-sm truncate" title={user.email!}>{user.email}</p><p className="text-xs text-muted-foreground">{getStatusLabel()}</p></div>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-56" align="end" forceMount>
-          <DropdownMenuLabel className="font-normal"><div className="flex flex-col space-y-1"><p className="text-sm font-medium leading-none">Compte</p><p className="text-xs leading-none text-muted-foreground">{user.email}</p></div></DropdownMenuLabel>
-          <DropdownMenuSeparator /><DropdownMenuItem asChild><Link href="/compte" className="flex items-center w-full"><User className="mr-2 h-4 w-4" /><span>Gérer le compte</span></Link></DropdownMenuItem>
-          <DropdownMenuItem onClick={handleLogout}><LogOut className="mr-2 h-4 w-4" /><span>Se déconnecter</span></DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    );
-  }
 
   const datePickerTrigger = (
     <Button variant={'outline'} className="w-[150px] sm:w-[180px] justify-start text-left font-normal h-8"><CalendarIcon className="mr-2 h-4 w-4" />{format(selectedDate, 'PPP', { locale: fr })}</Button>
@@ -220,7 +176,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Sidebar>
           <SidebarHeader><div className="flex items-center gap-3 p-2"><AppLogo className="size-8 text-primary" /><h1 className="font-bold text-lg group-data-[collapsible=icon]:hidden">Lagon & Brousse</h1></div></SidebarHeader>
           <SidebarContent><SidebarNav /></SidebarContent>
-          <SidebarFooter>{renderUserMenu()}</SidebarFooter>
+          <SidebarFooter>
+            {isUserLoading || (user && isProfileLoading) ? (
+              <div className="flex items-center gap-3 p-2"><Skeleton className="h-8 w-8 rounded-full" /><div className="flex flex-col gap-1"><Skeleton className="h-4 w-20" /></div></div>
+            ) : user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="w-full justify-start h-12 p-2 gap-3">
+                    <Avatar className="h-8 w-8"><AvatarFallback>{user.email?.[0].toUpperCase()}</AvatarFallback></Avatar>
+                    <div className="text-left group-data-[collapsible=icon]:hidden"><p className="font-medium text-xs truncate w-32">{user.email}</p></div>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem asChild><Link href="/compte" className="flex items-center"><User className="mr-2 h-4 w-4" />Compte</Link></DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleLogout}><LogOut className="mr-2 h-4 w-4" />Déconnexion</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button asChild variant="ghost" className="w-full justify-start h-12"><Link href="/login"><LogOut className="mr-2" />Connexion</Link></Button>
+            )}
+          </SidebarFooter>
         </Sidebar>
         <main className="flex-1">
           <UsageTimer status={status} auth={auth} />
@@ -228,35 +203,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <SidebarTrigger />
             <div className="w-full flex-1 flex items-center flex-wrap gap-y-2">
               <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-                {status === 'trial' && <Badge variant="secondary">Version d'essai</Badge>}
-                {status === 'limited' && <Badge variant="destructive">Mode Limité</Badge>}
+                {status === 'trial' && <Badge variant="secondary">Essai</Badge>}
+                {status === 'limited' && <Badge variant="destructive">Limité</Badge>}
                 {isLocationLoading ? <Skeleton className="h-10 w-[180px]" /> : (
                   <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-                    <SelectTrigger className="w-[150px] sm:w-[180px]"><SelectValue placeholder="Choisir une commune" /></SelectTrigger>
+                    <SelectTrigger className="w-[150px] sm:w-[180px]"><SelectValue placeholder="Commune" /></SelectTrigger>
                     <SelectContent>{locations.map((loc) => <SelectItem key={loc} value={loc}>{loc}</SelectItem>)}</SelectContent>
                   </Select>
-                )}
-                {pathname === '/calendrier' && (
-                  <div className="flex items-center space-x-2">
-                    <Label htmlFor="calendar-view" className="text-sm font-medium">Pêche</Label>
-                    <Switch id="calendar-view" checked={calendarView === 'champs'} onCheckedChange={(checked) => setCalendarView(checked ? 'champs' : 'peche')} />
-                    <Label htmlFor="calendar-view" className="text-sm font-medium">Champs</Label>
-                  </div>
                 )}
                 {showDayNavigator && (
                   <div className="flex items-center gap-1 rounded-md border bg-background p-1">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handlePrevDay}><ChevronLeft className="h-4 w-4" /></Button>
-                    {isMobile ? (
-                      <Dialog open={isDatePickerOpen} onOpenChange={setDatePickerOpen}>
-                        <DialogTrigger asChild>{datePickerTrigger}</DialogTrigger>
-                        <DialogContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(d) => { if(d) { setSelectedDate(d); setDatePickerOpen(false); } }} initialFocus /></DialogContent>
-                      </Dialog>
-                    ) : (
-                      <Popover open={isDatePickerOpen} onOpenChange={setDatePickerOpen}>
-                        <PopoverTrigger asChild>{datePickerTrigger}</PopoverTrigger>
-                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(d) => { if(d) { setSelectedDate(d); setDatePickerOpen(false); } }} initialFocus /></PopoverContent>
-                      </Popover>
-                    )}
+                    <Popover open={isDatePickerOpen} onOpenChange={setDatePickerOpen}>
+                      <PopoverTrigger asChild>{datePickerTrigger}</PopoverTrigger>
+                      <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(d) => { if(d) { setSelectedDate(d); setDatePickerOpen(false); } }} initialFocus /></PopoverContent>
+                    </Popover>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleNextDay}><ChevronRight className="h-4 w-4" /></Button>
                   </div>
                 )}

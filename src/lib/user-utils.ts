@@ -6,7 +6,7 @@ import { addMonths } from 'date-fns';
 
 /**
  * Gère la création et la mise à jour du document profil utilisateur dans Firestore.
- * Assure que les administrateurs sont correctement identifiés par leur e-mail.
+ * Force le statut admin pour les adresses de Fabrice afin de garantir la cohérence des accès.
  */
 export async function ensureUserDocument(firestore: Firestore, user: User, displayName?: string): Promise<void> {
   if (!user || !firestore) return;
@@ -14,15 +14,16 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
   const userDocRef = doc(firestore, 'users', user.uid);
   const email = user.email?.toLowerCase() || '';
   
-  // Reconnaissance administrative pour les comptes de Fabrice
-  const isAdminUser = email === 'f.mallet81@outlook.com' || email === 'f.mallet81@gmail.com';
+  // Comptes Administrateur Système
+  const adminEmails = ['f.mallet81@gmail.com', 'f.mallet81@outlook.com'];
+  const isAdminUser = adminEmails.includes(email);
 
   try {
     const docSnap = await getDoc(userDocRef);
 
     if (docSnap.exists()) {
       const currentData = docSnap.data() as UserAccount;
-      // Mise à jour forcée du statut admin pour synchroniser avec les règles de sécurité
+      // Mise à jour forcée si le statut admin n'est pas synchronisé
       if (isAdminUser && currentData.subscriptionStatus !== 'admin') {
           await setDoc(userDocRef, { 
             ...currentData, 
@@ -51,6 +52,6 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
     
     await setDoc(userDocRef, newUserDocument);
   } catch (error) {
-    console.warn("Erreur lors de la création/mise à jour du document utilisateur:", error);
+    console.warn("Erreur synchronisation profil:", error);
   }
 }
