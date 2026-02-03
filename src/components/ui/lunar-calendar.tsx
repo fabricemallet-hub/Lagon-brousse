@@ -287,8 +287,8 @@ function DetailDialogSkeleton() {
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <Skeleton className="h-24 w-full" />
-        <Skeleton className="h-48 w-full" />
+        <div className="h-24 w-full bg-muted animate-pulse rounded-lg" />
+        <div className="h-48 w-full bg-muted animate-pulse rounded-lg" />
       </div>
     </div>
   );
@@ -343,22 +343,24 @@ function ChampsDetailDialogContent({ day, location }: { day: Date; location: str
           <CalendarDays className="size-4 text-primary" /> Travaux à prévoir
         </h4>
         <div className="grid gap-3">
-          {farming.details.map((item, index) => (
-            <div key={index} className="flex items-start gap-3 p-3 rounded-lg bg-card border shadow-sm">
-              <div className="p-2 rounded-full bg-muted">
-                {item.icon === 'Leaf' && <Leaf className="size-4" />}
-                {item.icon === 'Spade' && <Spade className="size-4" />}
-                {item.icon === 'Flower' && <Flower className="size-4" />}
-                {item.icon === 'RefreshCw' && <RefreshCw className="size-4" />}
-                {item.icon === 'Scissors' && <Scissors className="size-4" />}
-                {item.icon === 'Carrot' && <Carrot className="size-4" />}
+          {farming.details.map((item, index) => {
+            return (
+              <div key={index} className="flex items-start gap-3 p-3 rounded-lg bg-card border shadow-sm">
+                <div className="p-2 rounded-full bg-muted">
+                  {item.icon === 'Leaf' && <Leaf className="size-4" />}
+                  {item.icon === 'Spade' && <Spade className="size-4" />}
+                  {item.icon === 'Flower' && <Flower className="size-4" />}
+                  {item.icon === 'RefreshCw' && <RefreshCw className="size-4" />}
+                  {item.icon === 'Scissors' && <Scissors className="size-4" />}
+                  {item.icon === 'Carrot' && <Carrot className="size-4" />}
+                </div>
+                <div>
+                  <p className="font-bold text-sm">{item.task}</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{item.description}</p>
+                </div>
               </div>
-              <div>
-                <p className="font-bold text-sm">{item.task}</p>
-                <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{item.description}</p>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
@@ -515,7 +517,7 @@ export function LunarCalendar() {
               {detailedDay ? format(detailedDay, 'eeee d MMMM yyyy', { locale: fr }) : 'Détails de la journée'}
             </DialogTitle>
             <DialogDescription>
-              {calendarView === 'peche' ? 'Prévisions pêche et marées' : 'Conseils de jardinage lunaire'}
+              {calendarView === 'peche' ? 'Prévisions de pêche basées sur la lune et les marées.' : 'Recommandations de jardinage lunaire et tâches du jour.'}
             </DialogDescription>
           </DialogHeader>
           <div className="p-6 pt-2">

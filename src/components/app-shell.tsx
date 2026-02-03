@@ -158,7 +158,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (isAuthPage) return <>{children}</>;
 
-  const showDayNavigator = ['/', '/lagon', '/peche', '/champs', '/chasse'].includes(pathname);
+  // Now including /calendrier to show the selected date in the banner
+  const showDayNavigator = ['/', '/lagon', '/peche', '/champs', '/chasse', '/calendrier'].includes(pathname);
 
   return (
     <div>
