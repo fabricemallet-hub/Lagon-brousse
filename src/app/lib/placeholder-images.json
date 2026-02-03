@@ -2,63 +2,51 @@
 {
   "placeholderImages": [
     {
-      "id": "pwa-screenshot-mobile",
-      "description": "Capture d'écran mobile pour le manifeste PWA",
-      "imageUrl": "https://picsum.photos/seed/pwa1/1080/1920",
-      "imageHint": "mobile app"
-    },
-    {
-      "id": "pwa-screenshot-desktop",
-      "description": "Capture d'écran desktop pour le manifeste PWA",
-      "imageUrl": "https://picsum.photos/seed/pwa2/1920/1080",
-      "imageHint": "desktop dashboard"
-    },
-    {
       "id": "fish-bec-de-cane",
       "description": "Photo d'un Bec de cane",
-      "imageUrl": "https://picsum.photos/seed/fish1/200/200",
+      "imageUrl": "https://picsum.photos/seed/fish1/400/400",
       "imageHint": "emperor fish"
     },
     {
       "id": "fish-bossu-dore",
       "description": "Photo d'un Bossu doré",
-      "imageUrl": "https://picsum.photos/seed/fish2/200/200",
+      "imageUrl": "https://picsum.photos/seed/fish2/400/400",
       "imageHint": "snapper fish"
     },
     {
       "id": "fish-loche-truite",
       "description": "Photo d'une Loche truite",
-      "imageUrl": "https://picsum.photos/seed/fish3/200/200",
+      "imageUrl": "https://picsum.photos/seed/fish3/400/400",
       "imageHint": "coral trout"
     },
     {
       "id": "fish-picot-raye",
       "description": "Photo d'un Picot rayé",
-      "imageUrl": "https://picsum.photos/seed/fish4/200/200",
+      "imageUrl": "https://picsum.photos/seed/fish4/400/400",
       "imageHint": "rabbitfish"
     },
     {
       "id": "fish-carangue-bleue",
       "description": "Photo d'une Carangue bleue",
-      "imageUrl": "https://picsum.photos/seed/fish5/200/200",
+      "imageUrl": "https://picsum.photos/seed/fish5/400/400",
       "imageHint": "trevally fish"
     },
     {
       "id": "fish-perroquet-bleu",
       "description": "Photo d'un Perroquet bleu",
-      "imageUrl": "https://picsum.photos/seed/fish6/200/200",
+      "imageUrl": "https://picsum.photos/seed/fish6/400/400",
       "imageHint": "parrotfish"
     },
     {
       "id": "fish-thazard",
       "description": "Photo d'un Thazard",
-      "imageUrl": "https://picsum.photos/seed/fish7/200/200",
+      "imageUrl": "https://picsum.photos/seed/fish7/400/400",
       "imageHint": "king mackerel"
     },
     {
       "id": "fish-rouget-barbet",
       "description": "Photo d'un Rouget-barbet",
-      "imageUrl": "https://picsum.photos/seed/fish8/200/200",
+      "imageUrl": "https://picsum.photos/seed/fish8/400/400",
       "imageHint": "goatfish"
     }
   ]
