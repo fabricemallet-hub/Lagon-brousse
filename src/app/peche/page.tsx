@@ -182,8 +182,8 @@ export default function PechePage() {
                 Potentiel par espèce
               </h4>
               <Accordion type="single" collapsible className="w-full space-y-3">
-                {/* Abaissement du seuil à 6 pour afficher matinée et après-midi */}
-                {slot.fish.filter(f => f.rating >= 6).map((f, i) => (
+                {/* Seuil relevé à 8/10 pour n'afficher que les meilleures opportunités */}
+                {slot.fish.filter(f => f.rating >= 8).map((f, i) => (
                   <AccordionItem value={`item-${i}`} key={i} className="border-none">
                     <div className="border rounded-lg overflow-hidden bg-card shadow-sm">
                       <AccordionTrigger className="p-4 hover:no-underline text-sm [&[data-state=open]]:bg-muted/50 [&[data-state=open]]:border-b">
@@ -221,6 +221,9 @@ export default function PechePage() {
                     </div>
                   </AccordionItem>
                 ))}
+                {slot.fish.filter(f => f.rating >= 8).length === 0 && (
+                  <p className="text-center text-xs text-muted-foreground py-4 italic">Peu d'activité majeure prévue sur ce créneau.</p>
+                )}
               </Accordion>
             </CardContent>
           </Card>
