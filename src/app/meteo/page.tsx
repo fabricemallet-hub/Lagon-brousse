@@ -280,15 +280,30 @@ function ForecastView({ communeId, liveData, onBack, now }: { communeId: string,
             try {
                 const summary = await getWeatherSummary({
                     commune: communeId,
-                    forecasts: dbForecasts.map(d => ({
-                        date: format(new Date(d.date.replace(/-/g, '/')), 'EEEE d MMMM', { locale: fr }),
-                        tempMin: d.temp_min,
-                        tempMax: d.temp_max,
-                        windSpeed: d.vent_max,
-                        windDirection: "Inconnue",
-                        uvIndex: 0,
-                        condition: getMeteoCondition(d.code_meteo)
-                    }))
+                    forecasts: dbForecasts.map((d, index) => {
+                        const dateObj = new Date(d.date.replace(/-/g, '/'));
+                        
+                        // Estimation réaliste de l'UV max en NC (pic à 14 en été, 6 en hiver)
+                        // On utilise la donnée live pour aujourd'hui si dispo
+                        let uvMax = 0;
+                        if (index === 0 && liveData?.uv) {
+                            uvMax = liveData.uv;
+                        } else {
+                            const month = dateObj.getMonth();
+                            // Courbe simple : pic en Jan (0) à 14, min en Juil (6) à 6
+                            uvMax = Math.round(10 + 4 * Math.cos((month * Math.PI) / 6));
+                        }
+
+                        return {
+                            date: format(dateObj, 'EEEE d MMMM', { locale: fr }),
+                            tempMin: d.temp_min,
+                            tempMax: d.temp_max,
+                            windSpeed: d.vent_max,
+                            windDirection: "Inconnue",
+                            uvIndex: uvMax,
+                            condition: getMeteoCondition(d.code_meteo)
+                        };
+                    })
                 });
                 setAiSummary(summary);
             } catch (error) {
@@ -298,7 +313,7 @@ function ForecastView({ communeId, liveData, onBack, now }: { communeId: string,
             }
         };
         fetchSummary();
-    }, [communeId, dbForecasts]);
+    }, [communeId, dbForecasts, liveData]);
 
     return (
         <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-12">

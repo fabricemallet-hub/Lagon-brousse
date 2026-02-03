@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview AI flow for generating a 7-day weather summary and advice.
@@ -31,7 +30,7 @@ const prompt = ai.definePrompt({
 TA MISSION :
 1. Rédige un bilan global de l'évolution du temps sur la semaine (tendance des températures, calme ou venté, humidité).
 2. Donne des conseils spécifiques aux activités locales : est-ce une bonne semaine pour la pêche (vent), la chasse ou le jardinage (pluie/chaleur) ?
-3. Liste les précautions de sécurité indispensables (protection solaire, navigation si vent fort).
+3. Liste les précautions de sécurité indispensables (protection solaire basée sur l'UV max fourni pour chaque journée, navigation si vent fort). Ignore les UV minimaux nocturnes, concentre-toi sur le pic UV maximal de la journée.
 
 Réponds avec expertise et clarté en français.`,
 });
