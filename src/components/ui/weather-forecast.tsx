@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -190,7 +191,7 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
                 </div>
                 <div className="flex items-center gap-2 bg-white/10 px-2 py-1 rounded">
                     <Sun className="size-4" />
-                    <span>UV: {weather.uvIndex}</span>
+                    <span>UV: {selectedForecast.uvIndex}</span>
                 </div>
              </div>
         </div>

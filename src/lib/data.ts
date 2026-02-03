@@ -1,3 +1,4 @@
+
 import { LocationData, SwellForecast, Tide, WindDirection, WindForecast, HourlyForecast } from './types';
 import { locations } from './locations';
 
@@ -416,22 +417,42 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   locationData.weather.hourly = [];
   const tideDataForDay = calculateHourlyTidesForSimulation(locationData.tides, date);
   
+  let maxUV = 0;
+  // Calcul de la température saisonnière NC (Moyenne 22-28°C selon mois)
+  const seasonalTempFactor = Math.cos(((month - 1) / 12) * 2 * Math.PI); // Pic en Janvier, Min en Juillet
+  const dailyBaseTemp = 22 + seasonalTempFactor * 4;
+
   for (let i = 0; i < 24; i++) {
       const forecastDate = new Date(effectiveDate.getTime() + i * 60 * 60 * 1000);
       const tideAtHour = tideDataForDay.find(td => new Date(td.date).getHours() === i);
+      
+      // Température dynamique (Peak à 14h)
+      const tempVariation = Math.sin(((i - 8) / 12) * Math.PI);
+      const hourlyTemp = Math.round(dailyBaseTemp + tempVariation * 5);
+
+      // UV dynamique (Peak à 12h, 0 entre 18h et 6h)
+      let hourlyUV = 0;
+      if (i >= 6 && i <= 18) {
+          hourlyUV = Math.round(Math.sin(((i - 6) / 12) * Math.PI) * 11);
+      }
+      if (hourlyUV > maxUV) maxUV = hourlyUV;
+
       locationData.weather.hourly.push({
           date: forecastDate.toISOString(),
-          condition: 'Ensoleillé',
+          condition: i < 6 || i > 18 ? 'Nuit claire' : (rainChance > 0.98 ? 'Averses' : 'Ensoleillé'),
           windSpeed: locationData.weather.wind[Math.floor(i/6)]?.speed || 10,
           windDirection: locationData.weather.wind[Math.floor(i/6)]?.direction || 'E',
           stability: locationData.weather.wind[Math.floor(i/6)]?.stability || 'Stable',
           isNight: i < 6 || i > 18,
-          temp: 25,
+          temp: hourlyTemp,
+          uvIndex: hourlyUV,
           tideHeight: tideAtHour?.tideHeight || 0,
           tideCurrent: tideAtHour?.tideCurrent || 'Nul',
           tidePeakType: tideAtHour?.tidePeakType
       });
   }
+  locationData.weather.uvIndex = maxUV;
+  locationData.weather.temp = locationData.weather.hourly[12].temp; // Température de référence à midi
 
   proceduralCache.set(cacheKey, locationData);
   return locationData;

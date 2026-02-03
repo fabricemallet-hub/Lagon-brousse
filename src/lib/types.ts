@@ -29,6 +29,7 @@ export interface HourlyForecast {
   stability: 'Stable' | 'Tournant';
   isNight: boolean;
   temp: number;
+  uvIndex: number;
   tideHeight: number;
   tideCurrent: 'Nul' | 'Faible' | 'Modéré' | 'Fort';
   tidePeakType?: 'haute' | 'basse';
