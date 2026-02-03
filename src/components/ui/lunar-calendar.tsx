@@ -225,18 +225,16 @@ export function LunarCalendar() {
   const days = eachDayOfInterval({ start: startDate, end: endDate });
   const weekdays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
-  // Centrage automatique du calendrier sur aujourd'hui à la page entière
+  // Centrage automatique sur le jour actuel
   useEffect(() => {
     const timer = setTimeout(() => {
       const todayEl = document.querySelector('.calendar-today-cell');
       if (todayEl) {
         const rect = todayEl.getBoundingClientRect();
+        // On scroll la fenêtre pour centrer l'élément horizontalement
         const scrollX = rect.left + window.scrollX - (window.innerWidth / 2) + (rect.width / 2);
-        const scrollY = rect.top + window.scrollY - (window.innerHeight / 2) + (rect.height / 2);
-        
         window.scrollTo({
           left: scrollX,
-          top: scrollY,
           behavior: 'smooth'
         });
       }
@@ -245,7 +243,7 @@ export function LunarCalendar() {
   }, [displayDate]);
 
   return (
-    <div className="flex flex-col items-start sm:items-center py-4">
+    <div className="flex flex-col items-start py-4">
       <div className="w-[1200px] border rounded-lg bg-card shadow-lg overflow-hidden flex flex-col shrink-0">
         <div className="flex justify-between items-center p-4 border-b bg-muted/10">
           <Button variant="ghost" size="icon" className="h-10 w-10" onClick={handlePrevMonth}><ChevronLeft className="size-6" /></Button>
@@ -257,10 +255,7 @@ export function LunarCalendar() {
           {weekdays.map((day, idx) => (
             <div 
               key={day} 
-              className={cn(
-                "text-center text-[10px] font-black uppercase text-muted-foreground p-3 border-l border-transparent first:border-l-0",
-                idx > 0 && "border-l-border/0"
-              )}
+              className="text-center text-[10px] font-black uppercase text-muted-foreground p-3 flex items-center justify-center border-l first:border-l-0 border-transparent"
             >
               {day}
             </div>

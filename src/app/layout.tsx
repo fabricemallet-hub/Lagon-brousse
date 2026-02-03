@@ -46,8 +46,8 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap"
           rel="stylesheet"
         />
-        {/* Viewport optimisé : permet un zoom arrière important pour voir tout le calendrier de 1200px */}
-        <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=0.3, maximum-scale=5, user-scalable=yes" />
+        {/* Viewport optimisé : retrait de width=device-width pour permettre le zoom arrière sur le calendrier large */}
+        <meta name="viewport" content="initial-scale=1, minimum-scale=0.1, maximum-scale=5, user-scalable=yes" />
         <link rel="icon" href="/icon-192x192.png?v=2" />
         <link rel="apple-touch-icon" href="/icon-192x192.png?v=2" />
         <link rel="manifest" href="/manifest.webmanifest?v=2" />
