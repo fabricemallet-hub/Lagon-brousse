@@ -156,24 +156,41 @@ export default function MeteoLivePage() {
               <CardContent className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className={cn(
-                    "size-12 rounded-xl flex items-center justify-center shrink-0",
+                    "size-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm",
                     commune.id === selectedLocation ? "bg-primary text-white" : "bg-primary/10 text-primary"
                   )}>
-                    <MapPin className="size-6" />
+                    <MapPin className="size-7" />
                   </div>
-                  <div className="flex flex-col">
+                  <div className="flex flex-col min-w-0">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-black uppercase tracking-tighter text-sm leading-none">{commune.id}</h3>
+                      <h3 className="font-black uppercase tracking-tighter text-base leading-none truncate">{commune.id}</h3>
                       {commune.id === selectedLocation && (
                         <Badge variant="outline" className="text-[8px] h-4 font-black uppercase px-1.5 border-primary text-primary">Ma Commune</Badge>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 mt-2">
-                      <div className="flex items-center gap-1 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded text-[10px] font-black text-blue-600 dark:text-blue-400">
-                        <Wind className="size-3" /> {commune.vent} ND {commune.direction && `(${translateWindDirection(commune.direction)})`}
+                    
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
+                      {/* Vent agrandi */}
+                      <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                        <Wind className="size-4" />
+                        <div className="flex flex-col leading-none">
+                          <span className="text-base font-black">{commune.vent} <span className="text-[10px]">ND</span></span>
+                          <span className="text-[9px] font-bold text-muted-foreground uppercase truncate">
+                            {commune.direction ? translateWindDirection(commune.direction) : ''}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1 bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded text-[10px] font-black text-orange-600 dark:text-orange-400">
-                        <Thermometer className="size-3" /> {commune.temperature}°C
+                      
+                      {/* Température agrandie */}
+                      <div className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400 border-l border-border/50 pl-3">
+                        <Thermometer className="size-4" />
+                        <span className="text-base font-black">{commune.temperature}°C</span>
+                      </div>
+
+                      {/* Ajout de l'UV */}
+                      <div className="flex items-center gap-1.5 text-yellow-600 dark:text-yellow-500 border-l border-border/50 pl-3">
+                        <Sun className="size-4" />
+                        <span className="text-sm font-black">UV {commune.uv}</span>
                       </div>
                     </div>
                   </div>
