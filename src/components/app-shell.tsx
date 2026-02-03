@@ -188,7 +188,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             )}
           </SidebarFooter>
         </Sidebar>
-        <main className="flex-1">
+        <main className="flex-1 flex flex-col min-h-screen">
           <UsageTimer status={status} auth={auth} />
           <header className={cn("flex h-auto min-h-14 items-center gap-4 border-b bg-card px-4 lg:h-[60px] lg:px-6 sticky top-0 z-30 py-2", status === 'limited' && 'mt-10')}>
             <SidebarTrigger />
@@ -241,7 +241,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               )}
             </div>
           </header>
-          <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 pb-24 md:pb-6">{children}</div>
+          <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 pb-36 md:pb-12">{children}</div>
           <BottomNav />
         </main>
       </SidebarProvider>

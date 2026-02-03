@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import {
   Card,
   CardContent,
@@ -24,7 +24,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { semisData, type Vegetable } from '@/lib/semis-data';
+import { semisData } from '@/lib/semis-data';
 import {
   Sun,
   Droplets,
@@ -39,13 +39,11 @@ import {
   BrainCircuit,
   Search,
   Sprout,
-  CalendarDays,
   Sparkles,
   AlertTriangle,
   CheckCircle2,
   Shovel,
   Info,
-  ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,13 +51,14 @@ import { Badge } from '@/components/ui/badge';
 import { useUser, useFirestore } from '@/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { format, addDays } from 'date-fns';
-import { fr } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { getGardeningAdvice } from '@/ai/flows/gardening-flow';
 import { useLocation } from '@/context/location-context';
 import { generateProceduralData, getDataForDate } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import type { GardeningAdviceOutput } from '@/ai/schemas';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 function AdviceDetail({
   icon: Icon,
@@ -75,7 +74,7 @@ function AdviceDetail({
       <Icon className="size-5 text-primary mt-1 flex-shrink-0" />
       <div>
         <h4 className="font-semibold text-sm">{title}</h4>
-        <p className="text-xs text-muted-foreground">{content}</p>
+        <p className="text-xs text-muted-foreground leading-relaxed">{content}</p>
       </div>
     </div>
   );
@@ -195,7 +194,7 @@ export default function SemisPage() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-32">
       <Card className="overflow-hidden border-none shadow-lg bg-gradient-to-br from-green-600 to-emerald-700 text-white">
         <CardHeader>
           <CardTitle className="text-2xl flex items-center gap-2"><Sprout /> Guide & Planificateur</CardTitle>
@@ -308,20 +307,20 @@ export default function SemisPage() {
         <CardContent className="space-y-6">
           <div>
             <h3 className="font-bold text-lg text-accent">Engrais Vert : Qu'est-ce que c'est ?</h3>
-            <p className="text-muted-foreground mt-1">
+            <p className="text-muted-foreground mt-1 leading-relaxed">
               Un engrais vert est une culture que l'on ne récolte pas. On la fauche avant qu'elle ne monte en graine et on l'incorpore au sol pour l'enrichir naturellement.
             </p>
           </div>
           <div className="space-y-4">
              <div className="space-y-1">
                 <h4 className="font-semibold">Les Légumineuses (Haricot, Pois, Crotalaire...)</h4>
-                <p className="text-sm text-muted-foreground text-pretty">
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   Ces plantes captent l'azote de l'air. En les laissant se décomposer, vous offrez un festin d'azote à vos prochaines cultures.
                 </p>
               </div>
               <div className="space-y-1">
                 <h4 className="font-semibold">La Phacélie</h4>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   Pousse vite, étouffe les mauvaises herbes, aère le sol et attire les abeilles avec ses fleurs violettes.
                 </p>
               </div>
@@ -331,86 +330,119 @@ export default function SemisPage() {
 
       {/* Planning Dialog */}
       <Dialog open={isPlanningOpen} onOpenChange={(open) => !open && handleCloseDialog()}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-lg h-[95vh] sm:h-auto max-h-[95vh] flex flex-col p-0 overflow-hidden rounded-t-xl sm:rounded-lg">
+          <DialogHeader className="p-6 pb-2 shrink-0">
             <DialogTitle className="flex items-center gap-2">
-              <Sprout className="text-primary" /> Planifier : {selectedVeg === 'CUSTOM' ? customVeg : selectedVeg}
+              <Sprout className="text-primary shrink-0" /> Planifier : {selectedVeg === 'CUSTOM' ? customVeg : selectedVeg}
             </DialogTitle>
             <DialogDescription>
-              Choisissez votre date. L'IA calculera la fiche de semis et vérifiera la lune.
+              Choisissez votre date. L'IA calculera la fiche et vérifiera la lune.
             </DialogDescription>
           </DialogHeader>
 
-          {!aiAdvice ? (
-            <div className="space-y-6 py-4">
-              <div className="space-y-2">
-                <label className="text-sm font-bold uppercase text-muted-foreground">Date de mise en semis prévue</label>
-                <div className="relative">
-                  <Input 
-                    type="date" 
-                    value={sowingDate}
-                    onChange={(e) => setSowingDate(e.target.value)}
-                    className="h-12 pl-10"
-                  />
-                  <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-primary pointer-events-none" />
-                </div>
-              </div>
-              <Button 
-                onClick={handleStartAnalysis} 
-                className="w-full h-12 text-lg font-bold" 
-                disabled={isAnalyzing}
-              >
-                {isAnalyzing ? (
-                  <><BrainCircuit className="mr-2 animate-pulse" /> Analyse de la fiche...</>
-                ) : (
-                  <><BrainCircuit className="mr-2" /> Calculer la fiche avec l'IA</>
-                )}
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-6 py-4 animate-in fade-in slide-in-from-bottom-4">
-              <div className={cn(
-                "p-4 rounded-xl border-2 flex gap-3",
-                aiAdvice.isValidForMoon ? "bg-green-50 border-green-200 text-green-800" : "bg-amber-50 border-amber-200 text-amber-800"
-              )}>
-                {aiAdvice.isValidForMoon ? <CheckCircle2 className="size-6 text-green-600 shrink-0" /> : <AlertTriangle className="size-6 text-amber-600 shrink-0" />}
-                <div className="space-y-1">
-                  <p className="font-bold text-sm">{aiAdvice.isValidForMoon ? "Période idéale !" : "Date déconseillée"}</p>
-                  <p className="text-xs leading-relaxed font-medium">{aiAdvice.moonWarning}</p>
-                </div>
-              </div>
+          <ScrollArea className="flex-grow">
+            <div className="p-6 pt-2 space-y-6 pb-20">
+              {!aiAdvice ? (
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold uppercase text-muted-foreground">Date de mise en semis prévue</label>
+                    <Input 
+                      type="date" 
+                      value={sowingDate}
+                      onChange={(e) => setSowingDate(e.target.value)}
+                      className="h-12 text-base"
+                    />
+                  </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-muted/50 p-3 rounded-lg border">
-                  <div className="text-[10px] font-bold uppercase text-muted-foreground">Catégorie</div>
-                  <div className="font-bold text-sm flex items-center gap-2 mt-1">
-                    <Badge variant="outline" className="bg-primary/5">{aiAdvice.plantType}</Badge>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold uppercase text-muted-foreground">Variété</label>
+                    <Select value={selectedVeg || ''} onValueChange={setSelectedVeg}>
+                      <SelectTrigger className="h-12 text-base">
+                        <SelectValue placeholder="Changer de graine..." />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[50vh]">
+                        {semisData.map(s => <SelectItem key={s.name} value={s.name}>{s.name}</SelectItem>)}
+                        <SelectItem value="CUSTOM">Autre / Saisie manuelle...</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {selectedVeg === 'CUSTOM' && (
+                    <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                      <label className="text-sm font-bold uppercase text-muted-foreground">Nom personnalisé</label>
+                      <Input 
+                        placeholder="Ex: Fruit du dragon..." 
+                        value={customVeg}
+                        onChange={(e) => setCustomVeg(e.target.value)}
+                        className="h-12 text-base"
+                      />
+                    </div>
+                  )}
+
+                  <Button 
+                    onClick={handleStartAnalysis} 
+                    className="w-full h-14 text-lg font-bold shadow-lg" 
+                    disabled={isAnalyzing || (!selectedVeg && !customVeg)}
+                  >
+                    {isAnalyzing ? (
+                      <><BrainCircuit className="mr-2 animate-pulse" /> Analyse en cours...</>
+                    ) : (
+                      <><BrainCircuit className="mr-2" /> Calculer la fiche IA</>
+                    )}
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                  <div className={cn(
+                    "p-4 rounded-xl border-2 flex gap-3 shadow-sm",
+                    aiAdvice.isValidForMoon ? "bg-green-50 border-green-200 text-green-800" : "bg-amber-50 border-amber-200 text-amber-800"
+                  )}>
+                    {aiAdvice.isValidForMoon ? <CheckCircle2 className="size-6 text-green-600 shrink-0" /> : <AlertTriangle className="size-6 text-amber-600 shrink-0" />}
+                    <div className="space-y-1">
+                      <p className="font-bold text-sm">{aiAdvice.isValidForMoon ? "Période idéale !" : "Date déconseillée"}</p>
+                      <p className="text-xs leading-relaxed font-medium">{aiAdvice.moonWarning}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-muted/50 p-3 rounded-lg border">
+                      <div className="text-[10px] font-bold uppercase text-muted-foreground">Catégorie</div>
+                      <div className="mt-1">
+                        <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary font-bold">{aiAdvice.plantType}</Badge>
+                      </div>
+                    </div>
+                    <div className="bg-muted/50 p-3 rounded-lg border">
+                      <div className="text-[10px] font-bold uppercase text-muted-foreground">Récolte estimée</div>
+                      <div className="font-bold text-sm mt-1 text-green-700">{aiAdvice.harvestDate}</div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                      <Info className="size-3 text-primary" /> Fiche Technique IA
+                    </h4>
+                    <div className="space-y-4 bg-muted/20 p-4 rounded-xl border">
+                      <AdviceDetail icon={Sun} title="Culture & Exposition" content={aiAdvice.cultureAdvice} />
+                      <AdviceDetail icon={Shovel} title="Mise en terre (Repiquage)" content={aiAdvice.transplantingAdvice} />
+                    </div>
                   </div>
                 </div>
-                <div className="bg-muted/50 p-3 rounded-lg border">
-                  <div className="text-[10px] font-bold uppercase text-muted-foreground">Récolte estimée</div>
-                  <div className="font-bold text-sm mt-1">{aiAdvice.harvestDate}</div>
-                </div>
-              </div>
+              )}
+            </div>
+          </ScrollArea>
 
-              <div className="space-y-4">
-                <h4 className="text-xs font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
-                  <Info className="size-3" /> Fiche Technique IA
-                </h4>
-                <div className="space-y-3">
-                  <AdviceDetail icon={Sun} title="Culture & Exposition" content={aiAdvice.cultureAdvice} />
-                  <AdviceDetail icon={Shovel} title="Mise en terre (Repiquage)" content={aiAdvice.transplantingAdvice} />
-                </div>
-              </div>
-
-              <DialogFooter className="flex-col gap-2 sm:flex-row pt-4 border-t">
-                <Button variant="ghost" onClick={() => setAiAdvice(null)} className="w-full sm:w-auto">Modifier la date</Button>
-                <Button onClick={handleConfirmSowing} disabled={isSaving} className="w-full sm:flex-1 font-bold">
+          <DialogFooter className="p-4 bg-muted/30 border-t shrink-0 flex-row gap-2">
+            {aiAdvice ? (
+              <>
+                <Button variant="ghost" onClick={() => setAiAdvice(null)} className="flex-1">Modifier</Button>
+                <Button onClick={handleConfirmSowing} disabled={isSaving} className="flex-[2] font-bold h-12 shadow-md">
                   {isSaving ? "Enregistrement..." : "Confirmer & Enregistrer"}
                 </Button>
-              </DialogFooter>
-            </div>
-          )}
+              </>
+            ) : (
+              <Button variant="outline" onClick={handleCloseDialog} className="w-full">Annuler</Button>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
