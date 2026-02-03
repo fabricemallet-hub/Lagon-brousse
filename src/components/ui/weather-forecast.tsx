@@ -13,7 +13,7 @@ import {
   Waves,
   Zap,
 } from 'lucide-react';
-import { format, formatDistanceToNow, isSameDay } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { WeatherData, HourlyForecast, WindDirection, Tide } from '@/lib/types';
 import { cn, translateWindDirection } from '@/lib/utils';
@@ -144,7 +144,6 @@ export function WeatherForecast({
     }
     const windSentence = `Vent de ${_selectedForecast.windSpeed} nœuds de ${translateWindDirection(_selectedForecast.windDirection)}, tendance ${windTrend}.`;
 
-    // Tri chronologique strict de 00h à 23h
     const sortedForecasts = [...weather.hourly].sort((a, b) => 
       new Date(a.date).getHours() - new Date(b.date).getHours()
     );
@@ -229,7 +228,7 @@ export function WeatherForecast({
                 className={cn(
                   'flex-shrink-0 w-24 flex flex-col items-center justify-between p-3 rounded-xl border h-40 space-y-2 text-center transition-all duration-300',
                    isCurrent ? 'bg-primary text-primary-foreground border-primary scale-[1.05] z-10 shadow-xl' : 'bg-card',
-                   isPast && 'bg-muted/40 text-muted-foreground/50 border-muted opacity-60 grayscale pointer-events-none'
+                   isPast && 'bg-zinc-200/80 text-muted-foreground/40 border-muted opacity-40 grayscale pointer-events-none'
                 )}
               >
                 <p className={cn(
