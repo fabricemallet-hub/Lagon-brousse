@@ -11,8 +11,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { DollarSign, Users, Crown, KeyRound, Copy, Trash2, AlertCircle, Mail, Share2, Palette, Image as ImageIcon, Type, Eye, Save, Upload } from 'lucide-react';
+import { DollarSign, Users, Crown, KeyRound, Copy, Trash2, AlertCircle, Mail, Share2, Palette, Image as ImageIcon, Type, Eye, Save, Upload, Timer } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Slider } from '@/components/ui/slider';
 import Link from 'next/link';
 import {
   Table,
@@ -74,6 +75,7 @@ export default function AdminPage() {
   const [splashBgColor, setSplashBgColor] = useState('#3b82f6');
   const [splashImageUrl, setSplashImageUrl] = useState('');
   const [splashImageFit, setSplashImageFit] = useState<'cover' | 'contain'>('contain');
+  const [splashDuration, setSplashDuration] = useState(3);
   const [isSavingSplash, setIsSavingSplash] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
 
@@ -96,6 +98,7 @@ export default function AdminPage() {
       setSplashBgColor(savedSplashSettings.splashBgColor || '#3b82f6');
       setSplashImageUrl(savedSplashSettings.splashImageUrl || '');
       setSplashImageFit(savedSplashSettings.splashImageFit || 'contain');
+      setSplashDuration(savedSplashSettings.splashDuration || 3);
     }
   }, [savedSplashSettings]);
 
@@ -178,7 +181,8 @@ export default function AdminPage() {
         splashFontSize,
         splashBgColor,
         splashImageUrl,
-        splashImageFit
+        splashImageFit,
+        splashDuration
       };
       await setDoc(doc(firestore, 'app_settings', 'splash'), settings, { merge: true });
       toast({ title: "Configuration sauvegardée", description: "Le nouvel écran de démarrage est actif." });
@@ -192,9 +196,10 @@ export default function AdminPage() {
 
   const startPreview = () => {
     setIsPreviewing(true);
+    // Add 1 second for the fade out transition
     setTimeout(() => {
       setIsPreviewing(false);
-    }, 3500);
+    }, (splashDuration * 1000) + 1000);
   };
 
   const handleGenerateToken = async () => {
@@ -345,7 +350,7 @@ export default function AdminPage() {
   }
 
   const currentPreviewSettings: SplashScreenSettings = {
-    splashMode, splashText, splashTextColor, splashFontSize, splashBgColor, splashImageUrl, splashImageFit
+    splashMode, splashText, splashTextColor, splashFontSize, splashBgColor, splashImageUrl, splashImageFit, splashDuration
   };
 
   return (
@@ -446,13 +451,34 @@ export default function AdminPage() {
               </div>
 
               <div className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-4">
-                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Couleurs & Fond</Label>
-                  <div className="space-y-2">
-                    <Label htmlFor="bg-color">Couleur de fond</Label>
-                    <div className="flex gap-2">
-                      <Input id="bg-color" type="color" value={splashBgColor} onChange={e => setSplashBgColor(e.target.value)} className="w-12 h-10 p-1" />
-                      <Input value={splashBgColor} onChange={e => setSplashBgColor(e.target.value)} placeholder="#000000" />
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Couleurs & Fond</Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="bg-color">Couleur de fond</Label>
+                      <div className="flex gap-2">
+                        <Input id="bg-color" type="color" value={splashBgColor} onChange={e => setSplashBgColor(e.target.value)} className="w-12 h-10 p-1" />
+                        <Input value={splashBgColor} onChange={e => setSplashBgColor(e.target.value)} placeholder="#000000" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 pt-4 border-t">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                      <Timer className="size-4" /> Durée d'affichage
+                    </Label>
+                    <div className="space-y-4">
+                      <div className="flex justify-between text-sm">
+                        <span>Durée : {splashDuration} secondes</span>
+                      </div>
+                      <Slider 
+                        value={[splashDuration]} 
+                        min={1} 
+                        max={10} 
+                        step={0.5} 
+                        onValueChange={(val) => setSplashDuration(val[0])} 
+                      />
+                      <p className="text-[10px] text-muted-foreground italic">Une durée trop longue peut frustrer les utilisateurs fréquents.</p>
                     </div>
                   </div>
                 </div>

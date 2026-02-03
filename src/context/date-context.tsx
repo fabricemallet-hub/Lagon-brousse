@@ -30,19 +30,21 @@ export function DateProvider({ children }: { children: ReactNode }) {
   const { data: splashSettings, isLoading: isSettingsLoading } = useDoc<SplashScreenSettings>(settingsRef);
 
   useEffect(() => {
+    // Determine duration: use settings if available, else default to 2.5s
+    const duration = (splashSettings?.splashDuration || 2.5) * 1000;
+
     const timer = setTimeout(() => {
       setIsExiting(true);
       setTimeout(() => {
         setShowSplash(false);
         setSelectedDate(new Date());
       }, 1000); // Wait for fade out animation
-    }, 2500); // Total splash duration
+    }, duration);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [splashSettings]);
 
   // Use a neutral default while loading to avoid "blue flash"
-  // We use the app background color or transparent to be seamless
   const defaultSettings: SplashScreenSettings = {
     splashMode: 'text',
     splashText: '', 

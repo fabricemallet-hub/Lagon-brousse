@@ -48,7 +48,8 @@
         "splashFontSize": { "type": "string" },
         "splashBgColor": { "type": "string" },
         "splashImageUrl": { "type": "string" },
-        "splashImageFit": { "type": "string", "enum": ["cover", "contain"] }
+        "splashImageFit": { "type": "string", "enum": ["cover", "contain"] },
+        "splashDuration": { "type": "number", "description": "Durée en secondes." }
       }
     }
   },

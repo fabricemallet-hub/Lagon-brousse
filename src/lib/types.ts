@@ -266,4 +266,5 @@ export interface SplashScreenSettings {
   splashBgColor?: string;
   splashImageUrl?: string;
   splashImageFit?: 'cover' | 'contain';
+  splashDuration?: number;
 }
