@@ -257,7 +257,7 @@ const Sidebar = React.forwardRef<
 Sidebar.displayName = "Sidebar"
 
 const SidebarTrigger = React.forwardRef<
-  React.ElementRef<typeof Button>,
+  HTMLButtonElement,
   React.ComponentProps<typeof Button>
 >(({ className, onClick, ...props }, ref) => {
   const { toggleSidebar } = useSidebar()
@@ -268,7 +268,7 @@ const SidebarTrigger = React.forwardRef<
       data-sidebar="trigger"
       variant="ghost"
       size="icon"
-      className={cn("h-11 w-11 md:hidden bg-background/50 backdrop-blur-sm shadow-sm border", className)}
+      className={cn("h-11 w-11 bg-background/50 backdrop-blur-sm shadow-sm border", className)}
       onClick={(event) => {
         onClick?.(event)
         toggleSidebar()
@@ -551,7 +551,7 @@ const SidebarMenuButton = React.forwardRef<
     ref
   ) => {
     const Comp = asChild ? Slot : "button"
-    const { isMobile, state, setOpenMobile } = useSidebar()
+    const { isMobile, state, setOpen, setOpenMobile } = useSidebar()
 
     const button = (
       <Comp
@@ -561,7 +561,8 @@ const SidebarMenuButton = React.forwardRef<
         data-active={isActive}
         className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
         onClick={(event) => {
-          if (isMobile) setOpenMobile(false)
+          setOpen(false)
+          setOpenMobile(false)
           onClick?.(event)
         }}
         {...props}
@@ -713,7 +714,7 @@ const SidebarMenuSubButton = React.forwardRef<
   }
 >(({ asChild = false, size = "md", isActive, className, onClick, ...props }, ref) => {
   const Comp = asChild ? Slot : "a"
-  const { isMobile, setOpenMobile } = useSidebar()
+  const { isMobile, setOpen, setOpenMobile } = useSidebar()
 
   return (
     <Comp
@@ -730,7 +731,8 @@ const SidebarMenuSubButton = React.forwardRef<
         className
       )}
       onClick={(event) => {
-        if (isMobile) setOpenMobile(false)
+        setOpen(false)
+        setOpenMobile(false)
         onClick?.(event)
       }}
       {...props}

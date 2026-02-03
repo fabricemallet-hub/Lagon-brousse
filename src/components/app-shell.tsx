@@ -163,7 +163,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="w-full max-w-full">
-      <SidebarProvider>
+      <SidebarProvider defaultOpen={false}>
         <InnerAppShell 
           status={status} 
           user={user} 
