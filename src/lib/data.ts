@@ -1,4 +1,3 @@
-
 import { LocationData, SwellForecast, Tide, WindDirection, WindForecast, HourlyForecast } from './types';
 import { locations } from './locations';
 

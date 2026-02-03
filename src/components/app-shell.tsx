@@ -162,7 +162,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const showDayNavigator = ['/', '/lagon', '/peche', '/champs', '/chasse', '/calendrier'].includes(pathname);
 
   return (
-    <div className="w-full max-w-full">
+    <div className="w-full">
       <SidebarProvider defaultOpen={false}>
         <InnerAppShell 
           status={status} 
@@ -248,7 +248,7 @@ function InnerAppShell({
           )}
         </SidebarFooter>
       </Sidebar>
-      <main className="flex-1 flex flex-col min-h-screen w-full max-w-full">
+      <main className="flex-1 flex flex-col min-h-screen w-full">
         <UsageTimer status={status} auth={auth} />
         <header className={cn("flex flex-col gap-2 border-b bg-card px-4 sticky top-0 z-30 py-3", status === 'limited' && 'mt-10')}>
           <div className="flex items-center justify-between w-full">
@@ -303,7 +303,7 @@ function InnerAppShell({
             )}
           </div>
         </header>
-        <div className="flex-1 flex flex-col gap-6 p-4 pb-32 md:pb-12 w-full max-w-full">{children}</div>
+        <div className="flex-1 flex flex-col gap-6 p-4 pb-32 md:pb-12 w-full">{children}</div>
         <BottomNav />
       </main>
     </>
