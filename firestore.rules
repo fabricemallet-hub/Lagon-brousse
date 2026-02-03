@@ -4,7 +4,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ----------------------------------------------------------------------
-    // DEPLOY_ID: 20240524_1305_FINAL_FORCE_RESYNC_V2
+    // DEPLOY_ID: 20240524_1310_FORCE_RESYNC_V4
     // ----------------------------------------------------------------------
 
     function isSignedIn() {
