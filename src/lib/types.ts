@@ -278,4 +278,5 @@ export interface MeteoLive {
   vent: number;
   temperature: number;
   uv: number;
+  direction?: WindDirection;
 }

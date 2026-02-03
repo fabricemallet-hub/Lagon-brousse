@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useState } from 'react';
 import type { MeteoLive } from '@/lib/types';
+import { translateWindDirection } from '@/lib/utils';
 
 export default function MeteoLivePage() {
   const firestore = useFirestore();
@@ -67,7 +68,7 @@ export default function MeteoLivePage() {
                     <h3 className="font-black uppercase tracking-tighter text-sm leading-none">{commune.id}</h3>
                     <div className="flex items-center gap-3 mt-2">
                       <div className="flex items-center gap-1 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded text-[10px] font-black text-blue-600 dark:text-blue-400">
-                        <Wind className="size-3" /> {commune.vent} ND
+                        <Wind className="size-3" /> {commune.vent} ND {commune.direction && `(${translateWindDirection(commune.direction)})`}
                       </div>
                       <div className="flex items-center gap-1 bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded text-[10px] font-black text-orange-600 dark:text-orange-400">
                         <Thermometer className="size-3" /> {commune.temperature}°C

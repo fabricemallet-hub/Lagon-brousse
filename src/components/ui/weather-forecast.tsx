@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -17,7 +16,7 @@ import {
 import { format, formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { WeatherData, HourlyForecast, WindDirection, Tide } from '@/lib/types';
-import { cn } from '@/lib/utils';
+import { cn, translateWindDirection } from '@/lib/utils';
 import { Skeleton } from './skeleton';
 
 const WeatherConditionIcon = ({
@@ -141,7 +140,7 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
         if (speed3h < lowerThreshold) windTrend = "à la baisse";
         else if (speed3h > upperThreshold) windTrend = "à la hausse";
     }
-    const windSentence = `Vent de ${_selectedForecast.windSpeed} nœuds, tendance ${windTrend}.`;
+    const windSentence = `Vent de ${_selectedForecast.windSpeed} nœuds de ${translateWindDirection(_selectedForecast.windDirection)}, tendance ${windTrend}.`;
 
     const forecasts = weather.hourly.slice(0, 24);
     const isToday = new Date(forecasts[0].date).toDateString() === now.toDateString();
@@ -181,7 +180,7 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
                 </div>
                 <div className="flex items-center gap-1 mt-1">
                     <WindArrowIcon direction={selectedForecast.windDirection} className="size-4" />
-                    <p className="text-[10px] font-bold uppercase">Vent de {selectedForecast.windDirection}</p>
+                    <p className="text-[10px] font-bold uppercase">Vent de {translateWindDirection(selectedForecast.windDirection)}</p>
                 </div>
             </div>
              <div className="flex flex-col items-center gap-2 text-xs font-bold">

@@ -21,7 +21,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useLocation } from '@/context/location-context';
 import { useDate } from '@/context/date-context';
-import { cn } from '@/lib/utils';
+import { cn, translateWindDirection } from '@/lib/utils';
 import { useMemo, useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { VesselTracker } from '@/components/vessel-tracker';
@@ -109,7 +109,7 @@ export default function LagonPage() {
                         <div className="text-right flex items-center gap-3">
                             <div className="flex flex-col items-end">
                                 <p className="font-black text-xl leading-none">{forecast.speed} <span className="text-[10px]">nds</span></p>
-                                <p className={cn("text-[9px] font-bold uppercase mt-1", selectedTime === forecast.time ? "text-white/80" : "text-muted-foreground")}>{forecast.direction}</p>
+                                <p className={cn("text-[9px] font-bold uppercase mt-1", selectedTime === forecast.time ? "text-white/80" : "text-muted-foreground")}>{translateWindDirection(forecast.direction)}</p>
                             </div>
                         </div>
                     </div>

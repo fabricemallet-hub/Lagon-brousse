@@ -25,7 +25,8 @@
         "id": { "type": "string", "description": "Nom de la commune" },
         "vent": { "type": "number" },
         "temperature": { "type": "number" },
-        "uv": { "type": "number" }
+        "uv": { "type": "number" },
+        "direction": { "type": "string", "enum": ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] }
       }
     },
     "AppSetting": {

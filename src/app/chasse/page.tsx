@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { ShootingTableCard } from '@/components/ui/shooting-table-card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { translateWindDirection } from '@/lib/utils';
 
 // Import dynamique pour économiser la mémoire au démarrage
 const HuntingSessionCard = dynamic(() => import('@/components/hunting-session').then(mod => mod.HuntingSessionCard), { 
@@ -119,7 +120,7 @@ export default function ChassePage() {
                 <div className='flex-1'>
                   <p className="font-bold text-lg">{forecast.time}</p>
                   <p className="text-xl font-bold">{forecast.speed} nœuds</p>
-                  <p className="text-sm text-muted-foreground">{forecast.direction} - {forecast.stability}</p>
+                  <p className="text-sm text-muted-foreground">{translateWindDirection(forecast.direction)} - {forecast.stability}</p>
                 </div>
                 <WindMap direction={forecast.direction} className="w-20 h-24" />
               </div>
