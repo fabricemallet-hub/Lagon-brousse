@@ -43,19 +43,19 @@ export function DateProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [splashSettings]);
 
-  // Use a neutral default matching the native splash to avoid visual jumps
+  // Default settings using the NEW logo to avoid showing an old version during load
   const defaultSettings: SplashScreenSettings = {
-    splashMode: 'text',
-    splashText: '', 
-    splashBgColor: '#000000', // Noir par défaut
-    splashTextColor: 'transparent',
-    splashFontSize: '32',
+    splashMode: 'image',
+    splashImageUrl: '/icon-512x512.png?v=2',
+    splashBgColor: '#000000',
+    splashImageFit: 'contain',
+    splashDuration: 2.5
   };
 
-  // If loading, we use neutral settings. Once loaded, we use the Firestore settings.
+  // If loading, we use defaultSettings with the new logo.
   const finalSettings = isSettingsLoading 
     ? defaultSettings 
-    : (splashSettings || { ...defaultSettings, splashText: 'Lagon & Brousse NC', splashBgColor: '#000000', splashTextColor: '#ffffff' });
+    : (splashSettings || defaultSettings);
 
   if (showSplash) {
     return <SplashScreen settings={finalSettings} isExiting={isExiting} />;

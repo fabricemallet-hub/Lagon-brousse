@@ -1,3 +1,5 @@
+'use client';
+
 import type { Metadata, Viewport } from 'next';
 import { AppShell } from '@/components/app-shell';
 import { Toaster } from '@/components/ui/toaster';
@@ -9,19 +11,6 @@ import './globals.css';
 import { Suspense } from 'react';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { GoogleMapsProvider } from '@/context/google-maps-context';
-
-export const metadata: Metadata = {
-  title: 'Lagon & Brousse NC',
-  description:
-    'Votre guide pour la mer et la terre en Nouvelle-Calédonie.',
-  manifest: '/manifest.webmanifest',
-};
-
-export const viewport: Viewport = {
-  themeColor: '#000000',
-  width: 1200,
-  initialScale: 1,
-};
 
 function AppContent({ children }: { children: React.ReactNode }) {
   return (
@@ -57,6 +46,12 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap"
           rel="stylesheet"
         />
+        {/* Force refresh icons cache */}
+        <link rel="icon" href="/icon-192x192.png?v=2" />
+        <link rel="apple-touch-icon" href="/icon-192x192.png?v=2" />
+        <link rel="manifest" href="/manifest.webmanifest?v=2" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
       <body className={cn('font-body antialiased', 'min-h-screen bg-background font-sans overflow-x-auto')}>
         <Suspense fallback={null}>
