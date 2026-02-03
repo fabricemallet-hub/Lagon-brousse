@@ -4,7 +4,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ----------------------------------------------------------------------
-    // DEPLOY_ID: 20240524_1330_FINAL_FORCE_RESYNC_V2
+    // DEPLOY_ID: 20240524_1345_FORCE_DEPLOY_V5
     // ----------------------------------------------------------------------
 
     function isSignedIn() {
@@ -18,7 +18,7 @@ service cloud.firestore {
       );
     }
 
-    // SESSIONS DE CHASSE - Autorisation de lecture et création pour tous les connectés
+    // SESSIONS DE CHASSE - Accès global pour les connectés
     match /hunting_sessions/{sessionId} {
       allow read, create: if isSignedIn();
       allow update, delete: if isAdmin() || (isSignedIn() && resource.data.organizerId == request.auth.uid);
