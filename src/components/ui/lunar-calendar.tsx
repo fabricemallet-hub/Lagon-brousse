@@ -58,12 +58,6 @@ import { Badge } from '@/components/ui/badge';
 import { CrabIcon, LobsterIcon, OctopusIcon } from '../icons';
 import { Separator } from './separator';
 import { Skeleton } from './skeleton';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
 
 export const MoonPhaseIcon = ({
   phase,
@@ -327,10 +321,10 @@ function ChampsDetailDialogContent({ day, location }: { day: Date; location: str
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 rounded-xl bg-muted/50 border">
         <div className="space-y-1">
           <h3 className="font-bold text-[10px] uppercase text-muted-foreground">Lune</h3>
-          <p className="flex items-center gap-2 text-primary font-bold text-sm">
+          <div className="flex items-center gap-2 text-primary font-bold text-sm">
             <MoonPhaseIcon phase={weather.moon.phase} className="size-4" />
             {weather.moon.phase}
-          </p>
+          </div>
         </div>
         <div className="space-y-1">
           <h3 className="font-bold text-[10px] uppercase text-muted-foreground">Tendance</h3>
@@ -436,11 +430,11 @@ function PecheDetailDialogContent({ day, location }: { day: Date; location: stri
         <div className="space-y-3">
           {fishing.map((slot, sIdx) => (
             <div key={sIdx} className="space-y-2">
-              <p className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-2">
+              <div className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-2">
                 <Clock className="size-3" /> {slot.timeOfDay}
-              </p>
+              </div>
               <div className="grid gap-2">
-                {slot.fish.filter(f => f.rating >= 8).map((f, fIdx) => (
+                {slot.fish.filter(f => f.rating >= 7).map((f, fIdx) => (
                   <div key={fIdx} className="flex items-center justify-between p-3 rounded-lg bg-card border shadow-sm">
                     <div className="flex items-center gap-3">
                       <Fish className={cn("size-4", f.location === 'Large' ? 'text-destructive' : 'text-primary')} />
