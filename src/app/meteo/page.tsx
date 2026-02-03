@@ -19,6 +19,20 @@ import { MoonPhaseIcon } from '@/components/ui/lunar-calendar';
 import { cn } from '@/lib/utils';
 import { getWeatherSummary } from '@/ai/flows/weather-summary-flow';
 import type { WeatherSummaryOutput } from '@/ai/schemas';
+import { useLocation } from '@/context/location-context';
+import { locations as locationsMap } from '@/lib/locations';
+
+// Helper: Calculate distance between two points (Haversine)
+const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371e3; // Earth radius in meters
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
 
 const WeatherIcon = ({ condition, className }: { condition: string, className?: string }) => {
     const props = { className: cn('size-8', className) };
@@ -34,6 +48,7 @@ const WeatherIcon = ({ condition, className }: { condition: string, className?: 
 
 export default function MeteoLivePage() {
   const firestore = useFirestore();
+  const { selectedLocation } = useLocation();
   const [search, setSearch] = useState('');
   const [selectedCommuneId, setSelectedCommuneId] = useState<string | null>(null);
   
@@ -44,9 +59,47 @@ export default function MeteoLivePage() {
 
   const { data: rawCommunes, isLoading } = useCollection<MeteoLive>(meteoQuery);
 
-  const communes = rawCommunes?.filter(c => 
-    c.id.toLowerCase().includes(search.toLowerCase())
-  ).sort((a, b) => a.id.localeCompare(b.id));
+  const communes = useMemo(() => {
+    if (!rawCommunes) return [];
+
+    const isLoyaltyOrBelep = (id: string) => ['Bélep', 'Lifou', 'Maré', 'Ouvéa'].includes(id);
+    const selectedCoords = locationsMap[selectedLocation];
+
+    // Filter by search first
+    const filtered = rawCommunes.filter(c => 
+      c.id.toLowerCase().includes(search.toLowerCase())
+    );
+
+    // Sort by priority
+    return [...filtered].sort((a, b) => {
+      // 1. Current selected location always first
+      if (a.id === selectedLocation) return -1;
+      if (b.id === selectedLocation) return 1;
+
+      // 2. Handle Loyalty Islands and Belep (at the end)
+      const aSpecial = isLoyaltyOrBelep(a.id);
+      const bSpecial = isLoyaltyOrBelep(b.id);
+      
+      if (aSpecial && !bSpecial) return 1;
+      if (!aSpecial && bSpecial) return -1;
+      
+      // If both are special, sort alphabetically
+      if (aSpecial && bSpecial) return a.id.localeCompare(b.id);
+
+      // 3. Proximity sort for others
+      if (!selectedCoords) return a.id.localeCompare(b.id);
+
+      const posA = locationsMap[a.id];
+      const posB = locationsMap[b.id];
+
+      if (!posA || !posB) return a.id.localeCompare(b.id);
+
+      const distA = getDistance(selectedCoords.lat, selectedCoords.lon, posA.lat, posA.lon);
+      const distB = getDistance(selectedCoords.lat, selectedCoords.lon, posB.lat, posB.lon);
+
+      return distA - distB;
+    });
+  }, [rawCommunes, selectedLocation, search]);
 
   if (selectedCommuneId) {
     const liveData = rawCommunes?.find(c => c.id === selectedCommuneId);
@@ -93,16 +146,27 @@ export default function MeteoLivePage() {
           {communes.map((commune) => (
             <Card 
               key={commune.id} 
-              className="overflow-hidden border-2 shadow-sm active:scale-[0.98] transition-transform cursor-pointer hover:border-primary/30"
+              className={cn(
+                "overflow-hidden border-2 shadow-sm active:scale-[0.98] transition-transform cursor-pointer hover:border-primary/30",
+                commune.id === selectedLocation && "border-primary/50 bg-primary/5"
+              )}
               onClick={() => setSelectedCommuneId(commune.id)}
             >
               <CardContent className="p-4 flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                    <MapPin className="size-6 text-primary" />
+                  <div className={cn(
+                    "size-12 rounded-xl flex items-center justify-center shrink-0",
+                    commune.id === selectedLocation ? "bg-primary text-white" : "bg-primary/10 text-primary"
+                  )}>
+                    <MapPin className="size-6" />
                   </div>
                   <div className="flex flex-col">
-                    <h3 className="font-black uppercase tracking-tighter text-sm leading-none">{commune.id}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-black uppercase tracking-tighter text-sm leading-none">{commune.id}</h3>
+                      {commune.id === selectedLocation && (
+                        <Badge variant="outline" className="text-[8px] h-4 font-black uppercase px-1.5 border-primary text-primary">Ma Commune</Badge>
+                      )}
+                    </div>
                     <div className="flex items-center gap-3 mt-2">
                       <div className="flex items-center gap-1 bg-blue-50 dark:bg-blue-900/20 px-2 py-0.5 rounded text-[10px] font-black text-blue-600 dark:text-blue-400">
                         <Wind className="size-3" /> {commune.vent} ND {commune.direction && `(${translateWindDirection(commune.direction)})`}
