@@ -88,17 +88,22 @@ export default function Home() {
 
     const currentHour = new Date().getHours();
     
+    // Correction intelligence UV : Si c'est la nuit, l'UV est forcément 0
+    // même si la station rapporte le max de la journée.
+    const isDaylight = currentHour >= 6 && currentHour < 18;
+    const effectiveUV = isDaylight ? liveMeteo.uv : 0;
+    
     return {
       ...data.weather,
       temp: liveMeteo.temperature,
-      uvIndex: liveMeteo.uv,
+      uvIndex: effectiveUV,
       hourly: data.weather.hourly.map(f => {
         // On met à jour l'entrée de l'heure actuelle avec les données réelles de Firestore
         if (new Date(f.date).getHours() === currentHour) {
           return {
             ...f,
             temp: liveMeteo.temperature,
-            uvIndex: liveMeteo.uv,
+            uvIndex: effectiveUV,
             windSpeed: liveMeteo.vent
           };
         }

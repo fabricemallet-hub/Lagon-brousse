@@ -4,17 +4,15 @@ import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, orderBy, query } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Wind, Thermometer, Sun, MapPin, Search, ChevronLeft, CalendarDays, Waves, Info, BrainCircuit, ShieldAlert, Sparkles, CloudSun, Cloud, CloudRain, Moon, CloudMoon, ArrowUp, Droplets } from 'lucide-react';
+import { Wind, Thermometer, Sun, MapPin, Search, ChevronLeft, CalendarDays, Waves, Info, BrainCircuit, ShieldAlert, Sparkles, CloudSun, Cloud, CloudRain, Moon, ArrowUp, Droplets } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useState, useMemo, useEffect } from 'react';
 import type { MeteoLive, MeteoForecast, WindDirection } from '@/lib/types';
 import { translateWindDirection, degreesToCardinal, getMeteoCondition } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { generateProceduralData } from '@/lib/data';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { MoonPhaseIcon } from '@/components/ui/lunar-calendar';
 import { cn } from '@/lib/utils';
 import { getWeatherSummary } from '@/ai/flows/weather-summary-flow';
 import type { WeatherSummaryOutput } from '@/ai/schemas';
@@ -42,10 +40,26 @@ const WeatherIcon = ({ condition, className }: { condition: string, className?: 
         case 'Couvert': return <Cloud {...props} className={cn(props.className, "text-slate-600")} />;
         case 'Averses': return <CloudRain {...props} className={cn(props.className, "text-blue-400")} />;
         case 'Pluvieux': return <CloudRain {...props} className={cn(props.className, "text-blue-600")} />;
-        case 'Nuit claire': return <Moon {...props} className={cn(props.className, "text-blue-200")} />;
         default: return <Sun {...props} />;
     }
 };
+
+const Cloud = (props: any) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M17.5 19c2.5 0 4.5-2.5 4.5-5 0-3.7-3-6-7-6-1 0-2 .2-3 .5C10.5 6 8 8 8 11c0 .4.1.8.2 1.2C5 12.7 3 15 3 18c0 2.8 2.2 5 5 5h9.5z" />
+  </svg>
+);
 
 const WindArrow = ({ direction, degrees, className }: { direction?: string, degrees?: number, className?: string }) => {
   const rotation = degrees !== undefined ? degrees : (
@@ -98,9 +112,11 @@ export default function MeteoLivePage() {
     );
 
     return [...filtered].sort((a, b) => {
+      // 1. Ma commune en premier
       if (a.id === selectedLocation) return -1;
       if (b.id === selectedLocation) return 1;
 
+      // 2. Bélep et Loyauté à la toute fin
       const aSpecial = isLoyaltyOrBelep(a.id);
       const bSpecial = isLoyaltyOrBelep(b.id);
       
@@ -108,6 +124,7 @@ export default function MeteoLivePage() {
       if (!aSpecial && bSpecial) return -1;
       if (aSpecial && bSpecial) return a.id.localeCompare(b.id);
 
+      // 3. Reste de la liste par distance GPS
       if (!selectedCoords) return a.id.localeCompare(b.id);
 
       const posA = locationsMap[a.id];
@@ -258,8 +275,8 @@ function ForecastView({ communeId, liveData, onBack }: { communeId: string, live
                         tempMin: d.temp_min,
                         tempMax: d.temp_max,
                         windSpeed: d.vent_max,
-                        windDirection: "Inconnue", // Pas stocké dans l'export prévision journalière
-                        uvIndex: 0, // Idem
+                        windDirection: "Inconnue",
+                        uvIndex: 0,
                         condition: getMeteoCondition(d.code_meteo)
                     }))
                 });
@@ -354,7 +371,11 @@ function DayForecastCard({ forecast, index, liveData }: { forecast: MeteoForecas
     // Fusion avec le live pour aujourd'hui
     const currentTemp = isToday && liveData ? liveData.temperature : null;
     const currentVent = isToday && liveData ? liveData.vent : forecast.vent_max;
-    const currentUV = isToday && liveData ? liveData.uv : null;
+    
+    // Correction intelligence UV : Si c'est la nuit, l'UV est forcément 0
+    const currentHour = new Date().getHours();
+    const isDaylight = currentHour >= 6 && currentHour < 18;
+    const currentUV = isToday && liveData ? (isDaylight ? liveData.uv : 0) : null;
 
     return (
         <Card className={cn("overflow-hidden border-2 shadow-sm", isToday && "border-primary/50 ring-1 ring-primary/20 bg-primary/5")}>
@@ -406,7 +427,7 @@ function DayForecastCard({ forecast, index, liveData }: { forecast: MeteoForecas
                         </p>
                         {isToday ? (
                             <Badge className={cn("font-black h-6 px-3 text-xs text-white border-none shadow-sm", (currentUV || 0) > 8 ? "bg-red-500" : (currentUV || 0) > 5 ? "bg-orange-500" : "bg-green-500")}>
-                                {currentUV || 'N/A'}
+                                {currentUV || 0}
                             </Badge>
                         ) : (
                             <div className="flex items-center gap-1 font-black text-sm text-blue-600">
