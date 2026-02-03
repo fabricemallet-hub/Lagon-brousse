@@ -15,18 +15,20 @@ service cloud.firestore {
     }
     
     function isAdmin() {
+      // The admin's email is hardcoded for this application.
       return request.auth.token.email == 'f.mallet81@outlook.com';
     }
 
     // ----------------------------------------------------------------------
     // Collection: users
+    // Purpose: Stores private user account information.
     // ----------------------------------------------------------------------
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
       allow create: if isOwner(userId);
       allow update: if isOwner(userId) || isAdmin();
-      allow delete: if isOwner(userId) || isAdmin();
+      allow delete: if isOwner(userId) || isAdmin(); // Admin can now delete users
       
       match /fishing_spots/{spotId} {
         allow read, write, delete: if isOwner(userId);
@@ -41,8 +43,9 @@ service cloud.firestore {
     // Collection: vessels (Real-time tracking)
     // ----------------------------------------------------------------------
     match /vessels/{userId} {
-      // Owner can fully manage their own vessel status
+      // Any signed-in user can read vessel status (for following)
       allow read: if isSignedIn();
+      // Only the owner can manage their own vessel status
       allow create, update, delete: if isOwner(userId);
 
       match /history/{pointId} {
@@ -53,6 +56,7 @@ service cloud.firestore {
 
     // ----------------------------------------------------------------------
     // Collection: locations
+    // Purpose: Stores public, read-only location data.
     // ----------------------------------------------------------------------
     match /locations/{locationId} {
       allow read: if true;
@@ -61,6 +65,7 @@ service cloud.firestore {
     
     // ----------------------------------------------------------------------
     // Collection: stations & subcollections
+    // Purpose: Stores public tide data, writable only by an admin process.
     // ----------------------------------------------------------------------
     match /stations/{stationId} {
       allow read: if true;
@@ -74,26 +79,38 @@ service cloud.firestore {
     
     // ----------------------------------------------------------------------
     // Collection: hunting_sessions
+    // Purpose: Manages real-time group hunting sessions.
     // ----------------------------------------------------------------------
     match /hunting_sessions/{sessionId} {
       allow get: if isSignedIn();
       allow create: if isOwner(request.resource.data.organizerId);
       allow delete: if isOwner(resource.data.organizerId);
       
+      // Participants subcollection
       match /participants/{userId} {
+        // A user can only manage their own participant document.
         allow create, update, delete: if isOwner(userId);
+        
+        // A signed-in user can get a specific participant document (e.g., to find the organizer).
         allow get: if isSignedIn();
+        
+        // Only an existing participant can list all other participants.
         allow list: if exists(/databases/$(database)/documents/hunting_sessions/$(sessionId)/participants/$(request.auth.uid));
       }
     }
 
     // ----------------------------------------------------------------------
     // Collection: access_tokens
+    // Purpose: Manages subscription access tokens.
     // ----------------------------------------------------------------------
     match /access_tokens/{tokenId} {
+      // Admin has full control.
       allow read, write: if isAdmin();
+      
+      // An authenticated user can check if a token exists.
       allow get: if isSignedIn();
       
+      // A user can update a token ONLY to redeem it for themselves.
       function isRedeemingOwnToken() {
         let isBecomingRedeemed = request.resource.data.status == 'redeemed';
         let wasActive = resource.data.status == 'active';
@@ -105,20 +122,29 @@ service cloud.firestore {
     
     // ----------------------------------------------------------------------
     // Collection: shared_access_tokens
+    // Purpose: Manages a global access token for all users.
     // ----------------------------------------------------------------------
     match /shared_access_tokens/{tokenId} {
+      // Admin has full control.
       allow write: if isAdmin();
+      
+      // Any authenticated user can read the global token.
       allow read: if isSignedIn();
     }
 
     // ----------------------------------------------------------------------
     // Collection: conversations
+    // Purpose: Manages support conversations between users and admin.
     // ----------------------------------------------------------------------
     match /conversations/{userId} {
+      // User can read/write their own conversation document.
+      // Admin can read/write any conversation document.
       allow read, write: if isOwner(userId) || isAdmin();
-      allow list: if isAdmin();
+      allow list: if isAdmin(); // Only admin can list all conversation threads.
 
       match /messages/{messageId} {
+        // User can read/write messages in their own thread.
+        // Admin can read/write messages in any thread.
         allow read, write: if isOwner(userId) || isAdmin();
       }
     }

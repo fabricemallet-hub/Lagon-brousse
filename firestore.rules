@@ -40,6 +40,21 @@ service cloud.firestore {
     }
 
     // ----------------------------------------------------------------------
+    // Collection: vessels (Real-time tracking)
+    // ----------------------------------------------------------------------
+    match /vessels/{userId} {
+      // Any signed-in user can read vessel status (for following)
+      allow read: if isSignedIn();
+      // Only the owner can manage their own vessel status
+      allow create, update, delete: if isOwner(userId);
+
+      match /history/{pointId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isOwner(userId);
+      }
+    }
+
+    // ----------------------------------------------------------------------
     // Collection: locations
     // Purpose: Stores public, read-only location data.
     // ----------------------------------------------------------------------
