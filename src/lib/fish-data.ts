@@ -1,3 +1,4 @@
+
 import { FishSpeciesInfo } from './types';
 
 export const lagoonFishData: FishSpeciesInfo[] = [
@@ -8,7 +9,8 @@ export const lagoonFishData: FishSpeciesInfo[] = [
     gratteRisk: 5,
     culinaryAdvice: 'Excellent en grillade ou au four. Sa chair est ferme et savoureuse. Très apprécié cru en salade tahitienne.',
     fishingAdvice: 'Se pêche à la ligne au fond ou au poser avec du calamar ou du bernard-l\'ermite. Très combatif.',
-    category: 'Lagon'
+    category: 'Lagon',
+    imagePlaceholder: 'fish-bec-de-cane'
   },
   {
     id: 'bossu-dore',
@@ -17,7 +19,8 @@ export const lagoonFishData: FishSpeciesInfo[] = [
     gratteRisk: 10,
     culinaryAdvice: 'Chair blanche très fine. Idéal au four avec un filet d\'huile d\'olive et des herbes.',
     fishingAdvice: 'Chercher les patates de corail isolées sur les fonds de 5 à 15m. Appât : crevettes ou morceaux de poisson.',
-    category: 'Lagon'
+    category: 'Lagon',
+    imagePlaceholder: 'fish-bossu-dore'
   },
   {
     id: 'loche-truite',
@@ -26,7 +29,8 @@ export const lagoonFishData: FishSpeciesInfo[] = [
     gratteRisk: 25,
     culinaryAdvice: 'Un des meilleurs poissons du Caillou. Chair floconneuse. Parfait à la vapeur ou à la crème.',
     fishingAdvice: 'Se pêche au leurre souple ou au jig près du récif. Attention, elle cherche tout de suite à s\'enraguer.',
-    category: 'Lagon'
+    category: 'Lagon',
+    imagePlaceholder: 'fish-loche-truite'
   },
   {
     id: 'picot-raye',
@@ -35,7 +39,8 @@ export const lagoonFishData: FishSpeciesInfo[] = [
     gratteRisk: 2,
     culinaryAdvice: 'Indétrônable en grillade. On le mange entier après l\'avoir écaillé soigneusement.',
     fishingAdvice: 'Se pêche souvent au filet ou à la ligne fine avec de la pâte. Attention aux épines venimeuses !',
-    category: 'Lagon'
+    category: 'Lagon',
+    imagePlaceholder: 'fish-picot-raye'
   },
   {
     id: 'carangue-bleue',
@@ -44,7 +49,8 @@ export const lagoonFishData: FishSpeciesInfo[] = [
     gratteRisk: 15,
     culinaryAdvice: 'Chair rouge sang. Meilleure consommée crue (sashimi) juste après la pêche pour garder sa fraîcheur.',
     fishingAdvice: 'Très agressive au popper ou au leurre de surface. Un combattant exceptionnel.',
-    category: 'Lagon'
+    category: 'Lagon',
+    imagePlaceholder: 'fish-carangue-bleue'
   },
   {
     id: 'perroquet-bleu',
@@ -53,7 +59,8 @@ export const lagoonFishData: FishSpeciesInfo[] = [
     gratteRisk: 10,
     culinaryAdvice: 'Chair très tendre, presque crémeuse. Délicieux en papillote pour conserver son humidité.',
     fishingAdvice: 'Se pêche principalement à la flèche en apnée le long du récif.',
-    category: 'Lagon'
+    category: 'Lagon',
+    imagePlaceholder: 'fish-perroquet-bleu'
   },
   {
     id: 'thazard',
@@ -62,7 +69,8 @@ export const lagoonFishData: FishSpeciesInfo[] = [
     gratteRisk: 5,
     culinaryAdvice: 'Le roi du sashimi en Calédonie. Se mange aussi très bien en steaks grillés ou fumé.',
     fishingAdvice: 'Se pêche à la traîne rapide (7-9 nds) avec des leurres à bavette longue (Rapala Magnum).',
-    category: 'Large'
+    category: 'Large',
+    imagePlaceholder: 'fish-thazard'
   },
   {
     id: 'rouget-barbet',
@@ -71,6 +79,7 @@ export const lagoonFishData: FishSpeciesInfo[] = [
     gratteRisk: 0,
     culinaryAdvice: 'Chair délicate avec un léger goût de crevette. Délicieux simplement poêlé au beurre.',
     fishingAdvice: 'Se trouve sur les fonds sableux entre les patates. Se pêche à la ligne fine.',
-    category: 'Lagon'
+    category: 'Lagon',
+    imagePlaceholder: 'fish-rouget-barbet'
   }
 ];

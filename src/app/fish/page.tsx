@@ -1,6 +1,8 @@
+
 'use client';
 
 import { useState, useRef } from 'react';
+import Image from 'next/image';
 import { lagoonFishData } from '@/lib/fish-data';
 import type { FishSpeciesInfo } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 export default function FishPage() {
   const { toast } = useToast();
@@ -161,57 +164,71 @@ export default function FishPage() {
         </h3>
         
         <div className="grid gap-3">
-          {filteredFish.map((fish) => (
-            <Card key={fish.id} className="overflow-hidden border-2 hover:border-primary/30 transition-all">
-              <Accordion type="single" collapsible>
-                <AccordionItem value={fish.id} className="border-none">
-                  <AccordionTrigger className="p-4 hover:no-underline [&[data-state=open]]:bg-muted/30">
-                    <div className="flex items-center gap-4 text-left w-full">
-                      <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                        <Fish className="size-6 text-primary" />
-                      </div>
-                      <div className="flex flex-col min-w-0">
-                        <h4 className="font-black uppercase tracking-tighter text-base leading-none truncate">{fish.name}</h4>
-                        <p className="text-[10px] text-muted-foreground italic truncate mt-1">{fish.scientificName}</p>
-                      </div>
-                      <div className="ml-auto pr-4">
-                        <Badge 
-                          variant={fish.gratteRisk > 20 ? "destructive" : "outline"} 
-                          className={cn("text-[8px] h-5 font-black uppercase", fish.gratteRisk <= 20 && "border-green-500 text-green-600")}
-                        >
-                          Gratte {fish.gratteRisk}%
-                        </Badge>
-                      </div>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="p-4 space-y-4 bg-muted/10 border-t border-dashed">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-[10px] font-black uppercase text-primary">
-                          <Target className="size-3" /> Pêche
+          {filteredFish.map((fish) => {
+            const placeholder = PlaceHolderImages.find(img => img.id === fish.imagePlaceholder);
+            return (
+              <Card key={fish.id} className="overflow-hidden border-2 hover:border-primary/30 transition-all">
+                <Accordion type="single" collapsible>
+                  <AccordionItem value={fish.id} className="border-none">
+                    <AccordionTrigger className="p-4 hover:no-underline [&[data-state=open]]:bg-muted/30">
+                      <div className="flex items-center gap-4 text-left w-full">
+                        <div className="size-14 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden border">
+                          {placeholder ? (
+                            <Image 
+                              src={placeholder.imageUrl} 
+                              alt={fish.name} 
+                              width={56} 
+                              height={56} 
+                              className="object-cover w-full h-full"
+                              data-ai-hint={placeholder.imageHint}
+                            />
+                          ) : (
+                            <Fish className="size-6 text-primary" />
+                          )}
                         </div>
-                        <p className="text-xs font-medium leading-relaxed">{fish.fishingAdvice}</p>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-[10px] font-black uppercase text-accent">
-                          <ChefHat className="size-3" /> Cuisine
+                        <div className="flex flex-col min-w-0">
+                          <h4 className="font-black uppercase tracking-tighter text-base leading-none truncate">{fish.name}</h4>
+                          <p className="text-[10px] text-muted-foreground italic truncate mt-1">{fish.scientificName}</p>
                         </div>
-                        <p className="text-xs font-medium leading-relaxed">{fish.culinaryAdvice}</p>
+                        <div className="ml-auto pr-4">
+                          <Badge 
+                            variant={fish.gratteRisk > 20 ? "destructive" : "outline"} 
+                            className={cn("text-[8px] h-5 font-black uppercase", fish.gratteRisk <= 20 && "border-green-500 text-green-600")}
+                          >
+                            Gratte {fish.gratteRisk}%
+                          </Badge>
+                        </div>
                       </div>
-                    </div>
-                    {fish.gratteRisk > 30 && (
-                      <div className="p-3 bg-red-50 border border-red-100 rounded-lg flex gap-3 text-red-800">
-                        <AlertTriangle className="size-4 shrink-0 mt-0.5" />
-                        <p className="text-[10px] font-bold leading-tight">
-                          Attention : Risque de ciguatera élevé. La consommation de gros spécimens est déconseillée.
-                        </p>
+                    </AccordionTrigger>
+                    <AccordionContent className="p-4 space-y-4 bg-muted/10 border-t border-dashed">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-[10px] font-black uppercase text-primary">
+                            <Target className="size-3" /> Pêche
+                          </div>
+                          <p className="text-xs font-medium leading-relaxed">{fish.fishingAdvice}</p>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-[10px] font-black uppercase text-accent">
+                            <ChefHat className="size-3" /> Cuisine
+                          </div>
+                          <p className="text-xs font-medium leading-relaxed">{fish.culinaryAdvice}</p>
+                        </div>
                       </div>
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
-            </Card>
-          ))}
+                      {fish.gratteRisk > 30 && (
+                        <div className="p-3 bg-red-50 border border-red-100 rounded-lg flex gap-3 text-red-800">
+                          <AlertTriangle className="size-4 shrink-0 mt-0.5" />
+                          <p className="text-[10px] font-bold leading-tight">
+                            Attention : Risque de ciguatera élevé. La consommation de gros spécimens est déconseillée.
+                          </p>
+                        </div>
+                      )}
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              </Card>
+            );
+          })}
         </div>
       </div>
     </div>
