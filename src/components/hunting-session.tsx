@@ -283,7 +283,7 @@ function HuntingSessionContent() {
         }
 
         let batteryData: SessionParticipant['battery'] | undefined = undefined;
-        if ('getBattery' in navigator) {
+        if (typeof navigator !== 'undefined' && 'getBattery' in navigator) {
             try {
                 const battery = await (navigator as any).getBattery();
                 batteryData = { level: battery.level, charging: battery.charging };
@@ -1032,7 +1032,7 @@ function HuntingSessionContent() {
                             {participants?.map(p => {
                                 const statusDisplay = getStatusDisplay(p);
                                 return (
-                                <div key={p.id} className="flex items-center justify-between p-2 border rounded-lg bg-card">
+                                <div key={p.id} className="flex items-center justify-between p-2 border rounded-lg bg-card shadow-sm">
                                     <div className="flex items-center gap-3">
                                         <div
                                             className="p-1.5 rounded-full flex items-center justify-center shadow-sm"
@@ -1051,14 +1051,16 @@ function HuntingSessionContent() {
                                             )}
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2 text-sm font-semibold">
-                                        {p.battery && (
+                                    <div className="flex items-center gap-2 text-xs font-bold bg-muted/50 px-2 py-1 rounded-md min-w-[70px] justify-end">
+                                        {p.battery ? (
                                             <>
                                                 <BatteryIcon level={p.battery.level} charging={p.battery.charging} />
                                                 <span className={cn(p.battery.level < 0.2 ? 'text-red-500' : 'text-foreground')}>
                                                     {Math.round(p.battery.level * 100)}%
                                                 </span>
                                             </>
+                                        ) : (
+                                            <span className="text-[9px] text-muted-foreground italic font-normal">N/A</span>
                                         )}
                                     </div>
                                 </div>
