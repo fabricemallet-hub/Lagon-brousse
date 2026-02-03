@@ -1,11 +1,9 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ----------------------------------------------------------------------
-    // DEPLOY_ID: 20240524_1345_FORCE_DEPLOY_V5 (SRC)
-    // ----------------------------------------------------------------------
+    // REVISION_ID: 20240524_1315_FINAL_SYNC_SRC
+    // Synchronisation forcée avec le fichier racine.
 
     function isSignedIn() {
       return request.auth != null;
@@ -13,12 +11,11 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.email.lower() == 'f.mallet81@outlook.com' || 
-        request.auth.token.email.lower() == 'f.mallet81@gmail.com'
+        request.auth.token.email.lower() == 'f.mallet81@gmail.com' || 
+        request.auth.token.email.lower() == 'f.mallet81@outlook.com'
       );
     }
 
-    // SESSIONS DE CHASSE
     match /hunting_sessions/{sessionId} {
       allow read, create: if isSignedIn();
       allow update, delete: if isAdmin() || (isSignedIn() && resource.data.organizerId == request.auth.uid);
@@ -28,58 +25,44 @@ service cloud.firestore {
       }
     }
 
-    // UTILISATEURS ET PROFILS
     match /users/{userId} {
-      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow list, delete: if isAdmin();
-      
-      match /fishing_spots/{spotId} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
-      }
-
-      match /sowings/{sowingId} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      allow read, write: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+      match /{allPaths=**} {
+        allow read, write: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
       }
     }
 
-    // ACCÈS ET MESSAGERIE
+    match /conversations/{userId} {
+      allow read, write: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+      match /{allPaths=**} {
+        allow read, write: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
+      }
+    }
+
     match /access_tokens/{tokenId} {
-      allow read, write: if isAdmin();
       allow get: if isSignedIn();
+      allow read, write: if isAdmin();
       allow update: if isSignedIn() && request.resource.data.status == 'redeemed';
     }
-    
+
     match /shared_access_tokens/{tokenId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
 
-    match /conversations/{userId} {
-      allow read, write: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
-      allow list: if isAdmin();
-
-      match /messages/{messageId} {
-        allow read, write: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
-      }
-    }
-
-    // TRACKER DE NAVIRES
     match /vessels/{vesselId} {
       allow read: if isSignedIn();
-      allow write: if (isSignedIn() && request.auth.uid == vesselId) || isAdmin();
-      match /history/{pointId} {
+      allow write: if isAdmin() || (isSignedIn() && request.auth.uid == vesselId);
+      match /{allPaths=**} {
         allow read, write: if isSignedIn();
       }
     }
 
-    // DONNÉES STATIQUES
     match /locations/{locationId} { allow read: if true; }
     match /stations/{stationId} {
       allow read: if true;
       allow write: if isAdmin();
-      match /tides/{date} {
+      match /{allPaths=**} {
         allow read: if true;
         allow write: if isAdmin();
       }

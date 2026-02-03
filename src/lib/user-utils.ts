@@ -1,4 +1,3 @@
-
 'use client';
 import { doc, getDoc, setDoc, Firestore } from 'firebase/firestore';
 import { User } from 'firebase/auth';
@@ -20,7 +19,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
 
   if (docSnap.exists()) {
     const currentData = docSnap.data() as UserAccount;
-    // Mise à jour forcée du statut admin si nécessaire
+    // Mise à jour forcée du statut admin si nécessaire pour synchroniser avec les règles
     if (isAdminUser && currentData.subscriptionStatus !== 'admin') {
         await setDoc(userDocRef, { ...currentData, subscriptionStatus: 'admin' }, { merge: true });
     }
