@@ -40,7 +40,12 @@ import {
   Search,
   Sprout,
   CalendarDays,
-  Sparkles
+  Sparkles,
+  AlertTriangle,
+  CheckCircle2,
+  Shovel,
+  Info,
+  ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,6 +60,7 @@ import { generateProceduralData, getDataForDate } from '@/lib/data';
 import { Calendar as CalendarUI } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import type { GardeningAdviceOutput } from '@/ai/schemas';
 
 function AdviceDetail({
   icon: Icon,
@@ -69,8 +75,8 @@ function AdviceDetail({
     <div className="flex items-start gap-3">
       <Icon className="size-5 text-primary mt-1 flex-shrink-0" />
       <div>
-        <h4 className="font-semibold">{title}</h4>
-        <p className="text-sm text-muted-foreground">{content}</p>
+        <h4 className="font-semibold text-sm">{title}</h4>
+        <p className="text-xs text-muted-foreground">{content}</p>
       </div>
     </div>
   );
@@ -88,6 +94,8 @@ export default function SemisPage() {
   const [customVeg, setCustomVeg] = useState('');
   const [sowingDate, setSowingDate] = useState<Date>(new Date());
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [aiAdvice, setAiAdvice] = useState<GardeningAdviceOutput | null>(null);
 
   const filteredData = semisData.filter(veg => 
     veg.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -107,11 +115,12 @@ export default function SemisPage() {
     return schedule.map(s => `- ${s.date} : ${s.phase}, Jour ${s.zodiac}`).join('\n');
   };
 
-  const handlePlanSowing = async () => {
+  const handleStartAnalysis = async () => {
     const plantName = selectedVeg === 'CUSTOM' ? customVeg : selectedVeg;
-    if (!user || !firestore || !plantName) return;
+    if (!plantName) return;
 
     setIsAnalyzing(true);
+    setAiAdvice(null);
     try {
       const locationData = getDataForDate(selectedLocation, sowingDate);
       const upcomingCalendar = getUpcomingGardeningCalendar(selectedLocation, sowingDate);
@@ -124,16 +133,33 @@ export default function SemisPage() {
         upcomingCalendar
       });
 
+      setAiAdvice(advice);
+    } catch (error) {
+      console.error(error);
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de générer les conseils IA.' });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleConfirmSowing = async () => {
+    if (!user || !firestore || !aiAdvice) return;
+    const plantName = selectedVeg === 'CUSTOM' ? customVeg : selectedVeg;
+    if (!plantName) return;
+
+    setIsSaving(true);
+    try {
+      const locationData = getDataForDate(selectedLocation, sowingDate);
       const newSowing = {
         userId: user.uid,
         seedName: plantName,
         sowingDate: sowingDate.toISOString(),
-        plantType: advice.plantType,
-        cultureAdvice: advice.cultureAdvice,
-        estimatedHarvestDate: advice.harvestDate,
-        transplantingAdvice: advice.transplantingAdvice,
-        moonWarning: advice.moonWarning,
-        isValidForMoon: advice.isValidForMoon,
+        plantType: aiAdvice.plantType,
+        cultureAdvice: aiAdvice.cultureAdvice,
+        estimatedHarvestDate: aiAdvice.harvestDate,
+        transplantingAdvice: aiAdvice.transplantingAdvice,
+        moonWarning: aiAdvice.moonWarning,
+        isValidForMoon: aiAdvice.isValidForMoon,
         lunarContext: {
           phase: locationData.farming.lunarPhase,
           zodiac: locationData.farming.zodiac
@@ -144,20 +170,27 @@ export default function SemisPage() {
       await addDoc(collection(firestore, 'users', user.uid, 'sowings'), newSowing);
       
       toast({ 
-        title: advice.isValidForMoon ? 'Semis enregistré !' : 'Avertissement Lunaire', 
-        description: advice.moonWarning,
-        variant: advice.isValidForMoon ? 'default' : 'destructive'
+        title: 'Semis enregistré !', 
+        description: 'Retrouvez-le dans votre onglet "Mes Semis".'
       });
       
       setIsPlanningOpen(false);
       setSelectedVeg(null);
       setCustomVeg('');
+      setAiAdvice(null);
     } catch (error) {
       console.error(error);
-      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de générer les conseils IA.' });
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible d\'enregistrer le semis.' });
     } finally {
-      setIsAnalyzing(false);
+      setIsSaving(false);
     }
+  };
+
+  const handleCloseDialog = () => {
+    setIsPlanningOpen(false);
+    setAiAdvice(null);
+    setSelectedVeg(null);
+    setCustomVeg('');
   };
 
   return (
@@ -296,36 +329,89 @@ export default function SemisPage() {
       </Card>
 
       {/* Planning Dialog */}
-      <Dialog open={isPlanningOpen} onOpenChange={setIsPlanningOpen}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog open={isPlanningOpen} onOpenChange={(open) => !open && handleCloseDialog()}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Planifier un semis</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Sprout className="text-primary" /> Planifier : {selectedVeg === 'CUSTOM' ? customVeg : selectedVeg}
+            </DialogTitle>
             <DialogDescription>
-              L'IA va calculer les meilleurs conseils pour {selectedVeg === 'CUSTOM' ? customVeg : selectedVeg} selon la lune.
+              Choisissez votre date. L'IA calculera la fiche de semis et vérifiera la lune.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-bold uppercase text-muted-foreground">Date de mise en semis</label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start text-left font-normal h-12">
-                    <CalendarDays className="mr-2 h-5 w-5" />
-                    {sowingDate ? format(sowingDate, 'PPP', { locale: fr }) : "Choisir une date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <CalendarUI mode="single" selected={sowingDate} onSelect={(d) => d && setSowingDate(d)} initialFocus />
-                </PopoverContent>
-              </Popover>
+
+          {!aiAdvice ? (
+            <div className="space-y-6 py-4">
+              <div className="space-y-2">
+                <label className="text-sm font-bold uppercase text-muted-foreground">Date de mise en semis prévue</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left font-normal h-12">
+                      <CalendarDays className="mr-2 h-5 w-5 text-primary" />
+                      {sowingDate ? format(sowingDate, 'PPP', { locale: fr }) : "Choisir une date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarUI mode="single" selected={sowingDate} onSelect={(d) => d && setSowingDate(d)} initialFocus />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <Button 
+                onClick={handleStartAnalysis} 
+                className="w-full h-12 text-lg font-bold" 
+                disabled={isAnalyzing}
+              >
+                {isAnalyzing ? (
+                  <><BrainCircuit className="mr-2 animate-pulse" /> Analyse de la fiche...</>
+                ) : (
+                  <><BrainCircuit className="mr-2" /> Calculer la fiche avec l'IA</>
+                )}
+              </Button>
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setIsPlanningOpen(false)}>Annuler</Button>
-            <Button onClick={handlePlanSowing} disabled={isAnalyzing}>
-              {isAnalyzing ? <><BrainCircuit className="mr-2 animate-pulse" /> Analyse IA...</> : "Valider & Enregistrer"}
-            </Button>
-          </DialogFooter>
+          ) : (
+            <div className="space-y-6 py-4 animate-in fade-in slide-in-from-bottom-4">
+              <div className={cn(
+                "p-4 rounded-xl border-2 flex gap-3",
+                aiAdvice.isValidForMoon ? "bg-green-50 border-green-200 text-green-800" : "bg-amber-50 border-amber-200 text-amber-800"
+              )}>
+                {aiAdvice.isValidForMoon ? <CheckCircle2 className="size-6 text-green-600 shrink-0" /> : <AlertTriangle className="size-6 text-amber-600 shrink-0" />}
+                <div className="space-y-1">
+                  <p className="font-bold text-sm">{aiAdvice.isValidForMoon ? "Période idéale !" : "Date déconseillée"}</p>
+                  <p className="text-xs leading-relaxed font-medium">{aiAdvice.moonWarning}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-muted/50 p-3 rounded-lg border">
+                  <p className="text-[10px] font-bold uppercase text-muted-foreground">Catégorie</p>
+                  <p className="font-bold text-sm flex items-center gap-2 mt-1">
+                    <Badge variant="outline" className="bg-primary/5">{aiAdvice.plantType}</Badge>
+                  </p>
+                </div>
+                <div className="bg-muted/50 p-3 rounded-lg border">
+                  <p className="text-[10px] font-bold uppercase text-muted-foreground">Récolte estimée</p>
+                  <p className="font-bold text-sm mt-1">{aiAdvice.harvestDate}</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="text-xs font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                  <Info className="size-3" /> Fiche Technique IA
+                </h4>
+                <div className="space-y-3">
+                  <AdviceDetail icon={Sun} title="Culture & Exposition" content={aiAdvice.cultureAdvice} />
+                  <AdviceDetail icon={Shovel} title="Mise en terre (Repiquage)" content={aiAdvice.transplantingAdvice} />
+                </div>
+              </div>
+
+              <DialogFooter className="flex-col gap-2 sm:flex-row pt-4 border-t">
+                <Button variant="ghost" onClick={() => setAiAdvice(null)} className="w-full sm:w-auto">Modifier la date</Button>
+                <Button onClick={handleConfirmSowing} disabled={isSaving} className="w-full sm:flex-1 font-bold">
+                  {isSaving ? "Enregistrement..." : "Confirmer & Enregistrer"}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

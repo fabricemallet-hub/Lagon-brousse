@@ -42,6 +42,7 @@ export function GardeningManager({ locationData }: { locationData: LocationData 
   const [sowingDate, setSowingDate] = useState<Date>(new Date());
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [tempAdvice, setTempAdvice] = useState<GardeningAdviceOutput | null>(null);
 
   const sowingsRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -56,7 +57,6 @@ export function GardeningManager({ locationData }: { locationData: LocationData 
 
   const seedName = selectedSeed === "AUTRE" ? customSeed : selectedSeed;
 
-  // Helper to generate upcoming calendar for AI
   const getUpcomingGardeningCalendar = (location: string, startDate: Date, days: number = 30) => {
     const schedule = [];
     for (let i = 0; i < days; i++) {
@@ -71,16 +71,16 @@ export function GardeningManager({ locationData }: { locationData: LocationData 
     return schedule.map(s => `- ${s.date} : ${s.phase}, Jour ${s.zodiac}`).join('\n');
   };
 
-  const handleAddSowing = async () => {
+  const handlePreviewAdvice = async () => {
     if (!user || !firestore || !seedName) {
       toast({ variant: 'destructive', title: 'Erreur', description: 'Veuillez sélectionner une graine.' });
       return;
     }
 
     setIsAnalyzing(true);
+    setTempAdvice(null);
     try {
       const upcomingCalendar = getUpcomingGardeningCalendar(selectedLocation, sowingDate);
-
       const advice = await getGardeningAdvice({
         seedName,
         sowingDate: sowingDate.toISOString(),
@@ -88,18 +88,30 @@ export function GardeningManager({ locationData }: { locationData: LocationData 
         zodiacSign: locationData.farming.zodiac,
         upcomingCalendar
       });
+      setTempAdvice(advice);
+    } catch (error) {
+      console.error(error);
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de générer les conseils IA.' });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
-      setIsSaving(true);
+  const handleAddSowing = async () => {
+    if (!user || !firestore || !tempAdvice) return;
+
+    setIsSaving(true);
+    try {
       const newSowing = {
         userId: user.uid,
         seedName,
         sowingDate: sowingDate.toISOString(),
-        plantType: advice.plantType,
-        cultureAdvice: advice.cultureAdvice,
-        estimatedHarvestDate: advice.harvestDate,
-        transplantingAdvice: advice.transplantingAdvice,
-        moonWarning: advice.moonWarning,
-        isValidForMoon: advice.isValidForMoon,
+        plantType: tempAdvice.plantType,
+        cultureAdvice: tempAdvice.cultureAdvice,
+        estimatedHarvestDate: tempAdvice.harvestDate,
+        transplantingAdvice: tempAdvice.transplantingAdvice,
+        moonWarning: tempAdvice.moonWarning,
+        isValidForMoon: tempAdvice.isValidForMoon,
         lunarContext: {
           phase: locationData.farming.lunarPhase,
           zodiac: locationData.farming.zodiac
@@ -110,19 +122,18 @@ export function GardeningManager({ locationData }: { locationData: LocationData 
       await addDoc(collection(firestore, 'users', user.uid, 'sowings'), newSowing);
       
       toast({ 
-        title: advice.isValidForMoon ? 'Semis enregistré !' : 'Avertissement Lunaire', 
-        description: advice.moonWarning,
-        variant: advice.isValidForMoon ? 'default' : 'destructive'
+        title: tempAdvice.isValidForMoon ? 'Semis enregistré !' : 'Semis enregistré avec avertissement', 
+        description: tempAdvice.isValidForMoon ? 'Votre culture a été ajoutée.' : tempAdvice.moonWarning,
       });
       
       setSelectedSeed("");
       setCustomSeed("");
       setSowingDate(new Date());
+      setTempAdvice(null);
     } catch (error) {
       console.error(error);
-      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de générer les conseils IA.' });
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Erreur lors de l\'enregistrement.' });
     } finally {
-      setIsAnalyzing(false);
       setIsSaving(false);
     }
   };
@@ -144,70 +155,107 @@ export function GardeningManager({ locationData }: { locationData: LocationData 
           <CardTitle className="flex items-center gap-2">
             <Sprout className="text-primary" /> Nouveau Semis
           </CardTitle>
-          <CardDescription>Enregistrez vos mises en godets ou semis direct.</CardDescription>
+          <CardDescription>Planifiez vos cultures avec l'aide de la lune et de l'IA.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Date de mise en semis</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className={cn("w-full justify-start text-left font-normal h-12 px-4", !sowingDate && "text-muted-foreground")}>
-                    <CalendarIcon className="mr-2 h-5 w-5" />
-                    {sowingDate ? format(sowingDate, 'PPP', { locale: fr }) : "Choisir une date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar mode="single" selected={sowingDate} onSelect={(d) => d && setSowingDate(d)} initialFocus />
-                </PopoverContent>
-              </Popover>
-              {isNotToday && (
-                <Alert className="bg-amber-50 border-amber-200 text-amber-800 py-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  <AlertDescription className="text-xs font-medium italic">
-                    Attention : la date saisie ne correspond pas à la date d'aujourd'hui. Est-ce intentionnel ?
-                  </AlertDescription>
-                </Alert>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label>Choix de la graine</Label>
-              <Select value={selectedSeed} onValueChange={setSelectedSeed}>
-                <SelectTrigger className="h-12 text-base">
-                  <SelectValue placeholder="Sélectionner une variété" />
-                </SelectTrigger>
-                <SelectContent>
-                  {COMMON_SEEDS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                  <SelectItem value="AUTRE">Autre / Saisie manuelle...</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {selectedSeed === "AUTRE" && (
-              <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                <Label>Nom de la plante</Label>
-                <Input 
-                  placeholder="Ex: Passion, Chouchoute..." 
-                  value={customSeed} 
-                  onChange={e => setCustomSeed(e.target.value)}
-                  className="h-12 text-base"
-                />
+          {!tempAdvice ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Date de mise en semis</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal h-12 px-4", !sowingDate && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-2 h-5 w-5 text-primary" />
+                      {sowingDate ? format(sowingDate, 'PPP', { locale: fr }) : "Choisir une date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={sowingDate} onSelect={(d) => d && setSowingDate(d)} initialFocus />
+                  </PopoverContent>
+                </Popover>
+                {isNotToday && (
+                  <Alert className="bg-amber-50 border-amber-200 text-amber-800 py-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-xs font-medium italic">
+                      Attention : la date saisie ne correspond pas à aujourd'hui.
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
-            )}
-          </div>
 
-          <Button 
-            className="w-full h-12 text-lg font-bold shadow-md" 
-            onClick={handleAddSowing} 
-            disabled={!seedName || isAnalyzing || isSaving}
-          >
-            {isAnalyzing ? (
-              <><BrainCircuit className="mr-2 animate-pulse" /> Analyse IA...</>
-            ) : (
-              <><Sprout className="mr-2" /> Valider mon semis</>
-            )}
-          </Button>
+              <div className="space-y-2">
+                <Label>Choix de la graine</Label>
+                <Select value={selectedSeed} onValueChange={setSelectedSeed}>
+                  <SelectTrigger className="h-12 text-base">
+                    <SelectValue placeholder="Sélectionner une variété" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COMMON_SEEDS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    <SelectItem value="AUTRE">Autre / Saisie manuelle...</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedSeed === "AUTRE" && (
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                  <Label>Nom de la plante</Label>
+                  <Input 
+                    placeholder="Ex: Passion, Chouchoute..." 
+                    value={customSeed} 
+                    onChange={e => setCustomSeed(e.target.value)}
+                    className="h-12 text-base"
+                  />
+                </div>
+              )}
+
+              <Button 
+                className="w-full h-12 text-lg font-bold" 
+                onClick={handlePreviewAdvice} 
+                disabled={!seedName || isAnalyzing}
+              >
+                {isAnalyzing ? (
+                  <><BrainCircuit className="mr-2 animate-pulse" /> Analyse IA...</>
+                ) : (
+                  <><BrainCircuit className="mr-2" /> Analyser avec l'IA</>
+                )}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+              <div className={cn(
+                "p-4 rounded-xl border-2 flex gap-3",
+                tempAdvice.isValidForMoon ? "bg-green-50 border-green-200 text-green-800" : "bg-amber-50 border-amber-200 text-amber-800"
+              )}>
+                {tempAdvice.isValidForMoon ? <CheckCircle2 className="size-6 text-green-600" /> : <AlertTriangle className="size-6 text-amber-600" />}
+                <div className="space-y-1">
+                  <p className="font-bold text-sm">{tempAdvice.isValidForMoon ? "Période favorable" : "Date déconseillée"}</p>
+                  <p className="text-xs leading-relaxed font-medium">{tempAdvice.moonWarning}</p>
+                </div>
+              </div>
+
+              <div className="space-y-4 bg-muted/30 p-4 rounded-lg border">
+                <div className="flex justify-between items-center border-b pb-2">
+                  <span className="text-xs font-bold uppercase text-muted-foreground">Type</span>
+                  <Badge variant="secondary">{tempAdvice.plantType}</Badge>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Conseils de culture</p>
+                  <p className="text-sm leading-relaxed">{tempAdvice.cultureAdvice}</p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Récolte estimée</p>
+                  <p className="text-sm font-bold text-green-600">{tempAdvice.harvestDate}</p>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button variant="ghost" onClick={() => setTempAdvice(null)} className="flex-1">Modifier</Button>
+                <Button onClick={handleAddSowing} disabled={isSaving} className="flex-[2] font-bold">
+                  {isSaving ? "Enregistrement..." : "Confirmer & Sauvegarder"}
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
