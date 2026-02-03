@@ -70,6 +70,8 @@
         "cultureAdvice": { "type": "string" },
         "estimatedHarvestDate": { "type": "string" },
         "transplantingAdvice": { "type": "string" },
+        "moonWarning": { "type": "string" },
+        "isValidForMoon": { "type": "boolean" },
         "lunarContext": {
           "type": "object",
           "properties": {
@@ -80,48 +82,6 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "seedName", "sowingDate"]
-    },
-    "Location": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Location",
-      "type": "object",
-      "description": "Represents a location (commune) selected by the user.",
-      "properties": {
-        "id": { "type": "string", "description": "Unique identifier for the location." },
-        "name": { "type": "string", "description": "The name of the location." },
-        "latitude": { "type": "number", "description": "The latitude of the location." },
-        "longitude": { "type": "number", "description": "The longitude of the location." }
-      },
-      "required": ["id", "name", "latitude", "longitude"]
-    },
-    "Station": {
-      "title": "Station",
-      "type": "object",
-      "description": "Represents a tide station with its coordinates.",
-      "properties": {
-        "name": { "type": "string" },
-        "lat": { "type": "number" },
-        "lon": { "type": "number" }
-      }
-    },
-    "TideArchive": {
-      "title": "TideArchive",
-      "type": "object",
-      "description": "Contains the tide events for a specific day and station.",
-      "properties": {
-        "tides": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "type": { "type": "string" },
-              "time": { "type": "string" },
-              "height": { "type": "number" }
-            },
-            "required": ["type", "time", "height"]
-          }
-        }
-      }
     },
     "HuntingSession": {
       "title": "HuntingSession",
@@ -169,56 +129,6 @@
       },
       "required": ["displayName", "updatedAt"]
     },
-     "AccessToken": {
-      "title": "AccessToken",
-      "type": "object",
-      "description": "Represents a generated access token for a limited-time subscription.",
-      "properties": {
-        "durationMonths": { "type": "number", "description": "The duration of the subscription in months granted by this token." },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the token was created." },
-        "status": { "type": "string", "enum": ["active", "redeemed"], "description": "The current status of the token." },
-        "redeemedBy": { "type": "string", "description": "The UID of the user who redeemed the token." },
-        "redeemedAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the token was redeemed." }
-      },
-      "required": ["durationMonths", "createdAt", "status"]
-    },
-    "SharedAccessToken": {
-      "title": "SharedAccessToken",
-      "type": "object",
-      "description": "Represents a globally shared access token that grants access to all users.",
-      "properties": {
-        "durationMonths": { "type": "number", "description": "The duration of the subscription in months granted by this token." },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the token was created." },
-        "expiresAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the token expires." }
-      },
-      "required": ["durationMonths", "createdAt", "expiresAt"]
-    },
-    "Conversation": {
-      "title": "Conversation",
-      "type": "object",
-      "description": "Represents a single conversation thread between a user and the admin.",
-      "properties": {
-        "userId": { "type": "string", "description": "The UID of the user who initiated the conversation." },
-        "userEmail": { "type": "string", "description": "The email of the user." },
-        "userDisplayName": { "type": "string", "description": "The display name of the user." },
-        "lastMessageContent": { "type": "string", "description": "A snippet of the latest message for preview." },
-        "lastMessageAt": { "type": "string", "format": "date-time", "description": "Timestamp of the last message sent." },
-        "isReadByAdmin": { "type": "boolean", "description": "True if the admin has read the latest message from the user." },
-        "isReadByUser": { "type": "boolean", "description": "True if the user has read the latest message from the admin." }
-      },
-      "required": ["userId", "userEmail", "userDisplayName", "lastMessageAt", "isReadByAdmin", "isReadByUser"]
-    },
-    "ChatMessage": {
-      "title": "ChatMessage",
-      "type": "object",
-      "description": "Represents a single message within a conversation.",
-      "properties": {
-        "senderId": { "type": "string", "description": "The UID of the sender ('admin' if from the administrator)." },
-        "content": { "type": "string", "description": "The text content of the message." },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp when the message was sent." }
-      },
-      "required": ["senderId", "content", "createdAt"]
-    },
     "FishingSpot": {
       "title": "FishingSpot",
       "type": "object",
@@ -233,28 +143,18 @@
             "longitude": { "type": "number" }
           }
         },
-        "icon": { "type": "string", "description": "The icon chosen for the spot marker." },
-        "color": { "type": "string", "description": "The color chosen for the spot marker." },
-        "fishingTypes": {
-          "type": "array",
-          "description": "The fishing techniques used at this spot.",
-          "items": { "type": "string" }
-        },
+        "icon": { "type": "string" },
+        "color": { "type": "string" },
+        "fishingTypes": { "type": "array", "items": { "type": "string" } },
         "createdAt": { "type": "string", "format": "date-time" },
         "context": {
           "type": "object",
-          "description": "Environmental context at the time of saving.",
           "properties": {
             "timestamp": { "type": "string", "format": "date-time" },
             "moonPhase": { "type": "string" },
             "tideHeight": { "type": "number" },
             "tideMovement": { "type": "string" },
-            "tideCurrent": { "type": "string" },
-            "weatherCondition": { "type": "string" },
-            "windSpeed": { "type": "number" },
-            "windDirection": { "type": "string" },
-            "airTemperature": { "type": "number" },
-            "waterTemperature": { "type": "number" }
+            "tideCurrent": { "type": "string" }
           }
         }
       },
@@ -265,46 +165,29 @@
     "providers": ["password"]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/users/{userId}",
-        "definition": {
-          "entityName": "UserAccount",
-          "schema": { "$ref": "#/backend/entities/UserAccount" },
-          "description": "Stores user account information.",
-          "params": [{ "name": "userId", "description": "The unique identifier for the user account." }]
-        }
-      },
-      {
-        "path": "/vessels/{userId}",
-        "definition": {
-          "entityName": "VesselStatus",
-          "schema": { "$ref": "#/backend/entities/VesselStatus" },
-          "description": "Real-time vessel status for tracking.",
-          "params": [{ "name": "userId", "description": "The UID of the vessel owner." }]
-        }
-      },
-      {
-        "path": "/hunting_sessions/{sessionId}",
-        "definition": {
-          "entityName": "HuntingSession",
-          "schema": { "$ref": "#/backend/entities/HuntingSession" },
-          "description": "Real-time hunting session.",
-          "params": [{ "name": "sessionId", "description": "The session ID." }]
-        }
-      },
-      {
-        "path": "/hunting_sessions/{sessionId}/participants/{userId}",
-        "definition": {
-          "entityName": "SessionParticipant",
-          "schema": { "$ref": "#/backend/entities/SessionParticipant" },
-          "description": "A participant in a hunting session.",
-          "params": [
-            { "name": "sessionId", "description": "The session ID." },
-            { "name": "userId", "description": "The participant's UID." }
-          ]
-        }
-      }
-    ]
+    "/users/{userId}": {
+      "schema": { "$ref": "#/backend/entities/UserAccount" },
+      "description": "Stores user account information."
+    },
+    "/vessels/{userId}": {
+      "schema": { "$ref": "#/backend/entities/VesselStatus" },
+      "description": "Real-time vessel status for tracking."
+    },
+    "/hunting_sessions/{sessionId}": {
+      "schema": { "$ref": "#/backend/entities/HuntingSession" },
+      "description": "Real-time hunting session."
+    },
+    "/hunting_sessions/{sessionId}/participants/{userId}": {
+      "schema": { "$ref": "#/backend/entities/SessionParticipant" },
+      "description": "A participant in a hunting session."
+    },
+    "/users/{userId}/fishing_spots/{spotId}": {
+      "schema": { "$ref": "#/backend/entities/FishingSpot" },
+      "description": "User's saved fishing spots."
+    },
+    "/users/{userId}/sowings/{sowingId}": {
+      "schema": { "$ref": "#/backend/entities/SowingRecord" },
+      "description": "User's saved sowing records."
+    }
   }
 }
