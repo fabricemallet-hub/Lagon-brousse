@@ -1,7 +1,8 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // REVISION: STABLE_SYNC_FINAL_V25
+    // REVISION: STABLE_SYNC_FINAL_V26
     
     function isAuth() { return request.auth != null; }
     function isAdmin() { 
@@ -39,6 +40,12 @@ service cloud.firestore {
     match /conversations/{cId} {
       allow read, write: if isAdmin() || (isAuth() && request.auth.uid == cId);
       match /{allPaths=**} { allow read, write: if isAdmin() || (isAuth() && request.auth.uid == cId); }
+    }
+
+    // Configuration globale (Splash screen, etc.)
+    match /app_settings/{settingId} {
+      allow read: if true; // Tout le monde peut lire le splash screen
+      allow write: if isAdmin();
     }
 
     // Règle par défaut

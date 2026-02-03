@@ -258,12 +258,12 @@ export interface VesselStatus {
   batteryLevel?: number;
 }
 
-export interface VesselHistory {
-  id: string;
-  timestamp: any;
-  location: {
-    latitude: number;
-    longitude: number;
-  };
-  durationMinutes: number;
+export interface SplashScreenSettings {
+  splashMode: 'text' | 'image';
+  splashText?: string;
+  splashTextColor?: string;
+  splashFontSize?: string;
+  splashBgColor?: string;
+  splashImageUrl?: string;
+  splashImageFit?: 'cover' | 'contain';
 }

@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "UserAccount": {
@@ -35,6 +36,20 @@
         "location": { "type": "object" },
         "context": { "type": "object" }
       }
+    },
+    "AppSettings": {
+      "title": "AppSettings",
+      "type": "object",
+      "description": "Paramètres globaux de l'application.",
+      "properties": {
+        "splashMode": { "type": "string", "enum": ["text", "image"] },
+        "splashText": { "type": "string" },
+        "splashTextColor": { "type": "string" },
+        "splashFontSize": { "type": "string" },
+        "splashBgColor": { "type": "string" },
+        "splashImageUrl": { "type": "string" },
+        "splashImageFit": { "type": "string", "enum": ["cover", "contain"] }
+      }
     }
   },
   "auth": {
@@ -61,6 +76,10 @@
     },
     "/conversations/{conversationId}": {
       "description": "Support et messagerie admin."
+    },
+    "/app_settings/{settingId}": {
+      "schema": { "$ref": "#/backend/entities/AppSettings" },
+      "description": "Configuration globale du splash screen."
     }
   }
 }
