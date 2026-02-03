@@ -79,7 +79,7 @@ service cloud.firestore {
     // ----------------------------------------------------------------------
     match /hunting_sessions/{sessionId} {
       // Autoriser explicitement la lecture (get + list) à tout utilisateur connecté
-      // Synchronisation forcee pour deploiement: 2024-05-24T12:45:00
+      // Synchronisation forcee pour deploiement: 2024-05-24T12:48:00
       allow read: if isSignedIn();
       allow create: if isSignedIn();
       // Seuls l'organisateur ou l'admin peuvent modifier/supprimer
