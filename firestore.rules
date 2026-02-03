@@ -78,8 +78,11 @@ service cloud.firestore {
     // Collection: hunting_sessions
     // ----------------------------------------------------------------------
     match /hunting_sessions/{sessionId} {
-      allow read: if isSignedIn();
+      // Autoriser explicitement le listage et la lecture individuelle pour les utilisateurs connectés
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
       allow create: if isSignedIn();
+      // Seuls l'organisateur ou l'admin peuvent modifier/supprimer
       allow update, delete: if isAdmin() || (isSignedIn() && (resource == null || resource.data.organizerId == request.auth.uid));
       
       match /participants/{userId} {
