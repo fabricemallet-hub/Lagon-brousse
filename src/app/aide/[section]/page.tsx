@@ -19,7 +19,9 @@ import {
   User,
   Home,
   Sparkles,
-  Sun
+  Sun,
+  ShieldAlert,
+  ExternalLink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -77,9 +79,10 @@ const sectionContent: Record<string, {
       "Vigilance & Sécurité : L'IA identifie les dangers comme les pics d'UV extrêmes, les fortes rafales ou les passages pluvieux soudains."
     ],
     tips: [
-      "L'assistant IA ne se contente pas de lire les chiffres : il vous aide à identifier la 'meilleure fenêtre' de la semaine pour vos activités.",
-      "La flèche du vent indique la provenance réelle de l'air : une flèche pointant vers le bas indique un vent de Nord.",
-      "Le bilan IA est régénéré à chaque consultation pour refléter les changements les plus récents de votre base de données."
+      "AVERTISSEMENT CRITIQUE : Cette application ne remplace PAS le site officiel de Météo Nouvelle-Calédonie (meteo.nc). Consultez-le toujours avant de prévoir une sortie en mer.",
+      "Source des données : Les relevés techniques proviennent d'une station météorologique située en Australie.",
+      "L'assistant IA vous aide à identifier la 'meilleure fenêtre' de la semaine pour vos activités, mais la décision finale et la sécurité vous incombent.",
+      "La flèche du vent indique la provenance réelle de l'air : une flèche pointant vers le bas indique un vent de Nord."
     ]
   },
   'vessel-tracker': {

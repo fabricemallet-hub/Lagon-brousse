@@ -4,7 +4,7 @@ import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, orderBy, query } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Wind, Thermometer, Sun, MapPin, Search, ChevronLeft, CalendarDays, Waves, Info, BrainCircuit, ShieldAlert, Sparkles, CloudSun, Cloud, CloudRain, Moon, ArrowUp, Droplets } from 'lucide-react';
+import { Wind, Thermometer, Sun, MapPin, Search, ChevronLeft, CalendarDays, Waves, Info, BrainCircuit, ShieldAlert, Sparkles, CloudSun, Cloud, CloudRain, Moon, ArrowUp, Droplets, ExternalLink, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useState, useMemo, useEffect } from 'react';
@@ -18,15 +18,16 @@ import { getWeatherSummary } from '@/ai/flows/weather-summary-flow';
 import type { WeatherSummaryOutput } from '@/ai/schemas';
 import { useLocation } from '@/context/location-context';
 import { locations as locationsMap } from '@/lib/locations';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 // Helper: Calculate distance between two points (Haversine)
 const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371e3; // Earth radius in meters
-  const φ1 = (lat1 * Math.PI) / 180;
+  const φ = (lat1 * Math.PI) / 180;
   const φ2 = (lat2 * Math.PI) / 180;
   const Δφ = ((lat2 - lat1) * Math.PI) / 180;
   const Δλ = ((lon2 - lon1) * Math.PI) / 180;
-  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 };
@@ -39,8 +40,6 @@ const getProgressiveUV = (maxUV: number, date: Date): number => {
 
   if (currentTimeInHours < 6 || currentTimeInHours > 18) return 0;
 
-  // Simple bell curve (sinusoidal) peaking at 12:00
-  // (currentTimeInHours - 6) / 12 maps 6:00-18:00 to 0-1
   const factor = Math.sin(((currentTimeInHours - 6) / 12) * Math.PI);
   return parseFloat((maxUV * factor).toFixed(1));
 };
@@ -87,7 +86,6 @@ export default function MeteoLivePage() {
   const [selectedCommuneId, setSelectedCommuneId] = useState<string | null>(null);
   const [now, setNow] = useState(new Date());
 
-  // Update "now" every minute for real-time UV progress
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(timer);
@@ -116,11 +114,9 @@ export default function MeteoLivePage() {
     );
 
     return [...filtered].sort((a, b) => {
-      // 1. Ma commune en premier
       if (a.id === selectedLocation) return -1;
       if (b.id === selectedLocation) return 1;
 
-      // 2. Bélep et Loyauté à la toute fin
       const aSpecial = isLoyaltyOrBelep(a.id);
       const bSpecial = isLoyaltyOrBelep(b.id);
       
@@ -128,7 +124,6 @@ export default function MeteoLivePage() {
       if (!aSpecial && bSpecial) return -1;
       if (aSpecial && bSpecial) return a.id.localeCompare(b.id);
 
-      // 3. Reste de la liste par distance GPS
       if (!selectedCoords) return a.id.localeCompare(b.id);
 
       const posA = locationsMap[a.id];
@@ -167,6 +162,14 @@ export default function MeteoLivePage() {
           </CardDescription>
         </CardHeader>
       </Card>
+
+      <Alert variant="destructive" className="bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950 dark:border-amber-900 dark:text-amber-100 py-3">
+        <Info className="size-4 text-amber-600" />
+        <AlertTitle className="text-xs font-black uppercase tracking-wider mb-1">Avis de sécurité & Source</AlertTitle>
+        <AlertDescription className="text-[10px] leading-relaxed font-medium">
+          Cette application <strong>ne remplace pas</strong> le site officiel <a href="https://www.meteo.nc/" target="_blank" rel="noopener noreferrer" className="underline inline-flex items-center gap-0.5 font-bold">meteo.nc <ExternalLink className="size-2" /></a>. Restez attentifs aux conditions locales avant toute sortie en mer. Les données proviennent d'une station australienne.
+        </AlertDescription>
+      </Alert>
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -262,7 +265,6 @@ function ForecastView({ communeId, liveData, onBack, now }: { communeId: string,
     const [aiSummary, setAiSummary] = useState<WeatherSummaryOutput | null>(null);
     const [isAiLoading, setIsAiLoading] = useState(false);
 
-    // Fetch previsions from sub-collection
     const forecastQuery = useMemoFirebase(() => {
         if (!firestore || !communeId) return null;
         return query(collection(firestore, 'meteo_caledonie', communeId, 'previsions'), orderBy('date', 'asc'));
@@ -308,6 +310,13 @@ function ForecastView({ communeId, liveData, onBack, now }: { communeId: string,
                     <MapPin className="text-primary size-6" /> {communeId}
                 </h1>
             </div>
+
+            <Alert className="bg-muted/50 border-2 py-3">
+              <ShieldAlert className="size-4 text-muted-foreground" />
+              <AlertDescription className="text-[10px] leading-relaxed italic text-muted-foreground font-medium">
+                Information : Les prévisions ci-dessous sont issues d'une station météorologique australienne. Consultez toujours <a href="https://www.meteo.nc/" target="_blank" rel="noopener noreferrer" className="underline font-bold">Météo NC</a> avant toute activité à risque.
+              </AlertDescription>
+            </Alert>
 
             <Card className="bg-gradient-to-br from-indigo-600 to-blue-700 text-white border-none shadow-xl overflow-hidden relative">
                 <div className="absolute right-0 top-0 opacity-10 -translate-y-4 translate-x-4">
@@ -375,12 +384,8 @@ function ForecastView({ communeId, liveData, onBack, now }: { communeId: string,
 function DayForecastCard({ forecast, index, liveData, now }: { forecast: MeteoForecast, index: number, liveData?: MeteoLive, now: Date }) {
     const isToday = index === 0;
     const condition = getMeteoCondition(forecast.code_meteo);
-    
-    // Fusion avec le live pour aujourd'hui
     const currentTemp = isToday && liveData ? liveData.temperature : null;
     const currentVent = isToday && liveData ? liveData.vent : forecast.vent_max;
-    
-    // Correction intelligence UV progressive
     const currentUV = isToday && liveData ? getProgressiveUV(liveData.uv, now) : null;
 
     return (
