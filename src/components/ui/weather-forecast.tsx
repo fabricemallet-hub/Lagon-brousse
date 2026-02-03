@@ -262,31 +262,35 @@ export function WeatherForecast({ weather, tides }: { weather: WeatherData; tide
                   <div className="border-t w-full my-0.5"></div>
 
                   <div className="w-full space-y-0.5 text-[10px]">
-                    <div className="flex items-center justify-center" title="Hauteur de la marée">
-                      <span className="text-muted-foreground mr-1">Hauteur:</span>
-                      <Waves className="size-3 text-muted-foreground" />
-                      <span className="font-semibold ml-1">{forecast.tideHeight.toFixed(1)}m</span>
+                    <div className="flex items-center justify-center">
+                      <Waves className="size-3 text-muted-foreground mr-1" />
+                      <span className="font-semibold">{forecast.tideHeight.toFixed(1)}m</span>
                     </div>
-                    <div className="flex items-center justify-center h-5" title="Force du courant">
-                        <span className="text-muted-foreground mr-1">Courant:</span>
-                        <Zap className="size-3 text-muted-foreground" />
-                        <div className="ml-1 flex items-center">
-                            {forecast.tidePeakType ? (
-                                <Badge variant={forecast.tidePeakType === 'haute' ? 'default' : 'destructive'} className="h-4 px-1 text-[8px] font-semibold leading-none">
-                                    {forecast.tidePeakType === 'haute' ? 'Pleine' : 'Basse'}
-                                </Badge>
-                            ) : forecast.tideCurrent === 'Nul' ? (
-                                <Badge variant="secondary" className="h-4 px-1 text-[8px] font-semibold leading-none">Étale</Badge>
-                            ) : (
-                                <span className="font-semibold text-[10px]">{forecast.tideCurrent}</span>
-                            )}
-                        </div>
+                    <div className="flex items-center justify-center h-5">
+                        <Zap className="size-3 text-muted-foreground mr-1" />
+                        <span className="font-semibold text-[10px]">
+                            {forecast.tidePeakType ? (forecast.tidePeakType === 'haute' ? 'Pleine' : 'Basse') : 
+                             forecast.tideCurrent === 'Nul' ? 'Étale' : 
+                             forecast.tideCurrent}
+                        </span>
                     </div>
                   </div>
                 </div>
               </div>
             )
           })}
+        </div>
+      </div>
+
+      {/* Légende explicative */}
+      <div className="p-2 border-t bg-muted/20 flex justify-center items-center gap-6 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
+        <div className="flex items-center gap-1.5">
+          <Waves className="size-3" />
+          <span>Hauteur</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Zap className="size-3" />
+          <span>Courant</span>
         </div>
       </div>
     </div>
