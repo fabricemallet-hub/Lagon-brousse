@@ -179,18 +179,25 @@ const DayCell = React.memo(({
             {fishingIcons?.pelagic}
           </div>
           <div className="mt-auto w-full flex flex-col items-center gap-0 pb-0.5">
-            {sortedTides.map((tide, idx) => (
-              <div 
-                key={idx} 
-                className={cn(
-                  "text-[6px] font-black leading-[1.1] flex items-center justify-between w-full px-0.5",
-                  tide.type === 'haute' ? "text-primary" : "text-blue-800 opacity-80"
-                )}
-              >
-                <span>{tide.time}</span>
-                <span>{tide.height.toFixed(1)}m</span>
-              </div>
-            ))}
+            {sortedTides.map((tide, idx) => {
+              const isLargeHigh = tide.type === 'haute' && tide.height > 1.65;
+              const isLargeLow = tide.type === 'basse' && tide.height < 0.23;
+              
+              return (
+                <div 
+                  key={idx} 
+                  className={cn(
+                    "text-[6px] font-black leading-[1.1] flex items-center justify-between w-full px-0.5 rounded-[1px]",
+                    tide.type === 'haute' ? "text-primary" : "text-blue-800 opacity-80",
+                    isLargeHigh && "bg-primary text-white ring-1 ring-primary",
+                    isLargeLow && "bg-destructive text-white ring-1 ring-destructive opacity-100"
+                  )}
+                >
+                  <span>{tide.time}</span>
+                  <span>{tide.height.toFixed(1)}m</span>
+                </div>
+              );
+            })}
             {tideInfo?.isGrandeMaree && (
               <span className="text-[5px] uppercase tracking-tighter font-black text-primary animate-pulse">Gr. Marée</span>
             )}
@@ -284,6 +291,8 @@ export function LunarCalendar() {
             <div className="flex flex-wrap gap-x-4 gap-y-2 p-3 bg-primary/5 border border-primary/20 rounded-lg">
               <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-primary"><Waves className="size-4"/> Heure/Hauteur</div>
               <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-primary"><Star className="size-3 fill-primary" /> Grandes Marées</div>
+              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><span className="bg-primary text-white px-1 rounded-[2px]">Haute {'>'} 1.65m</span></div>
+              <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase"><span className="bg-destructive text-white px-1 rounded-[2px]">Basse {'<'} 0.23m</span></div>
             </div>
           </div>
         )}
@@ -315,7 +324,6 @@ export function LunarCalendar() {
   );
 }
 
-// Sub-components kept but logic refined for mobile spacing
 function ChampsDetailDialogContent({ day, location }: { day: Date; location: string }) {
   const [data, setData] = useState<LocationData | null>(null);
   useEffect(() => { setData(getDataForDate(location, day)); }, [location, day]);
