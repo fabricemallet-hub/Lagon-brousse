@@ -321,15 +321,35 @@ export default function AdminPage() {
     audio.play().catch(e => toast({ variant: 'destructive', title: 'Erreur lecture', description: 'URL invalide ou inaccessible.' }));
   };
 
-  const downloadFile = (url: string, label: string) => {
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${label.toLowerCase().replace(/\s/g, '-')}.mp3`;
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast({ title: "Lancement du téléchargement" });
+  const downloadFile = async (url: string, label: string) => {
+    const filename = `${label.toLowerCase().replace(/\s/g, '-')}.mp3`;
+    toast({ title: "Préparation du téléchargement..." });
+
+    try {
+      // Tenter de télécharger via Blob pour forcer le téléchargement si CORS le permet
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Fetch failed");
+      
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+      
+      toast({ title: "Téléchargement terminé" });
+    } catch (error) {
+      // Fallback si CORS bloque le fetch (cas fréquent avec Mixkit ou serveurs tiers)
+      // On ouvre simplement le lien dans un nouvel onglet
+      window.open(url, '_blank');
+      toast({ 
+        title: "Ouverture du fichier", 
+        description: "Le téléchargement direct est bloqué par le serveur distant. Le fichier s'ouvre dans un nouvel onglet : faites 'Clic droit -> Enregistrer sous'." 
+      });
+    }
   };
 
   const handleEditUser = (u: UserAccount) => {
@@ -1051,7 +1071,7 @@ export default function AdminPage() {
               <AlertDialogCancel>Annuler</AlertDialogCancel>
               <AlertDialogAction onClick={handleDeleteUserConfirmed} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                 Supprimer le compte
-              </AlertDialogAction>
+              </AlertDescription>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
