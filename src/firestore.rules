@@ -14,10 +14,6 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
     function isAdmin() {
       return isSignedIn() && (
         (request.auth.token.email != null && request.auth.token.email.lower() in ['f.mallet81@gmail.com', 'f.mallet81@outlook.com']) ||
@@ -28,8 +24,8 @@ service cloud.firestore {
 
     // --- COLLECTION RULES ---
 
-    // Notifications Système (Public read for banner)
-    match /system_notifications/{notifId} {
+    // Notifications Système (Accès prioritaire et public en lecture)
+    match /system_notifications/{document=**} {
       allow read: if true;
       allow write: if isAdmin();
     }
@@ -66,6 +62,10 @@ service cloud.firestore {
       match /fishing_spots/{spotId} {
         allow read, write: if isOwner(userId) || isAdmin();
       }
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
     // Sessions de chasse
