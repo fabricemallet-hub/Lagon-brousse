@@ -2,9 +2,9 @@
 rules_version = '2';
 
 /**
- * LAGON & BROUSSE NC - SECURITY POLICY (SYNCED)
+ * LAGON & BROUSSE NC - SECURITY POLICY (V2.1)
  * Centralized security rules for the entire application.
- * Updated: 2024-05-24T14:25:00Z
+ * Fixed: Public list access for notifications and robust isAdmin logic.
  */
 
 service cloud.firestore {
@@ -16,6 +16,7 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Secure isAdmin: priority to token email, avoids unnecessary DB gets
     function isAdmin() {
       return isSignedIn() && (
         (request.auth.token.email != null && (
@@ -27,17 +28,17 @@ service cloud.firestore {
       );
     }
 
-    // --- PUBLIC COLLECTIONS (READ FOR ALL) ---
-    // These must be at the top to ensure priority evaluation.
+    // --- PUBLIC COLLECTIONS (PRIORITY READ) ---
+    // Rules here must be at the top to ensure they are evaluated first.
 
-    match /system_notifications/{notifId} {
-      // Explicitly allow list for queries with where/orderBy
-      allow get, list: if true;
+    match /system_notifications/{document=**} {
+      // Use recursive wildcard to ensure 'list' queries (with where/orderBy) are allowed publicly.
+      allow read: if true;
       allow write: if isAdmin();
     }
 
-    match /app_settings/{id} {
-      allow get, list: if true;
+    match /app_settings/{document=**} {
+      allow read: if true;
       allow write: if isAdmin();
     }
 
@@ -46,8 +47,8 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    match /fish_species/{id} {
-      allow get, list: if true;
+    match /fish_species/{document=**} {
+      allow read: if true;
       allow write: if isAdmin();
     }
 
@@ -96,7 +97,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     
-    // Safety Catch-all
+    // Safety Catch-all (Admin only)
     match /{allPaths=**} {
       allow read, write: if isAdmin();
     }
