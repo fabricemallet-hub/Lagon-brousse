@@ -67,8 +67,8 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 // CONFIGURATION DES SEUILS
-const IMMOBILITY_THRESHOLD_METERS = 20; // Rayon de 20m pour repasser en mouvement
-const IMMOBILITY_START_SECONDS = 30;    // 30 secondes pour passer en immobile si dans le rayon
+const IMMOBILITY_THRESHOLD_METERS = 20; // Rayon de 20m pour rester immobile
+const IMMOBILITY_START_SECONDS = 30;    // 30 secondes pour passer en immobile
 const THROTTLE_UPDATE_MS = 10000;       // Fréquence max de mise à jour Firestore
 
 interface StatusEvent {
@@ -342,6 +342,23 @@ export function VesselTracker() {
     }
   }, [isSharing, user, firestore, sharingId]);
 
+  // CRITICAL: Immobility check timer to ensure transition to stationary even without GPS updates
+  useEffect(() => {
+    if (!isSharing || mode !== 'sender' || vesselStatus !== 'moving') return;
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const idleSeconds = (now - lastMovementTime) / 1000;
+      
+      if (idleSeconds >= IMMOBILITY_START_SECONDS) {
+        setVesselStatus('stationary');
+        updateVesselInFirestore({ status: 'stationary', isSharing: true, batteryLevel });
+      }
+    }, 5000); // Check every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [isSharing, mode, vesselStatus, lastMovementTime, batteryLevel, updateVesselInFirestore]);
+
   useEffect(() => {
     if (!isSharing || !navigator.geolocation) {
       if (watchIdRef.current) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
@@ -395,16 +412,8 @@ export function VesselTracker() {
             });
             lastFirestoreUpdateRef.current = now;
           }
-        } else {
-          // RESTE DANS LE RAYON DE 20M
-          const idleSeconds = (now - lastMovementTime) / 1000;
-          if (idleSeconds >= IMMOBILITY_START_SECONDS && vesselStatus === 'moving') {
-            // PASSAGE EN IMMOBILE APRÈS 30 SECONDES SANS SORTIE DU RAYON
-            setVesselStatus('stationary');
-            updateVesselInFirestore({ status: 'stationary', isSharing: true, batteryLevel: batteryLevel });
-            lastFirestoreUpdateRef.current = now;
-          }
         }
+        // If dist <= 20m, we let the timer handle the flip to stationary
       },
       () => {},
       { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
@@ -455,6 +464,8 @@ export function VesselTracker() {
     if (currentEffectiveStatus === 'stationary') return 'MOUILLAGE';
     return 'HORS LIGNE';
   }, [currentEffectiveStatus]);
+
+  const statusEventsToShow = useMemo(() => statusEvents.slice(0, 5), [statusEvents]);
 
   return (
     <div className="space-y-6 pb-12">
@@ -616,7 +627,6 @@ export function VesselTracker() {
         )}
 
         <div className="bg-card border-t-2 p-4 flex flex-col gap-3">
-            {/* BANDEAU DE STATUT REDESSINÉ (FIDÈLE À L'IMAGE) */}
             <div className={cn(
                 "flex items-center justify-between p-4 rounded-2xl border-2 shadow-sm transition-all duration-500",
                 currentEffectiveStatus === 'moving' ? "bg-green-50 border-green-200" : currentEffectiveStatus === 'stationary' ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-200"
@@ -667,13 +677,13 @@ export function VesselTracker() {
                 )}
             </div>
 
-            {statusEvents.length > 0 && (
+            {statusEventsToShow.length > 0 && (
               <div className="mt-2 space-y-2">
                 <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
                   <History className="size-3" /> Historique des changements d'état
                 </h4>
                 <div className="space-y-2">
-                  {statusEvents.map((event, idx) => {
+                  {statusEventsToShow.map((event, idx) => {
                     const label = event.status === 'moving' ? 'MOUVEMENT' : event.status === 'stationary' ? 'MOUILLAGE' : 'SIGNAL PERDU';
                     const color = event.status === 'moving' ? 'text-green-600 border-green-100' : event.status === 'stationary' ? 'text-amber-600 border-amber-100' : 'text-red-600 border-red-100';
                     return (
