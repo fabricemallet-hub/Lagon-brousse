@@ -106,7 +106,8 @@ export function VesselTracker() {
     const list = [...defaultVesselSounds];
     if (dbSounds) {
         dbSounds.forEach(s => {
-            if (!list.find(l => l.url === s.url)) {
+            const hasRightCategory = !s.categories || s.categories.includes('Vessel') || s.categories.includes('General');
+            if (hasRightCategory && !list.find(l => l.url === s.url)) {
                 list.push({ id: s.id, label: s.label, url: s.url });
             }
         });

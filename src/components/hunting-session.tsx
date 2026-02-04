@@ -167,7 +167,8 @@ function HuntingSessionContent() {
     const list = [...defaultHuntingSounds];
     if (dbSounds) {
         dbSounds.forEach(s => {
-            if (!list.find(l => l.url === s.url)) {
+            const hasRightCategory = !s.categories || s.categories.includes('Hunting') || s.categories.includes('General');
+            if (hasRightCategory && !list.find(l => l.url === s.url)) {
                 list.push({ id: s.id, label: s.label, url: s.url });
             }
         });
@@ -425,7 +426,6 @@ function HuntingSessionContent() {
         const snap = await getDocs(participantsRef);
         const batch = writeBatch(firestore);
         snap.forEach(d => batch.delete(d.ref));
-        batch.delete(doc(firestore, 'hunting_sessions', sessionToDelete));
         await batch.commit();
         fetchMySessions();
         toast({ title: 'Session supprimée' });

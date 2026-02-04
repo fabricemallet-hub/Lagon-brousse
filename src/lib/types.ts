@@ -313,5 +313,5 @@ export interface SoundLibraryEntry {
   id: string;
   label: string;
   url: string;
-  category?: string;
+  categories: string[];
 }

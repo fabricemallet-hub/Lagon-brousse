@@ -47,13 +47,19 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 const SUBSCRIPTION_PRICE = 500;
 
 const defaultSounds: Omit<SoundLibraryEntry, 'id'>[] = [
-  { label: 'Alerte Urgence', url: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3', category: 'General' },
-  { label: 'Cloche Classique', url: 'https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3', category: 'General' },
-  { label: 'Fanfare Trompette', url: 'https://assets.mixkit.co/active_storage/sfx/2700/2700-preview.mp3', category: 'General' },
-  { label: 'Cor de chasse', url: 'https://assets.mixkit.co/active_storage/sfx/2701/2701-preview.mp3', category: 'Hunting' },
-  { label: 'Sifflet Arbitre', url: 'https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3', category: 'General' },
-  { label: 'Bip Digital', url: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3', category: 'General' },
-  { label: 'Ping Sonar', url: 'https://assets.mixkit.co/active_storage/sfx/2564/2564-preview.mp3', category: 'Vessel' },
+  { label: 'Alerte Urgence', url: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3', categories: ['General', 'Vessel'] },
+  { label: 'Cloche Classique', url: 'https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3', categories: ['General', 'Vessel', 'Hunting'] },
+  { label: 'Fanfare Trompette', url: 'https://assets.mixkit.co/active_storage/sfx/2700/2700-preview.mp3', categories: ['General', 'Hunting'] },
+  { label: 'Cor de chasse', url: 'https://assets.mixkit.co/active_storage/sfx/2701/2701-preview.mp3', categories: ['Hunting'] },
+  { label: 'Sifflet Arbitre', url: 'https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3', categories: ['General'] },
+  { label: 'Bip Digital', url: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3', categories: ['General'] },
+  { label: 'Ping Sonar', url: 'https://assets.mixkit.co/active_storage/sfx/2564/2564-preview.mp3', categories: ['General', 'Vessel'] },
+];
+
+const SOUND_CATEGORIES = [
+  { id: 'General', label: 'Général' },
+  { id: 'Vessel', label: 'Mer / Vessel' },
+  { id: 'Hunting', label: 'Chasse' },
 ];
 
 export default function AdminPage() {
@@ -246,6 +252,10 @@ export default function AdminPage() {
   const handleSaveSound = async () => {
     if (!firestore || !isAdmin || !currentSound.label || !currentSound.url) {
         toast({ variant: 'destructive', title: "Données manquantes", description: "Le libellé et l'URL sont obligatoires." });
+        return;
+    }
+    if (!currentSound.categories || currentSound.categories.length === 0) {
+        toast({ variant: 'destructive', title: "Catégorie manquante", description: "Veuillez sélectionner au moins une catégorie." });
         return;
     }
     setIsSavingSound(true);
@@ -544,6 +554,14 @@ export default function AdminPage() {
     toast({ description: "Copié !" });
   };
 
+  const handleToggleCategory = (catId: string) => {
+    const current = currentSound.categories || [];
+    const next = current.includes(catId)
+        ? current.filter(c => c !== catId)
+        : [...current, catId];
+    setCurrentSound({ ...currentSound, categories: next });
+  };
+
   if (isUserLoading || !isAdmin) return <div className="space-y-4"><Skeleton className="h-48 w-full" /><Skeleton className="h-24 w-full" /></div>;
 
   return (
@@ -744,7 +762,7 @@ export default function AdminPage() {
                         <DatabaseZap className="mr-2 size-4" /> Import Défaut
                     </Button>
                 )}
-                <Button onClick={() => { setSoundDialogMode('add'); setCurrentSound({ category: 'General' }); setIsSoundDialogOpen(true); }}>
+                <Button onClick={() => { setSoundDialogMode('add'); setCurrentSound({ categories: ['General'] }); setIsSoundDialogOpen(true); }}>
                     <Plus className="mr-2 size-4" /> Ajouter
                 </Button>
               </div>
@@ -759,7 +777,12 @@ export default function AdminPage() {
                       </div>
                       <div>
                         <h4 className="font-bold text-sm">{sound.label}</h4>
-                        <p className="text-[10px] text-muted-foreground truncate max-w-[200px]">{sound.url}</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                            {sound.categories?.map(cat => (
+                                <Badge key={cat} variant="secondary" className="text-[8px] font-black uppercase tracking-tighter h-4 px-1.5">{SOUND_CATEGORIES.find(c => c.id === cat)?.label || cat}</Badge>
+                            ))}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground truncate max-w-[200px] mt-1">{sound.url}</p>
                       </div>
                     </div>
                     <div className="flex gap-1">
@@ -973,11 +996,20 @@ export default function AdminPage() {
                     </div>
                 </div>
                 <div className="space-y-2">
-                    <Label>Catégorie</Label>
-                    <Select value={currentSound.category} onValueChange={(v) => setCurrentSound({...currentSound, category: v})}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent><SelectItem value="General">Général</SelectItem><SelectItem value="Vessel">Mer / Vessel</SelectItem><SelectItem value="Hunting">Chasse</SelectItem></SelectContent>
-                    </Select>
+                    <Label>Catégories (Sélection multiple possible)</Label>
+                    <div className="flex flex-wrap gap-2">
+                        {SOUND_CATEGORIES.map(cat => (
+                            <Button 
+                                key={cat.id} 
+                                variant={(currentSound.categories || []).includes(cat.id) ? 'default' : 'outline'}
+                                size="sm"
+                                className="text-[10px] font-black uppercase h-8 px-3"
+                                onClick={() => handleToggleCategory(cat.id)}
+                            >
+                                {cat.label}
+                            </Button>
+                        ))}
+                    </div>
                 </div>
             </div>
             <DialogFooter>
