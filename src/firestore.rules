@@ -2,7 +2,7 @@
 rules_version = '2';
 
 /**
- * LAGON & BROUSSE NC - SECURITY POLICY (SOURCE)
+ * LAGON & BROUSSE NC - SECURITY POLICY (SRC SYNC)
  */
 
 service cloud.firestore {
@@ -25,9 +25,9 @@ service cloud.firestore {
 
     // --- COLLECTION RULES ---
 
-    // Notifications Système (Priorité absolue et accès public total en lecture)
-    match /system_notifications/{notifId} {
-      allow get, list: if true;
+    // PRIORITÉ ABSOLUE : Notifications Système (Lecture publique totale pour la bannière)
+    match /system_notifications/{document=**} {
+      allow read: if true;
       allow write: if isAdmin();
     }
 
@@ -67,17 +67,17 @@ service cloud.firestore {
 
     // Sessions de chasse
     match /hunting_sessions/{sessionId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isSignedIn() || isAdmin();
       match /{allPaths=**} {
-        allow read, write: if isSignedIn();
+        allow read, write: if isSignedIn() || isAdmin();
       }
     }
 
     // Tracker maritime
     match /vessels/{vesselId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isSignedIn() || isAdmin();
       match /{allPaths=**} {
-        allow read, write: if isSignedIn();
+        allow read, write: if isSignedIn() || isAdmin();
       }
     }
 
@@ -91,26 +91,26 @@ service cloud.firestore {
 
     // Jetons d'accès
     match /access_tokens/{tokenId} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isSignedIn() || isAdmin();
     }
     match /shared_access_tokens/{tokenId} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() || isAdmin();
       allow write: if isAdmin();
     }
 
     // Stations et Archives
     match /stations/{stationId} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() || isAdmin();
       allow write: if isAdmin();
       match /{allPaths=**} {
-        allow read: if isSignedIn();
+        allow read: if isSignedIn() || isAdmin();
         allow write: if isAdmin();
       }
     }
     
-    // Default catch-all (Sécurité renforcée)
+    // Default catch-all (Sécurité renforcée avec support admin)
     match /{allPaths=**} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() || isAdmin();
       allow write: if isAdmin();
     }
   }
