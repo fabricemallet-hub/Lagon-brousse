@@ -15,18 +15,19 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && (
-        (request.auth.token.email != null && request.auth.token.email.lower() in ['f.mallet81@gmail.com', 'f.mallet81@outlook.com']) ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'admin')
-      );
+      return isSignedIn() && 
+        (
+          (request.auth.token.email != null && request.auth.token.email.lower() in ['f.mallet81@gmail.com', 'f.mallet81@outlook.com']) ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'admin')
+        );
     }
 
     // --- COLLECTION RULES ---
 
-    // Notifications Système (Accès prioritaire et public en lecture)
-    match /system_notifications/{document=**} {
-      allow read: if true;
+    // Notifications Système (Priorité absolue et accès public total en lecture)
+    match /system_notifications/{notifId} {
+      allow get, list: if true;
       allow write: if isAdmin();
     }
 
@@ -54,24 +55,20 @@ service cloud.firestore {
 
     // Profils utilisateurs
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId) || isAdmin();
+      allow read, write: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
+      
       match /sowings/{sowingId} {
-        allow read, write: if isOwner(userId) || isAdmin();
+        allow read, write: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
       }
       match /fishing_spots/{spotId} {
-        allow read, write: if isOwner(userId) || isAdmin();
+        allow read, write: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
       }
-    }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
     }
 
     // Sessions de chasse
     match /hunting_sessions/{sessionId} {
       allow read, write: if isSignedIn();
-      match /participants/{participantId} {
+      match /{allPaths=**} {
         allow read, write: if isSignedIn();
       }
     }
@@ -79,16 +76,16 @@ service cloud.firestore {
     // Tracker maritime
     match /vessels/{vesselId} {
       allow read, write: if isSignedIn();
-      match /history/{historyId} {
+      match /{allPaths=**} {
         allow read, write: if isSignedIn();
       }
     }
 
     // Messagerie (Support)
     match /conversations/{convId} {
-      allow read, write: if isOwner(convId) || isAdmin();
-      match /messages/{msgId} {
-        allow read, write: if isOwner(convId) || isAdmin();
+      allow read, write: if (isSignedIn() && request.auth.uid == convId) || isAdmin();
+      match /{allPaths=**} {
+        allow read, write: if (isSignedIn() && request.auth.uid == convId) || isAdmin();
       }
     }
 
@@ -111,7 +108,7 @@ service cloud.firestore {
       }
     }
     
-    // Default catch-all
+    // Default catch-all (Sécurité renforcée)
     match /{allPaths=**} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
