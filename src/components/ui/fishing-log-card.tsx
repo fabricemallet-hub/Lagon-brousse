@@ -583,14 +583,15 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                 </Alert>
                 
                 <Dialog open={isSpotDialogOpen} onOpenChange={(open) => { if (!open) setSpotToEdit(null); setIsSpotDialogOpen(open); }}>
-                    <DialogContent>
-                        <DialogHeader>
+                    <DialogContent className="max-h-[95vh] flex flex-col p-0 overflow-hidden sm:max-w-lg">
+                        <DialogHeader className="p-6 pb-2 shrink-0">
                             <DialogTitle>{dialogMode === 'add' ? 'Enregistrer un nouveau spot' : 'Modifier le spot'}</DialogTitle>
                             <DialogDescription>
                                 {dialogMode === 'add' ? "Remplissez les détails et sauvegardez pour ajouter ce spot à votre carnet." : "Modifiez les informations de votre spot."}
                             </DialogDescription>
                         </DialogHeader>
-                        <div className="space-y-4 py-4">
+                        
+                        <div className="flex-grow overflow-y-auto p-6 py-2 space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="spot-name">Nom du spot</Label>
                                 <Input id="spot-name" placeholder="Ex: Spot à bec de cane" value={spotName} onChange={(e) => setSpotName(e.target.value)} />
@@ -633,16 +634,17 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                             </div>
                             <div className="space-y-2">
                                 <Label>Couleur</Label>
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap gap-2">
                                     {availableColors.map(color => (
                                         <button key={color} onClick={() => setSelectedColor(color)} className={cn("w-8 h-8 rounded-full border-2", selectedColor === color ? "border-primary ring-2 ring-primary" : "border-transparent")} style={{ backgroundColor: color }} />
                                     ))}
                                 </div>
                             </div>
                         </div>
-                        <DialogFooter>
-                            <Button variant="ghost" onClick={() => { setIsSpotDialogOpen(false); if (dialogMode === 'add') setNewSpotLocation(null); }}>Annuler</Button>
-                            <Button onClick={handleSave} disabled={isSaving}><Save className="mr-2"/>{isSaving ? "Sauvegarde..." : "Sauvegarder"}</Button>
+                        
+                        <DialogFooter className="p-6 pt-2 border-t shrink-0 flex flex-row gap-2 sm:flex-row">
+                            <Button variant="ghost" onClick={() => { setIsSpotDialogOpen(false); if (dialogMode === 'add') setNewSpotLocation(null); }} className="flex-1">Annuler</Button>
+                            <Button onClick={handleSave} disabled={isSaving} className="flex-1"><Save className="mr-2"/>{isSaving ? "Sauvegarde..." : "Sauvegarder"}</Button>
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
