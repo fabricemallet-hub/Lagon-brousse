@@ -331,7 +331,8 @@ export function VesselTracker() {
     const coords = `${lat.toFixed(6)},${lng.toFixed(6)}`;
     const url = `https://www.google.com/maps?q=${coords}`;
     const body = `ALERTE : ${name === 'Ma Position' ? (user?.displayName || 'Bateau') : name} en difficulté. Position : ${url}`;
-    window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}?body=${encodeURIComponent(body)}`;
+    const smsHref = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
+    window.location.href = smsHref;
   };
 
   const displayVessel = mode === 'sender' ? (isSharing ? { location: { latitude: currentPos?.lat || 0, longitude: currentPos?.lng || 0 }, status: vesselStatus, displayName: 'Ma Position' } : null) : remoteVessel;
@@ -494,7 +495,7 @@ export function VesselTracker() {
                     <div className="flex items-start gap-2 bg-red-50/50 p-2 rounded-lg border border-red-100">
                       <Info className="size-3 text-red-600 shrink-0 mt-0.5" />
                       <p className="text-[9px] leading-relaxed text-muted-foreground font-medium italic">
-                        Rappelons qu’en mer, c’est le <strong>CANAL 16</strong> de la VHF qui est le moyen le plus approprié pour donner l’alerte et communiquer avec les sauveteurs, le 196 étant plutôt destiné aux appels effectués depuis la terre ferme.
+                        Rappelons qu’en mer, c’est le <strong>CANAL 16</strong> de la VHF qui est le moyen le plus approprié pour donner l’alerte et communiquer avec les sauveteurs, le 196 étant plutôt destiné aux appels effectués depuis la terre ferme, par exemple par des témoins constatant la présence d’une embarcation en détresse depuis le rivage.
                       </p>
                     </div>
                   </div>
