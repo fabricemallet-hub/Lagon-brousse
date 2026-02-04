@@ -90,18 +90,18 @@ const sectionContent: Record<string, {
     color: 'bg-blue-600',
     role: "Un système de sécurité maritime haute-fidélité conçu pour rassurer vos proches à terre en partageant votre position GPS exacte et votre statut d'activité en mer.",
     steps: [
-      "Activation Émetteur : Activer 'Partager ma position'. Votre identifiant unique s'affiche instantanément.",
-      "Partage de l'ID : Envoyez cet ID par SMS ou WhatsApp à votre contact de confiance resté à terre.",
-      "Détection d'Immobilité : Si le système détecte une absence de mouvement (>15m) pendant 5 min, votre statut passe en 'Stationnaire' (Mouillage/Dérive).",
-      "Mises à jour Auto : En mode stationnaire, le tracker rafraîchit votre position toutes les 30 min pour rassurer le récepteur sans vider votre batterie.",
-      "ALERTE SMS CRITIQUE : Saisissez le numéro de votre contact. En cas de détresse, le bouton rouge génère un message complet (GPS, lien Maps, secours) et ouvre l'application SMS de votre téléphone pré-remplie. Vous n'avez plus qu'à appuyer sur envoyer.",
-      "Contenu de l'Alerte : Le SMS envoyé contient vos coordonnées GPS décimales, un lien direct Google Maps, votre nom et les numéros d'urgence NC (CROSS 196)."
+      "Émetteur (A) - ID Personnalisé : Activez 'Partager ma position'. Vous pouvez saisir un code personnalisé pour simplifier le partage (ex: BATEAU-NC).",
+      "Émetteur (A) - Mode Éveil : Activez 'MODE ÉVEIL ACTIF' pour empêcher votre téléphone de se mettre en veille, garantissant un flux GPS continu en arrière-plan.",
+      "Récepteur (B) - Historique : Retrouvez vos navires habituels dans l'historique pour relancer un suivi d'un seul clic sans avoir à ressaisir l'ID.",
+      "Récepteur (B) - Alertes Sonores : Activez les notifications sonores et personnalisez le son pour chaque état (Mouvement, Arrêt, Perte Réseau).",
+      "Récepteur (B) - Surveillance Temporelle : Configurez une alerte critique si le navire reste dans un état (ex: Immobilisation) plus de X minutes. L'alarme sonnera toutes les 10s jusqu'à validation manuelle de votre part.",
+      "ALERTE SMS CRITIQUE (A) : En cas de détresse, le bouton rouge génère un SMS complet incluant vos coordonnées GPS exactes et un lien Google Maps vers votre position."
     ],
     tips: [
-      "Configuration Préalable : Enregistrez le numéro de votre contact via l'icône 'Disquette' pour que le bouton d'alerte soit opérationnel immédiatement lors de vos prochaines sorties.",
-      "Gestion de la Zone Blanche : Si vous perdez internet, le tracker stocke vos positions. Elles seront envoyées en bloc dès que vous retrouverez une barre de réseau.",
-      "Conseil Batterie : Le GPS haute précision est gourmand. Prévoyez une batterie externe ou une prise 12V sur le bateau pour les longues sorties.",
-      "Le récepteur peut copier vos coordonnées GPS d'un clic pour les transmettre aux secours ou les entrer dans un GPS de bord."
+      "Continuité : Le 'Mode Éveil' est indispensable pour les longues traversées afin d'éviter que le système d'exploitation du téléphone ne coupe le GPS pour économiser de la batterie.",
+      "Vigilance Passive : Grâce à la Surveillance Temporelle, le récepteur à terre peut vaquer à ses occupations ; le téléphone sonnera bruyamment si le bateau ne bouge plus au-delà du temps autorisé.",
+      "Volume : Pensez à régler le curseur de volume dans les paramètres du récepteur pour que les alertes soient audibles même dans un environnement bruyant.",
+      "Réseau : Si vous perdez internet en mer, le tracker synchronisera vos positions stockées dès que vous retrouverez une barre de réseau."
     ]
   },
   'peche': {
@@ -152,7 +152,7 @@ const sectionContent: Record<string, {
       "Identifiez la tendance du jour : Lune Montante (pour ce qui pousse hors de terre) ou Descendante (pour les racines).",
       "Consultez le signe du zodiaque : Jour Fruits, Racines, Fleurs ou Feuilles.",
       "Suivez les recommandations : l'application vous guide pour la taille, le bouturage ou la tonte de la pelouse selon la sève.",
-      "Accédez à l'onglet 'Mes Semis' pour enregistrer vos travaux. L'application mémorise le contexte lunaire exact (phase et zodiaque), calcule les dates de récolte prévisionnelles et planifie les périodes de repiquage pour assurer la réussite de votre potager."
+      "Accédez à l'onglet 'Mes Semis' pour enregistrez vos travaux. L'application mémorise le contexte lunaire exact (phase et zodiaque), calcule les dates de récolte prévisionnelles et planifie les périodes de repiquage pour assurer la réussite de votre potager."
     ],
     tips: [
       "La spécialisation des travaux (Le Calendrier Lunaire) : Signes de Terre (Taur., Vierg., Capr.) = Racines ; Signes d'Eau (Canc., Scorp., Pois.) = Feuilles ; Signes d'Air (Gém., Bal., Vers.) = Fleurs ; Signes de Feu (Bél., Lion, Sag.) = Fruits.",
