@@ -1,53 +1,37 @@
 
 {
   "placeholderImages": [
-    {
-      "id": "fish-bec-de-cane",
-      "description": "Photo d'un Bec de cane",
-      "imageUrl": "https://picsum.photos/seed/fish1/400/400",
-      "imageHint": "emperor fish"
-    },
-    {
-      "id": "fish-bossu-dore",
-      "description": "Photo d'un Bossu doré",
-      "imageUrl": "https://picsum.photos/seed/fish2/400/400",
-      "imageHint": "snapper fish"
-    },
-    {
-      "id": "fish-loche-truite",
-      "description": "Photo d'une Loche truite",
-      "imageUrl": "https://picsum.photos/seed/fish3/400/400",
-      "imageHint": "coral trout"
-    },
-    {
-      "id": "fish-picot-raye",
-      "description": "Photo d'un Picot rayé",
-      "imageUrl": "https://picsum.photos/seed/fish4/400/400",
-      "imageHint": "rabbitfish"
-    },
-    {
-      "id": "fish-carangue-bleue",
-      "description": "Photo d'une Carangue bleue",
-      "imageUrl": "https://picsum.photos/seed/fish5/400/400",
-      "imageHint": "trevally fish"
-    },
-    {
-      "id": "fish-perroquet-bleu",
-      "description": "Photo d'un Perroquet bleu",
-      "imageUrl": "https://picsum.photos/seed/fish6/400/400",
-      "imageHint": "parrotfish"
-    },
-    {
-      "id": "fish-thazard",
-      "description": "Photo d'un Thazard",
-      "imageUrl": "https://picsum.photos/seed/fish7/400/400",
-      "imageHint": "king mackerel"
-    },
-    {
-      "id": "fish-rouget-barbet",
-      "description": "Photo d'un Rouget-barbet",
-      "imageUrl": "https://picsum.photos/seed/fish8/400/400",
-      "imageHint": "goatfish"
-    }
+    { "id": "fish-baleinier", "description": "Baleinier", "imageUrl": "https://picsum.photos/seed/fish_baleinier/400/400", "imageHint": "green jobfish" },
+    { "id": "fish-barracuda", "description": "Barracuda, bécune", "imageUrl": "https://picsum.photos/seed/fish_barracuda/400/400", "imageHint": "barracuda" },
+    { "id": "fish-bec-de-cane-tache-noire", "description": "Bec de cane à tache noire", "imageUrl": "https://picsum.photos/seed/fish_bdc_noire/400/400", "imageHint": "thumbprint emperor" },
+    { "id": "fish-bec-de-cane-bleute", "description": "Bec de cane bleuté", "imageUrl": "https://picsum.photos/seed/fish_bdc_bleu/400/400", "imageHint": "spangled emperor" },
+    { "id": "fish-bec-de-cane", "description": "Bec de cane", "imageUrl": "https://picsum.photos/seed/fish_bdc/400/400", "imageHint": "emperor fish" },
+    { "id": "fish-bossu-herbe", "description": "Bossu d'herbe", "imageUrl": "https://picsum.photos/seed/fish_bossu_herbe/400/400", "imageHint": "sweetlips fish" },
+    { "id": "fish-bossu-dore", "description": "Bossu doré", "imageUrl": "https://picsum.photos/seed/fish_bossu_dore/400/400", "imageHint": "snapper fish" },
+    { "id": "fish-carangue-grosse-tete", "description": "Carangue à grosse tête, baoum", "imageUrl": "https://picsum.photos/seed/fish_carangue_gt/400/400", "imageHint": "giant trevally" },
+    { "id": "fish-carangue-echevelee", "description": "Carangue échevelée", "imageUrl": "https://picsum.photos/seed/fish_carangue_ech/400/400", "imageHint": "pennant fish" },
+    { "id": "fish-carangue-noire", "description": "Carangue noire", "imageUrl": "https://picsum.photos/seed/fish_carangue_noire/400/400", "imageHint": "black trevally" },
+    { "id": "fish-carangue-ombree", "description": "Carangue ombrée", "imageUrl": "https://picsum.photos/seed/fish_carangue_omb/400/400", "imageHint": "island trevally" },
+    { "id": "fish-gaterin", "description": "Gaterin à bandes diagonale", "imageUrl": "https://picsum.photos/seed/fish_gaterin/400/400", "imageHint": "oriental sweetlips" },
+    { "id": "fish-jaunet", "description": "Jaunet", "imageUrl": "https://picsum.photos/seed/fish_jaunet/400/400", "imageHint": "yellow snapper" },
+    { "id": "fish-lanterne", "description": "Lanterne Gros oeil", "imageUrl": "https://picsum.photos/seed/fish_lanterne/400/400", "imageHint": "bigeye fish" },
+    { "id": "fish-loche-castex-levres", "description": "Loche castex grosses lèvres", "imageUrl": "https://picsum.photos/seed/fish_castex_l/400/400", "imageHint": "thicklip snapper" },
+    { "id": "fish-loche-castex", "description": "Loche castex", "imageUrl": "https://picsum.photos/seed/fish_castex/400/400", "imageHint": "squaretail coral grouper" },
+    { "id": "fish-loche-merou", "description": "Loche Mérou", "imageUrl": "https://picsum.photos/seed/fish_merou/400/400", "imageHint": "grouper fish" },
+    { "id": "fish-loche-truite", "description": "Loche truite", "imageUrl": "https://picsum.photos/seed/fish_loche_truite/400/400", "imageHint": "coral trout" },
+    { "id": "fish-perroquet-bandes-bleues", "description": "Perroquet à bandes bleues", "imageUrl": "https://picsum.photos/seed/fish_perroquet_b/400/400", "imageHint": "blue parrotfish" },
+    { "id": "fish-picot-canaque", "description": "Picot canaque", "imageUrl": "https://picsum.photos/seed/fish_picot_can/400/400", "imageHint": "rabbitfish" },
+    { "id": "fish-picot-chirurgien", "description": "Picot chirurgien", "imageUrl": "https://picsum.photos/seed/fish_picot_chi/400/400", "imageHint": "surgeonfish" },
+    { "id": "fish-picot-gris", "description": "Picot gris", "imageUrl": "https://picsum.photos/seed/fish_picot_gris/400/400", "imageHint": "silver rabbitfish" },
+    { "id": "fish-picot-nid-abeille", "description": "Picot nid d'abeille", "imageUrl": "https://picsum.photos/seed/fish_picot_nid/400/400", "imageHint": "honeycomb rabbitfish" },
+    { "id": "fish-picot-raye", "description": "Picot rayé", "imageUrl": "https://picsum.photos/seed/fish_picot_raye/400/400", "imageHint": "striped rabbitfish" },
+    { "id": "fish-poisson-perroquet", "description": "Poisson-perroquet", "imageUrl": "https://picsum.photos/seed/fish_perroquet/400/400", "imageHint": "parrotfish" },
+    { "id": "fish-rouget-nuit", "description": "Rouget de nuit", "imageUrl": "https://picsum.photos/seed/fish_rouget_nuit/400/400", "imageHint": "goatfish" },
+    { "id": "fish-saumonee-loche-bleu", "description": "Saumonée loche bleu", "imageUrl": "https://picsum.photos/seed/fish_saumonee_bleu/400/400", "imageHint": "blue spotted grouper" },
+    { "id": "fish-saumonee", "description": "Saumonée", "imageUrl": "https://picsum.photos/seed/fish_saumonee/400/400", "imageHint": "leopard coralgrouper" },
+    { "id": "fish-tazard", "description": "Tazard", "imageUrl": "https://picsum.photos/seed/fish_tazard/400/400", "imageHint": "spanish mackerel" },
+    { "id": "fish-vieille-corail", "description": "Vieille de corail", "imageUrl": "https://picsum.photos/seed/fish_vieille/400/400", "imageHint": "peacock hind" },
+    { "id": "fish-vivanneau-tetu", "description": "Vivanneau têtu", "imageUrl": "https://picsum.photos/seed/fish_vivanneau/400/400", "imageHint": "red snapper" },
+    { "id": "fish-wahoo", "description": "Wahoo", "imageUrl": "https://picsum.photos/seed/fish_wahoo/400/400", "imageHint": "wahoo fish" }
   ]
 }
