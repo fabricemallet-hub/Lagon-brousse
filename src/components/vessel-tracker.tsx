@@ -232,6 +232,15 @@ export function VesselTracker() {
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
+  // Firebase Ref and Document for remote vessel
+  const vesselRef = useMemoFirebase(() => {
+    const cleanId = vesselIdToFollow.trim().toUpperCase();
+    if (!firestore || mode !== 'receiver' || !cleanId) return null;
+    return doc(firestore, 'vessels', cleanId);
+  }, [firestore, mode, vesselIdToFollow]);
+  const { data: remoteVessel } = useDoc<VesselStatus>(vesselRef);
+
+  // SMS hooks moved AFTER remoteVessel definition to fix ReferenceError
   const defaultSmsText = useMemo(() => {
     const name = mode === 'sender' ? (vesselNickname || 'Capitaine') : (remoteVessel?.displayName || vesselIdToFollow || 'Capitaine');
     return `ALERTE : Navire "${name}" en difficulté.`;
@@ -242,13 +251,6 @@ export function VesselTracker() {
     const posUrl = lastValidLocation ? `https://www.google.com/maps?q=${lastValidLocation.lat.toFixed(6)},${lastValidLocation.lng.toFixed(6)}` : "[RECHERCHE GPS...]";
     return `${mainText}\n\nPosition : ${posUrl}`;
   }, [customSmsMessage, defaultSmsText, lastValidLocation]);
-
-  const vesselRef = useMemoFirebase(() => {
-    const cleanId = vesselIdToFollow.trim().toUpperCase();
-    if (!firestore || mode !== 'receiver' || !cleanId) return null;
-    return doc(firestore, 'vessels', cleanId);
-  }, [firestore, mode, vesselIdToFollow]);
-  const { data: remoteVessel } = useDoc<VesselStatus>(vesselRef);
 
   const currentEffectiveStatus = useMemo(() => {
     if (mode === 'sender') {
