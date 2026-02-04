@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -17,6 +18,10 @@ service cloud.firestore {
     }
 
     match /fish_species/{id} {
+      allow get, list: if true;
+    }
+    
+    match /sound_library/{id} {
       allow get, list: if true;
     }
     
@@ -44,6 +49,7 @@ service cloud.firestore {
       match /previsions/{prevId} { allow write: if isAdmin(); }
     }
     match /fish_species/{id} { allow write: if isAdmin(); }
+    match /sound_library/{id} { allow write: if isAdmin(); }
     match /shared_access_tokens/{id} { allow write: if isAdmin(); }
 
     // --- 4. COLLECTIONS PROTÉGÉES (UTILISATEURS) ---

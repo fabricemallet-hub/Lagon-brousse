@@ -1,3 +1,4 @@
+
 export type WindDirection = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
 
 export interface WindForecast {
@@ -306,4 +307,11 @@ export interface FishSpeciesInfo {
   fishingAdvice: string;
   category: 'Lagon' | 'Large' | 'Recif';
   imagePlaceholder?: string;
+}
+
+export interface SoundLibraryEntry {
+  id: string;
+  label: string;
+  url: string;
+  category?: string;
 }

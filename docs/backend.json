@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -100,6 +101,17 @@
         "isSharing": { "type": "boolean" },
         "lastActive": { "type": "object" }
       }
+    },
+    "SoundLibraryEntry": {
+      "title": "SoundLibraryEntry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "url": { "type": "string" },
+        "category": { "type": "string" }
+      },
+      "required": ["label", "url"]
     }
   },
   "auth": {
@@ -161,6 +173,14 @@
           "entityName": "VesselStatus",
           "schema": { "$ref": "#/backend/entities/VesselStatus" },
           "description": "Positions des navires en temps réel"
+        }
+      },
+      {
+        "path": "/sound_library/{soundId}",
+        "definition": {
+          "entityName": "SoundLibraryEntry",
+          "schema": { "$ref": "#/backend/entities/SoundLibraryEntry" },
+          "description": "Bibliothèque de sons pour les notifications et alertes"
         }
       }
     ]

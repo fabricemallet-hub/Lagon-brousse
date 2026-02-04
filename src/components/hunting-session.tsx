@@ -73,9 +73,11 @@ import {
   updateDoc,
   writeBatch,
   getDocs,
+  query,
+  orderBy
 } from 'firebase/firestore';
 import type { WithId } from '@/firebase';
-import type { HuntingSession, SessionParticipant, UserAccount } from '@/lib/types';
+import type { HuntingSession, SessionParticipant, UserAccount, SoundLibraryEntry } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Skeleton } from './ui/skeleton';
@@ -95,19 +97,11 @@ import {
 
 const iconMap = { Navigation, UserIcon, Crosshair, Footprints, Mountain, MapPin };
 
-const soundLibrary = [
+const defaultHuntingSounds = [
   { id: 'trompette', label: 'Fanfare Trompette', url: 'https://assets.mixkit.co/active_storage/sfx/2700/2700-preview.mp3' },
   { id: 'cloche', label: 'Cloche Classique', url: 'https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3' },
   { id: 'alerte', label: 'Alerte Urgence', url: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' },
   { id: 'cor', label: 'Cor de chasse', url: 'https://assets.mixkit.co/active_storage/sfx/2701/2701-preview.mp3' },
-  { id: 'sifflet', label: 'Sifflet Arbitre', url: 'https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3' },
-  { id: 'digital-1', label: 'Bip Digital 1', url: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3' },
-  { id: 'digital-2', label: 'Bip Digital 2', url: 'https://assets.mixkit.co/active_storage/sfx/2562/2562-preview.mp3' },
-  { id: 'ping', label: 'Ping Sonar', url: 'https://assets.mixkit.co/active_storage/sfx/2564/2564-preview.mp3' },
-  { id: 'buzzer', label: 'Buzzer Grave', url: 'https://assets.mixkit.co/active_storage/sfx/2560/2560-preview.mp3' },
-  { id: 'bird', label: 'Chant d\'oiseau', url: 'https://assets.mixkit.co/active_storage/sfx/2558/2558-preview.mp3' },
-  { id: 'laser', label: 'Signal Laser', url: 'https://assets.mixkit.co/active_storage/sfx/2556/2556-preview.mp3' },
-  { id: 'magic', label: 'Chime Magique', url: 'https://assets.mixkit.co/active_storage/sfx/2554/2554-preview.mp3' },
 ];
 
 const BatteryIcon = React.memo(({ level, charging }: { level: number; charging: boolean }) => {
@@ -162,6 +156,25 @@ function HuntingSessionContent() {
 
   const prevParticipantsRef = useRef<SessionParticipant[] | null>(null);
 
+  // Sound Library from Firestore
+  const soundsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
+  }, [firestore]);
+  const { data: dbSounds } = useCollection<SoundLibraryEntry>(soundsQuery);
+
+  const availableSounds = useMemo(() => {
+    const list = [...defaultHuntingSounds];
+    if (dbSounds) {
+        dbSounds.forEach(s => {
+            if (!list.find(l => l.url === s.url)) {
+                list.push({ id: s.id, label: s.label, url: s.url });
+            }
+        });
+    }
+    return list;
+  }, [dbSounds]);
+
   const userDocRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return doc(firestore, 'users', user.uid);
@@ -178,23 +191,23 @@ function HuntingSessionContent() {
   const playStatusSound = useCallback((status: string) => {
     if (!isSoundEnabled) return;
     
-    let soundId = '';
-    if (status === 'En position') soundId = soundSettings.position;
-    else if (status === 'Battue en cours') soundId = soundSettings.battue;
-    else if (status === 'gibier') soundId = soundSettings.gibier;
+    let soundToIdentify = '';
+    if (status === 'En position') soundToIdentify = soundSettings.position;
+    else if (status === 'Battue en cours') soundToIdentify = soundSettings.battue;
+    else if (status === 'gibier') soundToIdentify = soundSettings.gibier;
 
-    const sound = soundLibrary.find(s => s.id === soundId);
+    const sound = availableSounds.find(s => s.id === soundToIdentify || s.label === soundToIdentify);
     if (sound) {
         const audio = new Audio(sound.url);
         audio.volume = soundVolume;
         audio.play().catch(() => {
-          console.warn(`Could not play sound: ${soundId}`);
+          console.warn(`Could not play sound: ${soundToIdentify}`);
         });
     }
-  }, [isSoundEnabled, soundSettings, soundVolume]);
+  }, [isSoundEnabled, soundSettings, soundVolume, availableSounds]);
 
-  const previewSound = (soundId: string) => {
-    const sound = soundLibrary.find(s => s.id === soundId);
+  const previewSound = (soundToIdentify: string) => {
+    const sound = availableSounds.find(s => s.id === soundToIdentify || s.label === soundToIdentify);
     if (sound) {
         const audio = new Audio(sound.url);
         audio.volume = soundVolume;
@@ -604,7 +617,7 @@ function HuntingSessionContent() {
                                                         <Select value={soundSettings.position} onValueChange={(val) => { setSoundSettings(prev => ({...prev, position: val})); previewSound(val); }}>
                                                             <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                                                             <SelectContent>
-                                                                {soundLibrary.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
+                                                                {availableSounds.map(s => <SelectItem key={s.id || s.label} value={s.id || s.label}>{s.label}</SelectItem>)}
                                                             </SelectContent>
                                                         </Select>
                                                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => previewSound(soundSettings.position)}><Play className="size-3" /></Button>
@@ -618,7 +631,7 @@ function HuntingSessionContent() {
                                                         <Select value={soundSettings.battue} onValueChange={(val) => { setSoundSettings(prev => ({...prev, battue: val})); previewSound(val); }}>
                                                             <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                                                             <SelectContent>
-                                                                {soundLibrary.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
+                                                                {availableSounds.map(s => <SelectItem key={s.id || s.label} value={s.id || s.label}>{s.label}</SelectItem>)}
                                                             </SelectContent>
                                                         </Select>
                                                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => previewSound(soundSettings.battue)}><Play className="size-3" /></Button>
@@ -632,7 +645,7 @@ function HuntingSessionContent() {
                                                         <Select value={soundSettings.gibier} onValueChange={(val) => { setSoundSettings(prev => ({...prev, gibier: val})); previewSound(val); }}>
                                                             <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                                                             <SelectContent>
-                                                                {soundLibrary.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}
+                                                                {availableSounds.map(s => <SelectItem key={s.id || s.label} value={s.id || s.label}>{s.label}</SelectItem>)}
                                                             </SelectContent>
                                                         </Select>
                                                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => previewSound(soundSettings.gibier)}><Play className="size-3" /></Button>

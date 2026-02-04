@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, serverTimestamp, deleteDoc, doc, Timestamp, orderBy, query, setDoc, writeBatch, getDocs, addDoc, updateDoc } from 'firebase/firestore';
-import type { UserAccount, AccessToken, Conversation, SharedAccessToken, SplashScreenSettings, FishSpeciesInfo } from '@/lib/types';
+import type { UserAccount, AccessToken, Conversation, SharedAccessToken, SplashScreenSettings, FishSpeciesInfo, SoundLibraryEntry } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +15,7 @@ import {
   DollarSign, Users, Crown, KeyRound, Trash2, Mail, 
   Share2, Palette, Save, Upload, 
   Fish, Plus, Pencil, DatabaseZap, Info, Sparkles, BrainCircuit, UserX,
-  Eye
+  Eye, Music, Volume2, Play
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
@@ -45,6 +46,16 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const SUBSCRIPTION_PRICE = 500;
 
+const defaultSounds: Omit<SoundLibraryEntry, 'id'>[] = [
+  { label: 'Alerte Urgence', url: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3', category: 'General' },
+  { label: 'Cloche Classique', url: 'https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3', category: 'General' },
+  { label: 'Fanfare Trompette', url: 'https://assets.mixkit.co/active_storage/sfx/2700/2700-preview.mp3', category: 'General' },
+  { label: 'Cor de chasse', url: 'https://assets.mixkit.co/active_storage/sfx/2701/2701-preview.mp3', category: 'Hunting' },
+  { label: 'Sifflet Arbitre', url: 'https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3', category: 'General' },
+  { label: 'Bip Digital', url: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3', category: 'General' },
+  { label: 'Ping Sonar', url: 'https://assets.mixkit.co/active_storage/sfx/2564/2564-preview.mp3', category: 'Vessel' },
+];
+
 export default function AdminPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
@@ -58,6 +69,7 @@ export default function AdminPage() {
   const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
   const [fishToDelete, setFishToDelete] = useState<string | null>(null);
   const [userToDelete, setUserToDelete] = useState<UserAccount | null>(null);
+  const [soundToDelete, setSoundToDelete] = useState<string | null>(null);
   
   // User Edit States
   const [userToEdit, setUserToEdit] = useState<UserAccount | null>(null);
@@ -86,6 +98,13 @@ export default function AdminPage() {
   const [isInitializingFish, setIsInitializingFish] = useState(false);
   const [isAiGeneratingFish, setIsAiGeneratingFish] = useState(false);
 
+  // Sound Admin States
+  const [isSoundDialogOpen, setIsSoundDialogOpen] = useState(false);
+  const [soundDialogMode, setSoundDialogMode] = useState<'add' | 'edit'>('add');
+  const [currentSound, setCurrentSound] = useState<Partial<SoundLibraryEntry>>({});
+  const [isSavingSound, setIsSavingSound] = useState(false);
+  const [isInitializingSounds, setIsInitializingSounds] = useState(false);
+
   // Global Access States
   const [globalDuration, setGlobalDuration] = useState('7');
 
@@ -105,6 +124,13 @@ export default function AdminPage() {
     return query(collection(firestore, 'fish_species'), orderBy('name', 'asc'));
   }, [firestore, isAdmin]);
   const { data: dbFishSpecies, isLoading: areFishLoading } = useCollection<FishSpeciesInfo>(fishSpeciesRef);
+
+  // Fetch Sound Library from Firestore
+  const soundsRef = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
+  }, [firestore, isAdmin]);
+  const { data: dbSounds, isLoading: areSoundsLoading } = useCollection<SoundLibraryEntry>(soundsRef);
 
   // Fetch Global Shared Token
   const sharedTokenRef = useMemoFirebase(() => {
@@ -215,6 +241,74 @@ export default function AdminPage() {
     } finally {
         setFishToDelete(null);
     }
+  };
+
+  const handleSaveSound = async () => {
+    if (!firestore || !isAdmin || !currentSound.label || !currentSound.url) {
+        toast({ variant: 'destructive', title: "Données manquantes", description: "Le libellé et l'URL sont obligatoires." });
+        return;
+    }
+    setIsSavingSound(true);
+    try {
+        if (soundDialogMode === 'add') {
+            await addDoc(collection(firestore, 'sound_library'), {
+                ...currentSound,
+                createdAt: serverTimestamp()
+            });
+            toast({ title: "Son ajouté", description: `${currentSound.label} est disponible.` });
+        } else {
+            const soundRef = doc(firestore, 'sound_library', currentSound.id!);
+            await updateDoc(soundRef, {
+                ...currentSound,
+                updatedAt: serverTimestamp()
+            });
+            toast({ title: "Son mis à jour" });
+        }
+        setIsSoundDialogOpen(false);
+        setCurrentSound({});
+    } catch (error) {
+        console.error(error);
+        toast({ variant: 'destructive', title: "Erreur", description: "Impossible de sauvegarder le son." });
+    } finally {
+        setIsSavingSound(false);
+    }
+  };
+
+  const handleDeleteSoundConfirmed = async () => {
+    if (!firestore || !isAdmin || !soundToDelete) return;
+    try {
+        await deleteDoc(doc(firestore, 'sound_library', soundToDelete));
+        toast({ title: "Son supprimé" });
+    } catch (error) {
+        console.error(error);
+    } finally {
+        setSoundToDelete(null);
+    }
+  };
+
+  const handleInitializeSounds = async () => {
+    if (!firestore || !isAdmin) return;
+    setIsInitializingSounds(true);
+    try {
+        const batch = writeBatch(firestore);
+        defaultSounds.forEach(sound => {
+            const soundId = sound.label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s/g, '-');
+            const docRef = doc(firestore, 'sound_library', soundId);
+            batch.set(docRef, { ...sound, createdAt: serverTimestamp() });
+        });
+        await batch.commit();
+        toast({ title: "Sons importés", description: `${defaultSounds.length} sons ajoutés.` });
+    } catch (error) {
+        console.error(error);
+        toast({ variant: 'destructive', title: "Erreur import" });
+    } finally {
+        setIsInitializingSounds(false);
+    }
+  };
+
+  const playPreview = (url: string) => {
+    const audio = new Audio(url);
+    audio.play().catch(e => toast({ variant: 'destructive', title: 'Erreur lecture', description: 'URL invalide ou inaccessible.' }));
   };
 
   const handleEditUser = (u: UserAccount) => {
@@ -450,11 +544,12 @@ export default function AdminPage() {
       </Card>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 mb-6 h-auto">
+        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 mb-6 h-auto">
           <TabsTrigger value="overview">Stats</TabsTrigger>
-          <TabsTrigger value="users">Utilisateurs</TabsTrigger>
+          <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="design">Design</TabsTrigger>
           <TabsTrigger value="fish">Fish</TabsTrigger>
+          <TabsTrigger value="sounds">Sons</TabsTrigger>
           <TabsTrigger value="access">Accès</TabsTrigger>
         </TabsList>
 
@@ -620,6 +715,49 @@ export default function AdminPage() {
                         </p>
                     </div>
                 )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="sounds" className="space-y-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle className="flex items-center gap-2"><Music /> Bibliothèque de Sons</CardTitle>
+                <CardDescription>Sons pour le Vessel Tracker et la Chasse.</CardDescription>
+              </div>
+              <div className="flex gap-2">
+                {(!dbSounds || dbSounds.length === 0) && (
+                    <Button variant="outline" onClick={handleInitializeSounds} disabled={isInitializingSounds}>
+                        <DatabaseZap className="mr-2 size-4" /> Import Défaut
+                    </Button>
+                )}
+                <Button onClick={() => { setSoundDialogMode('add'); setCurrentSound({ category: 'General' }); setIsSoundDialogOpen(true); }}>
+                    <Plus className="mr-2 size-4" /> Ajouter
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4">
+                {areSoundsLoading ? [1,2,3].map(i => <Skeleton key={i} className="h-16 w-full" />) : dbSounds && dbSounds.length > 0 ? dbSounds.map(sound => (
+                  <Card key={sound.id} className="p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="p-2 bg-primary/10 rounded-full text-primary">
+                        <Volume2 className="size-5" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm">{sound.label}</h4>
+                        <p className="text-[10px] text-muted-foreground truncate max-w-[200px]">{sound.url}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => playPreview(sound.url)}><Play className="size-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => { setSoundDialogMode('edit'); setCurrentSound(sound); setIsSoundDialogOpen(true); }}><Pencil className="size-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => setSoundToDelete(sound.id)}><Trash2 className="size-4 text-destructive" /></Button>
+                    </div>
+                  </Card>
+                )) : <p className="text-center py-8 text-muted-foreground italic">Aucun son personnalisé.</p>}
               </div>
             </CardContent>
           </Card>
@@ -795,6 +933,37 @@ export default function AdminPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog for Sound Create/Edit */}
+      <Dialog open={isSoundDialogOpen} onOpenChange={setIsSoundDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>{soundDialogMode === 'add' ? 'Ajouter un son' : 'Modifier le son'}</DialogTitle>
+                <DialogDescription>Saisissez le nom du son et son URL vers un fichier MP3.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+                <div className="space-y-2"><Label>Libellé du son</Label><Input value={currentSound.label || ''} onChange={e => setCurrentSound({...currentSound, label: e.target.value})} placeholder="Signal radio..." /></div>
+                <div className="space-y-2">
+                    <Label>URL du MP3</Label>
+                    <div className="flex gap-2">
+                        <Input value={currentSound.url || ''} onChange={e => setCurrentSound({...currentSound, url: e.target.value})} placeholder="https://assets.mixkit.co/..." />
+                        <Button variant="outline" size="icon" onClick={() => currentSound.url && playPreview(currentSound.url)}><Play className="size-4"/></Button>
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    <Label>Catégorie</Label>
+                    <Select value={currentSound.category} onValueChange={(v) => setCurrentSound({...currentSound, category: v})}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="General">Général</SelectItem><SelectItem value="Vessel">Mer / Vessel</SelectItem><SelectItem value="Hunting">Chasse</SelectItem></SelectContent>
+                    </Select>
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="ghost" onClick={() => setIsSoundDialogOpen(false)}>Annuler</Button>
+                <Button onClick={handleSaveSound} disabled={isSavingSound}>{isSavingSound ? 'Sauvegarde...' : 'Sauvegarder'}</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {generatedToken && (
         <AlertDialog open={!!generatedToken} onOpenChange={() => setGeneratedToken(null)}>
           <AlertDialogContent>
@@ -829,6 +998,15 @@ export default function AdminPage() {
                 Supprimer le compte
               </AlertDialogAction>
             </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {soundToDelete && (
+        <AlertDialog open={!!soundToDelete} onOpenChange={() => setSoundToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader><AlertDialogTitle>Supprimer ce son ?</AlertDialogTitle><AlertDialogDescription>Il ne sera plus disponible pour les alertes.</AlertDialogDescription></AlertDialogHeader>
+            <AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={handleDeleteSoundConfirmed}>Supprimer</AlertDialogAction></AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       )}

@@ -1,8 +1,9 @@
+
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useUser, useFirestore, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { doc, setDoc, serverTimestamp, collection, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useUser, useUser as useUserHook, useFirestore, useDoc, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { doc, setDoc, serverTimestamp, collection, addDoc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -48,7 +49,7 @@ import {
   Plus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { VesselStatus, UserAccount } from '@/lib/types';
+import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
 import { Skeleton } from './ui/skeleton';
 
 // Constants
@@ -57,13 +58,9 @@ const IMMOBILITY_START_MINUTES = 5;
 const IMMOBILITY_UPDATE_MINUTES = 30;
 const THROTTLE_UPDATE_MS = 10000; // Update Firestore at most once every 10s during movement
 
-const vesselSoundLibrary = [
+const defaultVesselSounds = [
   { id: 'alerte', label: 'Alerte Urgence', url: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' },
   { id: 'cloche', label: 'Cloche Classique', url: 'https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3' },
-  { id: 'trompette', label: 'Fanfare Trompette', url: 'https://assets.mixkit.co/active_storage/sfx/2700/2700-preview.mp3' },
-  { id: 'cor', label: 'Cor de chasse', url: 'https://assets.mixkit.co/active_storage/sfx/2701/2701-preview.mp3' },
-  { id: 'sifflet', label: 'Sifflet Arbitre', url: 'https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3' },
-  { id: 'digital', label: 'Bip Digital', url: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3' },
   { id: 'sonar', label: 'Ping Sonar', url: 'https://assets.mixkit.co/active_storage/sfx/2564/2564-preview.mp3' },
 ];
 
@@ -80,7 +77,7 @@ const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => 
 };
 
 export function VesselTracker() {
-  const { user } = useUser();
+  const { user } = useUserHook();
   const firestore = useFirestore();
   const { toast } = useToast();
   const { isLoaded, loadError } = useGoogleMaps();
@@ -97,6 +94,25 @@ export function VesselTracker() {
   
   // Receiver History
   const [vesselHistory, setVesselHistory] = useState<string[]>([]);
+
+  // Sound Library from Firestore
+  const soundsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
+  }, [firestore]);
+  const { data: dbSounds } = useCollection<SoundLibraryEntry>(soundsQuery);
+
+  const availableSounds = useMemo(() => {
+    const list = [...defaultVesselSounds];
+    if (dbSounds) {
+        dbSounds.forEach(s => {
+            if (!list.find(l => l.url === s.url)) {
+                list.push({ id: s.id, label: s.label, url: s.url });
+            }
+        });
+    }
+    return list;
+  }, [dbSounds]);
 
   // Load local data
   useEffect(() => {
@@ -191,13 +207,13 @@ export function VesselTracker() {
 
   // sound notification logic
   const playAlertSound = useCallback((soundId: string) => {
-    const sound = vesselSoundLibrary.find(s => s.id === soundId);
+    const sound = availableSounds.find(s => s.id === soundId || s.label === soundId);
     if (sound) {
       const audio = new Audio(sound.url);
       audio.volume = vesselVolume;
       audio.play().catch(e => console.warn("Audio playback failed:", e));
     }
-  }, [vesselVolume]);
+  }, [vesselVolume, availableSounds]);
 
   // --- RECEIVER WATCH LOGIC ---
   useEffect(() => {
@@ -778,7 +794,7 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
                           <div className="flex gap-2 pl-6">
                             <Select value={notifySounds.moving} onValueChange={(val) => setNotifySounds({...notifySounds, moving: val})}>
                               <SelectTrigger className="h-8 text-xs bg-background"><SelectValue /></SelectTrigger>
-                              <SelectContent>{vesselSoundLibrary.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+                              <SelectContent>{availableSounds.map(s => <SelectItem key={s.id || s.label} value={s.id || s.label}>{s.label}</SelectItem>)}</SelectContent>
                             </Select>
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => playAlertSound(notifySounds.moving)}><Play className="size-3" /></Button>
                           </div>
@@ -800,7 +816,7 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
                           <div className="flex gap-2 pl-6">
                             <Select value={notifySounds.stationary} onValueChange={(val) => setNotifySounds({...notifySounds, stationary: val})}>
                               <SelectTrigger className="h-8 text-xs bg-background"><SelectValue /></SelectTrigger>
-                              <SelectContent>{vesselSoundLibrary.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+                              <SelectContent>{availableSounds.map(s => <SelectItem key={s.id || s.label} value={s.id || s.label}>{s.label}</SelectItem>)}</SelectContent>
                             </Select>
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => playAlertSound(notifySounds.stationary)}><Play className="size-3" /></Button>
                           </div>
@@ -822,7 +838,7 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
                           <div className="flex gap-2 pl-6">
                             <Select value={notifySounds.offline} onValueChange={(val) => setNotifySounds({...notifySounds, offline: val})}>
                               <SelectTrigger className="h-8 text-xs bg-background"><SelectValue /></SelectTrigger>
-                              <SelectContent>{vesselSoundLibrary.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+                              <SelectContent>{availableSounds.map(s => <SelectItem key={s.id || s.label} value={s.id || s.label}>{s.label}</SelectItem>)}</SelectContent>
                             </Select>
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => playAlertSound(notifySounds.offline)}><Play className="size-3" /></Button>
                           </div>
@@ -872,7 +888,7 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
                             <div className="flex gap-2">
                               <Select value={watchSound} onValueChange={setWatchSound}>
                                 <SelectTrigger className="h-9 text-xs bg-background flex-1"><SelectValue /></SelectTrigger>
-                                <SelectContent>{vesselSoundLibrary.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+                                <SelectContent>{availableSounds.map(s => <SelectItem key={s.id || s.label} value={s.id || s.label}>{s.label}</SelectItem>)}</SelectContent>
                               </Select>
                               <Button variant="outline" size="icon" className="h-9 w-9 bg-background" onClick={() => playAlertSound(watchSound)}><Play className="size-3" /></Button>
                             </div>
