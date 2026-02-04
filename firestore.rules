@@ -27,14 +27,14 @@ service cloud.firestore {
     }
 
     // --- PUBLIC COLLECTIONS (READ FOR ALL) ---
-    // Rules placed at the top for priority evaluation.
+    // These must be at the top to ensure priority evaluation.
 
-    match /system_notifications/{document=**} {
+    match /system_notifications/{id} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    match /app_settings/{document=**} {
+    match /app_settings/{id} {
       allow read: if true;
       allow write: if isAdmin();
     }
@@ -44,7 +44,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    match /fish_species/{document=**} {
+    match /fish_species/{id} {
       allow read: if true;
       allow write: if isAdmin();
     }
