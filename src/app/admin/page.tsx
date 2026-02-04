@@ -15,7 +15,7 @@ import {
   DollarSign, Users, Crown, KeyRound, Trash2, Mail, 
   Share2, Palette, Save, Upload, 
   Fish, Plus, Pencil, DatabaseZap, Info, Sparkles, BrainCircuit, UserX,
-  Eye, Music, Volume2, Play
+  Eye, Music, Volume2, Play, Download
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
@@ -309,6 +309,17 @@ export default function AdminPage() {
   const playPreview = (url: string) => {
     const audio = new Audio(url);
     audio.play().catch(e => toast({ variant: 'destructive', title: 'Erreur lecture', description: 'URL invalide ou inaccessible.' }));
+  };
+
+  const downloadFile = (url: string, label: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${label.toLowerCase().replace(/\s/g, '-')}.mp3`;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast({ title: "Lancement du téléchargement" });
   };
 
   const handleEditUser = (u: UserAccount) => {
@@ -752,9 +763,10 @@ export default function AdminPage() {
                       </div>
                     </div>
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => playPreview(sound.url)}><Play className="size-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => { setSoundDialogMode('edit'); setCurrentSound(sound); setIsSoundDialogOpen(true); }}><Pencil className="size-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => setSoundToDelete(sound.id)}><Trash2 className="size-4 text-destructive" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => playPreview(sound.url)} title="Aperçu"><Play className="size-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => downloadFile(sound.url, sound.label)} title="Télécharger"><Download className="size-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => { setSoundDialogMode('edit'); setCurrentSound(sound); setIsSoundDialogOpen(true); }} title="Modifier"><Pencil className="size-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => setSoundToDelete(sound.id)} title="Supprimer"><Trash2 className="size-4 text-destructive" /></Button>
                     </div>
                   </Card>
                 )) : <p className="text-center py-8 text-muted-foreground italic">Aucun son personnalisé.</p>}
@@ -941,12 +953,23 @@ export default function AdminPage() {
                 <DialogDescription>Saisissez le nom du son et son URL vers un fichier MP3.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
+                <Alert className="bg-blue-50 border-blue-200">
+                  <Info className="size-4 text-blue-600" />
+                  <AlertTitle className="text-xs font-black uppercase">Spécifications recommandées</AlertTitle>
+                  <AlertDescription className="text-[10px] leading-relaxed">
+                    Format : <strong>MP3 uniquement</strong>.<br/>
+                    Compression : <strong>128 kbps</strong> recommandé.<br/>
+                    Poids idéal : <strong>{"< 500 Ko"}</strong> pour un chargement instantané en mer.
+                  </AlertDescription>
+                </Alert>
+
                 <div className="space-y-2"><Label>Libellé du son</Label><Input value={currentSound.label || ''} onChange={e => setCurrentSound({...currentSound, label: e.target.value})} placeholder="Signal radio..." /></div>
                 <div className="space-y-2">
                     <Label>URL du MP3</Label>
                     <div className="flex gap-2">
                         <Input value={currentSound.url || ''} onChange={e => setCurrentSound({...currentSound, url: e.target.value})} placeholder="https://assets.mixkit.co/..." />
-                        <Button variant="outline" size="icon" onClick={() => currentSound.url && playPreview(currentSound.url)}><Play className="size-4"/></Button>
+                        <Button variant="outline" size="icon" onClick={() => currentSound.url && playPreview(currentSound.url)} title="Aperçu"><Play className="size-4"/></Button>
+                        <Button variant="outline" size="icon" onClick={() => currentSound.url && downloadFile(currentSound.url, currentSound.label || 'son')} title="Télécharger"><Download className="size-4"/></Button>
                     </div>
                 </div>
                 <div className="space-y-2">
