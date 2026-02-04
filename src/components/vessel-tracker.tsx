@@ -60,6 +60,7 @@ import {
   Play,
   Trash2,
   Plus,
+  Minus,
   Info,
   Clock,
   WifiOff,
@@ -687,7 +688,25 @@ export function VesselTracker() {
                   <div className="p-4 border-2 rounded-2xl bg-muted/20 space-y-6 shadow-inner animate-in fade-in">
                     <div className="space-y-2">
                         <div className="flex justify-between items-center px-1"><span className="text-[10px] font-black uppercase text-muted-foreground">Volume</span><span className="font-black text-primary text-xs">{Math.round(vesselVolume * 100)}%</span></div>
-                        <Slider value={[vesselVolume]} min={0} max={1} step={0.1} onValueChange={v => setVesselVolume(v[0])} />
+                        <div className="flex items-center gap-3">
+                            <Button 
+                                variant="outline" 
+                                size="icon" 
+                                className="size-8 shrink-0 rounded-full border-2" 
+                                onClick={() => setVesselVolume(prev => Math.max(0, parseFloat((prev - 0.1).toFixed(1))))}
+                            >
+                                <Minus className="size-3" />
+                            </Button>
+                            <Slider value={[vesselVolume]} min={0} max={1} step={0.1} onValueChange={v => setVesselVolume(v[0])} className="flex-grow" />
+                            <Button 
+                                variant="outline" 
+                                size="icon" 
+                                className="size-8 shrink-0 rounded-full border-2" 
+                                onClick={() => setVesselVolume(prev => Math.min(1, parseFloat((prev + 0.1).toFixed(1))))}
+                            >
+                                <Plus className="size-3" />
+                            </Button>
+                        </div>
                     </div>
                     <Accordion type="single" collapsible className="space-y-2">
                         <AccordionItem value="sounds" className="border-none rounded-xl bg-card overflow-hidden shadow-sm">
@@ -714,7 +733,33 @@ export function VesselTracker() {
                                 {isWatchEnabled && (
                                     <div className="space-y-4 pt-2">
                                         <div className="space-y-1"><Label className="text-[10px] font-bold uppercase opacity-60">Statut</Label><Select value={watchType} onValueChange={v => setWatchType(v as any)}><SelectTrigger className="h-10 text-xs border-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="stationary">Immobile</SelectItem><SelectItem value="moving">En mouvement</SelectItem><SelectItem value="offline">Perte réseau</SelectItem></SelectContent></Select></div>
-                                        <div className="space-y-1"><div className="flex justify-between"><Label className="text-[10px] font-bold uppercase opacity-60">Durée</Label><span className="text-[10px] font-black">{watchDuration >= 60 ? `${Math.floor(watchDuration / 60)}h${watchDuration % 60 > 0 ? ` ${watchDuration % 60}min` : ''}` : `${watchDuration} min`}</span></div><Slider value={[watchDuration]} min={1} max={1440} step={1} onValueChange={v => setWatchDuration(v[0])} /></div>
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between items-center px-1">
+                                                <Label className="text-[10px] font-bold uppercase opacity-60">Durée</Label>
+                                                <span className="text-[10px] font-black bg-primary/10 text-primary px-2 py-0.5 rounded">
+                                                    {watchDuration >= 60 ? `${Math.floor(watchDuration / 60)}h${watchDuration % 60 > 0 ? ` ${watchDuration % 60}min` : ''}` : `${watchDuration} min`}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <Button 
+                                                    variant="outline" 
+                                                    size="icon" 
+                                                    className="size-8 shrink-0 rounded-full border-2" 
+                                                    onClick={() => setWatchDuration(prev => Math.max(1, prev - 1))}
+                                                >
+                                                    <Minus className="size-3" />
+                                                </Button>
+                                                <Slider value={[watchDuration]} min={1} max={1440} step={1} onValueChange={v => setWatchDuration(v[0])} className="flex-grow" />
+                                                <Button 
+                                                    variant="outline" 
+                                                    size="icon" 
+                                                    className="size-8 shrink-0 rounded-full border-2" 
+                                                    onClick={() => setWatchDuration(prev => Math.min(1440, prev + 1))}
+                                                >
+                                                    <Plus className="size-3" />
+                                                </Button>
+                                            </div>
+                                        </div>
                                         <div className="space-y-1"><Label className="text-[10px] font-bold uppercase opacity-60">Son</Label><Select value={watchSound} onValueChange={v => setWatchSound(v)}><SelectTrigger className="h-10 text-xs border-2"><SelectValue /></SelectTrigger><SelectContent>{availableSounds.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent></Select></div>
                                     </div>
                                 )}

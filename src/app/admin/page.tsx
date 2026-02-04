@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -13,7 +14,7 @@ import { useRouter } from 'next/navigation';
 import { 
   DollarSign, Users, Crown, KeyRound, Trash2, Mail, 
   Palette, Save, Upload, 
-  Fish, Plus, Pencil, DatabaseZap, Sparkles, UserX,
+  Fish, Plus, Minus, Pencil, DatabaseZap, Sparkles, UserX,
   Eye, Music, Volume2, Play, Download
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -94,7 +95,7 @@ export default function AdminPage() {
   const [isPreviewing, setIsPreviewing] = useState(false);
 
   const [isFishDialogOpen, setIsFishDialogOpen] = useState(false);
-  const [fishDialogMode, setFishDialogMode] = useState<'add' | 'edit'>('add');
+  const [fishDialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
   const [currentFish, setCurrentFish] = useState<Partial<FishSpeciesInfo>>({});
   const [isSavingFish, setIsSavingFish] = useState(false);
   const [isInitializingFish, setIsInitializingFish] = useState(false);
@@ -550,7 +551,14 @@ export default function AdminPage() {
               </RadioGroup>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2"><Label className="text-xs">Fond</Label><Input type="color" value={splashBgColor} onChange={e => setSplashBgColor(e.target.value)} /></div>
-                <div className="space-y-2"><Label className="text-xs">Durée ({splashDuration}s)</Label><Slider value={[splashDuration]} min={1} max={10} step={0.5} onValueChange={v => setSplashDuration(v[0])} /></div>
+                <div className="space-y-2">
+                    <Label className="text-xs">Durée ({splashDuration}s)</Label>
+                    <div className="flex items-center gap-3">
+                        <Button variant="outline" size="icon" className="size-8 shrink-0 rounded-full border-2" onClick={() => setSplashDuration(prev => Math.max(1, prev - 0.5))}><Minus className="size-3" /></Button>
+                        <Slider value={[splashDuration]} min={1} max={10} step={0.5} onValueChange={v => setSplashDuration(v[0])} className="flex-grow" />
+                        <Button variant="outline" size="icon" className="size-8 shrink-0 rounded-full border-2" onClick={() => setSplashDuration(prev => Math.min(10, prev + 0.5))}><Plus className="size-3" /></Button>
+                    </div>
+                </div>
                 {splashMode === 'text' ? (
                   <><div className="space-y-2"><Label className="text-xs">Texte</Label><Input value={splashText} onChange={e => setSplashText(e.target.value)} /></div><div className="space-y-2"><Label className="text-xs">Couleur Texte</Label><Input type="color" value={splashTextColor} onChange={e => setSplashTextColor(e.target.value)} /></div></>
                 ) : (
@@ -567,7 +575,7 @@ export default function AdminPage() {
 
         <TabsContent value="fish" className="space-y-6">
           <Card className="border-2">
-            <CardHeader className="flex-row items-center justify-between"><CardTitle className="font-black uppercase text-sm">Guide Poissons</CardTitle><div className="flex gap-2"><Button variant="outline" size="sm" onClick={handleInitializeFish} disabled={isInitializingFish} className="text-[10px] uppercase font-black">Import Défaut</Button><Button size="sm" onClick={() => { setFishDialogMode('add'); setCurrentFish({ category: 'Lagon', gratteRisk: 0 }); setIsFishDialogOpen(true); }} className="text-[10px] uppercase font-black"><Plus className="mr-1 size-3" /> Ajouter</Button></div></CardHeader>
+            <CardHeader className="flex-row items-center justify-between"><CardTitle className="font-black uppercase text-sm">Guide Poissons</CardTitle><div className="flex gap-2"><Button variant="outline" size="sm" onClick={handleInitializeFish} disabled={isInitializingFish} className="text-[10px] uppercase font-black">Import Défaut</Button><Button size="sm" onClick={() => { setDialogMode('add'); setCurrentFish({ category: 'Lagon', gratteRisk: 0 }); setIsFishDialogOpen(true); }} className="text-[10px] uppercase font-black"><Plus className="mr-1 size-3" /> Ajouter</Button></div></CardHeader>
             <CardContent className="p-4 pt-0">
               <div className="grid gap-2">
                 {dbFishSpecies?.map(fish => (
@@ -580,7 +588,7 @@ export default function AdminPage() {
                       <p className="text-[8px] italic opacity-60 truncate">{fish.scientificName}</p>
                     </div>
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setFishDialogMode('edit'); setCurrentFish(fish); setIsFishDialogOpen(true); }}><Pencil className="size-3" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDialogMode('edit'); setCurrentFish(fish); setIsFishDialogOpen(true); }}><Pencil className="size-3" /></Button>
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setFishToDelete(fish.id)}><Trash2 className="size-3 text-destructive" /></Button>
                     </div>
                   </div>

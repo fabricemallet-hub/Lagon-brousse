@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
@@ -53,6 +54,8 @@ import {
   Play,
   Settings,
   Zap,
+  Plus,
+  Minus,
 } from 'lucide-react';
 import {
   useUser,
@@ -661,7 +664,11 @@ function HuntingSessionContent() {
                                                     <span>Volume des alertes</span>
                                                     <span>{Math.round(soundVolume * 100)}%</span>
                                                 </div>
-                                                <Slider value={[soundVolume]} min={0} max={1} step={0.1} onValueChange={(val) => setSoundVolume(val[0])} />
+                                                <div className="flex items-center gap-3">
+                                                    <Button variant="outline" size="icon" className="size-8 shrink-0 rounded-full border-2" onClick={() => setSoundVolume(prev => Math.max(0, parseFloat((prev - 0.1).toFixed(1))))}><Minus className="size-3" /></Button>
+                                                    <Slider value={[soundVolume]} min={0} max={1} step={0.1} onValueChange={(val) => setSoundVolume(val[0])} className="flex-grow" />
+                                                    <Button variant="outline" size="icon" className="size-8 shrink-0 rounded-full border-2" onClick={() => setSoundVolume(prev => Math.min(1, parseFloat((prev + 0.1).toFixed(1))))}><Plus className="size-3" /></Button>
+                                                </div>
                                             </div>
 
                                             <div className="grid grid-cols-1 gap-3">
