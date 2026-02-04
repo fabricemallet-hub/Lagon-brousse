@@ -12,8 +12,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { 
   DollarSign, Users, Crown, KeyRound, Trash2, Mail, 
-  Share2, Palette, Save, Upload, 
-  Fish, Plus, Pencil, DatabaseZap, Info, Sparkles, BrainCircuit, UserX,
+  Palette, Save, Upload, 
+  Fish, Plus, Pencil, DatabaseZap, Sparkles, UserX,
   Eye, Music, Volume2, Play, Download
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';

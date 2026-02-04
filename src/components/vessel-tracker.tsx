@@ -46,12 +46,9 @@ import {
   Save,
   Zap,
   Bell,
-  BellOff,
   Play,
   Trash2,
   Plus,
-  Loader2,
-  Map as MapIcon,
   Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -114,7 +111,6 @@ export function VesselTracker() {
   const [lastMovementTime, setLastMovementTime] = useState<number>(Date.now());
   const [vesselStatus, setVesselStatus] = useState<'moving' | 'stationary'>('moving');
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [hasInitialCentered, setHasInitialCentered] = useState(false);
   const [wakeLock, setWakeLock] = useState<any>(null);
   
   const watchIdRef = useRef<number | null>(null);
@@ -152,7 +148,19 @@ export function VesselTracker() {
     if (!firestore || mode !== 'receiver' || !cleanId) return null;
     return doc(firestore, 'vessels', cleanId);
   }, [firestore, mode, vesselIdToFollow]);
-  const { data: remoteVessel, isLoading: isVesselLoading } = useDoc<VesselStatus>(vesselRef);
+  const { data: remoteVessel } = useDoc<VesselStatus>(vesselRef);
+
+  // Load data on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedHistory = localStorage.getItem('vessel_follow_history');
+      if (savedHistory) {
+        try { setVesselHistory(JSON.parse(savedHistory)); } catch (e) {}
+      }
+      const savedCustomId = localStorage.getItem('vessel_custom_id');
+      if (savedCustomId) setCustomSharingId(savedCustomId);
+    }
+  }, []);
 
   // Sync preferences from profile
   useEffect(() => {
@@ -175,46 +183,47 @@ export function VesselTracker() {
   // Auto-save preferences
   useEffect(() => {
     if (!user || !firestore || isProfileLoading) return;
-    
     const timeout = setTimeout(() => {
-      const prefs = {
-        isNotifyEnabled,
-        vesselVolume,
-        notifySettings,
-        notifySounds,
-        isWatchEnabled,
-        watchType,
-        watchDuration,
-        watchSound,
-      };
-      
-      const currentPrefsStr = JSON.stringify(prefs);
-      const savedPrefsStr = JSON.stringify(userProfile?.vesselPrefs);
-      
-      if (currentPrefsStr !== savedPrefsStr) {
-        updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: prefs })
-          .catch(e => console.warn("Auto-save prefs silent error", e));
+      const prefs = { isNotifyEnabled, vesselVolume, notifySettings, notifySounds, isWatchEnabled, watchType, watchDuration, watchSound };
+      if (JSON.stringify(prefs) !== JSON.stringify(userProfile?.vesselPrefs)) {
+        updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: prefs }).catch(() => {});
       }
     }, 1500);
-
     return () => clearTimeout(timeout);
   }, [user, firestore, isProfileLoading, isNotifyEnabled, vesselVolume, notifySettings, notifySounds, isWatchEnabled, watchType, watchDuration, watchSound, userProfile?.vesselPrefs]);
 
-  const handleSaveCustomId = () => {
+  const handleSaveCustomId = useCallback(() => {
     const id = customSharingId.trim().toUpperCase();
     localStorage.setItem('vessel_custom_id', id);
     setCustomSharingId(id);
     toast({ title: "ID enregistré", description: `Partage actif sur ID: ${id || 'Défaut'}` });
-  };
+  }, [customSharingId, toast]);
 
   const handleSaveEmergencyContact = async () => {
     if (!user || !firestore) return;
     try {
         await updateDoc(doc(firestore, 'users', user.uid), { emergencyContact });
         toast({ title: "Contact enregistré" });
-    } catch (e) {
-        console.error(e);
-    }
+    } catch (e) {}
+  };
+
+  const addToHistory = (id: string) => {
+    const cleanId = id.trim().toUpperCase();
+    if (!cleanId) return;
+    setVesselHistory(prev => {
+      if (prev.includes(cleanId)) return prev;
+      const next = [cleanId, ...prev].slice(0, 5);
+      localStorage.setItem('vessel_follow_history', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const removeFromHistory = (id: string) => {
+    setVesselHistory(prev => {
+      const next = prev.filter(x => x !== id);
+      localStorage.setItem('vessel_follow_history', JSON.stringify(next));
+      return next;
+    });
   };
 
   const playAlertSound = useCallback((soundId: string) => {
@@ -284,7 +293,7 @@ export function VesselTracker() {
           lock.addEventListener('release', () => setWakeLock(null));
         }
       } catch (err: any) {
-        toast({ variant: "destructive", title: "Permission bloquée", description: "Le Mode Éveil ne fonctionne pas dans une iframe." });
+        toast({ variant: "destructive", title: "Permission bloquée", description: "Mise en veille forcée par l'environnement de test." });
       }
     }
   };
@@ -355,14 +364,6 @@ export function VesselTracker() {
     window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
 
-  const addToHistory = (id: string) => {
-    const cleanId = id.trim().toUpperCase();
-    if (!cleanId || vesselHistory.includes(cleanId)) return;
-    const newHistory = [cleanId, ...vesselHistory].slice(0, 5);
-    setVesselHistory(newHistory);
-    localStorage.setItem('vessel_follow_history', JSON.stringify(newHistory));
-  };
-
   const displayVessel = mode === 'sender' ? (isSharing ? { location: { latitude: currentPos?.lat || 0, longitude: currentPos?.lng || 0 }, status: vesselStatus, displayName: 'Moi' } : null) : remoteVessel;
 
   return (
@@ -413,7 +414,7 @@ export function VesselTracker() {
                 <div className="flex flex-wrap gap-2 px-1">
                   {vesselHistory.map(id => (
                     <Badge key={id} variant="secondary" className="pl-3 pr-1 h-8 font-black text-[10px] cursor-pointer rounded-full" onClick={() => setVesselIdToFollow(id)}>
-                      {id} <button onClick={(e) => { e.stopPropagation(); setVesselHistory(vesselHistory.filter(x => x !== id)); }} className="ml-2 p-1 hover:bg-black/10 rounded-full"><Trash2 className="size-3 text-destructive" /></button>
+                      {id} <button onClick={(e) => { e.stopPropagation(); removeFromHistory(id); }} className="ml-2 p-1 hover:bg-black/10 rounded-full"><Trash2 className="size-3 text-destructive" /></button>
                     </Badge>
                   ))}
                 </div>
@@ -503,11 +504,13 @@ export function VesselTracker() {
                   <AlertDialogContent className="rounded-2xl border-2">
                     <AlertDialogHeader>
                       <AlertDialogTitle className="font-black uppercase tracking-tighter">Envoyer une alerte ?</AlertDialogTitle>
-                      <AlertDialogDescription className="text-xs font-medium leading-relaxed">
-                        Ceci va générer un SMS de détresse incluant votre position GPS exacte vers votre contact d'urgence : <span className="font-bold text-foreground">{emergencyContact || "Non défini"}</span>.
-                      </AlertDialogDescription>
+                      <AlertDialogHeader>
+                        <AlertDialogDescription className="text-xs font-medium leading-relaxed text-left">
+                          Ceci va générer un SMS de détresse incluant votre position GPS exacte vers votre contact d'urgence : <span className="font-bold text-foreground">{emergencyContact || "Non défini"}</span>.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
                     </AlertDialogHeader>
-                    <AlertDialogFooter className="flex-row gap-3 pt-2">
+                    <AlertDialogFooter className="flex flex-row gap-3 pt-2">
                       <AlertDialogCancel className="flex-1 h-12 font-black uppercase text-xs rounded-xl border-2">Annuler</AlertDialogCancel>
                       <AlertDialogAction 
                         className="flex-1 h-12 bg-red-600 hover:bg-red-700 text-white font-black uppercase text-xs rounded-xl"
