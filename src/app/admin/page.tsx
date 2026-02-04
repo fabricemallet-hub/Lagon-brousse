@@ -847,7 +847,7 @@ export default function AdminPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteConversation(conversationToDelete!)} className={cn(buttonVariants({ variant: "destructive" }))}>
+            <AlertDialogAction onClick={() => handleDeleteConversation(conversationToDelete!)} className={cn(buttonVariants({ variant: "destructive" }))}>
               Oui, supprimer
             </AlertDialogAction>
           </AlertDialogFooter>
