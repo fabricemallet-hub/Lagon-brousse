@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useUser as useUserHook, useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
+import { useUser as useUserHook, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
 import { doc, setDoc, serverTimestamp, collection, query, orderBy, updateDoc } from 'firebase/firestore';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -58,7 +58,6 @@ import {
   BatteryFull,
   AlertOctagon,
   History,
-  MapPin,
   ExternalLink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -69,7 +68,7 @@ import { fr } from 'date-fns/locale';
 
 // CONFIGURATION DES SEUILS
 const IMMOBILITY_THRESHOLD_METERS = 20; // Rayon de 20m pour repasser en mouvement
-const IMMOBILITY_START_MINUTES = 1;     // Délai pour passer en stationnaire
+const IMMOBILITY_START_SECONDS = 30;    // 30 secondes pour passer en immobile si dans le rayon
 const THROTTLE_UPDATE_MS = 10000;       // Fréquence max de mise à jour Firestore
 
 interface StatusEvent {
@@ -366,6 +365,7 @@ export function VesselTracker() {
         const now = Date.now();
         setCurrentPos(newPos);
         setLastValidLocation(newPos);
+        
         if (!anchorPos) {
           setAnchorPos(newPos);
           setLastMovementTime(now);
@@ -379,11 +379,10 @@ export function VesselTracker() {
           return;
         }
         
-        // Calcul de la distance par rapport au point d'ancrage
         const dist = getDistance(newLat, newLng, anchorPos.lat, anchorPos.lng);
         
         if (dist > IMMOBILITY_THRESHOLD_METERS) {
-          // Repassage en mouvement si on sort du rayon de 20m
+          // SORTIE DU RAYON DE 20M : Mouvement détecté
           setVesselStatus('moving');
           setAnchorPos(newPos);
           setLastMovementTime(now);
@@ -397,9 +396,10 @@ export function VesselTracker() {
             lastFirestoreUpdateRef.current = now;
           }
         } else {
-          // Détection d'immobilité prolongée
-          const idle = (now - lastMovementTime) / 60000;
-          if (idle >= IMMOBILITY_START_MINUTES && vesselStatus === 'moving') {
+          // RESTE DANS LE RAYON DE 20M
+          const idleSeconds = (now - lastMovementTime) / 1000;
+          if (idleSeconds >= IMMOBILITY_START_SECONDS && vesselStatus === 'moving') {
+            // PASSAGE EN IMMOBILE APRÈS 30 SECONDES SANS SORTIE DU RAYON
             setVesselStatus('stationary');
             updateVesselInFirestore({ status: 'stationary', isSharing: true, batteryLevel: batteryLevel });
             lastFirestoreUpdateRef.current = now;
@@ -449,6 +449,12 @@ export function VesselTracker() {
   };
 
   const lastActiveTime = remoteVessel?.lastActive ? format(remoteVessel.lastActive.toDate(), 'HH:mm', { locale: fr }) : '--:--';
+
+  const statusLabel = useMemo(() => {
+    if (currentEffectiveStatus === 'moving') return 'EN MOUVEMENT';
+    if (currentEffectiveStatus === 'stationary') return 'MOUILLAGE';
+    return 'HORS LIGNE';
+  }, [currentEffectiveStatus]);
 
   return (
     <div className="space-y-6 pb-12">
@@ -610,35 +616,38 @@ export function VesselTracker() {
         )}
 
         <div className="bg-card border-t-2 p-4 flex flex-col gap-3">
+            {/* BANDEAU DE STATUT REDESSINÉ (FIDÈLE À L'IMAGE) */}
             <div className={cn(
-                "flex items-center justify-between p-3 rounded-xl border shadow-sm transition-all duration-500",
-                currentEffectiveStatus === 'moving' ? "bg-green-50/50 border-green-200" : currentEffectiveStatus === 'stationary' ? "bg-amber-50/50 border-amber-200" : "bg-red-50/50 border-red-200"
+                "flex items-center justify-between p-4 rounded-2xl border-2 shadow-sm transition-all duration-500",
+                currentEffectiveStatus === 'moving' ? "bg-green-50 border-green-200" : currentEffectiveStatus === 'stationary' ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-200"
             )}>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4">
                     <div className={cn(
-                        "size-10 rounded-xl flex items-center justify-center text-white shadow-sm",
+                        "size-12 rounded-2xl flex items-center justify-center text-white shadow-md",
                         currentEffectiveStatus === 'moving' ? "bg-green-600" : currentEffectiveStatus === 'stationary' ? "bg-amber-600" : "bg-red-600"
                     )}>
-                        {currentEffectiveStatus === 'moving' ? <Move className="size-5" /> : currentEffectiveStatus === 'stationary' ? <Anchor className="size-5" /> : <WifiOff className="size-5" />}
+                        {currentEffectiveStatus === 'moving' ? <Move className="size-6" /> : currentEffectiveStatus === 'stationary' ? <Anchor className="size-6" /> : <WifiOff className="size-6" />}
                     </div>
                     <div className="flex flex-col">
                         <div className="flex items-center gap-2">
                           <p className={cn(
-                              "font-black text-sm uppercase tracking-tighter",
+                              "font-black text-lg uppercase tracking-tighter leading-none",
                               currentEffectiveStatus === 'moving' ? "text-green-700" : currentEffectiveStatus === 'stationary' ? "text-amber-700" : "text-red-700"
                           )}>
-                              {currentEffectiveStatus === 'moving' ? 'En mouvement' : currentEffectiveStatus === 'stationary' ? 'Immobile' : 'Hors ligne'}
+                              {statusLabel}
                           </p>
-                          {displayVessel?.batteryLevel !== undefined && <BatteryIconComp level={displayVessel.batteryLevel} className="size-3 opacity-80" />}
+                          {displayVessel?.batteryLevel !== undefined && (
+                            <BatteryIconComp level={displayVessel.batteryLevel} className="size-4 opacity-60" />
+                          )}
                         </div>
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground/70">
-                            <Clock className="size-3" /> depuis {elapsedString}
+                        <div className="flex items-center gap-1.5 mt-1.5 text-xs font-bold text-muted-foreground/60">
+                            <Clock className="size-3.5" /> depuis {elapsedString}
                         </div>
                     </div>
                 </div>
                 {displayVessel?.isSharing && (
                     <Badge className={cn(
-                        "font-black uppercase text-[9px] border-none px-2 h-5 flex items-center justify-center",
+                        "font-black uppercase text-[10px] border-none px-3 h-6 flex items-center justify-center rounded-lg shadow-sm",
                         currentEffectiveStatus === 'moving' ? "bg-green-600" : "bg-amber-600"
                     )}>LIVE</Badge>
                 )}
@@ -658,31 +667,30 @@ export function VesselTracker() {
                 )}
             </div>
 
-            {/* Historique des événements selon le modèle utilisateur */}
             {statusEvents.length > 0 && (
               <div className="mt-2 space-y-2">
                 <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
-                  <History className="size-3" /> Historique des états
+                  <History className="size-3" /> Historique des changements d'état
                 </h4>
-                <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
+                <div className="space-y-2">
                   {statusEvents.map((event, idx) => {
                     const label = event.status === 'moving' ? 'MOUVEMENT' : event.status === 'stationary' ? 'MOUILLAGE' : 'SIGNAL PERDU';
-                    const color = event.status === 'moving' ? 'text-green-600' : event.status === 'stationary' ? 'text-amber-600' : 'text-red-600';
+                    const color = event.status === 'moving' ? 'text-green-600 border-green-100' : event.status === 'stationary' ? 'text-amber-600 border-amber-100' : 'text-red-600 border-red-100';
                     return (
-                      <div key={idx} className="flex items-center justify-between p-3 border-b last:border-0 text-[11px] animate-in fade-in slide-in-from-left-2">
+                      <div key={idx} className={cn("flex items-center justify-between p-3 border-2 rounded-xl bg-white shadow-sm text-[11px] animate-in fade-in slide-in-from-left-2", color)}>
                         <div className="flex items-center gap-4">
-                          <span className="font-bold tabular-nums text-muted-foreground/60">{format(event.timestamp, 'HH:mm:ss')}</span>
-                          <span className={cn("font-black uppercase tracking-tight", color)}>{label}</span>
+                          <span className="font-black tabular-nums opacity-40">{format(event.timestamp, 'HH:mm:ss')}</span>
+                          <span className="font-black uppercase tracking-tight">{label}</span>
                         </div>
                         {event.location && (
                           <button 
-                            className="flex items-center gap-1 text-primary/60 hover:text-primary font-bold"
+                            className="flex items-center gap-1.5 text-primary/80 hover:text-primary font-black uppercase text-[9px]"
                             onClick={() => {
                               const url = `https://www.google.com/maps?q=${event.location!.lat},${event.location!.lng}`;
                               window.open(url, '_blank');
                             }}
                           >
-                            GPS <ExternalLink className="size-2.5" />
+                            GPS <ExternalLink className="size-3" />
                           </button>
                         )}
                       </div>
