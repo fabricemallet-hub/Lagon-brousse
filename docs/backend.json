@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -83,6 +84,14 @@
         "isSharing": { "type": "boolean" },
         "lastActive": { "type": "object" }
       }
+    },
+    "FishCustomization": {
+      "title": "FishCustomization",
+      "type": "object",
+      "description": "Customizes fish information such as images.",
+      "properties": {
+        "imageUrl": { "type": "string" }
+      }
     }
   },
   "auth": {
@@ -136,6 +145,14 @@
           "entityName": "VesselStatus",
           "schema": { "$ref": "#/backend/entities/VesselStatus" },
           "description": "Positions des navires en temps réel"
+        }
+      },
+      {
+        "path": "/fish_customizations/{fishId}",
+        "definition": {
+          "entityName": "FishCustomization",
+          "schema": { "$ref": "#/backend/entities/FishCustomization" },
+          "description": "Personnalisations des fiches de poissons"
         }
       }
     ]

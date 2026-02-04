@@ -11,10 +11,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { DollarSign, Users, Crown, KeyRound, Copy, Trash2, AlertCircle, Mail, Share2, Palette, Image as ImageIcon, Type, Eye, Save, Upload, Timer } from 'lucide-react';
+import { DollarSign, Users, Crown, KeyRound, Copy, Trash2, AlertCircle, Mail, Share2, Palette, Image as ImageIcon, Type, Eye, Save, Upload, Timer, Fish } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
 import Link from 'next/link';
+import Image from 'next/image';
+import { lagoonFishData } from '@/lib/fish-data';
+import { PlaceHolderImages } from '@/lib/placeholder-images';
 import {
   Table,
   TableBody,
@@ -79,6 +82,9 @@ export default function AdminPage() {
   const [isSavingSplash, setIsSavingSplash] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
 
+  // Fish Admin States
+  const [isSavingFish, setIsSavingFish] = useState<string | null>(null);
+
   const isAdmin = useMemo(() => 
     user?.email === 'f.mallet81@outlook.com' || user?.email === 'f.mallet81@gmail.com', 
   [user]);
@@ -88,6 +94,13 @@ export default function AdminPage() {
     return doc(firestore, 'app_settings', 'splash');
   }, [firestore, isAdmin]);
   const { data: savedSplashSettings, isLoading: isSplashLoading } = useDoc<SplashScreenSettings>(splashRef);
+
+  // Fetch custom fish images
+  const fishCustomRef = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    return collection(firestore, 'fish_customizations');
+  }, [firestore, isAdmin]);
+  const { data: fishCustomizations } = useCollection<{ imageUrl: string }>(fishCustomRef);
 
   useEffect(() => {
     if (savedSplashSettings) {
@@ -102,8 +115,7 @@ export default function AdminPage() {
     }
   }, [savedSplashSettings]);
 
-  // Handle local file upload for splash image
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, callback: (base64: string) => void) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -119,11 +131,29 @@ export default function AdminPage() {
     const reader = new FileReader();
     reader.onload = (event) => {
       const base64 = event.target?.result as string;
-      setSplashImageUrl(base64);
-      setSplashMode('image');
-      toast({ title: "Image importée", description: "L'image a été chargée. N'oubliez pas de sauvegarder la configuration." });
+      callback(base64);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleFishImageUpload = (e: React.ChangeEvent<HTMLInputElement>, fishId: string) => {
+    handleImageUpload(e, (base64) => {
+        handleSaveFishImage(fishId, base64);
+    });
+  };
+
+  const handleSaveFishImage = async (fishId: string, imageUrl: string) => {
+    if (!firestore || !isAdmin) return;
+    setIsSavingFish(fishId);
+    try {
+        await setDoc(doc(firestore, 'fish_customizations', fishId), { imageUrl }, { merge: true });
+        toast({ title: "Photo mise à jour", description: "La nouvelle image est en ligne." });
+    } catch (error) {
+        console.error(error);
+        toast({ variant: 'destructive', title: "Erreur", description: "Impossible de mettre à jour l'image." });
+    } finally {
+        setIsSavingFish(null);
+    }
   };
 
   // Fetch all users for stats
@@ -362,9 +392,10 @@ export default function AdminPage() {
       </Card>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-6">
+        <TabsList className="grid w-full grid-cols-4 mb-6">
           <TabsTrigger value="overview">Vue d'ensemble</TabsTrigger>
           <TabsTrigger value="design">Design & Splash</TabsTrigger>
+          <TabsTrigger value="fish">Guide Poissons</TabsTrigger>
           <TabsTrigger value="access">Jetons & Accès</TabsTrigger>
         </TabsList>
 
@@ -511,7 +542,7 @@ export default function AdminPage() {
                         <Input 
                           type="file" 
                           accept="image/*" 
-                          onChange={handleImageUpload} 
+                          onChange={(e) => handleImageUpload(e, setSplashImageUrl)} 
                           className="cursor-pointer text-xs"
                         />
                       </div>
@@ -546,6 +577,78 @@ export default function AdminPage() {
                 {isSavingSplash ? 'Enregistrement...' : <><Save className="mr-2 size-4"/> Sauvegarder la config</>}
               </Button>
             </CardFooter>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="fish" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Fish /> Gestion du Guide Poissons</CardTitle>
+              <CardDescription>Mettez à jour les photos des espèces pour faciliter l'identification.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid gap-4">
+                {lagoonFishData.map(fish => {
+                  const custom = fishCustomizations?.find(c => c.id === fish.id);
+                  const placeholder = PlaceHolderImages.find(img => img.id === fish.imagePlaceholder);
+                  const currentImage = custom?.imageUrl || placeholder?.imageUrl || '';
+
+                  return (
+                    <Card key={fish.id} className="overflow-hidden border shadow-sm">
+                      <div className="flex flex-col sm:flex-row items-center p-4 gap-6">
+                        <div className="relative size-32 rounded-xl overflow-hidden border bg-muted shrink-0 shadow-inner">
+                          {currentImage ? (
+                            <Image 
+                              src={currentImage} 
+                              alt={fish.name} 
+                              fill 
+                              className="object-cover" 
+                            />
+                          ) : (
+                            <div className="flex items-center justify-center h-full text-muted-foreground"><Fish className="size-10" /></div>
+                          )}
+                        </div>
+                        
+                        <div className="flex-grow space-y-4 w-full">
+                          <div>
+                            <h4 className="font-black uppercase tracking-tight text-lg leading-none">{fish.name}</h4>
+                            <p className="text-xs text-muted-foreground italic mt-1">{fish.scientificName}</p>
+                          </div>
+
+                          <div className="grid gap-3">
+                            <div className="space-y-1.5">
+                              <Label className="text-[10px] font-black uppercase text-muted-foreground">Mettre à jour la photo</Label>
+                              <div className="flex flex-col sm:flex-row gap-2">
+                                <div className="flex-grow relative">
+                                  <Input 
+                                    placeholder="Coller l'URL de l'image ou charger un fichier..." 
+                                    defaultValue={custom?.imageUrl || ''}
+                                    onBlur={(e) => handleSaveFishImage(fish.id, e.target.value)}
+                                    className="text-xs h-9"
+                                  />
+                                </div>
+                                <div className="relative shrink-0">
+                                  <input 
+                                    type="file" 
+                                    accept="image/*" 
+                                    className="absolute inset-0 opacity-0 cursor-pointer" 
+                                    onChange={(e) => handleFishImageUpload(e, fish.id)}
+                                  />
+                                  <Button variant="outline" size="sm" className="h-9 w-full sm:w-auto" disabled={isSavingFish === fish.id}>
+                                    <Upload className="size-4 mr-2" />
+                                    {isSavingFish === fish.id ? 'Import...' : 'Fichier'}
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </CardContent>
           </Card>
         </TabsContent>
 
@@ -744,7 +847,7 @@ export default function AdminPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={() => handleDeleteConversation(conversationToDelete!)} className={cn(buttonVariants({ variant: "destructive" }))}>
+            <AlertDialogAction onClick={handleDeleteConversation(conversationToDelete!)} className={cn(buttonVariants({ variant: "destructive" }))}>
               Oui, supprimer
             </AlertDialogAction>
           </AlertDialogFooter>

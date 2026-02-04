@@ -17,13 +17,23 @@ import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
 export default function FishPage() {
   const { toast } = useToast();
+  const firestore = useFirestore();
   const [search, setSearch] = useState('');
   const [isIdentifying, setIsIdentifying] = useState(false);
   const [aiResult, setAiResult] = useState<IdentifyFishOutput | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Synchronisation des personnalisations d'images
+  const customizationsRef = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'fish_customizations');
+  }, [firestore]);
+  const { data: customizations } = useCollection<{ imageUrl: string }>(customizationsRef);
 
   const filteredFish = lagoonFishData.filter(f => 
     f.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -41,11 +51,8 @@ export default function FishPage() {
     reader.onload = async (event) => {
       const base64 = event.target?.result as string;
       try {
-        // L'IA va chercher l'espèce la plus ressemblante
         const result = await identifyFish({ photoDataUri: base64 });
         setAiResult(result);
-        
-        // Scroll automatique vers le résultat
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } catch (error) {
         console.error(error);
@@ -56,7 +63,6 @@ export default function FishPage() {
         });
       } finally {
         setIsIdentifying(false);
-        // Reset l'input pour permettre une nouvelle capture de la même photo si besoin
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
     };
@@ -165,7 +171,10 @@ export default function FishPage() {
         
         <div className="grid gap-3">
           {filteredFish.map((fish) => {
+            const custom = customizations?.find(c => c.id === fish.id);
             const placeholder = PlaceHolderImages.find(img => img.id === fish.imagePlaceholder);
+            const finalImageUrl = custom?.imageUrl || placeholder?.imageUrl || '';
+
             return (
               <Card key={fish.id} className="overflow-hidden border-2 hover:border-primary/30 transition-all">
                 <Accordion type="single" collapsible>
@@ -173,14 +182,14 @@ export default function FishPage() {
                     <AccordionTrigger className="p-4 hover:no-underline [&[data-state=open]]:bg-muted/30">
                       <div className="flex items-center gap-4 text-left w-full">
                         <div className="size-14 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden border">
-                          {placeholder ? (
+                          {finalImageUrl ? (
                             <Image 
-                              src={placeholder.imageUrl} 
+                              src={finalImageUrl} 
                               alt={fish.name} 
                               width={56} 
                               height={56} 
                               className="object-cover w-full h-full"
-                              data-ai-hint={placeholder.imageHint}
+                              data-ai-hint={placeholder?.imageHint || fish.name}
                             />
                           ) : (
                             <Fish className="size-6 text-primary" />
