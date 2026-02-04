@@ -13,7 +13,8 @@ import { useRouter } from 'next/navigation';
 import { 
   DollarSign, Users, Crown, KeyRound, Trash2, Mail, 
   Share2, Palette, Save, Upload, 
-  Fish, Plus, Pencil, DatabaseZap, Info, Sparkles, BrainCircuit, UserX
+  Fish, Plus, Pencil, DatabaseZap, Info, Sparkles, BrainCircuit, UserX,
+  Eye
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
@@ -820,7 +821,7 @@ export default function AdminPage() {
               <AlertDialogTitle>Supprimer le compte de {userToDelete.displayName} ?</AlertDialogTitle>
               <AlertDialogDescription>
                 Cette action supprimera définitivement le profil de l'utilisateur dans Firestore.
-              </AlertDialogDescription>
+              </AlertDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Annuler</AlertDialogCancel>
