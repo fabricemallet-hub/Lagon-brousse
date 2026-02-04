@@ -1074,7 +1074,7 @@ export default function AdminPage() {
           <AlertDialogContent>
             <AlertDialogHeader><AlertDialogTitle>Jeton généré !</AlertDialogTitle><AlertDialogDescription>Copiez-le :</AlertDialogDescription></AlertDialogHeader>
             <div className="p-4 bg-muted rounded-md font-mono text-center text-lg">{generatedToken}</div>
-            <AlertDialogFooter><AlertDialogCancel>Fermer</AlertDialogCancel><AlertDialogAction onClick={copyToClipboard(generatedToken)}>Copier</AlertDialogAction></AlertDialogFooter>
+            <AlertDialogFooter><AlertDialogCancel>Fermer</AlertDialogCancel><AlertDialogAction onClick={() => copyToClipboard(generatedToken || '')}>Copier</AlertDialogAction></AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       )}
@@ -1082,7 +1082,7 @@ export default function AdminPage() {
       {conversationToDelete && (
         <AlertDialog open={!!conversationToDelete} onOpenChange={(open) => !open && setConversationToDelete(null)}>
           <AlertDialogContent>
-            <AlertDialogHeader><AlertDialogTitle>Supprimer la conversation ?</AlertDialogTitle><AlertDialogDescription>Cette action est irréversible.</AlertDialogDescription></AlertDialogHeader>
+            <AlertDialogHeader><AlertDialogTitle>Supprimer la conversation ?</AlertDialogTitle><AlertDialogDescription>Cette action est irréversible.</AlertDialogDescription></AccordionHeader>
             <AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteConversation(conversationToDelete!)}>Supprimer</AlertDialogAction></AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
