@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 /**
@@ -27,35 +28,38 @@ service cloud.firestore {
 
     // --- COLLECTION RULES ---
 
-    // Paramètres de l'application (Splash Screen, etc.)
+    // Paramètres de l'application
     match /app_settings/{id} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Météo NC Live (Données temps réel)
+    // Météo NC Live
     match /meteo_caledonie/{communeId} {
       allow read: if true;
       allow write: if isAdmin();
-      
-      // Prévisions sur 7 jours
       match /{allPaths=**} {
         allow read: if true;
         allow write: if isAdmin();
       }
     }
 
-    // Profils utilisateurs et abonnements
+    // Guide des Poissons (CRUD Admin)
+    match /fish_species/{fishId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Profils utilisateurs
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       allow write: if isOwner(userId) || isAdmin();
-      
       match /{allPaths=**} {
         allow read, write: if isOwner(userId) || isAdmin();
       }
     }
 
-    // Sessions de chasse (Groupes en temps réel)
+    // Sessions de chasse
     match /hunting_sessions/{sessionId} {
       allow read, write: if isSignedIn();
       match /participants/{participantId} {
@@ -63,15 +67,15 @@ service cloud.firestore {
       }
     }
 
-    // Tracker maritime (Vessel Tracker)
+    // Tracker maritime
     match /vessels/{vesselId} {
       allow read, write: if isSignedIn();
-      match /history/{historyId} {
+      match /{allPaths=**} {
         allow read, write: if isSignedIn();
       }
     }
 
-    // Messagerie (Support Admin)
+    // Messagerie
     match /conversations/{convId} {
       allow read, write: if isOwner(convId) || isAdmin();
       match /messages/{msgId} {
@@ -79,7 +83,7 @@ service cloud.firestore {
       }
     }
 
-    // Jetons d'accès
+    // Jetons
     match /access_tokens/{tokenId} {
       allow read, write: if isSignedIn();
     }
@@ -88,16 +92,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Données géographiques et archives (Lecture pour tous)
-    match /locations/{locationId} {
-      allow read: if true;
-      allow write: if isAdmin();
-      match /{allPaths=**} {
-        allow read: if true;
-        allow write: if isAdmin();
-      }
-    }
-    
+    // Données archives
     match /stations/{stationId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
@@ -105,12 +100,6 @@ service cloud.firestore {
         allow read: if isSignedIn();
         allow write: if isAdmin();
       }
-    }
-
-    // Personnalisation des poissons
-    match /fish_customizations/{fishId} {
-      allow read: if true;
-      allow write: if isAdmin();
     }
   }
 }

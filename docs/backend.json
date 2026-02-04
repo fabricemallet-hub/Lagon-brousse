@@ -44,6 +44,23 @@
         "vent_max": { "type": "number" }
       }
     },
+    "FishSpecies": {
+      "title": "FishSpecies",
+      "type": "object",
+      "description": "Information about a fish species in New Caledonia.",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "scientificName": { "type": "string" },
+        "gratteRisk": { "type": "number" },
+        "culinaryAdvice": { "type": "string" },
+        "fishingAdvice": { "type": "string" },
+        "category": { "type": "string", "enum": ["Lagon", "Large", "Recif"] },
+        "imageUrl": { "type": "string" },
+        "imagePlaceholder": { "type": "string" }
+      },
+      "required": ["name", "category"]
+    },
     "AppSetting": {
       "title": "AppSetting",
       "type": "object",
@@ -84,14 +101,6 @@
         "isSharing": { "type": "boolean" },
         "lastActive": { "type": "object" }
       }
-    },
-    "FishCustomization": {
-      "title": "FishCustomization",
-      "type": "object",
-      "description": "Customizes fish information such as images.",
-      "properties": {
-        "imageUrl": { "type": "string" }
-      }
     }
   },
   "auth": {
@@ -124,6 +133,14 @@
         }
       },
       {
+        "path": "/fish_species/{fishId}",
+        "definition": {
+          "entityName": "FishSpecies",
+          "schema": { "$ref": "#/backend/entities/FishSpecies" },
+          "description": "Catalogue complet des poissons du lagon et du large"
+        }
+      },
+      {
         "path": "/users/{userId}",
         "definition": {
           "entityName": "User",
@@ -145,14 +162,6 @@
           "entityName": "VesselStatus",
           "schema": { "$ref": "#/backend/entities/VesselStatus" },
           "description": "Positions des navires en temps réel"
-        }
-      },
-      {
-        "path": "/fish_customizations/{fishId}",
-        "definition": {
-          "entityName": "FishCustomization",
-          "schema": { "$ref": "#/backend/entities/FishCustomization" },
-          "description": "Personnalisations des fiches de poissons"
         }
       }
     ]
