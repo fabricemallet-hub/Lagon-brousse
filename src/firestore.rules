@@ -4,6 +4,7 @@ rules_version = '2';
 /**
  * LAGON & BROUSSE NC - SECURITY POLICY (SYNCED)
  * Centralized security rules for the entire application.
+ * Updated: 2024-05-24T14:25:00Z
  */
 
 service cloud.firestore {
@@ -29,13 +30,14 @@ service cloud.firestore {
     // --- PUBLIC COLLECTIONS (READ FOR ALL) ---
     // These must be at the top to ensure priority evaluation.
 
-    match /system_notifications/{id} {
-      allow read: if true;
+    match /system_notifications/{notifId} {
+      // Explicitly allow list for queries with where/orderBy
+      allow get, list: if true;
       allow write: if isAdmin();
     }
 
     match /app_settings/{id} {
-      allow read: if true;
+      allow get, list: if true;
       allow write: if isAdmin();
     }
 
@@ -45,7 +47,7 @@ service cloud.firestore {
     }
 
     match /fish_species/{id} {
-      allow read: if true;
+      allow get, list: if true;
       allow write: if isAdmin();
     }
 
@@ -85,7 +87,7 @@ service cloud.firestore {
     }
     
     match /shared_access_tokens/{id} {
-      allow read: if isSignedIn() || isAdmin();
+      allow read: if true;
       allow write: if isAdmin();
     }
 
