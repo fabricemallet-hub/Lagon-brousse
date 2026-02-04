@@ -6,7 +6,7 @@ import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@
 import { collection, serverTimestamp, deleteDoc, doc, Timestamp, orderBy, query, setDoc, writeBatch, getDocs, addDoc, updateDoc } from 'firebase/firestore';
 import type { UserAccount, AccessToken, Conversation, SharedAccessToken, SplashScreenSettings, FishSpeciesInfo } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,7 +14,7 @@ import { useRouter } from 'next/navigation';
 import { 
   DollarSign, Users, Crown, KeyRound, Copy, Trash2, AlertCircle, Mail, 
   Share2, Palette, Image as ImageIcon, Type, Eye, Save, Upload, Timer, 
-  Fish, Plus, Pencil, DatabaseZap, X
+  Fish, Plus, Pencil, DatabaseZap, X, Info
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
@@ -34,7 +34,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { format, isBefore, addMonths } from 'date-fns';
+import { format, isBefore } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { SplashScreen } from '@/components/splash-screen';
@@ -53,11 +53,6 @@ export default function AdminPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
 
-  const [sharedTokenDuration, setSharedTokenDuration] = useState('1');
-  const [isGeneratingShared, setIsGeneratingShared] = useState(false);
-  const [isDeleteSharedAlertOpen, setIsDeleteSharedAlertOpen] = useState(false);
-
-  const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
   const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
   
   // Splash Screen States
@@ -87,7 +82,7 @@ export default function AdminPage() {
     if (!firestore || !isAdmin) return null;
     return doc(firestore, 'app_settings', 'splash');
   }, [firestore, isAdmin]);
-  const { data: savedSplashSettings, isLoading: isSplashLoading } = useDoc<SplashScreenSettings>(splashRef);
+  const { data: savedSplashSettings } = useDoc<SplashScreenSettings>(splashRef);
 
   // Fetch dynamic fish species from Firestore
   const fishSpeciesRef = useMemoFirebase(() => {
@@ -180,9 +175,12 @@ export default function AdminPage() {
     try {
         const batch = writeBatch(firestore);
         lagoonFishData.forEach(fish => {
-            const newDocRef = doc(collection(firestore, 'fish_species'));
+            // Utiliser l'ID du fichier fish-data comme ID de document pour éviter les doublons
+            const fishId = fish.id || fish.name.toLowerCase().replace(/\s/g, '-');
+            const newDocRef = doc(firestore, 'fish_species', fishId);
             batch.set(newDocRef, {
                 ...fish,
+                id: fishId,
                 createdAt: serverTimestamp()
             });
         });
@@ -208,21 +206,14 @@ export default function AdminPage() {
     if (!firestore || !isAdmin) return null;
     return query(collection(firestore, 'access_tokens'), orderBy('createdAt', 'desc'));
   }, [firestore, isAdmin]);
-  const { data: accessTokens, isLoading: areTokensLoading } = useCollection<AccessToken>(tokensCollectionRef);
-
-  // Fetch shared access token
-  const sharedTokenRef = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return doc(firestore, 'shared_access_tokens', 'GLOBAL');
-  }, [firestore, user]);
-  const { data: sharedToken, isLoading: isSharedTokenLoading } = useDoc<SharedAccessToken>(sharedTokenRef);
+  const { data: accessTokens } = useCollection<AccessToken>(tokensCollectionRef);
 
   // Fetch conversations
   const conversationsCollectionRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
     return query(collection(firestore, 'conversations'), orderBy('lastMessageAt', 'desc'));
   }, [firestore, isAdmin]);
-  const { data: conversations, isLoading: areConversationsLoading } = useCollection<Conversation>(conversationsCollectionRef);
+  const { data: conversations } = useCollection<Conversation>(conversationsCollectionRef);
 
   const [stats, setStats] = useState<{ totalUsers: number; activeSubscribers: number; monthlyRevenue: number; } | null>(null);
 
@@ -417,7 +408,7 @@ export default function AdminPage() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-4">
-                {areFishLoading ? [1,2,3].map(i => <Skeleton key={i} className="h-24 w-full" />) : dbFishSpecies?.map(fish => (
+                {areFishLoading ? [1,2,3].map(i => <Skeleton key={i} className="h-24 w-full" />) : dbFishSpecies && dbFishSpecies.length > 0 ? dbFishSpecies.map(fish => (
                   <Card key={fish.id} className="overflow-hidden border shadow-sm">
                     <div className="flex items-center p-4 gap-4">
                       <div className="relative size-20 rounded-lg overflow-hidden border bg-white shrink-0">
@@ -436,7 +427,17 @@ export default function AdminPage() {
                       </div>
                     </div>
                   </Card>
-                ))}
+                )) : (
+                    <div className="text-center py-12 border-2 border-dashed rounded-xl bg-muted/10">
+                        <div className="size-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Info className="text-muted-foreground size-6" />
+                        </div>
+                        <h3 className="font-bold">Base de données vide</h3>
+                        <p className="text-xs text-muted-foreground max-w-xs mx-auto mt-1">
+                            Cliquez sur "Importer Défaut" pour charger les 33 espèces emblématiques du Caillou.
+                        </p>
+                    </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -498,6 +499,15 @@ export default function AdminPage() {
             <AlertDialogHeader><AlertDialogTitle>Jeton généré !</AlertDialogTitle><AlertDialogDescription>Copiez-le :</AlertDialogDescription></AlertDialogHeader>
             <div className="p-4 bg-muted rounded-md font-mono text-center text-lg">{generatedToken}</div>
             <AlertDialogFooter><AlertDialogCancel>Fermer</AlertDialogCancel><AlertDialogAction onClick={() => copyToClipboard(generatedToken)}>Copier</AlertDialogAction></AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {conversationToDelete && (
+        <AlertDialog open={!!conversationToDelete} onOpenChange={(open) => !open && setConversationToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader><AlertDialogTitle>Supprimer la conversation ?</AlertDialogTitle><AlertDialogDescription>Cette action est irréversible et supprimera tous les messages.</AlertDialogDescription></AlertDialogHeader>
+            <AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteConversation(conversationToDelete)}>Supprimer</AlertDialogAction></AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       )}
