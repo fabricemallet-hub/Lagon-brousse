@@ -248,11 +248,11 @@ export function VesselTracker() {
         const lock = await (navigator as any).wakeLock.request('screen');
         if (lock) {
           setWakeLock(lock);
-          toast({ title: "Mode éveil actif" });
+          toast({ title: "Mode éveil actif", description: "L'écran restera allumé." });
           lock.addEventListener('release', () => setWakeLock(null));
         }
       } catch (err: any) {
-        toast({ variant: "destructive", title: "Permission bloquée (environnement restreint)" });
+        toast({ variant: "destructive", title: "Permission bloquée", description: "La politique de sécurité interdit l'accès au Wake Lock dans cet environnement (iframe)." });
       }
     }
   };
@@ -411,6 +411,8 @@ export function VesselTracker() {
                   ))}
                 </div>
               )}
+
+              <Button variant={wakeLock ? "secondary" : "outline"} size="sm" className={cn("w-full gap-2 font-black h-12 border-2", wakeLock && "bg-primary/10 text-primary border-primary")} onClick={toggleWakeLock}><Zap className={cn("size-4", wakeLock && "fill-current")} />{wakeLock ? "MODE ÉVEIL ACTIF" : "ACTIVER MODE ÉVEIL"}</Button>
               
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-4 border rounded-lg bg-card">
@@ -623,11 +625,12 @@ export function VesselTracker() {
                 <div className="space-y-1.5">
                   <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Contact d'urgence (Alerte SMS) :</Label>
                   <div className="flex gap-2">
-                    <Input 
+                    <input 
+                      type="tel"
                       placeholder="Numéro du proche..." 
                       value={emergencyContact} 
                       onChange={e => setEmergencyContact(e.target.value)}
-                      className="h-11 text-sm border-2 font-bold bg-background"
+                      className="flex h-11 w-full rounded-md border-2 border-input bg-background px-3 py-2 text-sm font-bold ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     />
                     <Button 
                       variant="secondary"
