@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -11,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { DollarSign, Users, Crown, KeyRound, Copy, Trash2, AlertCircle, Mail, Share2, Palette, Image as ImageIcon, Type, Eye, Save, Upload, Timer, Fish } from 'lucide-center';
+import { DollarSign, Users, Crown, KeyRound, Copy, Trash2, AlertCircle, Mail, Share2, Palette, Image as ImageIcon, Type, Eye, Save, Upload, Timer, Fish } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
 import Link from 'next/link';
@@ -305,7 +304,7 @@ export default function AdminPage() {
   };
 
   const handleDeleteConversation = async (conversationId: string) => {
-    if (!firestore) return;
+    if (!firestore || !conversationId) return;
     try {
         const messagesRef = collection(firestore, 'conversations', conversationId, 'messages');
         const messagesSnap = await getDocs(messagesRef);
@@ -848,7 +847,7 @@ export default function AdminPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={() => handleDeleteConversation(conversationToDelete!)} className={cn(buttonVariants({ variant: "destructive" }))}>
+            <AlertDialogAction onClick={() => { if (conversationToDelete) handleDeleteConversation(conversationToDelete); }} className={cn(buttonVariants({ variant: "destructive" }))}>
               Oui, supprimer
             </AlertDialogAction>
           </AlertDialogFooter>
