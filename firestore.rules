@@ -26,7 +26,7 @@ service cloud.firestore {
     // --- COLLECTION RULES ---
 
     // PRIORITÉ ABSOLUE : Notifications Système (Lecture publique totale pour la bannière)
-    match /system_notifications/{document=**} {
+    match /system_notifications/{notifId} {
       allow read: if true;
       allow write: if isAdmin();
     }

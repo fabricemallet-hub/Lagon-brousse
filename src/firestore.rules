@@ -2,7 +2,7 @@
 rules_version = '2';
 
 /**
- * LAGON & BROUSSE NC - SECURITY POLICY (SRC SYNC)
+ * LAGON & BROUSSE NC - SECURITY POLICY (SYNC)
  */
 
 service cloud.firestore {
@@ -26,7 +26,7 @@ service cloud.firestore {
     // --- COLLECTION RULES ---
 
     // PRIORITÉ ABSOLUE : Notifications Système (Lecture publique totale pour la bannière)
-    match /system_notifications/{document=**} {
+    match /system_notifications/{notifId} {
       allow read: if true;
       allow write: if isAdmin();
     }
