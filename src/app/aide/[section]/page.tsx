@@ -88,20 +88,20 @@ const sectionContent: Record<string, {
     title: 'Vessel Tracker',
     icon: Navigation,
     color: 'bg-blue-600',
-    role: "Un système de sécurité maritime haute-fidélité conçu pour rassurer vos proches à terre en partageant votre position GPS exacte et votre statut d'activité en mer.",
+    role: "Un système de sécurité maritime haute-fidélité conçu pour rassurer vos proches à terre en partageant la position GPS exacte, le statut d'activité et l'état de la batterie du navire.",
     steps: [
-      "Émetteur (A) - ID Personnalisé : Activez 'Partager ma position'. Vous pouvez saisir un code personnalisé pour simplifier le partage (ex: BATEAU-NC).",
-      "Émetteur (A) - Mode Éveil : Activez 'MODE ÉVEIL ACTIF' pour empêcher votre téléphone de se mettre en veille, garantissant un flux GPS continu en arrière-plan.",
-      "Récepteur (B) - Historique : Retrouvez vos navires habituels dans l'historique pour relancer un suivi d'un seul clic sans avoir à ressaisir l'ID.",
-      "Récepteur (B) - Alertes Sonores : Activez les notifications sonores et personnalisez le son pour chaque état (Mouvement, Arrêt, Perte Réseau).",
-      "Récepteur (B) - Surveillance Temporelle : Configurez une alerte critique si le navire reste dans un état (ex: Immobilisation) plus de X minutes. L'alarme sonnera toutes les 10s jusqu'à validation manuelle de votre part.",
-      "ALERTE SMS CRITIQUE (A) : En cas de détresse, le bouton rouge génère un SMS complet incluant vos coordonnées GPS exactes et un lien Google Maps vers votre position."
+      "Émetteur (A) - ID & Surnom : Activez 'Partager ma position'. Configurez un ID personnalisé (ex: BATEAU-NC) et un surnom pour être identifié sur la carte.",
+      "Émetteur (A) - Mode Éveil & Batterie : Activez 'MODE ÉVEIL ACTIF' pour garantir un flux GPS continu. Votre niveau de batterie et statut de charge sont transmis en temps réel.",
+      "Récepteur (B) - Suivi Live : Visualisez le statut (EN MOUVEMENT / MOUILLAGE) et l'autonomie de l'émetteur. Le système détecte l'immobilité après 30s dans un rayon de 20m.",
+      "Récepteur (B) - Alertes Sonores : Activez les notifications et personnalisez le son pour chaque changement d'état (ex: passage au mouillage ou perte réseau).",
+      "Veille Critique (B) - Réglage Précis : Configurez une alarme si le navire reste immobile trop longtemps. Réglez la durée de 1 min à 24h avec les boutons '+' et '-'.",
+      "ALERTE SMS & Messages Types : Utilisez le sélecteur en plein écran pour envoyer un MAYDAY ou PAN PAN incluant vos coordonnées GPS et lien Maps verrouillés."
     ],
     tips: [
-      "Continuité : Le 'Mode Éveil' est indispensable pour les longues traversées afin d'éviter que le système d'exploitation du téléphone ne coupe le GPS pour économiser de la batterie.",
-      "Vigilance Passive : Grâce à la Surveillance Temporelle, le récepteur à terre peut vaquer à ses occupations ; le téléphone sonnera bruyamment si le bateau ne bouge plus au-delà du temps autorisé.",
-      "Volume : Pensez à régler le curseur de volume dans les paramètres du récepteur pour que les alertes soient audibles même dans un environnement bruyant.",
-      "Réseau : Si vous perdez internet en mer, le tracker synchronisera vos positions stockées dès que vous retrouverez une barre de réseau."
+      "Batterie Critique : Si le téléphone émetteur tombe à 5% ou s'éteint, le récepteur reçoit une alerte visuelle et sonore d'urgence 'Batterie Déchargée'.",
+      "Historique d'États : Chaque changement de situation est enregistré. Cliquez sur 'GPS' dans l'historique pour voir où se trouvait le navire à ce moment précis.",
+      "SMS Intelligent : Pour le récepteur, le message d'alerte par défaut calcule automatiquement depuis combien de temps le navire est immobile.",
+      "Personnalisation : Vos messages SMS personnalisés sont mémorisés dans votre profil pour une utilisation immédiate lors de vos prochaines sorties."
     ]
   },
   'peche': {
