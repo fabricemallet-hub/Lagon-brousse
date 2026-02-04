@@ -68,32 +68,37 @@ export default function FishPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-20">
+    <div className="flex flex-col gap-4 w-full max-w-full overflow-x-hidden px-1 pb-20">
       <Card className="border-none shadow-none bg-transparent">
-        <CardHeader className="px-0">
-          <CardTitle className="text-2xl font-black tracking-tight flex items-center gap-2">
-            <Fish className="text-primary size-7" /> Guide des Poissons NC
+        <CardHeader className="px-0 py-2">
+          <CardTitle className="text-xl font-black tracking-tight flex items-center gap-2">
+            <Fish className="text-primary size-6" /> Guide des Poissons NC
           </CardTitle>
-          <CardDescription className="text-xs font-medium">
-            Ouvrez votre appareil photo pour identifier une prise ou recherchez une espèce.
+          <CardDescription className="text-[10px] font-medium leading-tight">
+            Identifiez une prise par photo (IA) ou recherchez une espèce.
           </CardDescription>
         </CardHeader>
       </Card>
 
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         <Button 
           onClick={() => fileInputRef.current?.click()} 
-          className="h-16 text-lg font-black uppercase tracking-widest shadow-xl gap-3 bg-primary hover:bg-primary/90"
+          className="h-14 text-base font-black uppercase tracking-widest shadow-lg gap-3 bg-primary hover:bg-primary/90"
           disabled={isIdentifying}
         >
-          {isIdentifying ? <BrainCircuit className="size-7 animate-pulse" /> : <Camera className="size-7" />}
+          {isIdentifying ? <BrainCircuit className="size-6 animate-pulse" /> : <Camera className="size-6" />}
           {isIdentifying ? "Analyse..." : "Prendre en Photo (IA)"}
         </Button>
         <input type="file" accept="image/*" capture="environment" ref={fileInputRef} onChange={handleCapture} className="hidden" />
 
-        <div className="relative mt-2">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input placeholder="Rechercher par nom..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 h-12 border-2" />
+          <Input 
+            placeholder="Rechercher par nom..." 
+            value={search} 
+            onChange={(e) => setSearch(e.target.value)} 
+            className="pl-10 h-11 border-2 text-sm" 
+          />
         </div>
       </div>
 
@@ -118,46 +123,65 @@ export default function FishPage() {
         </Card>
       )}
 
-      <div className="space-y-4">
-        <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
-          <Fish className="size-4" /> Espèces Répertoriées ({filteredFish.length})
+      <div className="space-y-3">
+        <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
+          <Fish className="size-3" /> Espèces Répertoriées ({filteredFish.length})
         </h3>
         
-        <div className="grid gap-3">
-          {isLoading ? [1,2,3].map(i => <Skeleton key={i} className="h-24 w-full" />) : filteredFish.map((fish) => {
+        <div className="grid gap-2">
+          {isLoading ? [1,2,3].map(i => <Skeleton key={i} className="h-20 w-full rounded-xl" />) : filteredFish.map((fish) => {
             const finalImageUrl = fish.imageUrl || (fish.imagePlaceholder ? `https://picsum.photos/seed/${fish.imagePlaceholder}/400/400` : '');
 
             return (
-              <Card key={fish.id} className="overflow-hidden border-2 hover:border-primary/30 transition-all">
+              <Card key={fish.id} className="overflow-hidden border-2 hover:border-primary/30 transition-all shadow-sm">
                 <Accordion type="single" collapsible>
                   <AccordionItem value={fish.id} className="border-none">
-                    <AccordionTrigger className="p-4 hover:no-underline [&[data-state=open]]:bg-muted/30">
-                      <div className="flex items-center gap-4 text-left w-full">
-                        <div className="size-20 rounded-xl bg-white flex items-center justify-center shrink-0 overflow-hidden border shadow-inner">
+                    <AccordionTrigger className="p-3 hover:no-underline [&[data-state=open]]:bg-muted/30">
+                      <div className="flex items-center gap-3 text-left w-full overflow-hidden">
+                        <div className="size-16 rounded-xl bg-white flex items-center justify-center shrink-0 overflow-hidden border shadow-sm">
                           {finalImageUrl ? (
-                            <Image src={finalImageUrl} alt={fish.name} width={80} height={80} className="object-contain w-full h-full p-1" />
-                          ) : <Fish className="size-8 text-primary/40" />}
+                            <Image 
+                              src={finalImageUrl} 
+                              alt={fish.name} 
+                              width={64} 
+                              height={64} 
+                              className="object-contain w-full h-full p-1" 
+                            />
+                          ) : <Fish className="size-6 text-primary/40" />}
                         </div>
-                        <div className="flex flex-col min-w-0">
-                          <h4 className="font-black uppercase tracking-tighter text-base leading-none truncate">{fish.name}</h4>
-                          <p className="text-[10px] text-muted-foreground italic truncate mt-1">{fish.scientificName}</p>
-                        </div>
-                        <div className="ml-auto pr-4">
-                          <Badge variant={fish.gratteRisk > 20 ? "destructive" : "outline"} className={cn("text-[8px] h-5 font-black uppercase", fish.gratteRisk <= 20 && "border-green-500 text-green-600")}>
-                            Gratte {fish.gratteRisk}%
-                          </Badge>
+                        <div className="flex flex-col min-w-0 flex-1 gap-0.5">
+                          <h4 className="font-black uppercase tracking-tighter text-sm leading-tight break-words pr-2">
+                            {fish.name}
+                          </h4>
+                          <p className="text-[9px] text-muted-foreground italic truncate">
+                            {fish.scientificName}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge 
+                              variant={fish.gratteRisk > 20 ? "destructive" : "outline"} 
+                              className={cn(
+                                "text-[7px] h-4 px-1.5 font-black uppercase tracking-tight", 
+                                fish.gratteRisk <= 20 && "border-green-500 text-green-600"
+                              )}
+                            >
+                              Gratte {fish.gratteRisk}%
+                            </Badge>
+                            <Badge variant="outline" className="text-[7px] h-4 px-1.5 font-black uppercase opacity-60 border-muted-foreground/30">
+                              {fish.category}
+                            </Badge>
+                          </div>
                         </div>
                       </div>
                     </AccordionTrigger>
                     <AccordionContent className="p-4 space-y-4 bg-muted/10 border-t border-dashed">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 gap-4">
                         <div className="space-y-2">
                           <div className="flex items-center gap-2 text-[10px] font-black uppercase text-primary"><Target className="size-3" /> Pêche</div>
-                          <p className="text-xs font-medium">{fish.fishingAdvice}</p>
+                          <p className="text-xs font-medium leading-relaxed">{fish.fishingAdvice}</p>
                         </div>
                         <div className="space-y-2">
                           <div className="flex items-center gap-2 text-[10px] font-black uppercase text-accent"><ChefHat className="size-3" /> Cuisine</div>
-                          <p className="text-xs font-medium">{fish.culinaryAdvice}</p>
+                          <p className="text-xs font-medium leading-relaxed">{fish.culinaryAdvice}</p>
                         </div>
                       </div>
                       {fish.gratteRisk > 30 && (
