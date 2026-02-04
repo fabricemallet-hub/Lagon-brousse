@@ -233,8 +233,9 @@ export function VesselTracker() {
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
   const defaultSmsText = useMemo(() => {
-    return `ALERTE : Navire "${vesselNickname || 'Capitaine'}" en difficulté.`;
-  }, [vesselNickname]);
+    const name = mode === 'sender' ? (vesselNickname || 'Capitaine') : (remoteVessel?.displayName || vesselIdToFollow || 'Capitaine');
+    return `ALERTE : Navire "${name}" en difficulté.`;
+  }, [mode, vesselNickname, remoteVessel, vesselIdToFollow]);
 
   const finalSmsBody = useMemo(() => {
     const mainText = customSmsMessage.trim() || defaultSmsText;
@@ -575,7 +576,6 @@ export function VesselTracker() {
   const handleSelectPredefinedMessage = (text: string) => {
     setCustomSmsMessage(text);
     setIsQuickMsgOpen(false);
-    // On laisse un petit délai pour que le premier dialog se ferme proprement
     setTimeout(() => {
       setIsSmsConfirmOpen(true);
     }, 150);
@@ -635,31 +635,6 @@ export function VesselTracker() {
                         className="font-black text-center uppercase h-12 border-2 rounded-xl" 
                       />
                       <Button variant="outline" size="icon" className="h-12 w-12 border-2 rounded-xl" onClick={handleSaveCustomId} disabled={isSharing}><Save className="size-5" /></Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 pt-2 border-t border-dashed">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1 flex items-center gap-2">
-                        <MessageSquare className="size-3" /> Message SMS personnalisé
-                      </Label>
-                      <Button variant="ghost" size="sm" onClick={handleResetSms} className="h-6 px-2 text-[9px] font-black uppercase text-muted-foreground hover:text-primary">
-                        <RotateCcw className="size-3 mr-1" /> Réinitialiser
-                      </Button>
-                    </div>
-                    <Textarea 
-                      placeholder="Tapez votre message d'alerte ici..." 
-                      value={customSmsMessage} 
-                      onChange={e => setCustomSmsMessage(e.target.value)}
-                      className="text-xs font-bold border-2 rounded-xl min-h-[80px]"
-                    />
-                    
-                    <div className="space-y-1.5 p-3 bg-white/50 border-2 rounded-xl shadow-inner">
-                      <p className="text-[9px] font-black uppercase text-muted-foreground tracking-wider mb-1">Aperçu du SMS final :</p>
-                      <div className="text-[11px] leading-relaxed font-medium">
-                        <p>{customSmsMessage.trim() || defaultSmsText}</p>
-                        <p className="mt-2 text-primary font-bold">Position : https://www.google.com/maps?q=...</p>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -882,7 +857,32 @@ export function VesselTracker() {
         </div>
         
         <CardFooter className="bg-muted/10 p-4 flex flex-col gap-4 border-t-2">
-          <div className="w-full space-y-4">
+          <div className="w-full space-y-6">
+            <div className="space-y-4 rounded-2xl border-2 border-dashed p-4 bg-white/50 shadow-inner">
+              <div className="flex items-center justify-between">
+                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1 flex items-center gap-2">
+                  <MessageSquare className="size-3" /> Message SMS personnalisé
+                </Label>
+                <Button variant="ghost" size="sm" onClick={handleResetSms} className="h-6 px-2 text-[9px] font-black uppercase text-muted-foreground hover:text-primary">
+                  <RotateCcw className="size-3 mr-1" /> Réinitialiser
+                </Button>
+              </div>
+              <Textarea 
+                placeholder="Tapez votre message d'alerte ici..." 
+                value={customSmsMessage} 
+                onChange={e => setCustomSmsMessage(e.target.value)}
+                className="text-xs font-bold border-2 rounded-xl min-h-[80px] bg-white"
+              />
+              
+              <div className="space-y-1.5 p-3 bg-muted/30 border-2 rounded-xl">
+                <p className="text-[9px] font-black uppercase text-muted-foreground tracking-wider mb-1">Aperçu du SMS final :</p>
+                <div className="text-[11px] leading-relaxed font-medium">
+                  <p>{customSmsMessage.trim() || defaultSmsText}</p>
+                  <p className="mt-2 text-primary font-bold">Position : https://www.google.com/maps?q=...</p>
+                </div>
+              </div>
+            </div>
+
             <AlertDialog open={isSmsConfirmOpen} onOpenChange={setIsSmsConfirmOpen}>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" className="w-full h-14 bg-red-600 text-sm font-black shadow-lg flex items-center justify-center gap-2 uppercase rounded-xl border-b-4 border-red-800 transition-all active:scale-95" disabled={!lastValidLocation}>
@@ -969,13 +969,9 @@ export function VesselTracker() {
               </DialogContent>
             </Dialog>
 
-            <div className="space-y-3">
+            <div className="space-y-3 pt-2 border-t border-dashed">
               <div className="bg-white/80 p-4 rounded-xl border-2 border-dashed text-[10px] space-y-2">
                 <div className="flex justify-between font-black uppercase text-red-600"><span>MRCC Secours en Mer</span><span>196 / VHF 16</span></div>
-                <div className="flex items-start gap-2 bg-red-50 p-2 rounded border border-red-100 italic">
-                  <Info className="size-3 text-red-600 shrink-0 mt-0.5" />
-                  <p>Utilisez le <strong>CANAL 16</strong> de la VHF en priorité. Le 196 est idéal pour les appels depuis la terre ferme.</p>
-                </div>
                 <div className="flex justify-between opacity-70"><span>SAMU - SOS Médecins</span><span className="font-bold">15</span></div>
                 <div className="flex justify-between opacity-70"><span>SNSM Nouméa</span><span className="font-bold">25.23.12</span></div>
               </div>
