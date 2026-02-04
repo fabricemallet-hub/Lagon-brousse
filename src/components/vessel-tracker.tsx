@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { doc, setDoc, serverTimestamp, collection, addDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -41,7 +41,11 @@ import {
   Play,
   Clock,
   CheckCircle2,
-  Timer
+  Timer,
+  History,
+  Trash2,
+  Pencil,
+  Plus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { VesselStatus, UserAccount } from '@/lib/types';
@@ -88,6 +92,40 @@ export function VesselTracker() {
   const [emergencyContact, setEmergencyContact] = useState('');
   const [isSavingContact, setIsSavingContact] = useState(false);
   
+  // Custom Sender ID
+  const [customSharingId, setCustomSharingId] = useState('');
+  
+  // Receiver History
+  const [vesselHistory, setVesselHistory] = useState<string[]>([]);
+
+  // Load local data
+  useEffect(() => {
+    const savedHistory = localStorage.getItem('vessel_follow_history');
+    if (savedHistory) setVesselHistory(JSON.parse(savedHistory));
+    
+    const savedCustomId = localStorage.getItem('vessel_custom_id');
+    if (savedCustomId) setCustomSharingId(savedCustomId);
+  }, []);
+
+  const addToHistory = (id: string) => {
+    if (!id || vesselHistory.includes(id)) return;
+    const newHistory = [id, ...vesselHistory].slice(0, 5);
+    setVesselHistory(newHistory);
+    localStorage.setItem('vessel_follow_history', JSON.stringify(newHistory));
+  };
+
+  const removeFromHistory = (id: string) => {
+    const newHistory = vesselHistory.filter(item => item !== id);
+    setVesselHistory(newHistory);
+    localStorage.setItem('vessel_follow_history', JSON.stringify(newHistory));
+  };
+
+  const clearHistory = () => {
+    setVesselHistory([]);
+    localStorage.removeItem('vessel_follow_history');
+    toast({ title: "Historique effacé" });
+  };
+
   // Notification State (Receiver)
   const [isNotifyEnabled, setIsNotifyEnabled] = useState(false);
   const [vesselVolume, setVesselVolume] = useState(0.8);
@@ -140,6 +178,9 @@ export function VesselTracker() {
       setEmergencyContact(userProfile.emergencyContact);
     }
   }, [userProfile]);
+
+  // Final Sharing ID logic
+  const sharingId = customSharingId.trim() || user?.uid || '';
 
   // Firestore Sync (Receiver)
   const vesselRef = useMemoFirebase(() => {
@@ -320,11 +361,16 @@ export function VesselTracker() {
     }
   };
 
+  const handleSaveCustomId = () => {
+    localStorage.setItem('vessel_custom_id', customSharingId);
+    toast({ title: "ID de partage mis à jour", description: `Nouveau code : ${sharingId}` });
+  };
+
   // --- SENDER LOGIC (USER A) ---
   
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || !isSharing) return;
-    const docRef = doc(firestore, 'vessels', user.uid);
+    const docRef = doc(firestore, 'vessels', sharingId);
     const updateData = {
         userId: user.uid,
         displayName: user.displayName || 'Capitaine',
@@ -341,11 +387,11 @@ export function VesselTracker() {
         });
         errorEmitter.emit('permission-error', permissionError);
     });
-  }, [user, firestore, isSharing]);
+  }, [user, firestore, isSharing, sharingId]);
 
   const addImmobilityHistory = useCallback((pos: google.maps.LatLngLiteral, duration: number) => {
     if (!user || !firestore) return;
-    const colRef = collection(firestore, 'vessels', user.uid, 'history');
+    const colRef = collection(firestore, 'vessels', sharingId, 'history');
     const historyData = {
         timestamp: serverTimestamp(),
         location: { latitude: pos.lat, longitude: pos.lng },
@@ -360,7 +406,7 @@ export function VesselTracker() {
         });
         errorEmitter.emit('permission-error', permissionError);
     });
-  }, [user, firestore]);
+  }, [user, firestore, sharingId]);
 
   // Handle map centering
   useEffect(() => {
@@ -577,6 +623,25 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
                 <Switch checked={isSharing} onCheckedChange={setIsSharing} />
               </div>
 
+              <div className="space-y-2">
+                <Label className="text-xs font-black uppercase text-muted-foreground ml-1">ID de partage (Optionnel)</Label>
+                <div className="flex gap-2">
+                  <Input 
+                    placeholder="Mon-Bateau-123" 
+                    value={customSharingId} 
+                    onChange={e => setCustomSharingId(e.target.value)} 
+                    disabled={isSharing}
+                    className="font-mono text-xs uppercase"
+                  />
+                  <Button variant="outline" size="icon" onClick={handleSaveCustomId} disabled={isSharing}>
+                    <Save className="size-4" />
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground italic px-1">
+                  Par défaut, votre identifiant est votre UID système. Saisissez un texte simple pour le changer.
+                </p>
+              </div>
+
               <div className="pt-1">
                 <Button 
                   variant={wakeLock ? "secondary" : "outline"} 
@@ -587,34 +652,31 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
                   <Zap className={cn("size-4", wakeLock && "fill-current")} />
                   {wakeLock ? "MODE ÉVEIL ACTIF (Background)" : "ACTIVER MODE ÉVEIL (Background)"}
                 </Button>
-                <p className="text-[10px] text-muted-foreground mt-1.5 px-1 italic leading-tight">
-                  Empêche la mise en veille de votre smartphone pour garantir un suivi GPS ininterrompu même en arrière-plan.
-                </p>
               </div>
               
               {isSharing && (
-                <Alert className={cn(isOnline ? "border-green-200 bg-green-50" : "border-destructive/20 bg-destructive/5")}>
-                  {isOnline ? <Wifi className="h-4 w-4 text-green-600" /> : <WifiOff className="h-4 w-4 text-destructive" />}
-                  <AlertTitle>{isOnline ? "En ligne" : "Réseau perdu"}</AlertTitle>
-                  <AlertDescription>
-                    {isOnline 
-                      ? "Vos coordonnées sont transmises en temps réel." 
-                      : "L'application synchronisera votre position dès le retour du réseau."}
-                  </AlertDescription>
-                </Alert>
-              )}
+                <div className="space-y-3">
+                  <Alert className={cn(isOnline ? "border-green-200 bg-green-50" : "border-destructive/20 bg-destructive/5")}>
+                    {isOnline ? <Wifi className="h-4 w-4 text-green-600" /> : <WifiOff className="h-4 w-4 text-destructive" />}
+                    <AlertTitle>{isOnline ? "En ligne" : "Réseau perdu"}</AlertTitle>
+                    <AlertDescription className="text-xs">
+                      {isOnline 
+                        ? "Vos coordonnées sont transmises en temps réel." 
+                        : "L'application synchronisera votre position dès le retour du réseau."}
+                    </AlertDescription>
+                  </Alert>
 
-              {isSharing && (
-                <div className="p-4 border rounded-lg space-y-2">
-                  <p className="text-sm font-medium">Votre ID de partage :</p>
-                  <div className="flex gap-2">
-                    <code className="flex-1 bg-muted p-2 rounded font-mono text-center text-xs overflow-hidden truncate">{user?.uid}</code>
-                    <Button variant="outline" size="icon" onClick={() => {
-                      navigator.clipboard.writeText(user?.uid || '');
-                      toast({ title: "ID copié !" });
-                    }}>
-                      <Copy className="h-4 w-4" />
-                    </Button>
+                  <div className="p-4 border rounded-lg space-y-2 bg-muted/30">
+                    <p className="text-xs font-black uppercase text-muted-foreground">Votre ID de partage actuel :</p>
+                    <div className="flex gap-2">
+                      <code className="flex-1 bg-background border p-2 rounded font-mono text-center text-xs overflow-hidden truncate">{sharingId}</code>
+                      <Button variant="outline" size="icon" onClick={() => {
+                        navigator.clipboard.writeText(sharingId);
+                        toast({ title: "ID copié !" });
+                      }}>
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -622,15 +684,53 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
           ) : (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>ID du navire à suivre</Label>
+                <Label className="text-xs font-black uppercase text-muted-foreground ml-1">ID du navire à suivre</Label>
                 <div className="flex gap-2">
                   <Input 
                     placeholder="Coller l'ID ici..." 
                     value={vesselIdToFollow} 
                     onChange={e => setVesselIdToFollow(e.target.value)} 
+                    className="font-mono text-xs"
                   />
+                  <Button variant="secondary" size="icon" onClick={() => { if(vesselIdToFollow) addToHistory(vesselIdToFollow); }}>
+                    <Plus className="size-4" />
+                  </Button>
                 </div>
               </div>
+
+              {/* HISTORY SECTION */}
+              {vesselHistory.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between px-1">
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">
+                      <History className="size-3" /> Historique des suivis
+                    </Label>
+                    <Button variant="ghost" className="h-5 px-2 text-[9px] font-bold uppercase" onClick={clearHistory}>
+                      Effacer tout
+                    </Button>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {vesselHistory.map(id => (
+                      <div key={id} className="flex items-center gap-2 p-2 rounded-lg border bg-muted/10 group">
+                        <button 
+                          className="flex-1 text-left font-mono text-[10px] truncate"
+                          onClick={() => setVesselIdToFollow(id)}
+                        >
+                          {id}
+                        </button>
+                        <div className="flex items-center gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setVesselIdToFollow(id)}>
+                            <Pencil className="size-3" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => removeFromHistory(id)}>
+                            <Trash2 className="size-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="pt-1">
                 <Button 
@@ -642,9 +742,6 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
                   <Zap className={cn("size-4", wakeLock && "fill-current")} />
                   {wakeLock ? "MODE ÉVEIL ACTIF" : "GARDER L'ÉCRAN ALLUMÉ"}
                 </Button>
-                <p className="text-[10px] text-muted-foreground mt-1.5 px-1 italic leading-tight">
-                  Recommandé pour surveiller la position sur la carte sans que le téléphone ne se verrouille.
-                </p>
               </div>
 
               <div className="pt-2">
@@ -811,7 +908,7 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
                     {remoteVessel.status === 'moving' && <Move className="h-4 w-4 text-blue-600 animate-pulse" />}
                     {remoteVessel.status === 'stationary' && <Anchor className="h-4 w-4 text-amber-600" />}
                     {remoteVessel.status === 'offline' && <WifiOff className="h-4 w-4 text-destructive" />}
-                    <AlertTitle>
+                    <AlertTitle className="text-sm font-bold">
                       {remoteVessel.status === 'moving' && "Le bateau est en mouvement"}
                       {remoteVessel.status === 'stationary' && "L'utilisateur n'a pas bougé depuis 5min"}
                       {remoteVessel.status === 'offline' && "L'utilisateur n'a plus de réseau internet"}
