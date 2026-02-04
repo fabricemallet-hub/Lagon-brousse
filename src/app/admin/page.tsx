@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -14,7 +13,7 @@ import { useRouter } from 'next/navigation';
 import { 
   DollarSign, Users, Crown, KeyRound, Copy, Trash2, AlertCircle, Mail, 
   Share2, Palette, Image as ImageIcon, Type, Eye, Save, Upload, Timer, 
-  Fish, Plus, Pencil, DatabaseZap, X, Info
+  Fish, Plus, Pencil, DatabaseZap, X, Info, Sparkles, BrainCircuit
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
@@ -40,6 +39,7 @@ import { cn } from '@/lib/utils';
 import { SplashScreen } from '@/components/splash-screen';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
 
 const SUBSCRIPTION_PRICE = 500;
 
@@ -74,6 +74,7 @@ export default function AdminPage() {
   const [currentFish, setCurrentFish] = useState<Partial<FishSpeciesInfo>>({});
   const [isSavingFish, setIsSavingFish] = useState(false);
   const [isInitializingFish, setIsInitializingFish] = useState(false);
+  const [isAiGeneratingFish, setIsAiGeneratingFish] = useState(false);
 
   const isAdmin = useMemo(() => 
     user?.email === 'f.mallet81@outlook.com' || user?.email === 'f.mallet81@gmail.com', 
@@ -124,6 +125,31 @@ export default function AdminPage() {
       callback(base64);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleAiFillFish = async () => {
+    if (!currentFish.name) {
+        toast({ variant: 'destructive', title: "Nom manquant", description: "Saisissez au moins le nom commun du poisson." });
+        return;
+    }
+    setIsAiGeneratingFish(true);
+    try {
+        const info = await generateFishInfo({ name: currentFish.name });
+        setCurrentFish(prev => ({
+            ...prev,
+            scientificName: info.scientificName,
+            gratteRisk: info.gratteRisk,
+            culinaryAdvice: info.culinaryAdvice,
+            fishingAdvice: info.fishingAdvice,
+            category: info.category
+        }));
+        toast({ title: "Fiche générée", description: "Les informations ont été complétées par l'IA." });
+    } catch (error) {
+        console.error(error);
+        toast({ variant: 'destructive', title: "Erreur IA", description: "Impossible de générer les infos." });
+    } finally {
+        setIsAiGeneratingFish(false);
+    }
   };
 
   const handleSaveFish = async () => {
@@ -466,26 +492,40 @@ export default function AdminPage() {
                 <DialogDescription>Remplissez les informations techniques du poisson.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
+                <div className="flex items-end gap-2">
+                    <div className="flex-grow space-y-2">
+                        <Label>Nom Commun</Label>
+                        <Input value={currentFish.name || ''} onChange={e => setCurrentFish({...currentFish, name: e.target.value})} placeholder="Bec de cane..." />
+                    </div>
+                    <Button 
+                        variant="secondary" 
+                        className="gap-2 font-bold"
+                        disabled={!currentFish.name || isAiGeneratingFish}
+                        onClick={handleAiFillFish}
+                    >
+                        {isAiGeneratingFish ? <BrainCircuit className="size-4 animate-pulse" /> : <Sparkles className="size-4" />}
+                        {isAiGeneratingFish ? 'Analyse...' : 'Générer avec l\'IA'}
+                    </Button>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><Label>Nom Commun</Label><Input value={currentFish.name || ''} onChange={e => setCurrentFish({...currentFish, name: e.target.value})} placeholder="Bec de cane..." /></div>
                     <div className="space-y-2"><Label>Nom Scientifique</Label><Input value={currentFish.scientificName || ''} onChange={e => setCurrentFish({...currentFish, scientificName: e.target.value})} placeholder="Lethrinus..." /></div>
+                    <div className="space-y-2"><Label>Catégorie</Label><Select value={currentFish.category} onValueChange={(v:any) => setCurrentFish({...currentFish, category: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Lagon">Lagon</SelectItem><SelectItem value="Large">Large</SelectItem><SelectItem value="Recif">Récif</SelectItem></SelectContent></Select></div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><Label>Catégorie</Label><Select value={currentFish.category} onValueChange={(v:any) => setCurrentFish({...currentFish, category: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Lagon">Lagon</SelectItem><SelectItem value="Large">Large</SelectItem><SelectItem value="Recif">Récif</SelectItem></SelectContent></Select></div>
                     <div className="space-y-2"><Label>Risque Gratte (%)</Label><Input type="number" value={currentFish.gratteRisk || 0} onChange={e => setCurrentFish({...currentFish, gratteRisk: parseInt(e.target.value)})} /></div>
-                </div>
-                <div className="space-y-2"><Label>Conseil Culinaire</Label><Textarea value={currentFish.culinaryAdvice || ''} onChange={e => setCurrentFish({...currentFish, culinaryAdvice: e.target.value})} /></div>
-                <div className="space-y-2"><Label>Conseil de Pêche</Label><Textarea value={currentFish.fishingAdvice || ''} onChange={e => setCurrentFish({...currentFish, fishingAdvice: e.target.value})} /></div>
-                <div className="space-y-2">
-                    <Label>Photo (URL)</Label>
-                    <div className="flex gap-2">
-                        <Input value={currentFish.imageUrl || ''} onChange={e => setCurrentFish({...currentFish, imageUrl: e.target.value})} placeholder="https://..." />
-                        <div className="relative">
-                            <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => handleImageUpload(e, (b) => setCurrentFish({...currentFish, imageUrl: b}))} />
-                            <Button variant="outline" size="icon"><Upload className="size-4"/></Button>
+                    <div className="space-y-2">
+                        <Label>Photo (URL)</Label>
+                        <div className="flex gap-2">
+                            <Input value={currentFish.imageUrl || ''} onChange={e => setCurrentFish({...currentFish, imageUrl: e.target.value})} placeholder="https://..." />
+                            <div className="relative">
+                                <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => handleImageUpload(e, (b) => setCurrentFish({...currentFish, imageUrl: b}))} />
+                                <Button variant="outline" size="icon"><Upload className="size-4"/></Button>
+                            </div>
                         </div>
                     </div>
                 </div>
+                <div className="space-y-2"><Label>Conseil Culinaire</Label><Textarea value={currentFish.culinaryAdvice || ''} onChange={e => setCurrentFish({...currentFish, culinaryAdvice: e.target.value})} /></div>
+                <div className="space-y-2"><Label>Conseil de Pêche</Label><Textarea value={currentFish.fishingAdvice || ''} onChange={e => setCurrentFish({...currentFish, fishingAdvice: e.target.value})} /></div>
             </div>
             <DialogFooter>
                 <Button variant="ghost" onClick={() => setIsFishDialogOpen(false)}>Annuler</Button>

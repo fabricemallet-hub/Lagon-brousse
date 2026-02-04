@@ -95,3 +95,18 @@ export const IdentifyFishOutputSchema = z.object({
   description: z.string().describe("Brève description physique pour confirmation."),
 });
 export type IdentifyFishOutput = z.infer<typeof IdentifyFishOutputSchema>;
+
+// Generate Fish Info (for Admin)
+export const GenerateFishInfoInputSchema = z.object({
+  name: z.string().describe("Nom commun du poisson local à la Nouvelle-Calédonie."),
+});
+export type GenerateFishInfoInput = z.infer<typeof GenerateFishInfoInputSchema>;
+
+export const GenerateFishInfoOutputSchema = z.object({
+  scientificName: z.string().describe("Nom scientifique officiel."),
+  gratteRisk: z.number().describe("Risque estimé de ciguatera en NC (0-100)."),
+  culinaryAdvice: z.string().describe("Conseils de préparation culinaire."),
+  fishingAdvice: z.string().describe("Conseils de techniques de pêche en NC."),
+  category: z.enum(['Lagon', 'Large', 'Recif']).describe("Catégorie d'habitat."),
+});
+export type GenerateFishInfoOutput = z.infer<typeof GenerateFishInfoOutputSchema>;
