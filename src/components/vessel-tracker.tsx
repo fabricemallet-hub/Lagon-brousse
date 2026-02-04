@@ -56,7 +56,6 @@ import {
   BatteryMedium,
   BatteryLow,
   BatteryFull,
-  BatteryWarning,
   AlertOctagon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -158,6 +157,15 @@ export function VesselTracker() {
     return doc(firestore, 'vessels', cleanId);
   }, [firestore, mode, vesselIdToFollow]);
   const { data: remoteVessel } = useDoc<VesselStatus>(vesselRef);
+
+  // Calcule le statut effectif consolidé pour l'affichage et la logique d'alerte
+  const currentEffectiveStatus = useMemo(() => {
+    if (mode === 'sender') {
+      return isSharing ? vesselStatus : 'offline';
+    } else {
+      return (remoteVessel && remoteVessel.isSharing) ? remoteVessel.status : 'offline';
+    }
+  }, [mode, isSharing, vesselStatus, remoteVessel]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
