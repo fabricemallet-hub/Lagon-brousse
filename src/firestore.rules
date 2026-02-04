@@ -2,7 +2,7 @@
 rules_version = '2';
 
 /**
- * LAGON & BROUSSE NC - SECURITY POLICY (FIXED)
+ * LAGON & BROUSSE NC - SECURITY POLICY (SYNCED)
  */
 
 service cloud.firestore {
@@ -15,7 +15,6 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      // Priorité à l'email pour éviter les erreurs de lecture de document pendant l'auth
       return isSignedIn() && 
         (
           (request.auth.token.email != null && request.auth.token.email.lower() in ['f.mallet81@gmail.com', 'f.mallet81@outlook.com']) ||
@@ -26,26 +25,22 @@ service cloud.firestore {
 
     // --- PUBLIC COLLECTIONS (READ FOR ALL) ---
 
-    match /system_notifications/{notifId} {
+    match /system_notifications/{document=**} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    match /app_settings/{id} {
+    match /app_settings/{document=**} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    match /meteo_caledonie/{communeId} {
+    match /meteo_caledonie/{document=**} {
       allow read: if true;
       allow write: if isAdmin();
-      match /{allPaths=**} {
-        allow read: if true;
-        allow write: if isAdmin();
-      }
     }
 
-    match /fish_species/{fishId} {
+    match /fish_species/{document=**} {
       allow read: if true;
       allow write: if isAdmin();
     }
@@ -63,18 +58,12 @@ service cloud.firestore {
       }
     }
 
-    match /hunting_sessions/{sessionId} {
+    match /hunting_sessions/{document=**} {
       allow read, write: if isSignedIn() || isAdmin();
-      match /{allPaths=**} {
-        allow read, write: if isSignedIn() || isAdmin();
-      }
     }
 
-    match /vessels/{vesselId} {
+    match /vessels/{document=**} {
       allow read, write: if isSignedIn() || isAdmin();
-      match /{allPaths=**} {
-        allow read, write: if isSignedIn() || isAdmin();
-      }
     }
 
     match /conversations/{convId} {
@@ -93,13 +82,9 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    match /stations/{stationId} {
+    match /stations/{document=**} {
       allow read: if isSignedIn() || isAdmin();
       allow write: if isAdmin();
-      match /{allPaths=**} {
-        allow read: if isSignedIn() || isAdmin();
-        allow write: if isAdmin();
-      }
     }
     
     // Default catch-all

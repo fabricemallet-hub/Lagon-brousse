@@ -2,7 +2,7 @@
 rules_version = '2';
 
 /**
- * LAGON & BROUSSE NC - SECURITY POLICY (FIXED)
+ * LAGON & BROUSSE NC - SECURITY POLICY
  */
 
 service cloud.firestore {
@@ -25,27 +25,24 @@ service cloud.firestore {
     }
 
     // --- PUBLIC COLLECTIONS (READ FOR ALL) ---
+    // Placées en haut pour priorité maximale
 
-    match /system_notifications/{notifId} {
+    match /system_notifications/{document=**} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    match /app_settings/{id} {
+    match /app_settings/{document=**} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    match /meteo_caledonie/{communeId} {
+    match /meteo_caledonie/{document=**} {
       allow read: if true;
       allow write: if isAdmin();
-      match /{allPaths=**} {
-        allow read: if true;
-        allow write: if isAdmin();
-      }
     }
 
-    match /fish_species/{fishId} {
+    match /fish_species/{document=**} {
       allow read: if true;
       allow write: if isAdmin();
     }
@@ -63,18 +60,12 @@ service cloud.firestore {
       }
     }
 
-    match /hunting_sessions/{sessionId} {
+    match /hunting_sessions/{document=**} {
       allow read, write: if isSignedIn() || isAdmin();
-      match /{allPaths=**} {
-        allow read, write: if isSignedIn() || isAdmin();
-      }
     }
 
-    match /vessels/{vesselId} {
+    match /vessels/{document=**} {
       allow read, write: if isSignedIn() || isAdmin();
-      match /{allPaths=**} {
-        allow read, write: if isSignedIn() || isAdmin();
-      }
     }
 
     match /conversations/{convId} {
@@ -93,13 +84,9 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    match /stations/{stationId} {
+    match /stations/{document=**} {
       allow read: if isSignedIn() || isAdmin();
       allow write: if isAdmin();
-      match /{allPaths=**} {
-        allow read: if isSignedIn() || isAdmin();
-        allow write: if isAdmin();
-      }
     }
     
     // Default catch-all
