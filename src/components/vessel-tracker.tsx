@@ -332,13 +332,22 @@ export function VesselTracker() {
       }
     } else {
       try {
-        const lock = await (navigator as any).wakeLock.request('screen');
-        setWakeLock(lock);
-        toast({ title: "Mode éveil activé", description: "L'écran restera allumé pour garantir le suivi GPS." });
-        
-        lock.addEventListener('release', () => {
-          setWakeLock(null);
+        // We catch the error silently if it's a permission policy violation in development
+        const lock = await (navigator as any).wakeLock.request('screen').catch((e: any) => {
+          if (e.name === 'NotAllowedError') {
+            throw e;
+          }
+          console.warn("Wake Lock request failed:", e);
+          return null;
         });
+        
+        if (lock) {
+          setWakeLock(lock);
+          toast({ title: "Mode éveil activé", description: "L'écran restera allumé pour garantir le suivi GPS." });
+          lock.addEventListener('release', () => {
+            setWakeLock(null);
+          });
+        }
       } catch (err: any) {
         if (err.name === 'NotAllowedError') {
           toast({ 
@@ -358,8 +367,8 @@ export function VesselTracker() {
     const handleVisibilityChange = async () => {
       if (wakeLock !== null && document.visibilityState === 'visible') {
         try {
-          const lock = await (navigator as any).wakeLock.request('screen');
-          setWakeLock(lock);
+          const lock = await (navigator as any).wakeLock.request('screen').catch(() => null);
+          if (lock) setWakeLock(lock);
         } catch (e) {
           console.error(e);
         }
