@@ -1,35 +1,37 @@
 rules_version = '2';
 
 /**
- * LAGON & BROUSSE NC - SECURITY POLICY (V3.0)
- * METHODOLOGY: Recursive prioritized public access + simplified admin checks.
- * Unique Deployment ID: 20240524-1425
+ * LAGON & BROUSSE NC - SECURITY POLICY (V4.0-STABLE)
+ * Unique Deployment ID: 20240524-1500
  */
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. ACCÈS PUBLICS (PRIORITÉ ABSOLUE & RÉCURSIF) ---
-    // On autorise la lecture complète pour les collections de contenu global.
+    // --- 1. ACCÈS PUBLICS (PRIORITÉ ABSOLUE) ---
+    // Autorise la lecture (individuelle et liste) pour le contenu global
     
-    match /system_notifications/{document=**} {
-      allow read: if true;
+    match /system_notifications/{id} {
+      allow get, list: if true;
     }
     
-    match /app_settings/{document=**} {
-      allow read: if true;
+    match /app_settings/{id} {
+      allow get, list: if true;
     }
 
-    match /meteo_caledonie/{document=**} {
-      allow read: if true;
+    match /meteo_caledonie/{id} {
+      allow get, list: if true;
+      match /previsions/{prevId} {
+        allow get, list: if true;
+      }
     }
 
-    match /fish_species/{document=**} {
-      allow read: if true;
+    match /fish_species/{id} {
+      allow get, list: if true;
     }
     
-    match /shared_access_tokens/{document=**} {
-      allow read: if true;
+    match /shared_access_tokens/{id} {
+      allow get, list: if true;
     }
 
     // --- 2. FONCTIONS DE SÉCURITÉ ---
@@ -38,7 +40,7 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Vérification admin purement basée sur le jeton pour éviter les erreurs de lecture document
+    // Vérification admin basée sur l'email du jeton pour éviter les erreurs de lecture document
     function isAdmin() {
       return isSignedIn() && 
              (request.auth.token.email == 'f.mallet81@gmail.com' || 
