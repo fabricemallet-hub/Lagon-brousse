@@ -25,6 +25,17 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { 
   Navigation, 
@@ -134,6 +145,15 @@ export function VesselTracker() {
   }, [user, firestore]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
+  const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
+
+  const vesselRef = useMemoFirebase(() => {
+    const cleanId = vesselIdToFollow.trim().toUpperCase();
+    if (!firestore || mode !== 'receiver' || !cleanId) return null;
+    return doc(firestore, 'vessels', cleanId);
+  }, [firestore, mode, vesselIdToFollow]);
+  const { data: remoteVessel, isLoading: isVesselLoading } = useDoc<VesselStatus>(vesselRef);
+
   // Sync preferences from profile
   useEffect(() => {
     if (userProfile?.vesselPrefs) {
@@ -179,15 +199,6 @@ export function VesselTracker() {
 
     return () => clearTimeout(timeout);
   }, [user, firestore, isProfileLoading, isNotifyEnabled, vesselVolume, notifySettings, notifySounds, isWatchEnabled, watchType, watchDuration, watchSound, userProfile?.vesselPrefs]);
-
-  const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
-
-  const vesselRef = useMemoFirebase(() => {
-    const cleanId = vesselIdToFollow.trim().toUpperCase();
-    if (!firestore || mode !== 'receiver' || !cleanId) return null;
-    return doc(firestore, 'vessels', cleanId);
-  }, [firestore, mode, vesselIdToFollow]);
-  const { data: remoteVessel, isLoading: isVesselLoading } = useDoc<VesselStatus>(vesselRef);
 
   const handleSaveCustomId = () => {
     const id = customSharingId.trim().toUpperCase();
@@ -481,8 +492,32 @@ export function VesselTracker() {
           {displayVessel ? (
             <div className="w-full space-y-4">
               <div className="grid grid-cols-1 gap-2">
-                <Button variant="outline" className="h-10 border-2 text-[10px] font-black uppercase" onClick={() => copyCoordinates(displayVessel.location.latitude, displayVessel.location.longitude)}><Copy className="size-3 mr-2" /> Copier GPS</Button>
-                <Button variant="destructive" className="w-full h-14 bg-red-600 text-sm font-black shadow-lg flex items-center justify-center gap-2 uppercase rounded-xl border-b-4 border-red-800" onClick={() => sendEmergencySms(displayVessel.location.latitude, displayVessel.location.longitude, displayVessel.displayName)}><ShieldAlert className="size-6" /> ALERTE SMS</Button>
+                <Button variant="outline" className="h-10 border-2 text-[10px] font-black uppercase rounded-xl" onClick={() => copyCoordinates(displayVessel.location.latitude, displayVessel.location.longitude)}><Copy className="size-3 mr-2" /> Copier GPS</Button>
+                
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" className="w-full h-14 bg-red-600 text-sm font-black shadow-lg flex items-center justify-center gap-2 uppercase rounded-xl border-b-4 border-red-800 transition-all active:scale-95">
+                      <ShieldAlert className="size-6" /> ALERTE SMS
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="rounded-2xl border-2">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="font-black uppercase tracking-tighter">Envoyer une alerte ?</AlertDialogTitle>
+                      <AlertDialogDescription className="text-xs font-medium leading-relaxed">
+                        Ceci va générer un SMS de détresse incluant votre position GPS exacte vers votre contact d'urgence : <span className="font-bold text-foreground">{emergencyContact || "Non défini"}</span>.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="flex-row gap-3 pt-2">
+                      <AlertDialogCancel className="flex-1 h-12 font-black uppercase text-xs rounded-xl border-2">Annuler</AlertDialogCancel>
+                      <AlertDialogAction 
+                        className="flex-1 h-12 bg-red-600 hover:bg-red-700 text-white font-black uppercase text-xs rounded-xl"
+                        onClick={() => sendEmergencySms(displayVessel.location.latitude, displayVessel.location.longitude, displayVessel.displayName)}
+                      >
+                        Confirmer
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
               <div className="space-y-3">
                 <div className="bg-white/80 p-4 rounded-xl border-2 border-dashed text-[10px] space-y-2">
