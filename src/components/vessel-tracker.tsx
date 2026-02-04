@@ -60,7 +60,8 @@ import {
   BatteryCharging,
   AlertOctagon,
   History,
-  ExternalLink
+  ExternalLink,
+  User as UserIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -107,6 +108,7 @@ export function VesselTracker() {
   const [isSharing, setIsSharing] = useState(false);
   const [emergencyContact, setEmergencyContact] = useState('');
   const [customSharingId, setCustomSharingId] = useState('');
+  const [vesselNickname, setVesselNickname] = useState('');
   const [vesselHistory, setVesselHistory] = useState<string[]>([]);
   const [statusEvents, setStatusEvents] = useState<StatusEvent[]>([]);
 
@@ -136,6 +138,7 @@ export function VesselTracker() {
   
   const watchIdRef = useRef<number | null>(null);
   const lastFirestoreUpdateRef = useRef<number>(0);
+  const statusCheckTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const soundsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -187,6 +190,9 @@ export function VesselTracker() {
       }
       const savedCustomId = localStorage.getItem('vessel_custom_id');
       if (savedCustomId) setCustomSharingId(savedCustomId);
+      
+      const savedNickname = localStorage.getItem('vessel_nickname');
+      if (savedNickname) setVesselNickname(savedNickname);
     }
   }, []);
 
@@ -205,7 +211,10 @@ export function VesselTracker() {
     if (userProfile?.emergencyContact) {
       setEmergencyContact(userProfile.emergencyContact);
     }
-  }, [userProfile]);
+    if (userProfile?.displayName && !vesselNickname) {
+      setVesselNickname(userProfile.displayName);
+    }
+  }, [userProfile, vesselNickname]);
 
   useEffect(() => {
     if (!user || !firestore || isProfileLoading) return;
@@ -234,6 +243,11 @@ export function VesselTracker() {
       return next;
     });
   };
+
+  const handleSaveNickname = useCallback((name: string) => {
+    setVesselNickname(name);
+    localStorage.setItem('vessel_nickname', name);
+  }, []);
 
   const handleSaveCustomId = useCallback(() => {
     const id = customSharingId.trim().toUpperCase();
@@ -331,34 +345,36 @@ export function VesselTracker() {
     const docRef = doc(firestore, 'vessels', sharingId);
     setDoc(docRef, { 
       userId: user.uid, 
-      displayName: user.displayName || 'Capitaine', 
+      displayName: vesselNickname || user.displayName || 'Capitaine', 
       isSharing: isSharing, 
       lastActive: serverTimestamp(), 
       ...data 
     }, { merge: true }).catch(() => {});
-  }, [user, firestore, isSharing, sharingId]);
+  }, [user, firestore, isSharing, sharingId, vesselNickname]);
 
+  // Timer de vérification forcée de l'état (pour garantir le passage à "Immobile" même si le GPS ne bouge plus)
   useEffect(() => {
-    if (!isSharing && user && firestore && sharingId) {
-      const docRef = doc(firestore, 'vessels', sharingId);
-      updateDoc(docRef, { isSharing: false, status: 'offline', lastActive: serverTimestamp() }).catch(() => {});
+    if (!isSharing || mode !== 'sender') {
+      if (statusCheckTimerRef.current) clearInterval(statusCheckTimerRef.current);
+      return;
     }
-  }, [isSharing, user, firestore, sharingId]);
 
-  useEffect(() => {
-    if (!isSharing || mode !== 'sender' || vesselStatus !== 'moving') return;
-
-    const interval = setInterval(() => {
+    statusCheckTimerRef.current = setInterval(() => {
       const now = Date.now();
       const idleSeconds = (now - lastMovementTime) / 1000;
       
-      if (idleSeconds >= IMMOBILITY_START_SECONDS) {
+      if (vesselStatus === 'moving' && idleSeconds >= IMMOBILITY_START_SECONDS) {
         setVesselStatus('stationary');
-        updateVesselInFirestore({ status: 'stationary', isSharing: true, batteryLevel, isCharging });
+        updateVesselInFirestore({ 
+          status: 'stationary', 
+          isSharing: true, 
+          batteryLevel, 
+          isCharging 
+        });
       }
     }, 5000); 
 
-    return () => clearInterval(interval);
+    return () => { if (statusCheckTimerRef.current) clearInterval(statusCheckTimerRef.current); };
   }, [isSharing, mode, vesselStatus, lastMovementTime, batteryLevel, isCharging, updateVesselInFirestore]);
 
   useEffect(() => {
@@ -404,7 +420,7 @@ export function VesselTracker() {
         const dist = getDistance(newLat, newLng, anchorPos.lat, anchorPos.lng);
         
         if (dist > IMMOBILITY_THRESHOLD_METERS) {
-          setVesselStatus('moving');
+          if (vesselStatus !== 'moving') setVesselStatus('moving');
           setAnchorPos(newPos);
           setLastMovementTime(now);
           if (now - lastFirestoreUpdateRef.current > THROTTLE_UPDATE_MS) {
@@ -423,7 +439,7 @@ export function VesselTracker() {
       { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
     );
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
-  }, [isSharing, anchorPos, vesselStatus, lastMovementTime, updateVesselInFirestore, batteryLevel, isCharging]);
+  }, [isSharing, anchorPos, vesselStatus, batteryLevel, isCharging, updateVesselInFirestore]);
 
   useEffect(() => {
     if (mode === 'receiver' && remoteVessel?.location) {
@@ -444,21 +460,19 @@ export function VesselTracker() {
   const sendEmergencySms = (lat: number, lng: number, name: string) => {
     if (!emergencyContact.trim()) { toast({ variant: "destructive", title: "Numéro requis" }); return; }
     const url = `https://www.google.com/maps?q=${lat.toFixed(6)},${lng.toFixed(6)}`;
-    const body = `ALERTE : ${name} en difficulté. Position : ${url}`;
+    const body = `ALERTE : Navire "${name}" en difficulté. Position : ${url}`;
     window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
 
   const displayVessel = mode === 'sender' 
-    ? (isSharing ? { location: { latitude: currentPos?.lat || 0, longitude: currentPos?.lng || 0 }, status: vesselStatus, displayName: 'Moi', isSharing: true, batteryLevel, isCharging } : null) 
+    ? (isSharing ? { location: { latitude: currentPos?.lat || 0, longitude: currentPos?.lng || 0 }, status: vesselStatus, displayName: vesselNickname || 'Moi', isSharing: true, batteryLevel, isCharging } : null) 
     : remoteVessel;
 
   const isBatteryDischarged = mode === 'receiver' && remoteVessel && !remoteVessel.isSharing && (remoteVessel.batteryLevel ?? 1) <= 0.05;
 
   const BatteryIconComp = ({ level, isCharging, className }: { level?: number, isCharging?: boolean, className?: string }) => {
     if (level === undefined) return null;
-    
     const colorClass = isCharging ? "text-blue-500" : level > 0.6 ? "text-green-500" : level > 0.2 ? "text-orange-500" : "text-red-500";
-    
     if (isCharging) return <BatteryCharging className={cn("size-4", colorClass, className)} />;
     if (level > 0.6) return <BatteryFull className={cn("size-4", colorClass, className)} />;
     if (level > 0.2) return <BatteryMedium className={cn("size-4", colorClass, className)} />;
@@ -502,11 +516,34 @@ export function VesselTracker() {
                   <div className="space-y-0.5"><Label className="text-base font-black uppercase leading-none">Partager ma position</Label><p className="text-[9px] text-muted-foreground uppercase font-bold">Flux GPS live</p></div>
                   <Switch checked={isSharing} onCheckedChange={setIsSharing} className="scale-110" />
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1">ID de partage personnalisé</Label>
-                  <div className="flex gap-2">
-                    <Input placeholder="ID..." value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} disabled={isSharing} className="font-black text-center uppercase h-12 border-2 rounded-xl" />
-                    <Button variant="outline" size="icon" className="h-12 w-12 border-2 rounded-xl" onClick={handleSaveCustomId} disabled={isSharing}><Save className="size-5" /></Button>
+                
+                <div className="space-y-4 rounded-2xl border-2 border-dashed p-4 bg-muted/10">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1 flex items-center gap-2">
+                      <UserIcon className="size-3" /> Surnom / Nom du navire
+                    </Label>
+                    <Input 
+                      placeholder="Ex: Mon Bateau..." 
+                      value={vesselNickname} 
+                      onChange={e => handleSaveNickname(e.target.value)} 
+                      className="font-black h-12 border-2 rounded-xl" 
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1 flex items-center gap-2">
+                      <Zap className="size-3" /> ID de partage personnalisé
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input 
+                        placeholder="ID (ex: BATEAU-NC)..." 
+                        value={customSharingId} 
+                        onChange={e => setCustomSharingId(e.target.value)} 
+                        disabled={isSharing} 
+                        className="font-black text-center uppercase h-12 border-2 rounded-xl" 
+                      />
+                      <Button variant="outline" size="icon" className="h-12 w-12 border-2 rounded-xl" onClick={handleSaveCustomId} disabled={isSharing}><Save className="size-5" /></Button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -605,7 +642,7 @@ export function VesselTracker() {
                         {displayVessel.displayName}
                         {displayVessel.batteryLevel !== undefined && (
                           <span className="flex items-center gap-1 ml-1 border-l border-white/20 pl-1">
-                            <BatteryIconComp level={displayVessel.batteryLevel} isCharging={displayVessel.isCharging} />
+                            <BatteryIconComp level={displayVessel.batteryLevel} isCharging={displayVessel.isCharging} className="size-3" />
                             {Math.round(displayVessel.batteryLevel * 100)}%
                           </span>
                         )}
