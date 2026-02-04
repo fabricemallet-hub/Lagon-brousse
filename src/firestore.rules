@@ -1,36 +1,34 @@
 rules_version = '2';
 
 /**
- * LAGON & BROUSSE NC - SECURITY POLICY (V2.5)
- * Synchronized with root rules for absolute consistency.
+ * LAGON & BROUSSE NC - SECURITY POLICY (V3.0)
+ * Synchronized with root for consistency.
+ * Unique Deployment ID: 20240524-1425
  */
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. COLLECTIONS PUBLIQUES (PRIORITÉ MAXIMALE) ---
+    // --- 1. ACCÈS PUBLICS (PRIORITÉ ABSOLUE & RÉCURSIF) ---
     
-    match /system_notifications/{id} {
-      allow get, list: if true;
+    match /system_notifications/{document=**} {
+      allow read: if true;
     }
     
-    match /app_settings/{id} {
-      allow get, list: if true;
+    match /app_settings/{document=**} {
+      allow read: if true;
     }
 
-    match /meteo_caledonie/{id} {
-      allow get, list: if true;
-      match /previsions/{prevId} {
-        allow get, list: if true;
-      }
+    match /meteo_caledonie/{document=**} {
+      allow read: if true;
     }
 
-    match /fish_species/{id} {
-      allow get, list: if true;
+    match /fish_species/{document=**} {
+      allow read: if true;
     }
     
-    match /shared_access_tokens/{id} {
-      allow get, list: if true;
+    match /shared_access_tokens/{document=**} {
+      allow read: if true;
     }
 
     // --- 2. FONCTIONS DE SÉCURITÉ ---
@@ -41,7 +39,6 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && 
-             request.auth.token.email != null && 
              (request.auth.token.email == 'f.mallet81@gmail.com' || 
               request.auth.token.email == 'f.mallet81@outlook.com');
     }
@@ -57,7 +54,7 @@ service cloud.firestore {
     match /fish_species/{id} { allow write: if isAdmin(); }
     match /shared_access_tokens/{id} { allow write: if isAdmin(); }
 
-    // --- 4. COLLECTIONS PROTÉGÉES ---
+    // --- 4. COLLECTIONS PROTÉGÉES (UTILISATEURS) ---
 
     match /users/{userId} {
       allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
@@ -65,6 +62,8 @@ service cloud.firestore {
         allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       }
     }
+
+    // --- 5. FONCTIONNALITÉS APPLICATIVES ---
 
     match /hunting_sessions/{id} {
       allow read, write: if isSignedIn();

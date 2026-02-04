@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -13,6 +12,8 @@ export function NotificationBanner() {
 
   const notificationsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
+    // On simplifie la requête si les permissions posent problème, 
+    // mais le tri et le filtre sont ici essentiels.
     return query(
       collection(firestore, 'system_notifications'),
       where('isActive', '==', true),
@@ -20,9 +21,11 @@ export function NotificationBanner() {
     );
   }, [firestore]);
 
-  const { data: notifications } = useCollection<SystemNotification>(notificationsQuery);
+  const { data: notifications, error } = useCollection<SystemNotification>(notificationsQuery);
 
-  if (!notifications || notifications.length === 0) return null;
+  // En cas d'erreur de permission (pendant le déploiement des règles), on n'affiche rien 
+  // plutôt que de laisser l'application planter via le listener global.
+  if (error || !notifications || notifications.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-2 w-full animate-in fade-in slide-in-from-top-4 duration-500">
