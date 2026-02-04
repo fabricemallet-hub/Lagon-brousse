@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -86,7 +87,6 @@ export function VesselTracker() {
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
   const [isSharing, setIsSharing] = useState(false);
   const [emergencyContact, setEmergencyContact] = useState('');
-  const [isSavingContact, setIsSavingContact] = useState(false);
   
   // Custom Sender ID
   const [customSharingId, setCustomSharingId] = useState('');
@@ -141,6 +141,12 @@ export function VesselTracker() {
     setVesselHistory([]);
     localStorage.removeItem('vessel_follow_history');
     toast({ title: "Historique effacé" });
+  };
+
+  const handleSaveCustomId = () => {
+    const id = customSharingId.trim();
+    localStorage.setItem('vessel_custom_id', id);
+    toast({ title: "Identifiant enregistré", description: `Votre ID de partage est désormais : ${id || 'votre UID'}` });
   };
 
   // Notification State (Receiver)
@@ -274,10 +280,7 @@ export function VesselTracker() {
   // Handle Repeating Sound for Watch Alert
   useEffect(() => {
     if (isWatchAlerting) {
-      // Play immediately
       playAlertSound(watchSound);
-      
-      // Setup repeat every 10 seconds
       watchRepeatIntervalRef.current = setInterval(() => {
         playAlertSound(watchSound);
       }, 10000);
@@ -287,15 +290,11 @@ export function VesselTracker() {
         watchRepeatIntervalRef.current = null;
       }
     }
-
-    return () => {
-      if (watchRepeatIntervalRef.current) clearInterval(watchRepeatIntervalRef.current);
-    };
+    return () => { if (watchRepeatIntervalRef.current) clearInterval(watchRepeatIntervalRef.current); };
   }, [isWatchAlerting, watchSound, playAlertSound]);
 
   const handleStopWatchAlert = () => {
     setIsWatchAlerting(false);
-    // We also reset the timer so it doesn't trigger immediately again for the same continuous state
     setStatusStartTime(Date.now());
     toast({ title: "Alerte acquittée", description: "Le minuteur de surveillance a été réinitialisé." });
   };
@@ -315,11 +314,7 @@ export function VesselTracker() {
   // Mode Éveil (Wake Lock)
   const toggleWakeLock = async () => {
     if (!('wakeLock' in navigator)) {
-      toast({ 
-        variant: "destructive", 
-        title: "Non supporté", 
-        description: "Votre navigateur ne supporte pas le maintien de l'écran allumé." 
-      });
+      toast({ variant: "destructive", title: "Non supporté", description: "Votre navigateur ne supporte pas le maintien de l'écran allumé." });
       return;
     }
 
@@ -327,9 +322,8 @@ export function VesselTracker() {
       try {
         await wakeLock.release();
         setWakeLock(null);
-        toast({ title: "Mode éveil désactivé", description: "L'écran peut désormais se mettre en veille." });
+        toast({ title: "Mode éveil désactivé" });
       } catch (e) {
-        console.warn("Wake lock release failed:", e);
         setWakeLock(null);
       }
     } else {
@@ -337,68 +331,39 @@ export function VesselTracker() {
         const lock = await (navigator as any).wakeLock.request('screen');
         if (lock) {
           setWakeLock(lock);
-          toast({ title: "Mode éveil activé", description: "L'écran restera allumé pour garantir le suivi GPS." });
-          lock.addEventListener('release', () => {
-            setWakeLock(null);
-          });
+          toast({ title: "Mode éveil activé", description: "L'écran restera allumé." });
+          lock.addEventListener('release', () => setWakeLock(null));
         }
       } catch (err: any) {
-        if (err.name === 'NotAllowedError' || err.message?.includes('permissions policy')) {
-          toast({ 
-            variant: "destructive", 
-            title: "Permission bloquée", 
-            description: "Le maintien de l'écran est bloqué par cet environnement (iframe). Cette fonction sera active lors de l'utilisation réelle sur navigateur mobile ou onglet indépendant." 
-          });
-        } else {
-          console.error("Wake Lock error:", err);
-        }
+        toast({ variant: "destructive", title: "Permission bloquée", description: "Le mode éveil est bloqué par cet environnement (iframe)." });
       }
     }
   };
 
   // --- SENDER LOGIC (USER A) ---
-  
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || !isSharing) return;
     const docRef = doc(firestore, 'vessels', sharingId);
-    const updateData = {
+    setDoc(docRef, {
         userId: user.uid,
         displayName: user.displayName || 'Capitaine',
         isSharing: true,
         lastActive: serverTimestamp(),
         ...data
-    };
-    
-    setDoc(docRef, updateData, { merge: true }).catch(async (err) => {
-        const permissionError = new FirestorePermissionError({
-            path: docRef.path,
-            operation: 'write',
-            requestResourceData: updateData,
-        });
-        errorEmitter.emit('permission-error', permissionError);
-    });
+    }, { merge: true }).catch(() => {});
   }, [user, firestore, isSharing, sharingId]);
 
   const addImmobilityHistory = useCallback((pos: google.maps.LatLngLiteral, duration: number) => {
     if (!user || !firestore) return;
     const colRef = collection(firestore, 'vessels', sharingId, 'history');
-    const historyData = {
+    addDoc(colRef, {
         timestamp: serverTimestamp(),
         location: { latitude: pos.lat, longitude: pos.lng },
         durationMinutes: duration
-    };
-    
-    addDoc(colRef, historyData).catch(async (err) => {
-        const permissionError = new FirestorePermissionError({
-            path: colRef.path,
-            operation: 'create',
-            requestResourceData: historyData,
-        });
-        errorEmitter.emit('permission-error', permissionError);
-    });
+    }).catch(() => {});
   }, [user, firestore, sharingId]);
 
-  // Handle map centering
+  // Center map effect
   useEffect(() => {
     if (!isLoaded || !map || !hasInitialCentered) {
       if (mode === 'sender' && currentPos) {
@@ -413,7 +378,7 @@ export function VesselTracker() {
     }
   }, [isLoaded, map, currentPos, remoteVessel?.location, hasInitialCentered, mode]);
 
-  // Monitor position and mobility
+  // GPS Tracking effect
   useEffect(() => {
     if (!isSharing || !navigator.geolocation) {
       if (watchIdRef.current) {
@@ -429,7 +394,6 @@ export function VesselTracker() {
         const newLng = position.coords.longitude;
         const newPos = { lat: newLat, lng: newLng };
         const now = Date.now();
-        
         setCurrentPos(newPos);
 
         if (!anchorPos) {
@@ -441,50 +405,31 @@ export function VesselTracker() {
         }
 
         const dist = getDistance(newLat, newLng, anchorPos.lat, anchorPos.lng);
-
         if (dist > IMMOBILITY_THRESHOLD_METERS) {
-          if (vesselStatus === 'stationary') {
-            toast({ title: "Mouvement détecté", description: "Le bateau fait de nouveau route." });
-          }
           setVesselStatus('moving');
           setAnchorPos(newPos);
           setLastMovementTime(now);
-          
           if (now - lastFirestoreUpdateRef.current > THROTTLE_UPDATE_MS) {
             updateVesselInFirestore({ location: { latitude: newLat, longitude: newLng }, status: 'moving' });
             lastFirestoreUpdateRef.current = now;
           }
         } else {
           const idleTimeMinutes = (now - lastMovementTime) / 60000;
-          
           if (idleTimeMinutes >= IMMOBILITY_START_MINUTES && vesselStatus === 'moving') {
             setVesselStatus('stationary');
             updateVesselInFirestore({ status: 'stationary' });
             addImmobilityHistory(newPos, Math.round(idleTimeMinutes));
             setLastHistoryUpdateTime(now);
             lastFirestoreUpdateRef.current = now;
-          } else if (vesselStatus === 'stationary') {
-            const timeSinceLastLog = (now - lastHistoryUpdateTime) / 60000;
-            if (timeSinceLastLog >= IMMOBILITY_UPDATE_MINUTES) {
-              addImmobilityHistory(newPos, Math.round(idleTimeMinutes));
-              setLastHistoryUpdateTime(now);
-              updateVesselInFirestore({ lastActive: serverTimestamp() });
-              lastFirestoreUpdateRef.current = now;
-            }
           }
         }
       },
-      (err) => console.error(err),
+      () => {},
       { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
     );
 
-    return () => {
-      if (watchIdRef.current) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-      }
-    };
-  }, [isSharing, anchorPos, vesselStatus, lastMovementTime, lastHistoryUpdateTime, updateVesselInFirestore, addImmobilityHistory, toast]);
+    return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
+  }, [isSharing, anchorPos, vesselStatus, lastMovementTime, lastHistoryUpdateTime, updateVesselInFirestore, addImmobilityHistory]);
 
   const handleRecenter = () => {
     if (mode === 'sender' && currentPos && map) {
@@ -493,12 +438,9 @@ export function VesselTracker() {
     } else if (mode === 'receiver' && remoteVessel?.location && map) {
         map.panTo({ lat: remoteVessel.location.latitude, lng: remoteVessel.location.longitude });
         map.setZoom(15);
-    } else if (!navigator.geolocation) {
-        toast({ variant: "destructive", title: "Erreur", description: "GPS non disponible." });
-    } else {
+    } else if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition((pos) => {
             const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-            setCurrentPos(coords);
             if (map) map.panTo(coords);
         });
     }
@@ -512,28 +454,22 @@ export function VesselTracker() {
 
   const sendEmergencySms = (lat: number, lng: number, name: string) => {
     if (!emergencyContact.trim()) {
-      toast({ variant: "destructive", title: "Numéro requis", description: "Veuillez saisir le numéro de téléphone du contact à prévenir." });
+      toast({ variant: "destructive", title: "Numéro requis", description: "Veuillez saisir le numéro de votre contact d'urgence." });
       return;
     }
     const coords = `${lat.toFixed(6)},${lng.toFixed(6)}`;
     const googleMapsUrl = `https://www.google.com/maps?q=${coords}`;
     const cleanName = name === 'Ma Position' ? (user?.displayName || 'Capitaine') : name;
-    const bodyText = `ALERTE Lagon&Brousse NC : ${cleanName} est en difficulté en mer.\nPosition : ${googleMapsUrl}\nGPS : ${coords}\nSecours mer : SNSM (+687 23.66.66) ou 196 (CROSS).`;
-    const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent);
-    const separator = isIOS ? '&' : '?';
+    const bodyText = `ALERTE : ${cleanName} est en difficulté en mer. Position : ${googleMapsUrl}`;
     const target = emergencyContact.replace(/\s/g, '');
-    const smsUrl = `sms:${target}${separator}body=${encodeURIComponent(bodyText)}`;
-    window.location.href = smsUrl;
+    window.location.href = `sms:${target}?body=${encodeURIComponent(bodyText)}`;
   };
 
-  if (loadError) return <Alert variant="destructive"><AlertTitle>Erreur de carte</AlertTitle></Alert>;
-  if (!isLoaded) return <Skeleton className="h-96 w-full" />;
+  const shouldShowMap = mode === 'sender' ? isSharing : (mode === 'receiver');
 
   const displayVessel = mode === 'sender' 
     ? (isSharing ? { location: { latitude: currentPos?.lat || 0, longitude: currentPos?.lng || 0 }, status: isOnline ? vesselStatus : 'offline', displayName: 'Ma Position' } : null) 
     : remoteVessel;
-
-  const shouldShowMap = mode === 'sender' ? isSharing : (vesselIdToFollow.trim() !== '');
 
   return (
     <div className="space-y-6">
@@ -547,7 +483,7 @@ export function VesselTracker() {
                 <p className="text-xs font-bold opacity-90">Dépassement de durée pour l'état : {watchType}</p>
               </div>
             </div>
-            <Button className="w-full bg-white text-red-600 hover:bg-white/90 font-black h-14 text-lg shadow-2xl" onClick={handleStopWatchAlert}><CheckCircle2 className="mr-2 size-6" /> VALIDER & ARRÊTER L'ALERTE</Button>
+            <Button className="w-full bg-white text-red-600 font-black h-14" onClick={handleStopWatchAlert}>ARRÊTER L'ALERTE</Button>
           </div>
         </div>
       )}
@@ -565,12 +501,12 @@ export function VesselTracker() {
 
           {mode === 'sender' ? (
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 border rounded-lg bg-card shadow-sm">
-                <div className="space-y-0.5"><Label className="text-base">Partager ma position</Label><p className="text-sm text-muted-foreground">Activer le suivi en temps réel</p></div>
+              <div className="flex items-center justify-between p-4 border rounded-lg bg-card">
+                <div className="space-y-0.5"><Label className="text-base">Partager ma position</Label><p className="text-sm text-muted-foreground">Suivi en temps réel</p></div>
                 <Switch checked={isSharing} onCheckedChange={setIsSharing} />
               </div>
               <div className="space-y-2">
-                <Label className="text-xs font-black uppercase text-muted-foreground ml-1">ID de partage (Optionnel)</Label>
+                <Label className="text-xs font-black uppercase text-muted-foreground ml-1">ID de partage personnalisé</Label>
                 <div className="flex gap-2">
                   <Input placeholder="Mon-Bateau-123" value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} disabled={isSharing} className="font-mono text-xs uppercase" />
                   <Button variant="outline" size="icon" onClick={handleSaveCustomId} disabled={isSharing}><Save className="size-4" /></Button>
@@ -589,24 +525,22 @@ export function VesselTracker() {
               </div>
               {vesselHistory.length > 0 && (
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between px-1"><Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1"><History className="size-3" /> Historique des suivis</Label><Button variant="ghost" className="h-5 px-2 text-[9px] font-bold uppercase" onClick={clearHistory}>Effacer tout</Button></div>
+                  <div className="flex items-center justify-between px-1"><Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1"><History className="size-3" /> Historique</Label><Button variant="ghost" className="h-5 px-2 text-[9px] font-bold" onClick={clearHistory}>Effacer</Button></div>
                   <div className="flex flex-col gap-1.5">
                     {vesselHistory.map(id => (
                       <div key={id} className="flex items-center gap-2 p-2 rounded-lg border bg-muted/10 group">
                         <button className="flex-1 text-left font-mono text-[10px] truncate" onClick={() => { setVesselIdToFollow(id); setHasInitialCentered(false); }}>{id}</button>
-                        <div className="flex items-center gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => removeFromHistory(id)}><Trash2 className="size-3" /></Button>
-                        </div>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100" onClick={() => removeFromHistory(id)}><Trash2 className="size-3" /></Button>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
               <Button variant={wakeLock ? "secondary" : "outline"} size="sm" className={cn("w-full gap-2 font-bold h-11 border-2", wakeLock && "bg-primary/10 text-primary border-primary")} onClick={toggleWakeLock}><Zap className={cn("size-4", wakeLock && "fill-current")} />{wakeLock ? "MODE ÉVEIL ACTIF" : "GARDER L'ÉCRAN ALLUMÉ"}</Button>
-              <Button variant={isNotifyEnabled || isWatchEnabled ? "secondary" : "outline"} size="sm" className={cn("w-full gap-2 font-bold h-11 border-2", (isNotifyEnabled || isWatchEnabled) && "bg-primary/10 text-primary border-primary")} onClick={() => setIsNotifyEnabled(!isNotifyEnabled)}>{(isNotifyEnabled || isWatchEnabled) ? <Bell className="size-4 fill-current" /> : <BellOff className="size-4" />}{(isNotifyEnabled || isWatchEnabled) ? "NOTIFICATIONS ACTIVES" : "ACTIVER ALERTES SONORES"}</Button>
+              <Button variant={isNotifyEnabled ? "secondary" : "outline"} size="sm" className={cn("w-full gap-2 font-bold h-11 border-2", isNotifyEnabled && "bg-primary/10 text-primary border-primary")} onClick={() => setIsNotifyEnabled(!isNotifyEnabled)}>{isNotifyEnabled ? <Bell className="size-4 fill-current" /> : <BellOff className="size-4" />}{isNotifyEnabled ? "NOTIFICATIONS ACTIVES" : "ACTIVER ALERTES SONORES"}</Button>
               
               {isNotifyEnabled && (
-                <div className="mt-4 p-4 border rounded-lg bg-muted/30 space-y-6 animate-in fade-in slide-in-from-top-2">
+                <div className="mt-4 p-4 border rounded-lg bg-muted/30 space-y-4 animate-in fade-in">
                   <div className="flex items-center justify-between"><Label className="text-sm font-bold flex items-center gap-2"><Move className="size-4 text-blue-500" /> Mouvement</Label><Switch checked={notifySettings.moving} onCheckedChange={(val) => setNotifySettings({...notifySettings, moving: val})} /></div>
                   <div className="flex items-center justify-between"><Label className="text-sm font-bold flex items-center gap-2"><Anchor className="size-4 text-amber-500" /> Immobilisation</Label><Switch checked={notifySettings.stationary} onCheckedChange={(val) => setNotifySettings({...notifySettings, stationary: val})} /></div>
                   <div className="flex items-center justify-between"><Label className="text-sm font-bold flex items-center gap-2"><WifiOff className="size-4 text-destructive" /> Perte Réseau</Label><Switch checked={notifySettings.offline} onCheckedChange={(val) => setNotifySettings({...notifySettings, offline: val})} /></div>
@@ -621,13 +555,12 @@ export function VesselTracker() {
         <Card className="overflow-hidden">
           <div className="h-96 relative">
             {mode === 'receiver' && isVesselLoading && (
-              <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/50 backdrop-blur-sm"><Skeleton className="h-full w-full" /><p className="absolute font-black text-xs uppercase tracking-widest text-primary animate-pulse">Connexion au navire...</p></div>
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/50 backdrop-blur-sm"><Skeleton className="h-full w-full" /><p className="absolute font-black text-xs uppercase tracking-widest text-primary animate-pulse">Connexion...</p></div>
             )}
             {mode === 'receiver' && !isVesselLoading && !remoteVessel && (
               <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-background/80 gap-2 p-4 text-center">
                 <WifiOff className="size-10 text-destructive opacity-50 mb-2" />
                 <p className="font-black uppercase tracking-tighter text-base">Navire introuvable</p>
-                <p className="text-[10px] text-muted-foreground uppercase font-bold max-w-[250px]">L'ID est incorrect ou l'émetteur n'a pas encore activé son partage.</p>
               </div>
             )}
             <GoogleMap
@@ -659,9 +592,6 @@ export function VesselTracker() {
                 <Button variant="outline" className="text-xs h-10 border-2" onClick={() => copyCoordinates(displayVessel.location.latitude, displayVessel.location.longitude)}><Copy className="size-4 mr-2" /> Copier les coordonnées GPS</Button>
                 <Button variant="destructive" className="w-full h-14 bg-red-600 hover:bg-red-700 text-base font-black shadow-lg flex items-center justify-center gap-3 uppercase tracking-tighter" onClick={() => sendEmergencySms(displayVessel.location.latitude, displayVessel.location.longitude, displayVessel.displayName)}><ShieldAlert className="size-6" /> ENVOYER ALERTE SMS</Button>
               </div>
-            )}
-            {mode === 'receiver' && remoteVessel && (
-              <p className="text-[10px] text-center text-muted-foreground uppercase font-black tracking-widest pt-2">Dernière activité : {remoteVessel.lastActive ? new Date(remoteVessel.lastActive.toDate()).toLocaleTimeString('fr-FR') : 'En attente...'}</p>
             )}
           </CardFooter>
         </Card>
