@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useUser as useUserHook, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
+import { useUser as useUserHook, useUser, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
 import { doc, setDoc, serverTimestamp, collection, query, orderBy, updateDoc } from 'firebase/firestore';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
@@ -56,7 +56,10 @@ import {
   BatteryMedium,
   BatteryLow,
   BatteryFull,
-  AlertOctagon
+  AlertOctagon,
+  History,
+  MapPin,
+  ExternalLink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -65,8 +68,14 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 const IMMOBILITY_THRESHOLD_METERS = 15;
-const IMMOBILITY_START_MINUTES = 1; // Réduit à 1 minute pour plus de réactivité
+const IMMOBILITY_START_MINUTES = 1; 
 const THROTTLE_UPDATE_MS = 10000; 
+
+interface StatusEvent {
+  status: 'moving' | 'stationary' | 'offline';
+  timestamp: number;
+  location: { lat: number, lng: number } | null;
+}
 
 const defaultVesselSounds = [
   { id: 'alerte', label: 'Alerte Urgence', url: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' },
@@ -97,6 +106,7 @@ export function VesselTracker() {
   const [emergencyContact, setEmergencyContact] = useState('');
   const [customSharingId, setCustomSharingId] = useState('');
   const [vesselHistory, setVesselHistory] = useState<string[]>([]);
+  const [statusEvents, setStatusEvents] = useState<StatusEvent[]>([]);
 
   const [isNotifyEnabled, setIsNotifyEnabled] = useState(false);
   const [vesselVolume, setVesselVolume] = useState(0.8);
@@ -261,25 +271,40 @@ export function VesselTracker() {
     return () => clearInterval(interval);
   }, [statusStartTime]);
 
+  // Détection du changement d'état et enregistrement dans l'historique
   useEffect(() => {
-    if (mode !== 'receiver' || !remoteVessel) return;
-    const currentStatus = remoteVessel.isSharing ? remoteVessel.status : 'offline';
-    if (currentStatus !== prevVesselStatusRef.current) {
-      setStatusStartTime(Date.now());
-      setIsWatchAlerting(false);
-    }
-    if (isNotifyEnabled && prevVesselStatusRef.current !== null && prevVesselStatusRef.current !== currentStatus) {
-        let s = '';
-        if (currentStatus === 'moving' && notifySettings.moving) s = notifySounds.moving;
-        if (currentStatus === 'stationary' && notifySettings.stationary) s = notifySounds.stationary;
-        if (currentStatus === 'offline' && notifySettings.offline) s = notifySounds.offline;
-        if (s) {
-          playAlertSound(s);
-          toast({ title: "Statut Navire", description: currentStatus === 'moving' ? 'En route' : currentStatus === 'stationary' ? 'Immobile' : 'Déconnecté' });
+    if (currentEffectiveStatus !== prevVesselStatusRef.current) {
+      const now = Date.now();
+      const loc = mode === 'sender' ? currentPos : (remoteVessel?.location ? { lat: remoteVessel.location.latitude, lng: remoteVessel.location.longitude } : lastValidLocation);
+      
+      const newEvent: StatusEvent = {
+        status: currentEffectiveStatus as any,
+        timestamp: now,
+        location: loc
+      };
+      
+      setStatusEvents(prev => [newEvent, ...prev].slice(0, 10)); 
+      setStatusStartTime(now);
+      
+      if (prevVesselStatusRef.current !== null) {
+        const statusLabels = { moving: 'En route', stationary: 'Immobile', offline: 'Perte réseau' };
+        toast({
+          title: "Changement d'état",
+          description: `Navire ${statusLabels[currentEffectiveStatus as keyof typeof statusLabels]} à ${format(now, 'HH:mm', { locale: fr })}`,
+        });
+
+        if (isNotifyEnabled && mode === 'receiver') {
+            let s = '';
+            if (currentEffectiveStatus === 'moving' && notifySettings.moving) s = notifySounds.moving;
+            if (currentEffectiveStatus === 'stationary' && notifySettings.stationary) s = notifySounds.stationary;
+            if (currentEffectiveStatus === 'offline' && notifySettings.offline) s = notifySounds.offline;
+            if (s) playAlertSound(s);
         }
+      }
+      
+      prevVesselStatusRef.current = currentEffectiveStatus;
     }
-    prevVesselStatusRef.current = currentStatus;
-  }, [remoteVessel, mode, isNotifyEnabled, notifySettings, notifySounds, playAlertSound, toast]);
+  }, [currentEffectiveStatus, mode, currentPos, remoteVessel, lastValidLocation, isNotifyEnabled, notifySettings, notifySounds, playAlertSound, toast]);
 
   const toggleWakeLock = async () => {
     if (!('wakeLock' in navigator)) return;
@@ -344,7 +369,6 @@ export function VesselTracker() {
         if (!anchorPos) {
           setAnchorPos(newPos);
           setLastMovementTime(now);
-          setStatusStartTime(now);
           updateVesselInFirestore({ 
             location: { latitude: newLat, longitude: newLng }, 
             status: 'moving', 
@@ -356,7 +380,6 @@ export function VesselTracker() {
         }
         const dist = getDistance(newLat, newLng, anchorPos.lat, anchorPos.lng);
         if (dist > IMMOBILITY_THRESHOLD_METERS) {
-          if (vesselStatus !== 'moving') setStatusStartTime(now);
           setVesselStatus('moving');
           setAnchorPos(newPos);
           setLastMovementTime(now);
@@ -373,7 +396,6 @@ export function VesselTracker() {
           const idle = (now - lastMovementTime) / 60000;
           if (idle >= IMMOBILITY_START_MINUTES && vesselStatus === 'moving') {
             setVesselStatus('stationary');
-            setStatusStartTime(now);
             updateVesselInFirestore({ status: 'stationary', isSharing: true, batteryLevel: batteryLevel });
             lastFirestoreUpdateRef.current = now;
           }
@@ -414,11 +436,11 @@ export function VesselTracker() {
 
   const isBatteryDischarged = mode === 'receiver' && remoteVessel && !remoteVessel.isSharing && (remoteVessel.batteryLevel ?? 1) <= 0.05;
 
-  const BatteryIconComp = ({ level }: { level?: number }) => {
+  const BatteryIconComp = ({ level, className }: { level?: number, className?: string }) => {
     if (level === undefined) return null;
-    if (level > 0.6) return <BatteryFull className="size-4 text-green-500" />;
-    if (level > 0.2) return <BatteryMedium className="size-4 text-orange-500" />;
-    return <BatteryLow className="size-4 text-red-500 animate-pulse" />;
+    if (level > 0.6) return <BatteryFull className={cn("size-4 text-green-500", className)} />;
+    if (level > 0.2) return <BatteryMedium className={cn("size-4 text-orange-500", className)} />;
+    return <BatteryLow className={cn("size-4 text-red-500 animate-pulse", className)} />;
   };
 
   const lastActiveTime = remoteVessel?.lastActive ? format(remoteVessel.lastActive.toDate(), 'HH:mm', { locale: fr }) : '--:--';
@@ -583,44 +605,44 @@ export function VesselTracker() {
         )}
 
         <div className="bg-card border-t-2 p-4 flex flex-col gap-3">
+            {/* Bandeau de statut optimisé style image */}
             <div className={cn(
-                "flex items-center justify-between p-3 rounded-xl border-2 shadow-sm",
-                currentEffectiveStatus === 'moving' ? "bg-green-50 border-green-200" : currentEffectiveStatus === 'stationary' ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-200"
+                "flex items-center justify-between p-3 rounded-xl border shadow-sm transition-all duration-500",
+                currentEffectiveStatus === 'moving' ? "bg-green-50/50 border-green-200" : currentEffectiveStatus === 'stationary' ? "bg-amber-50/50 border-amber-200" : "bg-red-50/50 border-red-200"
             )}>
                 <div className="flex items-center gap-3">
                     <div className={cn(
-                        "p-2 rounded-lg text-white",
+                        "size-10 rounded-xl flex items-center justify-center text-white shadow-sm",
                         currentEffectiveStatus === 'moving' ? "bg-green-600" : currentEffectiveStatus === 'stationary' ? "bg-amber-600" : "bg-red-600"
                     )}>
                         {currentEffectiveStatus === 'moving' ? <Move className="size-5" /> : currentEffectiveStatus === 'stationary' ? <Anchor className="size-5" /> : <WifiOff className="size-5" />}
                     </div>
-                    <div>
+                    <div className="flex flex-col">
                         <div className="flex items-center gap-2">
                           <p className={cn(
-                              "text-xs font-black uppercase tracking-tight",
-                              currentEffectiveStatus === 'moving' ? "text-green-800" : currentEffectiveStatus === 'stationary' ? "text-amber-800" : "text-red-800"
+                              "font-black text-sm uppercase tracking-tighter",
+                              currentEffectiveStatus === 'moving' ? "text-green-700" : currentEffectiveStatus === 'stationary' ? "text-amber-700" : "text-red-700"
                           )}>
-                              {currentEffectiveStatus === 'moving' ? 'En mouvement' : currentEffectiveStatus === 'stationary' ? 'Navire Immobile' : 'Signal Perdu / Hors ligne'}
+                              {currentEffectiveStatus === 'moving' ? 'En mouvement' : currentEffectiveStatus === 'stationary' ? 'Immobile' : 'Hors ligne'}
                           </p>
-                          {displayVessel?.batteryLevel !== undefined && <BatteryIconComp level={displayVessel.batteryLevel} />}
+                          {displayVessel?.batteryLevel !== undefined && <BatteryIconComp level={displayVessel.batteryLevel} className="size-3 opacity-80" />}
                         </div>
-                        <div className="flex items-center gap-1.5 text-[10px] font-bold opacity-70">
-                            <Clock className="size-3" /> depuis {elapsedString} 
-                            {currentEffectiveStatus === 'offline' && <span className="ml-1 border-l pl-1">Fin à {lastActiveTime}</span>}
+                        <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground/70">
+                            <Clock className="size-3" /> depuis {elapsedString}
                         </div>
                     </div>
                 </div>
                 {displayVessel?.isSharing && (
                     <Badge className={cn(
-                        "font-black uppercase text-[9px] border-none shadow-sm",
+                        "font-black uppercase text-[9px] border-none px-2 h-5 flex items-center justify-center",
                         currentEffectiveStatus === 'moving' ? "bg-green-600" : "bg-amber-600"
                     )}>LIVE</Badge>
                 )}
             </div>
 
-            <div className="p-3 bg-muted/20 border-2 border-dashed rounded-xl flex items-center justify-between gap-4">
-                <div className="space-y-1">
-                    <p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Dernière position connue</p>
+            <div className="p-3 bg-muted/20 border rounded-xl flex items-center justify-between gap-4">
+                <div className="space-y-0.5">
+                    <p className="text-[9px] font-black uppercase text-muted-foreground/60 tracking-widest">Dernière position connue</p>
                     <p className="font-mono text-xs font-bold">
                         {lastValidLocation ? `${lastValidLocation.lat.toFixed(6)}, ${lastValidLocation.lng.toFixed(6)}` : "Recherche GPS..."}
                     </p>
@@ -631,6 +653,40 @@ export function VesselTracker() {
                     </Button>
                 )}
             </div>
+
+            {/* Historique des événements */}
+            {statusEvents.length > 0 && (
+              <div className="mt-2 space-y-2">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
+                  <History className="size-3" /> Historique des états
+                </h4>
+                <div className="grid gap-1.5">
+                  {statusEvents.map((event, idx) => {
+                    const label = event.status === 'moving' ? 'Mouvement' : event.status === 'stationary' ? 'Mouillage' : 'Signal Perdu';
+                    const color = event.status === 'moving' ? 'text-green-600' : event.status === 'stationary' ? 'text-amber-600' : 'text-red-600';
+                    return (
+                      <div key={idx} className="flex items-center justify-between p-2.5 bg-card border rounded-lg shadow-sm text-[11px] animate-in fade-in slide-in-from-left-2">
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold tabular-nums opacity-50">{format(event.timestamp, 'HH:mm:ss')}</span>
+                          <span className={cn("font-black uppercase tracking-tighter", color)}>{label}</span>
+                        </div>
+                        {event.location && (
+                          <button 
+                            className="flex items-center gap-1 text-primary hover:underline font-bold"
+                            onClick={() => {
+                              const url = `https://www.google.com/maps?q=${event.location!.lat},${event.location!.lng}`;
+                              window.open(url, '_blank');
+                            }}
+                          >
+                            GPS <ExternalLink className="size-2.5" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
         </div>
         
         <CardFooter className="bg-muted/10 p-4 flex flex-col gap-4 border-t-2">
