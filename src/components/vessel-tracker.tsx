@@ -12,6 +12,14 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Navigation, 
@@ -29,7 +37,8 @@ import {
   Bell,
   BellOff,
   Volume2,
-  Settings2
+  Settings2,
+  Play
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { VesselStatus, UserAccount } from '@/lib/types';
@@ -41,7 +50,15 @@ const IMMOBILITY_START_MINUTES = 5;
 const IMMOBILITY_UPDATE_MINUTES = 30;
 const THROTTLE_UPDATE_MS = 10000; // Update Firestore at most once every 10s during movement
 
-const ALERT_SOUND_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
+const vesselSoundLibrary = [
+  { id: 'alerte', label: 'Alerte Urgence', url: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' },
+  { id: 'cloche', label: 'Cloche Classique', url: 'https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3' },
+  { id: 'trompette', label: 'Fanfare Trompette', url: 'https://assets.mixkit.co/active_storage/sfx/2700/2700-preview.mp3' },
+  { id: 'cor', label: 'Cor de chasse', url: 'https://assets.mixkit.co/active_storage/sfx/2701/2701-preview.mp3' },
+  { id: 'sifflet', label: 'Sifflet Arbitre', url: 'https://assets.mixkit.co/active_storage/sfx/2572/2572-preview.mp3' },
+  { id: 'digital', label: 'Bip Digital', url: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3' },
+  { id: 'sonar', label: 'Ping Sonar', url: 'https://assets.mixkit.co/active_storage/sfx/2564/2564-preview.mp3' },
+];
 
 // Helper: Calculate distance between two points (Haversine)
 const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -70,6 +87,8 @@ export function VesselTracker() {
   
   // Notification State (Receiver)
   const [isNotifyEnabled, setIsNotifyEnabled] = useState(false);
+  const [selectedSound, setSelectedSound] = useState('alerte');
+  const [vesselVolume, setVesselVolume] = useState(0.8);
   const [notifySettings, setNotifySettings] = useState({
     moving: true,
     stationary: true,
@@ -114,10 +133,15 @@ export function VesselTracker() {
   const { data: remoteVessel, isLoading: isVesselLoading } = useDoc<VesselStatus>(vesselRef);
 
   // sound notification logic
-  const playAlertSound = useCallback(() => {
-    const audio = new Audio(ALERT_SOUND_URL);
-    audio.play().catch(e => console.warn("Audio playback failed:", e));
-  }, []);
+  const playAlertSound = useCallback((soundId?: string) => {
+    const id = soundId || selectedSound;
+    const sound = vesselSoundLibrary.find(s => s.id === id);
+    if (sound) {
+      const audio = new Audio(sound.url);
+      audio.volume = vesselVolume;
+      audio.play().catch(e => console.warn("Audio playback failed:", e));
+    }
+  }, [selectedSound, vesselVolume]);
 
   useEffect(() => {
     if (mode === 'receiver' && remoteVessel && isNotifyEnabled) {
@@ -544,10 +568,10 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
                   <div className="mt-4 p-4 border rounded-lg bg-muted/30 space-y-4 animate-in fade-in slide-in-from-top-2">
                     <div className="flex items-center gap-2 mb-2">
                       <Settings2 className="size-4 text-primary" />
-                      <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Alertes à surveiller</span>
+                      <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Paramètres des alertes</span>
                     </div>
                     
-                    <div className="space-y-3">
+                    <div className="space-y-3 pb-2 border-b border-border/50">
                       <div className="flex items-center justify-between">
                         <Label className="text-sm font-bold flex items-center gap-2">
                           <Move className="size-4 text-blue-500" /> Mouvement
@@ -577,8 +601,43 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
                       </div>
                     </div>
 
-                    <Button variant="ghost" size="sm" className="w-full mt-2 text-[10px] uppercase font-black" onClick={playAlertSound}>
-                      <Volume2 className="size-3 mr-2" /> Tester le son
+                    <div className="space-y-4 pt-2">
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2">
+                          <Volume2 className="size-3" /> Choix du son
+                        </Label>
+                        <div className="flex gap-2">
+                          <Select value={selectedSound} onValueChange={(val) => { setSelectedSound(val); playAlertSound(val); }}>
+                            <SelectTrigger className="flex-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {vesselSoundLibrary.map(s => (
+                                <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button variant="outline" size="icon" onClick={() => playAlertSound()}><Play className="size-4" /></Button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <Label className="text-[10px] font-black uppercase text-muted-foreground">Puissance sonore</Label>
+                          <span className="text-[10px] font-bold">{Math.round(vesselVolume * 100)}%</span>
+                        </div>
+                        <Slider 
+                          value={[vesselVolume]} 
+                          min={0} 
+                          max={1} 
+                          step={0.1} 
+                          onValueChange={(val) => setVesselVolume(val[0])} 
+                        />
+                      </div>
+                    </div>
+
+                    <Button variant="ghost" size="sm" className="w-full mt-2 text-[10px] uppercase font-black" onClick={() => playAlertSound()}>
+                      <Volume2 className="size-3 mr-2" /> Tester le son final
                     </Button>
                   </div>
                 )}
