@@ -821,7 +821,7 @@ export default function AdminPage() {
               <AlertDialogTitle>Supprimer le compte de {userToDelete.displayName} ?</AlertDialogTitle>
               <AlertDialogDescription>
                 Cette action supprimera définitivement le profil de l'utilisateur dans Firestore.
-              </AlertDescription>
+              </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Annuler</AlertDialogCancel>
