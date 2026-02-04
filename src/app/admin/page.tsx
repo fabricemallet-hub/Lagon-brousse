@@ -13,7 +13,7 @@ import { useRouter } from 'next/navigation';
 import { 
   DollarSign, Users, Crown, KeyRound, Copy, Trash2, AlertCircle, Mail, 
   Share2, Palette, Image as ImageIcon, Type, Eye, Save, Upload, Timer, 
-  Fish, Plus, Pencil, DatabaseZap, X, Info, Sparkles, BrainCircuit, Star
+  Fish, Plus, Pencil, DatabaseZap, X, Info, Sparkles, BrainCircuit, Star, UserX
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
@@ -56,6 +56,7 @@ export default function AdminPage() {
 
   const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
   const [fishToDelete, setFishToDelete] = useState<string | null>(null);
+  const [userToDelete, setUserToDelete] = useState<UserAccount | null>(null);
   
   // Splash Screen States
   const [splashMode, setSplashMode] = useState<'text' | 'image'>('text');
@@ -205,6 +206,25 @@ export default function AdminPage() {
         toast({ variant: 'destructive', title: "Erreur", description: "Impossible de supprimer l'espèce." });
     } finally {
         setFishToDelete(null);
+    }
+  };
+
+  const handleDeleteUserConfirmed = async () => {
+    if (!firestore || !isAdmin || !userToDelete) return;
+    if (userToDelete.id === user?.uid) {
+        toast({ variant: 'destructive', title: "Action impossible", description: "Vous ne pouvez pas supprimer votre propre compte administrateur." });
+        setUserToDelete(null);
+        return;
+    }
+
+    try {
+        await deleteDoc(doc(firestore, 'users', userToDelete.id));
+        toast({ title: "Compte supprimé", description: `Le compte de ${userToDelete.displayName} a été retiré.` });
+    } catch (error) {
+        console.error(error);
+        toast({ variant: 'destructive', title: "Erreur", description: "Impossible de supprimer le compte." });
+    } finally {
+        setUserToDelete(null);
     }
   };
 
@@ -444,7 +464,8 @@ export default function AdminPage() {
                     <TableRow>
                       <TableHead>Utilisateur</TableHead>
                       <TableHead>Statut</TableHead>
-                      <TableHead className="text-right">Fin Abo</TableHead>
+                      <TableHead>Fin Abo</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -459,8 +480,19 @@ export default function AdminPage() {
                             {u.subscriptionStatus}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right text-xs">
+                        <TableCell className="text-xs">
                           {u.subscriptionExpiryDate ? format(new Date(u.subscriptionExpiryDate), 'dd/MM/yy') : '-'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            disabled={u.id === user?.uid}
+                            onClick={() => setUserToDelete(u)}
+                            title={u.id === user?.uid ? "Impossible de supprimer votre propre compte" : "Supprimer le compte"}
+                          >
+                            <UserX className="h-4 w-4 text-destructive" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -521,7 +553,7 @@ export default function AdminPage() {
                     <div className="flex items-center p-4 gap-4">
                       <div className="relative size-20 rounded-lg overflow-hidden border bg-white shrink-0">
                         {fish.imageUrl || fish.imagePlaceholder ? (
-                          <Image src={fish.imageUrl || `https://picsum.photos/seed/${fish.imagePlaceholder}/200/200`} alt={fish.name} fill className="object-contain p-1" sizes="80px" />
+                          <Image src={fish.imageUrl || `https://picsum.photos/seed/${fish.imagePlaceholder}/200/200`} alt={fish.name} fill className="object-contain p-1" sizes="128px" />
                         ) : <Fish className="size-8 m-auto text-muted-foreground" />}
                       </div>
                       <div className="flex-grow">
@@ -706,6 +738,26 @@ export default function AdminPage() {
           <AlertDialogContent>
             <AlertDialogHeader><AlertDialogTitle>Supprimer l'espèce ?</AlertDialogTitle><AlertDialogDescription>Cette action est irréversible et supprimera cette espèce du guide.</AlertDialogDescription></AlertDialogHeader>
             <AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={handleDeleteFishConfirmed}>Supprimer</AlertDialogAction></AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {userToDelete && (
+        <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Supprimer le compte de {userToDelete.displayName} ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Cette action supprimera définitivement le profil et les données d'abonnement de cet utilisateur dans la base de données. 
+                Attention : l'utilisateur pourra toujours se reconnecter s'il n'est pas supprimé de la console d'authentification.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteUserConfirmed} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Supprimer le compte
+              </AlertDialogAction>
+            </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       )}
