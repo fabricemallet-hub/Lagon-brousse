@@ -326,7 +326,6 @@ export default function AdminPage() {
     toast({ title: "Préparation du téléchargement..." });
 
     try {
-      // Tenter de télécharger via Blob pour forcer le téléchargement si CORS le permet
       const response = await fetch(url);
       if (!response.ok) throw new Error("Fetch failed");
       
@@ -342,8 +341,6 @@ export default function AdminPage() {
       
       toast({ title: "Téléchargement terminé" });
     } catch (error) {
-      // Fallback si CORS bloque le fetch (cas fréquent avec Mixkit ou serveurs tiers)
-      // On ouvre simplement le lien dans un nouvel onglet
       window.open(url, '_blank');
       toast({ 
         title: "Ouverture du fichier", 
@@ -1069,9 +1066,12 @@ export default function AdminPage() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Annuler</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDeleteUserConfirmed} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              <AlertDialogAction 
+                onClick={handleDeleteUserConfirmed} 
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
                 Supprimer le compte
-              </AlertDescription>
+              </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
