@@ -54,6 +54,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from './ui/badge';
 import { cn } from '@/lib/utils';
 import { BottomNav } from './bottom-nav';
+import { NotificationBanner } from './notification-banner';
 
 const USAGE_LIMIT_SECONDS = 60;
 
@@ -337,7 +338,10 @@ function InnerAppShell({
             )}
           </div>
         </header>
-        <div className="flex-1 flex flex-col gap-6 p-4 pb-32 md:pb-12 w-full">{children}</div>
+        <div className="flex-1 flex flex-col gap-6 p-4 pb-32 md:pb-12 w-full">
+          <NotificationBanner />
+          {children}
+        </div>
         <BottomNav />
       </main>
     </>
