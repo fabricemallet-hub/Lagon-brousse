@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -26,7 +25,11 @@ import {
   Wifi,
   Phone,
   Save,
-  Zap
+  Zap,
+  Bell,
+  BellOff,
+  Volume2,
+  Settings2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { VesselStatus, UserAccount } from '@/lib/types';
@@ -37,6 +40,8 @@ const IMMOBILITY_THRESHOLD_METERS = 15;
 const IMMOBILITY_START_MINUTES = 5;
 const IMMOBILITY_UPDATE_MINUTES = 30;
 const THROTTLE_UPDATE_MS = 10000; // Update Firestore at most once every 10s during movement
+
+const ALERT_SOUND_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
 
 // Helper: Calculate distance between two points (Haversine)
 const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -63,6 +68,15 @@ export function VesselTracker() {
   const [emergencyContact, setEmergencyContact] = useState('');
   const [isSavingContact, setIsSavingContact] = useState(false);
   
+  // Notification State (Receiver)
+  const [isNotifyEnabled, setIsNotifyEnabled] = useState(false);
+  const [notifySettings, setNotifySettings] = useState({
+    moving: true,
+    stationary: true,
+    offline: true
+  });
+  const prevVesselStatusRef = useRef<string | null>(null);
+
   // Tracking State (Sender)
   const [currentPos, setCurrentPos] = useState<google.maps.LatLngLiteral | null>(null);
   const [anchorPos, setAnchorPos] = useState<google.maps.LatLngLiteral | null>(null);
@@ -98,6 +112,36 @@ export function VesselTracker() {
     return doc(firestore, 'vessels', vesselIdToFollow);
   }, [firestore, mode, vesselIdToFollow]);
   const { data: remoteVessel, isLoading: isVesselLoading } = useDoc<VesselStatus>(vesselRef);
+
+  // sound notification logic
+  const playAlertSound = useCallback(() => {
+    const audio = new Audio(ALERT_SOUND_URL);
+    audio.play().catch(e => console.warn("Audio playback failed:", e));
+  }, []);
+
+  useEffect(() => {
+    if (mode === 'receiver' && remoteVessel && isNotifyEnabled) {
+      const currentStatus = remoteVessel.status;
+      
+      if (prevVesselStatusRef.current !== null && prevVesselStatusRef.current !== currentStatus) {
+        // Status changed
+        let shouldAlert = false;
+        if (currentStatus === 'moving' && notifySettings.moving) shouldAlert = true;
+        if (currentStatus === 'stationary' && notifySettings.stationary) shouldAlert = true;
+        if (currentStatus === 'offline' && notifySettings.offline) shouldAlert = true;
+
+        if (shouldAlert) {
+          playAlertSound();
+          toast({ 
+            title: "Changement d'état détecté", 
+            description: `Le navire est maintenant : ${currentStatus === 'moving' ? 'En mouvement' : currentStatus === 'stationary' ? 'Stationnaire' : 'Hors-ligne'}`,
+            variant: currentStatus === 'offline' ? "destructive" : "default"
+          });
+        }
+      }
+      prevVesselStatusRef.current = currentStatus;
+    }
+  }, [remoteVessel, mode, isNotifyEnabled, notifySettings, playAlertSound, toast]);
 
   // Online detection
   useEffect(() => {
@@ -483,6 +527,61 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
                 <p className="text-[10px] text-muted-foreground mt-1.5 px-1 italic leading-tight">
                   Recommandé pour surveiller la position sur la carte sans que le téléphone ne se verrouille.
                 </p>
+              </div>
+
+              <div className="pt-2">
+                <Button 
+                  variant={isNotifyEnabled ? "secondary" : "outline"} 
+                  size="sm"
+                  className={cn("w-full gap-2 font-bold h-11 border-2", isNotifyEnabled && "bg-primary/10 text-primary border-primary")}
+                  onClick={() => setIsNotifyEnabled(!isNotifyEnabled)}
+                >
+                  {isNotifyEnabled ? <Bell className="size-4 fill-current" /> : <BellOff className="size-4" />}
+                  {isNotifyEnabled ? "NOTIFICATIONS ACTIVES" : "ACTIVER ALERTES SONORES"}
+                </Button>
+                
+                {isNotifyEnabled && (
+                  <div className="mt-4 p-4 border rounded-lg bg-muted/30 space-y-4 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Settings2 className="size-4 text-primary" />
+                      <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Alertes à surveiller</span>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-bold flex items-center gap-2">
+                          <Move className="size-4 text-blue-500" /> Mouvement
+                        </Label>
+                        <Switch 
+                          checked={notifySettings.moving} 
+                          onCheckedChange={(val) => setNotifySettings({...notifySettings, moving: val})} 
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-bold flex items-center gap-2">
+                          <Anchor className="size-4 text-amber-500" /> Immobilisation
+                        </Label>
+                        <Switch 
+                          checked={notifySettings.stationary} 
+                          onCheckedChange={(val) => setNotifySettings({...notifySettings, stationary: val})} 
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-bold flex items-center gap-2">
+                          <WifiOff className="size-4 text-destructive" /> Perte Réseau
+                        </Label>
+                        <Switch 
+                          checked={notifySettings.offline} 
+                          onCheckedChange={(val) => setNotifySettings({...notifySettings, offline: val})} 
+                        />
+                      </div>
+                    </div>
+
+                    <Button variant="ghost" size="sm" className="w-full mt-2 text-[10px] uppercase font-black" onClick={playAlertSound}>
+                      <Volume2 className="size-3 mr-2" /> Tester le son
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {remoteVessel && (
