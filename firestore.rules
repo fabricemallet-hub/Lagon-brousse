@@ -106,5 +106,11 @@ service cloud.firestore {
         allow write: if isAdmin();
       }
     }
+
+    // Personnalisation des poissons
+    match /fish_customizations/{fishId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
   }
 }
