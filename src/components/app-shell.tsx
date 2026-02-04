@@ -1,4 +1,3 @@
-
 'use client';
 import {
   Sidebar,
@@ -54,7 +53,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from './ui/badge';
 import { cn } from '@/lib/utils';
 import { BottomNav } from './bottom-nav';
-import { NotificationBanner } from './notification-banner';
 
 const USAGE_LIMIT_SECONDS = 60;
 
@@ -65,7 +63,6 @@ const UsageTimer = React.memo(({ status, auth, userId }: { status: string, auth:
   const pathname = usePathname();
 
   useEffect(() => {
-    // Reset timer state when status changes to trial/limited or user changes
     if ((status !== 'limited' && status !== 'trial') || !auth || !userId) {
       return;
     }
@@ -75,7 +72,6 @@ const UsageTimer = React.memo(({ status, auth, userId }: { status: string, auth:
     const lastUserId = localStorage.getItem('lastUserId');
     let dailyUsage = parseInt(localStorage.getItem('dailyUsage') || '0', 10);
 
-    // Reset si nouveau jour OU changement d'utilisateur
     if (lastUsageDate !== today || lastUserId !== userId) {
       dailyUsage = 0;
       localStorage.setItem('lastUsageDate', today);
@@ -163,16 +159,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const isAuthPage = pathname === '/login' || pathname === '/signup';
 
-  // Logique de redirection automatique vers la connexion
   useEffect(() => {
-    // Si le chargement est fini et qu'aucun utilisateur n'est présent
-    // on redirige vers /login sauf si on est déjà sur une page d'auth ou de vie privée
     if (!isUserLoading && !user && !isAuthPage && pathname !== '/privacy-policy') {
       router.push('/login');
     }
   }, [user, isUserLoading, isAuthPage, pathname, router]);
 
-  // Rediriger vers l'accueil si un utilisateur connecté tente d'aller sur /login ou /signup
   useEffect(() => {
     if (!isUserLoading && user && isAuthPage) {
       router.push('/');
@@ -339,7 +331,6 @@ function InnerAppShell({
           </div>
         </header>
         <div className="flex-1 flex flex-col gap-6 p-4 pb-32 md:pb-12 w-full">
-          <NotificationBanner />
           {children}
         </div>
         <BottomNav />

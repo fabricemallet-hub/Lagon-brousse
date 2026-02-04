@@ -1,10 +1,9 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, serverTimestamp, deleteDoc, doc, Timestamp, orderBy, query, setDoc, writeBatch, getDocs, addDoc, updateDoc } from 'firebase/firestore';
-import type { UserAccount, AccessToken, Conversation, SharedAccessToken, SplashScreenSettings, FishSpeciesInfo, SystemNotification } from '@/lib/types';
+import type { UserAccount, AccessToken, Conversation, SharedAccessToken, SplashScreenSettings, FishSpeciesInfo } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,9 +11,9 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { 
-  DollarSign, Users, Crown, KeyRound, Copy, Trash2, AlertCircle, Mail, 
-  Share2, Palette, Image as ImageIcon, Type, Eye, Save, Upload, Timer, 
-  Fish, Plus, Pencil, DatabaseZap, X, Info, Sparkles, BrainCircuit, Star, UserX, Settings2, Bell, Megaphone, CheckCircle2
+  DollarSign, Users, Crown, KeyRound, Trash2, Mail, 
+  Share2, Palette, Save, Upload, 
+  Fish, Plus, Pencil, DatabaseZap, Info, Sparkles, BrainCircuit, UserX
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
@@ -34,7 +33,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { format, isBefore, addDays, parseISO } from 'date-fns';
+import { format, isBefore, addDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { SplashScreen } from '@/components/splash-screen';
@@ -42,7 +41,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from '@/components/ui/textarea';
 import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Switch } from '@/components/ui/switch';
 
 const SUBSCRIPTION_PRICE = 500;
 
@@ -59,7 +57,6 @@ export default function AdminPage() {
   const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
   const [fishToDelete, setFishToDelete] = useState<string | null>(null);
   const [userToDelete, setUserToDelete] = useState<UserAccount | null>(null);
-  const [notifToDelete, setNotifToDelete] = useState<string | null>(null);
   
   // User Edit States
   const [userToEdit, setUserToEdit] = useState<UserAccount | null>(null);
@@ -88,12 +85,6 @@ export default function AdminPage() {
   const [isInitializingFish, setIsInitializingFish] = useState(false);
   const [isAiGeneratingFish, setIsAiGeneratingFish] = useState(false);
 
-  // Notification States
-  const [isNotifDialogOpen, setIsNotifDialogOpen] = useState(false);
-  const [notifDialogMode, setNotifDialogMode] = useState<'add' | 'edit'>('add');
-  const [currentNotif, setCurrentNotif] = useState<Partial<SystemNotification>>({ type: 'info', isActive: true });
-  const [isSavingNotif, setIsSavingNotif] = useState(false);
-
   // Global Access States
   const [globalDuration, setGlobalDuration] = useState('7');
 
@@ -113,13 +104,6 @@ export default function AdminPage() {
     return query(collection(firestore, 'fish_species'), orderBy('name', 'asc'));
   }, [firestore, isAdmin]);
   const { data: dbFishSpecies, isLoading: areFishLoading } = useCollection<FishSpeciesInfo>(fishSpeciesRef);
-
-  // Fetch Notifications
-  const notificationsRef = useMemoFirebase(() => {
-    if (!firestore || !isAdmin) return null;
-    return query(collection(firestore, 'system_notifications'), orderBy('createdAt', 'desc'));
-  }, [firestore, isAdmin]);
-  const { data: dbNotifications, isLoading: areNotifsLoading } = useCollection<SystemNotification>(notificationsRef);
 
   // Fetch Global Shared Token
   const sharedTokenRef = useMemoFirebase(() => {
@@ -160,62 +144,6 @@ export default function AdminPage() {
       callback(base64);
     };
     reader.readAsDataURL(file);
-  };
-
-  const handleSaveNotif = async () => {
-    if (!firestore || !isAdmin || !currentNotif.title || !currentNotif.content) {
-        toast({ variant: 'destructive', title: "Données manquantes", description: "Le titre et le contenu sont obligatoires." });
-        return;
-    }
-    setIsSavingNotif(true);
-    try {
-        if (notifDialogMode === 'add') {
-            await addDoc(collection(firestore, 'system_notifications'), {
-                ...currentNotif,
-                createdAt: serverTimestamp()
-            });
-            toast({ title: "Notification ajoutée" });
-        } else {
-            const notifRef = doc(firestore, 'system_notifications', currentNotif.id!);
-            await updateDoc(notifRef, {
-                ...currentNotif,
-                updatedAt: serverTimestamp()
-            });
-            toast({ title: "Notification mise à jour" });
-        }
-        setIsNotifDialogOpen(false);
-        setCurrentNotif({ type: 'info', isActive: true });
-    } catch (error) {
-        console.error(error);
-        toast({ variant: 'destructive', title: "Erreur", description: "Impossible de sauvegarder la notification." });
-    } finally {
-        setIsSavingNotif(false);
-    }
-  };
-
-  const handleDeleteNotifConfirmed = async () => {
-    if (!firestore || !isAdmin || !notifToDelete) return;
-    try {
-        await deleteDoc(doc(firestore, 'system_notifications', notifToDelete));
-        toast({ title: "Notification supprimée" });
-    } catch (error) {
-        console.error(error);
-        toast({ variant: 'destructive', title: "Erreur", description: "Impossible de supprimer la notification." });
-    } finally {
-        setNotifToDelete(null);
-    }
-  };
-
-  const toggleNotifStatus = async (notif: SystemNotification) => {
-    if (!firestore || !isAdmin) return;
-    try {
-        await updateDoc(doc(firestore, 'system_notifications', notif.id), {
-            isActive: !notif.isActive
-        });
-        toast({ title: notif.isActive ? "Notification désactivée" : "Notification activée" });
-    } catch (e) {
-        console.error(e);
-    }
   };
 
   const handleAiFillFish = async () => {
@@ -358,21 +286,18 @@ export default function AdminPage() {
     }
   };
 
-  // Fetch all users for stats
   const usersCollectionRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
     return collection(firestore, 'users');
   }, [firestore, isAdmin]);
   const { data: allUsers, isLoading: areUsersLoading } = useCollection<UserAccount>(usersCollectionRef);
 
-  // Fetch unique access tokens
   const tokensCollectionRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
     return query(collection(firestore, 'access_tokens'), orderBy('createdAt', 'desc'));
   }, [firestore, isAdmin]);
   const { data: accessTokens } = useCollection<AccessToken>(tokensCollectionRef);
 
-  // Fetch conversations
   const conversationsCollectionRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
     return query(collection(firestore, 'conversations'), orderBy('lastMessageAt', 'desc'));
@@ -465,7 +390,7 @@ export default function AdminPage() {
       const now = new Date();
       const expiresAt = addDays(now, daysCount);
       await setDoc(doc(firestore, 'shared_access_tokens', 'GLOBAL'), {
-        durationMonths: 0, // Unused for global
+        durationMonths: 0,
         createdAt: serverTimestamp(),
         expiresAt: Timestamp.fromDate(expiresAt)
       });
@@ -524,10 +449,9 @@ export default function AdminPage() {
       </Card>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 mb-6 h-auto">
+        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 mb-6 h-auto">
           <TabsTrigger value="overview">Stats</TabsTrigger>
           <TabsTrigger value="users">Utilisateurs</TabsTrigger>
-          <TabsTrigger value="notifications">Notifs</TabsTrigger>
           <TabsTrigger value="design">Design</TabsTrigger>
           <TabsTrigger value="fish">Fish</TabsTrigger>
           <TabsTrigger value="access">Accès</TabsTrigger>
@@ -620,55 +544,6 @@ export default function AdminPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="notifications" className="space-y-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <div>
-                <CardTitle className="flex items-center gap-2"><Megaphone /> Alertes & Infos</CardTitle>
-                <CardDescription>Diffusez des messages globaux à tous les utilisateurs.</CardDescription>
-              </div>
-              <Button onClick={() => { setNotifDialogMode('add'); setCurrentNotif({ type: 'info', isActive: true }); setIsNotifDialogOpen(true); }}>
-                <Plus className="mr-2 size-4" /> Nouvelle Alerte
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4">
-                {areNotifsLoading ? [1,2].map(i => <Skeleton key={i} className="h-24 w-full" />) : dbNotifications && dbNotifications.length > 0 ? dbNotifications.map(notif => (
-                  <Card key={notif.id} className={cn("overflow-hidden border-2", !notif.isActive && "opacity-60")}>
-                    <div className="flex items-center p-4 gap-4">
-                      <div className={cn(
-                        "size-10 rounded-full flex items-center justify-center shrink-0",
-                        notif.type === 'info' ? "bg-blue-100 text-blue-600" :
-                        notif.type === 'warning' ? "bg-amber-100 text-amber-600" :
-                        notif.type === 'error' ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"
-                      )}>
-                        {notif.type === 'info' ? <Info className="size-5" /> : 
-                         notif.type === 'warning' ? <AlertTriangle className="size-5" /> : 
-                         notif.type === 'error' ? <AlertCircle className="size-5" /> : <CheckCircle2 className="size-5" />}
-                      </div>
-                      <div className="flex-grow min-w-0">
-                        <h4 className="font-bold text-sm truncate">{notif.title}</h4>
-                        <p className="text-xs text-muted-foreground line-clamp-1">{notif.content}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="outline" className="text-[8px] uppercase">{notif.type}</Badge>
-                          {notif.isActive ? <Badge className="bg-green-500 text-[8px] uppercase">Actif</Badge> : <Badge variant="secondary" className="text-[8px] uppercase">Inactif</Badge>}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Switch checked={notif.isActive} onCheckedChange={() => toggleNotifStatus(notif)} />
-                        <Button variant="ghost" size="icon" onClick={() => { setNotifDialogMode('edit'); setCurrentNotif(notif); setIsNotifDialogOpen(true); }}><Pencil className="size-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => setNotifToDelete(notif.id)}><Trash2 className="size-4 text-destructive" /></Button>
-                      </div>
-                    </div>
-                  </Card>
-                )) : (
-                  <p className="text-center text-xs text-muted-foreground py-10">Aucune notification système.</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         <TabsContent value="design" className="space-y-6">
           <Card>
             <CardHeader><CardTitle><Palette /> Splash Screen</CardTitle></CardHeader>
@@ -740,7 +615,7 @@ export default function AdminPage() {
                         </div>
                         <h3 className="font-bold">Base de données vide</h3>
                         <p className="text-xs text-muted-foreground max-w-xs mx-auto mt-1">
-                            Cliquez sur "Importer Défaut" pour charger les 33 espèces emblématiques du Caillou.
+                            Cliquez sur "Importer Défaut" pour charger les espèces emblématiques.
                         </p>
                     </div>
                 )}
@@ -753,7 +628,7 @@ export default function AdminPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><Share2 className="text-primary" /> Accès Global (Cadeau)</CardTitle>
-              <CardDescription>Ouvrez l'accès premium à TOUS les utilisateurs inscrits pour une durée déterminée.</CardDescription>
+              <CardDescription>Ouvrez l'accès premium à TOUS les utilisateurs inscrits.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {sharedToken ? (
@@ -765,7 +640,7 @@ export default function AdminPage() {
                   </AlertDescription>
                 </Alert>
               ) : (
-                <p className="text-sm text-muted-foreground italic">Aucun accès global actif actuellement.</p>
+                <p className="text-sm text-muted-foreground italic">Aucun accès global actif.</p>
               )}
               
               <div className="flex items-end gap-4">
@@ -860,7 +735,6 @@ export default function AdminPage() {
                         value={editExpiryDate} 
                         onChange={e => setEditExpiryDate(e.target.value)} 
                     />
-                    <p className="text-[10px] text-muted-foreground italic">Laissez vide si non applicable (ex: Admin).</p>
                 </div>
             </div>
             <DialogFooter>
@@ -920,48 +794,6 @@ export default function AdminPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog for Notification Create/Edit */}
-      <Dialog open={isNotifDialogOpen} onOpenChange={setIsNotifDialogOpen}>
-        <DialogContent className="max-w-lg">
-            <DialogHeader>
-                <DialogTitle>{notifDialogMode === 'add' ? 'Diffuser une alerte' : 'Modifier l\'alerte'}</DialogTitle>
-                <DialogDescription>Rédigez le message qui apparaîtra sur l'ensemble de l'application.</DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                    <Label>Titre de l'alerte</Label>
-                    <Input value={currentNotif.title || ''} onChange={e => setCurrentNotif({...currentNotif, title: e.target.value})} placeholder="Ex: Alerte Météo, Maintenance..." />
-                </div>
-                <div className="space-y-2">
-                    <Label>Contenu du message</Label>
-                    <Textarea value={currentNotif.content || ''} onChange={e => setCurrentNotif({...currentNotif, content: e.target.value})} placeholder="Détaillez l'information ici..." />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label>Type d'alerte</Label>
-                        <Select value={currentNotif.type} onValueChange={(v:any) => setCurrentNotif({...currentNotif, type: v})}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="info">Info (Bleu)</SelectItem>
-                                <SelectItem value="warning">Alerte (Orange)</SelectItem>
-                                <SelectItem value="error">Critique (Rouge)</SelectItem>
-                                <SelectItem value="success">Succès (Vert)</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="flex items-center gap-2 pt-8">
-                        <Switch checked={currentNotif.isActive} onCheckedChange={(v) => setCurrentNotif({...currentNotif, isActive: v})} />
-                        <Label>Activer immédiatement</Label>
-                    </div>
-                </div>
-            </div>
-            <DialogFooter>
-                <Button variant="ghost" onClick={() => setIsNotifDialogOpen(false)}>Annuler</Button>
-                <Button onClick={handleSaveNotif} disabled={isSavingNotif}>{isSavingNotif ? 'Envoi...' : 'Diffuser'}</Button>
-            </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {generatedToken && (
         <AlertDialog open={!!generatedToken} onOpenChange={() => setGeneratedToken(null)}>
           <AlertDialogContent>
@@ -975,26 +807,8 @@ export default function AdminPage() {
       {conversationToDelete && (
         <AlertDialog open={!!conversationToDelete} onOpenChange={(open) => !open && setConversationToDelete(null)}>
           <AlertDialogContent>
-            <AlertDialogHeader><AlertDialogTitle>Supprimer la conversation ?</AlertDialogTitle><AlertDialogDescription>Cette action est irréversible et supprimera tous les messages.</AlertDialogDescription></AlertDialogHeader>
+            <AlertDialogHeader><AlertDialogTitle>Supprimer la conversation ?</AlertDialogTitle><AlertDialogDescription>Cette action est irréversible.</AlertDialogDescription></AlertDialogHeader>
             <AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteConversation(conversationToDelete!)}>Supprimer</AlertDialogAction></AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
-
-      {fishToDelete && (
-        <AlertDialog open={!!fishToDelete} onOpenChange={(open) => !open && setFishToDelete(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader><AlertDialogTitle>Supprimer l'espèce ?</AlertDialogTitle><AlertDialogDescription>Cette action est irréversible et supprimera cette espèce du guide.</AlertDialogDescription></AlertDialogHeader>
-            <AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={handleSaveFish}>Supprimer</AlertDialogAction></AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
-
-      {notifToDelete && (
-        <AlertDialog open={!!notifToDelete} onOpenChange={(open) => !open && setNotifToDelete(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader><AlertDialogTitle>Supprimer cette notification ?</AlertDialogTitle><AlertDialogDescription>Elle disparaîtra définitivement de la base de données.</AlertDialogDescription></AlertDialogHeader>
-            <AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={handleDeleteNotifConfirmed}>Supprimer</AlertDialogAction></AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       )}
@@ -1005,8 +819,7 @@ export default function AdminPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Supprimer le compte de {userToDelete.displayName} ?</AlertDialogTitle>
               <AlertDialogDescription>
-                Cette action supprimera définitivement le profil et les données d'abonnement de cet utilisateur dans la base de données. 
-                Attention : l'utilisateur pourra toujours se reconnecter s'il n'est pas supprimé de la console d'authentification.
+                Cette action supprimera définitivement le profil de l'utilisateur dans Firestore.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

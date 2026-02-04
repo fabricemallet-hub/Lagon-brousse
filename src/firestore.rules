@@ -1,19 +1,9 @@
 rules_version = '2';
 
-/**
- * LAGON & BROUSSE NC - SECURITY POLICY (V4.0-STABLE)
- * Unique Deployment ID: 20240524-1500
- */
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. ACCÈS PUBLICS (PRIORITÉ ABSOLUE) ---
-    // Autorise la lecture (individuelle et liste) pour le contenu global
-    
-    match /system_notifications/{id} {
-      allow get, list: if true;
-    }
+    // --- 1. ACCÈS PUBLICS ---
     
     match /app_settings/{id} {
       allow get, list: if true;
@@ -40,7 +30,6 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Vérification admin basée sur l'email du jeton pour éviter les erreurs de lecture document
     function isAdmin() {
       return isSignedIn() && 
              (request.auth.token.email == 'f.mallet81@gmail.com' || 
@@ -49,7 +38,6 @@ service cloud.firestore {
 
     // --- 3. DROITS D'ÉCRITURE ADMIN ---
 
-    match /system_notifications/{id} { allow write: if isAdmin(); }
     match /app_settings/{id} { allow write: if isAdmin(); }
     match /meteo_caledonie/{id} { 
       allow write: if isAdmin(); 

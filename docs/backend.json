@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "User": {
@@ -101,20 +100,6 @@
         "isSharing": { "type": "boolean" },
         "lastActive": { "type": "object" }
       }
-    },
-    "SystemNotification": {
-      "title": "SystemNotification",
-      "type": "object",
-      "description": "Message global diffusé à tous les utilisateurs.",
-      "properties": {
-        "id": { "type": "string" },
-        "title": { "type": "string" },
-        "content": { "type": "string" },
-        "type": { "type": "string", "enum": ["info", "warning", "error", "success"] },
-        "isActive": { "type": "boolean" },
-        "createdAt": { "type": "object" }
-      },
-      "required": ["title", "content", "type", "isActive"]
     }
   },
   "auth": {
@@ -176,14 +161,6 @@
           "entityName": "VesselStatus",
           "schema": { "$ref": "#/backend/entities/VesselStatus" },
           "description": "Positions des navires en temps réel"
-        }
-      },
-      {
-        "path": "/system_notifications/{notifId}",
-        "definition": {
-          "entityName": "SystemNotification",
-          "schema": { "$ref": "#/backend/entities/SystemNotification" },
-          "description": "Messages globaux d'information ou d'alerte"
         }
       }
     ]
