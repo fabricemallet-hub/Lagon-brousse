@@ -172,9 +172,9 @@ export default function AdminPage() {
 
   // Fetch shared access token
   const sharedTokenRef = useMemoFirebase(() => {
-    if (!firestore || !isAdmin) return null;
+    if (!firestore || !user) return null;
     return doc(firestore, 'shared_access_tokens', 'GLOBAL');
-  }, [firestore, isAdmin]);
+  }, [firestore, user]);
   const { data: sharedToken, isLoading: isSharedTokenLoading } = useDoc<SharedAccessToken>(sharedTokenRef);
 
   // Fetch conversations
@@ -603,6 +603,7 @@ export default function AdminPage() {
                               alt={fish.name} 
                               fill 
                               className="object-cover" 
+                              sizes="128px"
                             />
                           ) : (
                             <div className="flex items-center justify-center h-full text-muted-foreground"><Fish className="size-10" /></div>

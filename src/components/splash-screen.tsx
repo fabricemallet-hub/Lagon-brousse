@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -52,6 +53,7 @@ export function SplashScreen({ settings, isExiting }: SplashScreenProps) {
                   "transition-all",
                   splashImageFit === 'cover' ? "object-cover" : "object-contain"
                 )}
+                sizes="100vw"
                 priority
               />
             ) : (
