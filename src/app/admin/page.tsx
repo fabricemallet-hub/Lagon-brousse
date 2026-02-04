@@ -13,7 +13,7 @@ import { useRouter } from 'next/navigation';
 import { 
   DollarSign, Users, Crown, KeyRound, Copy, Trash2, AlertCircle, Mail, 
   Share2, Palette, Image as ImageIcon, Type, Eye, Save, Upload, Timer, 
-  Fish, Plus, Pencil, DatabaseZap, X, Info, Sparkles, BrainCircuit, Star, UserX
+  Fish, Plus, Pencil, DatabaseZap, X, Info, Sparkles, BrainCircuit, Star, UserX, Settings2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
@@ -33,7 +33,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { format, isBefore, addDays } from 'date-fns';
+import { format, isBefore, addDays, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { SplashScreen } from '@/components/splash-screen';
@@ -58,6 +58,13 @@ export default function AdminPage() {
   const [fishToDelete, setFishToDelete] = useState<string | null>(null);
   const [userToDelete, setUserToDelete] = useState<UserAccount | null>(null);
   
+  // User Edit States
+  const [userToEdit, setUserToEdit] = useState<UserAccount | null>(null);
+  const [isUserEditDialogOpen, setIsUserEditOpen] = useState(false);
+  const [editStatus, setEditStatus] = useState<string>('inactive');
+  const [editExpiryDate, setEditExpiryDate] = useState<string>('');
+  const [isSavingUser, setIsSavingUser] = useState(false);
+
   // Splash Screen States
   const [splashMode, setSplashMode] = useState<'text' | 'image'>('text');
   const [splashText, setSplashText] = useState('Lagon & Brousse NC');
@@ -206,6 +213,33 @@ export default function AdminPage() {
         toast({ variant: 'destructive', title: "Erreur", description: "Impossible de supprimer l'espèce." });
     } finally {
         setFishToDelete(null);
+    }
+  };
+
+  const handleEditUser = (u: UserAccount) => {
+    setUserToEdit(u);
+    setEditStatus(u.subscriptionStatus);
+    setEditExpiryDate(u.subscriptionExpiryDate ? u.subscriptionExpiryDate.split('T')[0] : '');
+    setIsUserEditOpen(true);
+  };
+
+  const handleUpdateUser = async () => {
+    if (!firestore || !userToEdit) return;
+    setIsSavingUser(true);
+    try {
+        const userRef = doc(firestore, 'users', userToEdit.id);
+        const updates: Partial<UserAccount> = {
+            subscriptionStatus: editStatus as any,
+            subscriptionExpiryDate: editExpiryDate ? new Date(editExpiryDate).toISOString() : undefined
+        };
+        await updateDoc(userRef, updates);
+        toast({ title: "Profil mis à jour", description: `Les accès de ${userToEdit.displayName} ont été modifiés.` });
+        setIsUserEditOpen(false);
+    } catch (error) {
+        console.error(error);
+        toast({ variant: 'destructive', title: "Erreur", description: "Impossible de mettre à jour le profil." });
+    } finally {
+        setIsSavingUser(false);
     }
   };
 
@@ -380,14 +414,14 @@ export default function AdminPage() {
     }
   };
 
-  const handleDeleteConversation = async (id: string) => {
-    if (!firestore || !id) return;
+  const handleDeleteConversation = async (conversationId: string) => {
+    if (!firestore) return;
     try {
-        const messagesRef = collection(firestore, 'conversations', id, 'messages');
+        const messagesRef = collection(firestore, 'conversations', conversationId, 'messages');
         const messagesSnap = await getDocs(messagesRef);
         const batch = writeBatch(firestore);
         messagesSnap.forEach(doc => batch.delete(doc.ref));
-        batch.delete(doc(firestore, 'conversations', id));
+        batch.delete(doc(firestore, 'conversations', conversationId));
         await batch.commit();
         toast({ title: "Conversation supprimée" });
     } catch (error) {
@@ -484,15 +518,25 @@ export default function AdminPage() {
                           {u.subscriptionExpiryDate ? format(new Date(u.subscriptionExpiryDate), 'dd/MM/yy') : '-'}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            disabled={u.id === user?.uid}
-                            onClick={() => setUserToDelete(u)}
-                            title={u.id === user?.uid ? "Impossible de supprimer votre propre compte" : "Supprimer le compte"}
-                          >
-                            <UserX className="h-4 w-4 text-destructive" />
-                          </Button>
+                          <div className="flex justify-end gap-1">
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => handleEditUser(u)}
+                                title="Modifier les accès"
+                            >
+                                <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                disabled={u.id === user?.uid}
+                                onClick={() => setUserToDelete(u)}
+                                title={u.id === user?.uid ? "Impossible de supprimer votre propre compte" : "Supprimer le compte"}
+                            >
+                                <UserX className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -663,6 +707,46 @@ export default function AdminPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Dialog for User Edit */}
+      <Dialog open={isUserEditDialogOpen} onOpenChange={setIsUserEditOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+                <DialogTitle>Modifier les accès</DialogTitle>
+                <DialogDescription>Modifiez le statut et la date d'expiration pour {userToEdit?.displayName}.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                    <Label htmlFor="status">Statut du compte</Label>
+                    <Select value={editStatus} onValueChange={setEditStatus}>
+                        <SelectTrigger id="status">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="active">Actif (Premium)</SelectItem>
+                            <SelectItem value="inactive">Inactif (Limité)</SelectItem>
+                            <SelectItem value="trial">Essai (Temporaire)</SelectItem>
+                            <SelectItem value="admin">Administrateur</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="expiry">Date de fin d'abonnement</Label>
+                    <Input 
+                        id="expiry" 
+                        type="date" 
+                        value={editExpiryDate} 
+                        onChange={e => setEditExpiryDate(e.target.value)} 
+                    />
+                    <p className="text-[10px] text-muted-foreground italic">Laissez vide si non applicable (ex: Admin).</p>
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="ghost" onClick={() => setIsUserEditOpen(false)}>Annuler</Button>
+                <Button onClick={handleUpdateUser} disabled={isSavingUser}>{isSavingUser ? 'Enregistrement...' : 'Sauvegarder'}</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog for Fish Create/Edit */}
       <Dialog open={isFishDialogOpen} onOpenChange={setIsFishDialogOpen}>
