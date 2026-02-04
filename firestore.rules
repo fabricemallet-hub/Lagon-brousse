@@ -3,6 +3,7 @@ rules_version = '2';
 
 /**
  * LAGON & BROUSSE NC - SECURITY POLICY
+ * Centralized security rules for the entire application.
  */
 
 service cloud.firestore {
@@ -15,23 +16,22 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && 
-        (
-          (request.auth.token.email != null && request.auth.token.email.lower() in ['f.mallet81@gmail.com', 'f.mallet81@outlook.com']) ||
-          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'admin')
-        );
+      return isSignedIn() && (
+        (request.auth.token.email != null && request.auth.token.email.lower() in ['f.mallet81@gmail.com', 'f.mallet81@outlook.com']) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'admin')
+      );
     }
 
     // --- PUBLIC COLLECTIONS (READ FOR ALL) ---
-    // Placées au sommet pour une priorité absolue
+    // These must be at the top to ensure they are evaluated with high priority.
 
-    match /system_notifications/{id} {
+    match /system_notifications/{document=**} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    match /app_settings/{id} {
+    match /app_settings/{document=**} {
       allow read: if true;
       allow write: if isAdmin();
     }
@@ -41,7 +41,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    match /fish_species/{id} {
+    match /fish_species/{document=**} {
       allow read: if true;
       allow write: if isAdmin();
     }
@@ -91,7 +91,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     
-    // Catch-all par défaut pour la sécurité
+    // Catch-all safety rule (Admin only)
     match /{allPaths=**} {
       allow read, write: if isAdmin();
     }
