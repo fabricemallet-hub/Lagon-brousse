@@ -1,22 +1,19 @@
-
 rules_version = '2';
 
 /**
- * LAGON & BROUSSE NC - SECURITY POLICY (V2.1)
- * Centralized security rules for the entire application.
- * Fixed: Public list access for notifications and robust isAdmin logic.
+ * LAGON & BROUSSE NC - SECURITY POLICY (V2.2)
+ * Robust rules with explicit public access for system notifications.
  */
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- GLOBAL HELPER FUNCTIONS ---
+    // --- HELPER FUNCTIONS ---
 
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Secure isAdmin: priority to token email, avoids unnecessary DB gets
     function isAdmin() {
       return isSignedIn() && (
         (request.auth.token.email != null && (
@@ -28,35 +25,42 @@ service cloud.firestore {
       );
     }
 
-    // --- PUBLIC COLLECTIONS (PRIORITY READ) ---
-    // Rules here must be at the top to ensure they are evaluated first.
+    // --- PUBLIC COLLECTIONS ---
+    // Explicitly allowing 'list' for queries (used by banners/lists)
 
-    match /system_notifications/{document=**} {
-      // Use recursive wildcard to ensure 'list' queries (with where/orderBy) are allowed publicly.
+    match /system_notifications/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    match /app_settings/{id} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    match /app_settings/{document=**} {
+    match /meteo_caledonie/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+      match /previsions/{prevId} {
+        allow read: if true;
+        allow write: if isAdmin();
+      }
+    }
+
+    match /fish_species/{id} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    match /meteo_caledonie/{document=**} {
+    match /shared_access_tokens/{id} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    match /fish_species/{document=**} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    // --- PROTECTED COLLECTIONS (AUTH REQUIRED) ---
+    // --- PROTECTED COLLECTIONS ---
 
     match /users/{userId} {
       allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      
       match /{allPaths=**} {
         allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       }
@@ -86,20 +90,10 @@ service cloud.firestore {
     match /access_tokens/{id} {
       allow read, write: if isSignedIn() || isAdmin();
     }
-    
-    match /shared_access_tokens/{id} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
 
     match /stations/{document=**} {
       allow read: if isSignedIn() || isAdmin();
       allow write: if isAdmin();
-    }
-    
-    // Safety Catch-all (Admin only)
-    match /{allPaths=**} {
-      allow read, write: if isAdmin();
     }
   }
 }
