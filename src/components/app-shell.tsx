@@ -1,3 +1,4 @@
+
 'use client';
 import {
   Sidebar,
@@ -160,6 +161,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [user, isUserLoading, userProfile, isProfileLoading]);
 
   const isAuthPage = pathname === '/login' || pathname === '/signup';
+
+  // Logique de redirection automatique vers la connexion
+  useEffect(() => {
+    // Si le chargement est fini et qu'aucun utilisateur n'est présent
+    // on redirige vers /login sauf si on est déjà sur une page d'auth ou de vie privée
+    if (!isUserLoading && !user && !isAuthPage && pathname !== '/privacy-policy') {
+      router.push('/login');
+    }
+  }, [user, isUserLoading, isAuthPage, pathname, router]);
+
+  // Rediriger vers l'accueil si un utilisateur connecté tente d'aller sur /login ou /signup
+  useEffect(() => {
+    if (!isUserLoading && user && isAuthPage) {
+      router.push('/');
+    }
+  }, [user, isUserLoading, isAuthPage, router]);
 
   const handleLogout = useCallback(async () => { 
     if (auth) { 
