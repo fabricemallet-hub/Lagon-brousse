@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
@@ -81,6 +82,16 @@ import { Skeleton } from './ui/skeleton';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import Link from 'next/link';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const iconMap = { Navigation, UserIcon, Crosshair, Footprints, Mountain, MapPin };
 
@@ -147,6 +158,7 @@ function HuntingSessionContent() {
 
   const [mySessions, setMySessions] = useState<WithId<HuntingSession>[]>([]);
   const [areMySessionsLoading, setAreMySessionsLoading] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
 
   const prevParticipantsRef = useRef<SessionParticipant[] | null>(null);
 
@@ -390,6 +402,24 @@ function HuntingSessionContent() {
         toast({ variant: 'destructive', title: 'Erreur', description: e.message });
     } finally {
         setIsSessionLoading(false);
+    }
+  };
+
+  const handleDeleteSessionConfirmed = async () => {
+    if (!firestore || !sessionToDelete) return;
+    try {
+        const participantsRef = collection(firestore, 'hunting_sessions', sessionToDelete, 'participants');
+        const snap = await getDocs(participantsRef);
+        const batch = writeBatch(firestore);
+        snap.forEach(d => batch.delete(d.ref));
+        batch.delete(doc(firestore, 'hunting_sessions', sessionToDelete));
+        await batch.commit();
+        fetchMySessions();
+        toast({ title: 'Session supprimée' });
+    } catch (e) {
+        console.error(e);
+    } finally {
+        setSessionToDelete(null);
     }
   };
 
@@ -683,22 +713,27 @@ function HuntingSessionContent() {
                             <span className="font-bold">{s.id}</span>
                             <div className="flex items-center gap-2">
                                 <Button variant="ghost" size="sm" onClick={() => setJoinCode(s.id)}>Sélectionner</Button>
-                                <Button variant="ghost" size="icon" onClick={() => {
-                                    if (confirm('Supprimer cette session et tous ses participants ?')) {
-                                        const participantsRef = collection(firestore!, 'hunting_sessions', s.id, 'participants');
-                                        getDocs(participantsRef).then(snap => {
-                                            const batch = writeBatch(firestore!);
-                                            snap.forEach(d => batch.delete(d.ref));
-                                            batch.delete(doc(firestore!, 'hunting_sessions', s.id));
-                                            batch.commit().then(() => fetchMySessions());
-                                        });
-                                    }
-                                }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                <Button variant="ghost" size="icon" onClick={() => setSessionToDelete(s.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                             </div>
                         </div>
                     ))}
                 </CardContent>
             </Card>
+        )}
+
+        {sessionToDelete && (
+            <AlertDialog open={!!sessionToDelete} onOpenChange={(open) => !open && setSessionToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Supprimer la session ?</AlertDialogTitle>
+                        <AlertDialogDescription>Cette action est irréversible et supprimera la session ainsi que tous ses participants.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Annuler</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteSessionConfirmed}>Supprimer</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         )}
     </div>
   );

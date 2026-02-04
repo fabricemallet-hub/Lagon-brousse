@@ -54,6 +54,7 @@ export default function AdminPage() {
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
 
   const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
+  const [fishToDelete, setFishToDelete] = useState<string | null>(null);
   
   // Splash Screen States
   const [splashMode, setSplashMode] = useState<'text' | 'image'>('text');
@@ -156,16 +157,17 @@ export default function AdminPage() {
     }
   };
 
-  const handleDeleteFish = async (fishId: string) => {
-    if (!firestore || !isAdmin) return;
-    if (!confirm("Voulez-vous vraiment supprimer cette espèce du guide ?")) return;
+  const handleDeleteFishConfirmed = async () => {
+    if (!firestore || !isAdmin || !fishToDelete) return;
     
     try {
-        await deleteDoc(doc(firestore, 'fish_species', fishId));
+        await deleteDoc(doc(firestore, 'fish_species', fishToDelete));
         toast({ title: "Espèce supprimée" });
     } catch (error) {
         console.error(error);
         toast({ variant: 'destructive', title: "Erreur", description: "Impossible de supprimer l'espèce." });
+    } finally {
+        setFishToDelete(null);
     }
   };
 
@@ -175,7 +177,6 @@ export default function AdminPage() {
     try {
         const batch = writeBatch(firestore);
         lagoonFishData.forEach(fish => {
-            // Utiliser l'ID du fichier fish-data comme ID de document pour éviter les doublons
             const fishId = fish.id || fish.name.toLowerCase().replace(/\s/g, '-');
             const newDocRef = doc(firestore, 'fish_species', fishId);
             batch.set(newDocRef, {
@@ -423,7 +424,7 @@ export default function AdminPage() {
                       </div>
                       <div className="flex gap-1">
                         <Button variant="ghost" size="icon" onClick={() => { setFishDialogMode('edit'); setCurrentFish(fish); setIsFishDialogOpen(true); }}><Pencil className="size-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteFish(fish.id)}><Trash2 className="size-4 text-destructive" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => setFishToDelete(fish.id)}><Trash2 className="size-4 text-destructive" /></Button>
                       </div>
                     </div>
                   </Card>
@@ -508,6 +509,15 @@ export default function AdminPage() {
           <AlertDialogContent>
             <AlertDialogHeader><AlertDialogTitle>Supprimer la conversation ?</AlertDialogTitle><AlertDialogDescription>Cette action est irréversible et supprimera tous les messages.</AlertDialogDescription></AlertDialogHeader>
             <AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteConversation(conversationToDelete)}>Supprimer</AlertDialogAction></AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {fishToDelete && (
+        <AlertDialog open={!!fishToDelete} onOpenChange={(open) => !open && setFishToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader><AlertDialogTitle>Supprimer l'espèce ?</AlertDialogTitle><AlertDialogDescription>Cette action est irréversible et supprimera cette espèce du guide.</AlertDialogDescription></AlertDialogHeader>
+            <AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={handleDeleteFishConfirmed}>Supprimer</AlertDialogAction></AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       )}
