@@ -55,7 +55,6 @@ import { cn } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
 import { Skeleton } from './ui/skeleton';
 
-// Constants
 const IMMOBILITY_THRESHOLD_METERS = 15;
 const IMMOBILITY_START_MINUTES = 5;
 const THROTTLE_UPDATE_MS = 10000; 
@@ -90,14 +89,12 @@ export function VesselTracker() {
   const [customSharingId, setCustomSharingId] = useState('');
   const [vesselHistory, setVesselHistory] = useState<string[]>([]);
 
-  // Sound settings
   const [isNotifyEnabled, setIsNotifyEnabled] = useState(false);
   const [vesselVolume, setVesselVolume] = useState(0.8);
   const [notifySettings, setNotifySettings] = useState({ moving: true, stationary: true, offline: true });
   const [notifySounds, setNotifySounds] = useState({ moving: 'cloche', stationary: 'sonar', offline: 'alerte' });
   const prevVesselStatusRef = useRef<string | null>(null);
 
-  // Watch settings
   const [isWatchEnabled, setIsWatchEnabled] = useState(false);
   const [watchType, setWatchType] = useState<'moving' | 'stationary' | 'offline'>('stationary');
   const [watchDuration, setWatchDuration] = useState(15);
@@ -150,7 +147,6 @@ export function VesselTracker() {
   }, [firestore, mode, vesselIdToFollow]);
   const { data: remoteVessel } = useDoc<VesselStatus>(vesselRef);
 
-  // Load data on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedHistory = localStorage.getItem('vessel_follow_history');
@@ -162,7 +158,6 @@ export function VesselTracker() {
     }
   }, []);
 
-  // Sync preferences from profile
   useEffect(() => {
     if (userProfile?.vesselPrefs) {
       const prefs = userProfile.vesselPrefs;
@@ -180,22 +175,20 @@ export function VesselTracker() {
     }
   }, [userProfile]);
 
-  // Auto-save preferences
   useEffect(() => {
     if (!user || !firestore || isProfileLoading) return;
     const timeout = setTimeout(() => {
       const prefs = { isNotifyEnabled, vesselVolume, notifySettings, notifySounds, isWatchEnabled, watchType, watchDuration, watchSound };
-      if (JSON.stringify(prefs) !== JSON.stringify(userProfile?.vesselPrefs)) {
-        updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: prefs }).catch(() => {});
-      }
+      updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: prefs }).catch(() => {});
     }, 1500);
     return () => clearTimeout(timeout);
-  }, [user, firestore, isProfileLoading, isNotifyEnabled, vesselVolume, notifySettings, notifySounds, isWatchEnabled, watchType, watchDuration, watchSound, userProfile?.vesselPrefs]);
+  }, [user, firestore, isProfileLoading, isNotifyEnabled, vesselVolume, notifySettings, notifySounds, isWatchEnabled, watchType, watchDuration, watchSound]);
 
   const handleSaveCustomId = useCallback(() => {
     const id = customSharingId.trim().toUpperCase();
     localStorage.setItem('vessel_custom_id', id);
     setCustomSharingId(id);
+    addToHistory(id);
     toast({ title: "ID enregistré", description: `Partage actif sur ID: ${id || 'Défaut'}` });
   }, [customSharingId, toast]);
 
@@ -255,31 +248,6 @@ export function VesselTracker() {
     prevVesselStatusRef.current = currentStatus;
   }, [remoteVessel, mode, isNotifyEnabled, notifySettings, notifySounds, playAlertSound, toast]);
 
-  useEffect(() => {
-    if (mode !== 'receiver' || !isWatchEnabled || isWatchAlerting || !statusStartTime || !remoteVessel) return;
-    const check = setInterval(() => {
-      if (remoteVessel.status === watchType) {
-        const elapsed = (Date.now() - statusStartTime) / 60000;
-        if (elapsed >= watchDuration) {
-          setIsWatchAlerting(true);
-          toast({ variant: "destructive", title: "ALERTE SURVEILLANCE", description: "Limite atteinte" });
-        }
-      }
-    }, 5000);
-    return () => clearInterval(check);
-  }, [mode, isWatchEnabled, isWatchAlerting, statusStartTime, watchType, watchDuration, remoteVessel, toast]);
-
-  useEffect(() => {
-    if (isWatchAlerting) {
-      playAlertSound(watchSound);
-      watchRepeatIntervalRef.current = setInterval(() => playAlertSound(watchSound), 10000);
-    } else if (watchRepeatIntervalRef.current) {
-      clearInterval(watchRepeatIntervalRef.current);
-      watchRepeatIntervalRef.current = null;
-    }
-    return () => { if (watchRepeatIntervalRef.current) clearInterval(watchRepeatIntervalRef.current); };
-  }, [isWatchAlerting, watchSound, playAlertSound]);
-
   const toggleWakeLock = async () => {
     if (!('wakeLock' in navigator)) return;
     if (wakeLock) {
@@ -293,7 +261,7 @@ export function VesselTracker() {
           lock.addEventListener('release', () => setWakeLock(null));
         }
       } catch (err: any) {
-        toast({ variant: "destructive", title: "Permission bloquée", description: "Mise en veille forcée par l'environnement de test." });
+        toast({ variant: "destructive", title: "Permission bloquée", description: "Le mode éveil est limité par ce navigateur." });
       }
     }
   };
@@ -386,41 +354,53 @@ export function VesselTracker() {
             <Button variant={mode === 'receiver' ? 'default' : 'ghost'} className="flex-1 font-bold h-10 rounded-lg" onClick={() => setMode('receiver')}>Récepteur (B)</Button>
           </div>
 
-          {mode === 'sender' ? (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between p-4 border-2 rounded-2xl bg-card shadow-sm">
-                <div className="space-y-0.5"><Label className="text-base font-black uppercase leading-none">Partager ma position</Label><p className="text-[9px] text-muted-foreground uppercase font-bold">Flux GPS live</p></div>
-                <Switch checked={isSharing} onCheckedChange={setIsSharing} className="scale-110" />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1">ID de partage personnalisé</Label>
-                <div className="flex gap-2">
-                  <Input placeholder="ID..." value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} disabled={isSharing} className="font-black text-center uppercase h-12 border-2 rounded-xl" />
-                  <Button variant="outline" size="icon" className="h-12 w-12 border-2 rounded-xl" onClick={handleSaveCustomId} disabled={isSharing}><Save className="size-5" /></Button>
+          <div className="space-y-6">
+            {mode === 'sender' ? (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between p-4 border-2 rounded-2xl bg-card shadow-sm">
+                  <div className="space-y-0.5"><Label className="text-base font-black uppercase leading-none">Partager ma position</Label><p className="text-[9px] text-muted-foreground uppercase font-bold">Flux GPS live</p></div>
+                  <Switch checked={isSharing} onCheckedChange={setIsSharing} className="scale-110" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1">ID de partage personnalisé</Label>
+                  <div className="flex gap-2">
+                    <Input placeholder="ID..." value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} disabled={isSharing} className="font-black text-center uppercase h-12 border-2 rounded-xl" />
+                    <Button variant="outline" size="icon" className="h-12 w-12 border-2 rounded-xl" onClick={handleSaveCustomId} disabled={isSharing}><Save className="size-5" /></Button>
+                  </div>
                 </div>
               </div>
-              <Button variant={wakeLock ? "secondary" : "outline"} className={cn("w-full gap-2 font-black h-12 border-2 text-xs uppercase tracking-widest rounded-xl", wakeLock && "bg-primary/10 text-primary border-primary")} onClick={toggleWakeLock}><Zap className={cn("size-4", wakeLock && "fill-current")} />{wakeLock ? "MODE ÉVEIL ACTIF" : "ACTIVER MODE ÉVEIL"}</Button>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1">Navire à suivre (ID)</Label>
-                <div className="flex gap-2">
-                  <Input placeholder="ID..." value={vesselIdToFollow} onChange={e => setVesselIdToFollow(e.target.value)} className="font-black text-center uppercase h-12 border-2 rounded-xl" />
-                  <Button variant="secondary" size="icon" className="h-12 w-12 border-2 rounded-xl" onClick={() => vesselIdToFollow && addToHistory(vesselIdToFollow)}><Plus className="size-5" /></Button>
+            ) : (
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1">Navire à suivre (ID)</Label>
+                  <div className="flex gap-2">
+                    <Input placeholder="ID..." value={vesselIdToFollow} onChange={e => setVesselIdToFollow(e.target.value)} className="font-black text-center uppercase h-12 border-2 rounded-xl" />
+                    <Button variant="secondary" size="icon" className="h-12 w-12 border-2 rounded-xl" onClick={() => { if(vesselIdToFollow) addToHistory(vesselIdToFollow); }}><Plus className="size-5" /></Button>
+                  </div>
                 </div>
               </div>
-              {vesselHistory.length > 0 && (
+            )}
+
+            {/* Historique visible dans les deux modes car les IDs sont partagés */}
+            {vesselHistory.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1">Historique des IDs</Label>
                 <div className="flex flex-wrap gap-2 px-1">
                   {vesselHistory.map(id => (
-                    <Badge key={id} variant="secondary" className="pl-3 pr-1 h-8 font-black text-[10px] cursor-pointer rounded-full" onClick={() => setVesselIdToFollow(id)}>
-                      {id} <button onClick={(e) => { e.stopPropagation(); removeFromHistory(id); }} className="ml-2 p-1 hover:bg-black/10 rounded-full"><Trash2 className="size-3 text-destructive" /></button>
+                    <Badge key={id} variant="secondary" className="pl-3 pr-1 h-8 font-black text-[10px] cursor-pointer rounded-full bg-muted/50 hover:bg-muted" onClick={() => mode === 'sender' ? setCustomSharingId(id) : setVesselIdToFollow(id)}>
+                      {id} 
+                      <button onClick={(e) => { e.stopPropagation(); removeFromHistory(id); }} className="ml-2 p-1 hover:bg-black/10 rounded-full">
+                        <Trash2 className="size-3 text-destructive" />
+                      </button>
                     </Badge>
                   ))}
                 </div>
-              )}
-              <Button variant={wakeLock ? "secondary" : "outline"} className={cn("w-full gap-2 font-black h-12 border-2 text-xs uppercase tracking-widest rounded-xl", wakeLock && "bg-primary/10 text-primary border-primary")} onClick={toggleWakeLock}><Zap className={cn("size-4", wakeLock && "fill-current")} />{wakeLock ? "MODE ÉVEIL ACTIF" : "ACTIVER MODE ÉVEIL"}</Button>
-              
+              </div>
+            )}
+
+            <Button variant={wakeLock ? "secondary" : "outline"} className={cn("w-full gap-2 font-black h-12 border-2 text-xs uppercase tracking-widest rounded-xl", wakeLock && "bg-primary/10 text-primary border-primary")} onClick={toggleWakeLock}><Zap className={cn("size-4", wakeLock && "fill-current")} />{wakeLock ? "MODE ÉVEIL ACTIF" : "ACTIVER MODE ÉVEIL"}</Button>
+
+            {mode === 'receiver' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-4 border-2 rounded-2xl bg-card shadow-sm">
                     <div className="flex items-center gap-3"><Bell className={cn("size-5", isNotifyEnabled && "text-primary fill-current")} /><Label className="font-black uppercase text-sm">Alertes Sonores</Label></div>
@@ -438,8 +418,14 @@ export function VesselTracker() {
                             <AccordionContent className="p-4 space-y-4 border-t border-dashed">
                                 {['moving', 'stationary', 'offline'].map(st => (
                                     <div key={st} className="space-y-2">
-                                        <div className="flex items-center justify-between"><Label className="text-[10px] font-black uppercase opacity-60">{st}</Label><Switch checked={(notifySettings as any)[st]} onCheckedChange={val => setNotifySettings({...notifySettings, [st]: val})} /></div>
-                                        <div className="flex gap-2"><Select value={(notifySounds as any)[st]} onValueChange={v => setNotifySounds({...notifySounds, [st]: v})}><SelectTrigger className="h-10 text-xs border-2 rounded-xl"><SelectValue /></SelectTrigger><SelectContent>{availableSounds.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent></Select><Button variant="outline" size="icon" className="h-10 w-10 border-2 rounded-xl" onClick={() => playAlertSound((notifySounds as any)[st])}><Play className="size-4" /></Button></div>
+                                        <div className="flex items-center justify-between"><Label className="text-[10px] font-black uppercase opacity-60">{st === 'moving' ? 'En route' : st === 'stationary' ? 'Immobile' : 'Perte réseau'}</Label><Switch checked={(notifySettings as any)[st]} onCheckedChange={val => setNotifySettings({...notifySettings, [st]: val})} /></div>
+                                        <div className="flex gap-2">
+                                          <Select value={(notifySounds as any)[st]} onValueChange={v => setNotifySounds({...notifySounds, [st]: v})}>
+                                            <SelectTrigger className="h-10 text-xs border-2 rounded-xl"><SelectValue /></SelectTrigger>
+                                            <SelectContent>{availableSounds.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+                                          </Select>
+                                          <Button variant="outline" size="icon" className="h-10 w-10 border-2 rounded-xl" onClick={() => playAlertSound((notifySounds as any)[st])}><Play className="size-4" /></Button>
+                                        </div>
                                     </div>
                                 ))}
                             </AccordionContent>
@@ -461,8 +447,8 @@ export function VesselTracker() {
                   </div>
                 )}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -504,11 +490,9 @@ export function VesselTracker() {
                   <AlertDialogContent className="rounded-2xl border-2">
                     <AlertDialogHeader>
                       <AlertDialogTitle className="font-black uppercase tracking-tighter">Envoyer une alerte ?</AlertDialogTitle>
-                      <AlertDialogHeader>
-                        <AlertDialogDescription className="text-xs font-medium leading-relaxed text-left">
-                          Ceci va générer un SMS de détresse incluant votre position GPS exacte vers votre contact d'urgence : <span className="font-bold text-foreground">{emergencyContact || "Non défini"}</span>.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
+                      <AlertDialogDescription className="text-xs font-medium leading-relaxed text-left">
+                        Ceci va générer un SMS de détresse incluant votre position GPS exacte vers votre contact d'urgence : <span className="font-bold text-foreground">{emergencyContact || "Non défini"}</span>.
+                      </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter className="flex flex-row gap-3 pt-2">
                       <AlertDialogCancel className="flex-1 h-12 font-black uppercase text-xs rounded-xl border-2">Annuler</AlertDialogCancel>
@@ -527,10 +511,10 @@ export function VesselTracker() {
                   <div className="flex justify-between font-black uppercase text-red-600"><span>MRCC Secours en Mer</span><span>196 / VHF 16</span></div>
                   <div className="flex items-start gap-2 bg-red-50 p-2 rounded border border-red-100 italic">
                     <Info className="size-3 text-red-600 shrink-0 mt-0.5" />
-                    <p>Utilisez le <strong>CANAL 16</strong> de la VHF en priorité en mer. Le 196 est idéal pour les appels depuis la terre.</p>
+                    <p>Utilisez le <strong>CANAL 16</strong> de la VHF en priorité en mer. Le 196 est idéal pour les appels depuis la terre ferme.</p>
                   </div>
-                  <div className="flex justify-between opacity-70"><span>Pompiers</span><span className="font-bold">18</span></div>
-                  <div className="flex justify-between opacity-70"><span>SAMU</span><span className="font-bold">15 / +687 78.77.25</span></div>
+                  <div className="flex justify-between opacity-70"><span>Sapeurs-pompiers</span><span className="font-bold">18</span></div>
+                  <div className="flex justify-between opacity-70"><span>SAMU - SOS Médecins</span><span className="font-bold">15 / +687 78.77.25</span></div>
                   <div className="flex justify-between opacity-70"><span>SNSM Nouméa</span><span className="font-bold">25.23.12</span></div>
                 </div>
                 <div className="space-y-1">
