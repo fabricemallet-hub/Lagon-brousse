@@ -179,6 +179,28 @@ export default function AdminPage() {
     reader.readAsDataURL(file);
   };
 
+  const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>, callback: (base64: string) => void) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 500000) {
+      toast({ 
+        variant: 'destructive', 
+        title: "Fichier trop lourd", 
+        description: "Le MP3 doit faire moins de 500 Ko pour garantir une lecture fluide en mer." 
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      callback(base64);
+      toast({ title: "Son chargé", description: "Le fichier est prêt à être sauvegardé." });
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleAiFillFish = async () => {
     if (!currentFish.name) {
         toast({ variant: 'destructive', title: "Nom manquant", description: "Saisissez au moins le nom commun du poisson." });
@@ -990,7 +1012,7 @@ export default function AdminPage() {
         <DialogContent>
             <DialogHeader>
                 <DialogTitle>{soundDialogMode === 'add' ? 'Ajouter un son' : 'Modifier le son'}</DialogTitle>
-                <DialogDescription>Saisissez le nom du son et son URL vers un fichier MP3.</DialogDescription>
+                <DialogDescription>Saisissez le nom du son et son URL ou chargez un fichier MP3.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
                 <Alert className="bg-blue-50 border-blue-200">
@@ -1005,9 +1027,18 @@ export default function AdminPage() {
 
                 <div className="space-y-2"><Label>Libellé du son</Label><Input value={currentSound.label || ''} onChange={e => setCurrentSound({...currentSound, label: e.target.value})} placeholder="Signal radio..." /></div>
                 <div className="space-y-2">
-                    <Label>URL du MP3</Label>
+                    <Label>Fichier MP3 / URL</Label>
                     <div className="flex gap-2">
-                        <Input value={currentSound.url || ''} onChange={e => setCurrentSound({...currentSound, url: e.target.value})} placeholder="https://assets.mixkit.co/..." />
+                        <Input value={currentSound.url || ''} onChange={e => setCurrentSound({...currentSound, url: e.target.value})} placeholder="https://... ou fichier chargé" />
+                        <div className="relative">
+                            <input 
+                                type="file" 
+                                accept="audio/mpeg" 
+                                className="absolute inset-0 opacity-0 cursor-pointer" 
+                                onChange={e => handleAudioUpload(e, (b) => setCurrentSound({...currentSound, url: b}))} 
+                            />
+                            <Button variant="outline" size="icon" title="Charger depuis l'ordinateur"><Upload className="size-4"/></Button>
+                        </div>
                         <Button variant="outline" size="icon" onClick={() => currentSound.url && playPreview(currentSound.url)} title="Aperçu"><Play className="size-4"/></Button>
                         <Button variant="outline" size="icon" onClick={() => currentSound.url && downloadFile(currentSound.url, currentSound.label || 'son')} title="Télécharger"><Download className="size-4"/></Button>
                     </div>
