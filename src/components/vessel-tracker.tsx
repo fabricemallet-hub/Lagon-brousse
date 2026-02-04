@@ -232,7 +232,6 @@ export function VesselTracker() {
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
-  // Firebase Ref and Document for remote vessel
   const vesselRef = useMemoFirebase(() => {
     const cleanId = vesselIdToFollow.trim().toUpperCase();
     if (!firestore || mode !== 'receiver' || !cleanId) return null;
@@ -248,7 +247,6 @@ export function VesselTracker() {
     }
   }, [mode, isSharing, vesselStatus, remoteVessel]);
 
-  // SMS Text Memoized Logic
   const defaultSmsText = useMemo(() => {
     const name = mode === 'sender' 
       ? (vesselNickname || 'Capitaine') 
@@ -716,7 +714,7 @@ export function VesselTracker() {
                                 {isWatchEnabled && (
                                     <div className="space-y-4 pt-2">
                                         <div className="space-y-1"><Label className="text-[10px] font-bold uppercase opacity-60">Statut</Label><Select value={watchType} onValueChange={v => setWatchType(v as any)}><SelectTrigger className="h-10 text-xs border-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="stationary">Immobile</SelectItem><SelectItem value="moving">En mouvement</SelectItem><SelectItem value="offline">Perte réseau</SelectItem></SelectContent></Select></div>
-                                        <div className="space-y-1"><div className="flex justify-between"><Label className="text-[10px] font-bold uppercase opacity-60">Durée</Label><span className="text-[10px] font-black">{watchDuration} min</span></div><Slider value={[watchDuration]} min={1} max={60} step={1} onValueChange={v => setWatchDuration(v[0])} /></div>
+                                        <div className="space-y-1"><div className="flex justify-between"><Label className="text-[10px] font-bold uppercase opacity-60">Durée</Label><span className="text-[10px] font-black">{watchDuration >= 60 ? `${Math.floor(watchDuration / 60)}h${watchDuration % 60 > 0 ? ` ${watchDuration % 60}min` : ''}` : `${watchDuration} min`}</span></div><Slider value={[watchDuration]} min={1} max={1440} step={1} onValueChange={v => setWatchDuration(v[0])} /></div>
                                         <div className="space-y-1"><Label className="text-[10px] font-bold uppercase opacity-60">Son</Label><Select value={watchSound} onValueChange={v => setWatchSound(v)}><SelectTrigger className="h-10 text-xs border-2"><SelectValue /></SelectTrigger><SelectContent>{availableSounds.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent></Select></div>
                                     </div>
                                 )}
