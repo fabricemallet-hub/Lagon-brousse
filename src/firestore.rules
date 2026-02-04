@@ -1,62 +1,63 @@
 rules_version = '2';
 
 /**
- * LAGON & BROUSSE NC - SECURITY POLICY (V2.2)
- * Synchronized with root rules for consistency.
+ * LAGON & BROUSSE NC - SECURITY POLICY (V2.5)
+ * Synchronized with root rules for absolute consistency.
  */
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- HELPER FUNCTIONS ---
+    // --- 1. COLLECTIONS PUBLIQUES (PRIORITÉ MAXIMALE) ---
+    
+    match /system_notifications/{id} {
+      allow get, list: if true;
+    }
+    
+    match /app_settings/{id} {
+      allow get, list: if true;
+    }
+
+    match /meteo_caledonie/{id} {
+      allow get, list: if true;
+      match /previsions/{prevId} {
+        allow get, list: if true;
+      }
+    }
+
+    match /fish_species/{id} {
+      allow get, list: if true;
+    }
+    
+    match /shared_access_tokens/{id} {
+      allow get, list: if true;
+    }
+
+    // --- 2. FONCTIONS DE SÉCURITÉ ---
 
     function isSignedIn() {
       return request.auth != null;
     }
 
     function isAdmin() {
-      return isSignedIn() && (
-        (request.auth.token.email != null && (
-          request.auth.token.email.lower() == 'f.mallet81@gmail.com' || 
-          request.auth.token.email.lower() == 'f.mallet81@outlook.com'
-        )) ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'admin')
-      );
+      return isSignedIn() && 
+             request.auth.token.email != null && 
+             (request.auth.token.email == 'f.mallet81@gmail.com' || 
+              request.auth.token.email == 'f.mallet81@outlook.com');
     }
 
-    // --- PUBLIC COLLECTIONS ---
+    // --- 3. DROITS D'ÉCRITURE ADMIN ---
 
-    match /system_notifications/{id} {
-      allow read: if true;
-      allow write: if isAdmin();
+    match /system_notifications/{id} { allow write: if isAdmin(); }
+    match /app_settings/{id} { allow write: if isAdmin(); }
+    match /meteo_caledonie/{id} { 
+      allow write: if isAdmin(); 
+      match /previsions/{prevId} { allow write: if isAdmin(); }
     }
-    
-    match /app_settings/{id} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
+    match /fish_species/{id} { allow write: if isAdmin(); }
+    match /shared_access_tokens/{id} { allow write: if isAdmin(); }
 
-    match /meteo_caledonie/{id} {
-      allow read: if true;
-      allow write: if isAdmin();
-      match /previsions/{prevId} {
-        allow read: if true;
-        allow write: if isAdmin();
-      }
-    }
-
-    match /fish_species/{id} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    match /shared_access_tokens/{id} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    // --- PROTECTED COLLECTIONS ---
+    // --- 4. COLLECTIONS PROTÉGÉES ---
 
     match /users/{userId} {
       allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
