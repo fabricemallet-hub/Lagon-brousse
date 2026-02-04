@@ -67,9 +67,10 @@ import { Skeleton } from './ui/skeleton';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
-const IMMOBILITY_THRESHOLD_METERS = 15;
-const IMMOBILITY_START_MINUTES = 1; 
-const THROTTLE_UPDATE_MS = 10000; 
+// CONFIGURATION DES SEUILS
+const IMMOBILITY_THRESHOLD_METERS = 20; // Rayon de 20m pour repasser en mouvement
+const IMMOBILITY_START_MINUTES = 1;     // Délai pour passer en stationnaire
+const THROTTLE_UPDATE_MS = 10000;       // Fréquence max de mise à jour Firestore
 
 interface StatusEvent {
   status: 'moving' | 'stationary' | 'offline';
@@ -271,7 +272,6 @@ export function VesselTracker() {
     return () => clearInterval(interval);
   }, [statusStartTime]);
 
-  // Détection du changement d'état et enregistrement dans l'historique
   useEffect(() => {
     if (currentEffectiveStatus !== prevVesselStatusRef.current) {
       const now = Date.now();
@@ -378,8 +378,12 @@ export function VesselTracker() {
           lastFirestoreUpdateRef.current = now;
           return;
         }
+        
+        // Calcul de la distance par rapport au point d'ancrage
         const dist = getDistance(newLat, newLng, anchorPos.lat, anchorPos.lng);
+        
         if (dist > IMMOBILITY_THRESHOLD_METERS) {
+          // Repassage en mouvement si on sort du rayon de 20m
           setVesselStatus('moving');
           setAnchorPos(newPos);
           setLastMovementTime(now);
@@ -393,6 +397,7 @@ export function VesselTracker() {
             lastFirestoreUpdateRef.current = now;
           }
         } else {
+          // Détection d'immobilité prolongée
           const idle = (now - lastMovementTime) / 60000;
           if (idle >= IMMOBILITY_START_MINUTES && vesselStatus === 'moving') {
             setVesselStatus('stationary');
@@ -605,7 +610,6 @@ export function VesselTracker() {
         )}
 
         <div className="bg-card border-t-2 p-4 flex flex-col gap-3">
-            {/* Bandeau de statut optimisé style image */}
             <div className={cn(
                 "flex items-center justify-between p-3 rounded-xl border shadow-sm transition-all duration-500",
                 currentEffectiveStatus === 'moving' ? "bg-green-50/50 border-green-200" : currentEffectiveStatus === 'stationary' ? "bg-amber-50/50 border-amber-200" : "bg-red-50/50 border-red-200"
@@ -654,25 +658,25 @@ export function VesselTracker() {
                 )}
             </div>
 
-            {/* Historique des événements */}
+            {/* Historique des événements selon le modèle utilisateur */}
             {statusEvents.length > 0 && (
               <div className="mt-2 space-y-2">
                 <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
                   <History className="size-3" /> Historique des états
                 </h4>
-                <div className="grid gap-1.5">
+                <div className="bg-card border rounded-xl overflow-hidden shadow-sm">
                   {statusEvents.map((event, idx) => {
-                    const label = event.status === 'moving' ? 'Mouvement' : event.status === 'stationary' ? 'Mouillage' : 'Signal Perdu';
+                    const label = event.status === 'moving' ? 'MOUVEMENT' : event.status === 'stationary' ? 'MOUILLAGE' : 'SIGNAL PERDU';
                     const color = event.status === 'moving' ? 'text-green-600' : event.status === 'stationary' ? 'text-amber-600' : 'text-red-600';
                     return (
-                      <div key={idx} className="flex items-center justify-between p-2.5 bg-card border rounded-lg shadow-sm text-[11px] animate-in fade-in slide-in-from-left-2">
-                        <div className="flex items-center gap-3">
-                          <span className="font-bold tabular-nums opacity-50">{format(event.timestamp, 'HH:mm:ss')}</span>
-                          <span className={cn("font-black uppercase tracking-tighter", color)}>{label}</span>
+                      <div key={idx} className="flex items-center justify-between p-3 border-b last:border-0 text-[11px] animate-in fade-in slide-in-from-left-2">
+                        <div className="flex items-center gap-4">
+                          <span className="font-bold tabular-nums text-muted-foreground/60">{format(event.timestamp, 'HH:mm:ss')}</span>
+                          <span className={cn("font-black uppercase tracking-tight", color)}>{label}</span>
                         </div>
                         {event.location && (
                           <button 
-                            className="flex items-center gap-1 text-primary hover:underline font-bold"
+                            className="flex items-center gap-1 text-primary/60 hover:text-primary font-bold"
                             onClick={() => {
                               const url = `https://www.google.com/maps?q=${event.location!.lat},${event.location!.lng}`;
                               window.open(url, '_blank');
@@ -691,41 +695,39 @@ export function VesselTracker() {
         
         <CardFooter className="bg-muted/10 p-4 flex flex-col gap-4 border-t-2">
           <div className="w-full space-y-4">
-            <div className="grid grid-cols-1 gap-2">
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" className="w-full h-14 bg-red-600 text-sm font-black shadow-lg flex items-center justify-center gap-2 uppercase rounded-xl border-b-4 border-red-800 transition-all active:scale-95" disabled={!lastValidLocation}>
-                    <ShieldAlert className="size-6" /> ALERTE SMS
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="rounded-2xl border-2">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle className="font-black uppercase tracking-tighter">Envoyer une alerte ?</AlertDialogTitle>
-                    <AlertDialogDescription className="text-xs font-medium leading-relaxed text-left">
-                      Ceci va générer un SMS de détresse incluant votre position GPS exacte vers votre contact d'urgence : <span className="font-bold text-foreground">{emergencyContact || "Non défini"}</span>.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter className="flex flex-row gap-3 pt-2">
-                    <AlertDialogCancel className="flex-1 h-12 font-black uppercase text-xs rounded-xl border-2">Annuler</AlertDialogCancel>
-                    <AlertDialogAction 
-                      className="flex-1 h-12 bg-red-600 hover:bg-red-700 text-white font-black uppercase text-xs rounded-xl"
-                      onClick={() => lastValidLocation && sendEmergencySms(lastValidLocation.lat, lastValidLocation.lng, displayVessel?.displayName || 'Capitaine')}
-                    >
-                      Confirmer
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" className="w-full h-14 bg-red-600 text-sm font-black shadow-lg flex items-center justify-center gap-2 uppercase rounded-xl border-b-4 border-red-800 transition-all active:scale-95" disabled={!lastValidLocation}>
+                  <ShieldAlert className="size-6" /> ALERTE SMS
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="rounded-2xl border-2">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="font-black uppercase tracking-tighter text-left">Confirmer l'alerte ?</AlertDialogTitle>
+                  <AlertDialogDescription className="text-xs font-medium leading-relaxed text-left">
+                    Cela enverra immédiatement un SMS de détresse avec votre position GPS à <span className="font-bold text-foreground">{emergencyContact || "votre contact d'urgence"}</span>.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="flex flex-row gap-3 pt-2">
+                  <AlertDialogCancel className="flex-1 h-12 font-black uppercase text-xs rounded-xl border-2">Annuler</AlertDialogCancel>
+                  <AlertDialogAction 
+                    className="flex-1 h-12 bg-red-600 hover:bg-red-700 text-white font-black uppercase text-xs rounded-xl"
+                    onClick={() => lastValidLocation && sendEmergencySms(lastValidLocation.lat, lastValidLocation.lng, displayVessel?.displayName || 'Capitaine')}
+                  >
+                    Confirmer
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
             <div className="space-y-3">
               <div className="bg-white/80 p-4 rounded-xl border-2 border-dashed text-[10px] space-y-2">
                 <div className="flex justify-between font-black uppercase text-red-600"><span>MRCC Secours en Mer</span><span>196 / VHF 16</span></div>
                 <div className="flex items-start gap-2 bg-red-50 p-2 rounded border border-red-100 italic">
                   <Info className="size-3 text-red-600 shrink-0 mt-0.5" />
-                  <p>Utilisez le <strong>CANAL 16</strong> de la VHF en priorité en mer. Le 196 est idéal pour les appels depuis la terre ferme.</p>
+                  <p>Utilisez le <strong>CANAL 16</strong> de la VHF en priorité. Le 196 est idéal pour les appels depuis la terre ferme.</p>
                 </div>
-                <div className="flex justify-between opacity-70"><span>Sapeurs-pompiers</span><span className="font-bold">18</span></div>
-                <div className="flex justify-between opacity-70"><span>SAMU - SOS Médecins</span><span className="font-bold">15 / +687 78.77.25</span></div>
+                <div className="flex justify-between opacity-70"><span>SAMU - SOS Médecins</span><span className="font-bold">15</span></div>
                 <div className="flex justify-between opacity-70"><span>SNSM Nouméa</span><span className="font-bold">25.23.12</span></div>
               </div>
               <div className="space-y-1">
