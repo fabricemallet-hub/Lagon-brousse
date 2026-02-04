@@ -1,11 +1,25 @@
 
 rules_version = '2';
+
+/**
+ * LAGON & BROUSSE NC - SECURITY POLICY (SOURCE)
+ */
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // HELPERS
-    function isAuth() { return request.auth != null; }
-    function isAdmin() { 
-      return isAuth() && (
+
+    // --- GLOBAL HELPER FUNCTIONS ---
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
         request.auth.token.email.lower() in ['f.mallet81@gmail.com', 'f.mallet81@outlook.com'] ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'admin')
@@ -14,82 +28,89 @@ service cloud.firestore {
 
     // --- COLLECTION RULES ---
 
-    // Paramètres système (Splash screen, configuration globale)
+    // Paramètres de l'application
     match /app_settings/{id} {
-      allow read: if true; 
+      allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Météo en temps réel et prévisions
+    // Météo NC Live
     match /meteo_caledonie/{communeId} {
       allow read: if true;
       allow write: if isAdmin();
-      
-      // Autoriser l'accès aux sous-collections (prévisions)
       match /{allPaths=**} {
         allow read: if true;
         allow write: if isAdmin();
       }
     }
 
-    // Sessions de chasse
-    match /hunting_sessions/{sId} {
-      allow read, write: if isAuth();
-      match /participants/{pId} {
-        allow read, write: if isAuth();
-      }
+    // Guide des Poissons
+    match /fish_species/{fishId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
-    // Profils utilisateurs et données privées
-    match /users/{uId} {
-      allow read, write: if isAdmin() || (isAuth() && request.auth.uid == uId);
-      allow write: if isAdmin() || (isAuth() && request.auth.uid == uId);
+    // Profils utilisateurs
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) || isAdmin();
       match /{allPaths=**} {
-        allow read, write: if isAdmin() || (isAuth() && request.auth.uid == uId);
+        allow read, write: if isOwner(userId) || isAdmin();
       }
     }
 
-    // Tracker maritime (Vessel Tracker)
-    match /vessels/{vId} {
-      allow read, write: if isAuth();
-      match /{allPaths=**} { allow read, write: if isAuth(); }
+    // Sessions de chasse
+    match /hunting_sessions/{sessionId} {
+      allow read, write: if isSignedIn();
+      match /participants/{participantId} {
+        allow read, write: if isSignedIn();
+      }
     }
 
-    // Jetons d'accès et abonnements
-    match /access_tokens/{tId} { allow read, write: if isAuth(); }
-    match /shared_access_tokens/{tId} { allow read: if isAuth(); allow write: if isAdmin(); }
-    
-    // Messagerie (Support Admin)
-    match /conversations/{cId} {
-      allow read, write: if isAdmin() || (isAuth() && request.auth.uid == cId);
-      match /{allPaths=**} { allow read, write: if isAdmin() || (isAuth() && request.auth.uid == cId); }
+    // Tracker maritime
+    match /vessels/{vesselId} {
+      allow read, write: if isSignedIn();
+      match /{allPaths=**} {
+        allow read, write: if isSignedIn();
+      }
     }
 
-    // Notifications Système
+    // Messagerie (Support)
+    match /conversations/{convId} {
+      allow read, write: if isOwner(convId) || isAdmin();
+      match /messages/{msgId} {
+        allow read, write: if isOwner(convId) || isAdmin();
+      }
+    }
+
+    // Jetons d'accès
+    match /access_tokens/{tokenId} {
+      allow read, write: if isSignedIn();
+    }
+    match /shared_access_tokens/{tokenId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Notifications Système (Public read for banner)
     match /system_notifications/{notifId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Stations de marée et archives (Lecture pour abonnés)
+    // Stations et Archives
     match /stations/{stationId} {
-      allow read: if isAuth();
+      allow read: if isSignedIn();
       allow write: if isAdmin();
       match /{allPaths=**} {
-        allow read: if isAuth();
+        allow read: if isSignedIn();
         allow write: if isAdmin();
       }
     }
-
-    // Personnalisation des poissons
-    match /fish_customizations/{fishId} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    // Règle par défaut : lecture pour abonnés, écriture pour admin
+    
+    // Default catch-all
     match /{allPaths=**} {
-      allow read: if isAuth();
+      allow read: if isSignedIn();
       allow write: if isAdmin();
     }
   }

@@ -2,7 +2,7 @@
 rules_version = '2';
 
 /**
- * MARÉES ET TERROIR CALÉDONIEN - SECURITY POLICY
+ * LAGON & BROUSSE NC - SECURITY POLICY
  */
 
 service cloud.firestore {
@@ -44,7 +44,7 @@ service cloud.firestore {
       }
     }
 
-    // Guide des Poissons (CRUD Admin)
+    // Guide des Poissons
     match /fish_species/{fishId} {
       allow read: if true;
       allow write: if isAdmin();
@@ -75,7 +75,7 @@ service cloud.firestore {
       }
     }
 
-    // Messagerie
+    // Messagerie (Support)
     match /conversations/{convId} {
       allow read, write: if isOwner(convId) || isAdmin();
       match /messages/{msgId} {
@@ -83,7 +83,7 @@ service cloud.firestore {
       }
     }
 
-    // Jetons
+    // Jetons d'accès
     match /access_tokens/{tokenId} {
       allow read, write: if isSignedIn();
     }
@@ -92,13 +92,13 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Notifications Système
+    // Notifications Système (Public read for banner)
     match /system_notifications/{notifId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Données archives
+    // Stations et Archives
     match /stations/{stationId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
@@ -106,6 +106,12 @@ service cloud.firestore {
         allow read: if isSignedIn();
         allow write: if isAdmin();
       }
+    }
+    
+    // Default catch-all
+    match /{allPaths=**} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
   }
 }
