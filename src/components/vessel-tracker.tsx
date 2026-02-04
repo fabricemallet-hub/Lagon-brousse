@@ -38,7 +38,10 @@ import {
   BellOff,
   Volume2,
   Settings2,
-  Play
+  Play,
+  Clock,
+  CheckCircle2,
+  Timer
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { VesselStatus, UserAccount } from '@/lib/types';
@@ -100,6 +103,15 @@ export function VesselTracker() {
   });
   const prevVesselStatusRef = useRef<string | null>(null);
 
+  // Advanced Timed Watch State
+  const [isWatchEnabled, setIsWatchEnabled] = useState(false);
+  const [watchType, setWatchType] = useState<'moving' | 'stationary' | 'offline'>('stationary');
+  const [watchDuration, setWatchDuration] = useState(15);
+  const [watchSound, setWatchSound] = useState('alerte');
+  const [isWatchAlerting, setIsWatchAlerting] = useState(false);
+  const [statusStartTime, setStatusStartTime] = useState<number | null>(null);
+  const watchRepeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   // Tracking State (Sender)
   const [currentPos, setCurrentPos] = useState<google.maps.LatLngLiteral | null>(null);
   const [anchorPos, setAnchorPos] = useState<google.maps.LatLngLiteral | null>(null);
@@ -146,12 +158,21 @@ export function VesselTracker() {
     }
   }, [vesselVolume]);
 
+  // --- RECEIVER WATCH LOGIC ---
   useEffect(() => {
-    if (mode === 'receiver' && remoteVessel && isNotifyEnabled) {
-      const currentStatus = remoteVessel.status;
-      
+    if (mode !== 'receiver' || !remoteVessel) return;
+
+    const currentStatus = remoteVessel.status;
+
+    // Reset timer if status changes
+    if (currentStatus !== prevVesselStatusRef.current) {
+      setStatusStartTime(Date.now());
+      setIsWatchAlerting(false); // Reset alert on state change
+    }
+
+    // Standard notifications
+    if (isNotifyEnabled) {
       if (prevVesselStatusRef.current !== null && prevVesselStatusRef.current !== currentStatus) {
-        // Status changed
         let soundToPlay = '';
         if (currentStatus === 'moving' && notifySettings.moving) soundToPlay = notifySounds.moving;
         if (currentStatus === 'stationary' && notifySettings.stationary) soundToPlay = notifySounds.stationary;
@@ -166,9 +187,59 @@ export function VesselTracker() {
           });
         }
       }
-      prevVesselStatusRef.current = currentStatus;
     }
+    prevVesselStatusRef.current = currentStatus;
   }, [remoteVessel, mode, isNotifyEnabled, notifySettings, notifySounds, playAlertSound, toast]);
+
+  // Check Watch Duration
+  useEffect(() => {
+    if (mode !== 'receiver' || !isWatchEnabled || isWatchAlerting || !statusStartTime || !remoteVessel) return;
+
+    const checkInterval = setInterval(() => {
+      if (remoteVessel.status === watchType) {
+        const elapsedMinutes = (Date.now() - statusStartTime) / 60000;
+        if (elapsedMinutes >= watchDuration) {
+          setIsWatchAlerting(true);
+          toast({ 
+            variant: "destructive",
+            title: "SURVEILLANCE CRITIQUE", 
+            description: `Le navire est en état "${watchType}" depuis plus de ${watchDuration} minutes.` 
+          });
+        }
+      }
+    }, 5000);
+
+    return () => clearInterval(checkInterval);
+  }, [mode, isWatchEnabled, isWatchAlerting, statusStartTime, watchType, watchDuration, remoteVessel, toast]);
+
+  // Handle Repeating Sound for Watch Alert
+  useEffect(() => {
+    if (isWatchAlerting) {
+      // Play immediately
+      playAlertSound(watchSound);
+      
+      // Setup repeat every 10 seconds
+      watchRepeatIntervalRef.current = setInterval(() => {
+        playAlertSound(watchSound);
+      }, 10000);
+    } else {
+      if (watchRepeatIntervalRef.current) {
+        clearInterval(watchRepeatIntervalRef.current);
+        watchRepeatIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (watchRepeatIntervalRef.current) clearInterval(watchRepeatIntervalRef.current);
+    };
+  }, [isWatchAlerting, watchSound, playAlertSound]);
+
+  const handleStopWatchAlert = () => {
+    setIsWatchAlerting(false);
+    // We also reset the timer so it doesn't trigger immediately again for the same continuous state
+    setStatusStartTime(Date.now());
+    toast({ title: "Alerte acquittée", description: "Le minuteur de surveillance a été réinitialisé." });
+  };
 
   // Online detection
   useEffect(() => {
@@ -451,6 +522,26 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
 
   return (
     <div className="space-y-6">
+      {isWatchAlerting && (
+        <div className="fixed top-0 left-0 right-0 z-[200] p-4 bg-red-600 animate-in fade-in slide-in-from-top-4">
+          <div className="max-w-md mx-auto flex flex-col items-center gap-4">
+            <div className="flex items-center gap-3 text-white">
+              <ShieldAlert className="size-8 animate-pulse" />
+              <div className="text-center">
+                <p className="font-black uppercase text-lg tracking-tighter">ALERTE SURVEILLANCE</p>
+                <p className="text-xs font-bold opacity-90">Dépassement de durée pour l'état : {watchType}</p>
+              </div>
+            </div>
+            <Button 
+              className="w-full bg-white text-red-600 hover:bg-white/90 font-black h-14 text-lg shadow-2xl"
+              onClick={handleStopWatchAlert}
+            >
+              <CheckCircle2 className="mr-2 size-6" /> VALIDER & ARRÊTER L'ALERTE
+            </Button>
+          </div>
+        </div>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -558,17 +649,17 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
 
               <div className="pt-2">
                 <Button 
-                  variant={isNotifyEnabled ? "secondary" : "outline"} 
+                  variant={isNotifyEnabled || isWatchEnabled ? "secondary" : "outline"} 
                   size="sm"
-                  className={cn("w-full gap-2 font-bold h-11 border-2", isNotifyEnabled && "bg-primary/10 text-primary border-primary")}
+                  className={cn("w-full gap-2 font-bold h-11 border-2", (isNotifyEnabled || isWatchEnabled) && "bg-primary/10 text-primary border-primary")}
                   onClick={() => setIsNotifyEnabled(!isNotifyEnabled)}
                 >
-                  {isNotifyEnabled ? <Bell className="size-4 fill-current" /> : <BellOff className="size-4" />}
-                  {isNotifyEnabled ? "NOTIFICATIONS ACTIVES" : "ACTIVER ALERTES SONORES"}
+                  {(isNotifyEnabled || isWatchEnabled) ? <Bell className="size-4 fill-current" /> : <BellOff className="size-4" />}
+                  {(isNotifyEnabled || isWatchEnabled) ? "NOTIFICATIONS ACTIVES" : "ACTIVER ALERTES SONORES"}
                 </Button>
                 
                 {isNotifyEnabled && (
-                  <div className="mt-4 p-4 border rounded-lg bg-muted/30 space-y-4 animate-in fade-in slide-in-from-top-2">
+                  <div className="mt-4 p-4 border rounded-lg bg-muted/30 space-y-6 animate-in fade-in slide-in-from-top-2">
                     <div className="flex items-center gap-2 mb-2">
                       <Settings2 className="size-4 text-primary" />
                       <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Personnalisation des alertes</span>
@@ -587,7 +678,7 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
                           />
                         </div>
                         {notifySettings.moving && (
-                          <div className="flex gap-2 pl-6 animate-in zoom-in-95">
+                          <div className="flex gap-2 pl-6">
                             <Select value={notifySounds.moving} onValueChange={(val) => setNotifySounds({...notifySounds, moving: val})}>
                               <SelectTrigger className="h-8 text-xs bg-background"><SelectValue /></SelectTrigger>
                               <SelectContent>{vesselSoundLibrary.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
@@ -609,7 +700,7 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
                           />
                         </div>
                         {notifySettings.stationary && (
-                          <div className="flex gap-2 pl-6 animate-in zoom-in-95">
+                          <div className="flex gap-2 pl-6">
                             <Select value={notifySounds.stationary} onValueChange={(val) => setNotifySounds({...notifySounds, stationary: val})}>
                               <SelectTrigger className="h-8 text-xs bg-background"><SelectValue /></SelectTrigger>
                               <SelectContent>{vesselSoundLibrary.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
@@ -631,7 +722,7 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
                           />
                         </div>
                         {notifySettings.offline && (
-                          <div className="flex gap-2 pl-6 animate-in zoom-in-95">
+                          <div className="flex gap-2 pl-6">
                             <Select value={notifySounds.offline} onValueChange={(val) => setNotifySounds({...notifySounds, offline: val})}>
                               <SelectTrigger className="h-8 text-xs bg-background"><SelectValue /></SelectTrigger>
                               <SelectContent>{vesselSoundLibrary.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
@@ -640,6 +731,57 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
                           </div>
                         )}
                       </div>
+                    </div>
+
+                    {/* ADVANCED WATCH SECTION */}
+                    <div className="space-y-4 pt-2 border-b border-border/50 pb-6">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label className="text-sm font-black text-primary flex items-center gap-2 uppercase tracking-tighter">
+                            <Timer className="size-4" /> Surveillance Temporelle
+                          </Label>
+                          <p className="text-[10px] text-muted-foreground italic">Alerte répétée toutes les 10s après X min.</p>
+                        </div>
+                        <Switch checked={isWatchEnabled} onCheckedChange={setIsWatchEnabled} />
+                      </div>
+
+                      {isWatchEnabled && (
+                        <div className="space-y-4 pl-2 animate-in slide-in-from-left-2">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <Label className="text-[9px] font-black uppercase opacity-60">État à surveiller</Label>
+                              <Select value={watchType} onValueChange={(val: any) => setWatchType(val)}>
+                                <SelectTrigger className="h-9 text-xs bg-background"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="stationary">Immobilisation</SelectItem>
+                                  <SelectItem value="moving">Mouvement</SelectItem>
+                                  <SelectItem value="offline">Perte Réseau</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-[9px] font-black uppercase opacity-60">Durée (min)</Label>
+                              <Input 
+                                type="number" 
+                                value={watchDuration} 
+                                onChange={e => setWatchDuration(parseInt(e.target.value) || 1)} 
+                                className="h-9 text-xs bg-background"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-1.5">
+                            <Label className="text-[9px] font-black uppercase opacity-60">Son de l'alerte</Label>
+                            <div className="flex gap-2">
+                              <Select value={watchSound} onValueChange={setWatchSound}>
+                                <SelectTrigger className="h-9 text-xs bg-background flex-1"><SelectValue /></SelectTrigger>
+                                <SelectContent>{vesselSoundLibrary.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+                              </Select>
+                              <Button variant="outline" size="icon" className="h-9 w-9 bg-background" onClick={() => playAlertSound(watchSound)}><Play className="size-3" /></Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-2 pt-2">
