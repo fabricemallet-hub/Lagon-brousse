@@ -65,7 +65,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 const IMMOBILITY_THRESHOLD_METERS = 15;
-const IMMOBILITY_START_MINUTES = 5;
+const IMMOBILITY_START_MINUTES = 1; // Réduit à 1 minute pour plus de réactivité
 const THROTTLE_UPDATE_MS = 10000; 
 
 const defaultVesselSounds = [
@@ -158,7 +158,6 @@ export function VesselTracker() {
   }, [firestore, mode, vesselIdToFollow]);
   const { data: remoteVessel } = useDoc<VesselStatus>(vesselRef);
 
-  // Calcule le statut effectif consolidé pour l'affichage et la logique d'alerte
   const currentEffectiveStatus = useMemo(() => {
     if (mode === 'sender') {
       return isSharing ? vesselStatus : 'offline';
