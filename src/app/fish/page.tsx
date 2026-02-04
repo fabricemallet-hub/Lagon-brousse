@@ -181,18 +181,18 @@ export default function FishPage() {
                   <AccordionItem value={fish.id} className="border-none">
                     <AccordionTrigger className="p-4 hover:no-underline [&[data-state=open]]:bg-muted/30">
                       <div className="flex items-center gap-4 text-left w-full">
-                        <div className="size-14 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden border">
+                        <div className="size-20 rounded-xl bg-white flex items-center justify-center shrink-0 overflow-hidden border shadow-inner">
                           {finalImageUrl ? (
                             <Image 
                               src={finalImageUrl} 
                               alt={fish.name} 
-                              width={56} 
-                              height={56} 
-                              className="object-cover w-full h-full"
+                              width={80} 
+                              height={80} 
+                              className="object-contain w-full h-full p-1"
                               data-ai-hint={placeholder?.imageHint || fish.name}
                             />
                           ) : (
-                            <Fish className="size-6 text-primary" />
+                            <Fish className="size-8 text-primary/40" />
                           )}
                         </div>
                         <div className="flex flex-col min-w-0">

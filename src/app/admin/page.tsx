@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { DollarSign, Users, Crown, KeyRound, Copy, Trash2, AlertCircle, Mail, Share2, Palette, Image as ImageIcon, Type, Eye, Save, Upload, Timer, Fish } from 'lucide-react';
+import { DollarSign, Users, Crown, KeyRound, Copy, Trash2, AlertCircle, Mail, Share2, Palette, Image as ImageIcon, Type, Eye, Save, Upload, Timer, Fish } from 'lucide-center';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
 import Link from 'next/link';
@@ -596,13 +596,13 @@ export default function AdminPage() {
                   return (
                     <Card key={fish.id} className="overflow-hidden border shadow-sm">
                       <div className="flex flex-col sm:flex-row items-center p-4 gap-6">
-                        <div className="relative size-32 rounded-xl overflow-hidden border bg-muted shrink-0 shadow-inner">
+                        <div className="relative size-32 rounded-xl overflow-hidden border bg-white shrink-0 shadow-inner">
                           {currentImage ? (
                             <Image 
                               src={currentImage} 
                               alt={fish.name} 
                               fill 
-                              className="object-cover" 
+                              className="object-contain p-2" 
                               sizes="128px"
                             />
                           ) : (
