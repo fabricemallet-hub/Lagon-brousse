@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -139,14 +138,14 @@ export function VesselTracker() {
   useEffect(() => {
     if (userProfile?.vesselPrefs) {
       const prefs = userProfile.vesselPrefs;
-      setIsNotifyEnabled(prefs.isNotifyEnabled);
-      setVesselVolume(prefs.vesselVolume);
-      setNotifySettings(prefs.notifySettings);
-      setNotifySounds(prefs.notifySounds);
-      setIsWatchEnabled(prefs.isWatchEnabled);
-      setWatchType(prefs.watchType);
-      setWatchDuration(prefs.watchDuration);
-      setWatchSound(prefs.watchSound);
+      setIsNotifyEnabled(prefs.isNotifyEnabled ?? false);
+      setVesselVolume(prefs.vesselVolume ?? 0.8);
+      if (prefs.notifySettings) setNotifySettings(prefs.notifySettings);
+      if (prefs.notifySounds) setNotifySounds(prefs.notifySounds);
+      setIsWatchEnabled(prefs.isWatchEnabled ?? false);
+      setWatchType(prefs.watchType ?? 'stationary');
+      setWatchDuration(prefs.watchDuration ?? 15);
+      setWatchSound(prefs.watchSound ?? 'alerte');
     }
     if (userProfile?.emergencyContact) {
       setEmergencyContact(userProfile.emergencyContact);
@@ -188,6 +187,23 @@ export function VesselTracker() {
     return doc(firestore, 'vessels', cleanId);
   }, [firestore, mode, vesselIdToFollow]);
   const { data: remoteVessel, isLoading: isVesselLoading } = useDoc<VesselStatus>(vesselRef);
+
+  const handleSaveCustomId = () => {
+    const id = customSharingId.trim().toUpperCase();
+    localStorage.setItem('vessel_custom_id', id);
+    setCustomSharingId(id);
+    toast({ title: "Identifiant enregistré", description: `ID : ${id || 'UID par défaut'}` });
+  };
+
+  const handleSaveEmergencyContact = async () => {
+    if (!user || !firestore) return;
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), { emergencyContact });
+        toast({ title: "Contact enregistré", description: "Le numéro sera utilisé pour l'alerte SMS." });
+    } catch (e) {
+        console.error(e);
+    }
+  };
 
   const playAlertSound = useCallback((soundId: string) => {
     const sound = availableSounds.find(s => s.id === soundId || s.label === soundId);
@@ -248,13 +264,6 @@ export function VesselTracker() {
     setStatusStartTime(Date.now());
   };
 
-  const handleSaveCustomId = () => {
-    const id = customSharingId.trim().toUpperCase();
-    localStorage.setItem('vessel_custom_id', id);
-    setCustomSharingId(id);
-    toast({ title: "Identifiant enregistré", description: `ID : ${id || 'UID par défaut'}` });
-  };
-
   const toggleWakeLock = async () => {
     if (!('wakeLock' in navigator)) {
       toast({ variant: "destructive", title: "Non supporté", description: "Votre navigateur ne supporte pas le maintien de l'écran." });
@@ -267,7 +276,7 @@ export function VesselTracker() {
         const lock = await (navigator as any).wakeLock.request('screen');
         if (lock) {
           setWakeLock(lock);
-          toast({ title: "Mode éveil actif", description: "L'écran restera allumé pour le suivi." });
+          toast({ title: "Mode éveil activé", description: "L'écran restera allumé pour le suivi." });
           lock.addEventListener('release', () => setWakeLock(null));
         }
       } catch (err: any) {
@@ -363,18 +372,6 @@ export function VesselTracker() {
     window.location.href = smsHref;
   };
 
-  const displayVessel = mode === 'sender' ? (isSharing ? { location: { latitude: currentPos?.lat || 0, longitude: currentPos?.lng || 0 }, status: vesselStatus, displayName: 'Ma Position' } : null) : remoteVessel;
-
-  const handleSaveEmergencyContact = async () => {
-    if (!user || !firestore) return;
-    try {
-        await updateDoc(doc(firestore, 'users', user.uid), { emergencyContact });
-        toast({ title: "Contact enregistré", description: "Le numéro sera utilisé pour l'alerte SMS." });
-    } catch (e) {
-        console.error(e);
-    }
-  };
-
   const addToHistory = (id: string) => {
     const cleanId = id.trim().toUpperCase();
     if (!cleanId || vesselHistory.includes(cleanId)) return;
@@ -388,6 +385,8 @@ export function VesselTracker() {
     setVesselHistory(newHistory);
     localStorage.setItem('vessel_follow_history', JSON.stringify(newHistory));
   };
+
+  const displayVessel = mode === 'sender' ? (isSharing ? { location: { latitude: currentPos?.lat || 0, longitude: currentPos?.lng || 0 }, status: vesselStatus, displayName: 'Ma Position' } : null) : remoteVessel;
 
   return (
     <div className="space-y-6">
@@ -547,7 +546,7 @@ export function VesselTracker() {
                                         </div>
                                         <div className="space-y-3">
                                             <div className="flex justify-between items-center px-1">
-                                                <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Durée avant alarme</span>
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground tracking-widest">Durée avant alarme</span>
                                                 <span className="font-black text-orange-600 bg-orange-50 px-2.5 py-1 rounded-md text-xs">{watchDuration} min</span>
                                             </div>
                                             <Slider value={[watchDuration]} min={1} max={60} step={1} onValueChange={v => setWatchDuration(v[0])} className="py-2" />
