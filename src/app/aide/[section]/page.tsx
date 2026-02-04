@@ -80,7 +80,7 @@ const sectionContent: Record<string, {
     ],
     tips: [
       "AVERTISSEMENT CRITIQUE : Cette application ne remplace PAS le site officiel de Météo Nouvelle-Calédonie (meteo.nc). Consultez-le toujours avant de prévoir une sortie en mer.",
-      "L'assistant IA vous aide à identifier la 'meilleure fenêtre' de la semaine pour vos activités, mais la décision finale et la sécurité vous incombent.",
+      "L'assistant IA vous aide à identifier la 'meilleure fenêtre' de la semaine pour vos activités, mas la décision finale et la sécurité vous incombent.",
       "La flèche du vent indique la provenance réelle de l'air : une flèche pointant vers le bas indique un vent de Nord."
     ]
   },
@@ -94,7 +94,7 @@ const sectionContent: Record<string, {
       "Émetteur (A) - Mode Éveil & Batterie : Activez 'MODE ÉVEIL ACTIF' pour garantir un flux GPS continu. Votre niveau de batterie et statut de charge sont transmis en temps réel.",
       "Récepteur (B) - Suivi Live : Visualisez le statut (EN MOUVEMENT / MOUILLAGE) et l'autonomie de l'émetteur. Le système détecte l'immobilité après 30s dans un rayon de 20m.",
       "Récepteur (B) - Alertes Sonores : Activez les notifications et personnalisez le son pour chaque changement d'état (ex: passage au mouillage ou perte réseau).",
-      "Veille Critique (B) - Réglage Précis : Configurez une alarme si le navire reste immobile trop longtemps. Réglez la durée de 1 min à 24h avec les boutons '+' et '-'.",
+      "Veille Critique (B) - Réglage Précis : Configurez une alarme si le navire reste immobile trop longtemps. Réglez la durée de 1 min à 24h.",
       "ALERTE SMS & Messages Types : Utilisez le sélecteur en plein écran pour envoyer un MAYDAY ou PAN PAN incluant vos coordonnées GPS et lien Maps verrouillés."
     ],
     tips: [
