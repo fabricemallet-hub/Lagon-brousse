@@ -101,49 +101,49 @@ const defaultVesselSounds = [
 
 const PREDEFINED_MESSAGES = [
   {
-    category: "1. Détresse Vitale (Urgence Absolue)",
+    category: "1. DÉTRESSE VITALE (URGENCE ABSOLUE)",
     urgency: "critical",
     color: "text-red-600",
     btnBorder: "border-red-200",
     btnHover: "hover:bg-red-50",
     messages: [
-      { id: 'voie_eau', label: "Voie d'eau", text: "MAYDAY - Voie d'eau importante à bord. Le navire coule. Besoin d'assistance immédiate. Ma position ci-jointe." },
-      { id: 'homme_mer', label: "Homme à la mer", text: "MAYDAY - Homme à la mer. Position du signal au moment de la chute. Début des recherches en cours." },
-      { id: 'incendie', label: "Incendie", text: "MAYDAY - Feu à bord non maîtrisé. Risque d'explosion. Nous évacuons le navire. Ma position ci-jointe." },
+      { id: 'voie_eau', label: "VOIE D'EAU", text: "MAYDAY - Voie d'eau importante à bord. Le navire coule. Besoin d'assistance immédiate. Ma position ci-jointe." },
+      { id: 'homme_mer', label: "HOMME À LA MER", text: "MAYDAY - Homme à la mer. Position du signal au moment de la chute. Début des recherches en cours." },
+      { id: 'incendie', label: "INCENDIE", text: "MAYDAY - Feu à bord non maîtrisé. Risque d'explosion. Nous évacuons le navire. Ma position ci-jointe." },
     ]
   },
   {
-    category: "2. Urgence Médicale",
+    category: "2. URGENCE MÉDICALE",
     urgency: "high",
     color: "text-orange-600",
     btnBorder: "border-orange-200",
     btnHover: "hover:bg-orange-50",
     messages: [
-      { id: 'blessure', label: "Blessure grave", text: "PAN PAN - Urgence médicale à bord. Un blessé grave (conscient/inconscient). Besoin d'une évacuation médicale." },
-      { id: 'malaise', label: "Malaise", text: "PAN PAN - Suspicion de malaise cardiaque ou AVC. Besoin d'une assistance médicale urgente." },
+      { id: 'blessure', label: "BLESSURE GRAVE", text: "PAN PAN - Urgence médicale à bord. Un blessé grave (conscient/inconscient). Besoin d'une évacuation médicale." },
+      { id: 'malaise', label: "MALAISE", text: "PAN PAN - Suspicion de malaise cardiaque ou AVC. Besoin d'une assistance médicale urgente." },
     ]
   },
   {
-    category: "3. Panne et Assistance (Sécurité)",
+    category: "3. PANNE ET ASSISTANCE (SÉCURITÉ)",
     urgency: "medium",
     color: "text-amber-600",
     btnBorder: "border-amber-200",
     btnHover: "hover:bg-amber-50",
     messages: [
-      { id: 'panne', label: "Panne moteur", text: "PAN PAN - Panne moteur totale. Navire à la dérive vers la côte/les rochers. Demande de remorquage." },
-      { id: 'gouvernail', label: "Gouvernail / Hélice", text: "PAN PAN - Gouvernail cassé / Bout dans l'hélice. Navire non manœuvrant. Ma position ci-jointe." },
-      { id: 'echouement', label: "Échouement", text: "PAN PAN - Navire échoué. Pas de voie d'eau apparente mais incapable de se dégager seul. Marée montante/descendante." },
+      { id: 'panne', label: "PANNE MOTEUR", text: "PAN PAN - Panne moteur totale. Navire à la dérive vers la côte/les rochers. Demande de remorquage." },
+      { id: 'gouvernail', label: "GOUVERNAIL / HÉLICE", text: "PAN PAN - Gouvernail cassé / Bout dans l'hélice. Navire non manœuvrant. Ma position ci-jointe." },
+      { id: 'echouement', label: "ÉCHOUEMENT", text: "PAN PAN - Navire échoué. Pas de voie d'eau apparente mais incapable de se dégager seul. Marée montante/descendante." },
     ]
   },
   {
-    category: "4. Messages de \"Confort\" / Prévention",
+    category: "4. MESSAGES DE \"CONFORT\" / PRÉVENTION",
     urgency: "low",
     color: "text-blue-600",
     btnBorder: "border-blue-200",
     btnHover: "hover:bg-blue-50",
     messages: [
-      { id: 'retard', label: "Retard", text: "Info Tablo : Nous avons du retard sur l'horaire d'arrivée prévu. Tout va bien à bord. Nouvelle position jointe." },
-      { id: 'mouillage_prev', label: "Mouillage", text: "Info Tablo : Nous sommes au mouillage pour la nuit à cette position. Fin de navigation." },
+      { id: 'retard', label: "RETARD", text: "Info Tablo : Nous avons du retard sur l'horaire d'arrivée prévu. Tout va bien à bord. Nouvelle position jointe." },
+      { id: 'mouillage_prev', label: "MOUILLAGE", text: "Info Tablo : Nous sommes au mouillage pour la nuit à cette position. Fin de navigation." },
     ]
   }
 ];
@@ -175,6 +175,7 @@ export function VesselTracker() {
   const [statusEvents, setStatusEvents] = useState<StatusEvent[]>([]);
   const [customSmsMessage, setCustomSmsMessage] = useState('');
   const [isQuickMsgOpen, setIsQuickMsgOpen] = useState(false);
+  const [isSmsConfirmOpen, setIsSmsConfirmOpen] = useState(false);
 
   const [isNotifyEnabled, setIsNotifyEnabled] = useState(false);
   const [vesselVolume, setVesselVolume] = useState(0.8);
@@ -571,6 +572,15 @@ export function VesselTracker() {
 
   const statusEventsToShow = useMemo(() => statusEvents.slice(0, 5), [statusEvents]);
 
+  const handleSelectPredefinedMessage = (text: string) => {
+    setCustomSmsMessage(text);
+    setIsQuickMsgOpen(false);
+    // On laisse un petit délai pour que le premier dialog se ferme proprement
+    setTimeout(() => {
+      setIsSmsConfirmOpen(true);
+    }, 150);
+  };
+
   return (
     <div className="space-y-6 pb-12">
       {isWatchAlerting && (
@@ -873,7 +883,7 @@ export function VesselTracker() {
         
         <CardFooter className="bg-muted/10 p-4 flex flex-col gap-4 border-t-2">
           <div className="w-full space-y-4">
-            <AlertDialog>
+            <AlertDialog open={isSmsConfirmOpen} onOpenChange={setIsSmsConfirmOpen}>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" className="w-full h-14 bg-red-600 text-sm font-black shadow-lg flex items-center justify-center gap-2 uppercase rounded-xl border-b-4 border-red-800 transition-all active:scale-95" disabled={!lastValidLocation}>
                   <ShieldAlert className="size-6" /> ALERTE SMS
@@ -908,58 +918,54 @@ export function VesselTracker() {
                   <MessageSquare className="size-4 mr-2" /> Sélectionner un message type
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md rounded-2xl h-[85vh] flex flex-col p-0 overflow-hidden">
-                <DialogHeader className="p-6 pb-2 shrink-0">
-                  <DialogTitle className="font-black uppercase tracking-tighter">Messages Prédéfinis</DialogTitle>
-                  <DialogDescription className="text-xs">Choisissez un message pour gagner du temps. Le lien GPS sera ajouté automatiquement.</DialogDescription>
+              <DialogContent className="max-w-md rounded-2xl h-[95vh] flex flex-col p-0 overflow-hidden sm:h-[85vh]">
+                <DialogHeader className="p-6 pb-2 shrink-0 border-b">
+                  <DialogTitle className="font-black uppercase tracking-tighter text-xl">MESSAGES PRÉDÉFINIS</DialogTitle>
+                  <DialogDescription className="text-xs font-medium mt-1">Choisissez un message pour gagner du temps. Le lien GPS sera ajouté automatiquement.</DialogDescription>
                 </DialogHeader>
-                <ScrollArea className="flex-grow p-6 pt-2">
-                  <div className="space-y-6 pb-6">
+                <ScrollArea className="flex-grow p-6 pt-2 bg-slate-50/30">
+                  <div className="space-y-8 pb-10">
                     {PREDEFINED_MESSAGES.map((cat) => (
-                      <div key={cat.category} className="space-y-3">
-                        <h4 className={cn("text-[10px] font-black uppercase tracking-widest flex items-center gap-2", cat.color)}>
-                          {cat.urgency === 'critical' && <AlertOctagon className="size-3" />}
-                          {cat.urgency === 'high' && <AlertCircle className="size-3" />}
+                      <div key={cat.category} className="space-y-4">
+                        <h4 className={cn("text-[11px] font-black uppercase tracking-wider flex items-center gap-2", cat.color)}>
+                          {cat.urgency === 'critical' && <AlertOctagon className="size-3.5" />}
+                          {cat.urgency === 'high' && <AlertCircle className="size-3.5" />}
                           {cat.category}
                         </h4>
-                        <div className="grid grid-cols-1 gap-2">
+                        <div className="grid grid-cols-1 gap-3">
                           {cat.messages.map((m) => (
                             <Button 
                               key={m.id} 
                               variant="outline" 
                               className={cn(
-                                "h-auto py-3 px-4 justify-start text-left flex flex-col items-start gap-1 border-2 transition-all active:scale-[0.98]",
+                                "h-auto py-4 px-5 justify-start text-left flex flex-col items-start gap-1 border-2 bg-white shadow-sm transition-all active:scale-[0.98]",
                                 cat.btnBorder,
                                 cat.btnHover
                               )}
-                              onClick={() => {
-                                setCustomSmsMessage(m.text);
-                                setIsQuickMsgOpen(false);
-                                toast({ title: "Message sélectionné", description: "Cliquez sur ALERTE SMS pour envoyer." });
-                              }}
+                              onClick={() => handleSelectPredefinedMessage(m.text)}
                             >
-                              <span className="font-black text-xs uppercase">{m.label}</span>
-                              <span className="text-[10px] opacity-70 leading-tight font-medium line-clamp-2">{m.text}</span>
+                              <span className="font-black text-xs uppercase tracking-tight">{m.label}</span>
+                              <span className="text-[10px] opacity-70 leading-relaxed font-medium line-clamp-2">{m.text}</span>
                             </Button>
                           ))}
                         </div>
                       </div>
                     ))}
-                    
-                    <div className="pt-4 border-t border-dashed">
-                       <Button 
-                         variant="secondary" 
-                         className="w-full h-12 font-black uppercase text-xs"
-                         onClick={() => {
-                           setCustomSmsMessage(userProfile?.vesselSmsMessage || '');
-                           setIsQuickMsgOpen(false);
-                         }}
-                       >
-                         Utiliser mon message personnalisé
-                       </Button>
-                    </div>
                   </div>
                 </ScrollArea>
+                <div className="p-4 bg-white border-t shrink-0">
+                   <Button 
+                     variant="secondary" 
+                     className="w-full h-14 font-black uppercase text-xs tracking-widest shadow-sm border-2"
+                     onClick={() => {
+                       setCustomSmsMessage(userProfile?.vesselSmsMessage || '');
+                       setIsQuickMsgOpen(false);
+                       setTimeout(() => setIsSmsConfirmOpen(true), 150);
+                     }}
+                   >
+                     UTILISER MON MESSAGE PERSONNALISÉ
+                   </Button>
+                </div>
               </DialogContent>
             </Dialog>
 
