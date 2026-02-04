@@ -76,14 +76,12 @@ export default function AdminPage() {
   const [userToDelete, setUserToDelete] = useState<UserAccount | null>(null);
   const [soundToDelete, setSoundToDelete] = useState<string | null>(null);
   
-  // User Edit States
   const [userToEdit, setUserToEdit] = useState<UserAccount | null>(null);
   const [isUserEditDialogOpen, setIsUserEditOpen] = useState(false);
   const [editStatus, setEditStatus] = useState<string>('inactive');
   const [editExpiryDate, setEditExpiryDate] = useState<string>('');
   const [isSavingUser, setIsSavingUser] = useState(false);
 
-  // Splash Screen States
   const [splashMode, setSplashMode] = useState<'text' | 'image'>('text');
   const [splashText, setSplashText] = useState('Lagon & Brousse NC');
   const [splashTextColor, setSplashTextColor] = useState('#ffffff');
@@ -95,7 +93,6 @@ export default function AdminPage() {
   const [isSavingSplash, setIsSavingSplash] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
 
-  // Fish Admin States
   const [isFishDialogOpen, setIsFishDialogOpen] = useState(false);
   const [fishDialogMode, setFishDialogMode] = useState<'add' | 'edit'>('add');
   const [currentFish, setCurrentFish] = useState<Partial<FishSpeciesInfo>>({});
@@ -103,14 +100,12 @@ export default function AdminPage() {
   const [isInitializingFish, setIsInitializingFish] = useState(false);
   const [isAiGeneratingFish, setIsAiGeneratingFish] = useState(false);
 
-  // Sound Admin States
   const [isSoundDialogOpen, setIsSoundDialogOpen] = useState(false);
   const [soundDialogMode, setSoundDialogMode] = useState<'add' | 'edit'>('add');
   const [currentSound, setCurrentSound] = useState<Partial<SoundLibraryEntry>>({});
   const [isSavingSound, setIsSavingSound] = useState(false);
   const [isInitializingSounds, setIsInitializingSounds] = useState(false);
 
-  // Global Access States
   const [globalDuration, setGlobalDuration] = useState('7');
 
   const isAdmin = useMemo(() => 
@@ -123,21 +118,18 @@ export default function AdminPage() {
   }, [firestore, isAdmin]);
   const { data: savedSplashSettings } = useDoc<SplashScreenSettings>(splashRef);
 
-  // Fetch dynamic fish species from Firestore
   const fishSpeciesRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
     return query(collection(firestore, 'fish_species'), orderBy('name', 'asc'));
   }, [firestore, isAdmin]);
   const { data: dbFishSpecies, isLoading: areFishLoading } = useCollection<FishSpeciesInfo>(fishSpeciesRef);
 
-  // Fetch Sound Library from Firestore
   const soundsRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
     return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
   }, [firestore, isAdmin]);
   const { data: dbSounds, isLoading: areSoundsLoading } = useCollection<SoundLibraryEntry>(soundsRef);
 
-  // Fetch Global Shared Token
   const sharedTokenRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
     return doc(firestore, 'shared_access_tokens', 'GLOBAL');
@@ -160,16 +152,10 @@ export default function AdminPage() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, callback: (base64: string) => void) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (file.size > 800000) {
-      toast({ 
-        variant: 'destructive', 
-        title: "Image trop lourde", 
-        description: "Veuillez choisir une image de moins de 800 Ko pour garantir un chargement rapide." 
-      });
+      toast({ variant: 'destructive', title: "Image trop lourde", description: "Veuillez choisir une image de moins de 800 Ko." });
       return;
     }
-
     const reader = new FileReader();
     reader.onload = (event) => {
       const base64 = event.target?.result as string;
@@ -181,30 +167,21 @@ export default function AdminPage() {
   const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>, callback: (base64: string) => void) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (file.size > 500000) {
-      toast({ 
-        variant: 'destructive', 
-        title: "Fichier trop lourd", 
-        description: "Le MP3 doit faire moins de 500 Ko pour garantir une lecture fluide en mer." 
-      });
+      toast({ variant: 'destructive', title: "Fichier trop lourd", description: "Le MP3 doit faire moins de 500 Ko." });
       return;
     }
-
     const reader = new FileReader();
     reader.onload = (event) => {
       const base64 = event.target?.result as string;
       callback(base64);
-      toast({ title: "Son chargé", description: "Le fichier est prêt à être sauvegardé." });
+      toast({ title: "Son chargé" });
     };
     reader.readAsDataURL(file);
   };
 
   const handleAiFillFish = async () => {
-    if (!currentFish.name) {
-        toast({ variant: 'destructive', title: "Nom manquant", description: "Saisissez au moins le nom commun du poisson." });
-        return;
-    }
+    if (!currentFish.name) return;
     setIsAiGeneratingFish(true);
     try {
         const info = await generateFishInfo({ name: currentFish.name });
@@ -216,41 +193,31 @@ export default function AdminPage() {
             fishingAdvice: info.fishingAdvice,
             category: info.category
         }));
-        toast({ title: "Fiche générée", description: "Les informations ont été complétées par l'IA." });
+        toast({ title: "Fiche générée par l'IA" });
     } catch (error) {
         console.error(error);
-        toast({ variant: 'destructive', title: "Erreur IA", description: "Impossible de générer les infos." });
+        toast({ variant: 'destructive', title: "Erreur IA" });
     } finally {
         setIsAiGeneratingFish(false);
     }
   };
 
   const handleSaveFish = async () => {
-    if (!firestore || !isAdmin || !currentFish.name || !currentFish.category) {
-        toast({ variant: 'destructive', title: "Données manquantes", description: "Le nom et la catégorie sont obligatoires." });
-        return;
-    }
+    if (!firestore || !isAdmin || !currentFish.name || !currentFish.category) return;
     setIsSavingFish(true);
     try {
         if (fishDialogMode === 'add') {
-            await addDoc(collection(firestore, 'fish_species'), {
-                ...currentFish,
-                createdAt: serverTimestamp()
-            });
-            toast({ title: "Espèce ajoutée", description: `${currentFish.name} est maintenant dans le guide.` });
+            await addDoc(collection(firestore, 'fish_species'), { ...currentFish, createdAt: serverTimestamp() });
+            toast({ title: "Espèce ajoutée" });
         } else {
             const fishRef = doc(firestore, 'fish_species', currentFish.id!);
-            await updateDoc(fishRef, {
-                ...currentFish,
-                updatedAt: serverTimestamp()
-            });
+            await updateDoc(fishRef, { ...currentFish, updatedAt: serverTimestamp() });
             toast({ title: "Espèce mise à jour" });
         }
         setIsFishDialogOpen(false);
         setCurrentFish({});
     } catch (error) {
         console.error(error);
-        toast({ variant: 'destructive', title: "Erreur", description: "Impossible de sauvegarder l'espèce." });
     } finally {
         setIsSavingFish(false);
     }
@@ -258,48 +225,32 @@ export default function AdminPage() {
 
   const handleDeleteFishConfirmed = async () => {
     if (!firestore || !isAdmin || !fishToDelete) return;
-    
     try {
         await deleteDoc(doc(firestore, 'fish_species', fishToDelete));
         toast({ title: "Espèce supprimée" });
     } catch (error) {
         console.error(error);
-        toast({ variant: 'destructive', title: "Erreur", description: "Impossible de supprimer l'espèce." });
     } finally {
         setFishToDelete(null);
     }
   };
 
   const handleSaveSound = async () => {
-    if (!firestore || !isAdmin || !currentSound.label || !currentSound.url) {
-        toast({ variant: 'destructive', title: "Données manquantes", description: "Le libellé et l'URL sont obligatoires." });
-        return;
-    }
-    if (!currentSound.categories || currentSound.categories.length === 0) {
-        toast({ variant: 'destructive', title: "Catégorie manquante", description: "Veuillez sélectionner au moins une catégorie." });
-        return;
-    }
+    if (!firestore || !isAdmin || !currentSound.label || !currentSound.url) return;
     setIsSavingSound(true);
     try {
         if (soundDialogMode === 'add') {
-            await addDoc(collection(firestore, 'sound_library'), {
-                ...currentSound,
-                createdAt: serverTimestamp()
-            });
-            toast({ title: "Son ajouté", description: `${currentSound.label} est disponible.` });
+            await addDoc(collection(firestore, 'sound_library'), { ...currentSound, createdAt: serverTimestamp() });
+            toast({ title: "Son ajouté" });
         } else {
             const soundRef = doc(firestore, 'sound_library', currentSound.id!);
-            await updateDoc(soundRef, {
-                ...currentSound,
-                updatedAt: serverTimestamp()
-            });
+            await updateDoc(soundRef, { ...currentSound, updatedAt: serverTimestamp() });
             toast({ title: "Son mis à jour" });
         }
         setIsSoundDialogOpen(false);
         setCurrentSound({});
     } catch (error) {
         console.error(error);
-        toast({ variant: 'destructive', title: "Erreur", description: "Impossible de sauvegarder le son." });
     } finally {
         setIsSavingSound(false);
     }
@@ -328,10 +279,9 @@ export default function AdminPage() {
             batch.set(docRef, { ...sound, createdAt: serverTimestamp() });
         });
         await batch.commit();
-        toast({ title: "Sons importés", description: `${defaultSounds.length} sons ajoutés.` });
+        toast({ title: "Sons importés" });
     } catch (error) {
         console.error(error);
-        toast({ variant: 'destructive', title: "Erreur import" });
     } finally {
         setIsInitializingSounds(false);
     }
@@ -339,34 +289,23 @@ export default function AdminPage() {
 
   const playPreview = (url: string) => {
     const audio = new Audio(url);
-    audio.play().catch(e => toast({ variant: 'destructive', title: 'Erreur lecture', description: 'URL invalide ou inaccessible.' }));
+    audio.play().catch(() => toast({ variant: 'destructive', title: 'Erreur lecture' }));
   };
 
   const downloadFile = async (url: string, label: string) => {
-    const filename = `${label.toLowerCase().replace(/\s/g, '-')}.mp3`;
-    toast({ title: "Préparation du téléchargement..." });
-
     try {
       const response = await fetch(url);
-      if (!response.ok) throw new Error("Fetch failed");
-      
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = filename;
+      link.download = `${label.toLowerCase().replace(/\s/g, '-')}.mp3`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
-      
-      toast({ title: "Téléchargement terminé" });
     } catch (error) {
       window.open(url, '_blank');
-      toast({ 
-        title: "Ouverture du fichier", 
-        description: "Le téléchargement direct est bloqué par le serveur distant. Le fichier s'ouvre dans un nouvel onglet : faites 'Clic droit -> Enregistrer sous'." 
-      });
     }
   };
 
@@ -382,16 +321,14 @@ export default function AdminPage() {
     setIsSavingUser(true);
     try {
         const userRef = doc(firestore, 'users', userToEdit.id);
-        const updates: Partial<UserAccount> = {
+        await updateDoc(userRef, {
             subscriptionStatus: editStatus as any,
             subscriptionExpiryDate: editExpiryDate ? new Date(editExpiryDate).toISOString() : undefined
-        };
-        await updateDoc(userRef, updates);
-        toast({ title: "Profil mis à jour", description: `Les accès de ${userToEdit.displayName} ont été modifiés.` });
+        });
+        toast({ title: "Profil mis à jour" });
         setIsUserEditOpen(false);
     } catch (error) {
         console.error(error);
-        toast({ variant: 'destructive', title: "Erreur", description: "Impossible de mettre à jour le profil." });
     } finally {
         setIsSavingUser(false);
     }
@@ -399,42 +336,30 @@ export default function AdminPage() {
 
   const handleDeleteUserConfirmed = async () => {
     if (!firestore || !isAdmin || !userToDelete) return;
-    if (userToDelete.id === user?.uid) {
-        toast({ variant: 'destructive', title: "Action impossible", description: "Vous ne pouvez pas supprimer votre propre compte administrateur." });
-        setUserToDelete(null);
-        return;
-    }
-
+    if (userToDelete.id === user?.uid) return;
     try {
         await deleteDoc(doc(firestore, 'users', userToDelete.id));
-        toast({ title: "Compte supprimé", description: `Le compte de ${userToDelete.displayName} a été retiré.` });
+        toast({ title: "Compte supprimé" });
     } catch (error) {
         console.error(error);
-        toast({ variant: 'destructive', title: "Erreur", description: "Impossible de supprimer le compte." });
     } finally {
         setUserToDelete(null);
     }
   };
 
   const handleInitializeFish = async () => {
-    if (!firestore || !isAdmin || !lagoonFishData) return;
+    if (!firestore || !isAdmin) return;
     setIsInitializingFish(true);
     try {
         const batch = writeBatch(firestore);
         lagoonFishData.forEach(fish => {
             const fishId = fish.id || fish.name.toLowerCase().replace(/\s/g, '-');
-            const newDocRef = doc(firestore, 'fish_species', fishId);
-            batch.set(newDocRef, {
-                ...fish,
-                id: fishId,
-                createdAt: serverTimestamp()
-            });
+            batch.set(doc(firestore, 'fish_species', fishId), { ...fish, id: fishId, createdAt: serverTimestamp() });
         });
         await batch.commit();
-        toast({ title: "Base de données initialisée", description: `${lagoonFishData.length} espèces importées.` });
+        toast({ title: "Base de données initialisée" });
     } catch (error) {
         console.error(error);
-        toast({ variant: 'destructive', title: "Erreur d'import", description: "Impossible d'importer la liste par défaut." });
     } finally {
         setIsInitializingFish(false);
     }
@@ -458,100 +383,51 @@ export default function AdminPage() {
   }, [firestore, isAdmin]);
   const { data: conversations } = useCollection<Conversation>(conversationsCollectionRef);
 
-  const [stats, setStats] = useState<{ totalUsers: number; activeSubscribers: number; monthlyRevenue: number; } | null>(null);
+  const stats = useMemo(() => {
+    if (!allUsers) return null;
+    const active = allUsers.filter(u => u.subscriptionStatus === 'active' && u.subscriptionExpiryDate && isBefore(new Date(), new Date(u.subscriptionExpiryDate))).length;
+    return { total: allUsers.length, active, revenue: active * SUBSCRIPTION_PRICE };
+  }, [allUsers]);
 
   useEffect(() => {
-    if (areUsersLoading || !allUsers) return;
-    const totalUsers = allUsers.length;
-    const activeSubscribers = allUsers.filter(u => u.subscriptionStatus === 'active' && u.subscriptionExpiryDate && isBefore(new Date(), new Date(u.subscriptionExpiryDate))).length;
-    const monthlyRevenue = activeSubscribers * SUBSCRIPTION_PRICE;
-    setStats({ totalUsers, activeSubscribers, monthlyRevenue });
-  }, [allUsers, areUsersLoading]);
-
-  useEffect(() => {
-    if (!isUserLoading && !isAdmin) {
-      router.push('/compte');
-    }
+    if (!isUserLoading && !isAdmin) router.push('/compte');
   }, [isAdmin, isUserLoading, router]);
 
   const handleSaveSplashSettings = async () => {
     if (!firestore || !isAdmin) return;
     setIsSavingSplash(true);
     try {
-      const settings: SplashScreenSettings = {
-        splashMode,
-        splashText,
-        splashTextColor,
-        splashFontSize,
-        splashBgColor,
-        splashImageUrl,
-        splashImageFit,
-        splashDuration
-      };
-      await setDoc(doc(firestore, 'app_settings', 'splash'), settings, { merge: true });
-      toast({ title: "Configuration sauvegardée", description: "Le nouvel écran de démarrage est actif." });
+      await setDoc(doc(firestore, 'app_settings', 'splash'), { splashMode, splashText, splashTextColor, splashFontSize, splashBgColor, splashImageUrl, splashImageFit, splashDuration }, { merge: true });
+      toast({ title: "Configuration sauvegardée" });
     } catch (error) {
       console.error(error);
-      toast({ variant: 'destructive', title: "Erreur", description: "Impossible de sauvegarder la configuration." });
     } finally {
       setIsSavingSplash(false);
     }
-  };
-
-  const startPreview = () => {
-    setIsPreviewing(true);
-    setTimeout(() => setIsPreviewing(false), (splashDuration * 1000) + 1000);
   };
 
   const handleGenerateToken = async () => {
     if (!firestore) return;
     setIsGenerating(true);
     try {
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-      let code = 'LBN-';
-      for (let i = 0; i < 8; i++) {
-        if (i === 4) code += '-';
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      await setDoc(doc(firestore, 'access_tokens', code), {
-        durationMonths: parseInt(tokenDuration, 10),
-        createdAt: serverTimestamp(),
-        status: 'active',
-      });
+      const code = `LBN-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+      await setDoc(doc(firestore, 'access_tokens', code), { durationMonths: parseInt(tokenDuration, 10), createdAt: serverTimestamp(), status: 'active' });
       setGeneratedToken(code);
-      toast({ title: "Jeton généré !" });
+      toast({ title: "Jeton généré" });
     } catch (error) {
       console.error(error);
-      toast({ variant: 'destructive', title: "Erreur" });
     } finally {
       setIsGenerating(false);
-    }
-  };
-
-  const handleDeleteToken = async (tokenId: string) => {
-    if (!firestore) return;
-    try {
-      await deleteDoc(doc(firestore, 'access_tokens', tokenId));
-      toast({ title: "Jeton supprimé" });
-    } catch (error) {
-      console.error(error);
     }
   };
 
   const handleUpdateSharedToken = async (daysCount: number) => {
     if (!firestore || !isAdmin) return;
     try {
-      const now = new Date();
-      const expiresAt = addDays(now, daysCount);
-      await setDoc(doc(firestore, 'shared_access_tokens', 'GLOBAL'), {
-        durationMonths: 0,
-        createdAt: serverTimestamp(),
-        expiresAt: Timestamp.fromDate(expiresAt)
-      });
-      toast({ title: "Accès global activé !", description: `Valable ${daysCount} jours.` });
+      await setDoc(doc(firestore, 'shared_access_tokens', 'GLOBAL'), { durationMonths: 0, createdAt: serverTimestamp(), expiresAt: Timestamp.fromDate(addDays(new Date(), daysCount)) });
+      toast({ title: "Accès global activé" });
     } catch (error) {
       console.error(error);
-      toast({ variant: 'destructive', title: "Erreur" });
     }
   };
 
@@ -581,37 +457,25 @@ export default function AdminPage() {
         setConversationToDelete(null);
     }
   };
-  
-  const getUserEmail = (uid?: string) => {
-    if (!uid || !allUsers) return 'N/A';
-    return allUsers.find(u => u.id === uid)?.email || 'Utilisateur inconnu';
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast({ description: "Copié !" });
-  };
 
   const handleToggleCategory = (catId: string) => {
     const current = currentSound.categories || [];
-    const next = current.includes(catId)
-        ? current.filter(c => c !== catId)
-        : [...current, catId];
+    const next = current.includes(catId) ? current.filter(c => c !== catId) : [...current, catId];
     setCurrentSound({ ...currentSound, categories: next });
   };
 
-  if (isUserLoading || !isAdmin) return <div className="space-y-4"><Skeleton className="h-48 w-full" /><Skeleton className="h-24 w-full" /></div>;
+  if (isUserLoading || !isAdmin) return <div className="p-8"><Skeleton className="h-48 w-full" /></div>;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6 pb-20">
       {isPreviewing && <SplashScreen settings={{ splashMode, splashText, splashTextColor, splashFontSize, splashBgColor, splashImageUrl, splashImageFit, splashDuration }} isExiting={false} />}
 
-      <Card>
-        <CardHeader><CardTitle>Tableau de Bord Administrateur</CardTitle></CardHeader>
+      <Card className="border-2 shadow-sm">
+        <CardHeader><CardTitle className="font-black uppercase tracking-tighter">Tableau de Bord Admin</CardTitle></CardHeader>
       </Card>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 mb-6 h-auto">
+        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 mb-6 h-auto p-1 bg-muted/50 border rounded-xl">
           <TabsTrigger value="overview">Stats</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="design">Design</TabsTrigger>
@@ -621,295 +485,164 @@ export default function AdminPage() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-3">
-            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Utilisateurs</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{stats?.totalUsers || 0}</div></CardContent></Card>
-            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Abonnés Actifs</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{stats?.activeSubscribers || 0}</div></CardContent></Card>
-            <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Revenu Mensuel</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{stats ? `${stats.monthlyRevenue.toLocaleString('fr-FR')} FCFP` : 0}</div></CardContent></Card>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card className="border-2"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Utilisateurs</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{stats?.total || 0}</div></CardContent></Card>
+            <Card className="border-2"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Premium Actifs</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{stats?.active || 0}</div></CardContent></Card>
+            <Card className="border-2"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Revenu Est.</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{stats?.revenue.toLocaleString('fr-FR')} F</div></CardContent></Card>
           </div>
           
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><Mail /> Messagerie</CardTitle></CardHeader>
-            <CardContent>
-              <div className="border rounded-lg overflow-x-auto">
-                <Table>
-                  <TableHeader><TableRow><TableHead>Utilisateur</TableHead><TableHead>Dernier Message</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {conversations?.map(convo => (
-                      <TableRow key={convo.id} className={cn(!convo.isReadByAdmin && "bg-blue-50 dark:bg-blue-900/20")}>
-                        <TableCell><span className="font-bold">{convo.userDisplayName}</span><br/><span className="text-xs text-muted-foreground">{convo.userEmail}</span></TableCell>
-                        <TableCell className="max-w-xs truncate">{convo.lastMessageContent}</TableCell>
-                        <TableCell className="text-right"><div className="flex justify-end gap-2"><Button asChild variant="outline" size="sm"><Link href={`/admin/messages/${convo.userId}`}>Répondre</Link></Button><Button variant="ghost" size="icon" onClick={() => setConversationToDelete(convo.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></div></TableCell>
-                      </TableRow>
-                    )) || <TableRow><TableCell colSpan={3} className="text-center">Aucun message.</TableCell></TableRow>}
-                  </TableBody>
-                </Table>
-              </div>
+          <Card className="border-2">
+            <CardHeader><CardTitle className="flex items-center gap-2 font-black uppercase text-sm"><Mail className="size-4" /> Messagerie</CardTitle></CardHeader>
+            <CardContent className="p-0 border-t">
+              <Table>
+                <TableHeader><TableRow className="bg-muted/30"><TableHead>Utilisateur</TableHead><TableHead>Message</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {conversations?.map(convo => (
+                    <TableRow key={convo.id} className={cn(!convo.isReadByAdmin && "bg-primary/5")}>
+                      <TableCell><span className="font-bold text-xs">{convo.userDisplayName}</span></TableCell>
+                      <TableCell className="max-w-[150px] truncate text-xs">{convo.lastMessageContent}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button asChild variant="outline" size="sm" className="h-8 text-[10px] font-black uppercase"><Link href={`/admin/messages/${convo.userId}`}>Répondre</Link></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setConversationToDelete(convo.id)}><Trash2 className="size-4 text-destructive" /></Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="users" className="space-y-6">
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><Users /> Liste des Utilisateurs</CardTitle></CardHeader>
-            <CardContent>
-              <div className="border rounded-lg overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Utilisateur</TableHead>
-                      <TableHead>Statut</TableHead>
-                      <TableHead>Fin Abo</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+          <Card className="border-2">
+            <CardHeader><CardTitle className="flex items-center gap-2 font-black uppercase text-sm"><Users className="size-4" /> Liste des Utilisateurs</CardTitle></CardHeader>
+            <CardContent className="p-0 border-t">
+              <Table>
+                <TableHeader><TableRow className="bg-muted/30"><TableHead>Nom / Email</TableHead><TableHead>Statut</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {allUsers?.map(u => (
+                    <TableRow key={u.id}>
+                      <TableCell><span className="font-bold text-xs">{u.displayName}</span><br/><span className="text-[9px] opacity-60">{u.email}</span></TableCell>
+                      <TableCell><Badge variant="outline" className="text-[9px] font-black uppercase">{u.subscriptionStatus}</Badge></TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditUser(u)}><Pencil className="size-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" disabled={u.id === user?.uid} onClick={() => setUserToDelete(u)}><UserX className="size-4 text-destructive" /></Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {allUsers?.map(u => (
-                      <TableRow key={u.id}>
-                        <TableCell>
-                          <span className="font-bold">{u.displayName}</span><br/>
-                          <span className="text-xs text-muted-foreground">{u.email}</span>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={u.subscriptionStatus === 'active' || u.subscriptionStatus === 'admin' ? 'default' : 'secondary'}>
-                            {u.subscriptionStatus}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {u.subscriptionExpiryDate ? format(new Date(u.subscriptionExpiryDate), 'dd/MM/yy') : '-'}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={() => handleEditUser(u)}
-                                title="Modifier les accès"
-                            >
-                                <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                disabled={u.id === user?.uid}
-                                onClick={() => setUserToDelete(u)}
-                                title={u.id === user?.uid ? "Impossible de supprimer votre propre compte" : "Supprimer le compte"}
-                            >
-                                <UserX className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                  ))}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="design" className="space-y-6">
-          <Card>
-            <CardHeader><CardTitle><Palette /> Splash Screen</CardTitle></CardHeader>
-            <CardContent className="space-y-8">
+          <Card className="border-2">
+            <CardHeader><CardTitle className="font-black uppercase text-sm">Splash Screen</CardTitle></CardHeader>
+            <CardContent className="space-y-6">
               <RadioGroup value={splashMode} onValueChange={(val: any) => setSplashMode(val)} className="flex gap-4">
-                <div className="flex items-center space-x-2 border p-4 rounded-lg flex-1"><RadioGroupItem value="text" id="r-text" /><Label htmlFor="r-text">Texte</Label></div>
-                <div className="flex items-center space-x-2 border p-4 rounded-lg flex-1"><RadioGroupItem value="image" id="r-image" /><Label htmlFor="r-image">Image</Label></div>
+                <div className="flex items-center space-x-2 border p-3 rounded-lg flex-1"><RadioGroupItem value="text" id="r-text" /><Label htmlFor="r-text">Texte</Label></div>
+                <div className="flex items-center space-x-2 border p-3 rounded-lg flex-1"><RadioGroupItem value="image" id="r-image" /><Label htmlFor="r-image">Image</Label></div>
               </RadioGroup>
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-4">
-                    <Label>Fond</Label><Input type="color" value={splashBgColor} onChange={e => setSplashBgColor(e.target.value)} />
-                    <Label>Durée ({splashDuration}s)</Label><Slider value={[splashDuration]} min={1} max={10} step={0.5} onValueChange={v => setSplashDuration(v[0])} />
-                </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2"><Label className="text-xs">Fond</Label><Input type="color" value={splashBgColor} onChange={e => setSplashBgColor(e.target.value)} /></div>
+                <div className="space-y-2"><Label className="text-xs">Durée ({splashDuration}s)</Label><Slider value={[splashDuration]} min={1} max={10} step={0.5} onValueChange={v => setSplashDuration(v[0])} /></div>
                 {splashMode === 'text' ? (
-                  <div className="space-y-4"><Label>Texte</Label><Input value={splashText} onChange={e => setSplashText(e.target.value)} /><Label>Couleur</Label><Input type="color" value={splashTextColor} onChange={e => setSplashTextColor(e.target.value)} /></div>
+                  <><div className="space-y-2"><Label className="text-xs">Texte</Label><Input value={splashText} onChange={e => setSplashText(e.target.value)} /></div><div className="space-y-2"><Label className="text-xs">Couleur Texte</Label><Input type="color" value={splashTextColor} onChange={e => setSplashTextColor(e.target.value)} /></div></>
                 ) : (
-                  <div className="space-y-4"><Label>Image (URL)</Label><Input value={splashImageUrl} onChange={e => setSplashImageUrl(e.target.value)} /><Label>Upload</Label><Input type="file" onChange={e => handleImageUpload(e, setSplashImageUrl)} /></div>
+                  <div className="col-span-2 space-y-2"><Label className="text-xs">Image URL</Label><div className="flex gap-2"><Input value={splashImageUrl} onChange={e => setSplashImageUrl(e.target.value)} /><Input type="file" onChange={e => handleImageUpload(e, setSplashImageUrl)} className="max-w-[100px]" /></div></div>
                 )}
               </div>
             </CardContent>
-            <CardFooter className="flex justify-between border-t p-6">
-              <Button variant="outline" onClick={startPreview}><Eye className="mr-2"/> Aperçu</Button>
-              <Button onClick={handleSaveSplashSettings} disabled={isSavingSplash}><Save className="mr-2"/> Sauvegarder</Button>
+            <CardFooter className="border-t p-4 flex justify-between">
+              <Button variant="outline" className="font-black uppercase text-xs" onClick={() => setIsPreviewing(true)}><Eye className="mr-2 size-4" /> Aperçu</Button>
+              <Button className="font-black uppercase text-xs" onClick={handleSaveSplashSettings} disabled={isSavingSplash}><Save className="mr-2 size-4" /> Sauvegarder</Button>
             </CardFooter>
           </Card>
         </TabsContent>
 
         <TabsContent value="fish" className="space-y-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <div>
-                <CardTitle className="flex items-center gap-2"><Fish /> Guide Poissons</CardTitle>
-                <CardDescription>Gérez les espèces affichées dans l'application.</CardDescription>
-              </div>
-              <div className="flex gap-2">
-                {(!dbFishSpecies || dbFishSpecies.length === 0) && (
-                    <Button variant="outline" onClick={handleInitializeFish} disabled={isInitializingFish}>
-                        <DatabaseZap className="mr-2 size-4" /> 
-                        {isInitializingFish ? 'Import...' : 'Importer Défaut'}
-                    </Button>
-                )}
-                <Button onClick={() => { setFishDialogMode('add'); setCurrentFish({ gratteRisk: 0, category: 'Lagon' }); setIsFishDialogOpen(true); }}>
-                    <Plus className="mr-2 size-4" /> Ajouter
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4">
-                {areFishLoading ? [1,2,3].map(i => <Skeleton key={i} className="h-24 w-full" />) : dbFishSpecies && dbFishSpecies.length > 0 ? dbFishSpecies.map(fish => (
-                  <Card key={fish.id} className="overflow-hidden border shadow-sm">
-                    <div className="flex items-center p-4 gap-4">
-                      <div className="relative size-20 rounded-lg overflow-hidden border bg-white shrink-0">
-                        {fish.imageUrl || fish.imagePlaceholder ? (
-                          <Image src={fish.imageUrl || `https://picsum.photos/seed/${fish.imagePlaceholder}/200/200`} alt={fish.name} fill className="object-contain p-1" sizes="128px" />
-                        ) : <Fish className="size-8 m-auto text-muted-foreground" />}
-                      </div>
-                      <div className="flex-grow">
-                        <h4 className="font-black uppercase text-sm">{fish.name}</h4>
-                        <p className="text-[10px] text-muted-foreground italic">{fish.scientificName}</p>
-                        <Badge variant="outline" className="mt-1 text-[8px]">{fish.category}</Badge>
-                      </div>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => { setFishDialogMode('edit'); setCurrentFish(fish); setIsFishDialogOpen(true); }}><Pencil className="size-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => setFishToDelete(fish.id)}><Trash2 className="size-4 text-destructive" /></Button>
-                      </div>
+          <Card className="border-2">
+            <CardHeader className="flex-row items-center justify-between"><CardTitle className="font-black uppercase text-sm">Guide Poissons</CardTitle><div className="flex gap-2"><Button variant="outline" size="sm" onClick={handleInitializeFish} disabled={isInitializingFish} className="text-[10px] uppercase font-black">Import Défaut</Button><Button size="sm" onClick={() => { setFishDialogMode('add'); setCurrentFish({ category: 'Lagon', gratteRisk: 0 }); setIsFishDialogOpen(true); }} className="text-[10px] uppercase font-black"><Plus className="mr-1 size-3" /> Ajouter</Button></div></CardHeader>
+            <CardContent className="p-4 pt-0">
+              <div className="grid gap-2">
+                {dbFishSpecies?.map(fish => (
+                  <div key={fish.id} className="flex items-center gap-3 p-2 border rounded-xl bg-card">
+                    <div className="size-12 rounded-lg bg-muted flex items-center justify-center overflow-hidden shrink-0">
+                      {fish.imageUrl || fish.imagePlaceholder ? <Image src={fish.imageUrl || `https://picsum.photos/seed/${fish.imagePlaceholder}/100/100`} alt={fish.name} width={48} height={48} className="object-cover" /> : <Fish className="size-6 opacity-20" />}
                     </div>
-                  </Card>
-                )) : (
-                    <div className="text-center py-12 border-2 border-dashed rounded-xl bg-muted/10">
-                        <div className="size-12 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Info className="text-muted-foreground size-6" />
-                        </div>
-                        <h3 className="font-bold">Base de données vide</h3>
-                        <p className="text-xs text-muted-foreground max-w-xs mx-auto mt-1">
-                            Cliquez sur "Importer Défaut" pour charger les espèces emblématiques.
-                        </p>
+                    <div className="flex-grow min-w-0">
+                      <p className="font-black uppercase text-[10px] truncate">{fish.name}</p>
+                      <p className="text-[8px] italic opacity-60 truncate">{fish.scientificName}</p>
                     </div>
-                )}
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setFishDialogMode('edit'); setCurrentFish(fish); setIsFishDialogOpen(true); }}><Pencil className="size-3" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setFishToDelete(fish.id)}><Trash2 className="size-3 text-destructive" /></Button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="sounds" className="space-y-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <div>
-                <CardTitle className="flex items-center gap-2"><Music /> Bibliothèque de Sons</CardTitle>
-                <CardDescription>Sons pour le Vessel Tracker et la Chasse.</CardDescription>
-              </div>
-              <div className="flex gap-2">
-                {(!dbSounds || dbSounds.length === 0) && (
-                    <Button variant="outline" onClick={handleInitializeSounds} disabled={isInitializingSounds}>
-                        <DatabaseZap className="mr-2 size-4" /> Import Défaut
-                    </Button>
-                )}
-                <Button onClick={() => { setSoundDialogMode('add'); setCurrentSound({ categories: ['General'] }); setIsSoundDialogOpen(true); }}>
-                    <Plus className="mr-2 size-4" /> Ajouter
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4">
-                {areSoundsLoading ? [1,2,3].map(i => <Skeleton key={i} className="h-16 w-full" />) : dbSounds && dbSounds.length > 0 ? dbSounds.map(sound => (
-                  <Card key={sound.id} className="p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="p-2 bg-primary/10 rounded-full text-primary">
-                        <Volume2 className="size-5" />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-sm">{sound.label}</h4>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                            {sound.categories?.map(cat => (
-                                <Badge key={cat} variant="secondary" className="text-[8px] font-black uppercase tracking-tighter h-4 px-1.5">{SOUND_CATEGORIES.find(c => c.id === cat)?.label || cat}</Badge>
-                            ))}
-                        </div>
-                        <p className="text-[10px] text-muted-foreground truncate max-w-[200px] mt-1">{sound.url}</p>
-                      </div>
+          <Card className="border-2">
+            <CardHeader className="flex-row items-center justify-between"><CardTitle className="font-black uppercase text-sm">Bibliothèque Sons</CardTitle><div className="flex gap-2"><Button variant="outline" size="sm" onClick={handleInitializeSounds} disabled={isInitializingSounds} className="text-[10px] uppercase font-black">Import Défaut</Button><Button size="sm" onClick={() => { setSoundDialogMode('add'); setCurrentSound({ categories: ['General'] }); setIsSoundDialogOpen(true); }} className="text-[10px] uppercase font-black"><Plus className="mr-1 size-3" /> Ajouter</Button></div></CardHeader>
+            <CardContent className="p-4 pt-0">
+              <div className="grid gap-2">
+                {dbSounds?.map(sound => (
+                  <div key={sound.id} className="flex items-center gap-3 p-3 border rounded-xl bg-card">
+                    <div className="p-2 bg-primary/10 rounded-full text-primary shrink-0"><Volume2 className="size-4" /></div>
+                    <div className="flex-grow min-w-0">
+                      <p className="font-bold text-xs truncate">{sound.label}</p>
+                      <div className="flex gap-1 mt-1">{sound.categories?.map(c => <Badge key={c} variant="secondary" className="text-[7px] px-1 h-3">{c}</Badge>)}</div>
                     </div>
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => playPreview(sound.url)} title="Aperçu"><Play className="size-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => downloadFile(sound.url, sound.label)} title="Télécharger"><Download className="size-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => { setSoundDialogMode('edit'); setCurrentSound(sound); setIsSoundDialogOpen(true); }} title="Modifier"><Pencil className="size-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => setSoundToDelete(sound.id)} title="Supprimer"><Trash2 className="size-4 text-destructive" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => playPreview(sound.url)}><Play className="size-3" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => downloadFile(sound.url, sound.label)}><Download className="size-3" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSoundToDelete(sound.id)}><Trash2 className="size-3 text-destructive" /></Button>
                     </div>
-                  </Card>
-                )) : <p className="text-center py-8 text-muted-foreground italic">Aucun son personnalisé.</p>}
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="access" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Share2 className="text-primary" /> Accès Global (Cadeau)</CardTitle>
-              <CardDescription>Ouvrez l'accès premium à TOUS les utilisateurs inscrits.</CardDescription>
-            </CardHeader>
+          <Card className="border-2">
+            <CardHeader><CardTitle className="font-black uppercase text-sm">Accès Global (Cadeau)</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              {sharedToken ? (
-                <Alert className="bg-primary/10 border-primary/20">
-                  <Crown className="size-4 text-primary" />
-                  <AlertTitle>Accès Global Actif</AlertTitle>
-                  <AlertDescription>
-                    Expire le : {sharedToken.expiresAt ? format(sharedToken.expiresAt.toDate(), 'dd/MM/yyyy HH:mm', { locale: fr }) : '...'}
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <p className="text-sm text-muted-foreground italic">Aucun accès global actif.</p>
-              )}
-              
-              <div className="flex items-end gap-4">
-                <div className="flex-grow space-y-2">
-                  <Label>Durée de l'offre (jours)</Label>
-                  <Select value={globalDuration} onValueChange={setGlobalDuration}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1 jour</SelectItem>
-                      <SelectItem value="3">3 jours</SelectItem>
-                      <SelectItem value="7">1 semaine</SelectItem>
-                      <SelectItem value="30">1 mois</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button onClick={() => handleUpdateSharedToken(parseInt(globalDuration))} className="bg-primary">
-                  {sharedToken ? 'Prolonger' : 'Activer'}
-                </Button>
-                {sharedToken && (
-                  <Button variant="destructive" onClick={handleDisableSharedToken}>Désactiver</Button>
-                )}
+              {sharedToken && <Alert className="bg-primary/5 border-primary/20"><Crown className="size-4 text-primary" /><AlertTitle className="text-xs font-black uppercase">Actif</AlertTitle><AlertDescription className="text-[10px]">Expire le {format(sharedToken.expiresAt.toDate(), 'dd/MM/yy HH:mm', { locale: fr })}</AlertDescription></Alert>}
+              <div className="flex gap-2">
+                <Select value={globalDuration} onValueChange={setGlobalDuration}><SelectTrigger className="h-10 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1">1 jour</SelectItem><SelectItem value="7">1 semaine</SelectItem><SelectItem value="30">1 mois</SelectItem></SelectContent></Select>
+                <Button className="h-10 px-6 font-black uppercase text-xs" onClick={() => handleUpdateSharedToken(parseInt(globalDuration))}>{sharedToken ? 'Prolonger' : 'Activer'}</Button>
+                {sharedToken && <Button variant="destructive" className="h-10 px-4" onClick={handleDisableSharedToken}><Trash2 className="size-4" /></Button>}
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader><CardTitle>Jetons d'Accès Individuels</CardTitle></CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-end gap-4">
-                <div className="flex-grow space-y-2"><Label>Durée (mois)</Label><Select value={tokenDuration} onValueChange={setTokenDuration}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1">1</SelectItem><SelectItem value="3">3</SelectItem><SelectItem value="6">6</SelectItem><SelectItem value="12">12</SelectItem></SelectContent></Select></div>
-                <Button onClick={handleGenerateToken} disabled={isGenerating}><KeyRound className="mr-2"/> Générer</Button>
+          <Card className="border-2">
+            <CardHeader><CardTitle className="font-black uppercase text-sm">Jetons Individuels</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-2">
+                <Select value={tokenDuration} onValueChange={setTokenDuration}><SelectTrigger className="h-10 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1">1 mois</SelectItem><SelectItem value="6">6 mois</SelectItem><SelectItem value="12">12 mois</SelectItem></SelectContent></Select>
+                <Button className="h-10 px-6 font-black uppercase text-xs" onClick={handleGenerateToken} disabled={isGenerating}><KeyRound className="mr-2 size-4" /> Générer</Button>
               </div>
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-xl overflow-hidden">
                 <Table>
-                  <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Statut / Utilisateur</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+                  <TableHeader><TableRow className="bg-muted/30"><TableHead>Code</TableHead><TableHead>Statut</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
                   <TableBody>
                     {accessTokens?.map(t => (
-                      <TableRow key={t.id}>
-                        <TableCell className="font-mono text-xs">{t.id}</TableCell>
-                        <TableCell>
-                          <Badge variant={t.status === 'active' ? 'default' : 'secondary'}>
-                            {t.status === 'active' ? 'Disponible' : 'Utilisé'}
-                          </Badge>
-                          {t.status === 'redeemed' && (
-                            <p className="text-[10px] text-muted-foreground mt-1">
-                              Par: {getUserEmail(t.redeemedBy)}
-                            </p>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" onClick={() => handleDeleteToken(t.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
+                      <TableRow key={t.id} className="text-[10px]">
+                        <TableCell className="font-mono">{t.id}</TableCell>
+                        <TableCell><Badge variant={t.status === 'active' ? 'default' : 'secondary'} className="text-[8px]">{t.status}</Badge></TableCell>
+                        <TableCell className="text-right"><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteDoc(doc(firestore, 'access_tokens', t.id))}><Trash2 className="size-3" /></Button></TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -920,204 +653,63 @@ export default function AdminPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Dialog for User Edit */}
+      {/* Dialogs */}
       <Dialog open={isUserEditDialogOpen} onOpenChange={setIsUserEditOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-                <DialogTitle>Modifier les accès</DialogTitle>
-                <DialogDescription>Modifiez le statut et la date d'expiration pour {userToEdit?.displayName}.</DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                    <Label htmlFor="status">Statut du compte</Label>
-                    <Select value={editStatus} onValueChange={setEditStatus}>
-                        <SelectTrigger id="status">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="active">Actif (Premium)</SelectItem>
-                            <SelectItem value="inactive">Inactif (Limité)</SelectItem>
-                            <SelectItem value="trial">Essai (Temporaire)</SelectItem>
-                            <SelectItem value="admin">Administrateur</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="expiry">Date de fin d'abonnement</Label>
-                    <Input 
-                        id="expiry" 
-                        type="date" 
-                        value={editExpiryDate} 
-                        onChange={e => setEditExpiryDate(e.target.value)} 
-                    />
-                </div>
-            </div>
-            <DialogFooter>
-                <Button variant="ghost" onClick={() => setIsUserEditOpen(false)}>Annuler</Button>
-                <Button onClick={handleUpdateUser} disabled={isSavingUser}>{isSavingUser ? 'Enregistrement...' : 'Sauvegarder'}</Button>
-            </DialogFooter>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader><DialogTitle className="font-black uppercase">Accès Utilisateur</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Statut</Label><Select value={editStatus} onValueChange={setEditStatus}><SelectTrigger className="h-12 border-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Actif (Premium)</SelectItem><SelectItem value="inactive">Inactif</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div>
+            <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Fin Abo</Label><Input type="date" value={editExpiryDate} onChange={e => setEditExpiryDate(e.target.value)} className="h-12 border-2" /></div>
+          </div>
+          <DialogFooter><Button onClick={handleUpdateUser} disabled={isSavingUser} className="w-full h-12 font-black uppercase">Sauvegarder</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog for Fish Create/Edit */}
       <Dialog open={isFishDialogOpen} onOpenChange={setIsFishDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-                <DialogTitle>{fishDialogMode === 'add' ? 'Ajouter une espèce' : 'Modifier l\'espèce'}</DialogTitle>
-                <DialogDescription>Remplissez les informations techniques du poisson.</DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-                <div className="flex items-end gap-2">
-                    <div className="flex-grow space-y-2">
-                        <Label>Nom Commun</Label>
-                        <Input value={currentFish.name || ''} onChange={e => setCurrentFish({...currentFish, name: e.target.value})} placeholder="Bec de cane..." />
-                    </div>
-                    <Button 
-                        variant="secondary" 
-                        className="gap-2 font-bold"
-                        disabled={!currentFish.name || isAiGeneratingFish}
-                        onClick={handleAiFillFish}
-                    >
-                        {isAiGeneratingFish ? <BrainCircuit className="size-4 animate-pulse" /> : <Sparkles className="size-4" />}
-                        {isAiGeneratingFish ? 'Analyse...' : 'Générer avec l\'IA'}
-                    </Button>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><Label>Nom Scientifique</Label><Input value={currentFish.scientificName || ''} onChange={e => setCurrentFish({...currentFish, scientificName: e.target.value})} placeholder="Lethrinus..." /></div>
-                    <div className="space-y-2"><Label>Catégorie</Label><Select value={currentFish.category} onValueChange={(v:any) => setCurrentFish({...currentFish, category: v})}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Lagon">Lagon</SelectItem><SelectItem value="Large">Large</SelectItem><SelectItem value="Recif">Récif</SelectItem></SelectContent></Select></div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><Label>Risque Gratte (%)</Label><Input type="number" value={currentFish.gratteRisk || 0} onChange={e => setCurrentFish({...currentFish, gratteRisk: parseInt(e.target.value)})} /></div>
-                    <div className="space-y-2">
-                        <Label>Photo (URL)</Label>
-                        <div className="flex gap-2">
-                            <Input value={currentFish.imageUrl || ''} onChange={e => setCurrentFish({...currentFish, imageUrl: e.target.value})} placeholder="https://..." />
-                            <div className="relative">
-                                <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => handleImageUpload(e, (b) => setCurrentFish({...currentFish, imageUrl: b}))} />
-                                <Button variant="outline" size="icon"><Upload className="size-4"/></Button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div className="space-y-2"><Label>Conseil Culinaire</Label><Textarea value={currentFish.culinaryAdvice || ''} onChange={e => setCurrentFish({...currentFish, culinaryAdvice: e.target.value})} /></div>
-                <div className="space-y-2"><Label>Conseil de Pêche</Label><Textarea value={currentFish.fishingAdvice || ''} onChange={e => setCurrentFish({...currentFish, fishingAdvice: e.target.value})} /></div>
-            </div>
-            <DialogFooter>
-                <Button variant="ghost" onClick={() => setIsFishDialogOpen(false)}>Annuler</Button>
-                <Button onClick={handleSaveFish} disabled={isSavingFish}>{isSavingFish ? 'Sauvegarde...' : 'Sauvegarder'}</Button>
-            </DialogFooter>
+        <DialogContent className="max-w-xl rounded-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="font-black uppercase">Fiche Poisson</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex gap-2"><Input placeholder="Nom..." value={currentFish.name || ''} onChange={e => setCurrentFish({...currentFish, name: e.target.value})} className="h-12 border-2" /><Button variant="secondary" className="h-12 font-black uppercase text-xs" onClick={handleAiFillFish} disabled={isAiGeneratingFish}><Sparkles className="mr-2 size-4" /> IA</Button></div>
+            <div className="grid grid-cols-2 gap-4"><div className="space-y-1"><Label className="text-[10px] font-bold uppercase opacity-60">Scientifique</Label><Input value={currentFish.scientificName || ''} onChange={e => setCurrentFish({...currentFish, scientificName: e.target.value})} className="h-10 border-2" /></div><div className="space-y-1"><Label className="text-[10px] font-bold uppercase opacity-60">Catégorie</Label><Select value={currentFish.category} onValueChange={(v:any) => setCurrentFish({...currentFish, category: v})}><SelectTrigger className="h-10 border-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Lagon">Lagon</SelectItem><SelectItem value="Large">Large</SelectItem><SelectItem value="Recif">Récif</SelectItem></SelectContent></Select></div></div>
+            <div className="space-y-1"><Label className="text-[10px] font-bold uppercase opacity-60">Cuisine</Label><Textarea value={currentFish.culinaryAdvice || ''} onChange={e => setCurrentFish({...currentFish, culinaryAdvice: e.target.value})} className="text-xs border-2" /></div>
+            <div className="space-y-1"><Label className="text-[10px] font-bold uppercase opacity-60">Pêche</Label><Textarea value={currentFish.fishingAdvice || ''} onChange={e => setCurrentFish({...currentFish, fishingAdvice: e.target.value})} className="text-xs border-2" /></div>
+          </div>
+          <DialogFooter><Button onClick={handleSaveFish} disabled={isSavingFish} className="w-full h-12 font-black uppercase">Sauvegarder Fiche</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog for Sound Create/Edit */}
       <Dialog open={isSoundDialogOpen} onOpenChange={setIsSoundDialogOpen}>
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle>{soundDialogMode === 'add' ? 'Ajouter un son' : 'Modifier le son'}</DialogTitle>
-                <DialogDescription>Saisissez le nom du son et son URL ou chargez un fichier MP3.</DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-                <Alert className="bg-blue-50 border-blue-200">
-                  <Info className="size-4 text-blue-600" />
-                  <AlertTitle className="text-xs font-black uppercase">Spécifications recommandées</AlertTitle>
-                  <AlertDescription className="text-[10px] leading-relaxed">
-                    Format : <strong>MP3 uniquement</strong>.<br/>
-                    Compression : <strong>128 kbps</strong> recommandé.<br/>
-                    Poids idéal : <strong>{"< 500 Ko"}</strong> pour un chargement instantané en mer.
-                  </AlertDescription>
-                </Alert>
-
-                <div className="space-y-2"><Label>Libellé du son</Label><Input value={currentSound.label || ''} onChange={e => setCurrentSound({...currentSound, label: e.target.value})} placeholder="Signal radio..." /></div>
-                <div className="space-y-2">
-                    <Label>Fichier MP3 / URL</Label>
-                    <div className="flex gap-2">
-                        <Input value={currentSound.url || ''} onChange={e => setCurrentSound({...currentSound, url: e.target.value})} placeholder="https://... ou fichier chargé" />
-                        <div className="relative">
-                            <input 
-                                type="file" 
-                                accept="audio/mpeg" 
-                                className="absolute inset-0 opacity-0 cursor-pointer" 
-                                onChange={e => handleAudioUpload(e, (b) => setCurrentSound({...currentSound, url: b}))} 
-                            />
-                            <Button variant="outline" size="icon" title="Charger depuis l'ordinateur"><Upload className="size-4"/></Button>
-                        </div>
-                        <Button variant="outline" size="icon" onClick={() => currentSound.url && playPreview(currentSound.url)} title="Aperçu"><Play className="size-4"/></Button>
-                        <Button variant="outline" size="icon" onClick={() => currentSound.url && downloadFile(currentSound.url, currentSound.label || 'son')} title="Télécharger"><Download className="size-4"/></Button>
-                    </div>
-                </div>
-                <div className="space-y-2">
-                    <Label>Catégories (Sélection multiple possible)</Label>
-                    <div className="flex flex-wrap gap-2">
-                        {SOUND_CATEGORIES.map(cat => (
-                            <Button 
-                                key={cat.id} 
-                                variant={(currentSound.categories || []).includes(cat.id) ? 'default' : 'outline'}
-                                size="sm"
-                                className="text-[10px] font-black uppercase h-8 px-3"
-                                onClick={() => handleToggleCategory(cat.id)}
-                            >
-                                {cat.label}
-                            </Button>
-                        ))}
-                    </div>
-                </div>
-            </div>
-            <DialogFooter>
-                <Button variant="ghost" onClick={() => setIsSoundDialogOpen(false)}>Annuler</Button>
-                <Button onClick={handleSaveSound} disabled={isSavingSound}>{isSavingSound ? 'Sauvegarde...' : 'Sauvegarder'}</Button>
-            </DialogFooter>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader><DialogTitle className="font-black uppercase">Ajouter Son</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-1"><Label className="text-[10px] font-bold uppercase">Libellé</Label><Input value={currentSound.label || ''} onChange={e => setCurrentSound({...currentSound, label: e.target.value})} className="h-12 border-2" /></div>
+            <div className="space-y-1"><Label className="text-[10px] font-bold uppercase">URL / MP3</Label><div className="flex gap-2"><Input value={currentSound.url || ''} onChange={e => setCurrentSound({...currentSound, url: e.target.value})} className="h-12 border-2" /><div className="relative"><Input type="file" onChange={e => handleAudioUpload(e, (b) => setCurrentSound({...currentSound, url: b}))} className="absolute inset-0 opacity-0 cursor-pointer" /><Button variant="outline" size="icon" className="h-12 w-12 border-2"><Upload className="size-5" /></Button></div></div></div>
+            <div className="space-y-2"><Label className="text-[10px] font-bold uppercase">Catégories</Label><div className="flex flex-wrap gap-2">{SOUND_CATEGORIES.map(c => <Button key={c.id} variant={(currentSound.categories || []).includes(c.id) ? 'default' : 'outline'} size="sm" onClick={() => handleToggleCategory(c.id)} className="text-[9px] h-7">{c.label}</Button>)}</div></div>
+          </div>
+          <DialogFooter><Button onClick={handleSaveSound} disabled={isSavingSound} className="w-full h-12 font-black uppercase">Enregistrer</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {generatedToken && (
-        <AlertDialog open={!!generatedToken} onOpenChange={() => setGeneratedToken(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader><AlertDialogTitle>Jeton généré !</AlertDialogTitle><AlertDialogDescription>Copiez-le :</AlertDialogDescription></AlertDialogHeader>
-            <div className="p-4 bg-muted rounded-md font-mono text-center text-lg">{generatedToken}</div>
-            <AlertDialogFooter><AlertDialogCancel>Fermer</AlertDialogCancel><AlertDialogAction onClick={() => copyToClipboard(generatedToken || '')}>Copier</AlertDialogAction></AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
+      <AlertDialog open={!!generatedToken} onOpenChange={() => setGeneratedToken(null)}><AlertDialogContent className="rounded-2xl border-2"><AlertDialogHeader><AlertDialogTitle className="font-black uppercase">Jeton Prêt</AlertDialogTitle><div className="p-6 bg-muted/50 rounded-xl font-mono text-center text-lg border-2 border-dashed">{generatedToken}</div></AlertDialogHeader><AlertDialogFooter><AlertDialogAction className="font-black uppercase">Compris</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      
+      <AlertDialog open={!!conversationToDelete} onOpenChange={() => setConversationToDelete(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Supprimer ?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Non</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteConversation(conversationToDelete!)}>Oui, supprimer</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
 
-      {conversationToDelete && (
-        <AlertDialog open={!!conversationToDelete} onOpenChange={(open) => !open && setConversationToDelete(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader><AlertDialogTitle>Supprimer la conversation ?</AlertDialogTitle><AlertDialogDescription>Cette action est irréversible.</AlertDialogDescription></AlertDialogHeader>
-            <AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteConversation(conversationToDelete!)}>Supprimer</AlertDialogAction></AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
+      <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer le compte ?</AlertDialogTitle>
+            <AlertDialogDescription>Action irréversible pour {userToDelete?.displayName}.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteUserConfirmed} className="bg-destructive text-destructive-foreground">Supprimer</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-      {userToDelete && (
-        <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Supprimer le compte de {userToDelete.displayName} ?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Cette action supprimera définitivement le profil de l'utilisateur dans Firestore.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Annuler</AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={handleDeleteUserConfirmed} 
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                Supprimer le compte
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
-
-      {soundToDelete && (
-        <AlertDialog open={!!soundToDelete} onOpenChange={() => setSoundToDelete(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader><AlertDialogTitle>Supprimer ce son ?</AlertDialogTitle><AlertDialogDescription>Il ne sera plus disponible pour les alertes.</AlertDialogDescription></AlertDialogHeader>
-            <AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={handleDeleteSoundConfirmed}>Supprimer</AlertDialogAction></AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
+      <AlertDialog open={!!soundToDelete} onOpenChange={() => setSoundToDelete(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Supprimer ce son ?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={handleDeleteSoundConfirmed}>Supprimer</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      
+      <AlertDialog open={!!fishToDelete} onOpenChange={() => setFishToDelete(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Supprimer cette fiche ?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={handleDeleteFishConfirmed}>Supprimer</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </div>
   );
 }
