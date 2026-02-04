@@ -103,8 +103,9 @@ export function VesselTracker() {
   }, []);
 
   const handleSaveCustomId = () => {
-    const id = customSharingId.trim();
+    const id = customSharingId.trim().toUpperCase();
     localStorage.setItem('vessel_custom_id', id);
+    setCustomSharingId(id);
     toast({ title: "Identifiant enregistré", description: `ID : ${id || 'UID par défaut'}` });
   };
 
@@ -159,7 +160,7 @@ export function VesselTracker() {
     }
   }, [userProfile]);
 
-  const sharingId = customSharingId.trim() || user?.uid || '';
+  const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
   const vesselRef = useMemoFirebase(() => {
     const cleanId = vesselIdToFollow.trim().toUpperCase();
