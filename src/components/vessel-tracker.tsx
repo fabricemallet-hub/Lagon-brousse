@@ -19,6 +19,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Navigation, 
@@ -76,6 +82,33 @@ export function VesselTracker() {
   const [customSharingId, setCustomSharingId] = useState('');
   const [vesselHistory, setVesselHistory] = useState<string[]>([]);
 
+  // Sound settings
+  const [isNotifyEnabled, setIsNotifyEnabled] = useState(false);
+  const [vesselVolume, setVesselVolume] = useState(0.8);
+  const [notifySettings, setNotifySettings] = useState({ moving: true, stationary: true, offline: true });
+  const [notifySounds, setNotifySounds] = useState({ moving: 'cloche', stationary: 'sonar', offline: 'alerte' });
+  const prevVesselStatusRef = useRef<string | null>(null);
+
+  // Watch settings
+  const [isWatchEnabled, setIsWatchEnabled] = useState(false);
+  const [watchType, setWatchType] = useState<'moving' | 'stationary' | 'offline'>('stationary');
+  const [watchDuration, setWatchDuration] = useState(15);
+  const [watchSound, setWatchSound] = useState('alerte');
+  const [isWatchAlerting, setIsWatchAlerting] = useState(false);
+  const [statusStartTime, setStatusStartTime] = useState<number | null>(null);
+  const watchRepeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const [currentPos, setCurrentPos] = useState<google.maps.LatLngLiteral | null>(null);
+  const [anchorPos, setAnchorPos] = useState<google.maps.LatLngLiteral | null>(null);
+  const [lastMovementTime, setLastMovementTime] = useState<number>(Date.now());
+  const [vesselStatus, setVesselStatus] = useState<'moving' | 'stationary'>('moving');
+  const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [hasInitialCentered, setHasInitialCentered] = useState(false);
+  const [wakeLock, setWakeLock] = useState<any>(null);
+  
+  const watchIdRef = useRef<number | null>(null);
+  const lastFirestoreUpdateRef = useRef<number>(0);
+
   const soundsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
@@ -122,31 +155,6 @@ export function VesselTracker() {
     setVesselHistory(newHistory);
     localStorage.setItem('vessel_follow_history', JSON.stringify(newHistory));
   };
-
-  const [isNotifyEnabled, setIsNotifyEnabled] = useState(false);
-  const [vesselVolume, setVesselVolume] = useState(0.8);
-  const [notifySettings] = useState({ moving: true, stationary: true, offline: true });
-  const [notifySounds] = useState({ moving: 'cloche', stationary: 'sonar', offline: 'alerte' });
-  const prevVesselStatusRef = useRef<string | null>(null);
-
-  const [isWatchEnabled] = useState(false);
-  const [watchType] = useState<'moving' | 'stationary' | 'offline'>('stationary');
-  const [watchDuration] = useState(15);
-  const [watchSound] = useState('alerte');
-  const [isWatchAlerting, setIsWatchAlerting] = useState(false);
-  const [statusStartTime, setStatusStartTime] = useState<number | null>(null);
-  const watchRepeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  const [currentPos, setCurrentPos] = useState<google.maps.LatLngLiteral | null>(null);
-  const [anchorPos, setAnchorPos] = useState<google.maps.LatLngLiteral | null>(null);
-  const [lastMovementTime, setLastMovementTime] = useState<number>(Date.now());
-  const [vesselStatus, setVesselStatus] = useState<'moving' | 'stationary'>('moving');
-  const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [hasInitialCentered, setHasInitialCentered] = useState(false);
-  const [wakeLock, setWakeLock] = useState<any>(null);
-  
-  const watchIdRef = useRef<number | null>(null);
-  const lastFirestoreUpdateRef = useRef<number>(0);
 
   const userDocRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -403,18 +411,110 @@ export function VesselTracker() {
                   ))}
                 </div>
               )}
-              <div className="flex flex-col gap-4 p-4 border rounded-lg bg-muted/30">
-                <div className="flex items-center justify-between">
+              
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 border rounded-lg bg-card">
                     <div className="flex items-center gap-2">
                         {isNotifyEnabled ? <Bell className="size-4 text-primary fill-current" /> : <BellOff className="size-4 text-muted-foreground" />}
-                        <Label className="text-sm font-bold">Alertes Sonores</Label>
+                        <Label className="text-base font-bold">Alertes Sonores</Label>
                     </div>
                     <Switch checked={isNotifyEnabled} onCheckedChange={setIsNotifyEnabled} />
                 </div>
-                <div className="space-y-2">
-                    <div className="flex justify-between text-[10px] font-black uppercase text-muted-foreground"><span>Volume</span><span>{Math.round(vesselVolume * 100)}%</span></div>
-                    <Slider value={[vesselVolume]} min={0} max={1} step={0.1} onValueChange={v => setVesselVolume(v[0])} disabled={!isNotifyEnabled} />
-                </div>
+
+                {isNotifyEnabled && (
+                  <div className="p-4 border rounded-lg bg-muted/30 space-y-4 animate-in fade-in slide-in-from-top-2">
+                    <div className="space-y-2">
+                        <div className="flex justify-between text-[10px] font-black uppercase text-muted-foreground"><span>Volume</span><span>{Math.round(vesselVolume * 100)}%</span></div>
+                        <Slider value={[vesselVolume]} min={0} max={1} step={0.1} onValueChange={v => setVesselVolume(v[0])} />
+                    </div>
+                    
+                    <Accordion type="single" collapsible className="w-full">
+                        <AccordionItem value="sounds" className="border-none">
+                            <AccordionTrigger className="text-xs font-black uppercase py-2 hover:no-underline">Personnaliser les sons</AccordionTrigger>
+                            <AccordionContent className="space-y-4 pt-2">
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <Label className="text-xs font-bold">En route (Moving)</Label>
+                                        <Switch checked={notifySettings.moving} onCheckedChange={val => setNotifySettings(p => ({...p, moving: val}))} />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Select value={notifySounds.moving} onValueChange={val => { setNotifySounds(p => ({...p, moving: val})); playAlertSound(val); }}>
+                                            <SelectTrigger className="h-8 text-[10px]"><SelectValue /></SelectTrigger>
+                                            <SelectContent>{availableSounds.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+                                        </Select>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => playAlertSound(notifySounds.moving)}><Play className="size-3" /></Button>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <Label className="text-xs font-bold">Immobile (Stationary)</Label>
+                                        <Switch checked={notifySettings.stationary} onCheckedChange={val => setNotifySettings(p => ({...p, stationary: val}))} />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Select value={notifySounds.stationary} onValueChange={val => { setNotifySounds(p => ({...p, stationary: val})); playAlertSound(val); }}>
+                                            <SelectTrigger className="h-8 text-[10px]"><SelectValue /></SelectTrigger>
+                                            <SelectContent>{availableSounds.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+                                        </Select>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => playAlertSound(notifySounds.stationary)}><Play className="size-3" /></Button>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <Label className="text-xs font-bold">Hors-ligne (Offline)</Label>
+                                        <Switch checked={notifySettings.offline} onCheckedChange={val => setNotifySettings(p => ({...p, offline: val}))} />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Select value={notifySounds.offline} onValueChange={val => { setNotifySounds(p => ({...p, offline: val})); playAlertSound(val); }}>
+                                            <SelectTrigger className="h-8 text-[10px]"><SelectValue /></SelectTrigger>
+                                            <SelectContent>{availableSounds.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+                                        </Select>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => playAlertSound(notifySounds.offline)}><Play className="size-3" /></Button>
+                                    </div>
+                                </div>
+                            </AccordionContent>
+                        </AccordionItem>
+
+                        <AccordionItem value="watch" className="border-none">
+                            <AccordionTrigger className="text-xs font-black uppercase py-2 hover:no-underline">Surveillance Temporelle</AccordionTrigger>
+                            <AccordionContent className="space-y-4 pt-2">
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-xs font-bold">Activer la veille critique</Label>
+                                    <Switch checked={isWatchEnabled} onCheckedChange={setIsWatchEnabled} />
+                                </div>
+                                {isWatchEnabled && (
+                                    <>
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase">Statut à surveiller</Label>
+                                            <Select value={watchType} onValueChange={val => setWatchType(val as any)}>
+                                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="stationary">Immobilité (Mouillage)</SelectItem>
+                                                    <SelectItem value="moving">Mouvement (Dérive)</SelectItem>
+                                                    <SelectItem value="offline">Perte réseau</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between text-[10px] font-black uppercase"><span>Durée max</span><span>{watchDuration} min</span></div>
+                                            <Slider value={[watchDuration]} min={1} max={60} step={1} onValueChange={v => setWatchDuration(v[0])} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-black uppercase">Son de l'alarme</Label>
+                                            <div className="flex gap-2">
+                                                <Select value={watchSound} onValueChange={val => { setWatchSound(val); playAlertSound(val); }}>
+                                                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                                    <SelectContent>{availableSounds.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+                                                </Select>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => playAlertSound(watchSound)}><Play className="size-3" /></Button>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
+                  </div>
+                )}
               </div>
             </div>
           )}
