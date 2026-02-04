@@ -25,7 +25,8 @@ import {
   ShieldAlert,
   Wifi,
   Phone,
-  Save
+  Save,
+  Zap
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { VesselStatus, UserAccount } from '@/lib/types';
@@ -72,6 +73,9 @@ export function VesselTracker() {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [hasInitialCentered, setHasInitialCentered] = useState(false);
   
+  // Background/WakeLock State
+  const [wakeLock, setWakeLock] = useState<any>(null);
+  
   const watchIdRef = useRef<number | null>(null);
   const lastFirestoreUpdateRef = useRef<number>(0);
 
@@ -107,6 +111,52 @@ export function VesselTracker() {
     };
   }, []);
 
+  // Mode Éveil (Wake Lock)
+  const toggleWakeLock = async () => {
+    if (!('wakeLock' in navigator)) {
+      toast({ 
+        variant: "destructive", 
+        title: "Non supporté", 
+        description: "Votre navigateur ne supporte pas le maintien de l'écran allumé." 
+      });
+      return;
+    }
+
+    if (wakeLock) {
+      await wakeLock.release();
+      setWakeLock(null);
+      toast({ title: "Mode éveil désactivé", description: "L'écran peut désormais se mettre en veille." });
+    } else {
+      try {
+        const lock = await (navigator as any).wakeLock.request('screen');
+        setWakeLock(lock);
+        toast({ title: "Mode éveil activé", description: "L'écran restera allumé pour garantir le suivi GPS." });
+        
+        lock.addEventListener('release', () => {
+          setWakeLock(null);
+        });
+      } catch (err: any) {
+        console.error(`${err.name}, ${err.message}`);
+      }
+    }
+  };
+
+  // Réactiver WakeLock au retour sur l'app
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (wakeLock !== null && document.visibilityState === 'visible') {
+        try {
+          const lock = await (navigator as any).wakeLock.request('screen');
+          setWakeLock(lock);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [wakeLock]);
+
   const handleSaveEmergencyContact = async () => {
     if (!user || !firestore) return;
     setIsSavingContact(true);
@@ -141,7 +191,6 @@ export function VesselTracker() {
         ...data
     };
     
-    // CRITICAL: Non-blocking call with error emitter
     setDoc(docRef, updateData, { merge: true }).catch(async (err) => {
         const permissionError = new FirestorePermissionError({
             path: docRef.path,
@@ -209,9 +258,7 @@ export function VesselTracker() {
 
         const dist = getDistance(newLat, newLng, anchorPos.lat, anchorPos.lng);
 
-        // Use a 15m threshold to avoid jitter updates
         if (dist > IMMOBILITY_THRESHOLD_METERS) {
-          // SIGNIFICANT MOVEMENT
           if (vesselStatus === 'stationary') {
             toast({ title: "Mouvement détecté", description: "Le bateau fait de nouveau route." });
           }
@@ -219,13 +266,11 @@ export function VesselTracker() {
           setAnchorPos(newPos);
           setLastMovementTime(now);
           
-          // THROTTLE: Only update Firestore during movement if enough time has passed
           if (now - lastFirestoreUpdateRef.current > THROTTLE_UPDATE_MS) {
             updateVesselInFirestore({ location: { latitude: newLat, longitude: newLng }, status: 'moving' });
             lastFirestoreUpdateRef.current = now;
           }
         } else {
-          // IMMOBILE
           const idleTimeMinutes = (now - lastMovementTime) / 60000;
           
           if (idleTimeMinutes >= IMMOBILITY_START_MINUTES && vesselStatus === 'moving') {
@@ -265,8 +310,6 @@ export function VesselTracker() {
       updateVesselInFirestore({ status: vesselStatus });
     }
   }, [isOnline, isSharing, vesselStatus, updateVesselInFirestore]);
-
-  // --- UI HELPERS ---
 
   const handleRecenter = () => {
     if (currentPos && map) {
@@ -371,6 +414,21 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
                 </div>
                 <Switch checked={isSharing} onCheckedChange={setIsSharing} />
               </div>
+
+              <div className="pt-1">
+                <Button 
+                  variant={wakeLock ? "secondary" : "outline"} 
+                  size="sm"
+                  className={cn("w-full gap-2 font-bold h-11 border-2", wakeLock && "bg-primary/10 text-primary border-primary")}
+                  onClick={toggleWakeLock}
+                >
+                  <Zap className={cn("size-4", wakeLock && "fill-current")} />
+                  {wakeLock ? "MODE ÉVEIL ACTIF (Background)" : "ACTIVER MODE ÉVEIL (Background)"}
+                </Button>
+                <p className="text-[10px] text-muted-foreground mt-1.5 px-1 italic leading-tight">
+                  Empêche la mise en veille de votre smartphone pour garantir un suivi GPS ininterrompu même en arrière-plan.
+                </p>
+              </div>
               
               {isSharing && (
                 <Alert className={cn(isOnline ? "border-green-200 bg-green-50" : "border-destructive/20 bg-destructive/5")}>
@@ -411,6 +469,22 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
                   />
                 </div>
               </div>
+
+              <div className="pt-1">
+                <Button 
+                  variant={wakeLock ? "secondary" : "outline"} 
+                  size="sm"
+                  className={cn("w-full gap-2 font-bold h-11 border-2", wakeLock && "bg-primary/10 text-primary border-primary")}
+                  onClick={toggleWakeLock}
+                >
+                  <Zap className={cn("size-4", wakeLock && "fill-current")} />
+                  {wakeLock ? "MODE ÉVEIL ACTIF" : "GARDER L'ÉCRAN ALLUMÉ"}
+                </Button>
+                <p className="text-[10px] text-muted-foreground mt-1.5 px-1 italic leading-tight">
+                  Recommandé pour surveiller la position sur la carte sans que le téléphone ne se verrouille.
+                </p>
+              </div>
+
               {remoteVessel && (
                 <Alert className={cn(
                   remoteVessel.status === 'moving' && "bg-blue-50 border-blue-200",
