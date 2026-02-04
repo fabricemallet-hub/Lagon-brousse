@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -323,9 +322,14 @@ export function VesselTracker() {
     }
 
     if (wakeLock) {
-      await wakeLock.release();
-      setWakeLock(null);
-      toast({ title: "Mode éveil désactivé", description: "L'écran peut désormais se mettre en veille." });
+      try {
+        await wakeLock.release();
+        setWakeLock(null);
+        toast({ title: "Mode éveil désactivé", description: "L'écran peut désormais se mettre en veille." });
+      } catch (e) {
+        console.warn("Wake lock release failed:", e);
+        setWakeLock(null);
+      }
     } else {
       try {
         const lock = await (navigator as any).wakeLock.request('screen');
@@ -336,7 +340,15 @@ export function VesselTracker() {
           setWakeLock(null);
         });
       } catch (err: any) {
-        console.error(`${err.name}, ${err.message}`);
+        if (err.name === 'NotAllowedError') {
+          toast({ 
+            variant: "destructive", 
+            title: "Permission refusée", 
+            description: "Le maintien de l'écran allumé est bloqué par les paramètres de sécurité de votre environnement (iframe/IDE)." 
+          });
+        } else {
+          console.error("Wake Lock error:", err);
+        }
       }
     }
   };

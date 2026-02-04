@@ -1,4 +1,3 @@
-
 'use client';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
@@ -54,6 +53,7 @@ import {
   AlertCircle,
   Play,
   Settings,
+  Zap,
 } from 'lucide-react';
 import {
   useUser,
@@ -153,6 +153,9 @@ function HuntingSessionContent() {
   const [mySessions, setMySessions] = useState<WithId<HuntingSession>[]>([]);
   const [areMySessionsLoading, setAreMySessionsLoading] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
+  
+  // Background/WakeLock State
+  const [wakeLock, setWakeLock] = useState<any>(null);
 
   const prevParticipantsRef = useRef<SessionParticipant[] | null>(null);
 
@@ -278,6 +281,49 @@ function HuntingSessionContent() {
   }, [userProfile, user]);
   
   const { isLoaded, loadError } = useGoogleMaps();
+
+  // Mode Éveil (Wake Lock)
+  const toggleWakeLock = async () => {
+    if (!('wakeLock' in navigator)) {
+      toast({ 
+        variant: "destructive", 
+        title: "Non supporté", 
+        description: "Votre navigateur ne supporte pas le maintien de l'écran allumé." 
+      });
+      return;
+    }
+
+    if (wakeLock) {
+      try {
+        await wakeLock.release();
+        setWakeLock(null);
+        toast({ title: "Mode éveil désactivé", description: "L'écran peut désormais se mettre en veille." });
+      } catch (e) {
+        console.warn("Wake lock release failed:", e);
+        setWakeLock(null);
+      }
+    } else {
+      try {
+        const lock = await (navigator as any).wakeLock.request('screen');
+        setWakeLock(lock);
+        toast({ title: "Mode éveil activé", description: "L'écran restera allumé pour garantir le suivi GPS." });
+        
+        lock.addEventListener('release', () => {
+          setWakeLock(null);
+        });
+      } catch (err: any) {
+        if (err.name === 'NotAllowedError') {
+          toast({ 
+            variant: "destructive", 
+            title: "Permission refusée", 
+            description: "Le maintien de l'écran allumé est bloqué par les paramètres de sécurité de l'IDE." 
+          });
+        } else {
+          console.error("Wake Lock error:", err);
+        }
+      }
+    }
+  };
 
   const handleLeaveSession = useCallback(async () => {
     if (watchIdRef.current !== null) {
@@ -587,6 +633,16 @@ function HuntingSessionContent() {
                                         <Label className="text-xs font-bold uppercase text-muted-foreground">Paramètres de session</Label>
                                         <Input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="Mon surnom..." />
                                         
+                                        <Button 
+                                          variant={wakeLock ? "secondary" : "outline"} 
+                                          size="sm"
+                                          className={cn("w-full gap-2 font-bold h-11 border-2 my-2", wakeLock && "bg-primary/10 text-primary border-primary")}
+                                          onClick={toggleWakeLock}
+                                        >
+                                          <Zap className={cn("size-4", wakeLock && "fill-current")} />
+                                          {wakeLock ? "MODE ÉVEIL ACTIF" : "ACTIVER MODE ÉVEIL"}
+                                        </Button>
+
                                         <div className="space-y-4 pt-4 border-t border-border/50">
                                             <Label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-2">
                                                 <Volume2 className="size-4" /> Paramètres Audio
