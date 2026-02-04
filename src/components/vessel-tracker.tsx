@@ -124,8 +124,9 @@ export function VesselTracker() {
   }, []);
 
   const addToHistory = (id: string) => {
-    if (!id || vesselHistory.includes(id)) return;
-    const newHistory = [id, ...vesselHistory].slice(0, 5);
+    const cleanId = id.trim().toUpperCase();
+    if (!cleanId || vesselHistory.includes(cleanId)) return;
+    const newHistory = [cleanId, ...vesselHistory].slice(0, 5);
     setVesselHistory(newHistory);
     localStorage.setItem('vessel_follow_history', JSON.stringify(newHistory));
   };
@@ -200,8 +201,9 @@ export function VesselTracker() {
 
   // Firestore Sync (Receiver)
   const vesselRef = useMemoFirebase(() => {
-    if (!firestore || mode !== 'receiver' || !vesselIdToFollow) return null;
-    return doc(firestore, 'vessels', vesselIdToFollow);
+    const cleanId = vesselIdToFollow.trim();
+    if (!firestore || mode !== 'receiver' || !cleanId) return null;
+    return doc(firestore, 'vessels', cleanId);
   }, [firestore, mode, vesselIdToFollow]);
   const { data: remoteVessel, isLoading: isVesselLoading } = useDoc<VesselStatus>(vesselRef);
 
@@ -332,9 +334,7 @@ export function VesselTracker() {
       }
     } else {
       try {
-        // Handle request with robust error interception for permissions policy violations
         const lock = await (navigator as any).wakeLock.request('screen');
-        
         if (lock) {
           setWakeLock(lock);
           toast({ title: "Mode éveil activé", description: "L'écran restera allumé pour garantir le suivi GPS." });
@@ -343,7 +343,6 @@ export function VesselTracker() {
           });
         }
       } catch (err: any) {
-        // Capture Specifically NotAllowedError (policy violation in iframes)
         if (err.name === 'NotAllowedError' || err.message?.includes('permissions policy')) {
           toast({ 
             variant: "destructive", 
@@ -352,56 +351,9 @@ export function VesselTracker() {
           });
         } else {
           console.error("Wake Lock error:", err);
-          toast({ 
-            variant: "destructive", 
-            title: "Erreur technique", 
-            description: "Impossible d'activer le mode éveil." 
-          });
         }
       }
     }
-  };
-
-  // Réactiver WakeLock au retour sur l'app
-  useEffect(() => {
-    const handleVisibilityChange = async () => {
-      if (wakeLock !== null && document.visibilityState === 'visible') {
-        try {
-          const lock = await (navigator as any).wakeLock.request('screen').catch(() => null);
-          if (lock) setWakeLock(lock);
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [wakeLock]);
-
-  const handleSaveEmergencyContact = async () => {
-    if (!user || !firestore) return;
-    setIsSavingContact(true);
-    const docRef = doc(firestore, 'users', user.uid);
-    try {
-      await updateDoc(docRef, { emergencyContact: emergencyContact });
-      toast({ title: "Contact enregistré", description: "Le numéro sera conservé pour vos prochaines sorties." });
-    } catch (e: any) {
-      console.error(e);
-      if (e.code === 'permission-denied') {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: docRef.path,
-          operation: 'update',
-          requestResourceData: { emergencyContact: emergencyContact }
-        }));
-      }
-    } finally {
-      setIsSavingContact(false);
-    }
-  };
-
-  const handleSaveCustomId = () => {
-    localStorage.setItem('vessel_custom_id', customSharingId);
-    toast({ title: "ID de partage mis à jour", description: `Nouveau code : ${sharingId}` });
   };
 
   // --- SENDER LOGIC (USER A) ---
@@ -448,12 +400,18 @@ export function VesselTracker() {
 
   // Handle map centering
   useEffect(() => {
-    if (isLoaded && map && currentPos && !hasInitialCentered) {
-        map.panTo(currentPos);
-        map.setZoom(15);
+    if (!isLoaded || !map || !hasInitialCentered) {
+      if (mode === 'sender' && currentPos) {
+        map?.panTo(currentPos);
+        map?.setZoom(15);
         setHasInitialCentered(true);
+      } else if (mode === 'receiver' && remoteVessel?.location) {
+        map?.panTo({ lat: remoteVessel.location.latitude, lng: remoteVessel.location.longitude });
+        map?.setZoom(15);
+        setHasInitialCentered(true);
+      }
     }
-  }, [isLoaded, map, currentPos, hasInitialCentered]);
+  }, [isLoaded, map, currentPos, remoteVessel?.location, hasInitialCentered, mode]);
 
   // Monitor position and mobility
   useEffect(() => {
@@ -528,18 +486,12 @@ export function VesselTracker() {
     };
   }, [isSharing, anchorPos, vesselStatus, lastMovementTime, lastHistoryUpdateTime, updateVesselInFirestore, addImmobilityHistory, toast]);
 
-  // Sync offline status
-  useEffect(() => {
-    if (isSharing && !isOnline) {
-      updateVesselInFirestore({ status: 'offline' });
-    } else if (isSharing && isOnline) {
-      updateVesselInFirestore({ status: vesselStatus });
-    }
-  }, [isOnline, isSharing, vesselStatus, updateVesselInFirestore]);
-
   const handleRecenter = () => {
-    if (currentPos && map) {
+    if (mode === 'sender' && currentPos && map) {
         map.panTo(currentPos);
+        map.setZoom(15);
+    } else if (mode === 'receiver' && remoteVessel?.location && map) {
+        map.panTo({ lat: remoteVessel.location.latitude, lng: remoteVessel.location.longitude });
         map.setZoom(15);
     } else if (!navigator.geolocation) {
         toast({ variant: "destructive", title: "Erreur", description: "GPS non disponible." });
@@ -560,41 +512,18 @@ export function VesselTracker() {
 
   const sendEmergencySms = (lat: number, lng: number, name: string) => {
     if (!emergencyContact.trim()) {
-      toast({ 
-        variant: "destructive", 
-        title: "Numéro requis", 
-        description: "Veuillez saisir le numéro de téléphone du contact à prévenir." 
-      });
+      toast({ variant: "destructive", title: "Numéro requis", description: "Veuillez saisir le numéro de téléphone du contact à prévenir." });
       return;
     }
-
     const coords = `${lat.toFixed(6)},${lng.toFixed(6)}`;
     const googleMapsUrl = `https://www.google.com/maps?q=${coords}`;
     const cleanName = name === 'Ma Position' ? (user?.displayName || 'Capitaine') : name;
-    
-    const bodyText = `ALERTE Lagon&Brousse NC : ${cleanName} est en difficulté en mer.
-Position : ${googleMapsUrl}
-GPS : ${coords}
-Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
-    
+    const bodyText = `ALERTE Lagon&Brousse NC : ${cleanName} est en difficulté en mer.\nPosition : ${googleMapsUrl}\nGPS : ${coords}\nSecours mer : SNSM (+687 23.66.66) ou 196 (CROSS).`;
     const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent);
-    const isAndroid = /Android/i.test(navigator.userAgent);
-    const isMobileDevice = isIOS || isAndroid;
     const separator = isIOS ? '&' : '?';
-    
     const target = emergencyContact.replace(/\s/g, '');
     const smsUrl = `sms:${target}${separator}body=${encodeURIComponent(bodyText)}`;
-    
-    toast({ 
-      title: "Alerte en cours", 
-      description: `Ouverture de l'application SMS pour prévenir ${target}.` 
-    });
-
-    if (isMobileDevice) {
-      window.location.href = smsUrl;
-    } else {
-      console.log("Desktop fallback - SMS would be sent to:", target, "with body:", bodyText);
-    }
+    window.location.href = smsUrl;
   };
 
   if (loadError) return <Alert variant="destructive"><AlertTitle>Erreur de carte</AlertTitle></Alert>;
@@ -603,6 +532,8 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
   const displayVessel = mode === 'sender' 
     ? (isSharing ? { location: { latitude: currentPos?.lat || 0, longitude: currentPos?.lng || 0 }, status: isOnline ? vesselStatus : 'offline', displayName: 'Ma Position' } : null) 
     : remoteVessel;
+
+  const shouldShowMap = mode === 'sender' ? isSharing : (vesselIdToFollow.trim() !== '');
 
   return (
     <div className="space-y-6">
@@ -616,352 +547,89 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
                 <p className="text-xs font-bold opacity-90">Dépassement de durée pour l'état : {watchType}</p>
               </div>
             </div>
-            <Button 
-              className="w-full bg-white text-red-600 hover:bg-white/90 font-black h-14 text-lg shadow-2xl"
-              onClick={handleStopWatchAlert}
-            >
-              <CheckCircle2 className="mr-2 size-6" /> VALIDER & ARRÊTER L'ALERTE
-            </Button>
+            <Button className="w-full bg-white text-red-600 hover:bg-white/90 font-black h-14 text-lg shadow-2xl" onClick={handleStopWatchAlert}><CheckCircle2 className="mr-2 size-6" /> VALIDER & ARRÊTER L'ALERTE</Button>
           </div>
         </div>
       )}
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Navigation className="text-primary" /> Vessel Tracker NC
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2"><Navigation className="text-primary" /> Vessel Tracker NC</CardTitle>
           <CardDescription>Partage de position haute-fidélité pour la sécurité en mer.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex bg-muted p-1 rounded-lg">
-            <Button 
-              variant={mode === 'sender' ? 'default' : 'ghost'} 
-              className="flex-1" 
-              onClick={() => { setMode('sender'); setHasInitialCentered(false); }}
-            >
-              Émetteur (A)
-            </Button>
-            <Button 
-              variant={mode === 'receiver' ? 'default' : 'ghost'} 
-              className="flex-1" 
-              onClick={() => { setMode('receiver'); setHasInitialCentered(false); }}
-            >
-              Récepteur (B)
-            </Button>
+            <Button variant={mode === 'sender' ? 'default' : 'ghost'} className="flex-1" onClick={() => { setMode('sender'); setHasInitialCentered(false); }}>Émetteur (A)</Button>
+            <Button variant={mode === 'receiver' ? 'default' : 'ghost'} className="flex-1" onClick={() => { setMode('receiver'); setHasInitialCentered(false); }}>Récepteur (B)</Button>
           </div>
 
           {mode === 'sender' ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between p-4 border rounded-lg bg-card shadow-sm">
-                <div className="space-y-0.5">
-                  <Label className="text-base">Partager ma position</Label>
-                  <p className="text-sm text-muted-foreground">Activer le suivi en temps réel</p>
-                </div>
+                <div className="space-y-0.5"><Label className="text-base">Partager ma position</Label><p className="text-sm text-muted-foreground">Activer le suivi en temps réel</p></div>
                 <Switch checked={isSharing} onCheckedChange={setIsSharing} />
               </div>
-
               <div className="space-y-2">
                 <Label className="text-xs font-black uppercase text-muted-foreground ml-1">ID de partage (Optionnel)</Label>
                 <div className="flex gap-2">
-                  <Input 
-                    placeholder="Mon-Bateau-123" 
-                    value={customSharingId} 
-                    onChange={e => setCustomSharingId(e.target.value)} 
-                    disabled={isSharing}
-                    className="font-mono text-xs uppercase"
-                  />
-                  <Button variant="outline" size="icon" onClick={handleSaveCustomId} disabled={isSharing}>
-                    <Save className="size-4" />
-                  </Button>
+                  <Input placeholder="Mon-Bateau-123" value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} disabled={isSharing} className="font-mono text-xs uppercase" />
+                  <Button variant="outline" size="icon" onClick={handleSaveCustomId} disabled={isSharing}><Save className="size-4" /></Button>
                 </div>
-                <p className="text-[10px] text-muted-foreground italic px-1">
-                  Par défaut, votre identifiant est votre UID système. Saisissez un texte simple pour le changer.
-                </p>
               </div>
-
-              <div className="pt-1">
-                <Button 
-                  variant={wakeLock ? "secondary" : "outline"} 
-                  size="sm"
-                  className={cn("w-full gap-2 font-bold h-11 border-2", wakeLock && "bg-primary/10 text-primary border-primary")}
-                  onClick={toggleWakeLock}
-                >
-                  <Zap className={cn("size-4", wakeLock && "fill-current")} />
-                  {wakeLock ? "MODE ÉVEIL ACTIF" : "ACTIVER MODE ÉVEIL"}
-                </Button>
-              </div>
-              
-              {isSharing && (
-                <div className="space-y-3">
-                  <Alert className={cn(isOnline ? "border-green-200 bg-green-50" : "border-destructive/20 bg-destructive/5")}>
-                    {isOnline ? <Wifi className="h-4 w-4 text-green-600" /> : <WifiOff className="h-4 w-4 text-destructive" />}
-                    <AlertTitle>{isOnline ? "En ligne" : "Réseau perdu"}</AlertTitle>
-                    <AlertDescription className="text-xs">
-                      {isOnline 
-                        ? "Vos coordonnées sont transmises en temps réel." 
-                        : "L'application synchronisera votre position dès le retour du réseau."}
-                    </AlertDescription>
-                  </Alert>
-
-                  <div className="p-4 border rounded-lg space-y-2 bg-muted/30">
-                    <p className="text-xs font-black uppercase text-muted-foreground">Votre ID de partage actuel :</p>
-                    <div className="flex gap-2">
-                      <code className="flex-1 bg-background border p-2 rounded font-mono text-center text-xs overflow-hidden truncate">{sharingId}</code>
-                      <Button variant="outline" size="icon" onClick={() => {
-                        navigator.clipboard.writeText(sharingId);
-                        toast({ title: "ID copié !" });
-                      }}>
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
+              <Button variant={wakeLock ? "secondary" : "outline"} size="sm" className={cn("w-full gap-2 font-bold h-11 border-2", wakeLock && "bg-primary/10 text-primary border-primary")} onClick={toggleWakeLock}><Zap className={cn("size-4", wakeLock && "fill-current")} />{wakeLock ? "MODE ÉVEIL ACTIF" : "ACTIVER MODE ÉVEIL"}</Button>
             </div>
           ) : (
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label className="text-xs font-black uppercase text-muted-foreground ml-1">ID du navire à suivre</Label>
                 <div className="flex gap-2">
-                  <Input 
-                    placeholder="Coller l'ID ici..." 
-                    value={vesselIdToFollow} 
-                    onChange={e => setVesselIdToFollow(e.target.value)} 
-                    className="font-mono text-xs"
-                  />
-                  <Button variant="secondary" size="icon" onClick={() => { if(vesselIdToFollow) addToHistory(vesselIdToFollow); }}>
-                    <Plus className="size-4" />
-                  </Button>
+                  <Input placeholder="Coller l'ID ici..." value={vesselIdToFollow} onChange={e => setVesselIdToFollow(e.target.value)} className="font-mono text-xs uppercase" />
+                  <Button variant="secondary" size="icon" onClick={() => { if(vesselIdToFollow) addToHistory(vesselIdToFollow); }}><Plus className="size-4" /></Button>
                 </div>
               </div>
-
-              {/* HISTORY SECTION */}
               {vesselHistory.length > 0 && (
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between px-1">
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1">
-                      <History className="size-3" /> Historique des suivis
-                    </Label>
-                    <Button variant="ghost" className="h-5 px-2 text-[9px] font-bold uppercase" onClick={clearHistory}>
-                      Effacer tout
-                    </Button>
-                  </div>
+                  <div className="flex items-center justify-between px-1"><Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-1"><History className="size-3" /> Historique des suivis</Label><Button variant="ghost" className="h-5 px-2 text-[9px] font-bold uppercase" onClick={clearHistory}>Effacer tout</Button></div>
                   <div className="flex flex-col gap-1.5">
                     {vesselHistory.map(id => (
                       <div key={id} className="flex items-center gap-2 p-2 rounded-lg border bg-muted/10 group">
-                        <button 
-                          className="flex-1 text-left font-mono text-[10px] truncate"
-                          onClick={() => setVesselIdToFollow(id)}
-                        >
-                          {id}
-                        </button>
+                        <button className="flex-1 text-left font-mono text-[10px] truncate" onClick={() => { setVesselIdToFollow(id); setHasInitialCentered(false); }}>{id}</button>
                         <div className="flex items-center gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
-                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setVesselIdToFollow(id)}>
-                            <Pencil className="size-3" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => removeFromHistory(id)}>
-                            <Trash2 className="size-3" />
-                          </Button>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => removeFromHistory(id)}><Trash2 className="size-3" /></Button>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
-
-              <div className="pt-1">
-                <Button 
-                  variant={wakeLock ? "secondary" : "outline"} 
-                  size="sm"
-                  className={cn("w-full gap-2 font-bold h-11 border-2", wakeLock && "bg-primary/10 text-primary border-primary")}
-                  onClick={toggleWakeLock}
-                >
-                  <Zap className={cn("size-4", wakeLock && "fill-current")} />
-                  {wakeLock ? "MODE ÉVEIL ACTIF" : "GARDER L'ÉCRAN ALLUMÉ"}
-                </Button>
-              </div>
-
-              <div className="pt-2">
-                <Button 
-                  variant={isNotifyEnabled || isWatchEnabled ? "secondary" : "outline"} 
-                  size="sm"
-                  className={cn("w-full gap-2 font-bold h-11 border-2", (isNotifyEnabled || isWatchEnabled) && "bg-primary/10 text-primary border-primary")}
-                  onClick={() => setIsNotifyEnabled(!isNotifyEnabled)}
-                >
-                  {(isNotifyEnabled || isWatchEnabled) ? <Bell className="size-4 fill-current" /> : <BellOff className="size-4" />}
-                  {(isNotifyEnabled || isWatchEnabled) ? "NOTIFICATIONS ACTIVES" : "ACTIVER ALERTES SONORES"}
-                </Button>
-                
-                {isNotifyEnabled && (
-                  <div className="mt-4 p-4 border rounded-lg bg-muted/30 space-y-6 animate-in fade-in slide-in-from-top-2">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Settings2 className="size-4 text-primary" />
-                      <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Personnalisation des alertes</span>
-                    </div>
-                    
-                    <div className="space-y-4 pb-4 border-b border-border/50">
-                      {/* MOVING ALERT */}
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-sm font-bold flex items-center gap-2">
-                            <Move className="size-4 text-blue-500" /> Mouvement
-                          </Label>
-                          <Switch 
-                            checked={notifySettings.moving} 
-                            onCheckedChange={(val) => setNotifySettings({...notifySettings, moving: val})} 
-                          />
-                        </div>
-                        {notifySettings.moving && (
-                          <div className="flex gap-2 pl-6">
-                            <Select value={notifySounds.moving} onValueChange={(val) => setNotifySounds({...notifySounds, moving: val})}>
-                              <SelectTrigger className="h-8 text-xs bg-background"><SelectValue /></SelectTrigger>
-                              <SelectContent>{availableSounds.map(s => <SelectItem key={s.id || s.label} value={s.id || s.label}>{s.label}</SelectItem>)}</SelectContent>
-                            </Select>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => playAlertSound(notifySounds.moving)}><Play className="size-3" /></Button>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* STATIONARY ALERT */}
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-sm font-bold flex items-center gap-2">
-                            <Anchor className="size-4 text-amber-500" /> Immobilisation
-                          </Label>
-                          <Switch 
-                            checked={notifySettings.stationary} 
-                            onCheckedChange={(val) => setNotifySettings({...notifySettings, stationary: val})} 
-                          />
-                        </div>
-                        {notifySettings.stationary && (
-                          <div className="flex gap-2 pl-6">
-                            <Select value={notifySounds.stationary} onValueChange={(val) => setNotifySounds({...notifySounds, stationary: val})}>
-                              <SelectTrigger className="h-8 text-xs bg-background"><SelectValue /></SelectTrigger>
-                              <SelectContent>{availableSounds.map(s => <SelectItem key={s.id || s.label} value={s.id || s.label}>{s.label}</SelectItem>)}</SelectContent>
-                            </Select>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => playAlertSound(notifySounds.stationary)}><Play className="size-3" /></Button>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* OFFLINE ALERT */}
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-sm font-bold flex items-center gap-2">
-                            <WifiOff className="size-4 text-destructive" /> Perte Réseau
-                          </Label>
-                          <Switch 
-                            checked={notifySettings.offline} 
-                            onCheckedChange={(val) => setNotifySettings({...notifySettings, offline: val})} 
-                          />
-                        </div>
-                        {notifySettings.offline && (
-                          <div className="flex gap-2 pl-6">
-                            <Select value={notifySounds.offline} onValueChange={(val) => setNotifySounds({...notifySounds, offline: val})}>
-                              <SelectTrigger className="h-8 text-xs bg-background"><SelectValue /></SelectTrigger>
-                              <SelectContent>{availableSounds.map(s => <SelectItem key={s.id || s.label} value={s.id || s.label}>{s.label}</SelectItem>)}</SelectContent>
-                            </Select>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => playAlertSound(notifySounds.offline)}><Play className="size-3" /></Button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* ADVANCED WATCH SECTION */}
-                    <div className="space-y-4 pt-2 border-b border-border/50 pb-6">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label className="text-sm font-black text-primary flex items-center gap-2 uppercase tracking-tighter">
-                            <Timer className="size-4" /> Surveillance Temporelle
-                          </Label>
-                          <p className="text-[10px] text-muted-foreground italic">Alerte répétée toutes les 10s après X min.</p>
-                        </div>
-                        <Switch checked={isWatchEnabled} onCheckedChange={setIsWatchEnabled} />
-                      </div>
-
-                      {isWatchEnabled && (
-                        <div className="space-y-4 pl-2 animate-in slide-in-from-left-2">
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1.5">
-                              <Label className="text-[9px] font-black uppercase opacity-60">État à surveiller</Label>
-                              <Select value={watchType} onValueChange={(val: any) => setWatchType(val)}>
-                                <SelectTrigger className="h-9 text-xs bg-background"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="stationary">Immobilisation</SelectItem>
-                                  <SelectItem value="moving">Mouvement</SelectItem>
-                                  <SelectItem value="offline">Perte Réseau</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label className="text-[9px] font-black uppercase opacity-60">Durée (min)</Label>
-                              <Input 
-                                type="number" 
-                                value={watchDuration} 
-                                onChange={e => setWatchDuration(parseInt(e.target.value) || 1)} 
-                                className="h-9 text-xs bg-background"
-                              />
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-1.5">
-                            <Label className="text-[9px] font-black uppercase opacity-60">Son de l'alerte</Label>
-                            <div className="flex gap-2">
-                              <Select value={watchSound} onValueChange={setWatchSound}>
-                                <SelectTrigger className="h-9 text-xs bg-background flex-1"><SelectValue /></SelectTrigger>
-                                <SelectContent>{availableSounds.map(s => <SelectItem key={s.id || s.label} value={s.id || s.label}>{s.label}</SelectItem>)}</SelectContent>
-                              </Select>
-                              <Button variant="outline" size="icon" className="h-9 w-9 bg-background" onClick={() => playAlertSound(watchSound)}><Play className="size-3" /></Button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="space-y-2 pt-2">
-                      <div className="flex justify-between items-center">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground">Puissance sonore globale</Label>
-                        <span className="text-[10px] font-bold">{Math.round(vesselVolume * 100)}%</span>
-                      </div>
-                      <Slider 
-                        value={[vesselVolume]} 
-                        min={0} 
-                        max={1} 
-                        step={0.1} 
-                        onValueChange={(val) => setVesselVolume(val[0])} 
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {remoteVessel && (
-                <Alert className={cn(
-                  remoteVessel.status === 'moving' && "bg-blue-50 border-blue-200",
-                  remoteVessel.status === 'stationary' && "bg-amber-50 border-amber-200",
-                  remoteVessel.status === 'offline' && "bg-destructive/5 border-destructive/20"
-                )}>
-                  <div className="flex items-center gap-2">
-                    {remoteVessel.status === 'moving' && <Move className="h-4 w-4 text-blue-600 animate-pulse" />}
-                    {remoteVessel.status === 'stationary' && <Anchor className="h-4 w-4 text-amber-600" />}
-                    {remoteVessel.status === 'offline' && <WifiOff className="h-4 w-4 text-destructive" />}
-                    <AlertTitle className="text-sm font-bold">
-                      {remoteVessel.status === 'moving' && "Le bateau est en mouvement"}
-                      {remoteVessel.status === 'stationary' && "L'utilisateur n'a pas bougé depuis 5min"}
-                      {remoteVessel.status === 'offline' && "L'utilisateur n'a plus de réseau internet"}
-                    </AlertTitle>
-                  </div>
-                </Alert>
+              <Button variant={wakeLock ? "secondary" : "outline"} size="sm" className={cn("w-full gap-2 font-bold h-11 border-2", wakeLock && "bg-primary/10 text-primary border-primary")} onClick={toggleWakeLock}><Zap className={cn("size-4", wakeLock && "fill-current")} />{wakeLock ? "MODE ÉVEIL ACTIF" : "GARDER L'ÉCRAN ALLUMÉ"}</Button>
+              <Button variant={isNotifyEnabled || isWatchEnabled ? "secondary" : "outline"} size="sm" className={cn("w-full gap-2 font-bold h-11 border-2", (isNotifyEnabled || isWatchEnabled) && "bg-primary/10 text-primary border-primary")} onClick={() => setIsNotifyEnabled(!isNotifyEnabled)}>{(isNotifyEnabled || isWatchEnabled) ? <Bell className="size-4 fill-current" /> : <BellOff className="size-4" />}{(isNotifyEnabled || isWatchEnabled) ? "NOTIFICATIONS ACTIVES" : "ACTIVER ALERTES SONORES"}</Button>
+              
+              {isNotifyEnabled && (
+                <div className="mt-4 p-4 border rounded-lg bg-muted/30 space-y-6 animate-in fade-in slide-in-from-top-2">
+                  <div className="flex items-center justify-between"><Label className="text-sm font-bold flex items-center gap-2"><Move className="size-4 text-blue-500" /> Mouvement</Label><Switch checked={notifySettings.moving} onCheckedChange={(val) => setNotifySettings({...notifySettings, moving: val})} /></div>
+                  <div className="flex items-center justify-between"><Label className="text-sm font-bold flex items-center gap-2"><Anchor className="size-4 text-amber-500" /> Immobilisation</Label><Switch checked={notifySettings.stationary} onCheckedChange={(val) => setNotifySettings({...notifySettings, stationary: val})} /></div>
+                  <div className="flex items-center justify-between"><Label className="text-sm font-bold flex items-center gap-2"><WifiOff className="size-4 text-destructive" /> Perte Réseau</Label><Switch checked={notifySettings.offline} onCheckedChange={(val) => setNotifySettings({...notifySettings, offline: val})} /></div>
+                </div>
               )}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {(mode === 'sender' ? isSharing : remoteVessel) && (
+      {shouldShowMap && (
         <Card className="overflow-hidden">
           <div className="h-96 relative">
+            {mode === 'receiver' && isVesselLoading && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/50 backdrop-blur-sm"><Skeleton className="h-full w-full" /><p className="absolute font-black text-xs uppercase tracking-widest text-primary animate-pulse">Connexion au navire...</p></div>
+            )}
+            {mode === 'receiver' && !isVesselLoading && !remoteVessel && (
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-background/80 gap-2 p-4 text-center">
+                <WifiOff className="size-10 text-destructive opacity-50 mb-2" />
+                <p className="font-black uppercase tracking-tighter text-base">Navire introuvable</p>
+                <p className="text-[10px] text-muted-foreground uppercase font-bold max-w-[250px]">L'ID est incorrect ou l'émetteur n'a pas encore activé son partage.</p>
+              </div>
+            )}
             <GoogleMap
               mapContainerClassName="w-full h-full"
               center={displayVessel?.location ? { lat: displayVessel.location.latitude, lng: displayVessel.location.longitude } : { lat: -22.27, lng: 166.45 }}
@@ -970,10 +638,7 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
               options={{ disableDefaultUI: true, mapTypeId: 'satellite' }}
             >
               {displayVessel?.location && (
-                <OverlayView
-                  position={{ lat: displayVessel.location.latitude, lng: displayVessel.location.longitude }}
-                  mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-                >
+                <OverlayView position={{ lat: displayVessel.location.latitude, lng: displayVessel.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                   <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
                     <div className="px-2 py-1 bg-white/90 backdrop-blur rounded shadow-lg text-xs font-bold whitespace-nowrap border flex items-center gap-2">
                       <span className={cn("size-2 rounded-full", displayVessel.status === 'moving' ? "bg-blue-500 animate-pulse" : displayVessel.status === 'stationary' ? "bg-amber-500" : "bg-destructive")}></span>
@@ -986,91 +651,17 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
                 </OverlayView>
               )}
             </GoogleMap>
-            <Button size="icon" className="absolute top-4 right-4 shadow-lg" onClick={handleRecenter}>
-              <LocateFixed className="size-5" />
-            </Button>
+            <Button size="icon" className="absolute top-4 right-4 shadow-lg h-10 w-10 z-10 bg-background/80 backdrop-blur-sm" onClick={handleRecenter}><LocateFixed className="size-5" /></Button>
           </div>
           <CardFooter className="bg-muted/30 p-4 flex flex-col gap-4">
-            <div className="w-full grid grid-cols-1 gap-2">
-              <Button variant="outline" className="text-sm h-10" onClick={() => copyCoordinates(displayVessel!.location.latitude, displayVessel!.location.longitude)}>
-                <Copy className="size-4 mr-2" /> Copier les coordonnées GPS
-              </Button>
-            </div>
-
-            <div className="w-full space-y-3 border-t pt-4 border-border/50">
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <Label htmlFor="emergency-num" className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                    Contact à prévenir (Proche / Famille)
-                  </Label>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-6 w-6" 
-                    title="Sauvegarder ce numéro"
-                    onClick={handleSaveEmergencyContact}
-                    disabled={isSavingContact}
-                  >
-                    <Save className={cn("h-4 w-4", isSavingContact && "animate-pulse")} />
-                  </Button>
-                </div>
-                <div className="flex gap-2">
-                  <Input 
-                    id="emergency-num"
-                    type="tel"
-                    placeholder="Numéro SMS..."
-                    value={emergencyContact}
-                    onChange={e => setEmergencyContact(e.target.value)}
-                    className="bg-background h-12"
-                  />
-                </div>
+            {displayVessel && (
+              <div className="w-full grid grid-cols-1 gap-2">
+                <Button variant="outline" className="text-xs h-10 border-2" onClick={() => copyCoordinates(displayVessel.location.latitude, displayVessel.location.longitude)}><Copy className="size-4 mr-2" /> Copier les coordonnées GPS</Button>
+                <Button variant="destructive" className="w-full h-14 bg-red-600 hover:bg-red-700 text-base font-black shadow-lg flex items-center justify-center gap-3 uppercase tracking-tighter" onClick={() => sendEmergencySms(displayVessel.location.latitude, displayVessel.location.longitude, displayVessel.displayName)}><ShieldAlert className="size-6" /> ENVOYER ALERTE SMS</Button>
               </div>
-              
-              <Button 
-                variant="destructive" 
-                className="w-full h-14 bg-red-600 hover:bg-red-700 text-base font-bold shadow-lg flex items-center justify-center gap-3"
-                onClick={() => sendEmergencySms(displayVessel!.location.latitude, displayVessel!.location.longitude, displayVessel!.displayName)}
-              >
-                <ShieldAlert className="size-6" /> ENVOYER ALERTE SMS
-              </Button>
-
-              <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900 rounded-lg space-y-3">
-                <div className="space-y-1.5">
-                  <p className="text-[10px] font-bold text-red-800 dark:text-red-300 flex items-center gap-1">
-                    <AlertTriangle className="size-3" /> RAPPEL SECOURS EN MER :
-                  </p>
-                  <div className="grid grid-cols-1 gap-1.5 text-[11px] text-red-700 dark:text-red-400">
-                    <p className="flex items-center gap-2">
-                      <Phone className="size-3" /> SNSM : <span className="font-bold">+687 23.66.66</span>
-                    </p>
-                    <p className="flex items-center gap-2">
-                      <Phone className="size-3" /> Urgence CROSS : <span className="font-bold text-sm">196</span> (Gratuit)
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5 border-t border-red-200/50 dark:border-red-800/50 pt-2">
-                  <p className="text-[10px] font-bold text-red-800 dark:text-red-300 flex items-center gap-1">
-                    <AlertTriangle className="size-3" /> SECOURS TERRESTRES :
-                  </p>
-                  <div className="grid grid-cols-1 gap-1.5 text-[11px] text-red-700 dark:text-red-400">
-                    <p className="flex items-start gap-2">
-                      <Phone className="size-3 mt-0.5" /> 
-                      <span><span className="font-bold">SAMU (15) :</span> Malaise cardiaque, urgence médicale.</span>
-                    </p>
-                    <p className="flex items-start gap-2">
-                      <Phone className="size-3 mt-0.5" /> 
-                      <span><span className="font-bold">Pompiers (18) :</span> Incendie, accident de la route.</span>
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {mode === 'receiver' && (
-              <p className="text-[10px] text-center text-muted-foreground uppercase font-bold tracking-widest pt-2">
-                Dernière activité : {remoteVessel?.lastActive ? new Date(remoteVessel.lastActive.toDate()).toLocaleTimeString('fr-FR') : 'Inconnue'}
-              </p>
+            )}
+            {mode === 'receiver' && remoteVessel && (
+              <p className="text-[10px] text-center text-muted-foreground uppercase font-black tracking-widest pt-2">Dernière activité : {remoteVessel.lastActive ? new Date(remoteVessel.lastActive.toDate()).toLocaleTimeString('fr-FR') : 'En attente...'}</p>
             )}
           </CardFooter>
         </Card>
