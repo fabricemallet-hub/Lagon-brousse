@@ -727,7 +727,10 @@ export default function AdminPage() {
                 )}
               </div>
             </CardContent>
-            <CardFooter className="flex justify-between border-t p-6"><Button variant="outline" onClick={startPreview}><Eye className="mr-2"/> Aperçu</Button><Button onClick={handleSaveSplashSettings} disabled={isSavingSplash}><Save className="mr-2"/> Sauvegarder</Button></CardFooter>
+            <CardFooter className="flex justify-between border-t p-6">
+              <Button variant="outline" onClick={startPreview}><Eye className="mr-2"/> Aperçu</Button>
+              <Button onClick={handleSaveSplashSettings} disabled={isSavingSplash}><Save className="mr-2"/> Sauvegarder</Button>
+            </CardFooter>
           </Card>
         </TabsContent>
 

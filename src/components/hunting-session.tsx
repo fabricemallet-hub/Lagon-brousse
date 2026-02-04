@@ -47,7 +47,6 @@ import {
   Target,
   LocateFixed,
   MapPin,
-  WifiOff,
   Volume2,
   VolumeX,
   AlertCircle,
@@ -282,7 +281,7 @@ function HuntingSessionContent() {
   
   const { isLoaded, loadError } = useGoogleMaps();
 
-  // Mode Éveil (Wake Lock)
+  // Mode Éveil (Wake Lock) avec interception propre de l'erreur de politique
   const toggleWakeLock = async () => {
     if (!('wakeLock' in navigator)) {
       toast({ 
@@ -305,18 +304,19 @@ function HuntingSessionContent() {
     } else {
       try {
         const lock = await (navigator as any).wakeLock.request('screen');
-        setWakeLock(lock);
-        toast({ title: "Mode éveil activé", description: "L'écran restera allumé pour garantir le suivi GPS." });
-        
-        lock.addEventListener('release', () => {
-          setWakeLock(null);
-        });
+        if (lock) {
+          setWakeLock(lock);
+          toast({ title: "Mode éveil activé", description: "L'écran restera allumé pour garantir le suivi GPS." });
+          lock.addEventListener('release', () => {
+            setWakeLock(null);
+          });
+        }
       } catch (err: any) {
-        if (err.name === 'NotAllowedError') {
+        if (err.name === 'NotAllowedError' || err.message?.includes('permissions policy')) {
           toast({ 
             variant: "destructive", 
             title: "Permission bloquée", 
-            description: "La sécurité de cet environnement (iframe) empêche le maintien de l'écran. Utilisez l'app hors environnement de test pour activer cette fonction." 
+            description: "Le maintien de l'écran est bloqué par cet environnement (iframe). Cette fonction sera active sur navigateur mobile ou onglet indépendant." 
           });
         } else {
           console.error("Wake Lock error:", err);

@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useUser, useUser as useUserHook, useFirestore, useDoc, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { doc, setDoc, serverTimestamp, collection, addDoc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { useUser as useUserHook, useFirestore, useDoc, useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { doc, setDoc, serverTimestamp, collection, addDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -332,14 +332,8 @@ export function VesselTracker() {
       }
     } else {
       try {
-        // We catch the error silently if it's a permission policy violation in development
-        const lock = await (navigator as any).wakeLock.request('screen').catch((e: any) => {
-          if (e.name === 'NotAllowedError') {
-            throw e;
-          }
-          console.warn("Wake Lock request failed:", e);
-          return null;
-        });
+        // Handle request with robust error interception for permissions policy violations
+        const lock = await (navigator as any).wakeLock.request('screen');
         
         if (lock) {
           setWakeLock(lock);
@@ -349,14 +343,20 @@ export function VesselTracker() {
           });
         }
       } catch (err: any) {
-        if (err.name === 'NotAllowedError') {
+        // Capture Specifically NotAllowedError (policy violation in iframes)
+        if (err.name === 'NotAllowedError' || err.message?.includes('permissions policy')) {
           toast({ 
             variant: "destructive", 
             title: "Permission bloquée", 
-            description: "La sécurité de cet environnement (iframe) empêche le maintien de l'écran. Utilisez l'app hors environnement de test pour activer cette fonction." 
+            description: "Le maintien de l'écran est bloqué par cet environnement (iframe). Cette fonction sera active lors de l'utilisation réelle sur navigateur mobile ou onglet indépendant." 
           });
         } else {
           console.error("Wake Lock error:", err);
+          toast({ 
+            variant: "destructive", 
+            title: "Erreur technique", 
+            description: "Impossible d'activer le mode éveil." 
+          });
         }
       }
     }
