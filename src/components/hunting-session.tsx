@@ -315,8 +315,8 @@ function HuntingSessionContent() {
         if (err.name === 'NotAllowedError') {
           toast({ 
             variant: "destructive", 
-            title: "Permission refusée", 
-            description: "Le maintien de l'écran allumé est bloqué par les paramètres de sécurité de l'IDE." 
+            title: "Permission bloquée", 
+            description: "La sécurité de cet environnement (iframe) empêche le maintien de l'écran. Utilisez l'app hors environnement de test pour activer cette fonction." 
           });
         } else {
           console.error("Wake Lock error:", err);

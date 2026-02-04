@@ -343,8 +343,8 @@ export function VesselTracker() {
         if (err.name === 'NotAllowedError') {
           toast({ 
             variant: "destructive", 
-            title: "Permission refusée", 
-            description: "Le maintien de l'écran allumé est bloqué par les paramètres de sécurité de votre environnement (iframe/IDE)." 
+            title: "Permission bloquée", 
+            description: "La sécurité de cet environnement (iframe) empêche le maintien de l'écran. Utilisez l'app hors environnement de test pour activer cette fonction." 
           });
         } else {
           console.error("Wake Lock error:", err);
@@ -679,7 +679,7 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
                   onClick={toggleWakeLock}
                 >
                   <Zap className={cn("size-4", wakeLock && "fill-current")} />
-                  {wakeLock ? "MODE ÉVEIL ACTIF (Background)" : "ACTIVER MODE ÉVEIL (Background)"}
+                  {wakeLock ? "MODE ÉVEIL ACTIF" : "ACTIVER MODE ÉVEIL"}
                 </Button>
               </div>
               
