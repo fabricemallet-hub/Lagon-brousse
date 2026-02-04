@@ -34,7 +34,8 @@ import {
   Trash2,
   Plus,
   Loader2,
-  Map as MapIcon
+  Map as MapIcon,
+  Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -303,7 +304,6 @@ export function VesselTracker() {
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
   }, [isSharing, anchorPos, vesselStatus, lastMovementTime, updateVesselInFirestore]);
 
-  // Obtenir ma position GPS même si je ne partage pas (pour la carte en mode B)
   useEffect(() => {
     if (mode === 'receiver' && navigator.geolocation) {
         navigator.geolocation.getCurrentPosition((pos) => {
@@ -485,21 +485,35 @@ export function VesselTracker() {
               </div>
 
               <div className="space-y-3 pt-2">
-                <div className="flex flex-col gap-1.5 text-[10px] uppercase font-black tracking-wider text-muted-foreground bg-white/50 p-3 rounded-xl border-2 border-dashed">
-                  <div className="flex justify-between items-center">
-                    <span>Secours en Mer (MRCC)</span>
-                    <span className="text-red-600 text-sm font-black">196 (ou VHF 16)</span>
+                <div className="flex flex-col gap-2 bg-white/50 p-4 rounded-xl border-2 border-dashed">
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] uppercase font-black tracking-wider text-muted-foreground">Secours en Mer (MRCC)</span>
+                      <span className="text-red-600 text-sm font-black">196 (OU VHF 16)</span>
+                    </div>
+                    <div className="flex items-start gap-2 bg-red-50/50 p-2 rounded-lg border border-red-100">
+                      <Info className="size-3 text-red-600 shrink-0 mt-0.5" />
+                      <p className="text-[9px] leading-relaxed text-muted-foreground font-medium italic">
+                        Rappelons qu’en mer, c’est le <strong>CANAL 16</strong> de la VHF qui est le moyen le plus approprié pour donner l’alerte et communiquer avec les sauveteurs, le 196 étant plutôt destiné aux appels effectués depuis la terre ferme.
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex justify-between items-center border-t border-muted-foreground/10 pt-1">
-                    <span>Sapeurs-pompiers</span>
+                  
+                  <div className="flex justify-between items-center border-t border-muted-foreground/10 pt-2">
+                    <span className="text-[10px] uppercase font-black tracking-wider text-muted-foreground">Sapeurs-pompiers</span>
                     <span className="text-foreground font-black text-xs">18</span>
                   </div>
+                  
                   <div className="flex justify-between items-center border-t border-muted-foreground/10 pt-1">
-                    <span>SAMU / SOS Médecins</span>
-                    <span className="text-foreground font-black text-xs">15 (+687 78.77.25)</span>
+                    <span className="text-[10px] uppercase font-black tracking-wider text-muted-foreground">Urgences Santé / SAMU</span>
+                    <div className="flex flex-col items-end">
+                      <span className="text-foreground font-black text-xs">15</span>
+                      <span className="text-[9px] font-bold text-muted-foreground">+687 78.77.25</span>
+                    </div>
                   </div>
+                  
                   <div className="flex justify-between items-center border-t border-muted-foreground/10 pt-1">
-                    <span>SNSM Nouméa</span>
+                    <span className="text-[10px] uppercase font-black tracking-wider text-muted-foreground">SNSM Nouméa</span>
                     <span className="text-foreground font-black text-xs">25.23.12</span>
                   </div>
                 </div>
