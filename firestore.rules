@@ -2,7 +2,7 @@
 rules_version = '2';
 
 /**
- * LAGON & BROUSSE NC - SECURITY POLICY (OPTIMIZED)
+ * LAGON & BROUSSE NC - SECURITY POLICY (FIXED)
  */
 
 service cloud.firestore {
@@ -15,6 +15,7 @@ service cloud.firestore {
     }
 
     function isAdmin() {
+      // Priorité à l'email pour éviter les erreurs de lecture de document pendant l'auth
       return isSignedIn() && 
         (
           (request.auth.token.email != null && request.auth.token.email.lower() in ['f.mallet81@gmail.com', 'f.mallet81@outlook.com']) ||
@@ -23,21 +24,18 @@ service cloud.firestore {
         );
     }
 
-    // --- COLLECTION RULES ---
+    // --- PUBLIC COLLECTIONS (READ FOR ALL) ---
 
-    // PRIORITÉ ABSOLUE : Notifications Système (Lecture publique totale pour la bannière)
     match /system_notifications/{notifId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Paramètres de l'application
     match /app_settings/{id} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Météo NC Live
     match /meteo_caledonie/{communeId} {
       allow read: if true;
       allow write: if isAdmin();
@@ -47,13 +45,13 @@ service cloud.firestore {
       }
     }
 
-    // Guide des Poissons
     match /fish_species/{fishId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Profils utilisateurs
+    // --- PROTECTED COLLECTIONS (AUTH REQUIRED) ---
+
     match /users/{userId} {
       allow read, write: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
       
@@ -65,7 +63,6 @@ service cloud.firestore {
       }
     }
 
-    // Sessions de chasse
     match /hunting_sessions/{sessionId} {
       allow read, write: if isSignedIn() || isAdmin();
       match /{allPaths=**} {
@@ -73,7 +70,6 @@ service cloud.firestore {
       }
     }
 
-    // Tracker maritime
     match /vessels/{vesselId} {
       allow read, write: if isSignedIn() || isAdmin();
       match /{allPaths=**} {
@@ -81,7 +77,6 @@ service cloud.firestore {
       }
     }
 
-    // Messagerie (Support)
     match /conversations/{convId} {
       allow read, write: if (isSignedIn() && request.auth.uid == convId) || isAdmin();
       match /{allPaths=**} {
@@ -89,16 +84,15 @@ service cloud.firestore {
       }
     }
 
-    // Jetons d'accès
     match /access_tokens/{tokenId} {
       allow read, write: if isSignedIn() || isAdmin();
     }
+    
     match /shared_access_tokens/{tokenId} {
       allow read: if isSignedIn() || isAdmin();
       allow write: if isAdmin();
     }
 
-    // Stations et Archives
     match /stations/{stationId} {
       allow read: if isSignedIn() || isAdmin();
       allow write: if isAdmin();
@@ -108,7 +102,7 @@ service cloud.firestore {
       }
     }
     
-    // Default catch-all (Sécurité renforcée avec support admin)
+    // Default catch-all
     match /{allPaths=**} {
       allow read: if isSignedIn() || isAdmin();
       allow write: if isAdmin();
