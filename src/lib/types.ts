@@ -158,6 +158,16 @@ export interface UserAccount {
   favoriteLocationIds?: string[];
   lastSelectedLocation?: string;
   emergencyContact?: string;
+  vesselPrefs?: {
+    isNotifyEnabled: boolean;
+    vesselVolume: number;
+    notifySettings: { moving: boolean; stationary: boolean; offline: boolean };
+    notifySounds: { moving: string; stationary: string; offline: string };
+    isWatchEnabled: boolean;
+    watchType: 'moving' | 'stationary' | 'offline';
+    watchDuration: number;
+    watchSound: string;
+  };
 }
 
 export interface FishingSpot {

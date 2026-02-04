@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -128,45 +129,56 @@ export function VesselTracker() {
     return list;
   }, [dbSounds]);
 
-  useEffect(() => {
-    const savedHistory = localStorage.getItem('vessel_follow_history');
-    if (savedHistory) setVesselHistory(JSON.parse(savedHistory));
-    const savedCustomId = localStorage.getItem('vessel_custom_id');
-    if (savedCustomId) setCustomSharingId(savedCustomId);
-  }, []);
-
-  const handleSaveCustomId = () => {
-    const id = customSharingId.trim().toUpperCase();
-    localStorage.setItem('vessel_custom_id', id);
-    setCustomSharingId(id);
-    toast({ title: "Identifiant enregistré", description: `ID : ${id || 'UID par défaut'}` });
-  };
-
-  const addToHistory = (id: string) => {
-    const cleanId = id.trim().toUpperCase();
-    if (!cleanId || vesselHistory.includes(cleanId)) return;
-    const newHistory = [cleanId, ...vesselHistory].slice(0, 5);
-    setVesselHistory(newHistory);
-    localStorage.setItem('vessel_follow_history', JSON.stringify(newHistory));
-  };
-
-  const removeFromHistory = (id: string) => {
-    const newHistory = vesselHistory.filter(item => item !== id);
-    setVesselHistory(newHistory);
-    localStorage.setItem('vessel_follow_history', JSON.stringify(newHistory));
-  };
-
   const userDocRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return doc(firestore, 'users', user.uid);
   }, [user, firestore]);
-  const { data: userProfile } = useDoc<UserAccount>(userDocRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
+  // Sync preferences from profile
   useEffect(() => {
+    if (userProfile?.vesselPrefs) {
+      const prefs = userProfile.vesselPrefs;
+      setIsNotifyEnabled(prefs.isNotifyEnabled);
+      setVesselVolume(prefs.vesselVolume);
+      setNotifySettings(prefs.notifySettings);
+      setNotifySounds(prefs.notifySounds);
+      setIsWatchEnabled(prefs.isWatchEnabled);
+      setWatchType(prefs.watchType);
+      setWatchDuration(prefs.watchDuration);
+      setWatchSound(prefs.watchSound);
+    }
     if (userProfile?.emergencyContact) {
       setEmergencyContact(userProfile.emergencyContact);
     }
   }, [userProfile]);
+
+  // Auto-save preferences
+  useEffect(() => {
+    if (!user || !firestore || isProfileLoading) return;
+    
+    const timeout = setTimeout(() => {
+      const prefs = {
+        isNotifyEnabled,
+        vesselVolume,
+        notifySettings,
+        notifySounds,
+        isWatchEnabled,
+        watchType,
+        watchDuration,
+        watchSound,
+      };
+      
+      const hasChanged = JSON.stringify(prefs) !== JSON.stringify(userProfile?.vesselPrefs);
+      
+      if (hasChanged) {
+        updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: prefs })
+          .catch(e => console.error("Error auto-saving prefs:", e));
+      }
+    }, 1500); // 1.5s debounce
+
+    return () => clearTimeout(timeout);
+  }, [user, firestore, isProfileLoading, isNotifyEnabled, vesselVolume, notifySettings, notifySounds, isWatchEnabled, watchType, watchDuration, watchSound, userProfile?.vesselPrefs]);
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
@@ -234,6 +246,13 @@ export function VesselTracker() {
   const handleStopWatchAlert = () => {
     setIsWatchAlerting(false);
     setStatusStartTime(Date.now());
+  };
+
+  const handleSaveCustomId = () => {
+    const id = customSharingId.trim().toUpperCase();
+    localStorage.setItem('vessel_custom_id', id);
+    setCustomSharingId(id);
+    toast({ title: "Identifiant enregistré", description: `ID : ${id || 'UID par défaut'}` });
   };
 
   const toggleWakeLock = async () => {
@@ -354,6 +373,20 @@ export function VesselTracker() {
     } catch (e) {
         console.error(e);
     }
+  };
+
+  const addToHistory = (id: string) => {
+    const cleanId = id.trim().toUpperCase();
+    if (!cleanId || vesselHistory.includes(cleanId)) return;
+    const newHistory = [cleanId, ...vesselHistory].slice(0, 5);
+    setVesselHistory(newHistory);
+    localStorage.setItem('vessel_follow_history', JSON.stringify(newHistory));
+  };
+
+  const removeFromHistory = (id: string) => {
+    const newHistory = vesselHistory.filter(item => item !== id);
+    setVesselHistory(newHistory);
+    localStorage.setItem('vessel_follow_history', JSON.stringify(newHistory));
   };
 
   return (
