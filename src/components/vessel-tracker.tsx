@@ -87,12 +87,16 @@ export function VesselTracker() {
   
   // Notification State (Receiver)
   const [isNotifyEnabled, setIsNotifyEnabled] = useState(false);
-  const [selectedSound, setSelectedSound] = useState('alerte');
   const [vesselVolume, setVesselVolume] = useState(0.8);
   const [notifySettings, setNotifySettings] = useState({
     moving: true,
     stationary: true,
     offline: true
+  });
+  const [notifySounds, setNotifySounds] = useState({
+    moving: 'cloche',
+    stationary: 'sonar',
+    offline: 'alerte'
   });
   const prevVesselStatusRef = useRef<string | null>(null);
 
@@ -133,15 +137,14 @@ export function VesselTracker() {
   const { data: remoteVessel, isLoading: isVesselLoading } = useDoc<VesselStatus>(vesselRef);
 
   // sound notification logic
-  const playAlertSound = useCallback((soundId?: string) => {
-    const id = soundId || selectedSound;
-    const sound = vesselSoundLibrary.find(s => s.id === id);
+  const playAlertSound = useCallback((soundId: string) => {
+    const sound = vesselSoundLibrary.find(s => s.id === soundId);
     if (sound) {
       const audio = new Audio(sound.url);
       audio.volume = vesselVolume;
       audio.play().catch(e => console.warn("Audio playback failed:", e));
     }
-  }, [selectedSound, vesselVolume]);
+  }, [vesselVolume]);
 
   useEffect(() => {
     if (mode === 'receiver' && remoteVessel && isNotifyEnabled) {
@@ -149,13 +152,13 @@ export function VesselTracker() {
       
       if (prevVesselStatusRef.current !== null && prevVesselStatusRef.current !== currentStatus) {
         // Status changed
-        let shouldAlert = false;
-        if (currentStatus === 'moving' && notifySettings.moving) shouldAlert = true;
-        if (currentStatus === 'stationary' && notifySettings.stationary) shouldAlert = true;
-        if (currentStatus === 'offline' && notifySettings.offline) shouldAlert = true;
+        let soundToPlay = '';
+        if (currentStatus === 'moving' && notifySettings.moving) soundToPlay = notifySounds.moving;
+        if (currentStatus === 'stationary' && notifySettings.stationary) soundToPlay = notifySounds.stationary;
+        if (currentStatus === 'offline' && notifySettings.offline) soundToPlay = notifySounds.offline;
 
-        if (shouldAlert) {
-          playAlertSound();
+        if (soundToPlay) {
+          playAlertSound(soundToPlay);
           toast({ 
             title: "Changement d'état détecté", 
             description: `Le navire est maintenant : ${currentStatus === 'moving' ? 'En mouvement' : currentStatus === 'stationary' ? 'Stationnaire' : 'Hors-ligne'}`,
@@ -165,7 +168,7 @@ export function VesselTracker() {
       }
       prevVesselStatusRef.current = currentStatus;
     }
-  }, [remoteVessel, mode, isNotifyEnabled, notifySettings, playAlertSound, toast]);
+  }, [remoteVessel, mode, isNotifyEnabled, notifySettings, notifySounds, playAlertSound, toast]);
 
   // Online detection
   useEffect(() => {
@@ -568,77 +571,90 @@ Secours mer : SNSM (+687 23.66.66) ou faites le 196 (CROSS).`;
                   <div className="mt-4 p-4 border rounded-lg bg-muted/30 space-y-4 animate-in fade-in slide-in-from-top-2">
                     <div className="flex items-center gap-2 mb-2">
                       <Settings2 className="size-4 text-primary" />
-                      <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Paramètres des alertes</span>
+                      <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Personnalisation des alertes</span>
                     </div>
                     
-                    <div className="space-y-3 pb-2 border-b border-border/50">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm font-bold flex items-center gap-2">
-                          <Move className="size-4 text-blue-500" /> Mouvement
-                        </Label>
-                        <Switch 
-                          checked={notifySettings.moving} 
-                          onCheckedChange={(val) => setNotifySettings({...notifySettings, moving: val})} 
-                        />
+                    <div className="space-y-4 pb-4 border-b border-border/50">
+                      {/* MOVING ALERT */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-bold flex items-center gap-2">
+                            <Move className="size-4 text-blue-500" /> Mouvement
+                          </Label>
+                          <Switch 
+                            checked={notifySettings.moving} 
+                            onCheckedChange={(val) => setNotifySettings({...notifySettings, moving: val})} 
+                          />
+                        </div>
+                        {notifySettings.moving && (
+                          <div className="flex gap-2 pl-6 animate-in zoom-in-95">
+                            <Select value={notifySounds.moving} onValueChange={(val) => setNotifySounds({...notifySounds, moving: val})}>
+                              <SelectTrigger className="h-8 text-xs bg-background"><SelectValue /></SelectTrigger>
+                              <SelectContent>{vesselSoundLibrary.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+                            </Select>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => playAlertSound(notifySounds.moving)}><Play className="size-3" /></Button>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm font-bold flex items-center gap-2">
-                          <Anchor className="size-4 text-amber-500" /> Immobilisation
-                        </Label>
-                        <Switch 
-                          checked={notifySettings.stationary} 
-                          onCheckedChange={(val) => setNotifySettings({...notifySettings, stationary: val})} 
-                        />
+
+                      {/* STATIONARY ALERT */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-bold flex items-center gap-2">
+                            <Anchor className="size-4 text-amber-500" /> Immobilisation
+                          </Label>
+                          <Switch 
+                            checked={notifySettings.stationary} 
+                            onCheckedChange={(val) => setNotifySettings({...notifySettings, stationary: val})} 
+                          />
+                        </div>
+                        {notifySettings.stationary && (
+                          <div className="flex gap-2 pl-6 animate-in zoom-in-95">
+                            <Select value={notifySounds.stationary} onValueChange={(val) => setNotifySounds({...notifySounds, stationary: val})}>
+                              <SelectTrigger className="h-8 text-xs bg-background"><SelectValue /></SelectTrigger>
+                              <SelectContent>{vesselSoundLibrary.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+                            </Select>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => playAlertSound(notifySounds.stationary)}><Play className="size-3" /></Button>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm font-bold flex items-center gap-2">
-                          <WifiOff className="size-4 text-destructive" /> Perte Réseau
-                        </Label>
-                        <Switch 
-                          checked={notifySettings.offline} 
-                          onCheckedChange={(val) => setNotifySettings({...notifySettings, offline: val})} 
-                        />
+
+                      {/* OFFLINE ALERT */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-bold flex items-center gap-2">
+                            <WifiOff className="size-4 text-destructive" /> Perte Réseau
+                          </Label>
+                          <Switch 
+                            checked={notifySettings.offline} 
+                            onCheckedChange={(val) => setNotifySettings({...notifySettings, offline: val})} 
+                          />
+                        </div>
+                        {notifySettings.offline && (
+                          <div className="flex gap-2 pl-6 animate-in zoom-in-95">
+                            <Select value={notifySounds.offline} onValueChange={(val) => setNotifySounds({...notifySounds, offline: val})}>
+                              <SelectTrigger className="h-8 text-xs bg-background"><SelectValue /></SelectTrigger>
+                              <SelectContent>{vesselSoundLibrary.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+                            </Select>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => playAlertSound(notifySounds.offline)}><Play className="size-3" /></Button>
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    <div className="space-y-4 pt-2">
-                      <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2">
-                          <Volume2 className="size-3" /> Choix du son
-                        </Label>
-                        <div className="flex gap-2">
-                          <Select value={selectedSound} onValueChange={(val) => { setSelectedSound(val); playAlertSound(val); }}>
-                            <SelectTrigger className="flex-1">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {vesselSoundLibrary.map(s => (
-                                <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Button variant="outline" size="icon" onClick={() => playAlertSound()}><Play className="size-4" /></Button>
-                        </div>
+                    <div className="space-y-2 pt-2">
+                      <div className="flex justify-between items-center">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground">Puissance sonore globale</Label>
+                        <span className="text-[10px] font-bold">{Math.round(vesselVolume * 100)}%</span>
                       </div>
-
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <Label className="text-[10px] font-black uppercase text-muted-foreground">Puissance sonore</Label>
-                          <span className="text-[10px] font-bold">{Math.round(vesselVolume * 100)}%</span>
-                        </div>
-                        <Slider 
-                          value={[vesselVolume]} 
-                          min={0} 
-                          max={1} 
-                          step={0.1} 
-                          onValueChange={(val) => setVesselVolume(val[0])} 
-                        />
-                      </div>
+                      <Slider 
+                        value={[vesselVolume]} 
+                        min={0} 
+                        max={1} 
+                        step={0.1} 
+                        onValueChange={(val) => setVesselVolume(val[0])} 
+                      />
                     </div>
-
-                    <Button variant="ghost" size="sm" className="w-full mt-2 text-[10px] uppercase font-black" onClick={() => playAlertSound()}>
-                      <Volume2 className="size-3 mr-2" /> Tester le son final
-                    </Button>
                   </div>
                 )}
               </div>
