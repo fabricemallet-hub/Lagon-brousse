@@ -184,23 +184,7 @@ export function VesselTracker() {
     return () => clearTimeout(timeout);
   }, [user, firestore, isProfileLoading, isNotifyEnabled, vesselVolume, notifySettings, notifySounds, isWatchEnabled, watchType, watchDuration, watchSound]);
 
-  const handleSaveCustomId = useCallback(() => {
-    const id = customSharingId.trim().toUpperCase();
-    localStorage.setItem('vessel_custom_id', id);
-    setCustomSharingId(id);
-    addToHistory(id);
-    toast({ title: "ID enregistré", description: `Partage actif sur ID: ${id || 'Défaut'}` });
-  }, [customSharingId, toast]);
-
-  const handleSaveEmergencyContact = async () => {
-    if (!user || !firestore) return;
-    try {
-        await updateDoc(doc(firestore, 'users', user.uid), { emergencyContact });
-        toast({ title: "Contact enregistré" });
-    } catch (e) {}
-  };
-
-  const addToHistory = (id: string) => {
+  const addToHistory = useCallback((id: string) => {
     const cleanId = id.trim().toUpperCase();
     if (!cleanId) return;
     setVesselHistory(prev => {
@@ -209,7 +193,7 @@ export function VesselTracker() {
       localStorage.setItem('vessel_follow_history', JSON.stringify(next));
       return next;
     });
-  };
+  }, []);
 
   const removeFromHistory = (id: string) => {
     setVesselHistory(prev => {
@@ -217,6 +201,22 @@ export function VesselTracker() {
       localStorage.setItem('vessel_follow_history', JSON.stringify(next));
       return next;
     });
+  };
+
+  const handleSaveCustomId = useCallback(() => {
+    const id = customSharingId.trim().toUpperCase();
+    localStorage.setItem('vessel_custom_id', id);
+    setCustomSharingId(id);
+    addToHistory(id);
+    toast({ title: "ID enregistré", description: `Partage actif sur ID: ${id || 'Défaut'}` });
+  }, [customSharingId, addToHistory, toast]);
+
+  const handleSaveEmergencyContact = async () => {
+    if (!user || !firestore) return;
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), { emergencyContact });
+        toast({ title: "Contact enregistré" });
+    } catch (e) {}
   };
 
   const playAlertSound = useCallback((soundId: string) => {
@@ -267,10 +267,24 @@ export function VesselTracker() {
   };
 
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
-    if (!user || !firestore || !isSharing) return;
+    if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
     const docRef = doc(firestore, 'vessels', sharingId);
-    setDoc(docRef, { userId: user.uid, displayName: user.displayName || 'Capitaine', isSharing: true, lastActive: serverTimestamp(), ...data }, { merge: true }).catch(() => {});
+    setDoc(docRef, { 
+      userId: user.uid, 
+      displayName: user.displayName || 'Capitaine', 
+      isSharing: isSharing, 
+      lastActive: serverTimestamp(), 
+      ...data 
+    }, { merge: true }).catch(() => {});
   }, [user, firestore, isSharing, sharingId]);
+
+  // Handle stop sharing in Firestore when toggled off
+  useEffect(() => {
+    if (!isSharing && user && firestore && sharingId) {
+      const docRef = doc(firestore, 'vessels', sharingId);
+      updateDoc(docRef, { isSharing: false, status: 'offline', lastActive: serverTimestamp() }).catch(() => {});
+    }
+  }, [isSharing, user, firestore, sharingId]);
 
   useEffect(() => {
     if (!isSharing || !navigator.geolocation) {
@@ -287,7 +301,7 @@ export function VesselTracker() {
         if (!anchorPos) {
           setAnchorPos(newPos);
           setLastMovementTime(now);
-          updateVesselInFirestore({ location: { latitude: newLat, longitude: newLng }, status: 'moving' });
+          updateVesselInFirestore({ location: { latitude: newLat, longitude: newLng }, status: 'moving', isSharing: true });
           lastFirestoreUpdateRef.current = now;
           return;
         }
@@ -297,14 +311,14 @@ export function VesselTracker() {
           setAnchorPos(newPos);
           setLastMovementTime(now);
           if (now - lastFirestoreUpdateRef.current > THROTTLE_UPDATE_MS) {
-            updateVesselInFirestore({ location: { latitude: newLat, longitude: newLng }, status: 'moving' });
+            updateVesselInFirestore({ location: { latitude: newLat, longitude: newLng }, status: 'moving', isSharing: true });
             lastFirestoreUpdateRef.current = now;
           }
         } else {
           const idle = (now - lastMovementTime) / 60000;
           if (idle >= IMMOBILITY_START_MINUTES && vesselStatus === 'moving') {
             setVesselStatus('stationary');
-            updateVesselInFirestore({ status: 'stationary' });
+            updateVesselInFirestore({ status: 'stationary', isSharing: true });
             lastFirestoreUpdateRef.current = now;
           }
         }
@@ -332,7 +346,9 @@ export function VesselTracker() {
     window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
 
-  const displayVessel = mode === 'sender' ? (isSharing ? { location: { latitude: currentPos?.lat || 0, longitude: currentPos?.lng || 0 }, status: vesselStatus, displayName: 'Moi' } : null) : remoteVessel;
+  const displayVessel = mode === 'sender' 
+    ? (isSharing ? { location: { latitude: currentPos?.lat || 0, longitude: currentPos?.lng || 0 }, status: vesselStatus, displayName: 'Moi' } : null) 
+    : (remoteVessel?.isSharing ? remoteVessel : null);
 
   return (
     <div className="space-y-6 pb-12">
