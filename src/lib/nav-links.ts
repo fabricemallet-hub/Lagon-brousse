@@ -2,8 +2,8 @@ import { Home, Waves, Leaf, Fish, Calendar, Scale, Crosshair, User, Shield, Mess
 
 export const navLinks = [
   { href: '/', label: 'Accueil', icon: Home, adminOnly: false },
-  { href: '/lagon', label: 'Lagon', icon: Waves, adminOnly: false },
   { href: '/meteo', label: 'Météo Live', icon: Sun, adminOnly: false },
+  { href: '/lagon', label: 'Lagon', icon: Waves, adminOnly: false },
   { href: '/peche', label: 'Pêche', icon: Fish, adminOnly: false },
   { href: '/chasse', label: 'Chasse', icon: Crosshair, adminOnly: false },
   { href: '/champs', label: 'Champs', icon: Leaf, adminOnly: false },
