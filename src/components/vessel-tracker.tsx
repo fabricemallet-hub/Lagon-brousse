@@ -52,11 +52,18 @@ import {
   Info,
   Clock,
   WifiOff,
-  Move
+  Move,
+  BatteryMedium,
+  BatteryLow,
+  BatteryFull,
+  BatteryWarning,
+  AlertOctagon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
 import { Skeleton } from './ui/skeleton';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 const IMMOBILITY_THRESHOLD_METERS = 15;
 const IMMOBILITY_START_MINUTES = 5;
@@ -113,6 +120,7 @@ export function VesselTracker() {
   const [lastValidLocation, setLastValidLocation] = useState<{lat: number, lng: number} | null>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [wakeLock, setWakeLock] = useState<any>(null);
+  const [batteryLevel, setBatteryLevel] = useState<number>(1);
   
   const watchIdRef = useRef<number | null>(null);
   const lastFirestoreUpdateRef = useRef<number>(0);
@@ -232,7 +240,6 @@ export function VesselTracker() {
     }
   }, [vesselVolume, availableSounds]);
 
-  // Durée de l'état actuel
   useEffect(() => {
     if (!statusStartTime) return;
     const interval = setInterval(() => {
@@ -309,6 +316,16 @@ export function VesselTracker() {
       if (watchIdRef.current) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
       return;
     }
+
+    const syncBattery = async () => {
+      if ('getBattery' in navigator) {
+        const battery: any = await (navigator as any).getBattery();
+        setBatteryLevel(battery.level);
+        battery.onlevelchange = () => setBatteryLevel(battery.level);
+      }
+    };
+    syncBattery();
+
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         const newLat = position.coords.latitude;
@@ -321,7 +338,12 @@ export function VesselTracker() {
           setAnchorPos(newPos);
           setLastMovementTime(now);
           setStatusStartTime(now);
-          updateVesselInFirestore({ location: { latitude: newLat, longitude: newLng }, status: 'moving', isSharing: true });
+          updateVesselInFirestore({ 
+            location: { latitude: newLat, longitude: newLng }, 
+            status: 'moving', 
+            isSharing: true,
+            batteryLevel: batteryLevel 
+          });
           lastFirestoreUpdateRef.current = now;
           return;
         }
@@ -332,7 +354,12 @@ export function VesselTracker() {
           setAnchorPos(newPos);
           setLastMovementTime(now);
           if (now - lastFirestoreUpdateRef.current > THROTTLE_UPDATE_MS) {
-            updateVesselInFirestore({ location: { latitude: newLat, longitude: newLng }, status: 'moving', isSharing: true });
+            updateVesselInFirestore({ 
+              location: { latitude: newLat, longitude: newLng }, 
+              status: 'moving', 
+              isSharing: true,
+              batteryLevel: batteryLevel 
+            });
             lastFirestoreUpdateRef.current = now;
           }
         } else {
@@ -340,7 +367,7 @@ export function VesselTracker() {
           if (idle >= IMMOBILITY_START_MINUTES && vesselStatus === 'moving') {
             setVesselStatus('stationary');
             setStatusStartTime(now);
-            updateVesselInFirestore({ status: 'stationary', isSharing: true });
+            updateVesselInFirestore({ status: 'stationary', isSharing: true, batteryLevel: batteryLevel });
             lastFirestoreUpdateRef.current = now;
           }
         }
@@ -349,9 +376,8 @@ export function VesselTracker() {
       { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
     );
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
-  }, [isSharing, anchorPos, vesselStatus, lastMovementTime, updateVesselInFirestore]);
+  }, [isSharing, anchorPos, vesselStatus, lastMovementTime, updateVesselInFirestore, batteryLevel]);
 
-  // Capturer la dernière position valide du navire distant
   useEffect(() => {
     if (mode === 'receiver' && remoteVessel?.location) {
       setLastValidLocation({ lat: remoteVessel.location.latitude, lng: remoteVessel.location.longitude });
@@ -376,12 +402,19 @@ export function VesselTracker() {
   };
 
   const displayVessel = mode === 'sender' 
-    ? (isSharing ? { location: { latitude: currentPos?.lat || 0, longitude: currentPos?.lng || 0 }, status: vesselStatus, displayName: 'Moi', isSharing: true } : null) 
+    ? (isSharing ? { location: { latitude: currentPos?.lat || 0, longitude: currentPos?.lng || 0 }, status: vesselStatus, displayName: 'Moi', isSharing: true, batteryLevel } : null) 
     : remoteVessel;
 
-  const currentEffectiveStatus = mode === 'sender' 
-    ? (isSharing ? vesselStatus : 'offline') 
-    : (remoteVessel?.isSharing ? remoteVessel.status : 'offline');
+  const isBatteryDischarged = mode === 'receiver' && remoteVessel && !remoteVessel.isSharing && (remoteVessel.batteryLevel ?? 1) <= 0.05;
+
+  const BatteryIconComp = ({ level }: { level?: number }) => {
+    if (level === undefined) return null;
+    if (level > 0.6) return <BatteryFull className="size-4 text-green-500" />;
+    if (level > 0.2) return <BatteryMedium className="size-4 text-orange-500" />;
+    return <BatteryLow className="size-4 text-red-500 animate-pulse" />;
+  };
+
+  const lastActiveTime = remoteVessel?.lastActive ? format(remoteVessel.lastActive.toDate(), 'HH:mm', { locale: fr }) : '--:--';
 
   return (
     <div className="space-y-6 pb-12">
@@ -511,6 +544,12 @@ export function VesselTracker() {
                         <div className="px-2 py-1 bg-slate-900/90 text-white rounded shadow-2xl text-[10px] font-black whitespace-nowrap border border-white/20 flex items-center gap-2">
                         <span className={cn("size-2 rounded-full", displayVessel.status === 'moving' ? "bg-green-400 animate-pulse" : "bg-amber-400")}></span>
                         {displayVessel.displayName}
+                        {displayVessel.batteryLevel !== undefined && (
+                          <span className="flex items-center gap-1 ml-1 border-l border-white/20 pl-1">
+                            <BatteryIconComp level={displayVessel.batteryLevel} />
+                            {Math.round(displayVessel.batteryLevel * 100)}%
+                          </span>
+                        )}
                         </div>
                         <div className={cn("p-2 rounded-full shadow-2xl border-2 border-white transition-all", displayVessel.status === 'moving' ? "bg-blue-600" : "bg-amber-600")}>
                         {displayVessel.status === 'stationary' ? <Anchor className="size-5 text-white" /> : <Navigation className="size-5 text-white" />}
@@ -523,7 +562,19 @@ export function VesselTracker() {
           <Button size="icon" className="absolute top-3 right-3 shadow-lg h-10 w-10 bg-background/90 border-2 rounded-xl" onClick={handleRecenter}><LocateFixed className="size-5" /></Button>
         </div>
 
-        {/* Bloc Résumé État et Coordonnées */}
+        {isBatteryDischarged && (
+          <div className="bg-red-600 text-white p-6 flex flex-col items-center text-center gap-3 animate-pulse border-y-4 border-red-800 shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
+            <AlertOctagon className="size-12" />
+            <div>
+              <h3 className="text-xl font-black uppercase tracking-tighter">Batterie Déchargée</h3>
+              <p className="text-xs font-bold opacity-90 mt-1 uppercase">Signal perdu à {lastActiveTime}</p>
+            </div>
+            <div className="bg-white/20 px-4 py-2 rounded-lg border border-white/30 backdrop-blur-sm">
+              <p className="text-[10px] font-black uppercase">Le téléphone émetteur s'est probablement éteint.</p>
+            </div>
+          </div>
+        )}
+
         <div className="bg-card border-t-2 p-4 flex flex-col gap-3">
             <div className={cn(
                 "flex items-center justify-between p-3 rounded-xl border-2 shadow-sm",
@@ -537,14 +588,18 @@ export function VesselTracker() {
                         {currentEffectiveStatus === 'moving' ? <Move className="size-5" /> : currentEffectiveStatus === 'stationary' ? <Anchor className="size-5" /> : <WifiOff className="size-5" />}
                     </div>
                     <div>
-                        <p className={cn(
-                            "text-xs font-black uppercase tracking-tight",
-                            currentEffectiveStatus === 'moving' ? "text-green-800" : currentEffectiveStatus === 'stationary' ? "text-amber-800" : "text-red-800"
-                        )}>
-                            {currentEffectiveStatus === 'moving' ? 'En mouvement' : currentEffectiveStatus === 'stationary' ? 'Navire Immobile' : 'Signal Perdu / Hors ligne'}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className={cn(
+                              "text-xs font-black uppercase tracking-tight",
+                              currentEffectiveStatus === 'moving' ? "text-green-800" : currentEffectiveStatus === 'stationary' ? "text-amber-800" : "text-red-800"
+                          )}>
+                              {currentEffectiveStatus === 'moving' ? 'En mouvement' : currentEffectiveStatus === 'stationary' ? 'Navire Immobile' : 'Signal Perdu / Hors ligne'}
+                          </p>
+                          {displayVessel?.batteryLevel !== undefined && <BatteryIconComp level={displayVessel.batteryLevel} />}
+                        </div>
                         <div className="flex items-center gap-1.5 text-[10px] font-bold opacity-70">
-                            <Clock className="size-3" /> depuis {elapsedString}
+                            <Clock className="size-3" /> depuis {elapsedString} 
+                            {currentEffectiveStatus === 'offline' && <span className="ml-1 border-l pl-1">Fin à {lastActiveTime}</span>}
                         </div>
                     </div>
                 </div>
