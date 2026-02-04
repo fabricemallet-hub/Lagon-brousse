@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -56,6 +57,7 @@ import {
   BatteryMedium,
   BatteryLow,
   BatteryFull,
+  BatteryCharging,
   AlertOctagon,
   History,
   ExternalLink
@@ -130,6 +132,7 @@ export function VesselTracker() {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [wakeLock, setWakeLock] = useState<any>(null);
   const [batteryLevel, setBatteryLevel] = useState<number>(1);
+  const [isCharging, setIsCharging] = useState<boolean>(false);
   
   const watchIdRef = useRef<number | null>(null);
   const lastFirestoreUpdateRef = useRef<number>(0);
@@ -342,7 +345,6 @@ export function VesselTracker() {
     }
   }, [isSharing, user, firestore, sharingId]);
 
-  // CRITICAL: Immobility check timer to ensure transition to stationary even without GPS updates
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || vesselStatus !== 'moving') return;
 
@@ -352,12 +354,12 @@ export function VesselTracker() {
       
       if (idleSeconds >= IMMOBILITY_START_SECONDS) {
         setVesselStatus('stationary');
-        updateVesselInFirestore({ status: 'stationary', isSharing: true, batteryLevel });
+        updateVesselInFirestore({ status: 'stationary', isSharing: true, batteryLevel, isCharging });
       }
-    }, 5000); // Check every 5 seconds
+    }, 5000); 
 
     return () => clearInterval(interval);
-  }, [isSharing, mode, vesselStatus, lastMovementTime, batteryLevel, updateVesselInFirestore]);
+  }, [isSharing, mode, vesselStatus, lastMovementTime, batteryLevel, isCharging, updateVesselInFirestore]);
 
   useEffect(() => {
     if (!isSharing || !navigator.geolocation) {
@@ -369,7 +371,9 @@ export function VesselTracker() {
       if ('getBattery' in navigator) {
         const battery: any = await (navigator as any).getBattery();
         setBatteryLevel(battery.level);
+        setIsCharging(battery.charging);
         battery.onlevelchange = () => setBatteryLevel(battery.level);
+        battery.onchargingchange = () => setIsCharging(battery.charging);
       }
     };
     syncBattery();
@@ -390,7 +394,8 @@ export function VesselTracker() {
             location: { latitude: newLat, longitude: newLng }, 
             status: 'moving', 
             isSharing: true,
-            batteryLevel: batteryLevel 
+            batteryLevel: batteryLevel,
+            isCharging: isCharging
           });
           lastFirestoreUpdateRef.current = now;
           return;
@@ -399,7 +404,6 @@ export function VesselTracker() {
         const dist = getDistance(newLat, newLng, anchorPos.lat, anchorPos.lng);
         
         if (dist > IMMOBILITY_THRESHOLD_METERS) {
-          // SORTIE DU RAYON DE 20M : Mouvement détecté
           setVesselStatus('moving');
           setAnchorPos(newPos);
           setLastMovementTime(now);
@@ -408,18 +412,18 @@ export function VesselTracker() {
               location: { latitude: newLat, longitude: newLng }, 
               status: 'moving', 
               isSharing: true,
-              batteryLevel: batteryLevel 
+              batteryLevel: batteryLevel,
+              isCharging: isCharging
             });
             lastFirestoreUpdateRef.current = now;
           }
         }
-        // If dist <= 20m, we let the timer handle the flip to stationary
       },
       () => {},
       { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
     );
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
-  }, [isSharing, anchorPos, vesselStatus, lastMovementTime, updateVesselInFirestore, batteryLevel]);
+  }, [isSharing, anchorPos, vesselStatus, lastMovementTime, updateVesselInFirestore, batteryLevel, isCharging]);
 
   useEffect(() => {
     if (mode === 'receiver' && remoteVessel?.location) {
@@ -445,16 +449,20 @@ export function VesselTracker() {
   };
 
   const displayVessel = mode === 'sender' 
-    ? (isSharing ? { location: { latitude: currentPos?.lat || 0, longitude: currentPos?.lng || 0 }, status: vesselStatus, displayName: 'Moi', isSharing: true, batteryLevel } : null) 
+    ? (isSharing ? { location: { latitude: currentPos?.lat || 0, longitude: currentPos?.lng || 0 }, status: vesselStatus, displayName: 'Moi', isSharing: true, batteryLevel, isCharging } : null) 
     : remoteVessel;
 
   const isBatteryDischarged = mode === 'receiver' && remoteVessel && !remoteVessel.isSharing && (remoteVessel.batteryLevel ?? 1) <= 0.05;
 
-  const BatteryIconComp = ({ level, className }: { level?: number, className?: string }) => {
+  const BatteryIconComp = ({ level, isCharging, className }: { level?: number, isCharging?: boolean, className?: string }) => {
     if (level === undefined) return null;
-    if (level > 0.6) return <BatteryFull className={cn("size-4 text-green-500", className)} />;
-    if (level > 0.2) return <BatteryMedium className={cn("size-4 text-orange-500", className)} />;
-    return <BatteryLow className={cn("size-4 text-red-500 animate-pulse", className)} />;
+    
+    const colorClass = isCharging ? "text-blue-500" : level > 0.6 ? "text-green-500" : level > 0.2 ? "text-orange-500" : "text-red-500";
+    
+    if (isCharging) return <BatteryCharging className={cn("size-4", colorClass, className)} />;
+    if (level > 0.6) return <BatteryFull className={cn("size-4", colorClass, className)} />;
+    if (level > 0.2) return <BatteryMedium className={cn("size-4", colorClass, className)} />;
+    return <BatteryLow className={cn("size-4 animate-pulse", colorClass, className)} />;
   };
 
   const lastActiveTime = remoteVessel?.lastActive ? format(remoteVessel.lastActive.toDate(), 'HH:mm', { locale: fr }) : '--:--';
@@ -597,7 +605,7 @@ export function VesselTracker() {
                         {displayVessel.displayName}
                         {displayVessel.batteryLevel !== undefined && (
                           <span className="flex items-center gap-1 ml-1 border-l border-white/20 pl-1">
-                            <BatteryIconComp level={displayVessel.batteryLevel} />
+                            <BatteryIconComp level={displayVessel.batteryLevel} isCharging={displayVessel.isCharging} />
                             {Math.round(displayVessel.batteryLevel * 100)}%
                           </span>
                         )}
@@ -647,7 +655,15 @@ export function VesselTracker() {
                               {statusLabel}
                           </p>
                           {displayVessel?.batteryLevel !== undefined && (
-                            <BatteryIconComp level={displayVessel.batteryLevel} className="size-4 opacity-60" />
+                            <div className="flex items-center gap-1.5 ml-1 border-l border-border/50 pl-2">
+                              <BatteryIconComp level={displayVessel.batteryLevel} isCharging={displayVessel.isCharging} className="size-6" />
+                              <span className={cn(
+                                "font-black text-sm",
+                                displayVessel.isCharging ? "text-blue-600" : displayVessel.batteryLevel > 0.6 ? "text-green-600" : displayVessel.batteryLevel > 0.2 ? "text-orange-600" : "text-red-600"
+                              )}>
+                                {Math.round(displayVessel.batteryLevel * 100)}%
+                              </span>
+                            </div>
                           )}
                         </div>
                         <div className="flex items-center gap-1.5 mt-1.5 text-xs font-bold text-muted-foreground/60">

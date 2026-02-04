@@ -271,6 +271,7 @@ export interface VesselStatus {
   lastActive: any; // ServerTimestamp
   isSharing: boolean;
   batteryLevel?: number;
+  isCharging?: boolean;
 }
 
 export interface SplashScreenSettings {
