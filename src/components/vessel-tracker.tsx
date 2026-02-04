@@ -240,18 +240,6 @@ export function VesselTracker() {
   }, [firestore, mode, vesselIdToFollow]);
   const { data: remoteVessel } = useDoc<VesselStatus>(vesselRef);
 
-  // SMS hooks moved AFTER remoteVessel definition to fix ReferenceError
-  const defaultSmsText = useMemo(() => {
-    const name = mode === 'sender' ? (vesselNickname || 'Capitaine') : (remoteVessel?.displayName || vesselIdToFollow || 'Capitaine');
-    return `ALERTE : Navire "${name}" en difficulté.`;
-  }, [mode, vesselNickname, remoteVessel, vesselIdToFollow]);
-
-  const finalSmsBody = useMemo(() => {
-    const mainText = customSmsMessage.trim() || defaultSmsText;
-    const posUrl = lastValidLocation ? `https://www.google.com/maps?q=${lastValidLocation.lat.toFixed(6)},${lastValidLocation.lng.toFixed(6)}` : "[RECHERCHE GPS...]";
-    return `${mainText}\n\nPosition : ${posUrl}`;
-  }, [customSmsMessage, defaultSmsText, lastValidLocation]);
-
   const currentEffectiveStatus = useMemo(() => {
     if (mode === 'sender') {
       return isSharing ? vesselStatus : 'offline';
@@ -259,6 +247,26 @@ export function VesselTracker() {
       return (remoteVessel && remoteVessel.isSharing) ? remoteVessel.status : 'offline';
     }
   }, [mode, isSharing, vesselStatus, remoteVessel]);
+
+  // SMS Text Memoized Logic
+  const defaultSmsText = useMemo(() => {
+    const name = mode === 'sender' 
+      ? (vesselNickname || 'Capitaine') 
+      : (remoteVessel?.displayName || vesselIdToFollow || 'Capitaine');
+    
+    if (mode === 'receiver') {
+      const statusWord = currentEffectiveStatus === 'moving' ? 'en navigation' : 'immobile';
+      return `Alerte : ${name} est ${statusWord} en mer depuis ${elapsedString}. Je n'arrive pas à joindre l'équipage. voici Les coordonnées GPS.`;
+    }
+    
+    return `ALERTE : Navire "${name}" en difficulté.`;
+  }, [mode, vesselNickname, remoteVessel, vesselIdToFollow, currentEffectiveStatus, elapsedString]);
+
+  const finalSmsBody = useMemo(() => {
+    const mainText = customSmsMessage.trim() || defaultSmsText;
+    const posUrl = lastValidLocation ? `https://www.google.com/maps?q=${lastValidLocation.lat.toFixed(6)},${lastValidLocation.lng.toFixed(6)}` : "[RECHERCHE GPS...]";
+    return `${mainText}\n\nPosition : ${posUrl}`;
+  }, [customSmsMessage, defaultSmsText, lastValidLocation]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
