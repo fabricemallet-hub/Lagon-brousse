@@ -158,6 +158,7 @@ export interface UserAccount {
   favoriteLocationIds?: string[];
   lastSelectedLocation?: string;
   emergencyContact?: string;
+  vesselSmsMessage?: string;
   vesselPrefs?: {
     isNotifyEnabled: boolean;
     vesselVolume: number;

@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -61,7 +62,9 @@ import {
   AlertOctagon,
   History,
   ExternalLink,
-  User as UserIcon
+  User as UserIcon,
+  MessageSquare,
+  RotateCcw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -111,6 +114,7 @@ export function VesselTracker() {
   const [vesselNickname, setVesselNickname] = useState('');
   const [vesselHistory, setVesselHistory] = useState<string[]>([]);
   const [statusEvents, setStatusEvents] = useState<StatusEvent[]>([]);
+  const [customSmsMessage, setCustomSmsMessage] = useState('');
 
   const [isNotifyEnabled, setIsNotifyEnabled] = useState(false);
   const [vesselVolume, setVesselVolume] = useState(0.8);
@@ -167,6 +171,16 @@ export function VesselTracker() {
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
+  const defaultSmsText = useMemo(() => {
+    return `ALERTE : Navire "${vesselNickname || 'Capitaine'}" en difficulté.`;
+  }, [vesselNickname]);
+
+  const finalSmsBody = useMemo(() => {
+    const mainText = customSmsMessage.trim() || defaultSmsText;
+    const posUrl = lastValidLocation ? `https://www.google.com/maps?q=${lastValidLocation.lat.toFixed(6)},${lastValidLocation.lng.toFixed(6)}` : "[RECHERCHE GPS...]";
+    return `${mainText}\n\nPosition : ${posUrl}`;
+  }, [customSmsMessage, defaultSmsText, lastValidLocation]);
+
   const vesselRef = useMemoFirebase(() => {
     const cleanId = vesselIdToFollow.trim().toUpperCase();
     if (!firestore || mode !== 'receiver' || !cleanId) return null;
@@ -214,16 +228,22 @@ export function VesselTracker() {
     if (userProfile?.displayName && !vesselNickname) {
       setVesselNickname(userProfile.displayName);
     }
+    if (userProfile?.vesselSmsMessage !== undefined) {
+      setCustomSmsMessage(userProfile.vesselSmsMessage);
+    }
   }, [userProfile, vesselNickname]);
 
   useEffect(() => {
     if (!user || !firestore || isProfileLoading) return;
     const timeout = setTimeout(() => {
       const prefs = { isNotifyEnabled, vesselVolume, notifySettings, notifySounds, isWatchEnabled, watchType, watchDuration, watchSound };
-      updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: prefs }).catch(() => {});
+      updateDoc(doc(firestore, 'users', user.uid), { 
+        vesselPrefs: prefs,
+        vesselSmsMessage: customSmsMessage 
+      }).catch(() => {});
     }, 1500);
     return () => clearTimeout(timeout);
-  }, [user, firestore, isProfileLoading, isNotifyEnabled, vesselVolume, notifySettings, notifySounds, isWatchEnabled, watchType, watchDuration, watchSound]);
+  }, [user, firestore, isProfileLoading, isNotifyEnabled, vesselVolume, notifySettings, notifySounds, isWatchEnabled, watchType, watchDuration, watchSound, customSmsMessage]);
 
   const addToHistory = useCallback((id: string) => {
     const cleanId = id.trim().toUpperCase();
@@ -263,6 +283,11 @@ export function VesselTracker() {
         await updateDoc(doc(firestore, 'users', user.uid), { emergencyContact });
         toast({ title: "Contact enregistré" });
     } catch (e) {}
+  };
+
+  const handleResetSms = () => {
+    setCustomSmsMessage('');
+    toast({ title: "Message réinitialisé" });
   };
 
   const playAlertSound = useCallback((soundId: string) => {
@@ -352,7 +377,6 @@ export function VesselTracker() {
     }, { merge: true }).catch(() => {});
   }, [user, firestore, isSharing, sharingId, vesselNickname]);
 
-  // Timer de vérification forcée de l'état (pour garantir le passage à "Immobile" même si le GPS ne bouge plus)
   useEffect(() => {
     if (!isSharing || mode !== 'sender') {
       if (statusCheckTimerRef.current) clearInterval(statusCheckTimerRef.current);
@@ -457,11 +481,9 @@ export function VesselTracker() {
     toast({ title: "Copié" });
   };
 
-  const sendEmergencySms = (lat: number, lng: number, name: string) => {
+  const sendEmergencySms = () => {
     if (!emergencyContact.trim()) { toast({ variant: "destructive", title: "Numéro requis" }); return; }
-    const url = `https://www.google.com/maps?q=${lat.toFixed(6)},${lng.toFixed(6)}`;
-    const body = `ALERTE : Navire "${name}" en difficulté. Position : ${url}`;
-    window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
+    window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(finalSmsBody)}`;
   };
 
   const displayVessel = mode === 'sender' 
@@ -543,6 +565,31 @@ export function VesselTracker() {
                         className="font-black text-center uppercase h-12 border-2 rounded-xl" 
                       />
                       <Button variant="outline" size="icon" className="h-12 w-12 border-2 rounded-xl" onClick={handleSaveCustomId} disabled={isSharing}><Save className="size-5" /></Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-2 border-t border-dashed">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1 flex items-center gap-2">
+                        <MessageSquare className="size-3" /> Message SMS personnalisé
+                      </Label>
+                      <Button variant="ghost" size="sm" onClick={handleResetSms} className="h-6 px-2 text-[9px] font-black uppercase text-muted-foreground hover:text-primary">
+                        <RotateCcw className="size-3 mr-1" /> Réinitialiser
+                      </Button>
+                    </div>
+                    <Textarea 
+                      placeholder="Tapez votre message d'alerte ici..." 
+                      value={customSmsMessage} 
+                      onChange={e => setCustomSmsMessage(e.target.value)}
+                      className="text-xs font-bold border-2 rounded-xl min-h-[80px]"
+                    />
+                    
+                    <div className="space-y-1.5 p-3 bg-white/50 border-2 rounded-xl shadow-inner">
+                      <p className="text-[9px] font-black uppercase text-muted-foreground tracking-wider mb-1">Aperçu du SMS final :</p>
+                      <div className="text-[11px] leading-relaxed font-medium">
+                        <p>{customSmsMessage.trim() || defaultSmsText}</p>
+                        <p className="mt-2 text-primary font-bold">Position : https://www.google.com/maps?q=...</p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -775,15 +822,19 @@ export function VesselTracker() {
               <AlertDialogContent className="rounded-2xl border-2">
                 <AlertDialogHeader>
                   <AlertDialogTitle className="font-black uppercase tracking-tighter text-left">Confirmer l'alerte ?</AlertDialogTitle>
-                  <AlertDialogDescription className="text-xs font-medium leading-relaxed text-left">
-                    Cela enverra immédiatement un SMS de détresse avec votre position GPS à <span className="font-bold text-foreground">{emergencyContact || "votre contact d'urgence"}</span>.
+                  <AlertDialogDescription className="text-xs font-medium leading-relaxed text-left space-y-3">
+                    <p>Cela enverra immédiatement un SMS de détresse à <span className="font-bold text-foreground">{emergencyContact || "votre contact d'urgence"}</span>.</p>
+                    <div className="p-3 bg-muted/50 rounded-lg border text-[11px] font-bold">
+                      <p className="text-[9px] uppercase text-muted-foreground mb-1">Message envoyé :</p>
+                      <p className="whitespace-pre-wrap">{finalSmsBody}</p>
+                    </div>
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="flex flex-row gap-3 pt-2">
                   <AlertDialogCancel className="flex-1 h-12 font-black uppercase text-xs rounded-xl border-2">Annuler</AlertDialogCancel>
                   <AlertDialogAction 
                     className="flex-1 h-12 bg-red-600 hover:bg-red-700 text-white font-black uppercase text-xs rounded-xl"
-                    onClick={() => lastValidLocation && sendEmergencySms(lastValidLocation.lat, lastValidLocation.lng, displayVessel?.displayName || 'Capitaine')}
+                    onClick={sendEmergencySms}
                   >
                     Confirmer
                   </AlertDialogAction>
