@@ -13,7 +13,7 @@ import { useRouter } from 'next/navigation';
 import { 
   DollarSign, Users, Crown, KeyRound, Copy, Trash2, AlertCircle, Mail, 
   Share2, Palette, Image as ImageIcon, Type, Eye, Save, Upload, Timer, 
-  Fish, Plus, Pencil, DatabaseZap, X, Info, Sparkles, BrainCircuit
+  Fish, Plus, Pencil, DatabaseZap, X, Info, Sparkles, BrainCircuit, Star
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
@@ -33,13 +33,14 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { format, isBefore } from 'date-fns';
+import { format, isBefore, addDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { SplashScreen } from '@/components/splash-screen';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const SUBSCRIPTION_PRICE = 500;
 
@@ -76,6 +77,9 @@ export default function AdminPage() {
   const [isInitializingFish, setIsInitializingFish] = useState(false);
   const [isAiGeneratingFish, setIsAiGeneratingFish] = useState(false);
 
+  // Global Access States
+  const [globalDuration, setGlobalDuration] = useState('7');
+
   const isAdmin = useMemo(() => 
     user?.email === 'f.mallet81@outlook.com' || user?.email === 'f.mallet81@gmail.com', 
   [user]);
@@ -92,6 +96,13 @@ export default function AdminPage() {
     return query(collection(firestore, 'fish_species'), orderBy('name', 'asc'));
   }, [firestore, isAdmin]);
   const { data: dbFishSpecies, isLoading: areFishLoading } = useCollection<FishSpeciesInfo>(fishSpeciesRef);
+
+  // Fetch Global Shared Token
+  const sharedTokenRef = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    return doc(firestore, 'shared_access_tokens', 'GLOBAL');
+  }, [firestore, isAdmin]);
+  const { data: sharedToken } = useDoc<SharedAccessToken>(sharedTokenRef);
 
   useEffect(() => {
     if (savedSplashSettings) {
@@ -322,14 +333,41 @@ export default function AdminPage() {
     }
   };
 
-  const handleDeleteConversation = async (conversationId: string) => {
-    if (!firestore || !conversationId) return;
+  const handleUpdateSharedToken = async (daysCount: number) => {
+    if (!firestore || !isAdmin) return;
     try {
-        const messagesRef = collection(firestore, 'conversations', conversationId, 'messages');
+      const now = new Date();
+      const expiresAt = addDays(now, daysCount);
+      await setDoc(doc(firestore, 'shared_access_tokens', 'GLOBAL'), {
+        durationMonths: 0, // Unused for global
+        createdAt: serverTimestamp(),
+        expiresAt: Timestamp.fromDate(expiresAt)
+      });
+      toast({ title: "Accès global activé !", description: `Valable ${daysCount} jours.` });
+    } catch (error) {
+      console.error(error);
+      toast({ variant: 'destructive', title: "Erreur" });
+    }
+  };
+
+  const handleDisableSharedToken = async () => {
+    if (!firestore || !isAdmin) return;
+    try {
+      await deleteDoc(doc(firestore, 'shared_access_tokens', 'GLOBAL'));
+      toast({ title: "Accès global désactivé" });
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleDeleteConversation = async (id: string) => {
+    if (!firestore || !id) return;
+    try {
+        const messagesRef = collection(firestore, 'conversations', id, 'messages');
         const messagesSnap = await getDocs(messagesRef);
         const batch = writeBatch(firestore);
         messagesSnap.forEach(doc => batch.delete(doc.ref));
-        batch.delete(doc(firestore, 'conversations', conversationId));
+        batch.delete(doc(firestore, 'conversations', id));
         await batch.commit();
         toast({ title: "Conversation supprimée" });
     } catch (error) {
@@ -339,6 +377,11 @@ export default function AdminPage() {
     }
   };
   
+  const getUserEmail = (uid?: string) => {
+    if (!uid || !allUsers) return 'N/A';
+    return allUsers.find(u => u.id === uid)?.email || 'Utilisateur inconnu';
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({ description: "Copié !" });
@@ -355,8 +398,9 @@ export default function AdminPage() {
       </Card>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-6">
+        <TabsList className="grid w-full grid-cols-5 mb-6">
           <TabsTrigger value="overview">Vue d'ensemble</TabsTrigger>
+          <TabsTrigger value="users">Utilisateurs</TabsTrigger>
           <TabsTrigger value="design">Design & Splash</TabsTrigger>
           <TabsTrigger value="fish">Guide Poissons</TabsTrigger>
           <TabsTrigger value="access">Accès</TabsTrigger>
@@ -383,6 +427,43 @@ export default function AdminPage() {
                         <TableCell className="text-right"><div className="flex justify-end gap-2"><Button asChild variant="outline" size="sm"><Link href={`/admin/messages/${convo.userId}`}>Répondre</Link></Button><Button variant="ghost" size="icon" onClick={() => setConversationToDelete(convo.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></div></TableCell>
                       </TableRow>
                     )) || <TableRow><TableCell colSpan={3} className="text-center">Aucun message.</TableCell></TableRow>}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="users" className="space-y-6">
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Users /> Liste des Utilisateurs</CardTitle></CardHeader>
+            <CardContent>
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Utilisateur</TableHead>
+                      <TableHead>Statut</TableHead>
+                      <TableHead className="text-right">Fin Abo</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allUsers?.map(u => (
+                      <TableRow key={u.id}>
+                        <TableCell>
+                          <span className="font-bold">{u.displayName}</span><br/>
+                          <span className="text-xs text-muted-foreground">{u.email}</span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={u.subscriptionStatus === 'active' || u.subscriptionStatus === 'admin' ? 'default' : 'secondary'}>
+                            {u.subscriptionStatus}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-xs">
+                          {u.subscriptionExpiryDate ? format(new Date(u.subscriptionExpiryDate), 'dd/MM/yy') : '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </div>
@@ -472,13 +553,80 @@ export default function AdminPage() {
 
         <TabsContent value="access" className="space-y-6">
           <Card>
-            <CardHeader><CardTitle>Jetons d'Accès</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Share2 className="text-primary" /> Accès Global (Cadeau)</CardTitle>
+              <CardDescription>Ouvrez l'accès premium à TOUS les utilisateurs inscrits pour une durée déterminée.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {sharedToken ? (
+                <Alert className="bg-primary/10 border-primary/20">
+                  <Crown className="size-4 text-primary" />
+                  <AlertTitle>Accès Global Actif</AlertTitle>
+                  <AlertDescription>
+                    Expire le : {sharedToken.expiresAt ? format(sharedToken.expiresAt.toDate(), 'dd/MM/yyyy HH:mm', { locale: fr }) : '...'}
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <p className="text-sm text-muted-foreground italic">Aucun accès global actif actuellement.</p>
+              )}
+              
+              <div className="flex items-end gap-4">
+                <div className="flex-grow space-y-2">
+                  <Label>Durée de l'offre (jours)</Label>
+                  <Select value={globalDuration} onValueChange={setGlobalDuration}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1 jour</SelectItem>
+                      <SelectItem value="3">3 jours</SelectItem>
+                      <SelectItem value="7">1 semaine</SelectItem>
+                      <SelectItem value="30">1 mois</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button onClick={() => handleUpdateSharedToken(parseInt(globalDuration))} className="bg-primary">
+                  {sharedToken ? 'Prolonger' : 'Activer'}
+                </Button>
+                {sharedToken && (
+                  <Button variant="destructive" onClick={handleDisableSharedToken}>Désactiver</Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Jetons d'Accès Individuels</CardTitle></CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-end gap-4">
                 <div className="flex-grow space-y-2"><Label>Durée (mois)</Label><Select value={tokenDuration} onValueChange={setTokenDuration}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1">1</SelectItem><SelectItem value="3">3</SelectItem><SelectItem value="6">6</SelectItem><SelectItem value="12">12</SelectItem></SelectContent></Select></div>
                 <Button onClick={handleGenerateToken} disabled={isGenerating}><KeyRound className="mr-2"/> Générer</Button>
               </div>
-              <div className="border rounded-lg overflow-hidden"><Table><TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Statut</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader><TableBody>{accessTokens?.map(t => <TableRow key={t.id}><TableCell className="font-mono text-xs">{t.id}</TableCell><TableCell><Badge variant={t.status === 'active' ? 'default' : 'secondary'}>{t.status}</Badge></TableCell><TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => handleDeleteToken(t.id)}><Trash2 className="h-4 w-4" /></Button></TableCell></TableRow>)}</TableBody></Table></div>
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Statut / Utilisateur</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {accessTokens?.map(t => (
+                      <TableRow key={t.id}>
+                        <TableCell className="font-mono text-xs">{t.id}</TableCell>
+                        <TableCell>
+                          <Badge variant={t.status === 'active' ? 'default' : 'secondary'}>
+                            {t.status === 'active' ? 'Disponible' : 'Utilisé'}
+                          </Badge>
+                          {t.status === 'redeemed' && (
+                            <p className="text-[10px] text-muted-foreground mt-1">
+                              Par: {getUserEmail(t.redeemedBy)}
+                            </p>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="icon" onClick={() => handleDeleteToken(t.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -548,7 +696,7 @@ export default function AdminPage() {
         <AlertDialog open={!!conversationToDelete} onOpenChange={(open) => !open && setConversationToDelete(null)}>
           <AlertDialogContent>
             <AlertDialogHeader><AlertDialogTitle>Supprimer la conversation ?</AlertDialogTitle><AlertDialogDescription>Cette action est irréversible et supprimera tous les messages.</AlertDialogDescription></AlertDialogHeader>
-            <AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteConversation(conversationToDelete)}>Supprimer</AlertDialogAction></AlertDialogFooter>
+            <AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteConversation(conversationToDelete!)}>Supprimer</AlertDialogAction></AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       )}
