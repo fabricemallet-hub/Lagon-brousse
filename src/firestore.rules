@@ -25,12 +25,12 @@ service cloud.firestore {
 
     // --- PUBLIC COLLECTIONS (READ FOR ALL) ---
 
-    match /system_notifications/{document=**} {
+    match /system_notifications/{id} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    match /app_settings/{document=**} {
+    match /app_settings/{id} {
       allow read: if true;
       allow write: if isAdmin();
     }
@@ -40,7 +40,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    match /fish_species/{document=**} {
+    match /fish_species/{id} {
       allow read: if true;
       allow write: if isAdmin();
     }
@@ -48,36 +48,39 @@ service cloud.firestore {
     // --- PROTECTED COLLECTIONS (AUTH REQUIRED) ---
 
     match /users/{userId} {
-      allow read, write: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       
-      match /sowings/{sowingId} {
-        allow read, write: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
-      }
-      match /fishing_spots/{spotId} {
-        allow read, write: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
-      }
-    }
-
-    match /hunting_sessions/{document=**} {
-      allow read, write: if isSignedIn() || isAdmin();
-    }
-
-    match /vessels/{document=**} {
-      allow read, write: if isSignedIn() || isAdmin();
-    }
-
-    match /conversations/{convId} {
-      allow read, write: if (isSignedIn() && request.auth.uid == convId) || isAdmin();
       match /{allPaths=**} {
-        allow read, write: if (isSignedIn() && request.auth.uid == convId) || isAdmin();
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       }
     }
 
-    match /access_tokens/{tokenId} {
+    match /hunting_sessions/{id} {
+      allow read, write: if isSignedIn();
+      match /{allPaths=**} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    match /vessels/{id} {
+      allow read, write: if isSignedIn();
+      match /{allPaths=**} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    match /conversations/{id} {
+      allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin());
+      match /{allPaths=**} {
+        allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin());
+      }
+    }
+
+    match /access_tokens/{id} {
       allow read, write: if isSignedIn() || isAdmin();
     }
     
-    match /shared_access_tokens/{tokenId} {
+    match /shared_access_tokens/{id} {
       allow read: if isSignedIn() || isAdmin();
       allow write: if isAdmin();
     }
@@ -87,10 +90,8 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     
-    // Default catch-all
     match /{allPaths=**} {
-      allow read: if isSignedIn() || isAdmin();
-      allow write: if isAdmin();
+      allow read, write: if isAdmin();
     }
   }
 }

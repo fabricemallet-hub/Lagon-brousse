@@ -15,7 +15,6 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      // Priorité à l'email pour éviter les erreurs de lecture de document pendant l'auth
       return isSignedIn() && 
         (
           (request.auth.token.email != null && request.auth.token.email.lower() in ['f.mallet81@gmail.com', 'f.mallet81@outlook.com']) ||
@@ -25,14 +24,14 @@ service cloud.firestore {
     }
 
     // --- PUBLIC COLLECTIONS (READ FOR ALL) ---
-    // Placées en haut pour priorité maximale
+    // Placées au sommet pour une priorité absolue
 
-    match /system_notifications/{document=**} {
+    match /system_notifications/{id} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    match /app_settings/{document=**} {
+    match /app_settings/{id} {
       allow read: if true;
       allow write: if isAdmin();
     }
@@ -42,7 +41,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    match /fish_species/{document=**} {
+    match /fish_species/{id} {
       allow read: if true;
       allow write: if isAdmin();
     }
@@ -50,36 +49,39 @@ service cloud.firestore {
     // --- PROTECTED COLLECTIONS (AUTH REQUIRED) ---
 
     match /users/{userId} {
-      allow read, write: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       
-      match /sowings/{sowingId} {
-        allow read, write: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
-      }
-      match /fishing_spots/{spotId} {
-        allow read, write: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
-      }
-    }
-
-    match /hunting_sessions/{document=**} {
-      allow read, write: if isSignedIn() || isAdmin();
-    }
-
-    match /vessels/{document=**} {
-      allow read, write: if isSignedIn() || isAdmin();
-    }
-
-    match /conversations/{convId} {
-      allow read, write: if (isSignedIn() && request.auth.uid == convId) || isAdmin();
       match /{allPaths=**} {
-        allow read, write: if (isSignedIn() && request.auth.uid == convId) || isAdmin();
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       }
     }
 
-    match /access_tokens/{tokenId} {
+    match /hunting_sessions/{id} {
+      allow read, write: if isSignedIn();
+      match /{allPaths=**} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    match /vessels/{id} {
+      allow read, write: if isSignedIn();
+      match /{allPaths=**} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    match /conversations/{id} {
+      allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin());
+      match /{allPaths=**} {
+        allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin());
+      }
+    }
+
+    match /access_tokens/{id} {
       allow read, write: if isSignedIn() || isAdmin();
     }
     
-    match /shared_access_tokens/{tokenId} {
+    match /shared_access_tokens/{id} {
       allow read: if isSignedIn() || isAdmin();
       allow write: if isAdmin();
     }
@@ -89,10 +91,9 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     
-    // Default catch-all
+    // Catch-all par défaut pour la sécurité
     match /{allPaths=**} {
-      allow read: if isSignedIn() || isAdmin();
-      allow write: if isAdmin();
+      allow read, write: if isAdmin();
     }
   }
 }
