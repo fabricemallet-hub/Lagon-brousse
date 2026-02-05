@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -27,6 +26,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { VesselTracker } from '@/components/vessel-tracker';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { WindMap } from '@/components/ui/wind-map';
 
 function LagonSkeleton() {
   return (
@@ -99,7 +99,7 @@ export default function LagonPage() {
                       key={index} 
                       onClick={() => setSelectedTime(forecast.time)}
                       className={cn(
-                          "flex justify-between items-center py-3 px-4 border rounded-lg transition-all cursor-pointer min-h-[80px]",
+                          "flex justify-between items-center py-3 px-4 border rounded-lg transition-all cursor-pointer min-h-[100px]",
                           selectedTime === forecast.time ? "bg-primary text-primary-foreground border-primary scale-[1.02] shadow-md" : "bg-card hover:bg-muted/50"
                       )}
                     >
@@ -122,8 +122,9 @@ export default function LagonPage() {
                                     <p className="font-black text-xs">{forecast.speedLarge}<span className="text-[8px] ml-0.5">nds</span></p>
                                 </div>
                             </div>
-                            <div className="flex flex-col items-end border-l pl-3 border-current/10 min-w-[80px]">
-                                <p className={cn("text-[9px] font-bold uppercase", selectedTime === forecast.time ? "text-white/80" : "text-muted-foreground")}>{translateWindDirection(forecast.direction)}</p>
+                            <div className="flex flex-col items-center border-l pl-3 border-current/10 min-w-[70px] gap-1">
+                                <WindMap direction={forecast.direction} className="size-10" />
+                                <p className={cn("text-[9px] font-bold uppercase leading-none", selectedTime === forecast.time ? "text-white/80" : "text-muted-foreground")}>{translateWindDirection(forecast.direction)}</p>
                             </div>
                         </div>
                     </div>

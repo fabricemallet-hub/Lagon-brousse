@@ -472,7 +472,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                             mapContainerClassName="w-full h-full"
                             center={userLocation || { lat: -21.5, lng: 165.5 }}
                             zoom={userLocation && initialZoomDone ? (map?.getZoom() ?? 16) : 7}
-                            options={{ disableDefaultUI: true, zoomControl: true, mapTypeControl: true, clickableIcons: false, mapTypeId: 'satellite' }}
+                            options={{ disableDefaultUI: true, zoomControl: true, mapTypeControl: true, clickableIcons: false, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
                             onClick={handleMapClick}
                             onLoad={onLoad}
                             onUnmount={onUnmount}
@@ -547,7 +547,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                             {isFullscreen ? <Shrink className="h-5 w-5" /> : <Expand className="h-5 w-5" />}
                         </Button>
                         <Button size="icon" onClick={handleRecenter} className="absolute top-2 right-2 shadow-lg h-9 w-9 z-10 bg-background/80 backdrop-blur-sm">
-                            <LocateFixed className="h-5 w-5" />
+                            <LocateFixed className="size-5" />
                         </Button>
                          <div className={cn("absolute bottom-0 left-0 right-0 z-10", !newSpotLocation && "hidden")}>
                             <Button 

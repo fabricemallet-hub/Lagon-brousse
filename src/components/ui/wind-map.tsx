@@ -54,7 +54,7 @@ export const WindMap = ({
       </div>
       <div className="absolute inset-0 flex items-center justify-center">
         <ArrowUp
-          className="h-12 w-12 text-primary drop-shadow-md"
+          className="size-1/2 text-primary drop-shadow-md"
           style={{ transform: `rotate(${rotation}deg)` }}
         />
       </div>

@@ -546,7 +546,8 @@ function HuntingSessionContent() {
   const mapOptions = useMemo(() => ({
     disableDefaultUI: true, 
     zoomControl: true, 
-    mapTypeId: 'satellite'
+    mapTypeId: 'satellite',
+    gestureHandling: 'greedy'
   }), []);
 
   if (session) {
