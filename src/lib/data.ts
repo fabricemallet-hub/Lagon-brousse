@@ -351,6 +351,50 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     ? `Lune montante : la sève est active. Idéal pour le bouturage et la plantation des variétés ${currentZodiac}.`
     : `Lune descendante : la sève descend vers les racines. Idéal pour la taille, la tonte et les légumes ${currentZodiac}.`;
 
+  // Peuplement des tâches détaillées (farming.details)
+  locationData.farming.details = [];
+  
+  if (locationData.farming.isGoodForPruning) {
+    locationData.farming.details.push({
+      task: 'Taille des végétaux',
+      description: 'La sève descend : c\'est le moment idéal pour tailler vos arbres et arbustes sans les épuiser.',
+      icon: 'Scissors'
+    });
+  }
+  
+  if (locationData.farming.isGoodForCuttings) {
+    locationData.farming.details.push({
+      task: 'Bouturage & Greffage',
+      description: 'La sève monte : les chances de reprise des boutures et la réussite des greffes sont maximales.',
+      icon: 'RefreshCw'
+    });
+  }
+  
+  if (locationData.farming.isGoodForMowing) {
+    locationData.farming.details.push({
+      task: 'Tonte de la pelouse',
+      description: 'En lune descendante, l\'herbe repousse moins vite. Idéal pour espacer les tontes.',
+      icon: 'Leaf'
+    });
+  }
+
+  // Tâche basée sur le zodiaque du jour
+  const zodiacTasks = {
+    Fruits: { task: 'Légumes Fruits', desc: 'Favorisez les semis et plantations de tomates, piments, aubergines et concombres.', icon: 'Spade' },
+    Racines: { task: 'Légumes Racines', desc: 'Idéal pour semer ou planter carottes, radis, oignons et pommes de terre.', icon: 'Carrot' },
+    Fleurs: { task: 'Plantes à Fleurs', desc: 'Moment propice pour s\'occuper de vos massifs floraux et arbustes d\'ornement.', icon: 'Flower' },
+    Feuilles: { task: 'Légumes Feuilles', desc: 'Priorité aux salades, choux, herbes aromatiques et brèdes.', icon: 'Leaf' },
+  };
+  
+  const currentTask = zodiacTasks[currentZodiac as keyof typeof zodiacTasks];
+  if (currentTask) {
+    locationData.farming.details.push({
+      task: currentTask.task,
+      description: currentTask.desc,
+      icon: currentTask.icon as any
+    });
+  }
+
   locationData.weather.hourly = [];
   const tideDataForDay = calculateHourlyTidesForSimulation(locationData.tides, effectiveDate);
   const seasonalTempFactor = Math.cos(((month - 1) / 12) * 2 * Math.PI);
