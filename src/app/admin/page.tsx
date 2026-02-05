@@ -678,7 +678,11 @@ export default function AdminPage() {
           <DialogHeader><DialogTitle className="font-black uppercase">Fiche Poisson</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div className="flex gap-2"><Input placeholder="Nom..." value={currentFish.name || ''} onChange={e => setCurrentFish({...currentFish, name: e.target.value})} className="h-12 border-2" /><Button variant="secondary" className="h-12 font-black uppercase text-xs" onClick={handleAiFillFish} disabled={isAiGeneratingFish}><Sparkles className="mr-2 size-4" /> IA</Button></div>
-            <div className="grid grid-cols-2 gap-4"><div className="space-y-1"><Label className="text-[10px] font-bold uppercase opacity-60">Scientifique</Label><Input value={currentFish.scientificName || ''} onChange={e => setCurrentFish({...currentFish, scientificName: e.target.value})} className="h-10 border-2" /></div><div className="space-y-1"><Label className="text-[10px] font-bold uppercase opacity-60">Catégorie</Label><Select value={currentFish.category} onValueChange={(v:any) => setCurrentFish({...currentFish, category: v})}><SelectTrigger className="h-10 border-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Lagon">Lagon</SelectItem><SelectItem value="Large">Large</SelectItem><SelectItem value="Recif">Récif</SelectItem></SelectContent></Select></div></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1"><Label className="text-[10px] font-bold uppercase opacity-60">Scientifique</Label><Input value={currentFish.scientificName || ''} onChange={e => setCurrentFish({...currentFish, scientificName: e.target.value})} className="h-10 border-2" /></div>
+              <div className="space-y-1"><Label className="text-[10px] font-bold uppercase opacity-60">Catégorie</Label><Select value={currentFish.category} onValueChange={(v:any) => setCurrentFish({...currentFish, category: v})}><SelectTrigger className="h-10 border-2"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Lagon">Lagon</SelectItem><SelectItem value="Large">Large</SelectItem><SelectItem value="Recif">Récif</SelectItem></SelectContent></Select></div>
+              <div className="space-y-1"><Label className="text-[10px] font-bold uppercase opacity-60">Risque Gratte (%)</Label><Input type="number" min="0" max="100" value={currentFish.gratteRisk ?? 0} onChange={e => setCurrentFish({...currentFish, gratteRisk: parseInt(e.target.value) || 0})} className="h-10 border-2" /></div>
+            </div>
             <div className="space-y-1"><Label className="text-[10px] font-bold uppercase opacity-60">Cuisine</Label><Textarea value={currentFish.culinaryAdvice || ''} onChange={e => setCurrentFish({...currentFish, culinaryAdvice: e.target.value})} className="text-xs border-2" /></div>
             <div className="space-y-1"><Label className="text-[10px] font-bold uppercase opacity-60">Pêche</Label><Textarea value={currentFish.fishingAdvice || ''} onChange={e => setCurrentFish({...currentFish, fishingAdvice: e.target.value})} className="text-xs border-2" /></div>
           </div>
@@ -687,7 +691,7 @@ export default function AdminPage() {
       </Dialog>
 
       <Dialog open={isSoundDialogOpen} onOpenChange={setIsSoundDialogOpen}>
-        <DialogContent className="max-w-sm rounded-2xl">
+        <DialogContent className="max-sm rounded-2xl">
           <DialogHeader><DialogTitle className="font-black uppercase">Ajouter Son</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-1"><Label className="text-[10px] font-bold uppercase">Libellé</Label><Input value={currentSound.label || ''} onChange={e => setCurrentSound({...currentSound, label: e.target.value})} className="h-12 border-2" /></div>
