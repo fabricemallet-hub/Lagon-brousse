@@ -27,7 +27,8 @@ import {
   Check,
   ClipboardList,
   AlertTriangle,
-  CalendarCheck
+  CalendarCheck,
+  Timer
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getPersonalizedGardenAdvice } from '@/ai/flows/garden-advice-flow';
@@ -293,7 +294,7 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
                 <Label className="text-[10px] font-black uppercase opacity-60">Saisir le nom de la plante</Label>
                 <div className="flex gap-2">
                   <Input 
-                    placeholder="Ex: Citronier, Manguier..." 
+                    placeholder="Ex: Citronnier, Manguier..." 
                     value={plantName} 
                     onChange={e => setPlantName(e.target.value)} 
                     className="h-12 border-2 font-bold" 
@@ -403,11 +404,17 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
                 </div>
 
                 <div className="p-4 space-y-3">
-                  <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest flex items-center gap-2"><Droplets className="size-3" /> Arrosage par groupes</p>
+                  <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest flex items-center gap-2"><Droplets className="size-3" /> Arrosage & Quantités</p>
                   <div className="grid gap-2">
                     {globalSummary.wateringGroups.map((group, idx) => (
-                      <div key={idx} className="flex flex-wrap items-center gap-2 p-2 bg-white rounded-xl border border-blue-100 shadow-sm">
-                        <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 font-black text-[9px] uppercase">{group.type}</Badge>
+                      <div key={idx} className="flex flex-col gap-2 p-3 bg-white rounded-xl border border-blue-100 shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 font-black text-[9px] uppercase">{group.type}</Badge>
+                          <div className="flex items-center gap-1.5 text-blue-600">
+                            <Timer className="size-3" />
+                            <span className="text-[10px] font-black uppercase">{group.quantityPerPlant}</span>
+                          </div>
+                        </div>
                         <span className="text-[11px] font-medium text-slate-600">{group.plantNames.join(', ')}</span>
                       </div>
                     ))}
@@ -416,17 +423,27 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
 
                 {globalSummary.maintenanceAlerts.length > 0 && (
                   <div className="p-4 space-y-3">
-                    <p className="text-[10px] font-black uppercase text-orange-600 tracking-widest flex items-center gap-2"><Scissors className="size-3" /> Alertes Maintenance</p>
+                    <p className="text-[10px] font-black uppercase text-orange-600 tracking-widest flex items-center gap-2"><Scissors className="size-3" /> Alertes Maintenance & Taille</p>
                     <div className="space-y-2">
                       {globalSummary.maintenanceAlerts.map((alert, idx) => (
                         <div key={idx} className={cn(
                           "p-3 rounded-xl border flex gap-3 shadow-sm",
                           alert.priority === 'Haute' ? "bg-red-50 border-red-100" : "bg-white border-orange-100"
                         )}>
-                          <AlertTriangle className={cn("size-4 shrink-0", alert.priority === 'Haute' ? "text-red-600" : "text-orange-500")} />
-                          <div className="space-y-0.5">
+                          <div className={cn(
+                            "size-8 rounded-lg flex items-center justify-center shrink-0",
+                            alert.action.toLowerCase().includes('taille') ? "bg-orange-600 text-white" : "bg-muted/50"
+                          )}>
+                            {alert.action.toLowerCase().includes('taille') ? <Scissors className="size-4" /> : <Zap className="size-4" />}
+                          </div>
+                          <div className="space-y-1">
                             <p className="text-[11px] font-black uppercase tracking-tight">{alert.action}</p>
-                            <p className="text-[10px] font-medium text-muted-foreground">{alert.reason}</p>
+                            <p className="text-[10px] font-medium text-muted-foreground leading-tight">{alert.reason}</p>
+                            {alert.howTo && (
+                              <p className="text-[10px] font-bold text-orange-700 bg-orange-50 p-1.5 rounded-md border border-orange-100 mt-1 italic">
+                                👉 {alert.howTo}
+                              </p>
+                            )}
                           </div>
                         </div>
                       ))}

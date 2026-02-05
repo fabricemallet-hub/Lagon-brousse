@@ -1,7 +1,7 @@
 'use server';
 /**
  * @fileOverview AI flow for generating a global daily summary for the user's entire garden.
- * STRICTURE CONSTRAINTS: Only uses plants provided in the input. No hallucinations.
+ * Integrates weather data, precise watering (liters/seconds), and pruning advice.
  */
 
 import { ai } from '@/ai/genkit';
@@ -30,12 +30,14 @@ const GardenGlobalSummaryOutputSchema = z.object({
   globalPlan: z.string().describe("Concise global action plan for today."),
   wateringGroups: z.array(z.object({
     type: z.string().describe("Type of watering (e.g., 'Abondant', 'Léger')."),
+    quantityPerPlant: z.string().describe("Water quantity per plant in liters and seconds (e.g. '5L / ~25s au jet')."),
     plantNames: z.array(z.string()).describe("List of ACTUAL plant names from the provided inventory."),
   })),
   maintenanceAlerts: z.array(z.object({
     priority: z.enum(['Haute', 'Moyenne', 'Basse']),
-    action: z.string().describe("Specific action including the plant name."),
-    reason: z.string().describe("Why this action is needed today."),
+    action: z.string().describe("Specific action (e.g. 'Taille du Manguier')."),
+    reason: z.string().describe("Why this action is needed (Pruning, Fertilizer, etc.)."),
+    howTo: z.string().optional().describe("Quick instruction on how to do it."),
   })),
   milestones: z.array(z.object({
     plantName: z.string().describe("Actual name of the plant."),
@@ -55,12 +57,6 @@ const gardenGlobalSummaryPrompt = ai.definePrompt({
   prompt: `Tu es l'Expert Jardinier de Nouvelle-Calédonie. 
 Ta mission est de rédiger un bilan quotidien pour l'inventaire RÉEL fourni par l'utilisateur.
 
-REGLE DE SÉCURITÉ CRITIQUE :
-1. Tu ne dois utiliser QUE les noms de plantes listés dans la section "INVENTAIRE" ci-dessous.
-2. Il est STRICTEMENT INTERDIT d'inventer, de suggérer ou de mentionner une plante qui n'est pas dans cette liste.
-3. Si une section (Alertes ou Étapes clés) ne concerne aucune plante de la liste, retourne un tableau vide [] pour cette section.
-4. N'utilise aucun exemple générique.
-
 CONTEXTE DU JOUR :
 - Lieu : {{{location}}}
 - Date : {{{date}}}
@@ -72,11 +68,11 @@ INVENTAIRE DES PLANTES DE L'UTILISATEUR (STRICTEMENT CES NOMS) :
 - {{{name}}} (Catégorie : {{{category}}})
 {{/each}}
 
-ACTIONS REQUISES :
-1. globalPlan : Un résumé d'une phrase des priorités du jour pour CETTE liste.
-2. wateringGroups : Groupe UNIQUEMENT les plantes de la liste par besoin en eau selon la météo et leur nature.
-3. maintenanceAlerts : Identifie les besoins de taille (si lune descendante) ou d'engrais (si floraison prévue) pour les plantes de la liste.
-4. milestones : Signale les étapes biologiques proches pour ces plantes spécifiques.
+CONSIGNES CRITIQUES :
+1. METEO : Si il a plu ou va pleuvoir fort (Météo: Forte), réduis ou annule les besoins en arrosage. Si il fait très chaud (>30°C), augmente-les.
+2. ARROSAGE : Pour chaque groupe de plantes, donne une estimation de la quantité d'eau par plante en Litres ET en temps de jet (en secondes, base: un jet standard débite environ 10-15L/min, soit ~0.2L/s). Ex: "5L (~25s au jet)".
+3. TAILLE (PRUNING) : Si la lune est Descendante, identifie les arbres ou arbustes de la liste qui nécessitent une taille de formation ou d'entretien. Donne un conseil court sur OÙ couper.
+4. Hallucinations INTERDITES : N'invente AUCUNE plante. Si la liste est vide ou si une section ne s'applique à aucune plante de la liste, retourne un tableau vide [].
 
 RÉPONDS UNIQUEMENT AU FORMAT JSON.`,
 });
