@@ -88,7 +88,6 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
 
   const handleAiSuggest = async () => {
     if (!plantName.trim() || plantName.trim().length < 2) {
-        // Mode Suggestions mensuelles (si champ vide ou trop court)
         setIsSuggesting(true);
         setAiSuggestions([]);
         setCorrectedName(null);
@@ -283,20 +282,29 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
               <Card key={plant.id} className="overflow-hidden border-2 shadow-sm">
                 <Accordion type="single" collapsible onValueChange={(val) => val === plant.id && fetchAdvice(plant)}>
                   <AccordionItem value={plant.id} className="border-none">
-                    <AccordionTrigger className="p-4 hover:no-underline [&[data-state=open]]:bg-muted/30">
-                      <div className="flex items-center gap-4 text-left w-full">
-                        <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 border border-primary/10">
-                          <Flower2 className="size-6 text-primary" />
+                    <div className="flex items-center w-full">
+                      <AccordionTrigger className="flex-1 p-4 hover:no-underline [&[data-state=open]]:bg-muted/30">
+                        <div className="flex items-center gap-4 text-left">
+                          <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 border border-primary/10">
+                            <Flower2 className="size-6 text-primary" />
+                          </div>
+                          <div className="flex-grow min-w-0">
+                            <h4 className="font-black uppercase tracking-tight text-sm truncate">{plant.name}</h4>
+                            <Badge variant="outline" className="text-[8px] font-black uppercase px-1.5 h-4 mt-1 opacity-60">{plant.category}</Badge>
+                          </div>
                         </div>
-                        <div className="flex-grow min-w-0">
-                          <h4 className="font-black uppercase tracking-tight text-sm truncate">{plant.name}</h4>
-                          <Badge variant="outline" className="text-[8px] font-black uppercase px-1.5 h-4 mt-1 opacity-60">{plant.category}</Badge>
-                        </div>
-                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(plant.id); }} className="size-8 text-destructive/40 hover:text-destructive">
+                      </AccordionTrigger>
+                      <div className="pr-2" onClick={(e) => e.stopPropagation()}>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => handleDelete(plant.id)} 
+                          className="size-8 text-destructive/40 hover:text-destructive"
+                        >
                           <Trash2 className="size-4" />
                         </Button>
                       </div>
-                    </AccordionTrigger>
+                    </div>
                     <AccordionContent className="p-0 border-t border-dashed">
                       <div className="p-4 space-y-6 bg-muted/5">
                         {loadingAdvice[plant.id] ? (
