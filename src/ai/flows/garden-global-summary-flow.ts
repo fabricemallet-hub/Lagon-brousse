@@ -1,7 +1,7 @@
 'use server';
 /**
  * @fileOverview AI flow for generating a global daily summary for the user's entire garden.
- * This flow is now strictly constrained to the user's inventory and uses real plant names.
+ * STRICTURE CONSTRAINTS: Only uses plants provided in the input. No hallucinations.
  */
 
 import { ai } from '@/ai/genkit';
@@ -30,7 +30,7 @@ const GardenGlobalSummaryOutputSchema = z.object({
   globalPlan: z.string().describe("Concise global action plan for today."),
   wateringGroups: z.array(z.object({
     type: z.string().describe("Type of watering (e.g., 'Abondant', 'Léger')."),
-    plantNames: z.array(z.string()).describe("List of ACTUAL plant names from the inventory."),
+    plantNames: z.array(z.string()).describe("List of ACTUAL plant names from the provided inventory."),
   })),
   maintenanceAlerts: z.array(z.object({
     priority: z.enum(['Haute', 'Moyenne', 'Basse']),
@@ -45,13 +45,21 @@ const GardenGlobalSummaryOutputSchema = z.object({
 export type GardenGlobalSummaryOutput = z.infer<typeof GardenGlobalSummaryOutputSchema>;
 
 export async function getGardenGlobalSummary(input: GardenGlobalSummaryInput): Promise<GardenGlobalSummaryOutput> {
-  const { output } = await ai.generate({
-    prompt: `Tu es le Maître Jardinier de Nouvelle-Calédonie. Analyse l'ensemble de ce jardin pour aujourd'hui.
-    
-CONSIGNE CRITIQUE ET ABSOLUE :
-Ta mission est de conseiller l'utilisateur EXCLUSIVEMENT et UNIQUEMENT sur les plantes listées dans son inventaire ci-dessous. 
-IL EST FORMELLEMENT INTERDIT d'inventer, de suggérer ou de mentionner une plante (comme "Citronnier", "Hibiscus", "Bougainvillier") si elle ne figure pas dans la liste fournie par l'utilisateur. 
-N'utilise aucun exemple générique.
+  return gardenGlobalSummaryFlow(input);
+}
+
+const gardenGlobalSummaryPrompt = ai.definePrompt({
+  name: 'gardenGlobalSummaryPrompt',
+  input: { schema: GardenGlobalSummaryInputSchema },
+  output: { schema: GardenGlobalSummaryOutputSchema },
+  prompt: `Tu es l'Expert Jardinier de Nouvelle-Calédonie. 
+Ta mission est de rédiger un bilan quotidien pour l'inventaire RÉEL fourni par l'utilisateur.
+
+REGLE DE SÉCURITÉ CRITIQUE :
+1. Tu ne dois utiliser QUE les noms de plantes listés dans la section "INVENTAIRE" ci-dessous.
+2. Il est STRICTEMENT INTERDIT d'inventer, de suggérer ou de mentionner une plante qui n'est pas dans cette liste.
+3. Si une section (Alertes ou Étapes clés) ne concerne aucune plante de la liste, retourne un tableau vide [] pour cette section.
+4. N'utilise aucun exemple générique.
 
 CONTEXTE DU JOUR :
 - Lieu : {{{location}}}
@@ -59,22 +67,28 @@ CONTEXTE DU JOUR :
 - Météo : {{{weather.temp}}}°C, Pluie : {{{weather.rain}}}
 - Lune : {{{lunarContext.phase}}} (Signe : {{{lunarContext.zodiac}}})
 
-INVENTAIRE RÉEL DU JARDIN (STRICTEMENT CES NOMS ET RIEN D'AUTRE) :
+INVENTAIRE DES PLANTES DE L'UTILISATEUR (STRICTEMENT CES NOMS) :
 {{#each plants}}
-- {{{name}}} ({{{category}}})
+- {{{name}}} (Catégorie : {{{category}}})
 {{/each}}
 
-TA MISSION :
-1. Rédige un PLAN GLOBAL très concis pour la journée qui synthétise les priorités pour CET inventaire précis.
-2. GROUPE les plantes de l'inventaire par besoin d'arrosage aujourd'hui. Utilise les NOMS EXACTS fournis.
-3. IDENTIFIE les alertes de maintenance (Taille car lune descendante, ou Engrais car floraison proche) pour les plantes de l'inventaire.
-4. SOIS PRÉCIS sur le "Pourquoi" en citant le nom de la plante.
+ACTIONS REQUISES :
+1. globalPlan : Un résumé d'une phrase des priorités du jour pour CETTE liste.
+2. wateringGroups : Groupe UNIQUEMENT les plantes de la liste par besoin en eau selon la météo et leur nature.
+3. maintenanceAlerts : Identifie les besoins de taille (si lune descendante) ou d'engrais (si floraison prévue) pour les plantes de la liste.
+4. milestones : Signale les étapes biologiques proches pour ces plantes spécifiques.
 
-RAPPEL : Si l'inventaire ne contient qu'une seule plante (ex: "Pamplemoussier"), ton bilan ne doit parler QUE de cette plante. Ne me donne aucune information sur d'autres arbres ou fleurs.
+RÉPONDS UNIQUEMENT AU FORMAT JSON.`,
+});
 
-Réponds au format JSON uniquement.`,
-    input: { schema: GardenGlobalSummaryInputSchema, data: input },
-    output: { schema: GardenGlobalSummaryOutputSchema },
-  });
-  return output!;
-}
+const gardenGlobalSummaryFlow = ai.defineFlow(
+  {
+    name: 'gardenGlobalSummaryFlow',
+    inputSchema: GardenGlobalSummaryInputSchema,
+    outputSchema: GardenGlobalSummaryOutputSchema,
+  },
+  async (input) => {
+    const { output } = await gardenGlobalSummaryPrompt(input);
+    return output!;
+  }
+);
