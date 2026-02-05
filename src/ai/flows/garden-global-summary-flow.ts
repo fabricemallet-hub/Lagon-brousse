@@ -48,25 +48,29 @@ export async function getGardenGlobalSummary(input: GardenGlobalSummaryInput): P
   const { output } = await ai.generate({
     prompt: `Tu es le Maître Jardinier de Nouvelle-Calédonie. Analyse l'ensemble de ce jardin pour aujourd'hui.
     
-IMPORTANT : Ta mission est de conseiller l'utilisateur UNIQUEMENT sur les plantes listées dans son inventaire ci-dessous. 
-Tu dois utiliser les NOMS RÉELS des plantes fournis par l'utilisateur (ex: "Citronnier Galet", "Pamplemoussier") et JAMAIS de termes génériques comme "Plante 1".
+CONSIGNE CRITIQUE ET ABSOLUE :
+Ta mission est de conseiller l'utilisateur EXCLUSIVEMENT et UNIQUEMENT sur les plantes listées dans son inventaire ci-dessous. 
+IL EST FORMELLEMENT INTERDIT d'inventer, de suggérer ou de mentionner une plante (comme "Citronnier", "Hibiscus", "Bougainvillier") si elle ne figure pas dans la liste fournie par l'utilisateur. 
+N'utilise aucun exemple générique.
 
-CONTEXTE :
+CONTEXTE DU JOUR :
 - Lieu : {{{location}}}
 - Date : {{{date}}}
 - Météo : {{{weather.temp}}}°C, Pluie : {{{weather.rain}}}
 - Lune : {{{lunarContext.phase}}} (Signe : {{{lunarContext.zodiac}}})
 
-INVENTAIRE RÉEL DU JARDIN (UTILISE CES NOMS EXACTS) :
+INVENTAIRE RÉEL DU JARDIN (STRICTEMENT CES NOMS ET RIEN D'AUTRE) :
 {{#each plants}}
 - {{{name}}} ({{{category}}})
 {{/each}}
 
 TA MISSION :
-1. Rédige un PLAN GLOBAL très concis pour la journée qui synthétise les priorités pour cet inventaire précis.
-2. GROUPE les plantes de l'inventaire par besoin d'arrosage aujourd'hui (utilise les vrais noms).
+1. Rédige un PLAN GLOBAL très concis pour la journée qui synthétise les priorités pour CET inventaire précis.
+2. GROUPE les plantes de l'inventaire par besoin d'arrosage aujourd'hui. Utilise les NOMS EXACTS fournis.
 3. IDENTIFIE les alertes de maintenance (Taille car lune descendante, ou Engrais car floraison proche) pour les plantes de l'inventaire.
-4. SOIS PRÉCIS sur le "Pourquoi" en citant le nom de la plante (ex: "Mettre de l'engrais sur le Citronnier pour booster la floraison car nous sommes en saison").
+4. SOIS PRÉCIS sur le "Pourquoi" en citant le nom de la plante.
+
+RAPPEL : Si l'inventaire ne contient qu'une seule plante (ex: "Pamplemoussier"), ton bilan ne doit parler QUE de cette plante. Ne me donne aucune information sur d'autres arbres ou fleurs.
 
 Réponds au format JSON uniquement.`,
     input: { schema: GardenGlobalSummaryInputSchema, data: input },
