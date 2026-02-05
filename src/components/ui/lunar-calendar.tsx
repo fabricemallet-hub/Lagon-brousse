@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -45,6 +46,7 @@ import {
   Star,
   Waves,
   Clock,
+  X,
 } from 'lucide-react';
 import { Button } from './button';
 import { cn } from '@/lib/utils';
@@ -225,7 +227,6 @@ export function LunarCalendar() {
   const days = eachDayOfInterval({ start: startDate, end: endDate });
   const weekdays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
-  // Fonction de centrage automatique sur le jour actuel, limitée au conteneur local
   useEffect(() => {
     const timer = setTimeout(() => {
       const container = scrollContainerRef.current;
@@ -314,23 +315,26 @@ export function LunarCalendar() {
       </div>
 
       <Dialog open={!!detailedDay} onOpenChange={(isOpen) => !isOpen && setDetailedDay(null)}>
-        <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] p-0 flex flex-col rounded-xl overflow-hidden shadow-2xl border-none">
-          <DialogHeader className="p-6 shrink-0 bg-muted/10 border-b">
-            <DialogTitle className="text-lg font-black uppercase tracking-tighter">
+        <DialogContent className="w-[95vw] sm:max-w-lg h-[95vh] sm:h-auto max-h-[95vh] flex flex-col p-0 overflow-hidden rounded-t-2xl sm:rounded-2xl border-none shadow-2xl">
+          <DialogHeader className="p-6 shrink-0 bg-slate-50 border-b flex flex-row items-center justify-between">
+            <DialogTitle className="text-xl font-black uppercase tracking-tight text-slate-800">
               {detailedDay ? format(detailedDay, 'eeee d MMMM', { locale: fr }) : ''}
             </DialogTitle>
+            <DialogClose className="opacity-40 hover:opacity-100 transition-opacity">
+              <X className="size-6" />
+            </DialogClose>
           </DialogHeader>
           
-          <div className="flex-grow p-6 overflow-y-auto">
+          <div className="flex-grow p-6 overflow-y-auto bg-slate-50/50">
             {calendarView === 'peche' 
               ? (detailedDay && <PecheDetailDialogContent day={detailedDay} location={selectedLocation} />)
               : (detailedDay && <ChampsDetailDialogContent day={detailedDay} location={selectedLocation} />)
             }
           </div>
 
-          <DialogFooter className="p-4 bg-muted/20 border-t shrink-0">
+          <DialogFooter className="p-4 bg-white border-t shrink-0">
             <DialogClose asChild>
-              <Button variant="outline" className="w-full h-12 font-black uppercase text-xs shadow-sm">Fermer</Button>
+              <Button variant="outline" className="w-full h-14 font-black uppercase text-base tracking-widest bg-slate-50 border-2 active:scale-95 transition-all">Fermer</Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
@@ -342,33 +346,36 @@ export function LunarCalendar() {
 function ChampsDetailDialogContent({ day, location }: { day: Date; location: string }) {
   const [data, setData] = useState<LocationData | null>(null);
   useEffect(() => { setData(getDataForDate(location, day)); }, [location, day]);
-  if (!data) return <Skeleton className="h-64 w-full" />;
+  if (!data) return <div className="space-y-4"><Skeleton className="h-20 w-full" /><Skeleton className="h-40 w-full" /></div>;
   const { farming, weather } = data;
   const GardeningIcon = { Fruits: Spade, Racines: Carrot, Fleurs: Flower, Feuilles: Leaf }[farming.zodiac];
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-3">
-        <div className="p-4 bg-primary/5 border rounded-lg flex items-center justify-between">
-          <div className="flex items-center gap-2"><MoonPhaseIcon phase={weather.moon.phase} className="text-primary"/><span className="text-xs font-bold uppercase">Lune</span></div>
-          <span className="font-black text-xs">{weather.moon.phase}</span>
+        <div className="p-4 bg-white border-2 rounded-2xl flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3"><MoonPhaseIcon phase={weather.moon.phase} className="size-5 text-primary"/><span className="text-xs font-black uppercase opacity-60">Lune</span></div>
+          <span className="font-black text-sm">{weather.moon.phase}</span>
         </div>
-        <div className="p-4 bg-accent/5 border rounded-lg flex items-center justify-between">
-          <div className="flex items-center gap-2"><GardeningIcon className="size-4 text-accent"/><span className="text-xs font-bold uppercase">Zodiaque</span></div>
-          <span className="font-black text-xs">Jour {farming.zodiac}</span>
+        <div className="p-4 bg-white border-2 rounded-2xl flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3"><GardeningIcon className="size-5 text-accent"/><span className="text-xs font-black uppercase opacity-60">Zodiaque</span></div>
+          <span className="font-black text-sm">Jour {farming.zodiac}</span>
         </div>
       </div>
-      <div className="p-4 bg-muted/30 border-2 border-dashed rounded-lg">
-        <p className="text-sm font-bold leading-relaxed">{farming.recommendation}</p>
+      <div className="p-5 bg-white border-2 border-dashed border-accent/30 rounded-2xl">
+        <p className="text-sm font-bold leading-relaxed text-slate-700">{farming.recommendation}</p>
       </div>
       <div className="space-y-3">
+        <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
+            <Info className="size-3" /> Travaux Recommandés
+        </h3>
         {farming.details.map((item, i) => (
-          <div key={i} className="p-3 border rounded-lg flex gap-3">
-            <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-1">
-              <Leaf className="size-4 text-primary" />
+          <div key={i} className="p-4 bg-white border-2 rounded-2xl flex gap-4 shadow-sm items-start">
+            <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 border border-primary/10">
+              <Leaf className="size-5 text-primary" />
             </div>
-            <div>
-              <p className="font-black text-xs uppercase">{item.task}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">{item.description}</p>
+            <div className="space-y-1">
+              <p className="font-black text-xs uppercase tracking-tight">{item.task}</p>
+              <p className="text-[11px] leading-relaxed text-muted-foreground font-medium">{item.description}</p>
             </div>
           </div>
         ))}
@@ -380,109 +387,100 @@ function ChampsDetailDialogContent({ day, location }: { day: Date; location: str
 function PecheDetailDialogContent({ day, location }: { day: Date; location: string }) {
   const [data, setData] = useState<LocationData | null>(null);
   useEffect(() => { setData(getDataForDate(location, day)); }, [location, day]);
-  if (!data) return <Skeleton className="h-64 w-full" />;
+  if (!data) return <div className="space-y-4"><Skeleton className="h-20 w-full" /><Skeleton className="h-40 w-full" /></div>;
   const { fishing, weather, crabAndLobster } = data;
   return (
-    <div className="space-y-6">
-      <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg space-y-2">
-        <h3 className="text-xs font-black uppercase tracking-widest text-primary flex items-center gap-2">
+    <div className="space-y-8">
+      {/* MARÉES */}
+      <div className="bg-blue-50/80 border-2 border-blue-100 rounded-2xl p-5 space-y-4 shadow-sm">
+        <h3 className="text-[11px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
             <Waves className="size-4" /> Marées du jour
         </h3>
-        <div className="flex justify-between text-[10px] font-black uppercase opacity-60"><span>Heure</span><span>Hauteur</span></div>
-        {data.tides.map((t, i) => (
-          <div key={i} className="flex justify-between font-black text-sm border-b border-blue-200/50 py-1 last:border-0">
-            <span className={t.type === 'haute' ? 'text-primary' : 'text-blue-600'}>{t.time}</span>
-            <span>{t.height.toFixed(2)}m</span>
-          </div>
-        ))}
+        <div className="flex justify-between text-[10px] font-black uppercase opacity-40 px-1"><span>HEURE</span><span>HAUTEUR</span></div>
+        <div className="space-y-2">
+          {data.tides.map((t, i) => (
+            <div key={i} className="flex justify-between items-center font-black text-base border-b border-blue-200/30 pb-2 last:border-0 last:pb-0">
+              <span className={cn(t.type === 'haute' ? 'text-primary' : 'text-blue-600')}>{t.time}</span>
+              <span className="tabular-nums">{t.height.toFixed(2)}m</span>
+            </div>
+          ))}
+        </div>
       </div>
 
+      {/* CRUSTACÉS */}
       <div className="space-y-3">
-        <h3 className="text-xs font-black uppercase tracking-widest text-primary flex items-center gap-2">
+        <h3 className="text-[11px] font-black uppercase tracking-widest text-blue-800/60 flex items-center gap-2 px-1">
             <CrabIcon className="size-4" /> Crustacés & Mollusques
         </h3>
-        <div className="grid grid-cols-1 gap-2">
-            <div className="p-3 bg-muted/20 border rounded-xl flex items-start gap-3">
-                <div className={cn("p-2 rounded-lg shrink-0", crabAndLobster.crabStatus === 'Plein' ? 'bg-green-500/10' : 'bg-red-500/10')}>
-                    <CrabIcon className={cn("size-5", crabAndLobster.crabStatus === 'Plein' ? 'text-green-600' : 'text-red-600')} />
+        <div className="grid grid-cols-1 gap-2.5">
+            <div className="p-4 bg-white border-2 rounded-2xl flex items-center gap-4 shadow-sm">
+                <div className={cn("size-12 rounded-xl flex items-center justify-center shrink-0 border", crabAndLobster.crabStatus === 'Plein' ? 'bg-green-50 border-green-100 text-green-600' : 'bg-red-50 border-red-100 text-red-600')}>
+                    <CrabIcon className="size-6" />
                 </div>
-                <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold">Crabe de palétuvier</span>
-                        <Badge variant={crabAndLobster.crabStatus === 'Plein' ? 'default' : (crabAndLobster.crabStatus === 'Mout' ? 'destructive' : 'secondary')} className="text-[9px] h-4">
+                <div className="flex-grow min-w-0">
+                    <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-sm font-black uppercase tracking-tighter">Crabe</span>
+                        <Badge variant={crabAndLobster.crabStatus === 'Plein' ? 'default' : (crabAndLobster.crabStatus === 'Mout' ? 'destructive' : 'secondary')} className="text-[9px] font-black uppercase px-2 h-5">
                             {crabAndLobster.crabStatus}
                         </Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{crabAndLobster.crabMessage}</p>
+                    <p className="text-[10px] text-muted-foreground font-medium leading-tight truncate">{crabAndLobster.crabMessage}</p>
                 </div>
             </div>
-            <div className="p-3 bg-muted/20 border rounded-xl flex items-start gap-3">
-                <div className={cn("p-2 rounded-lg shrink-0", crabAndLobster.lobsterActivity === 'Élevée' ? 'bg-blue-500/10' : 'bg-muted')}>
-                    <LobsterIcon className={cn("size-5", crabAndLobster.lobsterActivity === 'Élevée' ? 'text-blue-600' : 'text-muted-foreground')} />
+            <div className="p-4 bg-white border-2 rounded-2xl flex items-center gap-4 shadow-sm">
+                <div className={cn("size-12 rounded-xl flex items-center justify-center shrink-0 border", crabAndLobster.lobsterActivity === 'Élevée' ? 'bg-blue-50 border-blue-100 text-blue-600' : 'bg-slate-50 border-slate-100 text-slate-400')}>
+                    <LobsterIcon className="size-6" />
                 </div>
-                <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold">Langouste</span>
-                        <Badge variant={crabAndLobster.lobsterActivity === 'Élevée' ? 'default' : 'secondary'} className="text-[9px] h-4">
+                <div className="flex-grow min-w-0">
+                    <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-sm font-black uppercase tracking-tighter">Langouste</span>
+                        <Badge variant={crabAndLobster.lobsterActivity === 'Élevée' ? 'default' : 'secondary'} className="text-[9px] font-black uppercase px-2 h-5">
                             {crabAndLobster.lobsterActivity}
                         </Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{crabAndLobster.lobsterMessage}</p>
-                </div>
-            </div>
-            <div className="p-3 bg-muted/20 border rounded-xl flex items-start gap-3">
-                <div className={cn("p-2 rounded-lg shrink-0", crabAndLobster.octopusActivity === 'Élevée' ? 'bg-purple-500/10' : 'bg-muted')}>
-                    <OctopusIcon className={cn("size-5", crabAndLobster.octopusActivity === 'Élevée' ? 'text-purple-600' : 'text-muted-foreground')} />
-                </div>
-                <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold">Poulpe (Ourite)</span>
-                        <Badge variant={crabAndLobster.octopusActivity === 'Élevée' ? 'default' : 'secondary'} className="text-[9px] h-4">
-                            {crabAndLobster.octopusActivity}
-                        </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{crabAndLobster.octopusMessage}</p>
+                    <p className="text-[10px] text-muted-foreground font-medium leading-tight truncate">{crabAndLobster.lobsterMessage}</p>
                 </div>
             </div>
         </div>
       </div>
 
+      {/* ESPÈCES PAR CRÉNEAU */}
       <div className="space-y-4">
-        <h3 className="text-xs font-black uppercase tracking-widest text-primary flex items-center gap-2">
+        <h3 className="text-[11px] font-black uppercase tracking-widest text-blue-800/60 flex items-center gap-2 px-1">
             <Fish className="size-4" /> Prévisions par Espèces
         </h3>
         {fishing.map((slot, i) => (
           <div key={i} className="space-y-2">
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 flex items-center gap-2">
+            <p className="text-[10px] font-black uppercase tracking-widest text-primary/60 flex items-center gap-2 ml-1">
                 <Clock className="size-3" /> {slot.timeOfDay}
             </p>
             <div className="space-y-2">
               {slot.fish.filter(f => f.rating >= 8).map((f, fi) => (
-                <div key={fi} className="p-3 border rounded-lg bg-card shadow-sm space-y-2">
-                  <div className="flex justify-between items-center">
+                <div key={fi} className="p-4 bg-white border-2 rounded-2xl shadow-sm space-y-3">
+                  <div className="flex justify-between items-start">
                     <div className="flex items-center gap-3">
-                        <div className="size-8 rounded-full bg-primary/5 flex items-center justify-center">
-                            <Fish className="size-4 text-primary" />
+                        <div className="size-10 rounded-xl bg-primary/5 flex items-center justify-center border border-primary/10">
+                            <Fish className="size-5 text-primary" />
                         </div>
                         <div className="flex flex-col">
-                            <span className="font-bold text-sm">{f.name}</span>
-                            {f.location && <span className="text-[9px] font-black uppercase text-muted-foreground">{f.location}</span>}
+                            <span className="font-black text-sm uppercase tracking-tight leading-none">{f.name}</span>
+                            {f.location && <span className="text-[9px] font-black uppercase text-muted-foreground/60 mt-1">{f.location}</span>}
                         </div>
                     </div>
-                    <div className="flex flex-col items-end">
+                    <div className="flex flex-col items-end gap-1">
                         <RatingStars rating={f.rating} />
-                        <span className="text-[9px] font-black opacity-60 mt-0.5">{f.rating}/10</span>
+                        <span className="text-[10px] font-black opacity-40 tabular-nums">{f.rating}/10</span>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 gap-1.5 pt-2 border-t border-border/50 text-[11px] text-muted-foreground">
-                    <p><span className="font-black uppercase text-[9px] text-foreground/70 mr-1">Activité:</span> {f.advice.activity}</p>
-                    <p><span className="font-black uppercase text-[9px] text-foreground/70 mr-1">Profondeur:</span> <span className="text-primary font-bold">{f.advice.depth}</span></p>
-                    <p><span className="font-black uppercase text-[9px] text-foreground/70 mr-1">Spot:</span> {f.advice.location_specific}</p>
+                  <div className="grid grid-cols-1 gap-2 pt-2 border-t border-dashed border-slate-100 text-[11px] text-muted-foreground">
+                    <p className="leading-relaxed"><span className="font-black uppercase text-[9px] text-slate-800 mr-1.5">Activité:</span> {f.advice.activity}</p>
+                    <p className="leading-relaxed"><span className="font-black uppercase text-[9px] text-slate-800 mr-1.5">Profondeur:</span> <span className="text-primary font-bold">{f.advice.depth}</span></p>
+                    <p className="leading-relaxed"><span className="font-black uppercase text-[9px] text-slate-800 mr-1.5">Spot:</span> {f.advice.location_specific}</p>
                   </div>
                 </div>
               ))}
               {slot.fish.filter(f => f.rating >= 8).length === 0 && (
-                <p className="text-[10px] italic text-muted-foreground pl-2">Aucune activité majeure.</p>
+                <p className="text-[10px] italic text-muted-foreground pl-4">Aucune activité majeure prévue.</p>
               )}
             </div>
           </div>
