@@ -17,7 +17,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { LocationData, FishingSpot, SwellForecast } from '@/lib/types';
 import { getDataForDate } from '@/lib/data';
-import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown, Pencil } from 'lucide-react';
+import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown, Pencil, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from './alert';
 import { useLocation } from '@/context/location-context';
@@ -79,7 +79,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     const [openSpotId, setOpenSpotId] = useState<string | undefined>(undefined);
     const spotRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-    // State for the new unified dialog
+    // State for the unified dialog
     const [isSpotDialogOpen, setIsSpotDialogOpen] = useState(false);
     const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
     const [spotToEdit, setSpotToEdit] = useState<FishingSpot | null>(null);
@@ -240,7 +240,6 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
 
         const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
-        // Find the bracketing tides
         const prevTide = combinedTides.filter(t => t.timeMinutes <= nowMinutes).pop();
         const nextTide = combinedTides.find(t => t.timeMinutes > nowMinutes);
 
@@ -354,7 +353,6 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     const handleEditClick = (spot: FishingSpot) => {
         setDialogMode('edit');
         setSpotToEdit(spot);
-        // Pre-fill form state
         setSpotName(spot.name);
         setSpotNotes(spot.notes || '');
         setSelectedIcon(spot.icon as keyof typeof mapIcons);
