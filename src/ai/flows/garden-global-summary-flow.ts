@@ -1,7 +1,7 @@
 'use server';
 /**
  * @fileOverview AI flow for generating a global daily summary for the user's entire garden.
- * This flow is now strictly constrained to the user's inventory.
+ * This flow is now strictly constrained to the user's inventory and uses real plant names.
  */
 
 import { ai } from '@/ai/genkit';
@@ -30,15 +30,15 @@ const GardenGlobalSummaryOutputSchema = z.object({
   globalPlan: z.string().describe("Concise global action plan for today."),
   wateringGroups: z.array(z.object({
     type: z.string().describe("Type of watering (e.g., 'Abondant', 'Léger')."),
-    plantNames: z.array(z.string()),
+    plantNames: z.array(z.string()).describe("List of ACTUAL plant names from the inventory."),
   })),
   maintenanceAlerts: z.array(z.object({
     priority: z.enum(['Haute', 'Moyenne', 'Basse']),
-    action: z.string(),
-    reason: z.string(),
+    action: z.string().describe("Specific action including the plant name."),
+    reason: z.string().describe("Why this action is needed today."),
   })),
   milestones: z.array(z.object({
-    plantName: z.string(),
+    plantName: z.string().describe("Actual name of the plant."),
     event: z.string().describe("Upcoming flowering, harvest or specific phase."),
   })),
 });
@@ -49,7 +49,7 @@ export async function getGardenGlobalSummary(input: GardenGlobalSummaryInput): P
     prompt: `Tu es le Maître Jardinier de Nouvelle-Calédonie. Analyse l'ensemble de ce jardin pour aujourd'hui.
     
 IMPORTANT : Ta mission est de conseiller l'utilisateur UNIQUEMENT sur les plantes listées dans son inventaire ci-dessous. 
-Ne suggère jamais de plantes qui ne sont pas dans cette liste.
+Tu dois utiliser les NOMS RÉELS des plantes fournis par l'utilisateur (ex: "Citronnier Galet", "Pamplemoussier") et JAMAIS de termes génériques comme "Plante 1".
 
 CONTEXTE :
 - Lieu : {{{location}}}
@@ -57,16 +57,16 @@ CONTEXTE :
 - Météo : {{{weather.temp}}}°C, Pluie : {{{weather.rain}}}
 - Lune : {{{lunarContext.phase}}} (Signe : {{{lunarContext.zodiac}}})
 
-INVENTAIRE RÉEL DU JARDIN (CONSEILS UNIQUEMENT POUR CES PLANTES) :
+INVENTAIRE RÉEL DU JARDIN (UTILISE CES NOMS EXACTS) :
 {{#each plants}}
 - {{{name}}} ({{{category}}})
 {{/each}}
 
 TA MISSION :
 1. Rédige un PLAN GLOBAL très concis pour la journée qui synthétise les priorités pour cet inventaire précis.
-2. GROUPE les plantes de l'inventaire par besoin d'arrosage aujourd'hui.
+2. GROUPE les plantes de l'inventaire par besoin d'arrosage aujourd'hui (utilise les vrais noms).
 3. IDENTIFIE les alertes de maintenance (Taille car lune descendante, ou Engrais car floraison proche) pour les plantes de l'inventaire.
-4. SOIS PRÉCIS sur le "Pourquoi" (ex: "Mettre de l'engrais sur le {{{plants.0.name}}} pour booster la floraison car nous sommes en saison").
+4. SOIS PRÉCIS sur le "Pourquoi" en citant le nom de la plante (ex: "Mettre de l'engrais sur le Citronnier pour booster la floraison car nous sommes en saison").
 
 Réponds au format JSON uniquement.`,
     input: { schema: GardenGlobalSummaryInputSchema, data: input },
