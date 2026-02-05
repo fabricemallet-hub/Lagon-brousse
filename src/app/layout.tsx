@@ -1,4 +1,3 @@
-
 'use client';
 
 import { AppShell } from '@/components/app-shell';
@@ -59,7 +58,8 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap"
           rel="stylesheet"
         />
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
+        {/* Suppression de maximum-scale=1 et user-scalable=0 pour autoriser le zoom */}
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/icon-192x192.png" />
         <link rel="apple-touch-icon" href="/icon-192x192.png" />
         <link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />
