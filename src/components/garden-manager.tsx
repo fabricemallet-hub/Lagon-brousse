@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
 import { format } from 'date-fns';
@@ -23,20 +22,47 @@ import {
   Scissors, 
   Zap, 
   Plus, 
-  Calendar as CalendarIcon,
-  Info,
   Sparkles,
-  ChevronDown,
-  ChevronUp
+  RefreshCw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getPersonalizedGardenAdvice } from '@/ai/flows/garden-advice-flow';
+import { getGardenSuggestions } from '@/ai/flows/garden-suggestions-flow';
 import type { GardenAdviceOutput } from '@/ai/flows/garden-advice-flow';
 import type { LocationData, GardenPlant } from '@/lib/types';
 import { useLocation } from '@/context/location-context';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 const CATEGORIES = ["Arbre Fruitier", "Potager", "Fleur", "Aromatique", "Autre"] as const;
+
+const COMMON_PLANTS = [
+  { name: "Citronnier", category: "Arbre Fruitier" },
+  { name: "Manguier", category: "Arbre Fruitier" },
+  { name: "Avocatier", category: "Arbre Fruitier" },
+  { name: "Mandarinier", category: "Arbre Fruitier" },
+  { name: "Papayer", category: "Arbre Fruitier" },
+  { name: "Bananier", category: "Arbre Fruitier" },
+  { name: "Cocotier", category: "Arbre Fruitier" },
+  { name: "Letchi", category: "Arbre Fruitier" },
+  { name: "Goyavier", category: "Arbre Fruitier" },
+  { name: "Hibiscus", category: "Fleur" },
+  { name: "Bougainvillier", category: "Fleur" },
+  { name: "Frangipanier", category: "Fleur" },
+  { name: "Jasmin", category: "Fleur" },
+  { name: "Tiare", category: "Fleur" },
+  { name: "Rose du désert", category: "Fleur" },
+  { name: "Tomate", category: "Potager" },
+  { name: "Piment", category: "Potager" },
+  { name: "Salade", category: "Potager" },
+  { name: "Manioc", category: "Potager" },
+  { name: "Igname", category: "Potager" },
+  { name: "Taro", category: "Potager" },
+  { name: "Patate douce", category: "Potager" },
+  { name: "Basilic", category: "Aromatique" },
+  { name: "Menthe", category: "Aromatique" },
+  { name: "Persil", category: "Aromatique" },
+  { name: "Ciboulette", category: "Aromatique" },
+];
 
 export function GardenManager({ locationData }: { locationData: LocationData }) {
   const { user } = useUser();
@@ -48,9 +74,19 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
   const [plantName, setPlantName] = useState('');
   const [category, setCategory] = useState<typeof CATEGORIES[number] | "">("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<{name: string, category: string}[]>([]);
   
   const [adviceCache, setAdviceCache] = useState<Record<string, GardenAdviceOutput>>({});
   const [loadingAdvice, setLoadingAdvice] = useState<Record<string, boolean>>({});
+
+  // Auto-select category if plant is in common list
+  useEffect(() => {
+    const found = COMMON_PLANTS.find(p => p.name.toLowerCase() === plantName.toLowerCase());
+    if (found) {
+      setCategory(found.category as any);
+    }
+  }, [plantName]);
 
   const plantsRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -58,6 +94,27 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
   }, [user, firestore]);
 
   const { data: plants, isLoading: arePlantsLoading } = useCollection<GardenPlant>(plantsRef);
+
+  const handleAiSuggest = async () => {
+    setIsSuggesting(true);
+    try {
+      const month = format(new Date(), 'MMMM', { locale: fr });
+      const suggestions = await getGardenSuggestions(month);
+      setAiSuggestions(suggestions);
+      toast({ title: "Suggestions générées" });
+    } catch (error) {
+      console.error(error);
+      toast({ variant: 'destructive', title: "Erreur IA" });
+    } finally {
+      setIsSuggesting(false);
+    }
+  };
+
+  const handleSelectSuggestion = (s: {name: string, category: string}) => {
+    setPlantName(s.name);
+    setCategory(s.category as any);
+    setAiSuggestions([]);
+  };
 
   const handleAddPlant = async () => {
     if (!user || !firestore || !plantName || !category) return;
@@ -72,6 +129,7 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
       toast({ title: 'Plante ajoutée !' });
       setPlantName('');
       setCategory("");
+      setAiSuggestions([]);
       setIsAdding(false);
     } catch (e) {
       toast({ variant: 'destructive', title: 'Erreur' });
@@ -134,9 +192,51 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
           <CardContent className="p-4 pt-0 space-y-4 animate-in fade-in slide-in-from-top-2">
             <div className="grid gap-3">
               <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase opacity-60">Nom de la plante / arbre</Label>
-                <Input placeholder="Ex: Citronnier, Hibiscus..." value={plantName} onChange={e => setPlantName(e.target.value)} className="h-10 border-2" />
+                <Label className="text-[10px] font-black uppercase opacity-60">Saisir le nom de la plante</Label>
+                <div className="flex gap-2">
+                  <Input 
+                    placeholder="Ex: Citronnier, Hibiscus..." 
+                    value={plantName} 
+                    onChange={e => setPlantName(e.target.value)} 
+                    className="h-10 border-2" 
+                    list="nc-garden-plants"
+                  />
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    className="h-10 w-10 shrink-0 border-2" 
+                    onClick={handleAiSuggest}
+                    disabled={isSuggesting}
+                    title="Suggestions IA"
+                  >
+                    <BrainCircuit className={cn("size-4", isSuggesting && "animate-pulse")} />
+                  </Button>
+                </div>
+                <datalist id="nc-garden-plants">
+                  {COMMON_PLANTS.map(p => <option key={p.name} value={p.name} />)}
+                </datalist>
               </div>
+
+              {aiSuggestions.length > 0 && (
+                <div className="space-y-2 p-3 bg-white border-2 rounded-xl animate-in zoom-in-95">
+                  <p className="text-[9px] font-black uppercase text-primary flex items-center gap-1">
+                    <Sparkles className="size-3" /> Suggestions pour {format(new Date(), 'MMMM', { locale: fr })} :
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {aiSuggestions.map((s, idx) => (
+                      <Badge 
+                        key={idx} 
+                        variant="secondary" 
+                        className="cursor-pointer hover:bg-primary hover:text-white transition-colors py-1 px-2 text-[10px] font-bold uppercase"
+                        onClick={() => handleSelectSuggestion(s)}
+                      >
+                        {s.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-1">
                 <Label className="text-[10px] font-black uppercase opacity-60">Catégorie</Label>
                 <Select value={category} onValueChange={(v: any) => setCategory(v)}>
@@ -186,7 +286,6 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
                           </div>
                         ) : adviceCache[plant.id] ? (
                           <div className="space-y-6 animate-in fade-in">
-                            {/* Arrosage */}
                             <div className="flex gap-4 p-4 bg-blue-50 border-2 border-blue-100 rounded-2xl">
                               <div className="p-2 bg-blue-600 text-white rounded-xl h-fit shadow-md"><Droplets className="size-5" /></div>
                               <div className="space-y-1">
@@ -196,7 +295,6 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
                               </div>
                             </div>
 
-                            {/* Taille & Entretien */}
                             <div className="space-y-3">
                               <h5 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
                                 <Scissors className="size-3 text-orange-500" /> Guide de Taille & Entretien
@@ -223,7 +321,6 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
                               </div>
                             </div>
 
-                            {/* Rendement & Milestones */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <div className="p-4 bg-indigo-50 border-2 border-indigo-100 rounded-2xl space-y-2">
                                 <div className="flex items-center gap-2 text-indigo-800"><Sparkles className="size-4" /><span className="text-[9px] font-black uppercase">Rendement NC</span></div>
