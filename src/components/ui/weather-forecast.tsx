@@ -97,6 +97,9 @@ export function WeatherForecast({
   const [isClient, setIsClient] = useState(false);
   const [now, setNow] = useState(new Date());
   const scrollRef = useRef<HTMLDivElement>(null);
+  
+  // Ref pour ne centrer qu'une seule fois par heure pour éviter de bloquer le défilement manuel
+  const hasCenteredForHour = useRef<number | null>(null);
 
   useEffect(() => {
     setIsClient(true);
@@ -161,16 +164,21 @@ export function WeatherForecast({
 
   useEffect(() => {
     if (isClient && isToday && scrollRef.current) {
-        // Utilisation de container.scrollTo pour un défilement horizontal local sans affecter la page entière
-        const container = scrollRef.current;
-        const element = container.querySelector(`[data-hour="${currentHour}"]`) as HTMLElement;
-        if (element) {
-            const scrollLeft = element.offsetLeft - (container.clientWidth / 2) + (element.clientWidth / 2);
-            container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+        // On ne recentre que si l'heure a réellement changé depuis le dernier centrage
+        if (hasCenteredForHour.current !== currentHour) {
+            const container = scrollRef.current;
+            const element = container.querySelector(`[data-hour="${currentHour}"]`) as HTMLElement;
+            if (element) {
+                const scrollLeft = element.offsetLeft - (container.clientWidth / 2) + (element.clientWidth / 2);
+                container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+                hasCenteredForHour.current = currentHour;
+            }
         }
+    } else if (!isToday) {
+        // On réinitialise si on quitte la vue "Aujourd'hui" pour pouvoir recentrer au retour
+        hasCenteredForHour.current = null;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isClient, isToday, currentHour]); // Se déclenche uniquement au changement d'heure réelle
+  }, [isClient, isToday, currentHour]);
 
   if (!isClient || !selectedForecast) {
     return <Skeleton className="h-96 w-full rounded-lg" />;
