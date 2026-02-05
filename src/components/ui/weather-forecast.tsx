@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -170,12 +169,15 @@ export function WeatherForecast({
             const element = container.querySelector(`[data-hour="${currentHour}"]`) as HTMLElement;
             if (element) {
                 const scrollLeft = element.offsetLeft - (container.clientWidth / 2) + (element.clientWidth / 2);
-                container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+                // On utilise behavior 'auto' pour le premier centrage pour éviter une animation parasite
+                container.scrollTo({ 
+                  left: scrollLeft, 
+                  behavior: hasCenteredForHour.current === null ? 'auto' : 'smooth' 
+                });
                 hasCenteredForHour.current = currentHour;
             }
         }
     } else if (!isToday) {
-        // On réinitialise si on quitte la vue "Aujourd'hui" pour pouvoir recentrer au retour
         hasCenteredForHour.current = null;
     }
   }, [isClient, isToday, currentHour]);
