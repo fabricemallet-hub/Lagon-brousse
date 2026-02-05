@@ -69,6 +69,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
     const [initialZoomDone, setInitialZoomDone] = useState(false);
     const watchId = useRef<number | null>(null);
+    const mapContainerRef = useRef<HTMLDivElement>(null);
 
     const { selectedLocation } = useLocation();
     const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -466,7 +467,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                 {loadError && <Alert variant="destructive"><AlertTitle>Erreur de chargement de la carte</AlertTitle></Alert>}
                 {!isLoaded && <Skeleton className="h-80 w-full" />}
                 {isLoaded && (
-                    <div className={cn("relative w-full rounded-lg overflow-hidden border", isFullscreen ? "flex-grow" : "h-80")}>
+                    <div ref={mapContainerRef} className={cn("relative w-full rounded-lg overflow-hidden border", isFullscreen ? "flex-grow" : "h-80")}>
                         <GoogleMap
                             mapContainerClassName="w-full h-full"
                             center={userLocation || { lat: -21.5, lng: 165.5 }}
@@ -738,7 +739,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                    if (map && spot.location) {
                                                        map.panTo({ lat: spot.location.latitude, lng: spot.location.longitude });
                                                        map.setZoom(16);
-                                                       window.scrollTo({ top: 0, behavior: 'smooth' });
+                                                       mapContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                                    }
                                                }}>
                                                    <LocateFixed className="mr-2 size-4 text-primary" /> GPS
@@ -775,7 +776,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                 <div className="flex flex-col items-center justify-center py-10 space-y-4">
                                     <BrainCircuit className="size-12 text-primary animate-pulse" />
                                     <p className="text-xs font-bold uppercase text-muted-foreground animate-pulse">Analyse en cours...</p>
-                                    <Skeleton className="h-2 w-full" />
+                                    <Skeleton className="h-2 -full" />
                                 </div>
                             )}
                             {analysisResult && (
