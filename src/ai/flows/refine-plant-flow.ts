@@ -29,7 +29,8 @@ const refinePlantPrompt = ai.definePrompt({
     L'utilisateur a saisi le nom suivant pour son jardin : "{{query}}".
     
     TA MISSION :
-    1. CORRECTION : Si le mot est mal orthographié, corrige-le (ex: "citronier" -> "Citronnier", "mangu" -> "Manguier", "hibiscu" -> "Hibiscus").
+    1. CORRECTION : Si le mot est mal orthographié, corrige-le (ex: "citronier" -> "Citronnier"). 
+       IMPORTANT : Si l'utilisateur saisit le nom d'un fruit (ex: "Mangue", "Citron", "Litchi", "Goyave", "Avocat"), convertis-le systématiquement en nom d'arbre fruitier (ex: "Manguier", "Citronnier", "Litchi", "Goyavier", "Avocatier") dans le champ 'correctedName'.
     2. CONSERVATION DE L'ESPÈCE (CRITIQUE) : Tu ne dois JAMAIS changer le type de végétal. Si l'utilisateur saisit un agrume, reste sur un agrume. Ne propose jamais "Tomate" si l'utilisateur a écrit "Citronnier". 
     3. CATÉGORISATION : Détermine sa catégorie parmi : "Arbre Fruitier", "Potager", "Fleur", "Aromatique", "Autre".
     4. VARIÉTÉS NC : Propose une liste de 4 à 6 variétés ou types spécifiques qui sont LES PLUS COURANTS, POPULAIRES ET RÉUSSIS EN NOUVELLE-CALÉDONIE pour ce végétal précis.

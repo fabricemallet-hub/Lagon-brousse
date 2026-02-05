@@ -109,7 +109,12 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
     setCorrectedName(null);
     try {
       const result = await refinePlantInput({ query: plantName });
-      setCorrectedName(result.correctedName);
+      
+      // On ne propose la correction que si elle est différente de la saisie
+      if (result.correctedName.toLowerCase() !== plantName.toLowerCase()) {
+        setCorrectedName(result.correctedName);
+      }
+      
       setCategory(result.category);
       setAiSuggestions(result.varieties);
       toast({ title: "Analyse terminée" });
@@ -125,6 +130,13 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
     setPlantName(name);
     setAiSuggestions([]);
     setCorrectedName(null);
+  };
+
+  const handleApplyCorrection = () => {
+    if (correctedName) {
+      setPlantName(correctedName);
+      setCorrectedName(null);
+    }
   };
 
   const handleAddPlant = async () => {
@@ -230,7 +242,12 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
                     <p className="text-[9px] font-black uppercase text-blue-600">Correction suggérée :</p>
                     <p className="text-sm font-black">{correctedName}</p>
                   </div>
-                  <Button size="sm" variant="outline" className="h-8 text-[10px] font-black uppercase border-blue-200" onClick={() => setPlantName(correctedName)}>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="h-8 text-[10px] font-black uppercase border-blue-200" 
+                    onClick={handleApplyCorrection}
+                  >
                     <Check className="size-3 mr-1" /> Appliquer
                   </Button>
                 </div>
@@ -239,7 +256,7 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
               {aiSuggestions.length > 0 && (
                 <div className="space-y-2 p-4 bg-white border-2 rounded-2xl animate-in slide-in-from-right-2">
                   <p className="text-[10px] font-black uppercase text-primary flex items-center gap-2">
-                    <Sparkles className="size-3" /> {correctedName ? "Variétés conseillées (NC) :" : "Suggestions du moment :"}
+                    <Sparkles className="size-3" /> {correctedName || plantName ? "Variétés conseillées (NC) :" : "Suggestions du moment :"}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {aiSuggestions.map((name, idx) => (
