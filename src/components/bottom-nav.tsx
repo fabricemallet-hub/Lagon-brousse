@@ -24,8 +24,8 @@ export function BottomNav() {
 
   // Mobile navigation filters
   const visibleLinks = navLinks.filter(link => {
-    // List of 5 main tabs for mobile
-    const mobileTabs = ['/', '/lagon', '/peche', '/chasse', '/champs'];
+    // List of main tabs for mobile - adjusted to include Vessel Tracker and remove Lagon
+    const mobileTabs = ['/', '/peche', '/vessel-tracker', '/chasse', '/champs'];
     return mobileTabs.includes(link.href);
   });
 
