@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useUser as useUserHook, useFirestore, useDoc, useCollection, useMemoFirebase } from '@/firebase';
-import { doc, setDoc, serverTimestamp, collection, query, orderBy, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, query, orderBy, updateDoc, deleteDoc, writeBatch, getDocs, addDoc } from 'firebase/firestore';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -87,10 +87,12 @@ import { fr } from 'date-fns/locale';
 const IMMOBILITY_THRESHOLD_METERS = 20; 
 const IMMOBILITY_START_SECONDS = 30;    
 const THROTTLE_UPDATE_MS = 10000;       
+const HISTORY_DEBOUNCE_MS = 60000; // 1 minute de temporisation pour l'historique
 
 interface StatusEvent {
+  id?: string;
   status: 'moving' | 'stationary' | 'offline';
-  timestamp: number;
+  timestamp: any; // Firestore timestamp
   location: { lat: number, lng: number } | null;
 }
 
@@ -128,7 +130,7 @@ const PREDEFINED_MESSAGES = [
     category: "3. PANNE ET ASSISTANCE (SÉCURITÉ)",
     urgency: "medium",
     color: "text-amber-600",
-    btnBorder: "border-amber-200",
+    btnBorder: "border-orange-200",
     btnHover: "hover:bg-amber-50",
     messages: [
       { id: 'panne', label: "PANNE MOTEUR", text: "PAN PAN - Panne moteur totale. Navire à la dérive vers la côte/les rochers. Demande de remorquage." },
@@ -173,7 +175,6 @@ export function VesselTracker() {
   const [customSharingId, setCustomSharingId] = useState('');
   const [vesselNickname, setVesselNickname] = useState('');
   const [vesselHistory, setVesselHistory] = useState<string[]>([]);
-  const [statusEvents, setStatusEvents] = useState<StatusEvent[]>([]);
   const [customSmsMessage, setCustomSmsMessage] = useState('');
   const [isQuickMsgOpen, setIsQuickMsgOpen] = useState(false);
   const [isSmsConfirmOpen, setIsSmsConfirmOpen] = useState(false);
@@ -205,7 +206,12 @@ export function VesselTracker() {
   const watchIdRef = useRef<number | null>(null);
   const lastFirestoreUpdateRef = useRef<number>(0);
   const statusCheckTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const historyDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
+  const activeVesselId = useMemo(() => mode === 'sender' ? sharingId : vesselIdToFollow.trim().toUpperCase(), [mode, sharingId, vesselIdToFollow]);
+
+  // Sound Library from Firestore
   const soundsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
@@ -231,14 +237,18 @@ export function VesselTracker() {
   }, [user, firestore]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
-  const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
-
   const vesselRef = useMemoFirebase(() => {
-    const cleanId = vesselIdToFollow.trim().toUpperCase();
-    if (!firestore || mode !== 'receiver' || !cleanId) return null;
-    return doc(firestore, 'vessels', cleanId);
-  }, [firestore, mode, vesselIdToFollow]);
+    if (!firestore || !activeVesselId) return null;
+    return doc(firestore, 'vessels', activeVesselId);
+  }, [firestore, activeVesselId]);
   const { data: remoteVessel } = useDoc<VesselStatus>(vesselRef);
+
+  // History Collection (Shared between Emitter and Receiver)
+  const historyQuery = useMemoFirebase(() => {
+    if (!firestore || !activeVesselId) return null;
+    return query(collection(firestore, 'vessels', activeVesselId, 'history'), orderBy('timestamp', 'desc'));
+  }, [firestore, activeVesselId]);
+  const { data: remoteHistory } = useCollection<StatusEvent>(historyQuery);
 
   const currentEffectiveStatus = useMemo(() => {
     if (mode === 'sender') {
@@ -370,35 +380,37 @@ export function VesselTracker() {
     }
   }, [vesselVolume, availableSounds]);
 
-  useEffect(() => {
-    if (!statusStartTime) return;
-    const interval = setInterval(() => {
-      const diff = Math.floor((Date.now() - statusStartTime) / 1000);
-      const h = Math.floor(diff / 3600);
-      const m = Math.floor((diff % 3600) / 60);
-      const s = diff % 60;
-      if (h > 0) setElapsedString(`${h}h ${m}m`);
-      else if (m > 0) setElapsedString(`${m}m ${s}s`);
-      else setElapsedString(`${s}s`);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [statusStartTime]);
-
+  // --- LOGIQUE DE TEMPORISATION DE L'HISTORIQUE ---
   useEffect(() => {
     if (currentEffectiveStatus !== prevVesselStatusRef.current) {
       const now = Date.now();
       const loc = mode === 'sender' ? currentPos : (remoteVessel?.location ? { lat: remoteVessel.location.latitude, lng: remoteVessel.location.longitude } : lastValidLocation);
       
-      const newEvent: StatusEvent = {
-        status: currentEffectiveStatus as any,
-        timestamp: now,
-        location: loc
-      };
-      
-      setStatusEvents(prev => [newEvent, ...prev].slice(0, 10)); 
       setStatusStartTime(now);
       
+      // On lance le chrono de temporisation (1 min) pour l'écriture en DB
+      if (historyDebounceTimerRef.current) clearTimeout(historyDebounceTimerRef.current);
+      
       if (prevVesselStatusRef.current !== null) {
+        const targetStatus = currentEffectiveStatus as any;
+        
+        historyDebounceTimerRef.current = setTimeout(async () => {
+          if (!firestore || !activeVesselId) return;
+          
+          // On n'écrit que si l'état est stable depuis 1 min
+          try {
+            const historyRef = collection(firestore, 'vessels', activeVesselId, 'history');
+            await addDoc(historyRef, {
+              status: targetStatus,
+              timestamp: serverTimestamp(),
+              location: loc
+            });
+          } catch (e) {
+            console.error("Error writing to history:", e);
+          }
+        }, HISTORY_DEBOUNCE_MS);
+
+        // Alertes immédiates dans l'UI (Toasts & Sons)
         const statusLabels = { moving: 'En route', stationary: 'Immobile', offline: 'Perte réseau' };
         toast({
           title: "Changement d'état",
@@ -416,7 +428,21 @@ export function VesselTracker() {
       
       prevVesselStatusRef.current = currentEffectiveStatus;
     }
-  }, [currentEffectiveStatus, mode, currentPos, remoteVessel, lastValidLocation, isNotifyEnabled, notifySettings, notifySounds, playAlertSound, toast]);
+  }, [currentEffectiveStatus, mode, currentPos, remoteVessel, lastValidLocation, isNotifyEnabled, notifySettings, notifySounds, playAlertSound, toast, firestore, activeVesselId]);
+
+  useEffect(() => {
+    if (!statusStartTime) return;
+    const interval = setInterval(() => {
+      const diff = Math.floor((Date.now() - statusStartTime) / 1000);
+      const h = Math.floor(diff / 3600);
+      const m = Math.floor((diff % 3600) / 60);
+      const s = diff % 60;
+      if (h > 0) setElapsedString(`${h}h ${m}m`);
+      else if (m > 0) setElapsedString(`${m}m ${s}s`);
+      else setElapsedString(`${s}s`);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [statusStartTime]);
 
   const toggleWakeLock = async () => {
     if (!('wakeLock' in navigator)) return;
@@ -547,6 +573,20 @@ export function VesselTracker() {
     if (pos && map) { map.panTo(pos); map.setZoom(15); }
   };
 
+  const handleResetHistory = async () => {
+    if (!firestore || !activeVesselId) return;
+    try {
+      const historyRef = collection(firestore, 'vessels', activeVesselId, 'history');
+      const snap = await getDocs(historyRef);
+      const batch = writeBatch(firestore);
+      snap.docs.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+      toast({ title: "Historique réinitialisé" });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Erreur" });
+    }
+  };
+
   const copyCoordinates = (lat: number, lng: number) => {
     navigator.clipboard.writeText(`${lat.toFixed(6)},${lng.toFixed(6)}`);
     toast({ title: "Copié" });
@@ -580,7 +620,7 @@ export function VesselTracker() {
     return 'HORS LIGNE';
   }, [currentEffectiveStatus]);
 
-  const statusEventsToShow = useMemo(() => statusEvents.slice(0, 5), [statusEvents]);
+  const historyToShow = useMemo(() => remoteHistory?.slice(0, 5) || [], [remoteHistory]);
 
   const handleSelectPredefinedMessage = (text: string) => {
     setCustomSmsMessage(text);
@@ -875,38 +915,50 @@ export function VesselTracker() {
                 )}
             </div>
 
-            {statusEventsToShow.length > 0 && (
-              <div className="mt-2 space-y-2">
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
+            <div className="mt-2 space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                   <History className="size-3" /> Historique des changements d'état
                 </h4>
-                <div className="space-y-2">
-                  {statusEventsToShow.map((event, idx) => {
-                    const label = event.status === 'moving' ? 'MOUVEMENT' : event.status === 'stationary' ? 'MOUILLAGE' : 'SIGNAL PERDU';
-                    const color = event.status === 'moving' ? 'text-green-600 border-green-100' : event.status === 'stationary' ? 'text-amber-600 border-amber-100' : 'text-red-600 border-red-100';
-                    return (
-                      <div key={idx} className={cn("flex items-center justify-between p-3 border-2 rounded-xl bg-white shadow-sm text-[11px] animate-in fade-in slide-in-from-left-2", color)}>
-                        <div className="flex items-center gap-4">
-                          <span className="font-black tabular-nums opacity-40">{format(event.timestamp, 'HH:mm:ss')}</span>
-                          <span className="font-black uppercase tracking-tight">{label}</span>
-                        </div>
-                        {event.location && (
-                          <button 
-                            className="flex items-center gap-1.5 text-primary/80 hover:text-primary font-black uppercase text-[9px]"
-                            onClick={() => {
-                              const url = `https://www.google.com/maps?q=${event.location!.lat},${event.location!.lng}`;
-                              window.open(url, '_blank');
-                            }}
-                          >
-                            GPS <ExternalLink className="size-3" />
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                <Button variant="ghost" size="sm" onClick={handleResetHistory} className="h-6 px-2 text-[9px] font-black uppercase text-destructive hover:bg-destructive/10">
+                  Effacer
+                </Button>
               </div>
-            )}
+              <div className="space-y-2">
+                {historyToShow.length > 0 ? historyToShow.map((event, idx) => {
+                  const label = event.status === 'moving' ? 'MOUVEMENT' : event.status === 'stationary' ? 'MOUILLAGE' : 'SIGNAL PERDU';
+                  const color = event.status === 'moving' ? 'text-green-600 border-green-100' : event.status === 'stationary' ? 'text-amber-600 border-amber-100' : 'text-red-600 border-red-100';
+                  const eventTime = event.timestamp ? format(event.timestamp.toDate(), 'HH:mm:ss', { locale: fr }) : '--:--:--';
+                  
+                  return (
+                    <div key={idx} className={cn("flex items-center justify-between p-3 border-2 rounded-xl bg-white shadow-sm text-[11px] animate-in fade-in slide-in-from-left-2", color)}>
+                      <div className="flex items-center gap-4">
+                        <span className="font-black tabular-nums opacity-40">{eventTime}</span>
+                        <span className="font-black uppercase tracking-tight">{label}</span>
+                      </div>
+                      {event.location && (
+                        <button 
+                          className="flex items-center gap-1.5 text-primary/80 hover:text-primary font-black uppercase text-[9px]"
+                          onClick={() => {
+                            const url = `https://www.google.com/maps?q=${event.location!.lat},${event.location!.lng}`;
+                            window.open(url, '_blank');
+                          }}
+                        >
+                          GPS <ExternalLink className="size-3" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                }) : (
+                  <div className="text-center py-6 border-2 border-dashed rounded-xl opacity-30 italic text-[10px] uppercase font-bold">
+                    Aucun événement récent validé
+                  </div>
+                )}
+                <p className="text-[8px] italic text-muted-foreground text-center uppercase tracking-tighter opacity-60">
+                  Note : L'historique attend 1 min de stabilité avant d'enregistrer un état.
+                </p>
+              </div>
+            </div>
         </div>
         
         <CardFooter className="bg-muted/10 p-4 flex flex-col gap-4 border-t-2">
