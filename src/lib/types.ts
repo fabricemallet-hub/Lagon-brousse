@@ -3,7 +3,10 @@ export type WindDirection = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
 
 export interface WindForecast {
   time: string;
-  speed: number;
+  speed: number; // Primary/Lagon for compatibility
+  speedLagon: number;
+  speedLarge: number;
+  speedLand: number;
   direction: WindDirection;
   stability: 'Stable' | 'Tournant';
 }
@@ -52,6 +55,7 @@ export interface WeatherData {
   trend: 'Ensoleillé' | 'Nuageux' | 'Averses' | 'Pluvieux';
   uvIndex: number;
   temp: number;
+  uv?: number; // Real-time UV for MeteoLive fusion
   tempMin: number;
   tempMax: number;
   waterTemperature: number;
@@ -326,4 +330,13 @@ export interface SoundLibraryEntry {
   label: string;
   url: string;
   categories: string[];
+}
+
+export interface SystemNotification {
+  id: string;
+  title: string;
+  content: string;
+  type: 'info' | 'warning' | 'error' | 'success';
+  isActive: boolean;
+  createdAt: any;
 }

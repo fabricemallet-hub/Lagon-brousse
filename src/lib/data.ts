@@ -1,3 +1,4 @@
+
 import { LocationData, SwellForecast, Tide, WindDirection, WindForecast, HourlyForecast } from './types';
 import { locations } from './locations';
 
@@ -123,10 +124,10 @@ export const communeToTideStationMap: { [key: string]: string } = {
 const baseData: Omit<LocationData, 'tides' | 'tideStation' | 'tideThresholds'> = {
   weather: {
     wind: [
-      { time: '03:00', speed: 0, direction: 'N', stability: 'Stable' },
-      { time: '09:00', speed: 0, direction: 'N', stability: 'Stable' },
-      { time: '15:00', speed: 0, direction: 'N', stability: 'Stable' },
-      { time: '21:00', speed: 0, direction: 'N', stability: 'Stable' },
+      { time: '03:00', speed: 0, speedLagon: 0, speedLarge: 0, speedLand: 0, direction: 'N', stability: 'Stable' },
+      { time: '09:00', speed: 0, speedLagon: 0, speedLarge: 0, speedLand: 0, direction: 'N', stability: 'Stable' },
+      { time: '15:00', speed: 0, speedLagon: 0, speedLarge: 0, speedLand: 0, direction: 'N', stability: 'Stable' },
+      { time: '21:00', speed: 0, speedLagon: 0, speedLarge: 0, speedLand: 0, direction: 'N', stability: 'Stable' },
     ],
     swell: [],
     sun: { sunrise: '06:31', sunset: '17:45' },
@@ -310,7 +311,12 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   }
 
   locationData.weather.wind.forEach((forecast: WindForecast, index: number) => {
-    forecast.speed = Math.max(0, Math.round(8 + Math.sin(dateSeed * 0.2 + locationSeed + index) * 5));
+    const baseSpeed = 8 + Math.sin(dateSeed * 0.2 + locationSeed + index) * 5;
+    forecast.speedLagon = Math.max(0, Math.round(baseSpeed));
+    forecast.speedLarge = Math.max(0, Math.round(baseSpeed * 1.4)); // Plus fort au large
+    forecast.speedLand = Math.max(0, Math.round(baseSpeed * 0.7)); // Plus faible à terre
+    forecast.speed = forecast.speedLagon; // Pour compatibilité legacy
+
     const directions: WindDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
     forecast.direction = directions[Math.floor(((dateSeed / 5) + locationSeed + index * 2) % directions.length)];
     forecast.stability = (Math.sin(dateSeed + index) > 0) ? 'Stable' : 'Tournant';

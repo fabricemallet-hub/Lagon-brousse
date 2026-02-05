@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -98,7 +99,7 @@ export default function LagonPage() {
                       key={index} 
                       onClick={() => setSelectedTime(forecast.time)}
                       className={cn(
-                          "flex justify-between items-center py-3 px-4 border rounded-lg transition-all cursor-pointer",
+                          "flex justify-between items-center py-3 px-4 border rounded-lg transition-all cursor-pointer min-h-[80px]",
                           selectedTime === forecast.time ? "bg-primary text-primary-foreground border-primary scale-[1.02] shadow-md" : "bg-card hover:bg-muted/50"
                       )}
                     >
@@ -106,10 +107,23 @@ export default function LagonPage() {
                             <p className="font-black text-base leading-none">{forecast.time}</p>
                             <p className={cn("text-[9px] font-bold uppercase mt-1", selectedTime === forecast.time ? "text-white/80" : "text-muted-foreground")}>{forecast.stability}</p>
                         </div>
-                        <div className="text-right flex items-center gap-3">
-                            <div className="flex flex-col items-end">
-                                <p className="font-black text-xl leading-none">{forecast.speed} <span className="text-[10px]">nds</span></p>
-                                <p className={cn("text-[9px] font-bold uppercase mt-1", selectedTime === forecast.time ? "text-white/80" : "text-muted-foreground")}>{translateWindDirection(forecast.direction)}</p>
+                        <div className="text-right flex items-center gap-4">
+                            <div className="flex flex-col items-end gap-1 shrink-0">
+                                <div className="flex items-baseline gap-1.5 leading-none">
+                                    <span className={cn("text-[8px] font-black uppercase", selectedTime === forecast.time ? "text-white/60" : "text-muted-foreground")}>Terre</span>
+                                    <p className="font-black text-xs">{forecast.speedLand}<span className="text-[8px] ml-0.5">nds</span></p>
+                                </div>
+                                <div className={cn("flex items-baseline gap-1.5 leading-none border-y py-1 border-current/10")}>
+                                    <span className={cn("text-[8px] font-black uppercase", selectedTime === forecast.time ? "text-white/60" : "text-muted-foreground")}>Lagon</span>
+                                    <p className="font-black text-sm">{forecast.speedLagon}<span className="text-[8px] ml-0.5">nds</span></p>
+                                </div>
+                                <div className="flex items-baseline gap-1.5 leading-none">
+                                    <span className={cn("text-[8px] font-black uppercase", selectedTime === forecast.time ? "text-white/60" : "text-muted-foreground")}>Large</span>
+                                    <p className="font-black text-xs">{forecast.speedLarge}<span className="text-[8px] ml-0.5">nds</span></p>
+                                </div>
+                            </div>
+                            <div className="flex flex-col items-end border-l pl-3 border-current/10 min-w-[80px]">
+                                <p className={cn("text-[9px] font-bold uppercase", selectedTime === forecast.time ? "text-white/80" : "text-muted-foreground")}>{translateWindDirection(forecast.direction)}</p>
                             </div>
                         </div>
                     </div>
