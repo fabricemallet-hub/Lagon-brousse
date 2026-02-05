@@ -214,6 +214,7 @@ export function LunarCalendar() {
   const { selectedLocation } = useLocation();
   const [displayDate, setDisplayDate] = useState(startOfMonth(selectedDate));
   const [detailedDay, setDetailedDay] = useState<Date | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const handleDayClick = (day: Date) => { setSelectedDate(day); setDetailedDay(day); };
   const handlePrevMonth = () => setDisplayDate((d) => subMonths(d, 1));
@@ -226,15 +227,15 @@ export function LunarCalendar() {
   const days = eachDayOfInterval({ start: startDate, end: endDate });
   const weekdays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
-  // Fonction de centrage automatique sur le jour actuel
+  // Fonction de centrage automatique sur le jour actuel, limitée au conteneur local
   useEffect(() => {
     const timer = setTimeout(() => {
-      const todayEl = document.querySelector('.calendar-today-cell');
-      if (todayEl) {
-        const rect = todayEl.getBoundingClientRect();
-        const scrollX = rect.left + window.scrollX - (window.innerWidth / 2) + (rect.width / 2);
-        window.scrollTo({
-          left: scrollX,
+      const container = scrollContainerRef.current;
+      const todayEl = container?.querySelector('.calendar-today-cell') as HTMLElement;
+      if (todayEl && container) {
+        const scrollLeft = todayEl.offsetLeft - (container.clientWidth / 2) + (todayEl.clientWidth / 2);
+        container.scrollTo({
+          left: scrollLeft,
           behavior: 'smooth'
         });
       }
@@ -243,41 +244,43 @@ export function LunarCalendar() {
   }, [displayDate, calendarView]);
 
   return (
-    <div className="flex flex-col items-start py-4">
-      <div className="w-[1200px] border rounded-lg bg-card shadow-lg overflow-hidden flex flex-col shrink-0">
-        <div className="flex justify-between items-center p-4 border-b bg-muted/10">
-          <Button variant="ghost" size="icon" className="h-10 w-10" onClick={handlePrevMonth}><ChevronLeft className="size-6" /></Button>
-          <h2 className="text-lg font-black uppercase tracking-tighter capitalize">{format(displayDate, 'MMMM yyyy', { locale: fr })}</h2>
-          <Button variant="ghost" size="icon" className="h-10 w-10" onClick={handleNextMonth}><ChevronRight className="size-6" /></Button>
-        </div>
-        
-        <div className="grid grid-cols-7 bg-muted/30 border-b">
-          {weekdays.map((day, idx) => (
-            <div 
-              key={day} 
-              className="text-center text-[10px] font-black uppercase text-muted-foreground p-3 flex items-center justify-center border-l first:border-l-0 border-transparent"
-            >
-              {day}
-            </div>
-          ))}
-        </div>
-
-        <div className="w-full">
-          <div className="grid grid-cols-7 w-full">
-            {days.map((day) => (
-              <DayCell
-                key={day.toString()}
-                day={day}
-                isCurrentMonth={isSameMonth(day, displayDate)}
-                isSelected={isSameDay(day, selectedDate)}
-                onDateSelect={handleDayClick}
-              />
+    <div className="flex flex-col items-start py-4 w-full">
+      <div className="w-full overflow-x-auto pb-4 scrollbar-hide" ref={scrollContainerRef}>
+        <div className="w-[1200px] border rounded-lg bg-card shadow-lg overflow-hidden flex flex-col shrink-0">
+          <div className="flex justify-between items-center p-4 border-b bg-muted/10">
+            <Button variant="ghost" size="icon" className="h-10 w-10" onClick={handlePrevMonth}><ChevronLeft className="size-6" /></Button>
+            <h2 className="text-lg font-black uppercase tracking-tighter capitalize">{format(displayDate, 'MMMM yyyy', { locale: fr })}</h2>
+            <Button variant="ghost" size="icon" className="h-10 w-10" onClick={handleNextMonth}><ChevronRight className="size-6" /></Button>
+          </div>
+          
+          <div className="grid grid-cols-7 bg-muted/30 border-b">
+            {weekdays.map((day, idx) => (
+              <div 
+                key={day} 
+                className="text-center text-[10px] font-black uppercase text-muted-foreground p-3 flex items-center justify-center border-l first:border-l-0 border-transparent"
+              >
+                {day}
+              </div>
             ))}
+          </div>
+
+          <div className="w-full">
+            <div className="grid grid-cols-7 w-full">
+              {days.map((day) => (
+                <DayCell
+                  key={day.toString()}
+                  day={day}
+                  isCurrentMonth={isSameMonth(day, displayDate)}
+                  isSelected={isSameDay(day, selectedDate)}
+                  onDateSelect={handleDayClick}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </div>
       
-      <div className="mt-6 px-1 w-[1200px] shrink-0">
+      <div className="mt-6 px-1 w-full lg:w-[1200px] shrink-0">
         {calendarView === 'champs' ? (
           <div className="space-y-3">
             <div className="flex flex-wrap gap-x-4 gap-y-2 p-4 bg-muted/20 border rounded-xl shadow-sm">

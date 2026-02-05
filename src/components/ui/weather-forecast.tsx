@@ -100,9 +100,12 @@ export function WeatherForecast({
 
   useEffect(() => {
     setIsClient(true);
-    const timer = setInterval(() => setNow(new Date()), 1000); // Update every second for precise time display
+    // Mise à jour toutes les minutes pour l'affichage de l'heure (HH:mm)
+    const timer = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
+
+  const currentHour = now.getHours();
 
   const { summary, selectedForecast, hourlyForecastsToShow } = useMemo(() => {
     if (!weather.hourly.length || !tides.length) {
@@ -132,7 +135,6 @@ export function WeatherForecast({
     const remainingTime = formatDistanceToNow(nextTide.date, { locale: fr, addSuffix: true });
     const tideSentence = `Marée ${tideDirection} jusqu'à ${nextTide.time}, pleine ${nextTide.type === 'haute' ? 'mer' : 'basse'} ${remainingTime}.`;
 
-    const currentHour = now.getHours();
     const _selectedForecast = weather.hourly.find(f => new Date(f.date).getHours() === currentHour) || weather.hourly[0];
     
     const forecastIn3Hours = weather.hourly.find(f => new Date(f.date).getHours() === (currentHour + 3) % 24);
@@ -155,19 +157,20 @@ export function WeatherForecast({
       selectedForecast: _selectedForecast, 
       hourlyForecastsToShow: sortedForecasts
     };
-  }, [now, weather, tides]);
+  }, [now, weather, tides, currentHour]);
 
   useEffect(() => {
     if (isClient && isToday && scrollRef.current) {
-        requestAnimationFrame(() => {
-            const currentHour = now.getHours();
-            const element = scrollRef.current?.querySelector(`[data-hour="${currentHour}"]`) as HTMLElement;
-            if (element) {
-                element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-            }
-        });
+        // Utilisation de container.scrollTo pour un défilement horizontal local sans affecter la page entière
+        const container = scrollRef.current;
+        const element = container.querySelector(`[data-hour="${currentHour}"]`) as HTMLElement;
+        if (element) {
+            const scrollLeft = element.offsetLeft - (container.clientWidth / 2) + (element.clientWidth / 2);
+            container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+        }
     }
-  }, [isClient, isToday, now]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isClient, isToday, currentHour]); // Se déclenche uniquement au changement d'heure réelle
 
   if (!isClient || !selectedForecast) {
     return <Skeleton className="h-96 w-full rounded-lg" />;
@@ -225,7 +228,6 @@ export function WeatherForecast({
           {hourlyForecastsToShow.map((forecast, index) => {
              const forecastDate = new Date(forecast.date);
              const forecastHour = forecastDate.getHours();
-             const currentHour = now.getHours();
              
              const isPast = isToday && forecastHour < currentHour;
              const isCurrent = isToday && forecastHour === currentHour;
