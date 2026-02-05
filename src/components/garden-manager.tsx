@@ -87,24 +87,33 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
   const { data: plants, isLoading: arePlantsLoading } = useCollection<GardenPlant>(plantsRef);
 
   const handleAiSuggest = async () => {
+    if (!plantName.trim() || plantName.trim().length < 2) {
+        // Mode Suggestions mensuelles (si champ vide ou trop court)
+        setIsSuggesting(true);
+        setAiSuggestions([]);
+        setCorrectedName(null);
+        try {
+            const month = format(new Date(), 'MMMM', { locale: fr });
+            const suggestions = await getGardenSuggestions(month);
+            setAiSuggestions(suggestions.map(s => s.name));
+            toast({ title: "Suggestions du mois" });
+        } catch (e) {
+            toast({ variant: 'destructive', title: "Erreur IA" });
+        } finally {
+            setIsSuggesting(false);
+        }
+        return;
+    }
+
     setIsSuggesting(true);
     setAiSuggestions([]);
     setCorrectedName(null);
     try {
-      if (plantName.trim().length > 2) {
-        // Mode Correction + Variétés
-        const result = await refinePlantInput({ query: plantName });
-        setCorrectedName(result.correctedName);
-        setCategory(result.category);
-        setAiSuggestions(result.varieties);
-        toast({ title: "Analyse terminée" });
-      } else {
-        // Mode Suggestions mensuelles (si champ vide)
-        const month = format(new Date(), 'MMMM', { locale: fr });
-        const suggestions = await getGardenSuggestions(month);
-        setAiSuggestions(suggestions.map(s => s.name));
-        toast({ title: "Suggestions du mois" });
-      }
+      const result = await refinePlantInput({ query: plantName });
+      setCorrectedName(result.correctedName);
+      setCategory(result.category);
+      setAiSuggestions(result.varieties);
+      toast({ title: "Analyse terminée" });
     } catch (error) {
       console.error(error);
       toast({ variant: 'destructive', title: "Erreur IA" });
@@ -209,14 +218,14 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
                     size="icon" 
                     className="h-12 w-12 shrink-0 border-2" 
                     onClick={handleAiSuggest}
-                    disabled={isSuggesting || plantName.trim().length === 0}
+                    disabled={isSuggesting}
                   >
                     <BrainCircuit className={cn("size-5", isSuggesting && "animate-pulse text-primary")} />
                   </Button>
                 </div>
               </div>
 
-              {correctedName && correctedName.toLowerCase() !== plantName.toLowerCase() && (
+              {correctedName && (
                 <div className="p-3 bg-blue-50 border-2 border-blue-100 rounded-xl flex items-center justify-between animate-in zoom-in-95">
                   <div className="space-y-0.5">
                     <p className="text-[9px] font-black uppercase text-blue-600">Correction suggérée :</p>
@@ -231,7 +240,7 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
               {aiSuggestions.length > 0 && (
                 <div className="space-y-2 p-4 bg-white border-2 rounded-2xl animate-in slide-in-from-right-2">
                   <p className="text-[10px] font-black uppercase text-primary flex items-center gap-2">
-                    <Sparkles className="size-3" /> {correctedName ? "Variétés conseillées :" : "Suggestions du moment :"}
+                    <Sparkles className="size-3" /> {correctedName ? "Variétés conseillées (NC) :" : "Suggestions du moment :"}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {aiSuggestions.map((name, idx) => (
