@@ -72,6 +72,20 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
   const [adviceCache, setAdviceCache] = useState<Record<string, GardenAdviceOutput>>({});
   const [loadingAdvice, setLoadingAdvice] = useState<Record<string, boolean>>({});
 
+  // Charger le cache du téléphone au démarrage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('lb_garden_advice_cache_v2');
+      if (saved) {
+        try {
+          setAdviceCache(JSON.parse(saved));
+        } catch (e) {
+          console.error("Failed to parse garden cache", e);
+        }
+      }
+    }
+  }, []);
+
   useEffect(() => {
     const found = COMMON_PLANTS.find(p => p.name.toLowerCase() === plantName.toLowerCase());
     if (found && !category) {
@@ -110,7 +124,6 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
     try {
       const result = await refinePlantInput({ query: plantName });
       
-      // On ne propose la correction que si elle est différente de la saisie
       if (result.correctedName.toLowerCase() !== plantName.toLowerCase()) {
         setCorrectedName(result.correctedName);
       }
@@ -166,14 +179,22 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
     if (!user || !firestore) return;
     try {
       await deleteDoc(doc(firestore, 'users', user.uid, 'garden_plants', id));
+      
+      // Nettoyer le cache local
+      const newCache = { ...adviceCache };
+      delete newCache[id];
+      setAdviceCache(newCache);
+      localStorage.setItem('lb_garden_advice_cache_v2', JSON.stringify(newCache));
+      
       toast({ title: 'Plante retirée' });
     } catch (e) {
       toast({ variant: 'destructive', title: 'Erreur' });
     }
   };
 
-  const fetchAdvice = async (plant: GardenPlant) => {
-    if (adviceCache[plant.id] || loadingAdvice[plant.id]) return;
+  const fetchAdvice = async (plant: GardenPlant, forceRefresh = false) => {
+    // Si déjà en cache et qu'on ne force pas le refresh, on ne fait rien
+    if (!forceRefresh && adviceCache[plant.id]) return;
 
     setLoadingAdvice(prev => ({ ...prev, [plant.id]: true }));
     try {
@@ -186,10 +207,17 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
         lunarPhase: locationData.farming.lunarPhase,
         zodiac: locationData.farming.zodiac
       });
-      setAdviceCache(prev => ({ ...prev, [plant.id]: advice }));
+      
+      const newCache = { ...adviceCache, [plant.id]: advice };
+      setAdviceCache(newCache);
+      localStorage.setItem('lb_garden_advice_cache_v2', JSON.stringify(newCache));
+      
+      if (forceRefresh) {
+        toast({ title: "Conseils mis à jour" });
+      }
     } catch (error) {
       console.error(error);
-      toast({ variant: 'destructive', title: 'Erreur IA' });
+      toast({ variant: 'destructive', title: "Erreur IA" });
     } finally {
       setLoadingAdvice(prev => ({ ...prev, [plant.id]: false }));
     }
@@ -256,7 +284,7 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
               {aiSuggestions.length > 0 && (
                 <div className="space-y-2 p-4 bg-white border-2 rounded-2xl animate-in slide-in-from-right-2">
                   <p className="text-[10px] font-black uppercase text-primary flex items-center gap-2">
-                    <Sparkles className="size-3" /> {correctedName || plantName ? "Variétés conseillées (NC) :" : "Suggestions du moment :"}
+                    <Sparkles className="size-3" /> Variétés conseillées (NC) :
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {aiSuggestions.map((name, idx) => (
@@ -311,12 +339,21 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
                           </div>
                         </div>
                       </AccordionTrigger>
-                      <div className="pr-2" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center pr-3 gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => fetchAdvice(plant, true)} 
+                          className="size-8 text-primary/40 hover:text-primary hover:bg-primary/10 rounded-full"
+                          title="Rafraîchir les conseils"
+                        >
+                          <RefreshCw className={cn("size-4", loadingAdvice[plant.id] && "animate-spin")} />
+                        </Button>
                         <Button 
                           variant="ghost" 
                           size="icon" 
                           onClick={() => handleDelete(plant.id)} 
-                          className="size-8 text-destructive/40 hover:text-destructive"
+                          className="size-8 text-destructive/40 hover:text-destructive hover:bg-destructive/10 rounded-full"
                         >
                           <Trash2 className="size-4" />
                         </Button>
@@ -331,7 +368,7 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
                           </div>
                         ) : adviceCache[plant.id] ? (
                           <div className="space-y-6 animate-in fade-in">
-                            <div className="flex gap-4 p-4 bg-blue-50 border-2 border-blue-100 rounded-2xl">
+                            <div className="flex gap-4 p-4 bg-blue-50 border-2 border-blue-100 rounded-2xl shadow-sm">
                               <div className="p-2 bg-blue-600 text-white rounded-xl h-fit shadow-md"><Droplets className="size-5" /></div>
                               <div className="space-y-1">
                                 <p className="text-[10px] font-black uppercase text-blue-800 tracking-widest">Arrosage du jour</p>
@@ -349,7 +386,7 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
                                   <Badge variant={adviceCache[plant.id].maintenance.shouldPrune ? 'default' : 'secondary'} className="text-[9px] font-black h-5 uppercase">
                                     {adviceCache[plant.id].maintenance.shouldPrune ? 'Taille Recommandée' : 'Taille déconseillée'}
                                   </Badge>
-                                  <span className="text-[9px] font-bold text-muted-foreground">Lune {locationData.farming.lunarPhase === 'Lune Descendante' ? '↗' : '↘'}</span>
+                                  <span className="text-[9px] font-bold text-muted-foreground">Lune {locationData.farming.lunarPhase === 'Lune Descendante' ? '↘' : '↗'}</span>
                                 </div>
                                 <div className="space-y-2">
                                   <p className="text-xs font-medium leading-relaxed text-slate-700 bg-muted/30 p-3 rounded-xl border border-dashed">
