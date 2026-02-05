@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
 import { format } from 'date-fns';
@@ -24,12 +24,16 @@ import {
   Plus, 
   Sparkles,
   RefreshCw,
-  Check
+  Check,
+  ClipboardList,
+  AlertTriangle,
+  CalendarCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getPersonalizedGardenAdvice } from '@/ai/flows/garden-advice-flow';
 import { getGardenSuggestions } from '@/ai/flows/garden-suggestions-flow';
 import { refinePlantInput } from '@/ai/flows/refine-plant-flow';
+import { getGardenGlobalSummary, type GardenGlobalSummaryOutput } from '@/ai/flows/garden-global-summary-flow';
 import type { GardenAdviceOutput } from '@/ai/flows/garden-advice-flow';
 import type { LocationData, GardenPlant } from '@/lib/types';
 import { useLocation } from '@/context/location-context';
@@ -72,19 +76,34 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
   const [adviceCache, setAdviceCache] = useState<Record<string, GardenAdviceOutput>>({});
   const [loadingAdvice, setLoadingAdvice] = useState<Record<string, boolean>>({});
 
+  const [globalSummary, setGlobalSummary] = useState<GardenGlobalSummaryOutput | null>(null);
+  const [isGeneratingGlobal, setIsGeneratingGlobal] = useState(false);
+
   // Charger le cache du téléphone au démarrage
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('lb_garden_advice_cache_v2');
+      const saved = localStorage.getItem('lb_garden_advice_cache_v3');
       if (saved) {
         try {
-          setAdviceCache(JSON.parse(saved));
+          const parsed = JSON.parse(saved);
+          setAdviceCache(parsed.individual || {});
+          setGlobalSummary(parsed.global || null);
         } catch (e) {
           console.error("Failed to parse garden cache", e);
         }
       }
     }
   }, []);
+
+  // Sauvegarder le cache quand il change
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('lb_garden_advice_cache_v3', JSON.stringify({
+        individual: adviceCache,
+        global: globalSummary
+      }));
+    }
+  }, [adviceCache, globalSummary]);
 
   useEffect(() => {
     const found = COMMON_PLANTS.find(p => p.name.toLowerCase() === plantName.toLowerCase());
@@ -184,7 +203,6 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
       const newCache = { ...adviceCache };
       delete newCache[id];
       setAdviceCache(newCache);
-      localStorage.setItem('lb_garden_advice_cache_v2', JSON.stringify(newCache));
       
       toast({ title: 'Plante retirée' });
     } catch (e) {
@@ -193,7 +211,6 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
   };
 
   const fetchAdvice = async (plant: GardenPlant, forceRefresh = false) => {
-    // Si déjà en cache et qu'on ne force pas le refresh, on ne fait rien
     if (!forceRefresh && adviceCache[plant.id]) return;
 
     setLoadingAdvice(prev => ({ ...prev, [plant.id]: true }));
@@ -208,9 +225,7 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
         zodiac: locationData.farming.zodiac
       });
       
-      const newCache = { ...adviceCache, [plant.id]: advice };
-      setAdviceCache(newCache);
-      localStorage.setItem('lb_garden_advice_cache_v2', JSON.stringify(newCache));
+      setAdviceCache(prev => ({ ...prev, [plant.id]: advice }));
       
       if (forceRefresh) {
         toast({ title: "Conseils mis à jour" });
@@ -220,6 +235,37 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
       toast({ variant: 'destructive', title: "Erreur IA" });
     } finally {
       setLoadingAdvice(prev => ({ ...prev, [plant.id]: false }));
+    }
+  };
+
+  const handleGenerateGlobalSummary = async () => {
+    if (!plants || plants.length === 0) return;
+    setIsGeneratingGlobal(true);
+    try {
+      const summary = await getGardenGlobalSummary({
+        location: selectedLocation,
+        date: format(new Date(), 'eeee d MMMM yyyy', { locale: fr }),
+        weather: {
+          temp: locationData.weather.temp,
+          rain: locationData.weather.rain,
+        },
+        lunarContext: {
+          phase: locationData.farming.lunarPhase,
+          zodiac: locationData.farming.zodiac,
+        },
+        plants: plants.map(p => ({
+          name: p.name,
+          category: p.category,
+          individualAdvice: adviceCache[p.id]
+        })),
+      });
+      setGlobalSummary(summary);
+      toast({ title: "Bilan généré !" });
+    } catch (error) {
+      console.error(error);
+      toast({ variant: 'destructive', title: "Erreur génération bilan" });
+    } finally {
+      setIsGeneratingGlobal(false);
     }
   };
 
@@ -318,6 +364,96 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
         )}
       </Card>
 
+      {/* BILAN DU JOUR - GLOBAL SUMMARY SECTION */}
+      {plants && plants.length > 0 && (
+        <Card className="border-2 border-accent/20 bg-accent/5 overflow-hidden">
+          <CardHeader className="p-4 bg-accent/10 border-b border-accent/10">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-accent text-white rounded-lg shadow-sm"><ClipboardList className="size-5" /></div>
+                <div>
+                  <CardTitle className="text-base font-black uppercase tracking-tight">Bilan Stratégique du Jour</CardTitle>
+                  <CardDescription className="text-[9px] font-bold uppercase opacity-60">Synthèse intelligente de votre jardin</CardDescription>
+                </div>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleGenerateGlobalSummary} 
+                disabled={isGeneratingGlobal}
+                className="h-10 px-4 font-black uppercase text-[10px] tracking-widest bg-white border-2 border-accent/20 hover:bg-accent hover:text-white transition-all shadow-sm"
+              >
+                {isGeneratingGlobal ? <RefreshCw className="size-4 animate-spin" /> : <><Sparkles className="mr-2 size-4" /> Générer le bilan</>}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            {!globalSummary ? (
+              <div className="p-8 text-center space-y-3">
+                <BrainCircuit className="size-10 mx-auto text-accent/30" />
+                <p className="text-[11px] font-bold text-muted-foreground uppercase leading-relaxed max-w-[200px] mx-auto">
+                  L'IA peut analyser l'ensemble de votre jardin pour vous donner un plan d'action aujourd'hui.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-accent/10 animate-in fade-in slide-in-from-top-2">
+                <div className="p-4 space-y-2 bg-white/50">
+                  <p className="text-[10px] font-black uppercase text-accent tracking-widest flex items-center gap-2"><Zap className="size-3" /> Plan d'action prioritaires</p>
+                  <p className="text-sm font-bold leading-relaxed text-slate-700 italic">"{globalSummary.globalPlan}"</p>
+                </div>
+
+                <div className="p-4 space-y-3">
+                  <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest flex items-center gap-2"><Droplets className="size-3" /> Arrosage par groupes</p>
+                  <div className="grid gap-2">
+                    {globalSummary.wateringGroups.map((group, idx) => (
+                      <div key={idx} className="flex flex-wrap items-center gap-2 p-2 bg-white rounded-xl border border-blue-100 shadow-sm">
+                        <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 font-black text-[9px] uppercase">{group.type}</Badge>
+                        <span className="text-[11px] font-medium text-slate-600">{group.plantNames.join(', ')}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {globalSummary.maintenanceAlerts.length > 0 && (
+                  <div className="p-4 space-y-3">
+                    <p className="text-[10px] font-black uppercase text-orange-600 tracking-widest flex items-center gap-2"><Scissors className="size-3" /> Alertes Maintenance</p>
+                    <div className="space-y-2">
+                      {globalSummary.maintenanceAlerts.map((alert, idx) => (
+                        <div key={idx} className={cn(
+                          "p-3 rounded-xl border flex gap-3 shadow-sm",
+                          alert.priority === 'Haute' ? "bg-red-50 border-red-100" : "bg-white border-orange-100"
+                        )}>
+                          <AlertTriangle className={cn("size-4 shrink-0", alert.priority === 'Haute' ? "text-red-600" : "text-orange-500")} />
+                          <div className="space-y-0.5">
+                            <p className="text-[11px] font-black uppercase tracking-tight">{alert.action}</p>
+                            <p className="text-[10px] font-medium text-muted-foreground">{alert.reason}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {globalSummary.milestones.length > 0 && (
+                  <div className="p-4 space-y-3">
+                    <p className="text-[10px] font-black uppercase text-green-600 tracking-widest flex items-center gap-2"><CalendarCheck className="size-3" /> Événements à venir</p>
+                    <ul className="grid gap-1.5">
+                      {globalSummary.milestones.map((m, idx) => (
+                        <li key={idx} className="flex items-start gap-2 text-[11px] font-bold text-green-800 bg-green-50/50 p-2 rounded-lg">
+                          <Check className="size-3 mt-0.5 text-green-600 shrink-0" />
+                          {m}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* PLANTS LIST */}
       <div className="space-y-3">
         {arePlantsLoading ? (
           <Skeleton className="h-32 w-full rounded-xl" />
