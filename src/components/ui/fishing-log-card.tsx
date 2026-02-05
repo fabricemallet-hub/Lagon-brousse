@@ -536,28 +536,27 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                     position={newSpotLocation}
                                     mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
                                 >
-                                    <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
-                                         <div className="w-8 h-8 bg-blue-500 border-2 border-white rounded-full flex items-center justify-center shadow-lg">
-                                            <Plus className="text-white h-5 w-5" />
+                                    <div style={{ transform: 'translate(-50%, -50%)' }}>
+                                         <div className="size-10 bg-primary border-4 border-white rounded-full flex items-center justify-center shadow-xl">
+                                            <Plus className="text-white size-6" strokeWidth={3} />
                                         </div>
                                     </div>
                                 </OverlayView>
                             )}
                         </GoogleMap>
-                        <Button size="icon" onClick={() => setIsFullscreen(!isFullscreen)} className="absolute top-2 left-2 shadow-lg h-9 w-9 z-10">
+                        <Button size="icon" onClick={() => setIsFullscreen(!isFullscreen)} className="absolute top-2 left-2 shadow-lg h-9 w-9 z-10 bg-background/80 backdrop-blur-sm">
                             {isFullscreen ? <Shrink className="h-5 w-5" /> : <Expand className="h-5 w-5" />}
                         </Button>
-                        <Button size="icon" onClick={handleRecenter} className="absolute top-2 right-2 shadow-lg h-9 w-9 z-10">
+                        <Button size="icon" onClick={handleRecenter} className="absolute top-2 right-2 shadow-lg h-9 w-9 z-10 bg-background/80 backdrop-blur-sm">
                             <LocateFixed className="h-5 w-5" />
                         </Button>
-                         <div className={cn("absolute bottom-4 left-1/2 -translate-x-1/2 z-10 w-[calc(100%-2rem)] max-w-sm", !newSpotLocation && "hidden", isFullscreen && "visible")}>
+                         <div className={cn("absolute bottom-0 left-0 right-0 z-10", !newSpotLocation && "hidden")}>
                             <Button 
-                                className="shadow-lg w-full" 
+                                className="w-full h-14 rounded-none bg-primary hover:bg-primary/90 text-white font-black uppercase text-base tracking-widest shadow-[0_-4px_20px_rgba(0,0,0,0.3)] gap-3" 
                                 onClick={() => {
                                     if (newSpotLocation) {
                                         setDialogMode('add');
                                         setSpotToEdit(null);
-                                        // Reset form fields for new spot
                                         setSpotName('');
                                         setSpotNotes('');
                                         setSelectedIcon('Fish');
@@ -566,10 +565,8 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                         setIsSpotDialogOpen(true);
                                     }
                                 }}
-                                disabled={!newSpotLocation}
                             >
-                                <Plus className="mr-2" /> 
-                                {newSpotLocation ? 'Ajouter ce coin de pêche' : 'Cliquez sur la carte pour placer un repère'}
+                                <Plus className="size-6" /> Ajouter ce coin de pêche
                             </Button>
                         </div>
                     </div>
@@ -585,7 +582,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                 <Dialog open={isSpotDialogOpen} onOpenChange={(open) => { if (!open) setSpotToEdit(null); setIsSpotDialogOpen(open); }}>
                     <DialogContent className="max-h-[95vh] flex flex-col p-0 overflow-hidden sm:max-w-lg">
                         <DialogHeader className="p-6 pb-2 shrink-0">
-                            <DialogTitle>{dialogMode === 'add' ? 'Enregistrer un nouveau spot' : 'Modifier le spot'}</DialogTitle>
+                            <DialogTitle className="font-black uppercase tracking-tight">{dialogMode === 'add' ? 'Enregistrer un nouveau spot' : 'Modifier le spot'}</DialogTitle>
                             <DialogDescription>
                                 {dialogMode === 'add' ? "Remplissez les détails et sauvegardez pour ajouter ce spot à votre carnet." : "Modifiez les informations de votre spot."}
                             </DialogDescription>
@@ -593,15 +590,15 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         
                         <div className="flex-grow overflow-y-auto p-6 py-2 space-y-4">
                             <div className="space-y-2">
-                                <Label htmlFor="spot-name">Nom du spot</Label>
-                                <Input id="spot-name" placeholder="Ex: Spot à bec de cane" value={spotName} onChange={(e) => setSpotName(e.target.value)} />
+                                <Label htmlFor="spot-name" className="text-xs font-bold uppercase text-muted-foreground">Nom du spot</Label>
+                                <Input id="spot-name" placeholder="Ex: Spot à bec de cane" value={spotName} onChange={(e) => setSpotName(e.target.value)} className="h-12 border-2 font-bold" />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="spot-notes">Notes</Label>
-                                <Textarea id="spot-notes" placeholder="Ex: Pris à la traîne avec un leurre rouge" value={spotNotes} onChange={(e) => setSpotNotes(e.target.value)} />
+                                <Label htmlFor="spot-notes" className="text-xs font-bold uppercase text-muted-foreground">Notes</Label>
+                                <Textarea id="spot-notes" placeholder="Ex: Pris à la traîne avec un leurre rouge" value={spotNotes} onChange={(e) => setSpotNotes(e.target.value)} className="border-2 font-medium" />
                             </div>
                              <div className="space-y-2">
-                                <Label>Techniques de pêche</Label>
+                                <Label className="text-xs font-bold uppercase text-muted-foreground">Techniques de pêche</Label>
                                 <div className="flex flex-wrap gap-2">
                                     {fishingTypes.map((type) => {
                                         const isSelected = selectedFishingTypes.includes(type.id);
@@ -611,7 +608,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                 variant={isSelected ? 'default' : 'outline'}
                                                 size="sm"
                                                 onClick={() => handleToggleFishingType(type.id)}
-                                                className={cn(isSelected && `${type.bgColor} hover:${type.bgColor}/90 text-white`)}
+                                                className={cn("font-bold text-[10px] uppercase h-8", isSelected && `${type.bgColor} hover:${type.bgColor}/90 text-white border-none shadow-sm`)}
                                             >
                                                 {type.label}
                                             </Button>
@@ -620,31 +617,31 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <Label>Icône</Label>
-                                <div className="flex gap-2">
+                                <Label className="text-xs font-bold uppercase text-muted-foreground">Icône</Label>
+                                <div className="flex gap-3">
                                     {availableIcons.map(iconName => {
                                         const Icon = mapIcons[iconName as keyof typeof mapIcons];
                                         return (
-                                            <Button key={iconName} variant="outline" size="icon" onClick={() => setSelectedIcon(iconName as keyof typeof mapIcons)} className={cn(selectedIcon === iconName && "ring-2 ring-primary")}>
-                                                <Icon className="size-5" />
+                                            <Button key={iconName} variant="outline" size="icon" onClick={() => setSelectedIcon(iconName as keyof typeof mapIcons)} className={cn("size-12 border-2 transition-all", selectedIcon === iconName ? "border-primary bg-primary/5 scale-110 shadow-md" : "opacity-60")}>
+                                                <Icon className="size-6" />
                                             </Button>
                                         )
                                     })}
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <Label>Couleur</Label>
-                                <div className="flex flex-wrap gap-2">
+                                <Label className="text-xs font-bold uppercase text-muted-foreground">Couleur</Label>
+                                <div className="flex flex-wrap gap-3">
                                     {availableColors.map(color => (
-                                        <button key={color} onClick={() => setSelectedColor(color)} className={cn("w-8 h-8 rounded-full border-2", selectedColor === color ? "border-primary ring-2 ring-primary" : "border-transparent")} style={{ backgroundColor: color }} />
+                                        <button key={color} onClick={() => setSelectedColor(color)} className={cn("w-10 h-10 rounded-full border-4 transition-all shadow-sm", selectedColor === color ? "border-white ring-2 ring-primary scale-110" : "border-transparent opacity-80")} style={{ backgroundColor: color }} />
                                     ))}
                                 </div>
                             </div>
                         </div>
                         
                         <DialogFooter className="p-6 pt-2 border-t shrink-0 flex flex-row gap-2 sm:flex-row">
-                            <Button variant="ghost" onClick={() => { setIsSpotDialogOpen(false); if (dialogMode === 'add') setNewSpotLocation(null); }} className="flex-1">Annuler</Button>
-                            <Button onClick={handleSave} disabled={isSaving} className="flex-1"><Save className="mr-2"/>{isSaving ? "Sauvegarde..." : "Sauvegarder"}</Button>
+                            <Button variant="ghost" onClick={() => { setIsSpotDialogOpen(false); if (dialogMode === 'add') setNewSpotLocation(null); }} className="flex-1 font-bold h-12 uppercase text-xs">Annuler</Button>
+                            <Button onClick={handleSave} disabled={isSaving} className="flex-1 font-black h-12 uppercase text-xs shadow-md"><Save className="mr-2 size-4"/>{isSaving ? "Sauvegarde..." : "Sauvegarder"}</Button>
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
@@ -654,21 +651,23 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         <div className="flex items-center gap-2 mb-4">
                             <Button 
                                 variant="outline" 
-                                className="flex-1" 
+                                className="flex-1 font-bold h-12 uppercase text-[10px] tracking-widest border-2" 
                                 onClick={handleAnalyzeNext7Days}
                                 disabled={selectedSpotIds.length === 0 || isAnalyzing}
                             >
-                                <BarChart className="mr-2"/> 
-                                Analyser {selectedSpotIds.length > 0 ? `(${selectedSpotIds.length}) spot(s)` : ''} pour les 7 prochains jours (IA)
+                                <BarChart className="mr-2 size-4"/> 
+                                Analyser {selectedSpotIds.length > 0 ? `(${selectedSpotIds.length}) spot(s)` : ''} (IA)
                             </Button>
                         </div>
-                        <h4 className="font-semibold text-lg mb-2">Historique des prises</h4>
+                        <h4 className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 mb-2 px-1">
+                            <History className="size-3" /> Historique des prises
+                        </h4>
                         {areSpotsLoading && <Skeleton className="h-24 w-full" />}
                         {!areSpotsLoading && savedSpots && savedSpots.length > 0 ? (
                             <AccordionPrimitive.Root 
                                 type="single" 
                                 collapsible 
-                                className="w-full"
+                                className="w-full space-y-2"
                                 value={openSpotId}
                                 onValueChange={setOpenSpotId}
                             >
@@ -681,50 +680,50 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                         ref={(el) => (spotRefs.current[spot.id] = el)}
                                         value={spot.id} 
                                         key={spot.id} 
-                                        className="border-b"
+                                        className="border-2 rounded-xl bg-card overflow-hidden shadow-sm"
                                     >
                                        <div className="flex items-center w-full">
                                             <div className="pl-4 py-4" onClick={(e) => e.stopPropagation()}>
                                                 <Checkbox
                                                     id={`select-spot-${spot.id}`}
-                                                    className="size-5"
+                                                    className="size-5 border-2"
                                                     checked={selectedSpotIds.includes(spot.id)}
                                                     onCheckedChange={() => handleSpotSelection(spot.id)}
                                                 />
                                             </div>
                                             <AccordionPrimitive.Header asChild>
-                                                <AccordionPrimitive.Trigger className='flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180 pl-2 pr-4 text-left'>
+                                                <AccordionPrimitive.Trigger className='flex flex-1 items-center justify-between py-4 font-medium transition-all hover:no-underline [&[data-state=open]>svg]:rotate-180 pl-3 pr-4 text-left'>
                                                     <div className="flex items-center gap-3">
-                                                        <div className="p-1 rounded-md" style={{backgroundColor: spot.color + '20'}}>
+                                                        <div className="p-2 rounded-lg" style={{backgroundColor: spot.color + '15'}}>
                                                             {React.createElement(mapIcons[spot.icon as keyof typeof mapIcons] || MapPin, { className: 'size-5', style: {color: spot.color} })}
                                                         </div>
-                                                        <div>
-                                                            <p className="font-bold">{spot.name}</p>
-                                                            <p className="text-xs text-muted-foreground">
-                                                                {spot.createdAt ? format(spot.createdAt.toDate(), 'dd MMMM yyyy à HH:mm', { locale: fr }) : 'Enregistrement...'}
+                                                        <div className="min-w-0">
+                                                            <p className="font-black uppercase tracking-tight text-sm leading-none truncate">{spot.name}</p>
+                                                            <p className="text-[10px] font-bold text-muted-foreground/60 mt-1 uppercase">
+                                                                {spot.createdAt ? format(spot.createdAt.toDate(), 'd MMM yyyy à HH:mm', { locale: fr }) : 'Enregistrement...'}
                                                             </p>
                                                         </div>
                                                     </div>
-                                                    <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
+                                                    <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 opacity-30" />
                                                 </AccordionPrimitive.Trigger>
                                             </AccordionPrimitive.Header>
                                        </div>
-                                       <AccordionPrimitive.Content className="overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
-                                           <div className="pb-4 pl-12 pr-4 space-y-4">
+                                       <AccordionPrimitive.Content className="overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down border-t border-dashed">
+                                           <div className="pb-4 pl-12 pr-4 space-y-4 pt-4 bg-muted/5">
                                             {spot.fishingTypes && spot.fishingTypes.length > 0 && (
-                                                <div className="flex flex-wrap gap-2 pt-2">
+                                                <div className="flex flex-wrap gap-2">
                                                     {spot.fishingTypes.map(type => {
                                                         const typeInfo = fishingTypes.find(t => t.id === type);
                                                         return (
-                                                            <Badge key={type} variant="secondary" className={cn("text-xs text-white", typeInfo?.bgColor)}>
+                                                            <Badge key={type} variant="secondary" className={cn("text-[9px] font-black uppercase text-white border-none", typeInfo?.bgColor)}>
                                                                 {typeInfo?.label}
                                                             </Badge>
                                                         )
                                                     })}
                                                 </div>
                                             )}
-                                           <div className="text-sm text-muted-foreground bg-muted/50 p-4 rounded-lg space-y-2">
-                                               {spot.notes && <p className="italic">"{spot.notes}"</p>}
+                                           <div className="text-[11px] leading-relaxed text-muted-foreground bg-white border rounded-xl p-4 space-y-2 shadow-inner">
+                                               {spot.notes && <p className="italic text-foreground font-medium mb-3">"{spot.notes}"</p>}
                                                 <p><strong>Conditions :</strong> {spot.context.airTemperature}°C (air), {spot.context.waterTemperature}°C (eau)</p>
                                                 <p><strong>Vent :</strong> {spot.context.windSpeed} nœuds de {spot.context.windDirection}</p>
                                                 {spot.context.swellInside && spot.context.swellOutside && (
@@ -735,10 +734,10 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                 {displayLowTide && <p><strong>Marée basse :</strong> {displayLowTide.time} ({displayLowTide.height.toFixed(2)}m)</p>}
                                                 {displayHighTide && <p><strong>Marée haute :</strong> {displayHighTide.time} ({displayHighTide.height.toFixed(2)}m)</p>}
                                            </div>
-                                           <div className="flex flex-col sm:flex-row gap-2">
-                                               <Button variant="outline" className="flex-1" onClick={() => handleFindSimilarDay(spot)} disabled={isAnalyzing}><BrainCircuit className="mr-2"/> Chercher un jour similaire (IA)</Button>
-                                               <Button variant="outline" size="icon" onClick={() => handleEditClick(spot)}><Pencil className="h-4 w-4" /></Button>
-                                               <Button variant="destructive" size="icon" onClick={() => handleDeleteSpot(spot.id)}><Trash2 /></Button>
+                                           <div className="flex gap-2">
+                                               <Button variant="outline" className="flex-1 font-black uppercase text-[10px] h-10 border-2" onClick={() => handleFindSimilarDay(spot)} disabled={isAnalyzing}><BrainCircuit className="mr-2 size-4 text-primary"/> Jour similaire</Button>
+                                               <Button variant="outline" size="icon" onClick={() => handleEditClick(spot)} className="size-10 border-2"><Pencil className="h-4 w-4" /></Button>
+                                               <Button variant="destructive" size="icon" onClick={() => handleDeleteSpot(spot.id)} className="size-10 shadow-sm"><Trash2 className="size-4" /></Button>
                                            </div>
                                            </div>
                                        </AccordionPrimitive.Content>
@@ -746,52 +745,53 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                )})}
                             </AccordionPrimitive.Root>
                         ) : (
-                            <p className="text-sm text-muted-foreground text-center py-4">Aucun spot sauvegardé pour le moment.</p>
+                            <div className="text-center py-12 border-2 border-dashed rounded-2xl opacity-40">
+                                <Anchor className="size-8 mx-auto mb-2" />
+                                <p className="text-[10px] font-black uppercase tracking-widest">Aucun spot sauvegardé</p>
+                            </div>
                         )}
                     </div>
                 )}
 
                 <Dialog open={isAnalysisDialogOpen} onOpenChange={setIsAnalysisDialogOpen}>
-                    <DialogContent className="max-w-md">
+                    <DialogContent className="max-w-md rounded-2xl">
                         <DialogHeader>
-                            <DialogTitle className="flex items-center gap-2">
-                                <BrainCircuit /> Analyse de l'IA
+                            <DialogTitle className="flex items-center gap-2 font-black uppercase">
+                                <BrainCircuit className="text-primary" /> Analyse de l'IA
                             </DialogTitle>
                             <DialogDescription>
-                                L'intelligence artificielle recherche les meilleures opportunités basées exclusivement sur les marées et la lune.
+                                Prédiction basée exclusivement sur les marées et la lune.
                             </DialogDescription>
                         </DialogHeader>
                         <div className="py-4 space-y-4">
                             {isAnalyzing && (
-                                <div className="flex flex-col items-center justify-center space-y-2">
-                                    <p className="text-sm text-muted-foreground">Analyse des marées et de la lune...</p>
-                                    <Skeleton className="h-4 w-full" />
-                                    <Skeleton className="h-4 w-4/5" />
-                                    <Skeleton className="h-4 w-full" />
+                                <div className="flex flex-col items-center justify-center py-10 space-y-4">
+                                    <BrainCircuit className="size-12 text-primary animate-pulse" />
+                                    <p className="text-xs font-bold uppercase text-muted-foreground animate-pulse">Analyse en cours...</p>
+                                    <Skeleton className="h-2 w-full" />
                                 </div>
                             )}
                             {analysisResult && (
-                                <div className="space-y-4">
-                                    <div className="text-center">
-                                        <p className="text-sm text-muted-foreground">Meilleur jour recommandé</p>
-                                        <p className="text-2xl font-bold text-primary">
+                                <div className="space-y-6 animate-in fade-in zoom-in-95">
+                                    <div className="text-center p-6 bg-primary/5 border-2 border-primary/20 rounded-2xl">
+                                        <p className="text-[10px] font-black uppercase text-muted-foreground mb-1 tracking-widest">Meilleure fenêtre</p>
+                                        <p className="text-2xl font-black text-primary uppercase tracking-tighter">
                                             {format(new Date(analysisResult.bestDate.replace(/-/g, '/')), 'eeee d MMMM', { locale: fr })}
                                         </p>
                                     </div>
-                                    <div className="space-y-1">
-                                        <Label htmlFor="confidence-score">Score de confiance</Label>
-                                        <Progress value={analysisResult.score} id="confidence-score" />
-                                        <p className="text-xs text-right text-muted-foreground">{analysisResult.score}%</p>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between px-1"><Label className="text-[10px] font-black uppercase opacity-60">Indice de confiance</Label><span className="text-xs font-black">{analysisResult.score}%</span></div>
+                                        <Progress value={analysisResult.score} className="h-2" />
                                     </div>
-                                    <div className="p-3 bg-muted/50 rounded-lg max-h-60 overflow-y-auto">
-                                        <h4 className="font-semibold mb-2">Explication de l'IA</h4>
-                                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{analysisResult.explanation}</p>
+                                    <div className="p-4 bg-muted/30 border-2 rounded-2xl max-h-60 overflow-y-auto">
+                                        <h4 className="text-[10px] font-black uppercase mb-3 flex items-center gap-2"><Sparkles className="size-3 text-primary" /> Conclusion</h4>
+                                        <p className="text-xs font-medium leading-relaxed italic text-muted-foreground">"{analysisResult.explanation}"</p>
                                     </div>
                                 </div>
                             )}
                         </div>
                         <DialogFooter>
-                            <Button variant="outline" onClick={() => setIsAnalysisDialogOpen(false)}>Fermer</Button>
+                            <Button variant="outline" onClick={() => setIsAnalysisDialogOpen(false)} className="w-full font-black uppercase h-12">Fermer</Button>
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
