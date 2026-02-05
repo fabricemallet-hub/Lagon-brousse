@@ -20,7 +20,8 @@ import {
   Info,
   TrendingUp,
   TrendingDown,
-  CalendarDays
+  CalendarDays,
+  Lightbulb
 } from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
 import { useLocation } from '@/context/location-context';
@@ -29,6 +30,7 @@ import { MoonPhaseIcon } from '@/components/ui/lunar-calendar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { GardeningManager } from '@/components/gardening-manager';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const icons: { [key: string]: React.FC<LucideProps> } = {
   Spade,
@@ -127,11 +129,19 @@ export default function ChampsPage() {
 
       <Tabs defaultValue="tasks" className="w-full">
         <TabsList className="grid w-full grid-cols-2 h-12">
-          <TabsTrigger value="tasks" className="text-base font-bold">Tâches</TabsTrigger>
+          <TabsTrigger value="tasks" className="text-base font-bold">Conseils</TabsTrigger>
           <TabsTrigger value="manager" className="text-base font-bold">Mes Semis</TabsTrigger>
         </TabsList>
         
         <TabsContent value="tasks" className="space-y-6 pt-4">
+          <Alert className="bg-primary/5 border-primary/20">
+            <Lightbulb className="size-4 text-primary" />
+            <AlertTitle className="text-xs font-black uppercase">À quoi servent ces conseils ?</AlertTitle>
+            <AlertDescription className="text-xs text-muted-foreground leading-relaxed">
+              Cette section vous indique les actions optimales à réaliser aujourd'hui (taille, bouturage, tonte) en fonction de la circulation de la sève dictée par la lune. Suivre ces cycles permet de renforcer vos plantes naturellement.
+            </AlertDescription>
+          </Alert>
+
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {farming.details.map((item, index) => {
               const Icon = icons[item.icon];
