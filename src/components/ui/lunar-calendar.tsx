@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -23,7 +22,6 @@ import { generateProceduralData, getDataForDate, LocationData } from '@/lib/data
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -316,7 +314,7 @@ export function LunarCalendar() {
       </div>
 
       <Dialog open={!!detailedDay} onOpenChange={(isOpen) => !isOpen && setDetailedDay(null)}>
-        <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] p-0 flex flex-col rounded-xl overflow-hidden shadow-2xl border-none z-[100]">
+        <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] p-0 flex flex-col rounded-xl overflow-hidden shadow-2xl border-none">
           <DialogHeader className="p-6 shrink-0 bg-muted/10 border-b">
             <DialogTitle className="text-lg font-black uppercase tracking-tighter">
               {detailedDay ? format(detailedDay, 'eeee d MMMM', { locale: fr }) : ''}
