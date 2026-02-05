@@ -1,4 +1,3 @@
-
 'use client';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
@@ -474,12 +473,22 @@ function HuntingSessionContent() {
         const participantsRef = collection(firestore, 'hunting_sessions', sessionToDelete, 'participants');
         const snap = await getDocs(participantsRef);
         const batch = writeBatch(firestore);
+        
+        // Supprimer tous les participants
         snap.forEach(d => batch.delete(d.ref));
+        
+        // Supprimer la session elle-même
+        batch.delete(doc(firestore, 'hunting_sessions', sessionToDelete));
+        
         await batch.commit();
-        fetchMySessions();
+        
+        // Rafraîchir la liste locale
+        await fetchMySessions();
+        
         toast({ title: 'Session supprimée' });
     } catch (e) {
-        console.error(e);
+        console.error("Erreur lors de la suppression de la session:", e);
+        toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de supprimer la session.' });
     } finally {
         setSessionToDelete(null);
     }
