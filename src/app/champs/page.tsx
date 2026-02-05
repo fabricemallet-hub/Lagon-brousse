@@ -21,7 +21,8 @@ import {
   TrendingUp,
   TrendingDown,
   CalendarDays,
-  Lightbulb
+  Lightbulb,
+  Flower2
 } from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
 import { useLocation } from '@/context/location-context';
@@ -29,6 +30,7 @@ import { useDate } from '@/context/date-context';
 import { MoonPhaseIcon } from '@/components/ui/lunar-calendar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { GardeningManager } from '@/components/gardening-manager';
+import { GardenManager } from '@/components/garden-manager';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -128,9 +130,10 @@ export default function ChampsPage() {
       </Card>
 
       <Tabs defaultValue="tasks" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 h-12">
-          <TabsTrigger value="tasks" className="text-base font-bold">Conseils</TabsTrigger>
-          <TabsTrigger value="manager" className="text-base font-bold">Mes Semis</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 h-12">
+          <TabsTrigger value="tasks" className="text-xs sm:text-base font-bold">Conseils</TabsTrigger>
+          <TabsTrigger value="garden" className="text-xs sm:text-base font-bold">Mon Jardin</TabsTrigger>
+          <TabsTrigger value="manager" className="text-xs sm:text-base font-bold">Mes Semis</TabsTrigger>
         </TabsList>
         
         <TabsContent value="tasks" className="space-y-6 pt-4">
@@ -162,6 +165,10 @@ export default function ChampsPage() {
               );
             })}
           </div>
+        </TabsContent>
+
+        <TabsContent value="garden" className="pt-4">
+          <GardenManager locationData={data} />
         </TabsContent>
 
         <TabsContent value="manager" className="pt-4">

@@ -19,6 +19,21 @@
       },
       "required": ["id", "email", "subscriptionStatus"]
     },
+    "GardenPlant": {
+      "title": "GardenPlant",
+      "type": "object",
+      "description": "A plant currently growing in the user's garden.",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string", "enum": ["Arbre Fruitier", "Potager", "Fleur", "Aromatique", "Autre"] },
+        "plantingDate": { "type": "string", "format": "date-time" },
+        "notes": { "type": "string" },
+        "lastAdvice": { "type": "object" }
+      },
+      "required": ["name", "category"]
+    },
     "MeteoLive": {
       "title": "MeteoLive",
       "type": "object",
@@ -157,6 +172,14 @@
           "entityName": "User",
           "schema": { "$ref": "#/backend/entities/User" },
           "description": "Profils utilisateurs et statut d'abonnement"
+        }
+      },
+      {
+        "path": "/users/{userId}/garden_plants/{plantId}",
+        "definition": {
+          "entityName": "GardenPlant",
+          "schema": { "$ref": "#/backend/entities/GardenPlant" },
+          "description": "Plantes et arbres du jardin de l'utilisateur"
         }
       },
       {

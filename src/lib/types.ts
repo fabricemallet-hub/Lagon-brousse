@@ -175,6 +175,16 @@ export interface UserAccount {
   };
 }
 
+export interface GardenPlant {
+  id: string;
+  userId: string;
+  name: string;
+  category: 'Arbre Fruitier' | 'Potager' | 'Fleur' | 'Aromatique' | 'Autre';
+  plantingDate?: string;
+  notes?: string;
+  createdAt: any;
+}
+
 export interface FishingSpot {
   id: string;
   userId: string;
@@ -338,5 +348,23 @@ export interface SystemNotification {
   content: string;
   type: 'info' | 'warning' | 'error' | 'success';
   isActive: boolean;
+  createdAt: any;
+}
+
+export interface SowingRecord {
+  id: string;
+  userId: string;
+  seedName: string;
+  sowingDate: string;
+  plantType: string;
+  cultureAdvice: string;
+  estimatedHarvestDate: string;
+  transplantingAdvice: string;
+  moonWarning: string;
+  isValidForMoon: boolean;
+  lunarContext?: {
+    phase: string;
+    zodiac: string;
+  };
   createdAt: any;
 }
