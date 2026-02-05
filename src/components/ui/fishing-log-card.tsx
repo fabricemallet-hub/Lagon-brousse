@@ -734,6 +734,15 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                            </div>
                                            <div className="flex gap-2">
                                                <Button variant="outline" className="flex-1 font-black uppercase text-[10px] h-10 border-2" onClick={() => handleFindSimilarDay(spot)} disabled={isAnalyzing}><BrainCircuit className="mr-2 size-4 text-primary"/> Jour similaire</Button>
+                                               <Button variant="outline" className="font-black uppercase text-[10px] h-10 border-2 px-3" onClick={() => {
+                                                   if (map && spot.location) {
+                                                       map.panTo({ lat: spot.location.latitude, lng: spot.location.longitude });
+                                                       map.setZoom(16);
+                                                       window.scrollTo({ top: 0, behavior: 'smooth' });
+                                                   }
+                                               }}>
+                                                   <LocateFixed className="mr-2 size-4 text-primary" /> GPS
+                                               </Button>
                                                <Button variant="outline" size="icon" onClick={() => handleEditClick(spot)} className="size-10 border-2"><Pencil className="h-4 w-4" /></Button>
                                                <Button variant="destructive" size="icon" onClick={() => handleDeleteSpot(spot.id)} className="size-10 shadow-sm"><Trash2 className="size-4" /></Button>
                                            </div>
