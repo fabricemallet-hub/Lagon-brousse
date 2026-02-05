@@ -259,17 +259,14 @@ export function VesselTracker() {
   }, [mode, isSharing, vesselStatus, remoteVessel]);
 
   const defaultSmsText = useMemo(() => {
-    const name = mode === 'sender' 
-      ? (vesselNickname || 'Capitaine') 
-      : (remoteVessel?.displayName || vesselIdToFollow || 'Capitaine');
-    
     if (mode === 'receiver') {
+      const name = remoteVessel?.displayName || vesselIdToFollow || 'Capitaine';
       const statusWord = currentEffectiveStatus === 'moving' ? 'en navigation' : 'immobile';
-      return `Alerte : ${name} est ${statusWord} en mer depuis ${elapsedString}. Je n'arrive pas à joindre l'équipage. voici Les coordonnées GPS.`;
+      return `Alerte : ${name} est ${statusWord} en mer depuis ${elapsedString}. Je n'arrive pas à joindre l'équipage. Voici mes coordonnées GPS.`;
     }
     
-    return `ALERTE : Navire "${name}" en difficulté.`;
-  }, [mode, vesselNickname, remoteVessel, vesselIdToFollow, currentEffectiveStatus, elapsedString]);
+    return `SOS j'ai un souci avec le bateau contact immédiatement les secours en mer pour me porter secours. voici mes coordonnées GPS`;
+  }, [mode, remoteVessel, vesselIdToFollow, currentEffectiveStatus, elapsedString]);
 
   const finalSmsBody = useMemo(() => {
     const mainText = customSmsMessage.trim() || defaultSmsText;
