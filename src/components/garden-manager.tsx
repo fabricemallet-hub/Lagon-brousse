@@ -373,7 +373,7 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
                 <div className="p-2 bg-accent text-white rounded-lg shadow-sm"><ClipboardList className="size-5" /></div>
                 <div>
                   <CardTitle className="text-base font-black uppercase tracking-tight">Bilan Stratégique du Jour</CardTitle>
-                  <CardDescription className="text-[9px] font-bold uppercase opacity-60">Synthèse intelligente de votre jardin</CardDescription>
+                  <CardDescription className="text-[9px] font-bold uppercase opacity-60">Conseils basés exclusivement sur votre inventaire</CardDescription>
                 </div>
               </div>
               <Button 
@@ -392,7 +392,7 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
               <div className="p-8 text-center space-y-3">
                 <BrainCircuit className="size-10 mx-auto text-accent/30" />
                 <p className="text-[11px] font-bold text-muted-foreground uppercase leading-relaxed max-w-[200px] mx-auto">
-                  L'IA peut analyser l'ensemble de votre jardin pour vous donner un plan d'action aujourd'hui.
+                  L'IA va analyser vos {plants.length} plantes pour établir vos priorités d'aujourd'hui.
                 </p>
               </div>
             ) : (
@@ -436,12 +436,12 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
 
                 {globalSummary.milestones.length > 0 && (
                   <div className="p-4 space-y-3">
-                    <p className="text-[10px] font-black uppercase text-green-600 tracking-widest flex items-center gap-2"><CalendarCheck className="size-3" /> Événements à venir</p>
+                    <p className="text-[10px] font-black uppercase text-green-600 tracking-widest flex items-center gap-2"><CalendarCheck className="size-3" /> Étapes clés détectées</p>
                     <ul className="grid gap-1.5">
                       {globalSummary.milestones.map((m, idx) => (
                         <li key={idx} className="flex items-start gap-2 text-[11px] font-bold text-green-800 bg-green-50/50 p-2 rounded-lg">
                           <Check className="size-3 mt-0.5 text-green-600 shrink-0" />
-                          {m}
+                          <span className="font-black uppercase mr-1">{m.plantName} :</span> {m.event}
                         </li>
                       ))}
                     </ul>
