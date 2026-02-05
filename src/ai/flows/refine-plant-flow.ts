@@ -1,6 +1,6 @@
 'use server';
 /**
- * @fileOverview AI flow for correcting plant names and suggesting local varieties.
+ * @fileOverview AI flow for correcting plant names and suggesting local varieties specific to New Caledonia.
  */
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
@@ -17,19 +17,19 @@ const RefinePlantOutputSchema = z.object({
 
 export async function refinePlantInput(input: { query: string }) {
   const { output } = await ai.generate({
-    prompt: `Tu es un expert botaniste et pépiniériste en Nouvelle-Calédonie. 
-    L'utilisateur a saisi le nom suivant pour son jardin : "{{{query}}}".
+    prompt: `Tu es un expert botaniste et pépiniériste spécialisé dans la flore de Nouvelle-Calédonie. 
+    L'utilisateur a saisi le nom suivant pour son jardin : "{{query}}".
     
     TA MISSION :
-    1. Corrige l'orthographe du mot si nécessaire (ex: "Citronier" -> "Citronnier").
+    1. Corrige l'orthographe du mot si nécessaire (ex: "Citronier" -> "Citronnier"). 
+       ATTENTION : Ne change JAMAIS le type de plante. Si l'utilisateur écrit "Citronnier", ne propose pas "Mangue". Reste sur le végétal demandé.
     2. Détermine sa catégorie parmi : "Arbre Fruitier", "Potager", "Fleur", "Aromatique", "Autre".
-    3. Propose une liste de 4 à 6 variétés ou types spécifiques que l'on trouve couramment en Nouvelle-Calédonie pour ce végétal.
+    3. Propose une liste de 4 à 6 variétés ou types spécifiques qui sont **LES PLUS COURANTS, POPULAIRES ET RÉUSSIS EN NOUVELLE-CALÉDONIE** pour ce végétal précis.
+       - Pour les fruitiers, utilise les noms locaux connus (ex: Mangue Carotte, Mangue Greffe, Citron Galet, Banane Poingo, etc.).
+       - Pour le potager, cite les variétés qui supportent bien le climat tropical (ex: Tomate Heatmaster).
     
     Réponds au format JSON.`,
-    input: {
-      schema: RefinePlantInputSchema,
-      data: input,
-    },
+    input: input,
     output: {
       schema: RefinePlantOutputSchema,
     }
