@@ -120,7 +120,6 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             return;
         }
 
-        // Si on surveille déjà, on ne relance pas
         if (watchId.current !== null) return;
 
         watchId.current = navigator.geolocation.watchPosition(
@@ -141,8 +140,6 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
         );
     }, [map, initialZoomDone, toast]);
-
-    // Suppression du useEffect qui lançait startWatchingPosition automatiquement
 
     const handleRecenter = () => {
         if (!navigator.geolocation) {
@@ -701,7 +698,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                             </AccordionPrimitive.Header>
                                        </div>
                                        <AccordionPrimitive.Content className="overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down border-t border-dashed">
-                                           <div className="pb-4 pl-12 pr-4 space-y-4 pt-4 bg-muted/5">
+                                           <div className="pb-4 pl-4 sm:pl-12 pr-4 space-y-4 pt-4 bg-muted/5">
                                             {spot.fishingTypes && spot.fishingTypes.length > 0 && (
                                                 <div className="flex flex-wrap gap-2">
                                                     {spot.fishingTypes.map(type => {
@@ -726,9 +723,11 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                 {displayLowTide && <p><strong>Marée basse :</strong> {displayLowTide.time} ({displayLowTide.height.toFixed(2)}m)</p>}
                                                 {displayHighTide && <p><strong>Marée haute :</strong> {displayHighTide.time} ({displayHighTide.height.toFixed(2)}m)</p>}
                                            </div>
-                                           <div className="flex gap-2">
-                                               <Button variant="outline" className="flex-1 font-black uppercase text-[10px] h-10 border-2" onClick={() => handleFindSimilarDay(spot)} disabled={isAnalyzing}><BrainCircuit className="mr-2 size-4 text-primary"/> Jour similaire</Button>
-                                               <Button variant="outline" className="font-black uppercase text-[10px] h-10 border-2 px-3" onClick={() => {
+                                           <div className="flex flex-wrap gap-2">
+                                               <Button variant="outline" className="flex-1 min-w-[140px] font-black uppercase text-[10px] h-10 border-2" onClick={() => handleFindSimilarDay(spot)} disabled={isAnalyzing}>
+                                                   <BrainCircuit className="mr-2 size-4 text-primary"/> Jour similaire
+                                               </Button>
+                                               <Button variant="outline" className="flex-1 min-w-[80px] font-black uppercase text-[10px] h-10 border-2 px-3" onClick={() => {
                                                    if (map && spot.location) {
                                                        map.panTo({ lat: spot.location.latitude, lng: spot.location.longitude });
                                                        map.setZoom(16);
@@ -737,8 +736,10 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                }}>
                                                    <LocateFixed className="mr-2 size-4 text-primary" /> GPS
                                                </Button>
-                                               <Button variant="outline" size="icon" onClick={() => handleEditClick(spot)} className="size-10 border-2"><Pencil className="h-4 w-4" /></Button>
-                                               <Button variant="destructive" size="icon" onClick={() => handleDeleteSpot(spot.id)} className="size-10 shadow-sm"><Trash2 className="size-4" /></Button>
+                                               <div className="flex gap-2 w-full sm:w-auto">
+                                                   <Button variant="outline" size="icon" onClick={() => handleEditClick(spot)} className="flex-1 sm:flex-initial size-10 border-2"><Pencil className="h-4 w-4" /></Button>
+                                                   <Button variant="destructive" size="icon" onClick={() => handleDeleteSpot(spot.id)} className="flex-1 sm:flex-initial size-10 shadow-sm"><Trash2 className="size-4" /></Button>
+                                               </div>
                                            </div>
                                            </div>
                                        </AccordionPrimitive.Content>
