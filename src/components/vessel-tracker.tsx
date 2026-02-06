@@ -182,7 +182,7 @@ export function VesselTracker() {
         const updatePayload: any = { 
             userId: user.uid, 
             displayName: vesselNickname || user.displayName || 'Capitaine', 
-            isSharing: isSharing, 
+            isSharing: data.isSharing !== undefined ? data.isSharing : isSharing, 
             lastActive: serverTimestamp(),
             ...batteryInfo,
             ...data 
@@ -217,8 +217,15 @@ export function VesselTracker() {
   };
 
   const handleStopSharing = async () => {
+    if (!user || !firestore) return;
     setIsSharing(false);
-    updateVesselInFirestore({ isSharing: false });
+    // Explicitly write disconnection to Firestore
+    await setDoc(doc(firestore, 'vessels', sharingId), { 
+        isSharing: false, 
+        lastActive: serverTimestamp(),
+        statusChangedAt: serverTimestamp() 
+    }, { merge: true });
+
     if (watchIdRef.current) {
         navigator.geolocation.clearWatch(watchIdRef.current);
         watchIdRef.current = null;
@@ -269,6 +276,7 @@ export function VesselTracker() {
     }
   };
 
+  // Synchronized History Logic (Sender & Receiver)
   useEffect(() => {
     const vesselData = remoteVessel; 
     if (!vesselData || !activeVesselId) return;
@@ -301,7 +309,7 @@ export function VesselTracker() {
       };
       
       const label = statusLabels[currentStatus] || currentStatus;
-      const displayLabel = history.length === 0 ? `CONNEXION - ${label}` : label;
+      const displayLabel = history.length === 0 ? `ACTIF - ${label}` : label;
       
       const pos = { 
         lat: vesselData.location?.latitude || (currentPos?.lat ?? INITIAL_CENTER.lat), 
@@ -428,8 +436,6 @@ export function VesselTracker() {
 
   const displayVessel = mode === 'sender' ? (isSharing ? { location: { latitude: currentPos?.lat || 0, longitude: currentPos?.lng || 0 }, status: vesselStatus, displayName: vesselNickname || 'Ma Position', batteryLevel: 100 } : null) : remoteVessel;
 
-  if (isProfileLoading) return <Skeleton className="h-96 w-full" />;
-
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
       <Card className="border-2 shadow-sm overflow-hidden">
@@ -490,7 +496,7 @@ export function VesselTracker() {
                 <div className="space-y-4">
                     <div className="flex items-center justify-between p-4 border-2 rounded-2xl bg-primary/5 border-primary/10">
                         <div className="space-y-0.5"><Label className="text-sm font-black uppercase">Partager ma position</Label><p className="text-[9px] font-bold text-muted-foreground uppercase">Flux direct vers récepteur</p></div>
-                        <Switch checked={isSharing} onCheckedChange={(val) => { setIsSharing(val); updateVesselInFirestore({ isSharing: val }); }} />
+                        <Switch checked={isSharing} onCheckedChange={(val) => { if (val) { setIsSharing(true); updateVesselInFirestore({ isSharing: true }); } else { handleStopSharing(); } }} />
                     </div>
                     <div className="space-y-4">
                         <div className="space-y-1">
