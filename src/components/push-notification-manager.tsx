@@ -1,12 +1,12 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useUser, useFirestore, useFirebaseApp } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { useToast } from '@/hooks/use-toast';
-import { Bell, BellOff, ShieldCheck } from 'lucide-react';
+import { Bell, BellOff } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
@@ -18,10 +18,17 @@ export function PushNotificationManager() {
   const { toast } = useToast();
   const [permission, setPermission] = useState<NotificationPermission | 'default'>('default');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // On pré-charge le son pour éviter les délais lors de la réception
+  const notificationSound = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      setPermission(Notification.permission);
+    if (typeof window !== 'undefined') {
+      if ('Notification' in window) {
+        setPermission(Notification.permission);
+      }
+      notificationSound.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3');
+      notificationSound.current.load();
     }
   }, []);
 
@@ -29,20 +36,26 @@ export function PushNotificationManager() {
   useEffect(() => {
     if (!firebaseApp || typeof window === 'undefined') return;
 
-    const messaging = getMessaging(firebaseApp);
-    const unsubscribe = onMessage(messaging, (payload) => {
-      console.log('Message reçu au premier plan:', payload);
-      toast({
-        title: payload.notification?.title || 'Notification',
-        description: payload.notification?.body || '',
+    try {
+      const messaging = getMessaging(firebaseApp);
+      const unsubscribe = onMessage(messaging, (payload) => {
+        // Exécuter le toast et le son de manière asynchrone pour ne pas bloquer le thread principal
+        setTimeout(() => {
+          toast({
+            title: payload.notification?.title || 'Notification',
+            description: payload.notification?.body || '',
+          });
+          
+          if (notificationSound.current) {
+            notificationSound.current.play().catch(() => {});
+          }
+        }, 0);
       });
-      
-      // Optionnel : jouer un son personnalisé si l'app est ouverte
-      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3');
-      audio.play().catch(() => {});
-    });
 
-    return () => unsubscribe();
+      return () => unsubscribe();
+    } catch (e) {
+      console.warn("FCM non supporté sur ce navigateur");
+    }
   }, [firebaseApp, toast]);
 
   const requestPermission = async () => {
@@ -55,7 +68,7 @@ export function PushNotificationManager() {
 
       if (status === 'granted') {
         const messaging = getMessaging(firebaseApp);
-        // Remplacez par votre clé VAPID publique générée dans la console Firebase
+        // Utilisation de la clé VAPID pour lier l'appareil
         const token = await getToken(messaging, {
           vapidKey: 'BDS_VOTRE_CLE_VAPID_GENEREE_DANS_CONSOLE_FIREBASE' 
         });

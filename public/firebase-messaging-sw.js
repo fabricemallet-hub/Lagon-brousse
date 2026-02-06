@@ -1,54 +1,33 @@
 
-// Service Worker pour Firebase Cloud Messaging
+// Service Worker spécifique pour Firebase Cloud Messaging (FCM)
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
 
-// Remplacez par votre configuration Firebase
+// Ces valeurs seront injectées par Firebase ou lues depuis votre config
+// Note: En production, Firebase initialise automatiquement si le fichier est à la racine
 firebase.initializeApp({
   apiKey: "AIzaSyDs6qQO274Ro2RD4lVkr8KztsZIecP-ZDk",
   authDomain: "studio-2943478321-f746e.firebaseapp.com",
   projectId: "studio-2943478321-f746e",
+  storageBucket: "studio-2943478321-f746e.appspot.com",
   messagingSenderId: "679064713235",
   appId: "1:679064713235:web:93b38bd7feda744b24a7e6"
 });
 
 const messaging = firebase.messaging();
 
-// Gestion des messages en arrière-plan (veille)
+// Handler pour les messages reçus quand l'app est fermée ou en veille
 messaging.onBackgroundMessage((payload) => {
-  console.log('Notification reçue en arrière-plan:', payload);
+  console.log('[SW] Message en arrière-plan reçu:', payload);
 
   const notificationTitle = payload.notification.title;
   const notificationOptions = {
     body: payload.notification.body,
     icon: '/icon-192x192.png',
     badge: '/icon-192x192.png',
-    tag: payload.data?.tag || 'lagon-brousse-alert',
-    vibrate: [200, 100, 200],
-    data: {
-      url: payload.data?.url || '/'
-    }
+    data: payload.data,
+    vibrate: [200, 100, 200]
   };
 
   return self.registration.showNotification(notificationTitle, notificationOptions);
-});
-
-// Gérer le clic sur la notification
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  const urlToOpen = event.notification.data.url;
-
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      for (let i = 0; i < windowClients.length; i++) {
-        const client = windowClients[i];
-        if (client.url === urlToOpen && 'focus' in client) {
-          return client.focus();
-        }
-      }
-      if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
-      }
-    })
-  );
 });

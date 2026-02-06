@@ -1,3 +1,4 @@
+
 'use client';
 import {
   Sidebar,
@@ -48,7 +49,7 @@ import { Skeleton } from './ui/skeleton';
 import { signOut } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
 import type { UserAccount } from '@/lib/types';
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from './ui/badge';
 import { cn } from '@/lib/utils';
@@ -61,6 +62,7 @@ const UsageTimer = React.memo(({ status, auth, userId }: { status: string, auth:
   const { toast } = useToast();
   const router = useRouter();
   const pathname = usePathname();
+  const lastSyncRef = useRef<number>(0);
 
   useEffect(() => {
     if ((status !== 'limited' && status !== 'trial') || !auth || !userId) {
@@ -96,7 +98,12 @@ const UsageTimer = React.memo(({ status, auth, userId }: { status: string, auth:
         const next = Math.max(0, prev - 1);
         const used = USAGE_LIMIT_SECONDS - next;
         
-        localStorage.setItem('dailyUsage', String(used));
+        // Optimisation : On ne met à jour le localStorage que toutes les 5 secondes 
+        // ou si on arrive à la fin pour réduire la charge processeur (Forced Reflow)
+        if (Date.now() - lastSyncRef.current > 5000 || next === 0) {
+          localStorage.setItem('dailyUsage', String(used));
+          lastSyncRef.current = Date.now();
+        }
         
         if (next <= 0) {
           clearInterval(interval);
