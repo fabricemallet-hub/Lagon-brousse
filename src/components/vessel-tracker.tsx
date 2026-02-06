@@ -43,7 +43,9 @@ import {
   Battery,
   MessageSquare,
   Eye,
-  Smartphone
+  Smartphone,
+  Phone,
+  Waves
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -892,6 +894,88 @@ export function VesselTracker() {
                 </AccordionItem>
             </Accordion>
         </div>
+      </Card>
+
+      {/* Directory Section */}
+      <Card className="border-2 bg-muted/10 shadow-none">
+        <CardHeader className="p-4 pb-2 border-b">
+          <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
+            <Phone className="size-4 text-primary" /> Annuaire Maritime NC
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="space-y-3">
+            <h4 className="text-[10px] font-black uppercase text-red-600 flex items-center gap-2 border-b pb-1">
+              <ShieldAlert className="size-3" /> Urgences
+            </h4>
+            <div className="space-y-2">
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">COSS NC (Mer)</span>
+                <a href="tel:16" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                  <Phone className="size-3" /> 16
+                </a>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">SAMU (Terre)</span>
+                <a href="tel:15" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                  <Phone className="size-3" /> 15
+                </a>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">Gendarmerie Maritime</span>
+                <a href="tel:294036" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                  <Phone className="size-3" /> 29 40 36
+                </a>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">Protection du lagon</span>
+                <a href="tel:243255" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                  <Phone className="size-3" /> 24 32 55
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h4 className="text-[10px] font-black uppercase text-blue-600 flex items-center gap-2 border-b pb-1">
+              <Waves className="size-3" /> Services
+            </h4>
+            <div className="space-y-2">
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">Météo Marine</span>
+                <a href="tel:366736" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                  <Phone className="size-3" /> 36 67 36
+                </a>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">Phares et Balises</span>
+                <a href="tel:232100" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                  <Phone className="size-3" /> 23 21 00
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h4 className="text-[10px] font-black uppercase text-indigo-600 flex items-center gap-2 border-b pb-1">
+              <Ship className="size-3" /> Ports & Marinas
+            </h4>
+            <div className="space-y-2">
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">Port Autonome (VHF 12)</span>
+                <a href="tel:255000" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                  <Phone className="size-3" /> 25 50 00
+                </a>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">Port Moselle (VHF 67)</span>
+                <a href="tel:277197" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                  <Phone className="size-3" /> 27 71 97
+                </a>
+              </div>
+            </div>
+          </div>
+        </CardContent>
       </Card>
     </div>
   );
