@@ -44,7 +44,7 @@ import {
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
-import { Skeleton } from './ui/skeleton';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
@@ -436,10 +436,11 @@ export function VesselTracker() {
             <div className="space-y-6">
               {isSharing ? (
                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                    <div className="p-6 bg-primary text-white rounded-2xl shadow-xl relative overflow-hidden border-2 border-primary-foreground/20">
+                    <div className={cn("p-6 rounded-2xl shadow-xl relative overflow-hidden border-2", 
+                        vesselStatus === 'landed' ? "bg-green-600 border-green-400/20" : "bg-primary border-primary-foreground/20")}>
                         <Navigation className="absolute -right-4 -bottom-4 size-32 opacity-10 rotate-12" />
-                        <div className="space-y-1 relative z-10">
-                            <p className="text-[10px] font-black uppercase text-blue-100 tracking-widest flex items-center gap-2">
+                        <div className="space-y-1 relative z-10 text-white">
+                            <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
                                 <Zap className="size-3 fill-yellow-300 text-yellow-300" /> Partage en cours
                             </p>
                             <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">{sharingId}</h3>
