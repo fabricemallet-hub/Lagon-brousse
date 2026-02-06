@@ -39,7 +39,8 @@ import {
   Trash2,
   Ship,
   Home,
-  RefreshCw
+  RefreshCw,
+  Settings
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -49,6 +50,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
+import { Slider } from '@/components/ui/slider';
 
 const INITIAL_CENTER = { lat: -22.27, lng: 166.45 };
 const IMMOBILITY_THRESHOLD_METERS = 20; 
@@ -108,7 +110,6 @@ export function VesselTracker() {
   const lastStatusesRef = useRef<Record<string, string>>({});
   const lastUpdatesRef = useRef<Record<string, number>>({});
   const lastSentStatusRef = useRef<string | null>(null);
-  const batteryAlertsRef = useRef<Record<string, boolean>>({});
   const watchTriggeredRef = useRef<Record<string, boolean>>({});
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
@@ -193,18 +194,6 @@ export function VesselTracker() {
     update();
   }, [user, firestore, isSharing, sharingId, vesselNickname, vesselStatus]);
 
-  const handleManualStatus = (st: VesselStatus['status'], label?: string) => {
-    setVesselStatus(st);
-    updateVesselInFirestore({ status: st, eventLabel: label || null });
-    
-    if (st === 'moving') {
-        immobilityStartTime.current = null;
-        setAnchorPos(null);
-    }
-    
-    toast({ title: label || (st === 'returning' ? 'Retour Maison' : st === 'landed' ? 'À terre' : 'Mode Auto') });
-  };
-
   const handleSaveVessel = async () => {
     if (!user || !firestore) return;
     const cleanId = (vesselIdToFollow || customSharingId).trim().toUpperCase();
@@ -235,6 +224,18 @@ export function VesselTracker() {
     }
   };
 
+  const handleManualStatus = (st: VesselStatus['status'], label?: string) => {
+    setVesselStatus(st);
+    updateVesselInFirestore({ status: st, eventLabel: label || null });
+    
+    if (st === 'moving') {
+        immobilityStartTime.current = null;
+        setAnchorPos(null);
+    }
+    
+    toast({ title: label || (st === 'returning' ? 'Retour Maison' : st === 'landed' ? 'À terre' : 'Mode Auto') });
+  };
+
   const handleStopSharing = async () => {
     if (!user || !firestore) return;
     setIsSharing(false);
@@ -252,6 +253,12 @@ export function VesselTracker() {
     setAnchorPos(null);
     lastSentStatusRef.current = null;
     toast({ title: "Partage arrêté" });
+  };
+
+  const saveVesselPrefs = async (newPrefs: typeof vesselPrefs) => {
+    if (!user || !firestore) return;
+    setVesselPrefs(newPrefs);
+    await updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: newPrefs }).catch(() => {});
   };
 
   useEffect(() => {
@@ -422,7 +429,7 @@ export function VesselTracker() {
                         <Button 
                             variant="ghost" 
                             className="w-full h-12 font-black uppercase text-[9px] border-2 border-dashed gap-2 text-orange-600" 
-                            onClick={() => handleManualStatus('moving', 'ERREUR / REPRISE MODE NORMAL')}
+                            onClick={() => handleManualStatus('moving', 'ERREUR - REPRISE MODE AUTO')}
                         >
                             <RefreshCw className="size-4" /> ERREUR / REPRISE MODE NORMAL (AUTO)
                         </Button>
@@ -492,6 +499,91 @@ export function VesselTracker() {
                     </div>
                 </div>
               )}
+
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="receiver-settings" className="border-none">
+                  <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
+                    <Settings className="size-4 text-primary" />
+                    <span className="text-[10px] font-black uppercase">Réglages Notifications & Veille</span>
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-4 space-y-6">
+                    <div className="space-y-4 p-4 border-2 rounded-2xl bg-card shadow-inner">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label className="text-xs font-black uppercase">Alertes Sonores</Label>
+                          <p className="text-[9px] font-bold text-muted-foreground uppercase">Activer les signaux audio</p>
+                        </div>
+                        <Switch 
+                          checked={vesselPrefs.isNotifyEnabled} 
+                          onCheckedChange={v => saveVesselPrefs({ ...vesselPrefs, isNotifyEnabled: v })} 
+                        />
+                      </div>
+
+                      <div className="space-y-3 pt-2 border-t border-dashed">
+                        <Label className="text-[10px] font-black uppercase opacity-60 flex items-center gap-2">
+                          <Volume2 className="size-3" /> Volume des alertes
+                        </Label>
+                        <Slider 
+                          value={[vesselPrefs.vesselVolume * 100]} 
+                          max={100} step={1} 
+                          onValueChange={v => saveVesselPrefs({ ...vesselPrefs, vesselVolume: v[0] / 100 })} 
+                        />
+                      </div>
+
+                      <div className="space-y-4 pt-4 border-t border-dashed">
+                        <p className="text-[9px] font-black uppercase text-muted-foreground">Sons par événement</p>
+                        <div className="grid gap-3">
+                          {['moving', 'stationary', 'offline'].map(key => (
+                            <div key={key} className="flex items-center justify-between gap-4">
+                              <span className="text-[10px] font-bold uppercase flex-1">{key === 'moving' ? 'Mouvement' : key === 'stationary' ? 'Mouillage' : 'Signal Perdu'}</span>
+                              <Select 
+                                value={vesselPrefs.notifySounds[key as keyof typeof vesselPrefs.notifySounds]} 
+                                onValueChange={v => saveVesselPrefs({ ...vesselPrefs, notifySounds: { ...vesselPrefs.notifySounds, [key]: v } })}
+                              >
+                                <SelectTrigger className="h-8 text-[9px] font-black uppercase w-32 bg-muted/30">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] uppercase font-black">{s.label}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => playVesselSound(vesselPrefs.notifySounds[key as keyof typeof vesselPrefs.notifySounds])}><Play className="size-3" /></Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 p-4 border-2 rounded-2xl bg-orange-50/30 border-orange-100">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label className="text-xs font-black uppercase text-orange-800">Veille Stratégique</Label>
+                          <p className="text-[9px] font-bold text-orange-600/60 uppercase">Alarme si immobile trop longtemps</p>
+                        </div>
+                        <Switch 
+                          checked={vesselPrefs.isWatchEnabled} 
+                          onCheckedChange={v => saveVesselPrefs({ ...vesselPrefs, isWatchEnabled: v })} 
+                        />
+                      </div>
+                      
+                      <div className="space-y-3 pt-2 border-t border-orange-100">
+                        <Label className="text-[10px] font-black uppercase text-orange-800/60">Seuil d'immobilité (minutes)</Label>
+                        <Select 
+                          value={String(vesselPrefs.watchDuration)} 
+                          onValueChange={v => saveVesselPrefs({ ...vesselPrefs, watchDuration: parseInt(v) })}
+                        >
+                          <SelectTrigger className="h-10 font-black text-xs bg-white">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[5, 10, 15, 30, 60, 120].map(m => <SelectItem key={m} value={String(m)}>{m} minutes</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             </div>
           )}
         </CardContent>
@@ -540,7 +632,7 @@ export function VesselTracker() {
                   <AccordionTrigger className="text-[10px] font-black uppercase py-3">
                     <div className="flex items-center gap-2"><History className="size-3"/> Journal de bord unifié</div>
                   </AccordionTrigger>
-                  <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64">
+                  <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide touch-pan-y">
                         {history.length > 0 ? (
                             <div className="space-y-2">
                                 {history.map((h, i) => (
