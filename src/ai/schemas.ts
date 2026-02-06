@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // Schemas for find-best-fishing-day flow
-const FishingSpotContextSchema = z.object({
+export const FishingSpotContextSchema = z.object({
   timestamp: z.string(),
   moonPhase: z.string(),
   tideHeight: z.number(),
@@ -110,3 +110,25 @@ export const GenerateFishInfoOutputSchema = z.object({
   category: z.enum(['Lagon', 'Large', 'Recif']).describe("Catégorie d'habitat."),
 });
 export type GenerateFishInfoOutput = z.infer<typeof GenerateFishInfoOutputSchema>;
+
+// Recommend Best Spot (GPS + Current Context)
+export const RecommendBestSpotInputSchema = z.object({
+  currentContext: FishingSpotContextSchema,
+  candidateSpots: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    distance: z.number().describe('Distance in meters'),
+    historicalContext: FishingSpotContextSchema
+  })),
+  location: z.string(),
+});
+export type RecommendBestSpotInput = z.infer<typeof RecommendBestSpotInputSchema>;
+
+export const RecommendBestSpotOutputSchema = z.object({
+  bestSpotId: z.string(),
+  bestSpotName: z.string(),
+  reason: z.string().describe("Why this spot is recommended for current conditions."),
+  confidence: z.number().describe("Score from 0 to 100."),
+  advice: z.string().describe("Specific tactical advice for this spot right now.")
+});
+export type RecommendBestSpotOutput = z.infer<typeof RecommendBestSpotOutputSchema>;

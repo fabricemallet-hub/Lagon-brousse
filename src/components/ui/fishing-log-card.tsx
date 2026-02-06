@@ -15,14 +15,15 @@ import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebas
 import { collection, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import type { LocationData, FishingSpot, SwellForecast } from '@/lib/types';
-import { getDataForDate } from '@/lib/data';
-import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown, Pencil, History } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import type { LocationData, FishingSpot, SwellForecast, Tide } from '@/lib/types';
+import { getDataForDate, generateProceduralData } from '@/lib/data';
+import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown, Pencil, History, Navigation, Map as MapIcon } from 'lucide-react';
+import { cn, getDistance } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from './alert';
 import { useLocation } from '@/context/location-context';
 import { findSimilarDay, analyzeBestDay } from '@/ai/flows/find-best-fishing-day';
-import type { FishingAnalysisOutput } from '@/ai/schemas';
+import { recommendBestSpot } from '@/ai/flows/recommend-best-spot';
+import type { FishingAnalysisOutput, RecommendBestSpotOutput } from '@/ai/schemas';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { useGoogleMaps } from '@/context/google-maps-context';
@@ -74,7 +75,9 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     const { selectedLocation } = useLocation();
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analysisResult, setAnalysisResult] = useState<FishingAnalysisOutput | null>(null);
+    const [recommendResult, setRecommendResult] = useState<RecommendBestSpotOutput | null>(null);
     const [isAnalysisDialogOpen, setIsAnalysisDialogOpen] = useState(false);
+    const [isRecommendDialogOpen, setIsRecommendDialogOpen] = useState(false);
     const [selectedSpotIds, setSelectedSpotIds] = useState<string[]>([]);
     
     const [openSpotId, setOpenSpotId] = useState<string | undefined>(undefined);
@@ -164,13 +167,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         );
     };
 
-    const handleSaveSpot = async () => {
-        if (!user || !firestore || !newSpotLocation || !spotName) {
-            toast({ variant: 'destructive', title: 'Erreur', description: "Le nom du spot est requis." });
-            return;
-        }
-        setIsSaving(true);
-        
+    const getCurrentContext = () => {
         const now = new Date();
         const todayData = getDataForDate(selectedLocation, now);
         const prevDate = new Date(now);
@@ -193,12 +190,6 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
 
         const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
-        const prevTide = combinedTides.filter(t => t.timeMinutes <= nowMinutes).pop();
-        const nextTide = combinedTides.find(t => t.timeMinutes > nowMinutes);
-
-        const closestLowTide = prevTide?.type === 'basse' ? prevTide : (nextTide?.type === 'basse' ? nextTide : null);
-        const closestHighTide = prevTide?.type === 'haute' ? prevTide : (nextTide?.type === 'haute' ? nextTide : null);
-
         const getTideMovementForContext = (): 'montante' | 'descendante' | 'étale' => {
             const nextTidePeak = combinedTides.find(t => t.timeMinutes > nowMinutes);
             const prevTidePeak = combinedTides.filter(t => t.timeMinutes < nowMinutes).pop();
@@ -213,48 +204,41 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         const currentHour = now.getHours();
         const currentForecast = todayData.weather.hourly.find(f => new Date(f.date).getHours() === currentHour) || todayData.weather.hourly[0];
 
-        const findClosestSwell = (swellForecasts: SwellForecast[]): SwellForecast => {
-            if (!swellForecasts || swellForecasts.length === 0) {
-                return { time: '12:00', inside: 'N/A', outside: 'N/A', period: 0 };
-            }
-            const nowMinutes = now.getHours() * 60 + now.getMinutes();
-            return swellForecasts.reduce((prev, curr) => {
-                const prevTimeMinutes = timeToMinutes(prev.time);
-                const currTimeMinutes = timeToMinutes(curr.time);
-                return (Math.abs(currTimeMinutes - nowMinutes) < Math.abs(prevTimeMinutes - nowMinutes) ? curr : prev);
-            });
+        return {
+            timestamp: now.toISOString(),
+            moonPhase: todayData.weather.moon.phase,
+            tideHeight: currentForecast.tideHeight,
+            tideMovement: getTideMovementForContext(),
+            tideCurrent: currentForecast.tideCurrent,
+            weatherCondition: currentForecast.condition,
+            windSpeed: currentForecast.windSpeed,
+            windDirection: currentForecast.windDirection,
+            airTemperature: currentForecast.temp,
+            waterTemperature: todayData.weather.waterTemperature,
         };
-        const currentSwell = findClosestSwell(todayData.weather.swell);
+    };
 
-        const newSpotData = {
-            userId: user.uid,
-            name: spotName,
-            notes: spotNotes,
-            location: { latitude: newSpotLocation.lat, longitude: newSpotLocation.lng },
-            icon: selectedIcon,
-            color: selectedColor,
-            fishingTypes: selectedFishingTypes,
-            createdAt: serverTimestamp(),
-            context: {
-                timestamp: now.toISOString(),
-                moonPhase: todayData.weather.moon.phase,
-                tideHeight: currentForecast.tideHeight,
-                tideMovement: getTideMovementForContext(),
-                tideCurrent: currentForecast.tideCurrent,
-                weatherCondition: currentForecast.condition,
-                windSpeed: currentForecast.windSpeed,
-                windDirection: currentForecast.windDirection,
-                airTemperature: currentForecast.temp,
-                waterTemperature: todayData.weather.waterTemperature,
-                ...(closestLowTide && { closestLowTide: { time: closestLowTide.time, height: closestLowTide.height } }),
-                ...(closestHighTide && { closestHighTide: { time: closestHighTide.time, height: closestHighTide.height } }),
-                swellInside: currentSwell.inside,
-                swellOutside: currentSwell.outside,
-            }
-        };
+    const handleSaveSpot = async () => {
+        if (!user || !firestore || !newSpotLocation || !spotName) {
+            toast({ variant: 'destructive', title: 'Erreur', description: "Le nom du spot est requis." });
+            return;
+        }
+        setIsSaving(true);
+        
+        const context = getCurrentContext();
 
         try {
-            await addDoc(collection(firestore, 'users', user.uid, 'fishing_spots'), newSpotData);
+            await addDoc(collection(firestore, 'users', user.uid, 'fishing_spots'), {
+                userId: user.uid,
+                name: spotName,
+                notes: spotNotes,
+                location: { latitude: newSpotLocation.lat, longitude: newSpotLocation.lng },
+                icon: selectedIcon,
+                color: selectedColor,
+                fishingTypes: selectedFishingTypes,
+                createdAt: serverTimestamp(),
+                context
+            });
             toast({ title: 'Spot sauvegardé !' });
             setIsSpotDialogOpen(false);
             setNewSpotLocation(null);
@@ -375,6 +359,45 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         }
     };
 
+    const handleRecommendSpotNow = async () => {
+        if (!savedSpots || savedSpots.length === 0) {
+            toast({ title: 'Aucun spot', description: 'Enregistrez d\'abord quelques coins de pêche.' });
+            return;
+        }
+
+        setIsAnalyzing(true);
+        setRecommendResult(null);
+        setIsRecommendDialogOpen(true);
+
+        try {
+            const currentContext = getCurrentContext();
+            
+            // Si le GPS n'est pas actif, on utilise le centre de la carte comme fallback
+            const referenceLocation = userLocation || { lat: map?.getCenter()?.lat() || INITIAL_CENTER.lat, lng: map?.getCenter()?.lng() || INITIAL_CENTER.lng };
+
+            const candidateSpots = savedSpots.map(spot => ({
+                id: spot.id,
+                name: spot.name,
+                distance: Math.round(getDistance(referenceLocation.lat, referenceLocation.lng, spot.location.latitude, spot.location.longitude)),
+                historicalContext: spot.context
+            }));
+
+            const result = await recommendBestSpot({
+                currentContext: currentContext as any,
+                candidateSpots,
+                location: selectedLocation
+            });
+
+            setRecommendResult(result);
+        } catch (error) {
+            console.error(error);
+            toast({ variant: 'destructive', title: 'Erreur IA', description: 'Impossible de recommander un spot.' });
+            setIsRecommendDialogOpen(false);
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
     const handleSpotSelection = (spotId: string) => {
         setSelectedSpotIds(prev =>
             prev.includes(spotId)
@@ -386,7 +409,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     if (!user) {
         return (
             <Card>
-                <CardHeader><CardTitle className="flex items-center gap-2"><Map /> Carnet de Pêche</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="flex items-center gap-2"><MapIcon /> Carnet de Pêche</CardTitle></CardHeader>
                 <CardContent>
                     <Alert>
                         <AlertCircle className="h-4 w-4" />
@@ -401,7 +424,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     return (
         <Card className={cn("transition-all", isFullscreen && "fixed inset-0 z-50 w-screen h-screen rounded-none border-none flex flex-col")}>
             <CardHeader className={cn(isFullscreen && "flex-shrink-0")}>
-                <CardTitle className="flex items-center gap-2"><Map /> Carnet de Pêche</CardTitle>
+                <CardTitle className="flex items-center gap-2"><MapIcon /> Carnet de Pêche</CardTitle>
                 <CardDescription>Cliquez sur la carte pour marquer un coin. Vos spots apparaîtront dans l'historique.</CardDescription>
             </CardHeader>
             <CardContent className={cn("space-y-4", isFullscreen ? "flex-grow flex flex-col p-2 gap-2" : "p-6 pt-0")}>
@@ -513,6 +536,18 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                     </Alert>
                 )}
                 
+                <div className="grid grid-cols-1 gap-2">
+                    <Button 
+                        variant="secondary" 
+                        className="w-full font-black uppercase h-14 text-sm tracking-tight shadow-md border-2 border-primary/20 gap-3"
+                        onClick={handleRecommendSpotNow}
+                        disabled={isAnalyzing}
+                    >
+                        <BrainCircuit className={cn("size-6 text-primary", isAnalyzing && "animate-pulse")} />
+                        Quel spot pour maintenant ? (IA)
+                    </Button>
+                </div>
+
                 <Dialog open={isSpotDialogOpen} onOpenChange={(open) => { if (!open) setSpotToEdit(null); setIsSpotDialogOpen(open); }}>
                     <DialogContent className="max-h-[95vh] flex flex-col p-0 overflow-hidden sm:max-w-lg">
                         <DialogHeader className="p-6 pb-2 shrink-0">
@@ -672,6 +707,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                     </div>
                 )}
 
+                {/* Dialog Analyse 7 jours / Jour similaire */}
                 <Dialog open={isAnalysisDialogOpen} onOpenChange={setIsAnalysisDialogOpen}>
                     <DialogContent className="max-w-md rounded-2xl">
                         <DialogHeader>
@@ -700,6 +736,67 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                             )}
                         </div>
                         <DialogFooter><Button variant="outline" onClick={() => setIsAnalysisDialogOpen(false)} className="w-full font-black uppercase h-12">Fermer</Button></DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Dialog Recommandation Spot Actuel */}
+                <Dialog open={isRecommendDialogOpen} onOpenChange={setIsRecommendDialogOpen}>
+                    <DialogContent className="max-w-md rounded-2xl">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2 font-black uppercase"><BrainCircuit className="text-primary" /> Meilleur spot immédiat</DialogTitle>
+                            <DialogDescription className="text-[10px] uppercase font-bold">Analyse basée sur votre GPS, la marée et la lune actuelle</DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4">
+                            {isAnalyzing ? (
+                                <div className="flex flex-col items-center justify-center py-10 space-y-4">
+                                    <BrainCircuit className="size-12 text-primary animate-pulse" />
+                                    <p className="text-xs font-bold uppercase text-muted-foreground animate-pulse">Calcul tactique en cours...</p>
+                                </div>
+                            ) : recommendResult && (
+                                <div className="space-y-6 animate-in fade-in zoom-in-95">
+                                    <div className="p-6 bg-indigo-600 text-white rounded-2xl shadow-xl relative overflow-hidden">
+                                        <Navigation className="absolute -right-4 -bottom-4 size-24 opacity-10 rotate-12" />
+                                        <p className="text-[10px] font-black uppercase text-indigo-200 mb-1 tracking-widest">Allez à :</p>
+                                        <h3 className="text-2xl font-black uppercase tracking-tighter mb-2">{recommendResult.bestSpotName}</h3>
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="outline" className="bg-white/10 border-white/20 text-white font-black text-[10px]">CONFIANCE {recommendResult.confidence}%</Badge>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <div className="space-y-1.5">
+                                            <p className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2 px-1"><BrainCircuit className="size-3" /> Pourquoi ce choix ?</p>
+                                            <div className="bg-muted/30 p-4 rounded-xl border-2 italic text-xs font-medium leading-relaxed">
+                                                "{recommendResult.reason}"
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <p className="text-[10px] font-black uppercase text-primary flex items-center gap-2 px-1"><Fish className="size-3" /> Conseil Tactique</p>
+                                            <div className="bg-primary/5 p-4 rounded-xl border-2 border-primary/10 text-xs font-bold leading-relaxed text-primary">
+                                                {recommendResult.advice}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <Button 
+                                        className="w-full h-12 font-black uppercase gap-2"
+                                        onClick={() => {
+                                            const spot = savedSpots?.find(s => s.id === recommendResult.bestSpotId);
+                                            if (spot && map) {
+                                                map.panTo({ lat: spot.location.latitude, lng: spot.location.longitude });
+                                                map.setZoom(16);
+                                                setIsRecommendDialogOpen(false);
+                                                mapContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                            }
+                                        }}
+                                    >
+                                        <LocateFixed className="size-4" /> Voir sur la carte
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                        <DialogFooter><Button variant="outline" onClick={() => setIsRecommendDialogOpen(false)} className="w-full font-black uppercase h-12">Fermer</Button></DialogFooter>
                     </DialogContent>
                 </Dialog>
             </CardContent>
