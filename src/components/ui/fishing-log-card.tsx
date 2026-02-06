@@ -18,7 +18,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { LocationData, FishingSpot, SwellForecast, Tide } from '@/lib/types';
 import { getDataForDate, generateProceduralData } from '@/lib/data';
-import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown, Pencil, History, Navigation, Map as MapIcon } from 'lucide-react';
+import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown, Pencil, History, Navigation, Map as MapIcon, RefreshCw } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from './alert';
 import { useLocation } from '@/context/location-context';
@@ -75,6 +75,8 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     const mapContainerRef = useRef<HTMLDivElement>(null);
 
     const { selectedLocation } = useLocation();
+    
+    // États d'analyse séparés pour éviter les conflits
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analysisResult, setAnalysisResult] = useState<FishingAnalysisOutput | null>(null);
     const [recommendResult, setRecommendResult] = useState<RecommendBestSpotOutput | null>(null);
@@ -373,8 +375,6 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
 
         try {
             const currentContext = getCurrentContext();
-            
-            // Si le GPS n'est pas actif, on utilise le centre de la carte comme fallback
             const referenceLocation = userLocation || { lat: map?.getCenter()?.lat() || INITIAL_CENTER.lat, lng: map?.getCenter()?.lng() || INITIAL_CENTER.lng };
 
             const candidateSpots = savedSpots.map(spot => ({
@@ -426,8 +426,8 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     return (
         <Card className={cn("transition-all", isFullscreen && "fixed inset-0 z-50 w-screen h-screen rounded-none border-none flex flex-col")}>
             <CardHeader className={cn(isFullscreen && "flex-shrink-0")}>
-                <CardTitle className="flex items-center gap-2"><MapIcon /> Carnet de Pêche</CardTitle>
-                <CardDescription>Cliquez sur la carte pour marquer un coin. Vos spots apparaîtront dans l'historique.</CardDescription>
+                <CardTitle className="flex items-center gap-2 text-lg sm:text-xl font-black uppercase tracking-tighter"><MapIcon className="size-5" /> Carnet de Pêche</CardTitle>
+                <CardDescription className="text-[10px] font-bold uppercase">Cliquez sur la carte pour marquer un coin de pêche.</CardDescription>
             </CardHeader>
             <CardContent className={cn("space-y-4", isFullscreen ? "flex-grow flex flex-col p-2 gap-2" : "p-6 pt-0")}>
                 {loadError && <Alert variant="destructive"><AlertTitle>Erreur de chargement de la carte</AlertTitle></Alert>}
@@ -505,7 +505,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         </Button>
                          <div className={cn("absolute bottom-0 left-0 right-0 z-10", !newSpotLocation && "hidden")}>
                             <Button 
-                                className="w-full h-14 rounded-none bg-primary hover:bg-primary/90 text-white font-black uppercase text-sm sm:text-base tracking-tight shadow-[0_-4px_20px_rgba(0,0,0,0.3)] gap-3" 
+                                className="w-full h-14 rounded-none bg-primary hover:bg-primary/90 text-white font-black uppercase text-sm tracking-tight shadow-[0_-4px_20px_rgba(0,0,0,0.3)] gap-3" 
                                 onClick={() => {
                                     if (newSpotLocation) {
                                         setDialogMode('add');
@@ -519,7 +519,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                     }
                                 }}
                             >
-                                <Plus className="size-6" /> Ajouter ce coin de pêche
+                                <Plus className="size-6" /> Ajouter ce coin
                             </Button>
                         </div>
                     </div>
@@ -530,7 +530,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         <LocateFixed className="size-4 text-primary" />
                         <AlertTitle className="text-xs font-black uppercase">Localisation Inactive</AlertTitle>
                         <AlertDescription className="flex flex-col gap-2">
-                            <p className="text-[10px] font-medium leading-relaxed">Cliquez sur le bouton ci-dessous pour vous situer sur la carte et afficher votre position en temps réel.</p>
+                            <p className="text-[10px] font-medium leading-relaxed">Activez votre position pour vous situer sur la carte et afficher votre position en temps réel.</p>
                             <Button size="sm" onClick={handleRecenter} className="font-black uppercase text-[10px] h-8 tracking-widest">
                                 <LocateFixed className="size-3 mr-2" /> Afficher ma position
                             </Button>
@@ -550,85 +550,21 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                     </Button>
                 </div>
 
-                <Dialog open={isSpotDialogOpen} onOpenChange={(open) => { if (!open) setSpotToEdit(null); setIsSpotDialogOpen(open); }}>
-                    <DialogContent className="max-h-[95vh] flex flex-col p-0 overflow-hidden sm:max-w-lg">
-                        <DialogHeader className="p-6 pb-2 shrink-0">
-                            <DialogTitle className="font-black uppercase tracking-tight">{dialogMode === 'add' ? 'Nouveau spot' : 'Modifier le spot'}</DialogTitle>
-                        </DialogHeader>
-                        
-                        <div className="flex-grow overflow-y-auto p-6 py-2 space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="spot-name" className="text-xs font-bold uppercase text-muted-foreground">Nom du spot</Label>
-                                <Input id="spot-name" placeholder="Ex: Spot à bec de cane" value={spotName} onChange={(e) => setSpotName(e.target.value)} className="h-12 border-2 font-bold" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="spot-notes" className="text-xs font-bold uppercase text-muted-foreground">Notes</Label>
-                                <Textarea id="spot-notes" placeholder="Détails..." value={spotNotes} onChange={(e) => setSpotNotes(e.target.value)} className="border-2 font-medium" />
-                            </div>
-                             <div className="space-y-2">
-                                <Label className="text-xs font-bold uppercase text-muted-foreground">Techniques de pêche</Label>
-                                <div className="flex flex-wrap gap-2">
-                                    {fishingTypes.map((type) => {
-                                        const isSelected = selectedFishingTypes.includes(type.id);
-                                        return (
-                                            <Button
-                                                key={type.id}
-                                                variant={isSelected ? 'default' : 'outline'}
-                                                size="sm"
-                                                onClick={() => handleToggleFishingType(type.id)}
-                                                className={cn("font-bold text-[10px] uppercase h-8", isSelected && `${type.bgColor} hover:${type.bgColor}/90 text-white border-none shadow-sm`)}
-                                            >
-                                                {type.label}
-                                            </Button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-xs font-bold uppercase text-muted-foreground">Icône</Label>
-                                <div className="flex gap-3">
-                                    {availableIcons.map(iconName => {
-                                        const Icon = mapIcons[iconName as keyof typeof mapIcons];
-                                        return (
-                                            <Button key={iconName} variant="outline" size="icon" onClick={() => setSelectedIcon(iconName as keyof typeof mapIcons)} className={cn("size-12 border-2 transition-all", selectedIcon === iconName ? "border-primary bg-primary/5 scale-110 shadow-md" : "opacity-60")}>
-                                                <Icon className="size-6" />
-                                            </Button>
-                                        )
-                                    })}
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-xs font-bold uppercase text-muted-foreground">Couleur</Label>
-                                <div className="flex flex-wrap gap-3">
-                                    {availableColors.map(color => (
-                                        <button key={color} onClick={() => setSelectedColor(color)} className={cn("w-10 h-10 rounded-full border-4 transition-all shadow-sm", selectedColor === color ? "border-white ring-2 ring-primary scale-110" : "border-transparent opacity-80")} style={{ backgroundColor: color }} />
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <DialogFooter className="p-6 pt-2 border-t shrink-0 flex flex-row gap-2">
-                            <Button variant="ghost" onClick={() => { setIsSpotDialogOpen(false); if (dialogMode === 'add') setNewSpotLocation(null); }} className="flex-1 font-bold h-12 uppercase text-xs">Annuler</Button>
-                            <Button onClick={handleSave} disabled={isSaving} className="flex-1 font-black h-12 uppercase text-xs shadow-md"><Save className="mr-2 size-4"/>{isSaving ? "Sauvegarde..." : "Sauvegarder"}</Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-
                 {!isFullscreen && (
-                    <div>
-                        <div className="flex items-center gap-2 mb-4">
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2">
                             <Button 
                                 variant="outline" 
                                 className="flex-1 font-bold h-12 uppercase text-[10px] tracking-widest border-2" 
                                 onClick={handleAnalyzeNext7Days}
                                 disabled={selectedSpotIds.length === 0 || isAnalyzing}
                             >
-                                <BarChart className="mr-2 size-4"/> 
-                                Analyser {selectedSpotIds.length > 0 ? `(${selectedSpotIds.length})` : ''} (IA)
+                                <BarChart className="mr-2 size-4 text-primary"/> 
+                                Analyser {selectedSpotIds.length > 0 ? `(${selectedSpotIds.length})` : ''}
                             </Button>
                         </div>
-                        <h4 className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 mb-2 px-1">
-                            <History className="size-3" /> Historique des prises
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 mb-2 px-1">
+                            <History className="size-3" /> Historique de vos spots
                         </h4>
                         {!areSpotsLoading && savedSpots && savedSpots.length > 0 ? (
                             <AccordionPrimitive.Root 
@@ -679,21 +615,23 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                 <p><strong>Lune :</strong> {spot.context.moonPhase}</p>
                                                 <p><strong>Marée :</strong> {spot.context.tideMovement} ({spot.context.tideHeight.toFixed(2)}m)</p>
                                            </div>
-                                           <div className="grid grid-cols-2 gap-2">
-                                               <Button variant="outline" className="font-black uppercase text-[10px] h-12 border-2 px-1 whitespace-normal text-center" onClick={() => handleFindSimilarDay(spot)} disabled={isAnalyzing}>
-                                                   <BrainCircuit className="mr-1 size-4 text-primary shrink-0"/> Jour similaire
+                                           <div className="flex flex-wrap gap-2">
+                                               <Button variant="outline" className="flex-1 min-h-12 py-2 font-black uppercase text-[10px] border-2 px-3 whitespace-normal text-center leading-tight gap-2" onClick={() => handleFindSimilarDay(spot)} disabled={isAnalyzing}>
+                                                   <BrainCircuit className="size-4 text-primary shrink-0"/> Jour similaire
                                                </Button>
-                                               <Button variant="outline" className="font-black uppercase text-[10px] h-12 border-2 px-1" onClick={() => {
+                                               <Button variant="outline" className="flex-1 min-h-12 font-black uppercase text-[10px] border-2 px-3 gap-2" onClick={() => {
                                                    if (map && spot.location) {
                                                        map.panTo({ lat: spot.location.latitude, lng: spot.location.longitude });
                                                        map.setZoom(16);
                                                        mapContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                                    }
                                                }}>
-                                                   <LocateFixed className="mr-1 size-4 text-primary shrink-0" /> GPS
+                                                   <LocateFixed className="size-4 text-primary shrink-0" /> GPS
                                                </Button>
-                                               <Button variant="outline" className="font-black uppercase text-[10px] h-12 border-2" onClick={() => handleEditClick(spot)}><Pencil className="mr-1 size-4 shrink-0" /> Modifier</Button>
-                                               <Button variant="destructive" className="font-black uppercase text-[10px] h-12" onClick={() => handleDeleteSpot(spot.id)}><Trash2 className="mr-1 size-4 shrink-0" /> Supprimer</Button>
+                                               <div className="flex w-full sm:w-auto gap-2">
+                                                   <Button variant="outline" size="icon" className="h-12 w-12 border-2 shrink-0" onClick={() => handleEditClick(spot)}><Pencil className="size-4" /></Button>
+                                                   <Button variant="destructive" size="icon" className="h-12 w-12 shrink-0" onClick={() => handleDeleteSpot(spot.id)}><Trash2 className="size-4" /></Button>
+                                               </div>
                                            </div>
                                            </div>
                                        </AccordionPrimitive.Content>
@@ -708,105 +646,172 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         )}
                     </div>
                 )}
-
-                {/* Dialog Analyse 7 jours / Jour similaire */}
-                <Dialog open={isAnalysisDialogOpen} onOpenChange={setIsAnalysisDialogOpen}>
-                    <DialogContent className="max-w-md rounded-2xl max-h-[95vh] flex flex-col p-0 overflow-hidden">
-                        <DialogHeader className="p-6 pb-2 shrink-0">
-                            <DialogTitle className="flex items-center gap-2 font-black uppercase"><BrainCircuit className="text-primary" /> Analyse de l'IA</DialogTitle>
-                        </DialogHeader>
-                        <ScrollArea className="flex-grow">
-                            <div className="p-6 py-4 space-y-4">
-                                {isAnalyzing ? (
-                                    <div className="flex flex-col items-center justify-center py-10 space-y-4">
-                                        <BrainCircuit className="size-12 text-primary animate-pulse" />
-                                        <p className="text-xs font-bold uppercase text-muted-foreground animate-pulse">Analyse en cours...</p>
-                                    </div>
-                                ) : analysisResult && (
-                                    <div className="space-y-6 animate-in fade-in zoom-in-95">
-                                        <div className="text-center p-6 bg-primary/5 border-2 border-primary/20 rounded-2xl">
-                                            <p className="text-[10px] font-black uppercase text-muted-foreground mb-1 tracking-widest">Meilleure fenêtre</p>
-                                            <p className="text-2xl font-black text-primary uppercase tracking-tighter">
-                                                {format(new Date(analysisResult.bestDate.replace(/-/g, '/')), 'eeee d MMMM', { locale: fr })}
-                                            </p>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between px-1"><Label className="text-[10px] font-black uppercase opacity-60">Confiance</Label><span className="text-xs font-black">{analysisResult.score}%</span></div>
-                                            <Progress value={analysisResult.score} className="h-2" />
-                                        </div>
-                                        <p className="text-xs font-medium leading-relaxed italic text-muted-foreground bg-muted/30 p-4 rounded-xl border-2">"{analysisResult.explanation}"</p>
-                                    </div>
-                                )}
-                            </div>
-                        </ScrollArea>
-                        <DialogFooter className="p-4 border-t shrink-0"><Button variant="outline" onClick={() => setIsAnalysisDialogOpen(false)} className="w-full font-black uppercase h-12">Fermer</Button></DialogFooter>
-                    </DialogContent>
-                </Dialog>
-
-                {/* Dialog Recommandation Spot Actuel */}
-                <Dialog open={isRecommendDialogOpen} onOpenChange={setIsRecommendDialogOpen}>
-                    <DialogContent className="max-w-md rounded-2xl max-h-[95vh] flex flex-col p-0 overflow-hidden">
-                        <DialogHeader className="p-6 pb-2 shrink-0">
-                            <DialogTitle className="flex items-center gap-2 font-black uppercase text-base sm:text-lg"><BrainCircuit className="text-primary" /> Meilleur spot immédiat</DialogTitle>
-                            <DialogDescription className="text-[9px] sm:text-[10px] uppercase font-bold">Analyse basée sur votre GPS, la marée et la lune actuelle</DialogDescription>
-                        </DialogHeader>
-                        
-                        <ScrollArea className="flex-grow">
-                            <div className="p-4 sm:p-6 py-4 space-y-6">
-                                {isAnalyzing ? (
-                                    <div className="flex flex-col items-center justify-center py-10 space-y-4">
-                                        <BrainCircuit className="size-12 text-primary animate-pulse" />
-                                        <p className="text-xs font-bold uppercase text-muted-foreground animate-pulse">Calcul tactique en cours...</p>
-                                    </div>
-                                ) : recommendResult && (
-                                    <div className="space-y-6 animate-in fade-in zoom-in-95">
-                                        <div className="p-4 sm:p-6 bg-indigo-600 text-white rounded-2xl shadow-xl relative overflow-hidden">
-                                            <Navigation className="absolute -right-4 -bottom-4 size-24 opacity-10 rotate-12" />
-                                            <p className="text-[10px] font-black uppercase text-indigo-200 mb-1 tracking-widest">Allez à :</p>
-                                            <h3 className="text-xl sm:text-2xl font-black uppercase tracking-tighter mb-2 break-words">{recommendResult.bestSpotName}</h3>
-                                            <div className="flex items-center gap-2">
-                                                <Badge variant="outline" className="bg-white/10 border-white/20 text-white font-black text-[10px]">CONFIANCE {recommendResult.confidence}%</Badge>
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-4">
-                                            <div className="space-y-1.5">
-                                                <p className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2 px-1"><BrainCircuit className="size-3" /> Pourquoi ce choix ?</p>
-                                                <div className="bg-muted/30 p-3 sm:p-4 rounded-xl border-2 italic text-[11px] sm:text-xs font-medium leading-relaxed">
-                                                    "{recommendResult.reason}"
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-1.5">
-                                                <p className="text-[10px] font-black uppercase text-primary flex items-center gap-2 px-1"><Fish className="size-3" /> Conseil Tactique</p>
-                                                <div className="bg-primary/5 p-3 sm:p-4 rounded-xl border-2 border-primary/10 text-[11px] sm:text-xs font-bold leading-relaxed text-primary">
-                                                    {recommendResult.advice}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <Button 
-                                            className="w-full h-12 font-black uppercase gap-2 shadow-md"
-                                            onClick={() => {
-                                                const spot = savedSpots?.find(s => s.id === recommendResult.bestSpotId);
-                                                if (spot && map) {
-                                                    map.panTo({ lat: spot.location.latitude, lng: spot.location.longitude });
-                                                    map.setZoom(16);
-                                                    setIsRecommendDialogOpen(false);
-                                                    mapContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                                }
-                                            }}
-                                        >
-                                            <LocateFixed className="size-4" /> Voir sur la carte
-                                        </Button>
-                                    </div>
-                                )}
-                            </div>
-                        </ScrollArea>
-                        <DialogFooter className="p-4 border-t shrink-0"><Button variant="outline" onClick={() => setIsRecommendDialogOpen(false)} className="w-full font-black uppercase h-12">Fermer</Button></DialogFooter>
-                    </DialogContent>
-                </Dialog>
             </CardContent>
+
+            {/* Dialogs déplacés à la racine pour éviter les problèmes de z-index sur mobile */}
+            <Dialog open={isSpotDialogOpen} onOpenChange={(open) => { if (!open) setSpotToEdit(null); setIsSpotDialogOpen(open); }}>
+                <DialogContent className="max-h-[95vh] flex flex-col p-0 overflow-hidden sm:max-w-lg">
+                    <DialogHeader className="p-6 pb-2 shrink-0">
+                        <DialogTitle className="font-black uppercase tracking-tight">{dialogMode === 'add' ? 'Nouveau spot' : 'Modifier le spot'}</DialogTitle>
+                    </DialogHeader>
+                    
+                    <ScrollArea className="flex-grow">
+                        <div className="p-6 py-2 space-y-4 pb-20">
+                            <div className="space-y-2">
+                                <Label htmlFor="spot-name" className="text-xs font-bold uppercase text-muted-foreground">Nom du spot</Label>
+                                <Input id="spot-name" placeholder="Ex: Spot à bec de cane" value={spotName} onChange={(e) => setSpotName(e.target.value)} className="h-12 border-2 font-bold" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="spot-notes" className="text-xs font-bold uppercase text-muted-foreground">Notes</Label>
+                                <Textarea id="spot-notes" placeholder="Détails..." value={spotNotes} onChange={(e) => setSpotNotes(e.target.value)} className="border-2 font-medium" />
+                            </div>
+                             <div className="space-y-2">
+                                <Label className="text-xs font-bold uppercase text-muted-foreground">Techniques de pêche</Label>
+                                <div className="flex flex-wrap gap-2">
+                                    {fishingTypes.map((type) => {
+                                        const isSelected = selectedFishingTypes.includes(type.id);
+                                        return (
+                                            <Button
+                                                key={type.id}
+                                                variant={isSelected ? 'default' : 'outline'}
+                                                size="sm"
+                                                onClick={() => handleToggleFishingType(type.id)}
+                                                className={cn("font-bold text-[10px] uppercase h-8", isSelected && `${type.bgColor} hover:${type.bgColor}/90 text-white border-none shadow-sm`)}
+                                            >
+                                                {type.label}
+                                            </Button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs font-bold uppercase text-muted-foreground">Icône</Label>
+                                <div className="flex gap-3">
+                                    {availableIcons.map(iconName => {
+                                        const Icon = mapIcons[iconName as keyof typeof mapIcons];
+                                        return (
+                                            <Button key={iconName} variant="outline" size="icon" onClick={() => setSelectedIcon(iconName as keyof typeof mapIcons)} className={cn("size-12 border-2 transition-all", selectedIcon === iconName ? "border-primary bg-primary/5 scale-110 shadow-md" : "opacity-60")}>
+                                                <Icon className="size-6" />
+                                            </Button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs font-bold uppercase text-muted-foreground">Couleur</Label>
+                                <div className="flex flex-wrap gap-3">
+                                    {availableColors.map(color => (
+                                        <button key={color} onClick={() => setSelectedColor(color)} className={cn("w-10 h-10 rounded-full border-4 transition-all shadow-sm", selectedColor === color ? "border-white ring-2 ring-primary scale-110" : "border-transparent opacity-80")} style={{ backgroundColor: color }} />
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </ScrollArea>
+                    
+                    <DialogFooter className="p-4 border-t shrink-0 flex flex-row gap-2 bg-muted/10">
+                        <Button variant="ghost" onClick={() => { setIsSpotDialogOpen(false); if (dialogMode === 'add') setNewSpotLocation(null); }} className="flex-1 font-bold h-12 uppercase text-xs">Annuler</Button>
+                        <Button onClick={handleSave} disabled={isSaving} className="flex-1 font-black h-12 uppercase text-xs shadow-md"><Save className="mr-2 size-4"/>{isSaving ? "Sauvegarde..." : "Sauvegarder"}</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Dialog Analyse 7 jours / Jour similaire */}
+            <Dialog open={isAnalysisDialogOpen} onOpenChange={setIsAnalysisDialogOpen}>
+                <DialogContent className="max-w-md rounded-2xl max-h-[95vh] flex flex-col p-0 overflow-hidden">
+                    <DialogHeader className="p-6 pb-2 shrink-0">
+                        <DialogTitle className="flex items-center gap-2 font-black uppercase"><BrainCircuit className="text-primary" /> Analyse de l'IA</DialogTitle>
+                    </DialogHeader>
+                    <ScrollArea className="flex-grow">
+                        <div className="p-6 py-4 space-y-4">
+                            {isAnalyzing ? (
+                                <div className="flex flex-col items-center justify-center py-10 space-y-4">
+                                    <BrainCircuit className="size-12 text-primary animate-pulse" />
+                                    <p className="text-xs font-bold uppercase text-muted-foreground animate-pulse">Analyse en cours...</p>
+                                </div>
+                            ) : analysisResult && (
+                                <div className="space-y-6 animate-in fade-in zoom-in-95">
+                                    <div className="text-center p-6 bg-primary/5 border-2 border-primary/20 rounded-2xl">
+                                        <p className="text-[10px] font-black uppercase text-muted-foreground mb-1 tracking-widest">Meilleure fenêtre</p>
+                                        <p className="text-2xl font-black text-primary uppercase tracking-tighter">
+                                            {format(new Date(analysisResult.bestDate.replace(/-/g, '/')), 'eeee d MMMM', { locale: fr })}
+                                        </p>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between px-1"><Label className="text-[10px] font-black uppercase opacity-60">Confiance</Label><span className="text-xs font-black">{analysisResult.score}%</span></div>
+                                        <Progress value={analysisResult.score} className="h-2" />
+                                    </div>
+                                    <p className="text-xs font-medium leading-relaxed italic text-muted-foreground bg-muted/30 p-4 rounded-xl border-2">"{analysisResult.explanation}"</p>
+                                </div>
+                            )}
+                        </div>
+                    </ScrollArea>
+                    <DialogFooter className="p-4 border-t shrink-0"><Button variant="outline" onClick={() => setIsAnalysisDialogOpen(false)} className="w-full font-black uppercase h-12">Fermer</Button></DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Dialog Recommandation Spot Actuel */}
+            <Dialog open={isRecommendDialogOpen} onOpenChange={setIsRecommendDialogOpen}>
+                <DialogContent className="max-w-md rounded-2xl max-h-[95vh] flex flex-col p-0 overflow-hidden">
+                    <DialogHeader className="p-6 pb-2 shrink-0">
+                        <DialogTitle className="flex items-center gap-2 font-black uppercase text-base sm:text-lg"><BrainCircuit className="text-primary" /> Meilleur spot immédiat</DialogTitle>
+                        <DialogDescription className="text-[9px] sm:text-[10px] uppercase font-bold">Analyse basée sur votre GPS, la marée et la lune actuelle</DialogDescription>
+                    </DialogHeader>
+                    
+                    <ScrollArea className="flex-grow">
+                        <div className="p-4 sm:p-6 py-4 space-y-6">
+                            {isAnalyzing ? (
+                                <div className="flex flex-col items-center justify-center py-10 space-y-4">
+                                    <BrainCircuit className="size-12 text-primary animate-pulse" />
+                                    <p className="text-xs font-bold uppercase text-muted-foreground animate-pulse">Calcul tactique en cours...</p>
+                                </div>
+                            ) : recommendResult && (
+                                <div className="space-y-6 animate-in fade-in zoom-in-95">
+                                    <div className="p-4 sm:p-6 bg-indigo-600 text-white rounded-2xl shadow-xl relative overflow-hidden">
+                                        <Navigation className="absolute -right-4 -bottom-4 size-24 opacity-10 rotate-12" />
+                                        <p className="text-[10px] font-black uppercase text-indigo-200 mb-1 tracking-widest">Allez à :</p>
+                                        <h3 className="text-xl sm:text-2xl font-black uppercase tracking-tighter mb-2 break-words">{recommendResult.bestSpotName}</h3>
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="outline" className="bg-white/10 border-white/20 text-white font-black text-[10px]">CONFIANCE {recommendResult.confidence}%</Badge>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <div className="space-y-1.5">
+                                            <p className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2 px-1"><BrainCircuit className="size-3" /> Pourquoi ce choix ?</p>
+                                            <div className="bg-muted/30 p-3 sm:p-4 rounded-xl border-2 italic text-[11px] sm:text-xs font-medium leading-relaxed">
+                                                "{recommendResult.reason}"
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <p className="text-[10px] font-black uppercase text-primary flex items-center gap-2 px-1"><Fish className="size-3" /> Conseil Tactique</p>
+                                            <div className="bg-primary/5 p-3 sm:p-4 rounded-xl border-2 border-primary/10 text-[11px] sm:text-xs font-bold leading-relaxed text-primary">
+                                                {recommendResult.advice}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <Button 
+                                        className="w-full h-12 font-black uppercase gap-2 shadow-md"
+                                        onClick={() => {
+                                            const spot = savedSpots?.find(s => s.id === recommendResult.bestSpotId);
+                                            if (spot && map) {
+                                                map.panTo({ lat: spot.location.latitude, lng: spot.location.longitude });
+                                                map.setZoom(16);
+                                                setIsRecommendDialogOpen(false);
+                                                mapContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                            }
+                                        }}
+                                    >
+                                        <LocateFixed className="size-4" /> Voir sur la carte
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    </ScrollArea>
+                    <DialogFooter className="p-4 border-t shrink-0"><Button variant="outline" onClick={() => setIsRecommendDialogOpen(false)} className="w-full font-black uppercase h-12">Fermer</Button></DialogFooter>
+                </DialogContent>
+            </Dialog>
         </Card>
     );
 }
