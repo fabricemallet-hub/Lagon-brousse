@@ -1,3 +1,4 @@
+
 'use client';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, getDoc, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
@@ -9,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, isBefore, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Crown, Star, XCircle, KeyRound, Ticket, Gift, LogOut, Mail, Calendar, User } from 'lucide-react';
+import { Crown, Star, XCircle, KeyRound, Ticket, Gift, LogOut, Mail, Calendar, User, Bell, BellOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
@@ -17,6 +18,7 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
+import { PushNotificationManager } from '@/components/push-notification-manager';
 
 export default function ComptePage() {
   const { user, isUserLoading } = useUser();
@@ -131,6 +133,16 @@ export default function ComptePage() {
                   <span className="text-xs font-bold truncate max-w-[200px]">{user?.email}</span>
                 </div>
               </div>
+              
+              <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-xl border">
+                <div className="p-2 bg-background rounded-lg shadow-sm">
+                  {userProfile?.notificationsEnabled ? <Bell className="size-5 text-green-600" /> : <BellOff className="size-5 text-muted-foreground" />}
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase text-muted-foreground">Notifications Push</span>
+                  <span className="text-sm font-bold">{userProfile?.notificationsEnabled ? 'Activées' : 'Désactivées'}</span>
+                </div>
+              </div>
             </div>
 
             <div className="pt-4 flex flex-col gap-3">
@@ -145,6 +157,8 @@ export default function ComptePage() {
             </div>
         </CardContent>
        </Card>
+
+      <PushNotificationManager />
 
       {!isSharedAccessActive && userProfile?.subscriptionStatus !== 'admin' && (
         <Card className="w-full shadow-none border-2">

@@ -15,7 +15,9 @@
         "lastSelectedLocation": { "type": "string" },
         "emergencyContact": { "type": "string" },
         "mapIcon": { "type": "string" },
-        "mapColor": { "type": "string" }
+        "mapColor": { "type": "string" },
+        "fcmToken": { "type": "string", "description": "Token pour les notifications Push" },
+        "notificationsEnabled": { "type": "boolean" }
       },
       "required": ["id", "email", "subscriptionStatus"]
     },
