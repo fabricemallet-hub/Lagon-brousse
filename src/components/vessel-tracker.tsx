@@ -111,6 +111,7 @@ export function VesselTracker() {
   
   const [history, setHistory] = useState<{ status: string, time: Date, pos: google.maps.LatLngLiteral }[]>([]);
   const lastStatusRef = useRef<string | null>(null);
+  const lastSentStatusRef = useRef<string | null>(null);
   const batteryAlertTriggered = useRef(false);
   const watchTriggeredRef = useRef(false);
 
@@ -163,7 +164,7 @@ export function VesselTracker() {
     if (userProfile?.emergencyContact) setEmergencyContact(userProfile.emergencyContact);
     if (userProfile?.displayName && !vesselNickname) setVesselNickname(userProfile.displayName);
     if (userProfile?.lastVesselId && !customSharingId) setCustomSharingId(userProfile.lastVesselId);
-  }, [userProfile, vesselNickname, customSharingId]);
+  }, [userProfile]);
 
   const handleSaveVessel = async () => {
     if (!user || !firestore || !sharingId) return;
@@ -193,23 +194,36 @@ export function VesselTracker() {
 
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
+    
+    const newStatus = data.status || vesselStatus;
+    const isInitial = lastSentStatusRef.current === null;
+    const statusChanged = lastSentStatusRef.current !== newStatus;
+
     const update = async () => {
         let batteryInfo = {};
         if ('getBattery' in navigator) {
             const b: any = await (navigator as any).getBattery();
             batteryInfo = { batteryLevel: Math.round(b.level * 100), isCharging: b.charging };
         }
-        setDoc(doc(firestore, 'vessels', sharingId), { 
+
+        const updatePayload: any = { 
             userId: user.uid, 
             displayName: vesselNickname || user.displayName || 'Capitaine', 
             isSharing: isSharing, 
             lastActive: serverTimestamp(),
             ...batteryInfo,
             ...data 
-        }, { merge: true }).catch(() => {});
+        };
+
+        if (statusChanged || isInitial) {
+            updatePayload.statusChangedAt = serverTimestamp();
+            lastSentStatusRef.current = newStatus;
+        }
+
+        setDoc(doc(firestore, 'vessels', sharingId), updatePayload, { merge: true }).catch(() => {});
     };
     update();
-  }, [user, firestore, isSharing, sharingId, vesselNickname]);
+  }, [user, firestore, isSharing, sharingId, vesselNickname, vesselStatus]);
 
   const handleStopSharing = async () => {
     setIsSharing(false);
@@ -220,6 +234,7 @@ export function VesselTracker() {
     }
     setCurrentPos(null);
     setAnchorPos(null);
+    lastSentStatusRef.current = null;
     toast({ title: "Partage arrêté" });
   };
 
@@ -235,8 +250,10 @@ export function VesselTracker() {
     toast({ title: "Suivi activé", description: `Connexion au navire ${cleanId}...` });
   };
 
+  // Receiver logic: detect changes in remoteVessel status
   useEffect(() => {
     if (mode !== 'receiver' || !remoteVessel || !activeVesselId) return;
+    
     const currentStatus = remoteVessel.isSharing ? (remoteVessel.status || 'moving') : 'offline';
     
     if (lastStatusRef.current !== currentStatus) {
@@ -280,7 +297,7 @@ export function VesselTracker() {
             }
         }
     }
-  }, [remoteVessel, mode, vesselPrefs, playVesselSound, toast, activeVesselId]);
+  }, [remoteVessel?.status, remoteVessel?.isSharing, mode, vesselPrefs, playVesselSound, toast, activeVesselId]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
@@ -341,12 +358,14 @@ export function VesselTracker() {
     const pos = mode === 'sender' ? currentPos : (remoteVessel?.location ? { lat: remoteVessel.location.latitude, lng: remoteVessel.location.longitude } : null);
     const posUrl = pos ? `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}` : "[RECHERCHE GPS...]";
     let durationStr = "";
-    if (mode === 'receiver' && remoteVessel?.status === 'stationary') {
-        const lastActive = remoteVessel.lastActive?.toDate?.() || new Date();
-        const diffMs = new Date().getTime() - lastActive.getTime();
+    
+    const statusTime = remoteVessel?.statusChangedAt?.toDate?.() || remoteVessel?.lastActive?.toDate?.();
+    if (statusTime && remoteVessel?.status === 'stationary') {
+        const diffMs = new Date().getTime() - statusTime.getTime();
         const diffMins = Math.floor(diffMs / 60000);
         durationStr = ` (Immobile depuis ${diffMins} min)`;
     }
+    
     const body = `${type} Lagon & Brousse NC : ${vesselNickname || remoteVessel?.displayName || 'Navire'} en difficulté${durationStr}.\nPosition : ${posUrl}`;
     window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
