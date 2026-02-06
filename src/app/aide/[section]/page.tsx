@@ -88,20 +88,20 @@ const sectionContent: Record<string, {
     title: 'Vessel Tracker',
     icon: Navigation,
     color: 'bg-blue-600',
-    role: "Un système de sécurité maritime haute-fidélité conçu pour rassurer vos proches à terre en partageant la position GPS exacte, le statut d'activité et l'état de la batterie du navire.",
+    role: "Un système de sécurité maritime haute-fidélité conçu pour partager votre position GPS, votre statut d'activité et votre niveau de batterie avec vos proches restés à terre.",
     steps: [
-      "Émetteur (A) - ID & Surnom : Activez 'Partager ma position'. Configurez un ID personnalisé (ex: BATEAU-NC) et un surnom pour être identifié sur la carte.",
-      "Émetteur (A) - Mode Éveil & Batterie : Activez 'MODE ÉVEIL ACTIF' pour garantir un flux GPS continu. Votre niveau de batterie et statut de charge sont transmis en temps réel.",
-      "Récepteur (B) - Suivi Live : Visualisez le statut (EN MOUVEMENT / MOUILLAGE) et l'autonomie de l'émetteur. Le système détecte l'immobilité après 30s dans un rayon de 20m.",
-      "Récepteur (B) - Alertes Sonores : Activez les notifications et personnalisez le son pour chaque changement d'état (ex: passage au mouillage ou perte réseau).",
-      "Veille Critique (B) - Réglage Précis : Configurez une alarme si le navire reste immobile trop longtemps. Réglez la durée de 1 min à 24h.",
-      "ALERTE SMS & Messages Types : Utilisez le sélecteur en plein écran pour envoyer un MAYDAY ou PAN PAN incluant vos coordonnées GPS et lien Maps verrouillés."
+      "Émetteur (A) - Identité : Activez 'Partager ma position'. Configurez un ID (ex: BATEAU-1) et un surnom. Ce surnom est indépendant de la chasse et se sauvegarde automatiquement sur votre profil.",
+      "Émetteur (A) - Mode Éveil & Status : Activez 'MODE ÉVEIL' pour maintenir l'écran allumé. Utilisez les boutons 'Retour' ou 'Home' pour signaler vos intentions, ou 'Reprise Mode Auto' en cas d'erreur.",
+      "Émetteur (A) - Urgence SMS : Configurez un numéro de contact et personnalisez votre message. Vous pouvez désactiver le service via l'interrupteur. Le point GPS est automatiquement annexé.",
+      "Récepteur (B) - Flotte & Suivi : Saisissez l'ID d'un navire pour l'ajouter à votre liste. Vous pouvez suivre plusieurs navires simultanément sur la même carte satellite.",
+      "Récepteur (B) - Alertes & Veille : Personnalisez les sons. Réglez via les curseurs le seuil de batterie basse (5-50%) et l'alarme d'immobilité prolongée (1h à 24h).",
+      "Journal de Bord Unifié : Consultez l'historique synchronisé. Il affiche l'heure, le statut, le pourcentage de batterie (%) et l'état de charge. Effacer l'historique le vide pour tout le monde."
     ],
     tips: [
-      "Batterie Critique : Si le téléphone émetteur tombe à 5% ou s'éteint, le récepteur reçoit une alerte visuelle et sonore d'urgence 'Batterie Déchargée'.",
-      "Historique d'États : Chaque changement de situation est enregistré. Cliquez sur 'GPS' dans l'historique pour voir où se trouvait le navire à ce moment précis.",
-      "SMS Intelligent : Pour le récepteur, le message d'alerte par défaut calcule automatiquement depuis combien de temps le navire est immobile.",
-      "Personnalisation : Vos messages SMS personnalisés sont mémorisés dans votre profil pour une utilisation immédiate lors de vos prochaines sorties."
+      "Bouton GPS Historique : Dans le journal, cliquez sur 'GPS' pour situer précisément l'endroit où s'est produit un événement (ex: batterie faible ou passage au mouillage).",
+      "Sécurité SMS : L'aperçu vous montre le message exact qui sera envoyé. Le lien Maps est verrouillé sur votre position réelle pour garantir l'efficacité des secours.",
+      "Mode Auto : Le système détecte l'immobilité après 30s dans un rayon de 20m. En cas de dérive de pêche, le bouton 'Reprise Mode Auto' permet de recalibrer le statut.",
+      "Annuaire Maritime : Les numéros d'urgence NC (COSS 16, SAMU 15, etc.) sont disponibles en bas de page pour un appel instantané."
     ]
   },
   'peche': {
