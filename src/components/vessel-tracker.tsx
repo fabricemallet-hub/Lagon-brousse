@@ -36,7 +36,8 @@ import {
   ChevronDown,
   X,
   Play,
-  Volume2
+  Volume2,
+  Check
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -75,6 +76,9 @@ export function VesselTracker() {
 
   const [mode, setMode] = useState<'sender' | 'receiver'>('sender');
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
+  const [isFollowActive, setIsFollowActive] = useState(false);
+  const [confirmedVesselId, setConfirmedVesselId] = useState('');
+  
   const [isSharing, setIsSharing] = useState(false);
   const [emergencyContact, setEmergencyContact] = useState('');
   const [customSharingId, setCustomSharingId] = useState('');
@@ -104,12 +108,15 @@ export function VesselTracker() {
   
   const [history, setHistory] = useState<{ status: string, time: Date, pos: google.maps.LatLngLiteral }[]>([]);
   const lastStatusRef = useRef<string | null>(null);
-  const lastActiveVesselIdRef = useRef<string>('');
-  const watchTriggeredRef = useRef(false);
   const batteryAlertTriggered = useRef(false);
+  const watchTriggeredRef = useRef(false);
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
-  const activeVesselId = useMemo(() => mode === 'sender' ? sharingId : vesselIdToFollow.trim().toUpperCase(), [mode, sharingId, vesselIdToFollow]);
+  
+  // Utiliser l'ID confirmé pour le récepteur afin d'éviter les resets pendant la saisie
+  const activeVesselId = useMemo(() => 
+    mode === 'sender' ? sharingId : confirmedVesselId.trim().toUpperCase(), 
+  [mode, sharingId, confirmedVesselId]);
 
   const userDocRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -156,18 +163,20 @@ export function VesselTracker() {
     }
     if (userProfile?.emergencyContact) setEmergencyContact(userProfile.emergencyContact);
     if (userProfile?.displayName && !vesselNickname) setVesselNickname(userProfile.displayName);
+    if (userProfile?.lastVesselId && !vesselIdToFollow) setVesselIdToFollow(userProfile.lastVesselId);
   }, [userProfile]);
 
-  // Reset logic only when changing vessel ID (not on every keystroke)
-  useEffect(() => {
-    if (activeVesselId && activeVesselId !== lastActiveVesselIdRef.current) {
-        setHistory([]);
-        lastStatusRef.current = null;
-        watchTriggeredRef.current = false;
-        batteryAlertTriggered.current = false;
-        lastActiveVesselIdRef.current = activeVesselId;
-    }
-  }, [activeVesselId, mode]);
+  const handleFollow = () => {
+    if (!vesselIdToFollow.trim()) return;
+    const cleanId = vesselIdToFollow.trim().toUpperCase();
+    setConfirmedVesselId(cleanId);
+    setIsFollowActive(true);
+    setHistory([]);
+    lastStatusRef.current = null;
+    watchTriggeredRef.current = false;
+    batteryAlertTriggered.current = false;
+    toast({ title: "Suivi activé", description: `Connexion au navire ${cleanId}...` });
+  };
 
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
@@ -194,7 +203,7 @@ export function VesselTracker() {
   useEffect(() => {
     if (mode !== 'receiver' || !remoteVessel || !activeVesselId) return;
 
-    const currentStatus = remoteVessel.isSharing ? remoteVessel.status : 'offline';
+    const currentStatus = remoteVessel.isSharing ? (remoteVessel.status || 'moving') : 'offline';
     
     // Status Change Monitoring & History Logging
     if (lastStatusRef.current !== currentStatus) {
@@ -203,7 +212,9 @@ export function VesselTracker() {
         stationary: 'Au mouillage', 
         offline: 'Signal perdu' 
       };
-      const label = statusLabels[currentStatus] || currentStatus;
+      
+      const isInitial = lastStatusRef.current === null;
+      const label = isInitial ? `Connecté - ${statusLabels[currentStatus] || currentStatus}` : (statusLabels[currentStatus] || currentStatus);
       
       const newEntry = { 
         status: label, 
@@ -216,11 +227,11 @@ export function VesselTracker() {
       
       setHistory(prev => [newEntry, ...prev].slice(0, 20));
       
-      // Notifications
-      if (lastStatusRef.current !== null && vesselPrefs.isNotifyEnabled) {
+      // Notifications (uniquement si ce n'est pas la première connexion ou si explicitement activé)
+      if (!isInitial && vesselPrefs.isNotifyEnabled) {
         if (vesselPrefs.notifySettings[currentStatus as keyof typeof vesselPrefs.notifySettings]) {
           playVesselSound(vesselPrefs.notifySounds[currentStatus as keyof typeof vesselPrefs.notifySounds]);
-          toast({ title: "Changement d'état", description: `Le navire est maintenant : ${label}` });
+          toast({ title: "Changement d'état", description: `Le navire est maintenant : ${statusLabels[currentStatus] || currentStatus}` });
         }
       }
       
@@ -373,7 +384,28 @@ export function VesselTracker() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="space-y-1"><Label className="text-[9px] font-black uppercase ml-1 opacity-60">Suivre le navire ID</Label><Input placeholder="ENTREZ L'ID..." value={vesselIdToFollow} onChange={e => setVesselIdToFollow(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest" /></div>
+              <div className="space-y-1">
+                <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Suivre le navire ID</Label>
+                <div className="flex gap-2">
+                    <Input 
+                        placeholder="ENTREZ L'ID..." 
+                        value={vesselIdToFollow} 
+                        onChange={e => {
+                            setVesselIdToFollow(e.target.value);
+                            setIsFollowActive(false);
+                        }} 
+                        className="font-black text-center h-12 border-2 uppercase tracking-widest" 
+                    />
+                    <Button 
+                        variant={isFollowActive ? "secondary" : "default"}
+                        className="h-12 px-4 font-black uppercase text-[10px] shrink-0" 
+                        onClick={handleFollow}
+                        disabled={!vesselIdToFollow.trim()}
+                    >
+                        {isFollowActive ? <Check className="size-4" /> : "Suivre"}
+                    </Button>
+                </div>
+              </div>
               
               <div className="space-y-4 pt-2">
                 <div className="flex items-center justify-between p-3 border rounded-xl bg-card shadow-sm">
@@ -510,7 +542,7 @@ export function VesselTracker() {
                                 {history.map((h, i) => (
                                     <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm animate-in fade-in slide-in-from-left-2">
                                         <div className="flex flex-col gap-0.5">
-                                            <span className={cn("font-black uppercase", h.status === 'Au mouillage' ? 'text-orange-600' : h.status === 'En mouvement' ? 'text-blue-600' : 'text-red-600')}>
+                                            <span className={cn("font-black uppercase", h.status.includes('mouillage') ? 'text-orange-600' : h.status.includes('mouvement') ? 'text-blue-600' : 'text-red-600')}>
                                                 {h.status}
                                             </span>
                                             <span className="text-[9px] font-bold opacity-40">{format(h.time, 'HH:mm:ss')}</span>
@@ -524,7 +556,7 @@ export function VesselTracker() {
                         ) : (
                             <div className="text-center py-10 border-2 border-dashed rounded-xl opacity-40 bg-white/50">
                                 <History className="size-8 mx-auto mb-2 opacity-20" />
-                                <p className="text-[10px] font-black uppercase tracking-widest">Aucun changement détecté</p>
+                                <p className="text-[10px] font-black uppercase tracking-widest">pas d'affichage dans l'historique</p>
                             </div>
                         )}
                     </AccordionContent>
