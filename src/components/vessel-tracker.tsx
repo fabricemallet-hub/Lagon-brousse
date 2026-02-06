@@ -35,14 +35,15 @@ import {
   MapPin,
   ChevronDown,
   X,
-  Play
+  Play,
+  Volume2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
 import { Skeleton } from './ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 const INITIAL_CENTER = { lat: -22.27, lng: 166.45 };
@@ -103,6 +104,7 @@ export function VesselTracker() {
   
   const [history, setHistory] = useState<{ status: string, time: Date, pos: google.maps.LatLngLiteral }[]>([]);
   const lastStatusRef = useRef<string | null>(null);
+  const lastActiveVesselIdRef = useRef<string>('');
   const watchTriggeredRef = useRef(false);
   const batteryAlertTriggered = useRef(false);
 
@@ -156,12 +158,15 @@ export function VesselTracker() {
     if (userProfile?.displayName && !vesselNickname) setVesselNickname(userProfile.displayName);
   }, [userProfile]);
 
-  // Reset logic when switching vessel or mode
+  // Reset logic only when changing vessel ID (not on every keystroke)
   useEffect(() => {
-    setHistory([]);
-    lastStatusRef.current = null;
-    watchTriggeredRef.current = false;
-    batteryAlertTriggered.current = false;
+    if (activeVesselId && activeVesselId !== lastActiveVesselIdRef.current) {
+        setHistory([]);
+        lastStatusRef.current = null;
+        watchTriggeredRef.current = false;
+        batteryAlertTriggered.current = false;
+        lastActiveVesselIdRef.current = activeVesselId;
+    }
   }, [activeVesselId, mode]);
 
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
@@ -187,7 +192,7 @@ export function VesselTracker() {
 
   // Receiver Logic (Monitoring & History)
   useEffect(() => {
-    if (mode !== 'receiver' || !remoteVessel) return;
+    if (mode !== 'receiver' || !remoteVessel || !activeVesselId) return;
 
     const currentStatus = remoteVessel.isSharing ? remoteVessel.status : 'offline';
     
@@ -209,9 +214,9 @@ export function VesselTracker() {
         } 
       };
       
-      setHistory(prev => [newEntry, ...prev].slice(0, 10));
+      setHistory(prev => [newEntry, ...prev].slice(0, 20));
       
-      // Notifications (Avoid toast on initial load by checking lastStatusRef !== null)
+      // Notifications
       if (lastStatusRef.current !== null && vesselPrefs.isNotifyEnabled) {
         if (vesselPrefs.notifySettings[currentStatus as keyof typeof vesselPrefs.notifySettings]) {
           playVesselSound(vesselPrefs.notifySounds[currentStatus as keyof typeof vesselPrefs.notifySounds]);
@@ -220,7 +225,7 @@ export function VesselTracker() {
       }
       
       lastStatusRef.current = currentStatus;
-      watchTriggeredRef.current = false; // Reset critical watch on any status change
+      watchTriggeredRef.current = false;
     }
 
     // Battery Alert (Critical 5%)
@@ -247,7 +252,7 @@ export function VesselTracker() {
         }
     }
 
-  }, [remoteVessel, mode, vesselPrefs, playVesselSound, toast]);
+  }, [remoteVessel, mode, vesselPrefs, playVesselSound, toast, activeVesselId]);
 
   // Sender GPS Logic
   useEffect(() => {
@@ -322,7 +327,7 @@ export function VesselTracker() {
         durationStr = ` (Immobile depuis ${diffMins} min)`;
     }
 
-    const body = `${type} Lagon & Brousse NC : ${vesselNickname || 'Navire'} en difficulté${durationStr}.\nPosition : ${posUrl}`;
+    const body = `${type} Lagon & Brousse NC : ${vesselNickname || remoteVessel?.displayName || 'Navire'} en difficulté${durationStr}.\nPosition : ${posUrl}`;
     window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
 
@@ -500,22 +505,26 @@ export function VesselTracker() {
                         <div className="flex items-center gap-2"><History className="size-3"/> Historique des changements</div>
                     </AccordionTrigger>
                     <AccordionContent className="space-y-2 pt-2 pb-4">
-                        {history.length > 0 ? history.map((h, i) => (
-                            <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm animate-in fade-in slide-in-from-left-2">
-                                <div className="flex flex-col gap-0.5">
-                                    <span className={cn("font-black uppercase", h.status === 'Au mouillage' ? 'text-orange-600' : h.status === 'En mouvement' ? 'text-blue-600' : 'text-red-600')}>
-                                        {h.status}
-                                    </span>
-                                    <span className="text-[9px] font-bold opacity-40">{format(h.time, 'HH:mm:ss')}</span>
-                                </div>
-                                <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase border-2 px-3 gap-2" onClick={() => { map?.panTo(h.pos); map?.setZoom(17); }}>
-                                    <MapPin className="size-3 text-primary" /> GPS
-                                </Button>
+                        {history.length > 0 ? (
+                            <div className="space-y-2">
+                                {history.map((h, i) => (
+                                    <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm animate-in fade-in slide-in-from-left-2">
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className={cn("font-black uppercase", h.status === 'Au mouillage' ? 'text-orange-600' : h.status === 'En mouvement' ? 'text-blue-600' : 'text-red-600')}>
+                                                {h.status}
+                                            </span>
+                                            <span className="text-[9px] font-bold opacity-40">{format(h.time, 'HH:mm:ss')}</span>
+                                        </div>
+                                        <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase border-2 px-3 gap-2" onClick={() => { map?.panTo(h.pos); map?.setZoom(17); }}>
+                                            <MapPin className="size-3 text-primary" /> GPS
+                                        </Button>
+                                    </div>
+                                ))}
                             </div>
-                        )) : (
-                            <div className="text-center py-6 border-2 border-dashed rounded-xl opacity-40">
-                                <History className="size-6 mx-auto mb-2" />
-                                <p className="text-[9px] font-black uppercase tracking-widest">Aucun changement détecté</p>
+                        ) : (
+                            <div className="text-center py-10 border-2 border-dashed rounded-xl opacity-40 bg-white/50">
+                                <History className="size-8 mx-auto mb-2 opacity-20" />
+                                <p className="text-[10px] font-black uppercase tracking-widest">Aucun changement détecté</p>
                             </div>
                         )}
                     </AccordionContent>
