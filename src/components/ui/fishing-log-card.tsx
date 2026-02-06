@@ -470,8 +470,8 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                     <div ref={mapContainerRef} className={cn("relative w-full rounded-lg overflow-hidden border", isFullscreen ? "flex-grow" : "h-80")}>
                         <GoogleMap
                             mapContainerClassName="w-full h-full"
-                            center={userLocation || { lat: -21.5, lng: 165.5 }}
-                            zoom={userLocation && initialZoomDone ? (map?.getZoom() ?? 16) : 7}
+                            defaultCenter={userLocation || { lat: -21.5, lng: 165.5 }}
+                            defaultZoom={7}
                             options={{ disableDefaultUI: true, zoomControl: true, mapTypeControl: true, clickableIcons: false, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
                             onClick={handleMapClick}
                             onLoad={onLoad}

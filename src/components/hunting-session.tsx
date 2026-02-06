@@ -568,8 +568,8 @@ function HuntingSessionContent() {
                  <div className={cn("relative w-full rounded-lg overflow-hidden border", isFullscreen ? "flex-grow" : "h-80")}>
                     <GoogleMap
                         mapContainerClassName="w-full h-full"
-                        center={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : { lat: -21.45, lng: 165.5 }}
-                        zoom={16}
+                        defaultCenter={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : { lat: -21.45, lng: 165.5 }}
+                        defaultZoom={16}
                         onLoad={setMap}
                         options={mapOptions}
                     >

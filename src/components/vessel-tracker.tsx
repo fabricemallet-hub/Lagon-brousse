@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -202,6 +201,7 @@ export function VesselTracker() {
   const [wakeLock, setWakeLock] = useState<any>(null);
   const [batteryLevel, setBatteryLevel] = useState<number>(1);
   const [isCharging, setIsCharging] = useState<boolean>(false);
+  const [initialCenterDone, setInitialCenterDone] = useState(false);
   
   const watchIdRef = useRef<number | null>(null);
   const lastFirestoreUpdateRef = useRef<number>(0);
@@ -377,7 +377,6 @@ export function VesselTracker() {
     }
   }, [vesselVolume, availableSounds]);
 
-  // --- LOGIQUE DE TEMPORISATION DE L'HISTORIQUE ---
   useEffect(() => {
     if (currentEffectiveStatus !== prevVesselStatusRef.current) {
       const now = Date.now();
@@ -385,7 +384,6 @@ export function VesselTracker() {
       
       setStatusStartTime(now);
       
-      // On lance le chrono de temporisation (1 min) pour l'écriture en DB
       if (historyDebounceTimerRef.current) clearTimeout(historyDebounceTimerRef.current);
       
       if (prevVesselStatusRef.current !== null) {
@@ -394,7 +392,6 @@ export function VesselTracker() {
         historyDebounceTimerRef.current = setTimeout(async () => {
           if (!firestore || !activeVesselId) return;
           
-          // On n'écrit que si l'état est stable depuis 1 min
           try {
             const historyRef = collection(firestore, 'vessels', activeVesselId, 'history');
             await addDoc(historyRef, {
@@ -407,7 +404,6 @@ export function VesselTracker() {
           }
         }, HISTORY_DEBOUNCE_MS);
 
-        // Alertes immédiates dans l'UI (Toasts & Sons)
         const statusLabels = { moving: 'En route', stationary: 'Immobile', offline: 'Perte réseau' };
         toast({
           title: "Changement d'état",
@@ -564,6 +560,16 @@ export function VesselTracker() {
       setLastValidLocation({ lat: remoteVessel.location.latitude, lng: remoteVessel.location.longitude });
     }
   }, [mode, remoteVessel]);
+
+  // Initial Snap effect
+  useEffect(() => {
+    const pos = mode === 'sender' ? currentPos : (remoteVessel?.location ? { lat: remoteVessel.location.latitude, lng: remoteVessel.location.longitude } : null);
+    if (pos && map && !initialCenterDone) {
+      map.panTo(pos);
+      map.setZoom(15);
+      setInitialCenterDone(true);
+    }
+  }, [currentPos, remoteVessel, map, initialCenterDone, mode]);
 
   const handleRecenter = () => {
     const pos = mode === 'sender' ? currentPos : (remoteVessel?.location ? { lat: remoteVessel.location.latitude, lng: remoteVessel.location.longitude } : lastValidLocation);
@@ -814,7 +820,13 @@ export function VesselTracker() {
       <Card className="overflow-hidden border-2 shadow-xl rounded-2xl flex flex-col">
         <div className="h-[350px] relative bg-muted/20 shrink-0">
           {!isLoaded ? <Skeleton className="h-full w-full" /> : (
-            <GoogleMap mapContainerClassName="w-full h-full" center={displayVessel?.location ? { lat: displayVessel.location.latitude, lng: displayVessel.location.longitude } : (lastValidLocation || { lat: -22.27, lng: 166.45 })} zoom={15} onLoad={setMap} options={{ disableDefaultUI: true, mapTypeId: 'satellite' }}>
+            <GoogleMap 
+              mapContainerClassName="w-full h-full" 
+              defaultCenter={displayVessel?.location ? { lat: displayVessel.location.latitude, lng: displayVessel.location.longitude } : (lastValidLocation || { lat: -22.27, lng: 166.45 })} 
+              defaultZoom={15} 
+              onLoad={setMap} 
+              options={{ disableDefaultUI: true, mapTypeId: 'satellite' }}
+            >
                 {currentPos && <OverlayView position={currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}><div style={{ transform: 'translate(-50%, -50%)' }}><div className="size-4 bg-blue-500 rounded-full border-2 border-white shadow-2xl animate-pulse"></div></div></OverlayView>}
                 {displayVessel?.location && (
                     <OverlayView position={{ lat: displayVessel.location.latitude, lng: displayVessel.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
