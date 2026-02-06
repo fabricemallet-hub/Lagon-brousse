@@ -264,7 +264,11 @@ export function VesselTracker() {
 
   // --- RECEIVER LOGIC: Synchronisation automatique de l'historique ---
   useEffect(() => {
-    if (mode !== 'receiver' || !remoteVessel || !activeVesselId) return;
+    if (mode !== 'receiver' || !remoteVessel || !activeVesselId) {
+        lastStatusRef.current = null;
+        lastUpdateRef.current = 0;
+        return;
+    }
     
     const isSharingActive = remoteVessel.isSharing === true;
     const currentStatus = isSharingActive ? (remoteVessel.status || 'moving') : 'offline';
@@ -272,8 +276,11 @@ export function VesselTracker() {
     const timeKey = statusTime?.toMillis?.() || 0;
     
     // Détection de changement basée sur l'état OU le temps de changement (statusChangedAt)
-    // Cela garantit une synchronisation instantanée dès que le serveur reçoit l'info
-    if (lastStatusRef.current !== currentStatus || (timeKey > 0 && lastUpdateRef.current !== timeKey)) {
+    const isInitial = lastStatusRef.current === null;
+    const hasStatusChanged = lastStatusRef.current !== currentStatus;
+    const hasTimestampUpdated = timeKey > 0 && lastUpdateRef.current !== timeKey;
+
+    if (isInitial || hasStatusChanged || hasTimestampUpdated) {
       const statusLabels: Record<string, string> = { 
         moving: 'EN MOUVEMENT', 
         stationary: 'AU MOUILLAGE', 
@@ -282,7 +289,6 @@ export function VesselTracker() {
         landed: 'ARRIVÉ À TERRE (HOME)'
       };
       
-      const isInitial = lastStatusRef.current === null;
       const label = statusLabels[currentStatus] || currentStatus;
       const displayLabel = isInitial ? `CONNECTÉ - ${label}` : label;
       
@@ -292,9 +298,11 @@ export function VesselTracker() {
       };
 
       setHistory(prev => {
-        // Éviter les doublons exacts basés sur le temps et le label
-        if (prev.length > 0 && prev[0].statusLabel === displayLabel && Math.abs(prev[0].time.getTime() - (timeKey || Date.now())) < 1000) {
-            return prev;
+        // Éviter les doublons exacts basés sur le label et une fenêtre de temps courte
+        if (prev.length > 0 && prev[0].statusLabel === displayLabel) {
+            const prevTime = prev[0].time.getTime();
+            const currTime = timeKey || Date.now();
+            if (Math.abs(prevTime - currTime) < 5000) return prev;
         }
         return [{ statusLabel: displayLabel, time: timeKey ? new Date(timeKey) : new Date(), pos }, ...prev].slice(0, 30);
       });
