@@ -835,26 +835,26 @@ export function VesselTracker() {
                 <Button variant="secondary" className="flex-1 h-14 font-black uppercase rounded-xl shadow-lg gap-3 text-xs border-2 border-primary/20 touch-manipulation" onClick={() => sendEmergencySms('PAN PAN')}><AlertTriangle className="size-5 text-primary" /> PAN PAN</Button>
             </div>
             <Accordion type="single" collapsible className="w-full">
-                <AccordionItem value="history" className="border rounded-xl px-3 bg-muted/10">
-                  <AccordionTrigger className="text-[10px] font-black uppercase py-3">
-                    <div className="flex items-center justify-between w-full pr-4">
-                        <div className="flex items-center gap-2"><History className="size-3"/> Journal de bord unifié</div>
-                        <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-6 px-2 text-[8px] font-black text-destructive hover:bg-destructive/10 border border-destructive/20 touch-manipulation"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                handleClearHistory();
-                            }}
-                        >
-                            <Trash2 className="size-3 mr-1" /> Effacer
-                        </Button>
-                    </div>
-                  </AccordionTrigger>
+                <AccordionItem value="history" className="border rounded-xl bg-muted/10 overflow-hidden">
+                  <div className="flex items-center pr-4">
+                    <AccordionTrigger className="flex-1 text-[10px] font-black uppercase py-3 px-3 hover:no-underline">
+                      <div className="flex items-center gap-2"><History className="size-3"/> Journal de bord unifié</div>
+                    </AccordionTrigger>
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 px-2 text-[8px] font-black text-destructive hover:bg-destructive/10 border border-destructive/20 touch-manipulation"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleClearHistory();
+                        }}
+                    >
+                        <Trash2 className="size-3 mr-1" /> Effacer
+                    </Button>
+                  </div>
                   <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide touch-pan-y">
                         {history.length > 0 ? (
-                            <div className="space-y-2">
+                            <div className="space-y-2 px-3">
                                 {history.map((h, i) => (
                                     <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm animate-in fade-in slide-in-from-left-2">
                                         <div className="flex flex-col gap-0.5">
@@ -886,7 +886,7 @@ export function VesselTracker() {
                                 ))}
                             </div>
                         ) : (
-                            <div className="text-center py-10 border-2 border-dashed rounded-xl opacity-40">
+                            <div className="text-center py-10 border-2 border-dashed rounded-xl opacity-40 mx-3">
                               <p className="text-[10px] font-black uppercase tracking-widest">pas d'affichage dans l'historique</p>
                             </div>
                         )}
