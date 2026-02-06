@@ -48,6 +48,7 @@ import {
   Zap,
   TrendingUp,
   TrendingDown,
+  ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -101,21 +102,17 @@ export default function SemisPage() {
   const [customVeg, setCustomVeg] = useState('');
   const [sowingDate, setSowingDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   
-  // États d'analyse
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiAdvice, setAiAdvice] = useState<GardeningAdviceOutput | null>(null);
   const [isIdentifying, setIsIdentifying] = useState(false);
   const [idResult, setIdResult] = useState<IdentifyPlantOutput | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Données du jour pour le Dashboard
   const todayData = useMemo(() => getDataForDate(selectedLocation, new Date()), [selectedLocation]);
   
-  // Filtrage des meilleures graines pour aujourd'hui
   const topSeedsForToday = useMemo(() => {
     const { lunarPhase, zodiac } = todayData.farming;
     return semisData.filter(veg => {
-      // Logique simplifiée de correspondance
       if (zodiac === 'Fruits') return lunarPhase === 'Lune Montante';
       if (zodiac === 'Racines') return lunarPhase === 'Lune Descendante';
       if (zodiac === 'Fleurs') return lunarPhase === 'Lune Montante';
@@ -225,7 +222,6 @@ export default function SemisPage() {
 
   return (
     <div className="space-y-6 pb-32 w-full max-w-full overflow-x-hidden px-1">
-      {/* HEADER TACTIQUE */}
       <Card className="overflow-hidden border-none shadow-lg bg-gradient-to-br from-green-600 to-emerald-700 text-white">
         <CardHeader className="pb-2">
           <CardTitle className="text-xl font-black uppercase flex items-center gap-2 tracking-tighter"><Sprout className="size-6" /> Guide Culture IA</CardTitle>
@@ -261,7 +257,6 @@ export default function SemisPage() {
         </CardContent>
       </Card>
 
-      {/* BOUTON SCANNER PHOTO */}
       <div className="flex flex-col gap-3">
         <Button 
           onClick={() => fileInputRef.current?.click()} 
@@ -274,7 +269,6 @@ export default function SemisPage() {
         <input type="file" accept="image/*" capture="environment" ref={fileInputRef} onChange={handleCapture} className="hidden" />
       </div>
 
-      {/* RESULTAT IDENTIFICATION IA */}
       {idResult && (
         <Card className="border-2 border-primary bg-primary/5 animate-in fade-in slide-in-from-top-4 overflow-hidden relative shadow-xl">
           <button onClick={() => setIdResult(null)} className="absolute top-2 right-2 p-1 bg-primary/10 rounded-full text-primary z-10"><X className="size-4" /></button>
@@ -305,7 +299,6 @@ export default function SemisPage() {
         </Card>
       )}
 
-      {/* SUGGESTIONS TACTIQUES DU JOUR */}
       {!searchQuery && (
         <div className="space-y-3">
           <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
@@ -330,7 +323,6 @@ export default function SemisPage() {
         </div>
       )}
 
-      {/* LISTE DES PLANTES */}
       <div className="space-y-3">
         {searchQuery && filteredData.length === 0 ? (
           <Card className="border-dashed border-2 bg-muted/30">
@@ -379,7 +371,6 @@ export default function SemisPage() {
         )}
       </div>
 
-      {/* LEXIQUE */}
       <Card className="border-2 bg-muted/30">
         <CardHeader className="pb-2"><CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2"><BookText className="size-4 text-primary" /> Lexique du Jardinier</CardTitle></CardHeader>
         <CardContent className="space-y-4">
@@ -390,7 +381,6 @@ export default function SemisPage() {
         </CardContent>
       </Card>
 
-      {/* DIALOGUE PLANIFICATION IA */}
       <Dialog open={isPlanningOpen} onOpenChange={(open) => !open && setIsPlanningOpen(false)}>
         <DialogContent className="max-h-[95vh] flex flex-col p-0 overflow-hidden sm:max-w-lg rounded-2xl border-none">
           <DialogHeader className="p-6 pb-2 shrink-0 bg-slate-50 border-b">
@@ -412,7 +402,7 @@ export default function SemisPage() {
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-6 animate-in fade-in zoom-in-95">
+                <div className="space-y-6 animate-in fade-in zoom-in-95 pb-10">
                   <div className={cn("p-4 rounded-2xl border-2 flex gap-3 shadow-sm", aiAdvice.isValidForMoon ? "bg-green-50 border-green-200 text-green-800" : "bg-amber-50 border-amber-200 text-amber-800")}>
                     {aiAdvice.isValidForMoon ? <CheckCircle2 className="size-6 text-green-600 shrink-0" /> : <AlertTriangle className="size-6 text-amber-600 shrink-0" />}
                     <div className="space-y-1">
@@ -435,9 +425,9 @@ export default function SemisPage() {
 
           <DialogFooter className="p-4 bg-white border-t shrink-0 flex flex-row gap-2">
             {aiAdvice ? (
-              <><Button variant="ghost" onClick={() => setAiAdvice(null)} className="flex-1 font-bold uppercase text-[10px]">Modifier</Button><Button onClick={handleConfirmSowing} disabled={isSaving} className="flex-[2] font-black uppercase h-12 shadow-md">Enregistrer</Button></>
+              <><Button variant="ghost" onClick={() => setAiAdvice(null)} className="flex-1 font-bold uppercase text-[10px] border-2">Modifier</Button><Button onClick={handleConfirmSowing} disabled={isSaving} className="flex-[2] font-black uppercase h-12 shadow-md">Enregistrer</Button></>
             ) : (
-              <Button variant="outline" onClick={() => setIsPlanningOpen(false)} className="w-full font-black uppercase h-12">Annuler</Button>
+              <Button variant="outline" onClick={() => setIsPlanningOpen(false)} className="w-full font-black uppercase h-12 border-2">Annuler</Button>
             )}
           </DialogFooter>
         </DialogContent>

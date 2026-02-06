@@ -76,7 +76,6 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
 
     const { selectedLocation } = useLocation();
     
-    // États d'analyse séparés pour éviter les conflits
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analysisResult, setAnalysisResult] = useState<FishingAnalysisOutput | null>(null);
     const [recommendResult, setRecommendResult] = useState<RecommendBestSpotOutput | null>(null);
@@ -497,7 +496,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                             onClick={handleRecenter} 
                             className={cn(
                                 "absolute top-2 right-2 shadow-lg h-10 w-auto px-3 z-10 border-2 gap-2 flex items-center", 
-                                watchId.current !== null ? "bg-primary text-white border-primary" : "bg-background/80 backdrop-blur-sm"
+                                watchId.current !== null ? "bg-primary text-white border-primary" : "bg-background/90 backdrop-blur-sm"
                             )}
                         >
                             <span className="text-[9px] font-black uppercase tracking-tighter">ACTIVER MON GPS + RECENTRER</span>
@@ -648,7 +647,6 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                 )}
             </CardContent>
 
-            {/* Dialogs déplacés à la racine pour éviter les problèmes de z-index sur mobile */}
             <Dialog open={isSpotDialogOpen} onOpenChange={(open) => { if (!open) setSpotToEdit(null); setIsSpotDialogOpen(open); }}>
                 <DialogContent className="max-h-[95vh] flex flex-col p-0 overflow-hidden sm:max-w-lg">
                     <DialogHeader className="p-6 pb-2 shrink-0">
@@ -715,14 +713,13 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                 </DialogContent>
             </Dialog>
 
-            {/* Dialog Analyse 7 jours / Jour similaire */}
             <Dialog open={isAnalysisDialogOpen} onOpenChange={setIsAnalysisDialogOpen}>
                 <DialogContent className="max-w-md rounded-2xl max-h-[95vh] flex flex-col p-0 overflow-hidden">
                     <DialogHeader className="p-6 pb-2 shrink-0">
                         <DialogTitle className="flex items-center gap-2 font-black uppercase"><BrainCircuit className="text-primary" /> Analyse de l'IA</DialogTitle>
                     </DialogHeader>
                     <ScrollArea className="flex-grow">
-                        <div className="p-6 py-4 space-y-4">
+                        <div className="p-6 py-4 space-y-4 pb-10">
                             {isAnalyzing ? (
                                 <div className="flex flex-col items-center justify-center py-10 space-y-4">
                                     <BrainCircuit className="size-12 text-primary animate-pulse" />
@@ -749,7 +746,6 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                 </DialogContent>
             </Dialog>
 
-            {/* Dialog Recommandation Spot Actuel */}
             <Dialog open={isRecommendDialogOpen} onOpenChange={setIsRecommendDialogOpen}>
                 <DialogContent className="max-w-md rounded-2xl max-h-[95vh] flex flex-col p-0 overflow-hidden">
                     <DialogHeader className="p-6 pb-2 shrink-0">
@@ -758,7 +754,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                     </DialogHeader>
                     
                     <ScrollArea className="flex-grow">
-                        <div className="p-4 sm:p-6 py-4 space-y-6">
+                        <div className="p-4 sm:p-6 py-4 space-y-6 pb-12">
                             {isAnalyzing ? (
                                 <div className="flex flex-col items-center justify-center py-10 space-y-4">
                                     <BrainCircuit className="size-12 text-primary animate-pulse" />
@@ -792,7 +788,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                     </div>
 
                                     <Button 
-                                        className="w-full h-12 font-black uppercase gap-2 shadow-md"
+                                        className="w-full h-14 font-black uppercase gap-3 shadow-lg bg-primary hover:bg-primary/90 text-white"
                                         onClick={() => {
                                             const spot = savedSpots?.find(s => s.id === recommendResult.bestSpotId);
                                             if (spot && map) {
@@ -803,13 +799,13 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                             }
                                         }}
                                     >
-                                        <LocateFixed className="size-4" /> Voir sur la carte
+                                        <LocateFixed className="size-5" /> Voir sur la carte
                                     </Button>
                                 </div>
                             )}
                         </div>
                     </ScrollArea>
-                    <DialogFooter className="p-4 border-t shrink-0"><Button variant="outline" onClick={() => setIsRecommendDialogOpen(false)} className="w-full font-black uppercase h-12">Fermer</Button></DialogFooter>
+                    <DialogFooter className="p-4 border-t shrink-0 bg-white"><Button variant="outline" onClick={() => setIsRecommendDialogOpen(false)} className="w-full font-black uppercase h-12 border-2">Fermer</Button></DialogFooter>
                 </DialogContent>
             </Dialog>
         </Card>
