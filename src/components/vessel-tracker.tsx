@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useUser as useUserHook, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, getDocs, writeBatch, deleteDoc, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, getDocs, deleteDoc } from 'firebase/firestore';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -262,9 +262,9 @@ export function VesselTracker() {
     toast({ title: "Suivi activé", description: `Connexion au navire ${cleanId}...` });
   };
 
-  // --- RECEIVER LOGIC: Synchronisation temps réel robuste ---
+  // --- LOGIQUE D'HISTORIQUE UNIVERSELLE ---
   useEffect(() => {
-    if (mode !== 'receiver' || !remoteVessel || !activeVesselId) {
+    if (!remoteVessel || !activeVesselId) {
         return;
     }
     
@@ -272,7 +272,6 @@ export function VesselTracker() {
     const currentStatus = isSharingActive ? (remoteVessel.status || 'moving') : 'offline';
     const statusTime = remoteVessel.statusChangedAt || remoteVessel.lastActive;
     
-    // Convertisseur universel d'horodatage
     const getTimeMillis = (t: any) => {
         if (!t) return 0;
         if (typeof t.toMillis === 'function') return t.toMillis();
@@ -297,7 +296,7 @@ export function VesselTracker() {
       };
       
       const label = statusLabels[currentStatus] || currentStatus;
-      const displayLabel = history.length === 0 ? `CONNEXION ÉTABLIE - ${label}` : label;
+      const displayLabel = history.length === 0 ? `CONNEXION - ${label}` : label;
       
       const pos = { 
         lat: remoteVessel.location?.latitude || INITIAL_CENTER.lat, 
@@ -305,14 +304,13 @@ export function VesselTracker() {
       };
 
       setHistory(prev => {
-        // Anti-doublons immédiats (2 secondes de fenêtre)
         if (prev.length > 0 && prev[0].statusLabel === displayLabel && Math.abs(prev[0].time.getTime() - timeKey) < 2000) {
             return prev;
         }
         return [{ statusLabel: displayLabel, time: new Date(timeKey), pos }, ...prev].slice(0, 30);
       });
       
-      if (lastStatusRef.current !== null && statusChanged && vesselPrefs.isNotifyEnabled) {
+      if (mode === 'receiver' && lastStatusRef.current !== null && statusChanged && vesselPrefs.isNotifyEnabled) {
         const soundKey = (currentStatus === 'returning' || currentStatus === 'landed') ? 'moving' : currentStatus;
         if (vesselPrefs.notifySettings[soundKey as keyof typeof vesselPrefs.notifySettings]) {
           playVesselSound(vesselPrefs.notifySounds[soundKey as keyof typeof vesselPrefs.notifySounds] || 'sonar');
@@ -325,24 +323,24 @@ export function VesselTracker() {
       watchTriggeredRef.current = false;
     }
 
-    // Batterie Critique
-    if (remoteVessel.batteryLevel !== undefined && remoteVessel.batteryLevel <= 5 && !remoteVessel.isCharging) {
-        if (!batteryAlertTriggered.current) {
-            toast({ variant: "destructive", title: "BATTERIE CRITIQUE", description: `L'émetteur n'a plus que ${remoteVessel.batteryLevel}% !` });
-            playVesselSound('alerte');
-            batteryAlertTriggered.current = true;
-        }
-    } else { batteryAlertTriggered.current = false; }
+    // Alertes spécifiques au mode récepteur
+    if (mode === 'receiver') {
+        if (remoteVessel.batteryLevel !== undefined && remoteVessel.batteryLevel <= 5 && !remoteVessel.isCharging) {
+            if (!batteryAlertTriggered.current) {
+                toast({ variant: "destructive", title: "BATTERIE CRITIQUE", description: `L'émetteur n'a plus que ${remoteVessel.batteryLevel}% !` });
+                playVesselSound('alerte');
+                batteryAlertTriggered.current = true;
+            }
+        } else { batteryAlertTriggered.current = false; }
 
-    // Veille Critique
-    if (vesselPrefs.isWatchEnabled && !watchTriggeredRef.current && currentStatus !== 'landed') {
-        if (currentStatus === vesselPrefs.watchType) {
-            const lastUpdate = remoteVessel.lastActive?.toDate?.() || new Date();
-            const diffMinutes = (new Date().getTime() - lastUpdate.getTime()) / 60000;
-            if (diffMinutes >= vesselPrefs.watchDuration) {
-                watchTriggeredRef.current = true;
-                playVesselSound(vesselPrefs.watchSound);
-                toast({ variant: "destructive", title: "ALERTE VEILLE CRITIQUE", description: `Inactivité prolongée (${vesselPrefs.watchDuration} min)` });
+        if (vesselPrefs.isWatchEnabled && !watchTriggeredRef.current && currentStatus !== 'landed') {
+            if (currentStatus === vesselPrefs.watchType) {
+                const diffMinutes = (new Date().getTime() - timeKey) / 60000;
+                if (diffMinutes >= vesselPrefs.watchDuration) {
+                    watchTriggeredRef.current = true;
+                    playVesselSound(vesselPrefs.watchSound);
+                    toast({ variant: "destructive", title: "ALERTE VEILLE CRITIQUE", description: `Inactivité prolongée (${vesselPrefs.watchDuration} min)` });
+                }
             }
         }
     }
@@ -588,7 +586,8 @@ export function VesselTracker() {
                             displayVessel.status === 'returning' ? "bg-indigo-600" :
                             displayVessel.status === 'landed' ? "bg-green-600" : "bg-amber-600")}>
                           {displayVessel.status === 'stationary' ? <Anchor className="size-5 text-white" /> : 
-                           displayVessel.status === 'landed' ? <Home className="size-5 text-white" /> : <Navigation className="size-5 text-white" />}
+                           displayVessel.status === 'landed' ? <Home className="size-5 text-white" /> : 
+                           displayVessel.status === 'returning' ? <Navigation className="size-5 text-white" /> : <Navigation className="size-5 text-white" />}
                         </div>
                     </div>
                     </OverlayView>
@@ -623,7 +622,7 @@ export function VesselTracker() {
                 <Button variant="ghost" className="h-10 font-black uppercase text-[9px] border-2 gap-2 touch-manipulation" onClick={copyCoordinates} disabled={!displayVessel?.location}>
                   <Copy className="size-3" /> Coordonnées
                 </Button>
-                <Button variant="ghost" className="h-10 font-black uppercase text-[9px] border-2 gap-2 touch-manipulation" onClick={() => { if(mode === 'receiver') { setHistory([]); lastStatusRef.current = null; lastUpdateRef.current = 0; } }}>
+                <Button variant="ghost" className="h-10 font-black uppercase text-[9px] border-2 gap-2 touch-manipulation" onClick={() => { setHistory([]); lastStatusRef.current = null; lastUpdateRef.current = 0; }}>
                   <X className="size-3" /> Effacer Hist.
                 </Button>
             </div>
