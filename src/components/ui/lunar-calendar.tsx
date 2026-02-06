@@ -54,7 +54,6 @@ import type { FishRating, Tide } from '@/lib/types';
 import { CrabIcon, LobsterIcon, OctopusIcon } from '../icons';
 import { Skeleton } from './skeleton';
 import { Badge } from './badge';
-import { ScrollArea } from './scroll-area';
 
 export const MoonPhaseIcon = ({
   phase,
@@ -329,14 +328,14 @@ export function LunarCalendar() {
             </DialogClose>
           </DialogHeader>
           
-          <ScrollArea className="flex-grow min-h-0 bg-slate-50/50">
+          <div className="flex-grow overflow-y-auto min-h-0 touch-pan-y scrollbar-hide bg-slate-50/50">
             <div className="p-6 pb-32">
               {calendarView === 'peche' 
                 ? (detailedDay && <PecheDetailDialogContent day={detailedDay} location={selectedLocation} />)
                 : (detailedDay && <ChampsDetailDialogContent day={detailedDay} location={selectedLocation} />)
               }
             </div>
-          </ScrollArea>
+          </div>
 
           <DialogFooter className="p-4 bg-white border-t shrink-0">
             <DialogClose asChild>

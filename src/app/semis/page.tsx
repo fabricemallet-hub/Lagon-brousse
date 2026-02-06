@@ -66,7 +66,6 @@ import { cn } from '@/lib/utils';
 import type { GardeningAdviceOutput } from '@/ai/schemas';
 import type { IdentifyPlantOutput } from '@/ai/flows/identify-plant-flow';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { MoonPhaseIcon } from '@/components/ui/lunar-calendar';
 
 function AdviceDetail({
@@ -403,7 +402,7 @@ export default function SemisPage() {
             </DialogTitle>
           </DialogHeader>
 
-          <ScrollArea className="flex-grow min-h-0 bg-slate-50/50">
+          <div className="flex-grow overflow-y-auto min-h-0 touch-pan-y scrollbar-hide bg-slate-50/50">
             <div className="p-6 pt-4 space-y-6 pb-32">
               {!aiAdvice ? (
                 <div className="space-y-6">
@@ -412,7 +411,11 @@ export default function SemisPage() {
                     <Input type="date" value={sowingDate} onChange={(e) => setSowingDate(e.target.value)} className="h-14 text-base border-2 font-black" />
                   </div>
                   <Button onClick={handleStartAnalysis} className="w-full h-14 text-base font-black uppercase tracking-widest shadow-lg" disabled={isAnalyzing}>
-                    {isAnalyzing ? <><BrainCircuit className="mr-2 animate-pulse" /> Analyse en cours...</> : <><BrainCircuit className="mr-2" /> Calculer la fiche IA</>}
+                    {isAnalyzing ? (
+                      <><BrainCircuit className="mr-2 animate-pulse" /> Analyse en cours...</>
+                    ) : (
+                      <><BrainCircuit className="mr-2" /> Calculer la fiche IA</>
+                    )}
                   </Button>
                 </div>
               ) : (
@@ -435,7 +438,7 @@ export default function SemisPage() {
                 </div>
               )}
             </div>
-          </ScrollArea>
+          </div>
 
           <DialogFooter className="p-4 bg-white border-t shrink-0 flex flex-row gap-2">
             {aiAdvice ? (

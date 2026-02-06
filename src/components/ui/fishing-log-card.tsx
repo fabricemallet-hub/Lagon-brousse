@@ -18,7 +18,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { LocationData, FishingSpot, SwellForecast, Tide } from '@/lib/types';
 import { getDataForDate, generateProceduralData } from '@/lib/data';
-import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown, Pencil, History, Navigation, Map as MapIcon, RefreshCw } from 'lucide-react';
+import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown, Pencil, History, Navigation, Map as MapIcon, RefreshCw, X } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from './alert';
 import { useLocation } from '@/context/location-context';
@@ -28,7 +28,6 @@ import type { FishingAnalysisOutput, RecommendBestSpotOutput } from '@/ai/schema
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { useGoogleMaps } from '@/context/google-maps-context';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -649,12 +648,14 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
 
             <Dialog open={isSpotDialogOpen} onOpenChange={(open) => { if (!open) setSpotToEdit(null); setIsSpotDialogOpen(open); }}>
                 <DialogContent className="max-h-[95vh] flex flex-col p-0 overflow-hidden sm:max-w-lg">
-                    <DialogHeader className="p-6 pb-2 shrink-0">
-                        <DialogTitle className="font-black uppercase tracking-tight">{dialogMode === 'add' ? 'Nouveau spot' : 'Modifier le spot'}</DialogTitle>
+                    <DialogHeader className="p-6 pb-2 shrink-0 border-b">
+                        <div className="flex items-center justify-between w-full pr-8">
+                            <DialogTitle className="font-black uppercase tracking-tight">{dialogMode === 'add' ? 'Nouveau spot' : 'Modifier le spot'}</DialogTitle>
+                        </div>
                     </DialogHeader>
                     
-                    <ScrollArea className="flex-grow min-h-0">
-                        <div className="p-6 py-2 space-y-4 pb-32">
+                    <div className="flex-grow overflow-y-auto min-h-0 touch-pan-y scrollbar-hide">
+                        <div className="p-6 py-4 space-y-4 pb-32">
                             <div className="space-y-2">
                                 <Label htmlFor="spot-name" className="text-xs font-bold uppercase text-muted-foreground">Nom du spot</Label>
                                 <Input id="spot-name" placeholder="Ex: Spot à bec de cane" value={spotName} onChange={(e) => setSpotName(e.target.value)} className="h-12 border-2 font-bold" />
@@ -704,7 +705,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                 </div>
                             </div>
                         </div>
-                    </ScrollArea>
+                    </div>
                     
                     <DialogFooter className="p-4 border-t shrink-0 flex flex-row gap-2 bg-muted/10">
                         <Button variant="ghost" onClick={() => { setIsSpotDialogOpen(false); if (dialogMode === 'add') setNewSpotLocation(null); }} className="flex-1 font-bold h-12 uppercase text-xs">Annuler</Button>
@@ -715,10 +716,12 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
 
             <Dialog open={isAnalysisDialogOpen} onOpenChange={setIsAnalysisDialogOpen}>
                 <DialogContent className="max-w-md rounded-2xl max-h-[95vh] flex flex-col p-0 overflow-hidden">
-                    <DialogHeader className="p-6 pb-2 shrink-0">
-                        <DialogTitle className="flex items-center gap-2 font-black uppercase"><BrainCircuit className="text-primary" /> Analyse de l'IA</DialogTitle>
+                    <DialogHeader className="p-6 pb-2 shrink-0 border-b">
+                        <div className="flex items-center justify-between w-full pr-8">
+                            <DialogTitle className="flex items-center gap-2 font-black uppercase"><BrainCircuit className="text-primary" /> Analyse de l'IA</DialogTitle>
+                        </div>
                     </DialogHeader>
-                    <ScrollArea className="flex-grow min-h-0">
+                    <div className="flex-grow overflow-y-auto min-h-0 touch-pan-y scrollbar-hide">
                         <div className="p-6 py-4 space-y-4 pb-32">
                             {isAnalyzing ? (
                                 <div className="flex flex-col items-center justify-center py-10 space-y-4">
@@ -741,19 +744,23 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                 </div>
                             )}
                         </div>
-                    </ScrollArea>
+                    </div>
                     <DialogFooter className="p-4 border-t shrink-0 bg-white"><Button variant="outline" onClick={() => setIsAnalysisDialogOpen(false)} className="w-full font-black uppercase h-12 border-2">Fermer</Button></DialogFooter>
                 </DialogContent>
             </Dialog>
 
             <Dialog open={isRecommendDialogOpen} onOpenChange={setIsRecommendDialogOpen}>
                 <DialogContent className="max-w-md rounded-2xl max-h-[95vh] flex flex-col p-0 overflow-hidden">
-                    <DialogHeader className="p-6 pb-2 shrink-0">
-                        <DialogTitle className="flex items-center gap-2 font-black uppercase text-base sm:text-lg"><BrainCircuit className="text-primary" /> Meilleur spot immédiat</DialogTitle>
-                        <DialogDescription className="text-[9px] sm:text-[10px] uppercase font-bold">Analyse basée sur votre GPS, la marée et la lune actuelle</DialogDescription>
+                    <DialogHeader className="p-6 pb-2 shrink-0 border-b">
+                        <div className="flex items-center justify-between w-full pr-8">
+                            <div>
+                                <DialogTitle className="flex items-center gap-2 font-black uppercase text-base sm:text-lg"><BrainCircuit className="text-primary" /> Meilleur spot immédiat</DialogTitle>
+                                <DialogDescription className="text-[9px] sm:text-[10px] uppercase font-bold">Basé sur GPS, marée et lune</DialogDescription>
+                            </div>
+                        </div>
                     </DialogHeader>
                     
-                    <ScrollArea className="flex-grow min-h-0">
+                    <div className="flex-grow overflow-y-auto min-h-0 touch-pan-y scrollbar-hide">
                         <div className="p-4 sm:p-6 py-4 space-y-6 pb-32">
                             {isAnalyzing ? (
                                 <div className="flex flex-col items-center justify-center py-10 space-y-4">
@@ -804,7 +811,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                 </div>
                             )}
                         </div>
-                    </ScrollArea>
+                    </div>
                     <DialogFooter className="p-4 border-t shrink-0 bg-white"><Button variant="outline" onClick={() => setIsRecommendDialogOpen(false)} className="w-full font-black uppercase h-12 border-2">Fermer</Button></DialogFooter>
                 </DialogContent>
             </Dialog>
