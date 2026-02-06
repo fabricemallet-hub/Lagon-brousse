@@ -360,11 +360,13 @@ function HuntingSessionContent() {
   };
 
   const handleRecenter = () => {
-    if (isGpsActive && userLocation && map) {
+    if (watchIdRef.current === null) {
+        setIsGpsActive(true);
+        shouldPanOnNextFix.current = true;
+        toast({ title: "GPS Activé" });
+    } else if (userLocation && map) {
         map.panTo({ lat: userLocation.latitude, lng: userLocation.longitude });
         map.setZoom(16);
-    } else {
-        handleToggleGps();
     }
   };
 
@@ -453,7 +455,16 @@ function HuntingSessionContent() {
                         ))}
                     </GoogleMap>
                     <Button size="icon" onClick={() => setIsFullscreen(!isFullscreen)} className="absolute top-2 left-2 shadow-lg h-9 w-9 z-10 bg-background/80 backdrop-blur-sm"><Expand className="size-5" /></Button>
-                    <Button size="icon" onClick={handleRecenter} className={cn("absolute top-2 right-2 shadow-lg h-9 w-9 z-10 border-2", isGpsActive ? "bg-primary text-white" : "bg-background/80 backdrop-blur-sm")}><LocateFixed className="size-5" /></Button>
+                    <Button 
+                        onClick={handleRecenter} 
+                        className={cn(
+                            "absolute top-2 right-2 shadow-lg h-10 w-auto px-3 z-10 border-2 gap-2 flex items-center", 
+                            isGpsActive ? "bg-primary text-white border-primary" : "bg-background/80 backdrop-blur-sm"
+                        )}
+                    >
+                        <span className="text-[9px] font-black uppercase tracking-tighter">ACTIVER MON GPS + RECENTRER</span>
+                        <LocateFixed className="size-5" />
+                    </Button>
                 </div>
 
                 {!isGpsActive && (

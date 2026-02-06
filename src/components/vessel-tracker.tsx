@@ -178,7 +178,16 @@ export function VesselTracker() {
                 )}
           </GoogleMap>
           <div className="absolute top-3 right-3 flex flex-col gap-2">
-            <Button size="icon" className="shadow-lg h-10 w-10 bg-background/90 border-2" onClick={handleRecenter}><LocateFixed className="size-5" /></Button>
+            <Button 
+                onClick={handleRecenter} 
+                className={cn(
+                    "shadow-lg h-10 w-auto px-3 z-10 border-2 gap-2 flex items-center", 
+                    (mode === 'sender' && isSharing) || (mode === 'receiver' && isGpsActiveForReceiver) ? "bg-primary text-white border-primary" : "bg-background/90 backdrop-blur-sm"
+                )}
+            >
+                <span className="text-[9px] font-black uppercase tracking-tighter">ACTIVER MON GPS + RECENTRER</span>
+                <LocateFixed className="size-5" />
+            </Button>
             <Button size="icon" className="shadow-lg h-10 w-10 bg-background/90 border-2" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}</Button>
           </div>
         </div>

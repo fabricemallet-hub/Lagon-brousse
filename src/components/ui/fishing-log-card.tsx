@@ -468,7 +468,14 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         <Button size="icon" onClick={() => setIsFullscreen(!isFullscreen)} className="absolute top-2 left-2 shadow-lg h-9 w-9 z-10 bg-background/80 backdrop-blur-sm">
                             {isFullscreen ? <Shrink className="h-5 w-5" /> : <Expand className="h-5 w-5" />}
                         </Button>
-                        <Button size="icon" onClick={handleRecenter} className={cn("absolute top-2 right-2 shadow-lg h-9 w-9 z-10 border-2", watchId.current !== null ? "bg-primary text-white border-primary" : "bg-background/80 backdrop-blur-sm")}>
+                        <Button 
+                            onClick={handleRecenter} 
+                            className={cn(
+                                "absolute top-2 right-2 shadow-lg h-10 w-auto px-3 z-10 border-2 gap-2 flex items-center", 
+                                watchId.current !== null ? "bg-primary text-white border-primary" : "bg-background/80 backdrop-blur-sm"
+                            )}
+                        >
+                            <span className="text-[9px] font-black uppercase tracking-tighter">ACTIVER MON GPS + RECENTRER</span>
                             <LocateFixed className="size-5" />
                         </Button>
                          <div className={cn("absolute bottom-0 left-0 right-0 z-10", !newSpotLocation && "hidden")}>
