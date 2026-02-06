@@ -154,6 +154,7 @@ export interface UserAccount {
   id: string;
   email: string;
   displayName: string;
+  vesselNickname?: string;
   mapIcon?: string;
   mapColor?: string;
   subscriptionStatus: 'active' | 'inactive' | 'trial' | 'admin';

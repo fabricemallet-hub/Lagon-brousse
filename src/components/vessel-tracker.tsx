@@ -133,7 +133,6 @@ export function VesselTracker() {
   const savedVesselIds = userProfile?.savedVesselIds || [];
   const vesselsQuery = useMemoFirebase(() => {
     if (!firestore || savedVesselIds.length === 0) return null;
-    // On inclut potentiellement l'ID de partage actuel si on est en mode émission pour voir son propre historique
     const queryIds = [...savedVesselIds];
     if (isSharing && !queryIds.includes(sharingId)) queryIds.push(sharingId);
     return query(collection(firestore, 'vessels'), where('id', 'in', queryIds.slice(0, 10)));
@@ -168,11 +167,29 @@ export function VesselTracker() {
   }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, availableSounds]);
 
   useEffect(() => {
-    if (userProfile?.vesselPrefs) setVesselPrefs(userProfile.vesselPrefs);
-    if (userProfile?.emergencyContact) setEmergencyContact(userProfile.emergencyContact);
-    if (userProfile?.displayName && !vesselNickname) setVesselNickname(userProfile.displayName);
-    if (userProfile?.lastVesselId && !customSharingId) setCustomSharingId(userProfile.lastVesselId);
-  }, [userProfile]);
+    if (userProfile) {
+      if (userProfile.vesselPrefs) setVesselPrefs(userProfile.vesselPrefs);
+      if (userProfile.emergencyContact) setEmergencyContact(userProfile.emergencyContact);
+      
+      const savedNickname = userProfile.vesselNickname || userProfile.displayName || user?.displayName || user?.email?.split('@')[0] || '';
+      if (!vesselNickname) setVesselNickname(savedNickname);
+      
+      if (userProfile.lastVesselId && !customSharingId) setCustomSharingId(userProfile.lastVesselId);
+    }
+  }, [userProfile, user]);
+
+  // Debounced auto-save for vessel nickname
+  useEffect(() => {
+    if (!user || !firestore || !vesselNickname) return;
+    
+    const timer = setTimeout(() => {
+      updateDoc(doc(firestore, 'users', user.uid), {
+        vesselNickname: vesselNickname
+      }).catch(err => console.warn("Auto-save failed:", err));
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [vesselNickname, user, firestore]);
 
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
@@ -215,10 +232,10 @@ export function VesselTracker() {
         await updateDoc(doc(firestore, 'users', user.uid), {
             savedVesselIds: cleanId ? arrayUnion(cleanId) : savedVesselIds,
             lastVesselId: cleanId || customSharingId,
-            displayName: vesselNickname // On sauvegarde aussi le surnom dans le profil
+            vesselNickname: vesselNickname
         });
         if (vesselIdToFollow) setVesselIdToFollow('');
-        toast({ title: "Configuration sauvegardée" });
+        toast({ title: "ID enregistré" });
     } catch (e) {
         console.error(e);
         toast({ variant: 'destructive', title: "Erreur sauvegarde" });
@@ -496,21 +513,24 @@ export function VesselTracker() {
                     <div className="space-y-4">
                         <div className="space-y-1">
                             <Label className="text-[9px] font-black uppercase ml-1 opacity-60">ID du navire (Partage)</Label>
-                            <Input placeholder="NOM..." value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest" />
-                        </div>
-                        <div className="space-y-1">
-                            <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Surnom du capitaine / navire</Label>
                             <div className="flex gap-2">
-                                <Input 
-                                    placeholder="EX: CAPITAINE NEMO" 
-                                    value={vesselNickname} 
-                                    onChange={e => setVesselNickname(e.target.value)} 
-                                    className="font-bold text-center h-12 border-2 uppercase flex-grow" 
-                                />
+                                <Input placeholder="ID EX: BATEAU-1" value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest flex-grow" />
                                 <Button variant="outline" size="icon" className="h-12 w-12 border-2 shrink-0 touch-manipulation" onClick={handleSaveVessel}>
                                     <Save className="size-4" />
                                 </Button>
                             </div>
+                        </div>
+                        <div className="space-y-1">
+                            <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Surnom du capitaine / navire</Label>
+                            <Input 
+                                placeholder="EX: CAPITAINE NEMO" 
+                                value={vesselNickname} 
+                                onChange={e => setVesselNickname(e.target.value)} 
+                                className="font-bold text-center h-12 border-2 uppercase flex-grow w-full" 
+                            />
+                            <p className="text-[8px] font-bold text-muted-foreground px-1 mt-1 leading-tight italic">
+                                le surnom inscrit ici n'est pas relié au surnom de la session chasse. il sera enregistré automatiquement sur le profil utilisateur a la saisie
+                            </p>
                         </div>
                         <Button variant={wakeLock ? "secondary" : "outline"} className="w-full h-12 font-black uppercase text-[10px] tracking-widest border-2 gap-2 touch-manipulation" onClick={toggleWakeLock}>
                             <Zap className={cn("size-4", wakeLock && "fill-primary")} />
