@@ -103,7 +103,7 @@ export function VesselTracker() {
     notifySounds: { moving: 'sonar', stationary: 'cloche', offline: 'alerte' },
     isWatchEnabled: false,
     watchType: 'stationary',
-    watchDuration: 15,
+    watchDuration: 60,
     watchSound: 'alerte',
     batteryThreshold: 20
   });
@@ -597,19 +597,22 @@ export function VesselTracker() {
                         />
                       </div>
                       
-                      <div className="space-y-3 pt-2 border-t border-orange-100">
-                        <Label className="text-[10px] font-black uppercase text-orange-800/60">Seuil d'immobilité (minutes)</Label>
-                        <Select 
-                          value={String(vesselPrefs.watchDuration)} 
-                          onValueChange={v => saveVesselPrefs({ ...vesselPrefs, watchDuration: parseInt(v) })}
-                        >
-                          <SelectTrigger className="h-10 font-black text-xs bg-white">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {[5, 10, 15, 30, 60, 120].map(m => <SelectItem key={m} value={String(m)}>{m} minutes</SelectItem>)}
-                          </SelectContent>
-                        </Select>
+                      <div className="space-y-4 pt-2 border-t border-orange-100">
+                        <div className="flex justify-between items-center px-1">
+                          <Label className="text-[10px] font-black uppercase text-orange-800/60">Seuil d'immobilité</Label>
+                          <Badge variant="outline" className="font-black bg-white">{vesselPrefs.watchDuration >= 60 ? `${Math.floor(vesselPrefs.watchDuration / 60)}h` : `${vesselPrefs.watchDuration} min`}</Badge>
+                        </div>
+                        <Slider 
+                          value={[vesselPrefs.watchDuration || 60]} 
+                          min={60} 
+                          max={1440} 
+                          step={60}
+                          onValueChange={v => saveVesselPrefs({ ...vesselPrefs, watchDuration: v[0] })} 
+                        />
+                        <div className="flex justify-between text-[8px] font-black uppercase opacity-40 px-1">
+                          <span>1h</span>
+                          <span>24h</span>
+                        </div>
                       </div>
                     </div>
 
