@@ -97,12 +97,10 @@ export function WeatherForecast({
   const [now, setNow] = useState(new Date());
   const scrollRef = useRef<HTMLDivElement>(null);
   
-  // Ref pour ne centrer qu'une seule fois par heure pour éviter de bloquer le défilement manuel
   const hasCenteredForHour = useRef<number | null>(null);
 
   useEffect(() => {
     setIsClient(true);
-    // Mise à jour toutes les minutes pour l'affichage de l'heure (HH:mm)
     const timer = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
@@ -127,7 +125,7 @@ export function WeatherForecast({
     }));
     
     const sortedTideEvents = [...currentTideEvents].sort((a,b) => a.date.getTime() - b.date.getTime());
-    let nextTide = sortedTideEvents.find(tide => tide.date > now);
+    let nextTide = sortedTideEvents.find(t => t.date > now);
     
     if (!nextTide) {
         nextTide = { ...sortedTideEvents[0], date: new Date(sortedTideEvents[0].date.getTime() + 24 * 60 * 60 * 1000) };
@@ -163,13 +161,11 @@ export function WeatherForecast({
 
   useEffect(() => {
     if (isClient && isToday && scrollRef.current) {
-        // On ne recentre que si l'heure a réellement changé depuis le dernier centrage
         if (hasCenteredForHour.current !== currentHour) {
             const container = scrollRef.current;
             const element = container.querySelector(`[data-hour="${currentHour}"]`) as HTMLElement;
             if (element) {
                 const scrollLeft = element.offsetLeft - (container.clientWidth / 2) + (element.clientWidth / 2);
-                // On utilise behavior 'auto' pour le premier centrage pour éviter une animation parasite
                 container.scrollTo({ 
                   left: scrollLeft, 
                   behavior: hasCenteredForHour.current === null ? 'auto' : 'smooth' 
@@ -187,47 +183,49 @@ export function WeatherForecast({
   }
 
   return (
-    <div className="w-full max-w-full overflow-x-hidden rounded-xl border bg-card shadow-md">
-      <div className="bg-blue-600 text-white p-5 rounded-t-xl">
-        <div className="text-center mb-4 border-b border-white/20 pb-4">
+    <div className="w-full max-w-full overflow-hidden rounded-xl border bg-card shadow-md">
+      <div className="bg-blue-600 text-white p-4 sm:p-5 rounded-t-xl overflow-hidden">
+        <div className="text-center mb-4 border-b border-white/20 pb-4 px-1">
           {summary ? (
-            <>
-              <p className="text-[10px] font-black uppercase tracking-widest mb-1.5 opacity-70">Aperçu Immédiat</p>
-              <p className="text-sm font-bold leading-tight">{summary.tideSentence}</p>
-              <p className="text-xs text-blue-100 leading-tight mt-1.5">{summary.windSentence}</p>
-            </>
+            <div className="space-y-1">
+              <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Aperçu Immédiat</p>
+              <p className="text-sm font-bold leading-snug break-words">{summary.tideSentence}</p>
+              <p className="text-xs text-blue-100 leading-snug break-words opacity-90">{summary.windSentence}</p>
+            </div>
           ) : (
             <Skeleton className="h-12 w-full bg-white/10" />
           )}
         </div>
 
-        <div className="flex justify-around items-center gap-4 py-1">
-           <div className="flex flex-col items-center text-center">
-                <WeatherConditionIcon condition={selectedForecast.condition} isNight={selectedForecast.isNight} className="size-12 mb-1.5" />
-                <p className="font-black text-[10px] uppercase tracking-tighter">{selectedForecast.condition}</p>
+        <div className="grid grid-cols-3 items-center gap-2 py-1">
+           <div className="flex flex-col items-center text-center min-w-0">
+                <WeatherConditionIcon condition={selectedForecast.condition} isNight={selectedForecast.isNight} className="size-10 sm:size-12 mb-1.5" />
+                <p className="font-black text-[9px] uppercase tracking-tighter truncate w-full">{selectedForecast.condition}</p>
             </div>
-            <div className="flex flex-col items-center text-center">
-                <div className="flex items-baseline gap-1">
-                    <p className="font-black text-6xl leading-none">{selectedForecast.windSpeed}</p>
-                    <p className="font-black text-sm uppercase">nds</p>
+            
+            <div className="flex flex-col items-center text-center min-w-0">
+                <div className="flex items-baseline gap-0.5">
+                    <p className="font-black text-4xl sm:text-5xl md:text-6xl leading-none">{selectedForecast.windSpeed}</p>
+                    <p className="font-black text-[10px] uppercase">nds</p>
                 </div>
-                <div className="flex items-center gap-1.5 mt-2 bg-white/10 px-2 py-0.5 rounded-full">
-                    <WindArrowIcon direction={selectedForecast.windDirection} className="size-3.5" />
-                    <p className="text-[10px] font-black uppercase tracking-tighter">{translateWindDirection(selectedForecast.windDirection)}</p>
+                <div className="flex items-center gap-1 mt-1.5 bg-white/10 px-2 py-0.5 rounded-full max-w-full overflow-hidden">
+                    <WindArrowIcon direction={selectedForecast.windDirection} className="size-3" />
+                    <p className="text-[9px] font-black uppercase tracking-tighter truncate">{translateWindDirection(selectedForecast.windDirection)}</p>
                 </div>
             </div>
-             <div className="flex flex-col items-center gap-2">
-                <div className="flex items-center gap-2 bg-white/15 px-3 py-1.5 rounded-lg border border-white/10 shadow-inner">
-                    <Clock className="size-4 text-blue-200" />
-                    <span className="font-black text-sm">{format(now, 'HH:mm')}</span>
+
+             <div className="flex flex-col items-center gap-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 bg-white/15 px-2 py-1.5 rounded-lg border border-white/10 shadow-inner w-full justify-center">
+                    <Clock className="size-3.5 text-blue-200 shrink-0" />
+                    <span className="font-black text-xs">{format(now, 'HH:mm')}</span>
                 </div>
-                <div className="flex items-center gap-2 bg-white/15 px-3 py-1.5 rounded-lg border border-white/10 shadow-inner">
-                    <Thermometer className="size-4 text-orange-300" />
-                    <span className="font-black text-sm">{selectedForecast.temp.toFixed(1)}°C</span>
+                <div className="flex items-center gap-1.5 bg-white/15 px-2 py-1.5 rounded-lg border border-white/10 shadow-inner w-full justify-center">
+                    <Thermometer className="size-3.5 text-orange-300 shrink-0" />
+                    <span className="font-black text-xs">{selectedForecast.temp.toFixed(1)}°C</span>
                 </div>
-                <div className="flex items-center gap-2 bg-white/15 px-3 py-1.5 rounded-lg border border-white/10 shadow-inner">
-                    <Sun className="size-4 text-yellow-300" />
-                    <span className="font-black text-sm text-yellow-50">UV: {selectedForecast.uvIndex}</span>
+                <div className="flex items-center gap-1.5 bg-white/15 px-2 py-1.5 rounded-lg border border-white/10 shadow-inner w-full justify-center">
+                    <Sun className="size-3.5 text-yellow-300 shrink-0" />
+                    <span className="font-black text-[10px] text-yellow-50 whitespace-nowrap">UV: {selectedForecast.uvIndex}</span>
                 </div>
              </div>
         </div>
@@ -238,7 +236,6 @@ export function WeatherForecast({
           {hourlyForecastsToShow.map((forecast, index) => {
              const forecastDate = new Date(forecast.date);
              const forecastHour = forecastDate.getHours();
-             
              const isPast = isToday && forecastHour < currentHour;
              const isCurrent = isToday && forecastHour === currentHour;
              
