@@ -271,7 +271,7 @@ export function VesselTracker() {
 
   // Logique de l'historique universelle
   useEffect(() => {
-    const vesselData = remoteVessel; // L'historique doit écouter les données Firestore pour être universel
+    const vesselData = remoteVessel; 
     if (!vesselData || !activeVesselId) return;
     
     const isSharingActive = vesselData.isSharing === true;
