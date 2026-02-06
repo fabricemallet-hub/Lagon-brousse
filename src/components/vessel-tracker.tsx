@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useUser as useUserHook, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, getDocs, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -70,13 +70,6 @@ const BatteryIconComp = ({ level, charging, className }: { level?: number, charg
   if (level <= 40) return <BatteryMedium {...props} className={cn(props.className, "text-orange-500")} />;
   return <BatteryFull {...props} className={cn(props.className, "text-green-600")} />;
 };
-
-const PulsingDot = () => (
-    <div className="absolute" style={{ transform: 'translate(-50%, -50%)' }}>
-      <div className="size-5 rounded-full bg-blue-500 opacity-75 animate-ping absolute"></div>
-      <div className="size-5 rounded-full bg-blue-500 border-2 border-white relative"></div>
-    </div>
-);
 
 export function VesselTracker() {
   const { user } = useUserHook();
@@ -209,7 +202,6 @@ export function VesselTracker() {
     setVesselStatus(st);
     updateVesselInFirestore({ status: st });
     
-    // Si on repasse en mode auto (moving), on réinitialise l'immobilité
     if (st === 'moving') {
         immobilityStartTime.current = null;
         setAnchorPos(null);
@@ -248,6 +240,33 @@ export function VesselTracker() {
     watchTriggeredRef.current = false;
     batteryAlertTriggered.current = false;
     toast({ title: "Suivi activé", description: `Connexion au navire ${cleanId}...` });
+  };
+
+  const handleSaveVessel = async () => {
+    if (!user || !firestore || !customSharingId.trim()) return;
+    const cleanId = customSharingId.trim().toUpperCase();
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            savedVesselIds: arrayUnion(cleanId),
+            lastVesselId: cleanId
+        });
+        toast({ title: "Navire enregistré" });
+    } catch (e) {
+        console.error(e);
+        toast({ variant: 'destructive', title: "Erreur sauvegarde" });
+    }
+  };
+
+  const handleRemoveSavedVessel = async (id: string) => {
+    if (!user || !firestore) return;
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            savedVesselIds: arrayRemove(id)
+        });
+        toast({ title: "Navire retiré" });
+    } catch (e) {
+        console.error(e);
+    }
   };
 
   // Logique de l'historique universelle
