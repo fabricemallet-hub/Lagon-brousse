@@ -262,11 +262,8 @@ export function VesselTracker() {
     toast({ title: "Suivi activé", description: `Connexion au navire ${cleanId}...` });
   };
 
-  // --- LOGIQUE D'HISTORIQUE UNIVERSELLE ---
   useEffect(() => {
-    if (!remoteVessel || !activeVesselId) {
-        return;
-    }
+    if (!remoteVessel || !activeVesselId) return;
     
     const isSharingActive = remoteVessel.isSharing === true;
     const currentStatus = isSharingActive ? (remoteVessel.status || 'moving') : 'offline';
@@ -323,7 +320,6 @@ export function VesselTracker() {
       watchTriggeredRef.current = false;
     }
 
-    // Alertes spécifiques au mode récepteur
     if (mode === 'receiver') {
         if (remoteVessel.batteryLevel !== undefined && remoteVessel.batteryLevel <= 5 && !remoteVessel.isCharging) {
             if (!batteryAlertTriggered.current) {
