@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -121,6 +120,7 @@ export function VesselTracker() {
   const lastSentStatusRef = useRef<string | null>(null);
   const lastBatteryLevelsRef = useRef<Record<string, number>>({});
   const lastChargingStatesRef = useRef<Record<string, boolean>>({});
+  const lastClearTimesRef = useRef<Record<string, number>>({});
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
@@ -178,7 +178,6 @@ export function VesselTracker() {
     }
   }, [userProfile, user]);
 
-  // Debounced auto-save for vessel nickname
   useEffect(() => {
     if (!user || !firestore || !vesselNickname) return;
     
@@ -285,6 +284,23 @@ export function VesselTracker() {
     toast({ title: "Partage arrêté" });
   };
 
+  const handleClearHistory = async () => {
+    setHistory([]);
+    if (!firestore || !user) return;
+    
+    try {
+        // En tant qu'émetteur, on peut effacer l'historique global de son navire
+        if (isSharing) {
+            await updateDoc(doc(firestore, 'vessels', sharingId), {
+                historyClearedAt: serverTimestamp()
+            });
+        }
+        toast({ title: "Historique effacé" });
+    } catch (e) {
+        console.error(e);
+    }
+  };
+
   const saveVesselPrefs = async (newPrefs: typeof vesselPrefs) => {
     if (!user || !firestore) return;
     setVesselPrefs(newPrefs);
@@ -310,6 +326,14 @@ export function VesselTracker() {
         };
 
         const timeKey = getTimeMillis(statusTime);
+        const clearTimeKey = getTimeMillis(vessel.historyClearedAt);
+
+        // Gestion de la suppression globale de l'historique
+        if (clearTimeKey > (lastClearTimesRef.current[vessel.id] || 0)) {
+            setHistory(prev => prev.filter(h => h.vesselName !== (vessel.displayName || vessel.id)));
+            lastClearTimesRef.current[vessel.id] = clearTimeKey;
+        }
+
         if (timeKey === 0) return;
         
         const lastStatus = lastStatusesRef.current[vessel.id];
@@ -339,7 +363,7 @@ export function VesselTracker() {
             setHistory(prev => {
                 const alreadyAdded = prev.length > 0 && 
                                    prev[0].statusLabel === label && 
-                                   prev[0].vesselName === vessel.displayName && 
+                                   prev[0].vesselName === (vessel.displayName || vessel.id) && 
                                    Math.abs(prev[0].time.getTime() - Date.now()) < 2000;
                 if (alreadyAdded) return prev;
                 return [{ 
@@ -732,7 +756,20 @@ export function VesselTracker() {
             <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="history" className="border rounded-xl px-3 bg-muted/10">
                   <AccordionTrigger className="text-[10px] font-black uppercase py-3">
-                    <div className="flex items-center gap-2"><History className="size-3"/> Journal de bord unifié</div>
+                    <div className="flex items-center justify-between w-full pr-4">
+                        <div className="flex items-center gap-2"><History className="size-3"/> Journal de bord unifié</div>
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-6 px-2 text-[8px] font-black text-destructive hover:bg-destructive/10 border border-destructive/20 touch-manipulation"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleClearHistory();
+                            }}
+                        >
+                            <Trash2 className="size-3 mr-1" /> Effacer
+                        </Button>
+                    </div>
                   </AccordionTrigger>
                   <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide touch-pan-y">
                         {history.length > 0 ? (
