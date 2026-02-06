@@ -290,6 +290,7 @@ export interface VesselStatus {
   batteryLevel?: number;
   isCharging?: boolean;
   statusChangedAt?: any; // ServerTimestamp
+  eventLabel?: string; // Libellé personnalisé pour l'historique
 }
 
 export interface SplashScreenSettings {
