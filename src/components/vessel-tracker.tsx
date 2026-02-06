@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useUser as useUserHook, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, getDocs, writeBatch, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, getDocs, writeBatch, deleteDoc, Timestamp } from 'firebase/firestore';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -250,34 +250,54 @@ export function VesselTracker() {
     toast({ title: "Suivi activé", description: `Connexion au navire ${cleanId}...` });
   };
 
-  // Receiver logic: detect changes in remoteVessel status
+  // --- RECEIVER LOGIC: Robust history and status tracking ---
   useEffect(() => {
     if (mode !== 'receiver' || !remoteVessel || !activeVesselId) return;
     
-    const currentStatus = remoteVessel.isSharing ? (remoteVessel.status || 'moving') : 'offline';
+    const isSharing = remoteVessel.isSharing === true;
+    const currentStatus = isSharing ? (remoteVessel.status || 'moving') : 'offline';
     
+    // On détecte un changement par rapport au dernier état mémorisé
     if (lastStatusRef.current !== currentStatus) {
-      const statusLabels: Record<string, string> = { moving: 'En mouvement', stationary: 'Au mouillage', offline: 'Signal perdu' };
+      const statusLabels: Record<string, string> = { 
+        moving: 'En mouvement', 
+        stationary: 'Au mouillage', 
+        offline: 'Signal perdu' 
+      };
+      
       const isInitial = lastStatusRef.current === null;
-      const label = isInitial ? `Connecté - ${statusLabels[currentStatus] || currentStatus}` : (statusLabels[currentStatus] || currentStatus);
+      const label = isInitial 
+        ? `Connecté - ${statusLabels[currentStatus] || currentStatus}` 
+        : (statusLabels[currentStatus] || currentStatus);
       
       const pos = { 
         lat: remoteVessel.location?.latitude || INITIAL_CENTER.lat, 
         lng: remoteVessel.location?.longitude || INITIAL_CENTER.lng 
       };
 
-      setHistory(prev => [{ status: label, time: new Date(), pos }, ...prev].slice(0, 20));
+      // Ajout à l'historique seulement si c'est nouveau
+      setHistory(prev => {
+        // Sécurité contre les doublons consécutifs (si l'effet re-déclenche pour une autre prop)
+        if (prev.length > 0 && prev[0].status === label) return prev;
+        return [{ status: label, time: new Date(), pos }, ...prev].slice(0, 20);
+      });
       
+      // Alertes sonores et visuelles
       if (!isInitial && vesselPrefs.isNotifyEnabled) {
         if (vesselPrefs.notifySettings[currentStatus as keyof typeof vesselPrefs.notifySettings]) {
           playVesselSound(vesselPrefs.notifySounds[currentStatus as keyof typeof vesselPrefs.notifySounds]);
-          toast({ title: "Changement d'état", description: `Le navire est maintenant : ${statusLabels[currentStatus] || currentStatus}` });
+          toast({ 
+            title: "Changement d'état", 
+            description: `Le navire est maintenant : ${statusLabels[currentStatus] || currentStatus}` 
+          });
         }
       }
+      
       lastStatusRef.current = currentStatus;
       watchTriggeredRef.current = false;
     }
 
+    // Gestion de la batterie critique
     if (remoteVessel.batteryLevel !== undefined && remoteVessel.batteryLevel <= 5 && !remoteVessel.isCharging) {
         if (!batteryAlertTriggered.current) {
             toast({ variant: "destructive", title: "BATTERIE CRITIQUE", description: `L'émetteur n'a plus que ${remoteVessel.batteryLevel}% !` });
@@ -286,6 +306,7 @@ export function VesselTracker() {
         }
     } else { batteryAlertTriggered.current = false; }
 
+    // Veille critique (Inactivité prolongée)
     if (vesselPrefs.isWatchEnabled && !watchTriggeredRef.current) {
         if (currentStatus === vesselPrefs.watchType) {
             const lastUpdate = remoteVessel.lastActive?.toDate?.() || new Date();
@@ -293,11 +314,15 @@ export function VesselTracker() {
             if (diffMinutes >= vesselPrefs.watchDuration) {
                 watchTriggeredRef.current = true;
                 playVesselSound(vesselPrefs.watchSound);
-                toast({ variant: "destructive", title: "ALERTE VEILLE CRITIQUE", description: `Condition [${currentStatus}] maintenue trop longtemps (${vesselPrefs.watchDuration} min)` });
+                toast({ 
+                  variant: "destructive", 
+                  title: "ALERTE VEILLE CRITIQUE", 
+                  description: `Condition [${currentStatus}] maintenue trop longtemps (${vesselPrefs.watchDuration} min)` 
+                });
             }
         }
     }
-  }, [remoteVessel?.status, remoteVessel?.isSharing, mode, vesselPrefs, playVesselSound, toast, activeVesselId]);
+  }, [remoteVessel, mode, vesselPrefs, playVesselSound, toast, activeVesselId]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
@@ -519,20 +544,33 @@ export function VesselTracker() {
 
         <div className="bg-card p-4 flex flex-col gap-4 border-t-2">
             <div className="grid grid-cols-2 gap-2">
-                <Button variant="ghost" className="h-10 font-black uppercase text-[9px] border-2 gap-2 touch-manipulation" onClick={copyCoordinates} disabled={!displayVessel?.location}><Copy className="size-3" /> Coordonnées</Button>
-                <Button variant="ghost" className="h-10 font-black uppercase text-[9px] border-2 gap-2 touch-manipulation" onClick={() => { if(mode === 'receiver') setHistory([]); }}><X className="size-3" /> Effacer Hist.</Button>
+                <Button variant="ghost" className="h-10 font-black uppercase text-[9px] border-2 gap-2 touch-manipulation" onClick={copyCoordinates} disabled={!displayVessel?.location}>
+                  <Copy className="size-3" /> Coordonnées
+                </Button>
+                <Button variant="ghost" className="h-10 font-black uppercase text-[9px] border-2 gap-2 touch-manipulation" onClick={() => { if(mode === 'receiver') { setHistory([]); lastStatusRef.current = null; } }}>
+                  <X className="size-3" /> Effacer Hist.
+                </Button>
             </div>
             <div className="flex gap-2">
                 <Button variant="destructive" className="flex-1 h-14 font-black uppercase rounded-xl shadow-lg gap-3 text-xs touch-manipulation" onClick={() => sendEmergencySms('MAYDAY')} disabled={!displayVessel?.location}><ShieldAlert className="size-5" /> MAYDAY</Button>
                 <Button variant="secondary" className="flex-1 h-14 font-black uppercase rounded-xl shadow-lg gap-3 text-xs border-2 border-primary/20 touch-manipulation" onClick={() => sendEmergencySms('PAN PAN')} disabled={!displayVessel?.location}><AlertTriangle className="size-5 text-primary" /> PAN PAN</Button>
             </div>
             <Accordion type="single" collapsible className="w-full">
-                <AccordionItem value="history" className="border rounded-xl px-3 bg-muted/10"><AccordionTrigger className="text-[10px] font-black uppercase py-3"><div className="flex items-center gap-2"><History className="size-3"/> Historique des changements</div></AccordionTrigger><AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 touch-pan-y min-h-0">
+                <AccordionItem value="history" className="border rounded-xl px-3 bg-muted/10">
+                  <AccordionTrigger className="text-[10px] font-black uppercase py-3">
+                    <div className="flex items-center gap-2"><History className="size-3"/> Historique des changements</div>
+                  </AccordionTrigger>
+                  <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 touch-pan-y min-h-0">
                         {history.length > 0 ? (
                             <div className="space-y-2">
                                 {history.map((h, i) => (
                                     <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm animate-in fade-in slide-in-from-left-2">
-                                        <div className="flex flex-col gap-0.5"><span className={cn("font-black uppercase", h.status.includes('mouillage') ? 'text-orange-600' : h.status.includes('mouvement') ? 'text-blue-600' : 'text-red-600')}>{h.status}</span><span className="text-[9px] font-bold opacity-40">{format(h.time, 'HH:mm:ss')}</span></div>
+                                        <div className="flex flex-col gap-0.5">
+                                          <span className={cn("font-black uppercase", h.status.includes('mouillage') ? 'text-orange-600' : h.status.includes('mouvement') ? 'text-blue-600' : 'text-red-600')}>
+                                            {h.status}
+                                          </span>
+                                          <span className="text-[9px] font-bold opacity-40">{format(h.time, 'HH:mm:ss')}</span>
+                                        </div>
                                         <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase border-2 px-3 gap-2 touch-manipulation" onClick={() => { map?.panTo(h.pos); map?.setZoom(17); }}>
                                           <MapPin className="size-3 text-primary" /> GPS
                                         </Button>
@@ -545,7 +583,8 @@ export function VesselTracker() {
                               <p className="text-[10px] font-black uppercase tracking-widest">pas d'affichage dans l'historique</p>
                             </div>
                         )}
-                    </AccordionContent></AccordionItem>
+                    </AccordionContent>
+                </AccordionItem>
             </Accordion>
             <div className="bg-red-50 border-2 border-red-100 rounded-2xl p-4 space-y-3">
                 <div className="flex items-center justify-between border-b pb-2 border-red-200"><span className="text-[10px] font-black uppercase text-red-800">MRCC Secours en mer</span><span className="font-black text-xs text-red-600">196 / VHF 16</span></div>
