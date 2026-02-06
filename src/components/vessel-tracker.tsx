@@ -40,7 +40,8 @@ import {
   Check,
   Trash2,
   Ship,
-  Home
+  Home,
+  RefreshCw
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -233,7 +234,20 @@ export function VesselTracker() {
   const handleManualStatus = (st: VesselStatus['status']) => {
     setVesselStatus(st);
     updateVesselInFirestore({ status: st });
-    toast({ title: `État : ${st === 'returning' ? 'Retour Maison' : 'À terre (Home)'}` });
+    
+    // Si on repasse en mode auto (moving), on réinitialise l'immobilité
+    if (st === 'moving') {
+        immobilityStartTime.current = null;
+        setAnchorPos(null);
+    }
+    
+    const labels: Record<string, string> = {
+        returning: 'Retour Maison',
+        landed: 'À terre (Home)',
+        moving: 'Mode Auto'
+    };
+    
+    toast({ title: `État : ${labels[st] || st}` });
   };
 
   const handleStopSharing = async () => {
@@ -353,6 +367,7 @@ export function VesselTracker() {
         setCurrentPos(newPos);
         if (shouldPanOnNextFix.current && map) { map.panTo(newPos); map.setZoom(15); shouldPanOnNextFix.current = false; }
         
+        // La détection automatique ne tourne que si on n'est pas en mode manuel (Retour ou Home)
         if (vesselStatus !== 'returning' && vesselStatus !== 'landed') {
             if (!anchorPos) { 
               setAnchorPos(newPos); 
@@ -370,6 +385,7 @@ export function VesselTracker() {
               }
             }
         } else {
+            // En mode manuel, on met quand même à jour la position GPS
             updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng } });
         }
       },
@@ -464,6 +480,11 @@ export function VesselTracker() {
                                 <Home className="size-4 text-green-600" /> Home (À terre)
                             </Button>
                         </div>
+                        {(vesselStatus === 'returning' || vesselStatus === 'landed') && (
+                            <Button variant="ghost" className="w-full h-10 font-black uppercase text-[9px] border-2 border-dashed gap-2 touch-manipulation" onClick={() => handleManualStatus('moving')}>
+                                <RefreshCw className="size-3 text-orange-500" /> Erreur / Reprise mode normal (Auto)
+                            </Button>
+                        )}
                     </div>
 
                     <Button 
