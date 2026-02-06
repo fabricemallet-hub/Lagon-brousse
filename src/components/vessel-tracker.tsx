@@ -265,17 +265,18 @@ export function VesselTracker() {
   // --- RECEIVER LOGIC: Synchronisation automatique de l'historique ---
   useEffect(() => {
     if (mode !== 'receiver' || !remoteVessel || !activeVesselId) {
-        lastStatusRef.current = null;
-        lastUpdateRef.current = 0;
         return;
     }
     
     const isSharingActive = remoteVessel.isSharing === true;
     const currentStatus = isSharingActive ? (remoteVessel.status || 'moving') : 'offline';
     const statusTime = remoteVessel.statusChangedAt || remoteVessel.lastActive;
-    const timeKey = statusTime?.toMillis?.() || 0;
     
-    // Détection de changement basée sur l'état OU le temps de changement (statusChangedAt)
+    // Si l'horodatage serveur est en attente (null), on attend la prochaine mise à jour
+    if (!statusTime) return;
+    
+    const timeKey = statusTime.toMillis();
+    
     const isInitial = lastStatusRef.current === null;
     const hasStatusChanged = lastStatusRef.current !== currentStatus;
     const hasTimestampUpdated = timeKey > 0 && lastUpdateRef.current !== timeKey;
@@ -285,12 +286,12 @@ export function VesselTracker() {
         moving: 'EN MOUVEMENT', 
         stationary: 'AU MOUILLAGE', 
         offline: 'SIGNAL PERDU',
-        returning: 'TRAJET RETOUR LANCÉ',
-        landed: 'ARRIVÉ À TERRE (HOME)'
+        returning: 'RETOUR MAISON',
+        landed: 'À TERRE (HOME)'
       };
       
       const label = statusLabels[currentStatus] || currentStatus;
-      const displayLabel = isInitial ? `CONNECTÉ - ${label}` : label;
+      const displayLabel = isInitial ? `CONNEXION ÉTABLIE - ${label}` : label;
       
       const pos = { 
         lat: remoteVessel.location?.latitude || INITIAL_CENTER.lat, 
@@ -298,20 +299,18 @@ export function VesselTracker() {
       };
 
       setHistory(prev => {
-        // Éviter les doublons exacts basés sur le label et une fenêtre de temps courte
-        if (prev.length > 0 && prev[0].statusLabel === displayLabel) {
-            const prevTime = prev[0].time.getTime();
-            const currTime = timeKey || Date.now();
-            if (Math.abs(prevTime - currTime) < 5000) return prev;
+        // Anti-doublons immédiats
+        if (prev.length > 0 && prev[0].statusLabel === displayLabel && Math.abs(prev[0].time.getTime() - timeKey) < 3000) {
+            return prev;
         }
-        return [{ statusLabel: displayLabel, time: timeKey ? new Date(timeKey) : new Date(), pos }, ...prev].slice(0, 30);
+        return [{ statusLabel: displayLabel, time: new Date(timeKey), pos }, ...prev].slice(0, 30);
       });
       
       if (!isInitial && vesselPrefs.isNotifyEnabled) {
         const soundKey = (currentStatus === 'returning' || currentStatus === 'landed') ? 'moving' : currentStatus;
         if (vesselPrefs.notifySettings[soundKey as keyof typeof vesselPrefs.notifySettings]) {
           playVesselSound(vesselPrefs.notifySounds[soundKey as keyof typeof vesselPrefs.notifySounds] || 'sonar');
-          toast({ title: "Changement d'état", description: `Le navire est maintenant : ${label.toLowerCase()}` });
+          toast({ title: "Changement d'état", description: `Navire : ${label.toLowerCase()}` });
         }
       }
       
