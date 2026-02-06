@@ -284,11 +284,12 @@ export interface VesselStatus {
     latitude: number;
     longitude: number;
   };
-  status: 'moving' | 'stationary' | 'offline';
+  status: 'moving' | 'stationary' | 'offline' | 'returning' | 'landed';
   lastActive: any; // ServerTimestamp
   isSharing: boolean;
   batteryLevel?: number;
   isCharging?: boolean;
+  statusChangedAt?: any; // ServerTimestamp
 }
 
 export interface SplashScreenSettings {

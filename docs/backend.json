@@ -17,7 +17,10 @@
         "mapIcon": { "type": "string" },
         "mapColor": { "type": "string" },
         "fcmToken": { "type": "string", "description": "Token pour les notifications Push" },
-        "notificationsEnabled": { "type": "boolean" }
+        "notificationsEnabled": { "type": "boolean" },
+        "savedVesselIds": { "type": "array", "items": { "type": "string" } },
+        "lastVesselId": { "type": "string" },
+        "vesselPrefs": { "type": "object" }
       },
       "required": ["id", "email", "subscriptionStatus"]
     },
@@ -114,9 +117,12 @@
             "longitude": { "type": "number" }
           }
         },
-        "status": { "type": "string", "enum": ["moving", "stationary", "offline"] },
+        "status": { "type": "string", "enum": ["moving", "stationary", "offline", "returning", "landed"] },
         "isSharing": { "type": "boolean" },
-        "lastActive": { "type": "object" }
+        "lastActive": { "type": "object" },
+        "statusChangedAt": { "type": "object" },
+        "batteryLevel": { "type": "number" },
+        "isCharging": { "type": "boolean" }
       }
     },
     "SoundLibraryEntry": {
@@ -126,7 +132,7 @@
         "id": { "type": "string" },
         "label": { "type": "string" },
         "url": { "type": "string" },
-        "category": { "type": "string" }
+        "categories": { "type": "array", "items": { "type": "string" } }
       },
       "required": ["label", "url"]
     }

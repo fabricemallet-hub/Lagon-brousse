@@ -40,7 +40,8 @@ import {
   Volume2,
   Check,
   Trash2,
-  Ship
+  Ship,
+  Home
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -93,7 +94,7 @@ export function VesselTracker() {
 
   const [currentPos, setCurrentPos] = useState<google.maps.LatLngLiteral | null>(null);
   const [anchorPos, setAnchorPos] = useState<google.maps.LatLngLiteral | null>(null);
-  const [vesselStatus, setVesselStatus] = useState<'moving' | 'stationary'>('moving');
+  const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const immobilityStartTime = useRef<number | null>(null);
@@ -109,7 +110,7 @@ export function VesselTracker() {
     watchSound: 'alerte'
   });
   
-  const [history, setHistory] = useState<{ status: string, time: Date, pos: google.maps.LatLngLiteral }[]>([]);
+  const [history, setHistory] = useState<{ statusLabel: string, time: Date, pos: google.maps.LatLngLiteral }[]>([]);
   const lastStatusRef = useRef<string | null>(null);
   const lastSentStatusRef = useRef<string | null>(null);
   const batteryAlertTriggered = useRef(false);
@@ -196,7 +197,6 @@ export function VesselTracker() {
     if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
     
     const newStatus = data.status || vesselStatus;
-    const isInitial = lastSentStatusRef.current === null;
     const statusChanged = lastSentStatusRef.current !== newStatus;
 
     const update = async () => {
@@ -215,7 +215,7 @@ export function VesselTracker() {
             ...data 
         };
 
-        if (statusChanged || isInitial) {
+        if (statusChanged || lastSentStatusRef.current === null) {
             updatePayload.statusChangedAt = serverTimestamp();
             lastSentStatusRef.current = newStatus;
         }
@@ -224,6 +224,12 @@ export function VesselTracker() {
     };
     update();
   }, [user, firestore, isSharing, sharingId, vesselNickname, vesselStatus]);
+
+  const handleManualStatus = (st: VesselStatus['status']) => {
+    setVesselStatus(st);
+    updateVesselInFirestore({ status: st });
+    toast({ title: `État : ${st === 'returning' ? 'Retour Maison' : 'À terre (Home)'}` });
+  };
 
   const handleStopSharing = async () => {
     setIsSharing(false);
@@ -250,46 +256,41 @@ export function VesselTracker() {
     toast({ title: "Suivi activé", description: `Connexion au navire ${cleanId}...` });
   };
 
-  // --- RECEIVER LOGIC: Robust history and status tracking ---
+  // --- RECEIVER LOGIC: History and status tracking ---
   useEffect(() => {
     if (mode !== 'receiver' || !remoteVessel || !activeVesselId) return;
     
     const isSharing = remoteVessel.isSharing === true;
     const currentStatus = isSharing ? (remoteVessel.status || 'moving') : 'offline';
     
-    // On détecte un changement par rapport au dernier état mémorisé
     if (lastStatusRef.current !== currentStatus) {
       const statusLabels: Record<string, string> = { 
         moving: 'En mouvement', 
         stationary: 'Au mouillage', 
-        offline: 'Signal perdu' 
+        offline: 'Signal perdu',
+        returning: 'Trajet retour lancé',
+        landed: 'Arrivé à terre (Home)'
       };
       
       const isInitial = lastStatusRef.current === null;
-      const label = isInitial 
-        ? `Connecté - ${statusLabels[currentStatus] || currentStatus}` 
-        : (statusLabels[currentStatus] || currentStatus);
+      const label = statusLabels[currentStatus] || currentStatus;
+      const displayLabel = isInitial ? `Connecté - ${label}` : label;
       
       const pos = { 
         lat: remoteVessel.location?.latitude || INITIAL_CENTER.lat, 
         lng: remoteVessel.location?.longitude || INITIAL_CENTER.lng 
       };
 
-      // Ajout à l'historique seulement si c'est nouveau
       setHistory(prev => {
-        // Sécurité contre les doublons consécutifs (si l'effet re-déclenche pour une autre prop)
-        if (prev.length > 0 && prev[0].status === label) return prev;
-        return [{ status: label, time: new Date(), pos }, ...prev].slice(0, 20);
+        if (prev.length > 0 && prev[0].statusLabel === displayLabel) return prev;
+        return [{ statusLabel: displayLabel, time: new Date(), pos }, ...prev].slice(0, 30);
       });
       
-      // Alertes sonores et visuelles
       if (!isInitial && vesselPrefs.isNotifyEnabled) {
-        if (vesselPrefs.notifySettings[currentStatus as keyof typeof vesselPrefs.notifySettings]) {
-          playVesselSound(vesselPrefs.notifySounds[currentStatus as keyof typeof vesselPrefs.notifySounds]);
-          toast({ 
-            title: "Changement d'état", 
-            description: `Le navire est maintenant : ${statusLabels[currentStatus] || currentStatus}` 
-          });
+        const soundKey = (currentStatus === 'returning' || currentStatus === 'landed') ? 'moving' : currentStatus;
+        if (vesselPrefs.notifySettings[soundKey as keyof typeof vesselPrefs.notifySettings]) {
+          playVesselSound(vesselPrefs.notifySounds[soundKey as keyof typeof vesselPrefs.notifySounds] || 'sonar');
+          toast({ title: "Changement d'état", description: `Le navire est maintenant : ${label}` });
         }
       }
       
@@ -297,7 +298,6 @@ export function VesselTracker() {
       watchTriggeredRef.current = false;
     }
 
-    // Gestion de la batterie critique
     if (remoteVessel.batteryLevel !== undefined && remoteVessel.batteryLevel <= 5 && !remoteVessel.isCharging) {
         if (!batteryAlertTriggered.current) {
             toast({ variant: "destructive", title: "BATTERIE CRITIQUE", description: `L'émetteur n'a plus que ${remoteVessel.batteryLevel}% !` });
@@ -306,19 +306,14 @@ export function VesselTracker() {
         }
     } else { batteryAlertTriggered.current = false; }
 
-    // Veille critique (Inactivité prolongée)
-    if (vesselPrefs.isWatchEnabled && !watchTriggeredRef.current) {
+    if (vesselPrefs.isWatchEnabled && !watchTriggeredRef.current && currentStatus !== 'landed') {
         if (currentStatus === vesselPrefs.watchType) {
             const lastUpdate = remoteVessel.lastActive?.toDate?.() || new Date();
             const diffMinutes = (new Date().getTime() - lastUpdate.getTime()) / 60000;
             if (diffMinutes >= vesselPrefs.watchDuration) {
                 watchTriggeredRef.current = true;
                 playVesselSound(vesselPrefs.watchSound);
-                toast({ 
-                  variant: "destructive", 
-                  title: "ALERTE VEILLE CRITIQUE", 
-                  description: `Condition [${currentStatus}] maintenue trop longtemps (${vesselPrefs.watchDuration} min)` 
-                });
+                toast({ variant: "destructive", title: "ALERTE VEILLE CRITIQUE", description: `Inactivité prolongée (${vesselPrefs.watchDuration} min)` });
             }
         }
     }
@@ -334,27 +329,34 @@ export function VesselTracker() {
         const newPos = { lat: position.coords.latitude, lng: position.coords.longitude };
         setCurrentPos(newPos);
         if (shouldPanOnNextFix.current && map) { map.panTo(newPos); map.setZoom(15); shouldPanOnNextFix.current = false; }
-        if (!anchorPos) { 
-          setAnchorPos(newPos); 
-          updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng }, status: 'moving', isSharing: true }); 
-          return; 
-        }
-        const dist = getDistance(newPos.lat, newPos.lng, anchorPos.lat, anchorPos.lng);
-        if (dist > IMMOBILITY_THRESHOLD_METERS) {
-          setVesselStatus('moving'); setAnchorPos(newPos); immobilityStartTime.current = null;
-          updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng }, status: 'moving', isSharing: true });
+        
+        // Only auto-update status if NOT in a manual overriding state like 'returning' or 'landed'
+        if (vesselStatus !== 'returning' && vesselStatus !== 'landed') {
+            if (!anchorPos) { 
+              setAnchorPos(newPos); 
+              updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng }, status: 'moving', isSharing: true }); 
+              return; 
+            }
+            const dist = getDistance(newPos.lat, newPos.lng, anchorPos.lat, anchorPos.lng);
+            if (dist > IMMOBILITY_THRESHOLD_METERS) {
+              setVesselStatus('moving'); setAnchorPos(newPos); immobilityStartTime.current = null;
+              updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng }, status: 'moving', isSharing: true });
+            } else {
+              if (!immobilityStartTime.current) immobilityStartTime.current = Date.now();
+              if (Date.now() - immobilityStartTime.current > 30000) {
+                setVesselStatus('stationary'); updateVesselInFirestore({ status: 'stationary' });
+              }
+            }
         } else {
-          if (!immobilityStartTime.current) immobilityStartTime.current = Date.now();
-          if (Date.now() - immobilityStartTime.current > 30000) {
-            setVesselStatus('stationary'); updateVesselInFirestore({ status: 'stationary' });
-          }
+            // Still update location even in manual status
+            updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng } });
         }
       },
       () => toast({ variant: "destructive", title: "Erreur GPS" }),
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
-  }, [isSharing, mode, anchorPos, updateVesselInFirestore, map, toast]);
+  }, [isSharing, mode, anchorPos, updateVesselInFirestore, map, toast, vesselStatus]);
 
   const savePrefs = (newPrefs: Partial<typeof vesselPrefs>) => {
     const updated = { ...vesselPrefs, ...newPrefs };
@@ -433,11 +435,24 @@ export function VesselTracker() {
                         <div className="mt-8 flex items-center gap-3 relative z-10">
                             <Badge variant="outline" className="bg-green-500/30 border-green-200 text-white font-black text-[10px] px-3 h-6 animate-pulse">EN LIGNE</Badge>
                             <span className="text-[10px] font-black uppercase tracking-widest text-white/80 flex items-center gap-2">
-                                {vesselStatus === 'moving' ? <Move className="size-3" /> : <Anchor className="size-3" />}
-                                {vesselStatus === 'moving' ? 'En mouvement' : 'Au mouillage'}
+                                {vesselStatus === 'moving' ? <Move className="size-3" /> : vesselStatus === 'returning' ? <Navigation className="size-3" /> : vesselStatus === 'landed' ? <Home className="size-3" /> : <Anchor className="size-3" />}
+                                {vesselStatus === 'moving' ? 'En mouvement' : vesselStatus === 'returning' ? 'Retour Maison' : vesselStatus === 'landed' ? 'À terre' : 'Au mouillage'}
                             </span>
                         </div>
                     </div>
+
+                    <div className="bg-muted/20 p-4 rounded-2xl border-2 border-dashed space-y-3">
+                        <p className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest flex items-center gap-2"><Zap className="size-3" /> Signalisation manuelle</p>
+                        <div className="grid grid-cols-2 gap-2">
+                            <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatus('returning')} disabled={vesselStatus === 'returning'}>
+                                <Navigation className="size-4 text-blue-600" /> Retour Maison
+                            </Button>
+                            <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatus('landed')} disabled={vesselStatus === 'landed'}>
+                                <Home className="size-4 text-green-600" /> Home (À terre)
+                            </Button>
+                        </div>
+                    </div>
+
                     <Button 
                         variant="destructive" 
                         className="w-full h-16 text-xs font-black uppercase tracking-widest shadow-lg rounded-xl gap-3 border-2 border-white/20 touch-manipulation"
@@ -521,8 +536,12 @@ export function VesselTracker() {
                           {displayVessel.displayName}
                           <BatteryIconComp level={displayVessel.batteryLevel} charging={displayVessel.isCharging} />
                         </div>
-                        <div className={cn("p-2 rounded-full border-2 border-white shadow-xl", displayVessel.status === 'moving' ? "bg-blue-600" : "bg-amber-600")}>
-                          {displayVessel.status === 'stationary' ? <Anchor className="size-5 text-white" /> : <Navigation className="size-5 text-white" />}
+                        <div className={cn("p-2 rounded-full border-2 border-white shadow-xl", 
+                            displayVessel.status === 'moving' ? "bg-blue-600" : 
+                            displayVessel.status === 'returning' ? "bg-indigo-600" :
+                            displayVessel.status === 'landed' ? "bg-green-600" : "bg-amber-600")}>
+                          {displayVessel.status === 'stationary' ? <Anchor className="size-5 text-white" /> : 
+                           displayVessel.status === 'landed' ? <Home className="size-5 text-white" /> : <Navigation className="size-5 text-white" />}
                         </div>
                     </div>
                     </OverlayView>
@@ -534,8 +553,18 @@ export function VesselTracker() {
           </div>
           {displayVessel && (
             <div className="absolute bottom-3 left-3 right-3 flex gap-2">
-                <div className={cn("flex-1 p-2 rounded-lg backdrop-blur-md text-white border flex items-center justify-between shadow-lg", displayVessel.status === 'moving' ? "bg-blue-600/80 border-blue-400/30" : "bg-amber-600/80 border-amber-400/30")}>
-                    <div className="flex items-center gap-2"><Move className={cn("size-4", displayVessel.status === 'moving' && "animate-pulse")} /><span className="text-[10px] font-black uppercase">{displayVessel.status === 'moving' ? 'En mouvement' : 'Au mouillage'}</span></div>
+                <div className={cn("flex-1 p-2 rounded-lg backdrop-blur-md text-white border flex items-center justify-between shadow-lg", 
+                    displayVessel.status === 'moving' ? "bg-blue-600/80 border-blue-400/30" : 
+                    displayVessel.status === 'returning' ? "bg-indigo-600/80 border-indigo-400/30" :
+                    displayVessel.status === 'landed' ? "bg-green-600/80 border-green-400/30" : "bg-amber-600/80 border-amber-400/30")}>
+                    <div className="flex items-center gap-2">
+                        {displayVessel.status === 'landed' ? <Home className="size-4" /> : <Move className={cn("size-4", displayVessel.status === 'moving' && "animate-pulse")} />}
+                        <span className="text-[10px] font-black uppercase">
+                            {displayVessel.status === 'moving' ? 'En mouvement' : 
+                             displayVessel.status === 'returning' ? 'Retour Maison' :
+                             displayVessel.status === 'landed' ? 'À terre (Home)' : 'Au mouillage'}
+                        </span>
+                    </div>
                     <div className="flex items-center gap-2 border-l pl-2 border-white/20"><BatteryIconComp level={displayVessel.batteryLevel} charging={displayVessel.isCharging} /><span className="text-[10px] font-black">{displayVessel.batteryLevel}%</span></div>
                 </div>
             </div>
@@ -566,8 +595,14 @@ export function VesselTracker() {
                                 {history.map((h, i) => (
                                     <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm animate-in fade-in slide-in-from-left-2">
                                         <div className="flex flex-col gap-0.5">
-                                          <span className={cn("font-black uppercase", h.status.includes('mouillage') ? 'text-orange-600' : h.status.includes('mouvement') ? 'text-blue-600' : 'text-red-600')}>
-                                            {h.status}
+                                          <span className={cn("font-black uppercase flex items-center gap-2", 
+                                            h.statusLabel.includes('mouillage') ? 'text-orange-600' : 
+                                            h.statusLabel.includes('mouvement') ? 'text-blue-600' : 
+                                            h.statusLabel.includes('retour') ? 'text-indigo-600' :
+                                            h.statusLabel.includes('terre') ? 'text-green-600' : 'text-red-600')}>
+                                            {h.statusLabel.includes('retour') && <Navigation className="size-3" />}
+                                            {h.statusLabel.includes('terre') && <Home className="size-3" />}
+                                            {h.statusLabel}
                                           </span>
                                           <span className="text-[9px] font-bold opacity-40">{format(h.time, 'HH:mm:ss')}</span>
                                         </div>
