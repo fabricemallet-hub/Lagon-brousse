@@ -110,46 +110,39 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         setInitialZoomDone(false);
         if (watchId.current !== null) {
             navigator.geolocation.clearWatch(watchId.current);
+            watchId.current = null;
         }
     }, []);
 
     const startWatchingPosition = useCallback(() => {
         if (!navigator.geolocation) {
+            toast({ variant: "destructive", title: "Non supporté", description: "La géolocalisation n'est pas supportée par votre navigateur." });
             return;
         }
-        navigator.permissions.query({ name: 'geolocation' }).then(permissionStatus => {
-            if (permissionStatus.state === 'prompt' || permissionStatus.state === 'granted') {
-                 if (watchId.current !== null) {
-                    navigator.geolocation.clearWatch(watchId.current);
-                }
-                watchId.current = navigator.geolocation.watchPosition(
-                    (position) => {
-                        const { latitude, longitude } = position.coords;
-                        const newLocation = { lat: latitude, lng: longitude };
-                        setUserLocation(newLocation);
-                        if (map && !initialZoomDone) {
-                            map.panTo(newLocation);
-                            map.setZoom(16);
-                            setInitialZoomDone(true);
-                        }
-                    },
-                    () => { /* Error can be handled silently or with a toast */ },
-                    { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-                );
-            }
-        });
-    }, [map, initialZoomDone]);
 
-     useEffect(() => {
-        if (map && isLoaded) {
-            startWatchingPosition();
-        }
-        return () => {
-            if (watchId.current !== null) {
-                navigator.geolocation.clearWatch(watchId.current);
-            }
-        };
-    }, [map, isLoaded, startWatchingPosition]);
+        // Si on surveille déjà, on ne relance pas
+        if (watchId.current !== null) return;
+
+        watchId.current = navigator.geolocation.watchPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                const newLocation = { lat: latitude, lng: longitude };
+                setUserLocation(newLocation);
+                if (map && !initialZoomDone) {
+                    map.panTo(newLocation);
+                    map.setZoom(16);
+                    setInitialZoomDone(true);
+                }
+            },
+            (err) => {
+                console.error("Geolocation error:", err);
+                toast({ variant: "destructive", title: "Erreur GPS", description: "Impossible d'accéder à votre position." });
+            },
+            { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+        );
+    }, [map, initialZoomDone, toast]);
+
+    // Suppression du useEffect qui lançait startWatchingPosition automatiquement
 
     const handleRecenter = () => {
         if (!navigator.geolocation) {
@@ -161,15 +154,17 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             return;
         }
 
-        toast({ description: "Mise à jour de votre position..." });
+        if (watchId.current === null) {
+            toast({ description: "Activation du GPS..." });
+            startWatchingPosition();
+        }
 
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 const { latitude, longitude } = position.coords;
-                if (typeof latitude !== 'number' || typeof longitude !== 'number') return;
                 const newLocation = { lat: latitude, lng: longitude };
                 
-                setUserLocation({lat: latitude, lng: longitude});
+                setUserLocation(newLocation);
 
                 if (map) {
                     map.panTo(newLocation);
@@ -184,9 +179,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                  if (err.code === 1) {
                    description = "Veuillez activer la géolocalisation dans les paramètres de votre navigateur.";
                  } else if (err.code === 3) {
-                   description = "La demande de localisation a expiré. Veuillez réessayer dans une zone avec un meilleur signal GPS.";
-                 } else if (err.code === 2) {
-                   description = "Position indisponible. Vérifiez les paramètres de votre appareil et le signal GPS.";
+                   description = "La demande de localisation a expiré.";
                  }
                  toast({
                      variant: "destructive",
@@ -194,7 +187,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                      description: description,
                  });
             },
-            { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 10000 }
         );
     };
 

@@ -134,6 +134,7 @@ function HuntingSessionContent() {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number} | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const [isParticipating, setIsParticipating] = useState(false);
+  const [isGpsActive, setIsGpsActive] = useState(false);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [initialZoomDone, setInitialZoomDone] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -283,14 +284,9 @@ function HuntingSessionContent() {
   
   const { isLoaded, loadError } = useGoogleMaps();
 
-  // Mode Éveil (Wake Lock) avec interception propre de l'erreur de politique
   const toggleWakeLock = async () => {
     if (!('wakeLock' in navigator)) {
-      toast({ 
-        variant: "destructive", 
-        title: "Non supporté", 
-        description: "Votre navigateur ne supporte pas le maintien de l'écran allumé." 
-      });
+      toast({ variant: "destructive", title: "Non supporté", description: "Votre navigateur ne supporte pas le maintien de l'écran allumé." });
       return;
     }
 
@@ -298,9 +294,8 @@ function HuntingSessionContent() {
       try {
         await wakeLock.release();
         setWakeLock(null);
-        toast({ title: "Mode éveil désactivé", description: "L'écran peut désormais se mettre en veille." });
+        toast({ title: "Mode éveil désactivé" });
       } catch (e) {
-        console.warn("Wake lock release failed:", e);
         setWakeLock(null);
       }
     } else {
@@ -308,21 +303,11 @@ function HuntingSessionContent() {
         const lock = await (navigator as any).wakeLock.request('screen');
         if (lock) {
           setWakeLock(lock);
-          toast({ title: "Mode éveil activé", description: "L'écran restera allumé pour garantir le suivi GPS." });
-          lock.addEventListener('release', () => {
-            setWakeLock(null);
-          });
+          toast({ title: "Mode éveil activé" });
+          lock.addEventListener('release', () => setWakeLock(null));
         }
       } catch (err: any) {
-        if (err.name === 'NotAllowedError' || err.message?.includes('permissions policy')) {
-          toast({ 
-            variant: "destructive", 
-            title: "Permission bloquée", 
-            description: "Le maintien de l'écran est bloqué par cet environnement (iframe). Cette fonction sera active sur navigateur mobile ou onglet indépendant." 
-          });
-        } else {
-          console.error("Wake Lock error:", err);
-        }
+        toast({ variant: "destructive", title: "Permission bloquée", description: "Le maintien de l'écran est bloqué." });
       }
     }
   };
@@ -336,6 +321,7 @@ function HuntingSessionContent() {
     const previousSessionId = session?.id;
     setSession(null);
     setIsParticipating(false);
+    setIsGpsActive(false);
     setUserLocation(null);
     setInitialZoomDone(false);
 
@@ -391,11 +377,11 @@ function HuntingSessionContent() {
   }, [user, firestore, session, map, initialZoomDone]);
   
   useEffect(() => {
-    if (isParticipating && session) {
+    if (isParticipating && session && isGpsActive) {
         startTracking();
     }
     return () => { if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current); };
-  }, [isParticipating, session, startTracking]);
+  }, [isParticipating, session, isGpsActive, startTracking]);
 
   const handleCreateSession = async () => {
     if (!user || !firestore) return;
@@ -407,26 +393,22 @@ function HuntingSessionContent() {
         const newSessionData = { organizerId: user.uid, createdAt: serverTimestamp(), expiresAt: Timestamp.fromDate(expiresAt) };
         await setDoc(doc(firestore, 'hunting_sessions', code), newSessionData);
         
-        navigator.geolocation.getCurrentPosition(async (pos) => {
-            const { latitude, longitude } = pos.coords;
-            const participantDocRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
-            await setDoc(participantDocRef, { 
-                id: user.uid,
-                displayName: nickname, 
-                mapIcon: selectedIcon, 
-                mapColor: selectedColor, 
-                baseStatus: '', 
-                isGibierEnVue: false,
-                location: { latitude, longitude },
-                updatedAt: serverTimestamp() 
-            });
-            setUserLocation({ latitude, longitude });
+        // Initial participant setup (no location yet)
+        const participantDocRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
+        await setDoc(participantDocRef, { 
+            id: user.uid,
+            displayName: nickname, 
+            mapIcon: selectedIcon, 
+            mapColor: selectedColor, 
+            baseStatus: '', 
+            isGibierEnVue: false,
+            updatedAt: serverTimestamp() 
         });
         
         setSession({ id: code, ...newSessionData } as any);
         setIsParticipating(true);
         fetchMySessions();
-        toast({ title: 'Session créée !', description: `Code : ${code}` });
+        toast({ title: 'Session créée !', description: `Code : ${code}. Activez votre GPS pour être vu.` });
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'Erreur', description: e.message });
     } finally {
@@ -442,28 +424,39 @@ function HuntingSessionContent() {
       const sessionDoc = await getDoc(doc(firestore, 'hunting_sessions', sessionId));
       if (!sessionDoc.exists()) throw new Error('Session non trouvée.');
       
-      navigator.geolocation.getCurrentPosition(async (pos) => {
-          const { latitude, longitude } = pos.coords;
-          const participantDocRef = doc(firestore, 'hunting_sessions', sessionId, 'participants', user.uid);
-          await setDoc(participantDocRef, { 
-              id: user.uid,
-              displayName: nickname, 
-              mapIcon: selectedIcon, 
-              mapColor: selectedColor, 
-              baseStatus: '', 
-              isGibierEnVue: false,
-              location: { latitude, longitude },
-              updatedAt: serverTimestamp() 
-          }, { merge: true });
-          setUserLocation({ latitude, longitude });
-      });
+      const participantDocRef = doc(firestore, 'hunting_sessions', sessionId, 'participants', user.uid);
+      await setDoc(participantDocRef, { 
+          id: user.uid,
+          displayName: nickname, 
+          mapIcon: selectedIcon, 
+          mapColor: selectedColor, 
+          baseStatus: '', 
+          isGibierEnVue: false,
+          updatedAt: serverTimestamp() 
+      }, { merge: true });
       
       setSession({ id: sessionDoc.id, ...sessionDoc.data() } as any);
       setIsParticipating(true);
+      toast({ title: 'Session rejointe', description: "Activez votre GPS pour que vos partenaires vous voient." });
     } catch (e: any) {
         toast({ variant: 'destructive', title: 'Erreur', description: e.message });
     } finally {
         setIsSessionLoading(false);
+    }
+  };
+
+  const handleToggleGps = () => {
+    if (!isGpsActive) {
+        setIsGpsActive(true);
+        toast({ title: "GPS Activé", description: "Votre position est maintenant partagée." });
+    } else {
+        setIsGpsActive(false);
+        if (watchIdRef.current !== null) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
+            watchIdRef.current = null;
+        }
+        setUserLocation(null);
+        toast({ title: "GPS Désactivé", description: "Vous n'êtes plus visible sur la carte." });
     }
   };
 
@@ -473,22 +466,13 @@ function HuntingSessionContent() {
         const participantsRef = collection(firestore, 'hunting_sessions', sessionToDelete, 'participants');
         const snap = await getDocs(participantsRef);
         const batch = writeBatch(firestore);
-        
-        // Supprimer tous les participants
         snap.forEach(d => batch.delete(d.ref));
-        
-        // Supprimer la session elle-même
         batch.delete(doc(firestore, 'hunting_sessions', sessionToDelete));
-        
         await batch.commit();
-        
-        // Rafraîchir la liste locale
         await fetchMySessions();
-        
         toast({ title: 'Session supprimée' });
     } catch (e) {
-        console.error("Erreur lors de la suppression de la session:", e);
-        toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de supprimer la session.' });
+        toast({ variant: 'destructive', title: 'Erreur' });
     } finally {
         setSessionToDelete(null);
     }
@@ -498,17 +482,12 @@ function HuntingSessionContent() {
     if (!user || !firestore || !session) return;
     const ref = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
     const me = participants?.find(p => p.id === user.uid);
-    
     const isDeactivating = me?.baseStatus === status;
     const newStatus = isDeactivating ? '' : status;
-    
     await updateDoc(ref, { baseStatus: newStatus });
-    
     if (!isDeactivating) {
         playStatusSound(status);
         toast({ title: `Statut : ${status}` });
-    } else {
-        toast({ title: 'Statut retiré' });
     }
   };
 
@@ -519,10 +498,7 @@ function HuntingSessionContent() {
     const newVal = !me?.isGibierEnVue;
     await updateDoc(ref, { isGibierEnVue: newVal });
     if (newVal) playStatusSound('gibier');
-    toast({ 
-        title: newVal ? "Gibier signalé !" : "Alerte levée", 
-        variant: newVal ? "destructive" : "default" 
-    });
+    toast({ title: newVal ? "Gibier signalé !" : "Alerte levée", variant: newVal ? "destructive" : "default" });
   };
 
   const handleSavePreferences = async () => {
@@ -560,7 +536,7 @@ function HuntingSessionContent() {
         <Card className={cn("transition-all", isFullscreen && "fixed inset-0 z-50 w-screen h-screen rounded-none border-none flex flex-col")}>
             <CardHeader className="flex-shrink-0">
                 <CardTitle className="flex items-center justify-between">
-                    <div className="flex items-center gap-2"><Users className="size-5 text-primary" /> Session {session.id}</div>
+                    <div className="flex items-center gap-2"><Users className="size-5 text-primary" /> {session.id}</div>
                     <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isSessionLoading}><LogOut className="size-4 mr-2"/> Quitter</Button>
                 </CardTitle>
             </CardHeader>
@@ -604,7 +580,7 @@ function HuntingSessionContent() {
                     <Button size="icon" onClick={() => setIsFullscreen(!isFullscreen)} className="absolute top-2 left-2 shadow-lg h-9 w-9 z-10 bg-background/80 backdrop-blur-sm">
                         {isFullscreen ? <Shrink /> : <Expand />}
                     </Button>
-                    <Button size="icon" onClick={() => userLocation && map?.panTo({ lat: userLocation.latitude, lng: userLocation.longitude })} className="absolute top-2 right-2 shadow-lg h-9 w-9 z-10 bg-background/80 backdrop-blur-sm">
+                    <Button size="icon" onClick={() => { if(!isGpsActive) handleToggleGps(); else userLocation && map?.panTo({ lat: userLocation.latitude, lng: userLocation.longitude }); }} className={cn("absolute top-2 right-2 shadow-lg h-9 w-9 z-10 border-2", isGpsActive ? "bg-primary text-white border-primary" : "bg-background/80 backdrop-blur-sm")}>
                         <LocateFixed className="size-5" />
                     </Button>
                 </div>
@@ -635,6 +611,15 @@ function HuntingSessionContent() {
 
                 {!isFullscreen && (
                     <div className="space-y-4">
+                        <Button 
+                          onClick={handleToggleGps} 
+                          variant={isGpsActive ? "default" : "outline"} 
+                          className={cn("w-full h-12 font-black uppercase tracking-widest border-2", isGpsActive && "bg-green-600 border-green-700 hover:bg-green-700")}
+                        >
+                          <LocateFixed className="mr-2 size-5" />
+                          {isGpsActive ? "MON GPS EST ACTIF" : "ACTIVER MON GPS"}
+                        </Button>
+
                         <Accordion type="single" collapsible value={prefsSection} onValueChange={setPrefsSection} className="w-full">
                             <AccordionItem value="prefs" className="border-none">
                                 <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-2 bg-muted/50 rounded-lg px-4 mb-2">
@@ -671,58 +656,33 @@ function HuntingSessionContent() {
 
                                             <div className="space-y-2">
                                                 <div className="flex justify-between text-xs">
-                                                    <span>Volume des alertes</span>
+                                                    <span>Volume</span>
                                                     <span>{Math.round(soundVolume * 100)}%</span>
                                                 </div>
-                                                <div className="flex items-center gap-3">
-                                                    <Button variant="outline" size="icon" className="size-8 shrink-0 rounded-full border-2" onClick={() => setSoundVolume(prev => Math.max(0, parseFloat((prev - 0.1).toFixed(1))))}><Minus className="size-3" /></Button>
-                                                    <Slider value={[soundVolume]} min={0} max={1} step={0.1} onValueChange={(val) => setSoundVolume(val[0])} className="flex-grow" />
-                                                    <Button variant="outline" size="icon" className="size-8 shrink-0 rounded-full border-2" onClick={() => setSoundVolume(prev => Math.min(1, parseFloat((prev + 0.1).toFixed(1))))}><Plus className="size-3" /></Button>
-                                                </div>
+                                                <Slider value={[soundVolume]} min={0} max={1} step={0.1} onValueChange={(val) => setSoundVolume(val[0])} className="flex-grow" />
                                             </div>
 
                                             <div className="grid grid-cols-1 gap-3">
                                                 <div className="space-y-1.5">
-                                                    <Label className="text-[10px] font-bold uppercase flex items-center gap-1">
-                                                        <MapPin className="size-3" /> Son : En Position
-                                                    </Label>
-                                                    <div className="flex gap-2">
-                                                        <Select value={soundSettings.position} onValueChange={(val) => { setSoundSettings(prev => ({...prev, position: val})); previewSound(val); }}>
-                                                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                                                            <SelectContent>
-                                                                {availableSounds.map(s => <SelectItem key={s.id || s.label} value={s.id || s.label}>{s.label}</SelectItem>)}
-                                                            </SelectContent>
-                                                        </Select>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => previewSound(soundSettings.position)}><Play className="size-3" /></Button>
-                                                    </div>
+                                                    <Label className="text-[10px] font-bold uppercase flex items-center gap-1">Son : En Position</Label>
+                                                    <Select value={soundSettings.position} onValueChange={(val) => { setSoundSettings(prev => ({...prev, position: val})); previewSound(val); }}>
+                                                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                                        <SelectContent>{availableSounds.map(s => <SelectItem key={s.id || s.label} value={s.id || s.label}>{s.label}</SelectItem>)}</SelectContent>
+                                                    </Select>
                                                 </div>
                                                 <div className="space-y-1.5">
-                                                    <Label className="text-[10px] font-bold uppercase flex items-center gap-1">
-                                                        <Footprints className="size-3" /> Son : En Battue
-                                                    </Label>
-                                                    <div className="flex gap-2">
-                                                        <Select value={soundSettings.battue} onValueChange={(val) => { setSoundSettings(prev => ({...prev, battue: val})); previewSound(val); }}>
-                                                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                                                            <SelectContent>
-                                                                {availableSounds.map(s => <SelectItem key={s.id || s.label} value={s.id || s.label}>{s.label}</SelectItem>)}
-                                                            </SelectContent>
-                                                        </Select>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => previewSound(soundSettings.battue)}><Play className="size-3" /></Button>
-                                                    </div>
+                                                    <Label className="text-[10px] font-bold uppercase flex items-center gap-1">Son : En Battue</Label>
+                                                    <Select value={soundSettings.battue} onValueChange={(val) => { setSoundSettings(prev => ({...prev, battue: val})); previewSound(val); }}>
+                                                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                                        <SelectContent>{availableSounds.map(s => <SelectItem key={s.id || s.label} value={s.id || s.label}>{s.label}</SelectItem>)}</SelectContent>
+                                                    </Select>
                                                 </div>
                                                 <div className="space-y-1.5">
-                                                    <Label className="text-[10px] font-bold uppercase text-destructive flex items-center gap-1">
-                                                        <Target className="size-3" /> Son : Gibier en vue
-                                                    </Label>
-                                                    <div className="flex gap-2">
-                                                        <Select value={soundSettings.gibier} onValueChange={(val) => { setSoundSettings(prev => ({...prev, gibier: val})); previewSound(val); }}>
-                                                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                                                            <SelectContent>
-                                                                {availableSounds.map(s => <SelectItem key={s.id || s.label} value={s.id || s.label}>{s.label}</SelectItem>)}
-                                                            </SelectContent>
-                                                        </Select>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => previewSound(soundSettings.gibier)}><Play className="size-3" /></Button>
-                                                    </div>
+                                                    <Label className="text-[10px] font-bold uppercase text-destructive flex items-center gap-1">Son : Gibier</Label>
+                                                    <Select value={soundSettings.gibier} onValueChange={(val) => { setSoundSettings(prev => ({...prev, gibier: val})); previewSound(val); }}>
+                                                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                                        <SelectContent>{availableSounds.map(s => <SelectItem key={s.id || s.label} value={s.id || s.label}>{s.label}</SelectItem>)}</SelectContent>
+                                                    </Select>
                                                 </div>
                                             </div>
                                         </div>
@@ -745,14 +705,7 @@ function HuntingSessionContent() {
                                             <div className="flex items-center gap-2">
                                                 <span className="font-bold">{p.displayName}</span>
                                                 {p.baseStatus && (
-                                                    <Badge 
-                                                        className={cn(
-                                                            "text-[10px] font-black uppercase px-1.5 py-0 shadow-sm border-none",
-                                                            p.baseStatus === 'En position' 
-                                                                ? "bg-blue-600 hover:bg-blue-600 text-white" 
-                                                                : "bg-orange-600 hover:bg-orange-600 text-white"
-                                                        )}
-                                                    >
+                                                    <Badge className={cn("text-[10px] font-black uppercase px-1.5 py-0 shadow-sm border-none", p.baseStatus === 'En position' ? "bg-blue-600" : "bg-orange-600")}>
                                                         {p.baseStatus}
                                                     </Badge>
                                                 )}
@@ -812,7 +765,7 @@ function HuntingSessionContent() {
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Supprimer la session ?</AlertDialogTitle>
-                        <AlertDialogDescription>Cette action est irréversible et supprimera la session ainsi que tous ses participants.</AlertDialogDescription>
+                        <AlertDialogDescription>Cette action est irréversible.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Annuler</AlertDialogCancel>
@@ -832,7 +785,7 @@ export function HuntingSessionCard() {
     <Card>
         <CardHeader>
             <CardTitle className="flex items-center gap-2"><AlertCircle className="text-destructive" /> Connexion requise</CardTitle>
-            <CardDescription>Vous devez être connecté pour rejoindre ou créer une session de chasse de groupe.</CardDescription>
+            <CardDescription>Connectez-vous pour rejoindre une session de chasse.</CardDescription>
         </CardHeader>
         <CardContent>
             <Button asChild className="w-full"><Link href="/login">Se connecter</Link></Button>
