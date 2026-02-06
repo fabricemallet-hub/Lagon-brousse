@@ -271,12 +271,12 @@ export function VesselTracker() {
 
   // Logique de l'historique universelle
   useEffect(() => {
-    const vesselData = mode === 'sender' ? (isSharing ? { ...displayVessel, lastActive: new Date() } : null) : remoteVessel;
+    const vesselData = remoteVessel; // L'historique doit écouter les données Firestore pour être universel
     if (!vesselData || !activeVesselId) return;
     
-    const isSharingActive = mode === 'sender' ? isSharing : (vesselData as VesselStatus).isSharing === true;
+    const isSharingActive = vesselData.isSharing === true;
     const currentStatus = isSharingActive ? (vesselData.status || 'moving') : 'offline';
-    const statusTime = (vesselData as VesselStatus).statusChangedAt || (vesselData as VesselStatus).lastActive;
+    const statusTime = vesselData.statusChangedAt || vesselData.lastActive;
     
     const getTimeMillis = (t: any) => {
         if (!t) return 0;
