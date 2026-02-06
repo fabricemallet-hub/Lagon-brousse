@@ -49,7 +49,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Badge } from './badge';
+import { Badge } from '@/components/ui/badge';
 
 const INITIAL_CENTER = { lat: -22.27, lng: 166.45 };
 const IMMOBILITY_THRESHOLD_METERS = 20; 
