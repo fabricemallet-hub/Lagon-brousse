@@ -269,7 +269,6 @@ export function VesselTracker() {
     }
   };
 
-  // Logique de l'historique universelle
   useEffect(() => {
     const vesselData = remoteVessel; 
     if (!vesselData || !activeVesselId) return;
@@ -473,11 +472,10 @@ export function VesselTracker() {
                                 <Home className="size-4 text-green-600" /> Home (À terre)
                             </Button>
                         </div>
-                        {(vesselStatus === 'returning' || vesselStatus === 'landed') && (
-                            <Button variant="ghost" className="w-full h-10 font-black uppercase text-[9px] border-2 border-dashed gap-2 touch-manipulation" onClick={() => handleManualStatus('moving')}>
-                                <RefreshCw className="size-3 text-orange-500" /> Erreur / Reprise mode normal (Auto)
-                            </Button>
-                        )}
+                        
+                        <Button variant="ghost" className="w-full h-12 font-black uppercase text-[9px] border-2 border-dashed gap-2 touch-manipulation text-orange-600" onClick={() => handleManualStatus('moving')}>
+                            <RefreshCw className="size-4" /> Erreur / Reprise mode normal (Auto)
+                        </Button>
                     </div>
 
                     <Button 
