@@ -480,7 +480,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         </Button>
                          <div className={cn("absolute bottom-0 left-0 right-0 z-10", !newSpotLocation && "hidden")}>
                             <Button 
-                                className="w-full h-14 rounded-none bg-primary hover:bg-primary/90 text-white font-black uppercase text-base tracking-widest shadow-[0_-4px_20px_rgba(0,0,0,0.3)] gap-3" 
+                                className="w-full h-14 rounded-none bg-primary hover:bg-primary/90 text-white font-black uppercase text-sm sm:text-base tracking-tight shadow-[0_-4px_20px_rgba(0,0,0,0.3)] gap-3" 
                                 onClick={() => {
                                     if (newSpotLocation) {
                                         setDialogMode('add');
@@ -635,30 +635,28 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                             </AccordionPrimitive.Header>
                                        </div>
                                        <AccordionPrimitive.Content className="overflow-hidden text-sm transition-all border-t border-dashed">
-                                           <div className="pb-4 pl-10 pr-4 space-y-4 pt-4 bg-muted/5">
+                                           <div className="pb-4 px-4 space-y-4 pt-4 bg-muted/5">
                                            <div className="text-[11px] leading-relaxed text-muted-foreground bg-white border rounded-xl p-4 space-y-2 shadow-inner">
                                                {spot.notes && <p className="italic text-foreground font-medium mb-3">"{spot.notes}"</p>}
                                                 <p><strong>Conditions :</strong> {spot.context.airTemperature}°C, {spot.context.windSpeed} nds {spot.context.windDirection}</p>
                                                 <p><strong>Lune :</strong> {spot.context.moonPhase}</p>
                                                 <p><strong>Marée :</strong> {spot.context.tideMovement} ({spot.context.tideHeight.toFixed(2)}m)</p>
                                            </div>
-                                           <div className="flex flex-wrap gap-2">
-                                               <Button variant="outline" className="flex-1 min-w-[120px] font-black uppercase text-[9px] h-10 border-2" onClick={() => handleFindSimilarDay(spot)} disabled={isAnalyzing}>
-                                                   <BrainCircuit className="mr-2 size-4 text-primary"/> Jour similaire
+                                           <div className="grid grid-cols-2 gap-2">
+                                               <Button variant="outline" className="font-black uppercase text-[10px] h-12 border-2 px-1 whitespace-normal text-center" onClick={() => handleFindSimilarDay(spot)} disabled={isAnalyzing}>
+                                                   <BrainCircuit className="mr-1 size-4 text-primary shrink-0"/> Jour similaire
                                                </Button>
-                                               <Button variant="outline" className="flex-1 min-w-[60px] font-black uppercase text-[9px] h-10 border-2" onClick={() => {
+                                               <Button variant="outline" className="font-black uppercase text-[10px] h-12 border-2 px-1" onClick={() => {
                                                    if (map && spot.location) {
                                                        map.panTo({ lat: spot.location.latitude, lng: spot.location.longitude });
                                                        map.setZoom(16);
                                                        mapContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                                    }
                                                }}>
-                                                   <LocateFixed className="mr-2 size-4 text-primary" /> GPS
+                                                   <LocateFixed className="mr-1 size-4 text-primary shrink-0" /> GPS
                                                </Button>
-                                               <div className="flex gap-2 w-full sm:w-auto">
-                                                   <Button variant="outline" size="icon" onClick={() => handleEditClick(spot)} className="size-10 border-2"><Pencil className="h-4 w-4" /></Button>
-                                                   <Button variant="destructive" size="icon" onClick={() => handleDeleteSpot(spot.id)} className="size-10 shadow-sm"><Trash2 className="size-4" /></Button>
-                                               </div>
+                                               <Button variant="outline" className="font-black uppercase text-[10px] h-12 border-2" onClick={() => handleEditClick(spot)}><Pencil className="mr-1 size-4 shrink-0" /> Modifier</Button>
+                                               <Button variant="destructive" className="font-black uppercase text-[10px] h-12" onClick={() => handleDeleteSpot(spot.id)}><Trash2 className="mr-1 size-4 shrink-0" /> Supprimer</Button>
                                            </div>
                                            </div>
                                        </AccordionPrimitive.Content>
