@@ -16,6 +16,7 @@ import {
   AnalyzeBestDayInputSchema,
   FindSimilarDayInputSchema,
   FishingAnalysisOutputSchema,
+  FishingSpotContextSchema,
   type AnalyzeBestDayInput,
   type FindSimilarDayInput,
   type FishingAnalysisOutput,
@@ -61,8 +62,22 @@ function formatForecastForPrompt(forecast: { date: string, data: LocationData })
 // Flow 1: Find Similar Day
 const findSimilarDayPrompt = ai.definePrompt({
   name: 'findSimilarDayPrompt',
-  input: { schema: z.any() },
+  input: { 
+    schema: z.object({
+      pastDate: z.string(),
+      spotContext: FishingSpotContextSchema,
+      futureForecasts: z.string(),
+    }) 
+  },
   output: { schema: FishingAnalysisOutputSchema },
+  config: {
+    safetySettings: [
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+    ],
+  },
   prompt: `Tu es un expert en pêche en Nouvelle-Calédonie. Analyse les conditions d'une prise passée et trouve le jour le plus similaire dans les prévisions futures.
 IMPORTANT: Pour cette analyse, concentre-toi EXCLUSIVEMENT sur la marée et la lune. Ignore totalement le vent, la houle et la météo.
 
@@ -81,7 +96,7 @@ TA MISSION:
 4. Attribue un score de confiance de 0 à 100.
 5. Fournis une explication claire et concise, en comparant les facteurs clés (marée/lune) qui justifient ton choix.
 
-Réponds uniquement avec l'objet JSON formaté.`,
+Réponds uniquement au format JSON requis.`,
 });
 
 const findSimilarDayFlow = ai.defineFlow(
@@ -109,8 +124,21 @@ const findSimilarDayFlow = ai.defineFlow(
 // Flow 2: Analyze Best Day from multiple spots
 const analyzeBestDayPrompt = ai.definePrompt({
     name: 'analyzeBestDayPrompt',
-    input: { schema: z.any() },
+    input: { 
+      schema: z.object({
+        pastContexts: z.string(),
+        futureForecasts: z.string(),
+      }) 
+    },
     output: { schema: FishingAnalysisOutputSchema },
+    config: {
+      safetySettings: [
+        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+      ],
+    },
     prompt: `Tu es un expert en pêche en Nouvelle-Calédonie. Un pêcheur te donne les conditions de ses meilleures prises. Ta mission est d'analyser ces succès pour trouver des tendances, puis de recommander le meilleur jour pour pêcher dans la semaine à venir.
 IMPORTANT: Concentre-toi EXCLUSIVEMENT sur la marée et la lune. Ignore totalement le vent, la houle et la météo.
 
@@ -128,7 +156,7 @@ TA MISSION:
 5. Attribue un score de confiance de 0 à 100 pour ta prédiction.
 6. Fournis une explication claire : commence par la synthèse des tendances (marée/lune), puis justifie ton choix du meilleur jour futur.
 
-Réponds uniquement avec l'objet JSON formaté.`,
+Réponds uniquement au format JSON requis.`,
 });
 
 const analyzeBestDayFlow = ai.defineFlow(

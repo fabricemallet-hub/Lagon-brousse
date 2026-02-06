@@ -14,12 +14,14 @@ export const FishingSpotContextSchema = z.object({
   waterTemperature: z.number(),
   swellInside: z.string().optional(),
   swellOutside: z.string().optional(),
+  closestLowTide: z.object({ time: z.string(), height: z.number() }).optional(),
+  closestHighTide: z.object({ time: z.string(), height: z.number() }).optional(),
 });
 
 export const FindSimilarDayInputSchema = z.object({
   spotContext: FishingSpotContextSchema,
   location: z.string(),
-  searchRangeDays: z.number().default(30),
+  searchRangeDays: z.number().default(14),
 });
 export type FindSimilarDayInput = z.infer<typeof FindSimilarDayInputSchema>;
 

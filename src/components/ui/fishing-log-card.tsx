@@ -322,11 +322,11 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             const result = await findSimilarDay({
                 spotContext: spot.context,
                 location: selectedLocation,
-                searchRangeDays: 30,
+                searchRangeDays: 14,
             });
             setAnalysisResult(result);
         } catch (error) {
-            console.error(error);
+            console.error("Find Similar Day Error:", error);
             toast({ variant: 'destructive', title: 'Erreur IA', description: 'Impossible de trouver un jour similaire.' });
             setIsAnalysisDialogOpen(false);
         } finally {
@@ -355,7 +355,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             });
             setAnalysisResult(result);
         } catch (error) {
-            console.error(error);
+            console.error("Analyze Next 7 Days Error:", error);
             toast({ variant: 'destructive', title: 'Erreur IA', description: 'Impossible d\'analyser les spots.' });
             setIsAnalysisDialogOpen(false);
         } finally {
@@ -392,7 +392,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
 
             setRecommendResult(result);
         } catch (error) {
-            console.error(error);
+            console.error("Recommend Spot Error:", error);
             toast({ variant: 'destructive', title: 'Erreur IA', description: 'Impossible de recommander un spot.' });
             setIsRecommendDialogOpen(false);
         } finally {
