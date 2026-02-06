@@ -28,6 +28,7 @@ import type { FishingAnalysisOutput, RecommendBestSpotOutput } from '@/ai/schema
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { useGoogleMaps } from '@/context/google-maps-context';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -710,94 +711,99 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
 
                 {/* Dialog Analyse 7 jours / Jour similaire */}
                 <Dialog open={isAnalysisDialogOpen} onOpenChange={setIsAnalysisDialogOpen}>
-                    <DialogContent className="max-w-md rounded-2xl">
-                        <DialogHeader>
+                    <DialogContent className="max-w-md rounded-2xl max-h-[95vh] flex flex-col p-0 overflow-hidden">
+                        <DialogHeader className="p-6 pb-2 shrink-0">
                             <DialogTitle className="flex items-center gap-2 font-black uppercase"><BrainCircuit className="text-primary" /> Analyse de l'IA</DialogTitle>
                         </DialogHeader>
-                        <div className="py-4 space-y-4">
-                            {isAnalyzing ? (
-                                <div className="flex flex-col items-center justify-center py-10 space-y-4">
-                                    <BrainCircuit className="size-12 text-primary animate-pulse" />
-                                    <p className="text-xs font-bold uppercase text-muted-foreground animate-pulse">Analyse en cours...</p>
-                                </div>
-                            ) : analysisResult && (
-                                <div className="space-y-6 animate-in fade-in zoom-in-95">
-                                    <div className="text-center p-6 bg-primary/5 border-2 border-primary/20 rounded-2xl">
-                                        <p className="text-[10px] font-black uppercase text-muted-foreground mb-1 tracking-widest">Meilleure fenêtre</p>
-                                        <p className="text-2xl font-black text-primary uppercase tracking-tighter">
-                                            {format(new Date(analysisResult.bestDate.replace(/-/g, '/')), 'eeee d MMMM', { locale: fr })}
-                                        </p>
+                        <ScrollArea className="flex-grow">
+                            <div className="p-6 py-4 space-y-4">
+                                {isAnalyzing ? (
+                                    <div className="flex flex-col items-center justify-center py-10 space-y-4">
+                                        <BrainCircuit className="size-12 text-primary animate-pulse" />
+                                        <p className="text-xs font-bold uppercase text-muted-foreground animate-pulse">Analyse en cours...</p>
                                     </div>
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between px-1"><Label className="text-[10px] font-black uppercase opacity-60">Confiance</Label><span className="text-xs font-black">{analysisResult.score}%</span></div>
-                                        <Progress value={analysisResult.score} className="h-2" />
+                                ) : analysisResult && (
+                                    <div className="space-y-6 animate-in fade-in zoom-in-95">
+                                        <div className="text-center p-6 bg-primary/5 border-2 border-primary/20 rounded-2xl">
+                                            <p className="text-[10px] font-black uppercase text-muted-foreground mb-1 tracking-widest">Meilleure fenêtre</p>
+                                            <p className="text-2xl font-black text-primary uppercase tracking-tighter">
+                                                {format(new Date(analysisResult.bestDate.replace(/-/g, '/')), 'eeee d MMMM', { locale: fr })}
+                                            </p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between px-1"><Label className="text-[10px] font-black uppercase opacity-60">Confiance</Label><span className="text-xs font-black">{analysisResult.score}%</span></div>
+                                            <Progress value={analysisResult.score} className="h-2" />
+                                        </div>
+                                        <p className="text-xs font-medium leading-relaxed italic text-muted-foreground bg-muted/30 p-4 rounded-xl border-2">"{analysisResult.explanation}"</p>
                                     </div>
-                                    <p className="text-xs font-medium leading-relaxed italic text-muted-foreground bg-muted/30 p-4 rounded-xl border-2">"{analysisResult.explanation}"</p>
-                                </div>
-                            )}
-                        </div>
-                        <DialogFooter><Button variant="outline" onClick={() => setIsAnalysisDialogOpen(false)} className="w-full font-black uppercase h-12">Fermer</Button></DialogFooter>
+                                )}
+                            </div>
+                        </ScrollArea>
+                        <DialogFooter className="p-4 border-t shrink-0"><Button variant="outline" onClick={() => setIsAnalysisDialogOpen(false)} className="w-full font-black uppercase h-12">Fermer</Button></DialogFooter>
                     </DialogContent>
                 </Dialog>
 
                 {/* Dialog Recommandation Spot Actuel */}
                 <Dialog open={isRecommendDialogOpen} onOpenChange={setIsRecommendDialogOpen}>
-                    <DialogContent className="max-w-md rounded-2xl">
-                        <DialogHeader>
-                            <DialogTitle className="flex items-center gap-2 font-black uppercase"><BrainCircuit className="text-primary" /> Meilleur spot immédiat</DialogTitle>
-                            <DialogDescription className="text-[10px] uppercase font-bold">Analyse basée sur votre GPS, la marée et la lune actuelle</DialogDescription>
+                    <DialogContent className="max-w-md rounded-2xl max-h-[95vh] flex flex-col p-0 overflow-hidden">
+                        <DialogHeader className="p-6 pb-2 shrink-0">
+                            <DialogTitle className="flex items-center gap-2 font-black uppercase text-base sm:text-lg"><BrainCircuit className="text-primary" /> Meilleur spot immédiat</DialogTitle>
+                            <DialogDescription className="text-[9px] sm:text-[10px] uppercase font-bold">Analyse basée sur votre GPS, la marée et la lune actuelle</DialogDescription>
                         </DialogHeader>
-                        <div className="py-4">
-                            {isAnalyzing ? (
-                                <div className="flex flex-col items-center justify-center py-10 space-y-4">
-                                    <BrainCircuit className="size-12 text-primary animate-pulse" />
-                                    <p className="text-xs font-bold uppercase text-muted-foreground animate-pulse">Calcul tactique en cours...</p>
-                                </div>
-                            ) : recommendResult && (
-                                <div className="space-y-6 animate-in fade-in zoom-in-95">
-                                    <div className="p-6 bg-indigo-600 text-white rounded-2xl shadow-xl relative overflow-hidden">
-                                        <Navigation className="absolute -right-4 -bottom-4 size-24 opacity-10 rotate-12" />
-                                        <p className="text-[10px] font-black uppercase text-indigo-200 mb-1 tracking-widest">Allez à :</p>
-                                        <h3 className="text-2xl font-black uppercase tracking-tighter mb-2">{recommendResult.bestSpotName}</h3>
-                                        <div className="flex items-center gap-2">
-                                            <Badge variant="outline" className="bg-white/10 border-white/20 text-white font-black text-[10px]">CONFIANCE {recommendResult.confidence}%</Badge>
-                                        </div>
+                        
+                        <ScrollArea className="flex-grow">
+                            <div className="p-4 sm:p-6 py-4 space-y-6">
+                                {isAnalyzing ? (
+                                    <div className="flex flex-col items-center justify-center py-10 space-y-4">
+                                        <BrainCircuit className="size-12 text-primary animate-pulse" />
+                                        <p className="text-xs font-bold uppercase text-muted-foreground animate-pulse">Calcul tactique en cours...</p>
                                     </div>
-
-                                    <div className="space-y-4">
-                                        <div className="space-y-1.5">
-                                            <p className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2 px-1"><BrainCircuit className="size-3" /> Pourquoi ce choix ?</p>
-                                            <div className="bg-muted/30 p-4 rounded-xl border-2 italic text-xs font-medium leading-relaxed">
-                                                "{recommendResult.reason}"
+                                ) : recommendResult && (
+                                    <div className="space-y-6 animate-in fade-in zoom-in-95">
+                                        <div className="p-4 sm:p-6 bg-indigo-600 text-white rounded-2xl shadow-xl relative overflow-hidden">
+                                            <Navigation className="absolute -right-4 -bottom-4 size-24 opacity-10 rotate-12" />
+                                            <p className="text-[10px] font-black uppercase text-indigo-200 mb-1 tracking-widest">Allez à :</p>
+                                            <h3 className="text-xl sm:text-2xl font-black uppercase tracking-tighter mb-2 break-words">{recommendResult.bestSpotName}</h3>
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant="outline" className="bg-white/10 border-white/20 text-white font-black text-[10px]">CONFIANCE {recommendResult.confidence}%</Badge>
                                             </div>
                                         </div>
 
-                                        <div className="space-y-1.5">
-                                            <p className="text-[10px] font-black uppercase text-primary flex items-center gap-2 px-1"><Fish className="size-3" /> Conseil Tactique</p>
-                                            <div className="bg-primary/5 p-4 rounded-xl border-2 border-primary/10 text-xs font-bold leading-relaxed text-primary">
-                                                {recommendResult.advice}
+                                        <div className="space-y-4">
+                                            <div className="space-y-1.5">
+                                                <p className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2 px-1"><BrainCircuit className="size-3" /> Pourquoi ce choix ?</p>
+                                                <div className="bg-muted/30 p-3 sm:p-4 rounded-xl border-2 italic text-[11px] sm:text-xs font-medium leading-relaxed">
+                                                    "{recommendResult.reason}"
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-1.5">
+                                                <p className="text-[10px] font-black uppercase text-primary flex items-center gap-2 px-1"><Fish className="size-3" /> Conseil Tactique</p>
+                                                <div className="bg-primary/5 p-3 sm:p-4 rounded-xl border-2 border-primary/10 text-[11px] sm:text-xs font-bold leading-relaxed text-primary">
+                                                    {recommendResult.advice}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
 
-                                    <Button 
-                                        className="w-full h-12 font-black uppercase gap-2"
-                                        onClick={() => {
-                                            const spot = savedSpots?.find(s => s.id === recommendResult.bestSpotId);
-                                            if (spot && map) {
-                                                map.panTo({ lat: spot.location.latitude, lng: spot.location.longitude });
-                                                map.setZoom(16);
-                                                setIsRecommendDialogOpen(false);
-                                                mapContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                            }
-                                        }}
-                                    >
-                                        <LocateFixed className="size-4" /> Voir sur la carte
-                                    </Button>
-                                </div>
-                            )}
-                        </div>
-                        <DialogFooter><Button variant="outline" onClick={() => setIsRecommendDialogOpen(false)} className="w-full font-black uppercase h-12">Fermer</Button></DialogFooter>
+                                        <Button 
+                                            className="w-full h-12 font-black uppercase gap-2 shadow-md"
+                                            onClick={() => {
+                                                const spot = savedSpots?.find(s => s.id === recommendResult.bestSpotId);
+                                                if (spot && map) {
+                                                    map.panTo({ lat: spot.location.latitude, lng: spot.location.longitude });
+                                                    map.setZoom(16);
+                                                    setIsRecommendDialogOpen(false);
+                                                    mapContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                }
+                                            }}
+                                        >
+                                            <LocateFixed className="size-4" /> Voir sur la carte
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                        </ScrollArea>
+                        <DialogFooter className="p-4 border-t shrink-0"><Button variant="outline" onClick={() => setIsRecommendDialogOpen(false)} className="w-full font-black uppercase h-12">Fermer</Button></DialogFooter>
                     </DialogContent>
                 </Dialog>
             </CardContent>
