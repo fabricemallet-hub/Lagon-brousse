@@ -164,6 +164,7 @@ export interface UserAccount {
   lastSelectedLocation?: string;
   emergencyContact?: string;
   isEmergencyEnabled?: boolean;
+  isCustomMessageEnabled?: boolean;
   vesselSmsMessage?: string;
   savedVesselIds?: string[];
   lastVesselId?: string;

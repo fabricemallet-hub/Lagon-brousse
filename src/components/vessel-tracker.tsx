@@ -97,6 +97,7 @@ export function VesselTracker() {
   const [isSharing, setIsSharing] = useState(false);
   const [emergencyContact, setEmergencyContact] = useState('');
   const [isEmergencyEnabled, setIsEmergencyEnabled] = useState(true);
+  const [isCustomMessageEnabled, setIsCustomMessageEnabled] = useState(true);
   const [vesselSmsMessage, setVesselSmsMessage] = useState('');
   const [customSharingId, setCustomSharingId] = useState('');
   const [vesselNickname, setVesselNickname] = useState('');
@@ -181,6 +182,7 @@ export function VesselTracker() {
       if (userProfile.emergencyContact) setEmergencyContact(userProfile.emergencyContact);
       if (userProfile.vesselSmsMessage) setVesselSmsMessage(userProfile.vesselSmsMessage);
       setIsEmergencyEnabled(userProfile.isEmergencyEnabled ?? true);
+      setIsCustomMessageEnabled(userProfile.isCustomMessageEnabled ?? true);
       
       const savedNickname = userProfile.vesselNickname || userProfile.displayName || user?.displayName || user?.email?.split('@')[0] || '';
       if (!vesselNickname) setVesselNickname(savedNickname);
@@ -323,7 +325,8 @@ export function VesselTracker() {
         await updateDoc(doc(firestore, 'users', user.uid), {
             emergencyContact: emergencyContact,
             vesselSmsMessage: vesselSmsMessage,
-            isEmergencyEnabled: isEmergencyEnabled
+            isEmergencyEnabled: isEmergencyEnabled,
+            isCustomMessageEnabled: isCustomMessageEnabled
         });
         toast({ title: "Paramètres SMS sauvegardés" });
     } catch (e) {
@@ -494,16 +497,16 @@ export function VesselTracker() {
     const pos = mode === 'sender' ? currentPos : (followedVessels?.find(v => v.isSharing)?.location ? { lat: followedVessels.find(v => v.isSharing)!.location.latitude, lng: followedVessels.find(v => v.isSharing)!.location.longitude } : null);
     const posUrl = pos ? `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}` : "[RECHERCHE GPS...]";
     
-    const customText = vesselSmsMessage || "Requiert assistance immédiate.";
+    const customText = (isCustomMessageEnabled && vesselSmsMessage) ? vesselSmsMessage : "Requiert assistance immédiate.";
     const body = `${customText} [${type}] Position : ${posUrl}`;
     
     window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
 
   const smsPreview = useMemo(() => {
-    const customText = vesselSmsMessage || "Requiert assistance immédiate.";
+    const customText = (isCustomMessageEnabled && vesselSmsMessage) ? vesselSmsMessage : "Requiert assistance immédiate.";
     return `${customText} [MAYDAY/PAN PAN] Position : https://www.google.com/maps?q=-22.27,166.45`;
-  }, [vesselSmsMessage]);
+  }, [vesselSmsMessage, isCustomMessageEnabled]);
 
   if (loadError) return <div className="p-4 text-destructive">Erreur chargement Google Maps.</div>;
   if (!isLoaded) return <Skeleton className="h-96 w-full" />;
@@ -638,13 +641,24 @@ export function VesselTracker() {
                                         </div>
 
                                         <div className="space-y-1.5">
-                                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Message de détresse personnalisé</Label>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Message de détresse personnalisé</Label>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[8px] font-bold uppercase opacity-60">{isCustomMessageEnabled ? 'Activé' : 'Désactivé'}</span>
+                                                    <Switch 
+                                                        checked={isCustomMessageEnabled} 
+                                                        onCheckedChange={setIsCustomMessageEnabled} 
+                                                        className="scale-75 touch-manipulation"
+                                                        disabled={!isEmergencyEnabled}
+                                                    />
+                                                </div>
+                                            </div>
                                             <Textarea 
                                                 placeholder="Ex: Problème moteur, demande assistance." 
                                                 value={vesselSmsMessage} 
                                                 onChange={e => setVesselSmsMessage(e.target.value)} 
-                                                className="border-2 font-medium min-h-[80px]"
-                                                disabled={!isEmergencyEnabled}
+                                                className={cn("border-2 font-medium min-h-[80px]", !isCustomMessageEnabled && "opacity-50")}
+                                                disabled={!isEmergencyEnabled || !isCustomMessageEnabled}
                                             />
                                             <p className="text-[8px] font-bold text-muted-foreground italic px-1">Le point GPS sera annexé automatiquement à la fin de votre message.</p>
                                         </div>
@@ -974,7 +988,7 @@ export function VesselTracker() {
                 </a>
               </div>
               <div className="flex flex-col">
-                <span className="text-[9px] font-bold text-muted-foreground uppercase">Phares et Balises</span>
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">Phares et balises</span>
                 <a href="tel:232100" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
                   <Phone className="size-3" /> 23 21 00
                 </a>
