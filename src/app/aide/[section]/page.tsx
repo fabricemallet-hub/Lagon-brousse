@@ -90,14 +90,15 @@ const sectionContent: Record<string, {
     color: 'bg-blue-600',
     role: "Un système de sécurité maritime haute-fidélité conçu pour partager votre position GPS, votre statut d'activité et votre niveau de batterie avec vos proches restés à terre.",
     steps: [
-      "Émetteur (A) - Identité : Activez 'Partager ma position'. Configurez un ID (ex: BATEAU-1) et un surnom. Ce surnom est indépendant de la chasse et se sauvegarde automatiquement sur votre profil.",
+      "Émetteur (A) - Identité : Configurez un ID et votre surnom de navire. Ce surnom est indépendant de la chasse et sera inclus automatiquement dans vos SMS d'urgence.",
       "Émetteur (A) - Mode Éveil & Status : Activez 'MODE ÉVEIL' pour maintenir l'écran allumé. Utilisez les boutons 'Retour' ou 'Home' pour signaler vos intentions, ou 'Reprise Mode Auto' en cas d'erreur.",
-      "Émetteur (A) - Urgence SMS : Configurez un numéro de contact et personnalisez votre message. Vous pouvez désactiver le service via l'interrupteur. Le point GPS est automatiquement annexé.",
+      "Émetteur (A) - Urgence SMS : Configurez un numéro de contact. Vous pouvez utiliser un message personnalisé ou le texte standard via l'interrupteur. Le point GPS est toujours annexé.",
       "Récepteur (B) - Flotte & Suivi : Saisissez l'ID d'un navire pour l'ajouter à votre liste. Vous pouvez suivre plusieurs navires simultanément sur la même carte satellite.",
       "Récepteur (B) - Alertes & Veille : Personnalisez les sons. Réglez via les curseurs le seuil de batterie basse (5-50%) et l'alarme d'immobilité prolongée (1h à 24h).",
-      "Journal de Bord Unifié : Consultez l'historique synchronisé. Il affiche l'heure, le statut, le pourcentage de batterie (%) et l'état de charge. Effacer l'historique le vide pour tout le monde."
+      "Journal de Bord Unifié : Consultez l'historique synchronisé (batterie, charge, statut). L'émetteur peut effacer l'historique globalement pour tous les récepteurs."
     ],
     tips: [
+      "Surnom SMS : Votre surnom de navire est ajouté automatiquement au début de chaque SMS d'urgence pour vous identifier immédiatement auprès des secours.",
       "Bouton GPS Historique : Dans le journal, cliquez sur 'GPS' pour situer précisément l'endroit où s'est produit un événement (ex: batterie faible ou passage au mouillage).",
       "Sécurité SMS : L'aperçu vous montre le message exact qui sera envoyé. Le lien Maps est verrouillé sur votre position réelle pour garantir l'efficacité des secours.",
       "Mode Auto : Le système détecte l'immobilité après 30s dans un rayon de 20m. En cas de dérive de pêche, le bouton 'Reprise Mode Auto' permet de recalibrer le statut.",
