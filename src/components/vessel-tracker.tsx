@@ -497,16 +497,18 @@ export function VesselTracker() {
     const pos = mode === 'sender' ? currentPos : (followedVessels?.find(v => v.isSharing)?.location ? { lat: followedVessels.find(v => v.isSharing)!.location.latitude, lng: followedVessels.find(v => v.isSharing)!.location.longitude } : null);
     const posUrl = pos ? `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}` : "[RECHERCHE GPS...]";
     
+    const nicknamePrefix = vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : "";
     const customText = (isCustomMessageEnabled && vesselSmsMessage) ? vesselSmsMessage : "Requiert assistance immédiate.";
-    const body = `${customText} [${type}] Position : ${posUrl}`;
+    const body = `${nicknamePrefix}${customText} [${type}] Position : ${posUrl}`;
     
     window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
 
   const smsPreview = useMemo(() => {
+    const nicknamePrefix = vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : "";
     const customText = (isCustomMessageEnabled && vesselSmsMessage) ? vesselSmsMessage : "Requiert assistance immédiate.";
-    return `${customText} [MAYDAY/PAN PAN] Position : https://www.google.com/maps?q=-22.27,166.45`;
-  }, [vesselSmsMessage, isCustomMessageEnabled]);
+    return `${nicknamePrefix}${customText} [MAYDAY/PAN PAN] Position : https://www.google.com/maps?q=-22.27,166.45`;
+  }, [vesselSmsMessage, isCustomMessageEnabled, vesselNickname]);
 
   if (loadError) return <div className="p-4 text-destructive">Erreur chargement Google Maps.</div>;
   if (!isLoaded) return <Skeleton className="h-96 w-full" />;
