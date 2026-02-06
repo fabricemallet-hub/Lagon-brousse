@@ -276,7 +276,6 @@ export function VesselTracker() {
     }
   };
 
-  // Synchronized History Logic (Sender & Receiver)
   useEffect(() => {
     const vesselData = remoteVessel; 
     if (!vesselData || !activeVesselId) return;
@@ -434,7 +433,9 @@ export function VesselTracker() {
     window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
 
-  const displayVessel = mode === 'sender' ? (isSharing ? { location: { latitude: currentPos?.lat || 0, longitude: currentPos?.lng || 0 }, status: vesselStatus, displayName: vesselNickname || 'Ma Position', batteryLevel: 100 } : null) : remoteVessel;
+  const displayVessel = mode === 'sender' 
+    ? (isSharing ? { location: { latitude: currentPos?.lat || 0, longitude: currentPos?.lng || 0 }, status: vesselStatus, displayName: vesselNickname || 'Ma Position', batteryLevel: 100 } : null) 
+    : (remoteVessel?.isSharing ? remoteVessel : null);
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
