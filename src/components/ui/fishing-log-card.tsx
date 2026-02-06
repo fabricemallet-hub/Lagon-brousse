@@ -742,7 +742,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                             )}
                         </div>
                     </ScrollArea>
-                    <DialogFooter className="p-4 border-t shrink-0"><Button variant="outline" onClick={() => setIsAnalysisDialogOpen(false)} className="w-full font-black uppercase h-12">Fermer</Button></DialogFooter>
+                    <DialogFooter className="p-4 border-t shrink-0 bg-white"><Button variant="outline" onClick={() => setIsAnalysisDialogOpen(false)} className="w-full font-black uppercase h-12 border-2">Fermer</Button></DialogFooter>
                 </DialogContent>
             </Dialog>
 

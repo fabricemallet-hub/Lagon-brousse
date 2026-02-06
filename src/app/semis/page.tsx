@@ -259,6 +259,20 @@ export default function SemisPage() {
 
       <div className="flex flex-col gap-3">
         <Button 
+          variant="secondary" 
+          className="w-full font-black uppercase h-14 text-sm tracking-tight shadow-md border-2 border-primary/20 gap-3"
+          onClick={() => {
+            if (topSeedsForToday.length > 0) {
+              setSearchQuery(topSeedsForToday[0].name);
+              toast({ title: "Analyse en cours", description: `Focus sur : ${topSeedsForToday[0].name}` });
+            }
+          }}
+        >
+          <BrainCircuit className="size-6 text-primary" />
+          Que semer aujourd'hui ? (IA)
+        </Button>
+
+        <Button 
           onClick={() => fileInputRef.current?.click()} 
           className="h-14 text-base font-black uppercase tracking-widest shadow-lg gap-3 bg-primary hover:bg-primary/90"
           disabled={isIdentifying}

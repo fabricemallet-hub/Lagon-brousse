@@ -266,7 +266,17 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-2">
+      <div className="grid grid-cols-1 gap-3">
+        <Button 
+          variant="secondary" 
+          className="w-full font-black uppercase h-14 text-sm tracking-tight shadow-md border-2 border-accent/20 gap-3"
+          onClick={handleGenerateGlobalSummary}
+          disabled={isGeneratingGlobal}
+        >
+          {isGeneratingGlobal ? <RefreshCw className="size-6 animate-spin text-accent" /> : <BrainCircuit className="size-6 text-accent" />}
+          Bilan Stratégique du Jardin (IA)
+        </Button>
+
         <Button 
           onClick={() => fileInputRef.current?.click()} 
           className="h-14 text-base font-black uppercase tracking-widest shadow-lg gap-3 bg-primary hover:bg-primary/90"
@@ -297,6 +307,48 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
             {idResult.category !== 'Nuisible' && !plants?.find(p => p.name === idResult.name) && (
                 <Button className="w-full h-10 font-black uppercase text-[10px] shadow-md" onClick={handleAddPlant}>Ajouter à mon jardin</Button>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* BILAN DU JOUR - GLOBAL SUMMARY SECTION */}
+      {globalSummary && (
+        <Card className="border-2 border-accent/20 bg-accent/5 overflow-hidden animate-in fade-in slide-in-from-top-2">
+          <CardHeader className="p-4 bg-accent/10 border-b border-accent/10 flex-row justify-between items-center">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-accent text-white rounded-lg shadow-sm"><ClipboardList className="size-5" /></div>
+              <div>
+                <CardTitle className="text-base font-black uppercase tracking-tight">Bilan IA du {format(new Date(), 'dd MMM', { locale: fr })}</CardTitle>
+                <CardDescription className="text-[9px] font-bold uppercase opacity-60">Synthèse tactique</CardDescription>
+              </div>
+            </div>
+            <button onClick={() => setGlobalSummary(null)} className="p-1 hover:bg-accent/10 rounded-full opacity-40"><X className="size-4" /></button>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-accent/10">
+              <div className="p-4 space-y-2 bg-white/50">
+                <p className="text-[10px] font-black uppercase text-accent tracking-widest flex items-center gap-2"><Zap className="size-3" /> Plan d'action prioritaires</p>
+                <p className="text-sm font-bold leading-relaxed text-slate-700 italic">"{globalSummary.globalPlan}"</p>
+              </div>
+
+              <div className="p-4 space-y-3">
+                <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest flex items-center gap-2"><Droplets className="size-3" /> Arrosage & Quantités</p>
+                <div className="grid gap-2">
+                  {globalSummary.wateringGroups.map((group, idx) => (
+                    <div key={idx} className="flex flex-col gap-2 p-3 bg-white rounded-xl border border-blue-100 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 font-black text-[9px] uppercase">{group.type}</Badge>
+                        <div className="flex items-center gap-1.5 text-blue-600">
+                          <Timer className="size-3" />
+                          <span className="text-[10px] font-black uppercase">{group.quantityPerPlant}</span>
+                        </div>
+                      </div>
+                      <span className="text-[11px] font-medium text-slate-600">{group.plantNames.join(', ')}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -373,67 +425,6 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
           </CardContent>
         )}
       </Card>
-
-      {/* BILAN DU JOUR - GLOBAL SUMMARY SECTION */}
-      {plants && plants.length > 0 && (
-        <Card className="border-2 border-accent/20 bg-accent/5 overflow-hidden">
-          <CardHeader className="p-4 bg-accent/10 border-b border-accent/10">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-accent text-white rounded-lg shadow-sm"><ClipboardList className="size-5" /></div>
-                <div>
-                  <CardTitle className="text-base font-black uppercase tracking-tight">Bilan Stratégique du Jour</CardTitle>
-                  <CardDescription className="text-[9px] font-bold uppercase opacity-60">Analyse de vos {plants.length} plantes</CardDescription>
-                </div>
-              </div>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={handleGenerateGlobalSummary} 
-                disabled={isGeneratingGlobal}
-                className="h-10 px-4 font-black uppercase text-[10px] tracking-widest bg-white border-2 border-accent/20 hover:bg-accent hover:text-white transition-all shadow-sm"
-              >
-                {isGeneratingGlobal ? <RefreshCw className="size-4 animate-spin" /> : <><Sparkles className="mr-2 size-4" /> Bilan IA</>}
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {!globalSummary ? (
-              <div className="p-8 text-center space-y-3">
-                <BrainCircuit className="size-10 mx-auto text-accent/30" />
-                <p className="text-[11px] font-bold text-muted-foreground uppercase leading-relaxed max-w-[200px] mx-auto">
-                  L'IA va établir vos priorités d'aujourd'hui.
-                </p>
-              </div>
-            ) : (
-              <div className="divide-y divide-accent/10 animate-in fade-in slide-in-from-top-2">
-                <div className="p-4 space-y-2 bg-white/50">
-                  <p className="text-[10px] font-black uppercase text-accent tracking-widest flex items-center gap-2"><Zap className="size-3" /> Plan d'action prioritaires</p>
-                  <p className="text-sm font-bold leading-relaxed text-slate-700 italic">"{globalSummary.globalPlan}"</p>
-                </div>
-
-                <div className="p-4 space-y-3">
-                  <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest flex items-center gap-2"><Droplets className="size-3" /> Arrosage & Quantités</p>
-                  <div className="grid gap-2">
-                    {globalSummary.wateringGroups.map((group, idx) => (
-                      <div key={idx} className="flex flex-col gap-2 p-3 bg-white rounded-xl border border-blue-100 shadow-sm">
-                        <div className="flex items-center justify-between">
-                          <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 font-black text-[9px] uppercase">{group.type}</Badge>
-                          <div className="flex items-center gap-1.5 text-blue-600">
-                            <Timer className="size-3" />
-                            <span className="text-[10px] font-black uppercase">{group.quantityPerPlant}</span>
-                          </div>
-                        </div>
-                        <span className="text-[11px] font-medium text-slate-600">{group.plantNames.join(', ')}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {/* PLANTS LIST */}
       <div className="space-y-3">
