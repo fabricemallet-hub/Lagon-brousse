@@ -40,7 +40,10 @@ import {
   Home,
   RefreshCw,
   Settings,
-  Battery
+  Battery,
+  MessageSquare,
+  Eye,
+  Smartphone
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -51,6 +54,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
+import { Textarea } from '@/components/ui/textarea';
 
 const INITIAL_CENTER = { lat: -22.27, lng: 166.45 };
 const IMMOBILITY_THRESHOLD_METERS = 20; 
@@ -89,6 +93,7 @@ export function VesselTracker() {
   
   const [isSharing, setIsSharing] = useState(false);
   const [emergencyContact, setEmergencyContact] = useState('');
+  const [vesselSmsMessage, setVesselSmsMessage] = useState('');
   const [customSharingId, setCustomSharingId] = useState('');
   const [vesselNickname, setVesselNickname] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -170,6 +175,7 @@ export function VesselTracker() {
     if (userProfile) {
       if (userProfile.vesselPrefs) setVesselPrefs(userProfile.vesselPrefs);
       if (userProfile.emergencyContact) setEmergencyContact(userProfile.emergencyContact);
+      if (userProfile.vesselSmsMessage) setVesselSmsMessage(userProfile.vesselSmsMessage);
       
       const savedNickname = userProfile.vesselNickname || userProfile.displayName || user?.displayName || user?.email?.split('@')[0] || '';
       if (!vesselNickname) setVesselNickname(savedNickname);
@@ -289,7 +295,6 @@ export function VesselTracker() {
     if (!firestore || !user) return;
     
     try {
-        // En tant qu'émetteur, on peut effacer l'historique global de son navire
         if (isSharing) {
             await updateDoc(doc(firestore, 'vessels', sharingId), {
                 historyClearedAt: serverTimestamp()
@@ -305,6 +310,20 @@ export function VesselTracker() {
     if (!user || !firestore) return;
     setVesselPrefs(newPrefs);
     await updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: newPrefs }).catch(() => {});
+  };
+
+  const handleSaveSmsSettings = async () => {
+    if (!user || !firestore) return;
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            emergencyContact: emergencyContact,
+            vesselSmsMessage: vesselSmsMessage
+        });
+        toast({ title: "Paramètres SMS sauvegardés" });
+    } catch (e) {
+        console.error(e);
+        toast({ variant: 'destructive', title: "Erreur sauvegarde SMS" });
+    }
   };
 
   useEffect(() => {
@@ -328,7 +347,6 @@ export function VesselTracker() {
         const timeKey = getTimeMillis(statusTime);
         const clearTimeKey = getTimeMillis(vessel.historyClearedAt);
 
-        // Gestion de la suppression globale de l'historique
         if (clearTimeKey > (lastClearTimesRef.current[vessel.id] || 0)) {
             setHistory(prev => prev.filter(h => h.vesselName !== (vessel.displayName || vessel.id)));
             lastClearTimesRef.current[vessel.id] = clearTimeKey;
@@ -465,9 +483,17 @@ export function VesselTracker() {
     if (!emergencyContact) { toast({ variant: "destructive", title: "Numéro requis" }); return; }
     const pos = mode === 'sender' ? currentPos : (followedVessels?.find(v => v.isSharing)?.location ? { lat: followedVessels.find(v => v.isSharing)!.location.latitude, lng: followedVessels.find(v => v.isSharing)!.location.longitude } : null);
     const posUrl = pos ? `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}` : "[RECHERCHE GPS...]";
-    const body = `${type} Lagon & Brousse NC : Position : ${posUrl}`;
+    
+    const customText = vesselSmsMessage || "Requiert assistance immédiate.";
+    const body = `${customText} [${type}] Position : ${posUrl}`;
+    
     window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
+
+  const smsPreview = useMemo(() => {
+    const customText = vesselSmsMessage || "Requiert assistance immédiate.";
+    return `${customText} [MAYDAY/PAN PAN] Position : https://www.google.com/maps?q=-22.27,166.45`;
+  }, [vesselSmsMessage]);
 
   if (loadError) return <div className="p-4 text-destructive">Erreur chargement Google Maps.</div>;
   if (!isLoaded) return <Skeleton className="h-96 w-full" />;
@@ -534,33 +560,86 @@ export function VesselTracker() {
                         <div className="space-y-0.5"><Label className="text-sm font-black uppercase">Partager ma position</Label><p className="text-[9px] font-bold text-muted-foreground uppercase">Flux direct vers récepteur</p></div>
                         <Switch checked={isSharing} onCheckedChange={(val) => { if (val) setIsSharing(true); else handleStopSharing(); }} className="touch-manipulation" />
                     </div>
-                    <div className="space-y-4">
-                        <div className="space-y-1">
-                            <Label className="text-[9px] font-black uppercase ml-1 opacity-60">ID du navire (Partage)</Label>
-                            <div className="flex gap-2">
-                                <Input placeholder="ID EX: BATEAU-1" value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest flex-grow" />
-                                <Button variant="outline" size="icon" className="h-12 w-12 border-2 shrink-0 touch-manipulation" onClick={handleSaveVessel}>
-                                    <Save className="size-4" />
+                    
+                    <Accordion type="single" collapsible className="w-full">
+                        <AccordionItem value="sender-prefs" className="border-none">
+                            <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
+                                <Settings className="size-4 text-primary" />
+                                <span className="text-[10px] font-black uppercase">Identité & Surnom</span>
+                            </AccordionTrigger>
+                            <AccordionContent className="pt-4 space-y-4">
+                                <div className="space-y-1">
+                                    <Label className="text-[9px] font-black uppercase ml-1 opacity-60">ID du navire (Partage)</Label>
+                                    <div className="flex gap-2">
+                                        <Input placeholder="ID EX: BATEAU-1" value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest flex-grow" />
+                                        <Button variant="outline" size="icon" className="h-12 w-12 border-2 shrink-0 touch-manipulation" onClick={handleSaveVessel}>
+                                            <Save className="size-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Surnom du capitaine / navire</Label>
+                                    <Input 
+                                        placeholder="EX: CAPITAINE NEMO" 
+                                        value={vesselNickname} 
+                                        onChange={e => setVesselNickname(e.target.value)} 
+                                        className="font-bold text-center h-12 border-2 uppercase flex-grow w-full" 
+                                    />
+                                    <p className="text-[8px] font-bold text-muted-foreground px-1 mt-1 leading-tight italic">
+                                        le surnom inscrit ici n'est pas relié au surnom de la session chasse. il sera enregistré automatiquement sur le profil utilisateur a la saisie
+                                    </p>
+                                </div>
+                                <Button variant={wakeLock ? "secondary" : "outline"} className="w-full h-12 font-black uppercase text-[10px] tracking-widest border-2 gap-2 touch-manipulation" onClick={toggleWakeLock}>
+                                    <Zap className={cn("size-4", wakeLock && "fill-primary")} />
+                                    {wakeLock ? "MODE ÉVEIL ACTIF" : "ACTIVER MODE ÉVEIL"}
                                 </Button>
-                            </div>
-                        </div>
-                        <div className="space-y-1">
-                            <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Surnom du capitaine / navire</Label>
-                            <Input 
-                                placeholder="EX: CAPITAINE NEMO" 
-                                value={vesselNickname} 
-                                onChange={e => setVesselNickname(e.target.value)} 
-                                className="font-bold text-center h-12 border-2 uppercase flex-grow w-full" 
-                            />
-                            <p className="text-[8px] font-bold text-muted-foreground px-1 mt-1 leading-tight italic">
-                                le surnom inscrit ici n'est pas relié au surnom de la session chasse. il sera enregistré automatiquement sur le profil utilisateur a la saisie
-                            </p>
-                        </div>
-                        <Button variant={wakeLock ? "secondary" : "outline"} className="w-full h-12 font-black uppercase text-[10px] tracking-widest border-2 gap-2 touch-manipulation" onClick={toggleWakeLock}>
-                            <Zap className={cn("size-4", wakeLock && "fill-primary")} />
-                            {wakeLock ? "MODE ÉVEIL ACTIF" : "ACTIVER MODE ÉVEIL"}
-                        </Button>
-                    </div>
+                            </AccordionContent>
+                        </AccordionItem>
+
+                        <AccordionItem value="sms-settings" className="border-none mt-2">
+                            <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-orange-50/50 border-2 border-orange-100/50 rounded-xl">
+                                <Smartphone className="size-4 text-orange-600" />
+                                <span className="text-[10px] font-black uppercase text-orange-800">Réglages d'Urgence (SMS)</span>
+                            </AccordionTrigger>
+                            <AccordionContent className="pt-4 space-y-6">
+                                <div className="space-y-4 p-4 border-2 rounded-2xl bg-card shadow-inner">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Numéro d'urgence (Contact à terre)</Label>
+                                        <Input 
+                                            placeholder="Ex: 77 12 34" 
+                                            value={emergencyContact} 
+                                            onChange={e => setEmergencyContact(e.target.value)} 
+                                            className="h-12 border-2 font-black text-lg" 
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Message de détresse personnalisé</Label>
+                                        <Textarea 
+                                            placeholder="Ex: Problème moteur, demande assistance." 
+                                            value={vesselSmsMessage} 
+                                            onChange={e => setVesselSmsMessage(e.target.value)} 
+                                            className="border-2 font-medium min-h-[80px]"
+                                        />
+                                        <p className="text-[8px] font-bold text-muted-foreground italic px-1">Le point GPS sera annexé automatiquement à la fin de votre message.</p>
+                                    </div>
+
+                                    <div className="space-y-2 pt-2 border-t border-dashed">
+                                        <p className="text-[9px] font-black uppercase text-primary flex items-center gap-2 ml-1">
+                                            <Eye className="size-3" /> Visualisation du SMS envoyé :
+                                        </p>
+                                        <div className="p-3 bg-muted/30 rounded-xl border-2 italic text-[10px] font-medium leading-relaxed text-slate-600">
+                                            "{smsPreview}"
+                                        </div>
+                                    </div>
+
+                                    <Button onClick={handleSaveSmsSettings} className="w-full h-12 font-black uppercase text-[10px] tracking-widest gap-2 shadow-md">
+                                        <Save className="size-4" /> Enregistrer mes réglages SMS
+                                    </Button>
+                                </div>
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
                 </div>
               )}
             </div>
