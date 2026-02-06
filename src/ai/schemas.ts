@@ -1,17 +1,18 @@
 import { z } from 'zod';
 
 // Schemas for find-best-fishing-day flow
+// Making fields optional/default to prevent crashes on old or incomplete data
 export const FishingSpotContextSchema = z.object({
-  timestamp: z.string(),
-  moonPhase: z.string(),
-  tideHeight: z.number(),
-  tideMovement: z.string(),
-  tideCurrent: z.string(),
-  weatherCondition: z.string(),
-  windSpeed: z.number(),
-  windDirection: z.string(),
-  airTemperature: z.number(),
-  waterTemperature: z.number(),
+  timestamp: z.string().optional().default(() => new Date().toISOString()),
+  moonPhase: z.string().optional().default('Inconnue'),
+  tideHeight: z.number().optional().default(0.5),
+  tideMovement: z.string().optional().default('étale'),
+  tideCurrent: z.string().optional().default('Nul'),
+  weatherCondition: z.string().optional().default('Clair'),
+  windSpeed: z.number().optional().default(5),
+  windDirection: z.string().optional().default('E'),
+  airTemperature: z.number().optional().default(25),
+  waterTemperature: z.number().optional().default(24),
   swellInside: z.string().optional(),
   swellOutside: z.string().optional(),
   closestLowTide: z.object({ time: z.string(), height: z.number() }).optional(),
@@ -35,7 +36,7 @@ export type AnalyzeBestDayInput = z.infer<typeof AnalyzeBestDayInputSchema>;
 export const FishingAnalysisOutputSchema = z.object({
   bestDate: z.string().describe('The best date found in YYYY-MM-DD format.'),
   explanation: z.string().describe("A detailed explanation of why this date was chosen, comparing the key factors."),
-  score: z.number().describe("A confidence score from 0 to 100 on how good the match is."),
+  score: z.coerce.number().describe("A confidence score from 0 to 100 on how good the match is."),
 });
 export type FishingAnalysisOutput = z.infer<typeof FishingAnalysisOutputSchema>;
 
@@ -130,7 +131,7 @@ export const RecommendBestSpotOutputSchema = z.object({
   bestSpotId: z.string(),
   bestSpotName: z.string(),
   reason: z.string().describe("Why this spot is recommended for current conditions."),
-  confidence: z.number().describe("Score from 0 to 100."),
+  confidence: z.coerce.number().describe("Score from 0 to 100."),
   advice: z.string().describe("Specific tactical advice for this spot right now.")
 });
 export type RecommendBestSpotOutput = z.infer<typeof RecommendBestSpotOutputSchema>;

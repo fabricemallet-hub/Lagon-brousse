@@ -35,6 +35,7 @@ export async function analyzeBestDay(input: AnalyzeBestDayInput): Promise<Fishin
 // Helper to generate future data
 function getFutureForecasts(location: string, searchRangeDays: number): { date: string, data: LocationData }[] {
   const forecasts = [];
+  // Use current UTC date to start generation safely
   const today = new Date();
   for (let i = 1; i <= searchRangeDays; i++) {
     const futureDate = addDays(today, i);
@@ -96,7 +97,7 @@ TA MISSION:
 4. Attribue un score de confiance de 0 à 100.
 5. Fournis une explication claire et concise, en comparant les facteurs clés (marée/lune) qui justifient ton choix.
 
-Réponds uniquement au format JSON requis.`,
+RÉPONDS UNIQUEMENT AU FORMAT JSON. N'ajoute aucun texte avant ou après le JSON.`,
 });
 
 const findSimilarDayFlow = ai.defineFlow(
@@ -111,12 +112,13 @@ const findSimilarDayFlow = ai.defineFlow(
 
     const promptData = {
       spotContext: input.spotContext,
-      pastDate: format(new Date(input.spotContext.timestamp), 'eeee d MMMM yyyy', { locale: fr }),
+      pastDate: input.spotContext.timestamp ? format(new Date(input.spotContext.timestamp), 'eeee d MMMM yyyy', { locale: fr }) : 'Date inconnue',
       futureForecasts: formattedForecasts,
     };
     
     const { output } = await findSimilarDayPrompt(promptData);
-    return output!;
+    if (!output) throw new Error("L'IA n'a pas pu générer de réponse.");
+    return output;
   }
 );
 
@@ -156,7 +158,7 @@ TA MISSION:
 5. Attribue un score de confiance de 0 à 100 pour ta prédiction.
 6. Fournis une explication claire : commence par la synthèse des tendances (marée/lune), puis justifie ton choix du meilleur jour futur.
 
-Réponds uniquement au format JSON requis.`,
+RÉPONDS UNIQUEMENT AU FORMAT JSON. N'ajoute aucun texte avant ou après le JSON.`,
 });
 
 const analyzeBestDayFlow = ai.defineFlow(
@@ -170,7 +172,8 @@ const analyzeBestDayFlow = ai.defineFlow(
       const formattedForecasts = futureForecasts.map(formatForecastForPrompt).join('');
   
       const formattedPastContexts = input.spotContexts.map(ctx => {
-        return `- Prise le ${format(new Date(ctx.timestamp), 'd MMM', {locale: fr})}: Marée ${ctx.tideMovement}, Lune ${ctx.moonPhase}.`;
+        const dateStr = ctx.timestamp ? format(new Date(ctx.timestamp), 'd MMM', {locale: fr}) : 'Inconnue';
+        return `- Prise le ${dateStr}: Marée ${ctx.tideMovement}, Lune ${ctx.moonPhase}.`;
       }).join('\n');
 
       const promptData = {
@@ -179,6 +182,7 @@ const analyzeBestDayFlow = ai.defineFlow(
       };
       
       const { output } = await analyzeBestDayPrompt(promptData);
-      return output!;
+      if (!output) throw new Error("L'IA n'a pas pu analyser les données.");
+      return output;
     }
   );
