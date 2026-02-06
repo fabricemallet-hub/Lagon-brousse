@@ -173,32 +173,6 @@ export function VesselTracker() {
     if (userProfile?.lastVesselId && !customSharingId) setCustomSharingId(userProfile.lastVesselId);
   }, [userProfile]);
 
-  const handleSaveVessel = async () => {
-    if (!user || !firestore || !sharingId) return;
-    try {
-        const currentSaved = userProfile?.savedVesselIds || [];
-        if (!currentSaved.includes(sharingId)) {
-            await updateDoc(doc(firestore, 'users', user.uid), {
-                savedVesselIds: [...currentSaved, sharingId],
-                lastVesselId: sharingId
-            });
-            toast({ title: "Navire enregistré" });
-        } else {
-            await updateDoc(doc(firestore, 'users', user.uid), { lastVesselId: sharingId });
-            toast({ title: "ID mis à jour" });
-        }
-    } catch (e) { console.error(e); }
-  };
-
-  const handleRemoveSavedVessel = async (id: string) => {
-    if (!user || !firestore || !userProfile) return;
-    try {
-        const next = (userProfile.savedVesselIds || []).filter(v => v !== id);
-        await updateDoc(doc(firestore, 'users', user.uid), { savedVesselIds: next });
-        toast({ title: "Navire effacé" });
-    } catch (e) { console.error(e); }
-  };
-
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
     
@@ -276,12 +250,14 @@ export function VesselTracker() {
     toast({ title: "Suivi activé", description: `Connexion au navire ${cleanId}...` });
   };
 
+  // Logique de l'historique universelle
   useEffect(() => {
-    if (!remoteVessel || !activeVesselId) return;
+    const vesselData = mode === 'sender' ? (isSharing ? { ...displayVessel, lastActive: new Date() } : null) : remoteVessel;
+    if (!vesselData || !activeVesselId) return;
     
-    const isSharingActive = remoteVessel.isSharing === true;
-    const currentStatus = isSharingActive ? (remoteVessel.status || 'moving') : 'offline';
-    const statusTime = remoteVessel.statusChangedAt || remoteVessel.lastActive;
+    const isSharingActive = mode === 'sender' ? isSharing : (vesselData as VesselStatus).isSharing === true;
+    const currentStatus = isSharingActive ? (vesselData.status || 'moving') : 'offline';
+    const statusTime = (vesselData as VesselStatus).statusChangedAt || (vesselData as VesselStatus).lastActive;
     
     const getTimeMillis = (t: any) => {
         if (!t) return 0;
@@ -297,7 +273,7 @@ export function VesselTracker() {
     const statusChanged = lastStatusRef.current !== currentStatus;
     const timestampUpdated = timeKey > 0 && lastUpdateRef.current !== timeKey;
 
-    if (statusChanged || timestampUpdated || history.length === 0) {
+    if (statusChanged || timestampUpdated || (history.length === 0 && isSharingActive)) {
       const statusLabels: Record<string, string> = { 
         moving: 'EN MOUVEMENT', 
         stationary: 'AU MOUILLAGE', 
@@ -310,8 +286,8 @@ export function VesselTracker() {
       const displayLabel = history.length === 0 ? `CONNEXION - ${label}` : label;
       
       const pos = { 
-        lat: remoteVessel.location?.latitude || INITIAL_CENTER.lat, 
-        lng: remoteVessel.location?.longitude || INITIAL_CENTER.lng 
+        lat: vesselData.location?.latitude || (currentPos?.lat ?? INITIAL_CENTER.lat), 
+        lng: vesselData.location?.longitude || (currentPos?.lng ?? INITIAL_CENTER.lng) 
       };
 
       setHistory(prev => {
@@ -335,9 +311,9 @@ export function VesselTracker() {
     }
 
     if (mode === 'receiver') {
-        if (remoteVessel.batteryLevel !== undefined && remoteVessel.batteryLevel <= 5 && !remoteVessel.isCharging) {
+        if (vesselData.batteryLevel !== undefined && vesselData.batteryLevel <= 5 && !vesselData.isCharging) {
             if (!batteryAlertTriggered.current) {
-                toast({ variant: "destructive", title: "BATTERIE CRITIQUE", description: `L'émetteur n'a plus que ${remoteVessel.batteryLevel}% !` });
+                toast({ variant: "destructive", title: "BATTERIE CRITIQUE", description: `L'émetteur n'a plus que ${vesselData.batteryLevel}% !` });
                 playVesselSound('alerte');
                 batteryAlertTriggered.current = true;
             }
@@ -354,7 +330,7 @@ export function VesselTracker() {
             }
         }
     }
-  }, [remoteVessel, mode, vesselPrefs, playVesselSound, toast, activeVesselId, history.length]);
+  }, [remoteVessel, isSharing, mode, vesselPrefs, playVesselSound, toast, activeVesselId, history.length, currentPos]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
@@ -367,7 +343,6 @@ export function VesselTracker() {
         setCurrentPos(newPos);
         if (shouldPanOnNextFix.current && map) { map.panTo(newPos); map.setZoom(15); shouldPanOnNextFix.current = false; }
         
-        // La détection automatique ne tourne que si on n'est pas en mode manuel (Retour ou Home)
         if (vesselStatus !== 'returning' && vesselStatus !== 'landed') {
             if (!anchorPos) { 
               setAnchorPos(newPos); 
@@ -385,7 +360,6 @@ export function VesselTracker() {
               }
             }
         } else {
-            // En mode manuel, on met quand même à jour la position GPS
             updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng } });
         }
       },
