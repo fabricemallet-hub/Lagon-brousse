@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -55,6 +54,7 @@ import type { FishRating, Tide } from '@/lib/types';
 import { CrabIcon, LobsterIcon, OctopusIcon } from '../icons';
 import { Skeleton } from './skeleton';
 import { Badge } from './badge';
+import { ScrollArea } from './scroll-area';
 
 export const MoonPhaseIcon = ({
   phase,
@@ -81,9 +81,9 @@ const RatingStars = ({ rating }: { rating: number }) => {
   const emptyStars = 5 - fullStars - (halfStar ? 1 : 0);
   return (
     <div className="flex items-center">
-      {[...Array(fullStars)].map((_, i) => <Star key={`full-${i}`} className="h-3 w-3 fill-yellow-400 text-yellow-400" />)}
-      {halfStar && <Star key="half" className="h-3 w-3 fill-yellow-400 text-yellow-400" style={{ clipPath: 'polygon(0 0, 50% 0, 50% 100%, 0 100%)' }} />}
-      {[...Array(emptyStars)].map((_, i) => <Star key={`empty-${i}`} className="h-3 w-3 text-gray-300" />)}
+      {[...Array(fullStars)].map((_, i) => <Star key={`full-${i}`} className="size-3 fill-yellow-400 text-yellow-400" />)}
+      {halfStar && <Star key="half" className="size-3 fill-yellow-400 text-yellow-400" style={{ clipPath: 'polygon(0 0, 50% 0, 50% 100%, 0 100%)' }} />}
+      {[...Array(emptyStars)].map((_, i) => <Star key={`empty-${i}`} className="size-3 text-gray-300" />)}
     </div>
   );
 };
@@ -247,9 +247,9 @@ export function LunarCalendar() {
       <div className="w-full overflow-x-auto pb-4 scrollbar-hide" ref={scrollContainerRef}>
         <div className="w-[1200px] border rounded-lg bg-card shadow-lg overflow-hidden flex flex-col shrink-0">
           <div className="flex justify-between items-center p-4 border-b bg-muted/10">
-            <Button variant="ghost" size="icon" className="h-10 w-10" onClick={handlePrevMonth}><ChevronLeft className="size-6" /></Button>
+            <Button variant="ghost" size="icon" className="size-10" onClick={handlePrevMonth}><ChevronLeft className="size-6" /></Button>
             <h2 className="text-lg font-black uppercase tracking-tighter capitalize">{format(displayDate, 'MMMM yyyy', { locale: fr })}</h2>
-            <Button variant="ghost" size="icon" className="h-10 w-10" onClick={handleNextMonth}><ChevronRight className="size-6" /></Button>
+            <Button variant="ghost" size="icon" className="size-10" onClick={handleNextMonth}><ChevronRight className="size-6" /></Button>
           </div>
           
           <div className="grid grid-cols-7 bg-muted/30 border-b">
@@ -325,12 +325,14 @@ export function LunarCalendar() {
             </DialogClose>
           </DialogHeader>
           
-          <div className="flex-grow p-6 overflow-y-auto bg-slate-50/50">
-            {calendarView === 'peche' 
-              ? (detailedDay && <PecheDetailDialogContent day={detailedDay} location={selectedLocation} />)
-              : (detailedDay && <ChampsDetailDialogContent day={detailedDay} location={selectedLocation} />)
-            }
-          </div>
+          <ScrollArea className="flex-grow bg-slate-50/50">
+            <div className="p-6 pb-24">
+              {calendarView === 'peche' 
+                ? (detailedDay && <PecheDetailDialogContent day={detailedDay} location={selectedLocation} />)
+                : (detailedDay && <ChampsDetailDialogContent day={detailedDay} location={selectedLocation} />)
+              }
+            </div>
+          </ScrollArea>
 
           <DialogFooter className="p-4 bg-white border-t shrink-0">
             <DialogClose asChild>

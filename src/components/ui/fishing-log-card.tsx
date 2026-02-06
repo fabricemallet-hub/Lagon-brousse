@@ -50,8 +50,8 @@ const fishingTypes = [
 
 const PulsingDot = () => (
     <div className="absolute" style={{ transform: 'translate(-50%, -50%)' }}>
-      <div className="w-5 h-5 rounded-full bg-blue-500 opacity-75 animate-ping absolute"></div>
-      <div className="w-5 h-5 rounded-full bg-blue-500 border-2 border-white relative"></div>
+      <div className="size-5 rounded-full bg-blue-500 opacity-75 animate-ping absolute"></div>
+      <div className="size-5 rounded-full bg-blue-500 border-2 border-white relative"></div>
     </div>
 );
 
@@ -413,7 +413,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                 <CardHeader><CardTitle className="flex items-center gap-2"><MapIcon /> Carnet de Pêche</CardTitle></CardHeader>
                 <CardContent>
                     <Alert>
-                        <AlertCircle className="h-4 w-4" />
+                        <AlertCircle className="size-4" />
                         <AlertTitle>Connexion requise</AlertTitle>
                         <AlertDescription>Sauvegardez vos meilleurs coins de pêche et consultez votre historique.</AlertDescription>
                     </Alert>
@@ -490,7 +490,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                             )}
                         </GoogleMap>
                         <Button size="icon" onClick={() => setIsFullscreen(!isFullscreen)} className="absolute top-2 left-2 shadow-lg h-9 w-9 z-10 bg-background/80 backdrop-blur-sm">
-                            {isFullscreen ? <Shrink className="h-5 w-5" /> : <Expand className="h-5 w-5" />}
+                            {isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}
                         </Button>
                         <Button 
                             onClick={handleRecenter} 
@@ -602,7 +602,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                             </p>
                                                         </div>
                                                     </div>
-                                                    <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 opacity-30" />
+                                                    <ChevronDown className="size-4 shrink-0 transition-transform duration-200 opacity-30" />
                                                 </AccordionPrimitive.Trigger>
                                             </AccordionPrimitive.Header>
                                        </div>
@@ -654,7 +654,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                     </DialogHeader>
                     
                     <ScrollArea className="flex-grow">
-                        <div className="p-6 py-2 space-y-4 pb-20">
+                        <div className="p-6 py-2 space-y-4 pb-24">
                             <div className="space-y-2">
                                 <Label htmlFor="spot-name" className="text-xs font-bold uppercase text-muted-foreground">Nom du spot</Label>
                                 <Input id="spot-name" placeholder="Ex: Spot à bec de cane" value={spotName} onChange={(e) => setSpotName(e.target.value)} className="h-12 border-2 font-bold" />
@@ -699,7 +699,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                 <Label className="text-xs font-bold uppercase text-muted-foreground">Couleur</Label>
                                 <div className="flex flex-wrap gap-3">
                                     {availableColors.map(color => (
-                                        <button key={color} onClick={() => setSelectedColor(color)} className={cn("w-10 h-10 rounded-full border-4 transition-all shadow-sm", selectedColor === color ? "border-white ring-2 ring-primary scale-110" : "border-transparent opacity-80")} style={{ backgroundColor: color }} />
+                                        <button key={color} onClick={() => setSelectedColor(color)} className={cn("size-10 rounded-full border-4 transition-all shadow-sm", selectedColor === color ? "border-white ring-2 ring-primary scale-110" : "border-transparent opacity-80")} style={{ backgroundColor: color }} />
                                     ))}
                                 </div>
                             </div>
@@ -719,7 +719,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         <DialogTitle className="flex items-center gap-2 font-black uppercase"><BrainCircuit className="text-primary" /> Analyse de l'IA</DialogTitle>
                     </DialogHeader>
                     <ScrollArea className="flex-grow">
-                        <div className="p-6 py-4 space-y-4 pb-10">
+                        <div className="p-6 py-4 space-y-4 pb-24">
                             {isAnalyzing ? (
                                 <div className="flex flex-col items-center justify-center py-10 space-y-4">
                                     <BrainCircuit className="size-12 text-primary animate-pulse" />
@@ -754,7 +754,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                     </DialogHeader>
                     
                     <ScrollArea className="flex-grow">
-                        <div className="p-4 sm:p-6 py-4 space-y-6 pb-12">
+                        <div className="p-4 sm:p-6 py-4 space-y-6 pb-24">
                             {isAnalyzing ? (
                                 <div className="flex flex-col items-center justify-center py-10 space-y-4">
                                     <BrainCircuit className="size-12 text-primary animate-pulse" />
