@@ -403,8 +403,8 @@ export default function SemisPage() {
             </DialogTitle>
           </DialogHeader>
 
-          <ScrollArea className="flex-grow bg-slate-50/50">
-            <div className="p-6 pt-4 space-y-6 pb-24">
+          <ScrollArea className="flex-grow min-h-0 bg-slate-50/50">
+            <div className="p-6 pt-4 space-y-6 pb-32">
               {!aiAdvice ? (
                 <div className="space-y-6">
                   <div className="space-y-2">

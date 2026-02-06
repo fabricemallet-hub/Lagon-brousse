@@ -653,8 +653,8 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         <DialogTitle className="font-black uppercase tracking-tight">{dialogMode === 'add' ? 'Nouveau spot' : 'Modifier le spot'}</DialogTitle>
                     </DialogHeader>
                     
-                    <ScrollArea className="flex-grow">
-                        <div className="p-6 py-2 space-y-4 pb-24">
+                    <ScrollArea className="flex-grow min-h-0">
+                        <div className="p-6 py-2 space-y-4 pb-32">
                             <div className="space-y-2">
                                 <Label htmlFor="spot-name" className="text-xs font-bold uppercase text-muted-foreground">Nom du spot</Label>
                                 <Input id="spot-name" placeholder="Ex: Spot à bec de cane" value={spotName} onChange={(e) => setSpotName(e.target.value)} className="h-12 border-2 font-bold" />
@@ -718,8 +718,8 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                     <DialogHeader className="p-6 pb-2 shrink-0">
                         <DialogTitle className="flex items-center gap-2 font-black uppercase"><BrainCircuit className="text-primary" /> Analyse de l'IA</DialogTitle>
                     </DialogHeader>
-                    <ScrollArea className="flex-grow">
-                        <div className="p-6 py-4 space-y-4 pb-24">
+                    <ScrollArea className="flex-grow min-h-0">
+                        <div className="p-6 py-4 space-y-4 pb-32">
                             {isAnalyzing ? (
                                 <div className="flex flex-col items-center justify-center py-10 space-y-4">
                                     <BrainCircuit className="size-12 text-primary animate-pulse" />
@@ -753,8 +753,8 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         <DialogDescription className="text-[9px] sm:text-[10px] uppercase font-bold">Analyse basée sur votre GPS, la marée et la lune actuelle</DialogDescription>
                     </DialogHeader>
                     
-                    <ScrollArea className="flex-grow">
-                        <div className="p-4 sm:p-6 py-4 space-y-6 pb-24">
+                    <ScrollArea className="flex-grow min-h-0">
+                        <div className="p-4 sm:p-6 py-4 space-y-6 pb-32">
                             {isAnalyzing ? (
                                 <div className="flex flex-col items-center justify-center py-10 space-y-4">
                                     <BrainCircuit className="size-12 text-primary animate-pulse" />

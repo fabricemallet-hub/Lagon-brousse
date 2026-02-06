@@ -325,8 +325,8 @@ export function LunarCalendar() {
             </DialogClose>
           </DialogHeader>
           
-          <ScrollArea className="flex-grow bg-slate-50/50">
-            <div className="p-6 pb-24">
+          <ScrollArea className="flex-grow min-h-0 bg-slate-50/50">
+            <div className="p-6 pb-32">
               {calendarView === 'peche' 
                 ? (detailedDay && <PecheDetailDialogContent day={detailedDay} location={selectedLocation} />)
                 : (detailedDay && <ChampsDetailDialogContent day={detailedDay} location={selectedLocation} />)
