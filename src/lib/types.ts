@@ -174,6 +174,7 @@ export interface UserAccount {
     watchType: 'moving' | 'stationary' | 'offline';
     watchDuration: number;
     watchSound: string;
+    batteryThreshold?: number;
   };
 }
 

@@ -40,7 +40,8 @@ import {
   Ship,
   Home,
   RefreshCw,
-  Settings
+  Settings,
+  Battery
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -103,14 +104,16 @@ export function VesselTracker() {
     isWatchEnabled: false,
     watchType: 'stationary',
     watchDuration: 15,
-    watchSound: 'alerte'
+    watchSound: 'alerte',
+    batteryThreshold: 20
   });
   
   const [history, setHistory] = useState<{ vesselName: string, statusLabel: string, time: Date, pos: google.maps.LatLngLiteral }[]>([]);
   const lastStatusesRef = useRef<Record<string, string>>({});
   const lastUpdatesRef = useRef<Record<string, number>>({});
   const lastSentStatusRef = useRef<string | null>(null);
-  const watchTriggeredRef = useRef<Record<string, boolean>>({});
+  const lastBatteryLevelsRef = useRef<Record<string, number>>({});
+  const lastChargingStatesRef = useRef<Record<string, boolean>>({});
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
@@ -268,6 +271,8 @@ export function VesselTracker() {
         const isSharingActive = vessel.isSharing === true;
         const currentStatus = isSharingActive ? (vessel.status || 'moving') : 'offline';
         const statusTime = vessel.statusChangedAt || vessel.lastActive;
+        const currentBattery = vessel.batteryLevel ?? 100;
+        const currentCharging = vessel.isCharging ?? false;
         
         const getTimeMillis = (t: any) => {
             if (!t) return 0;
@@ -282,33 +287,41 @@ export function VesselTracker() {
         
         const lastStatus = lastStatusesRef.current[vessel.id];
         const lastUpdate = lastUpdatesRef.current[vessel.id] || 0;
+        const lastBattery = lastBatteryLevelsRef.current[vessel.id] ?? 100;
+        const lastCharging = lastChargingStatesRef.current[vessel.id] ?? false;
         
         const statusChanged = lastStatus !== currentStatus;
         const timestampUpdated = timeKey > lastUpdate;
+        const batteryDroppedUnderThreshold = lastBattery >= (vesselPrefs.batteryThreshold || 20) && currentBattery < (vesselPrefs.batteryThreshold || 20);
+        const chargingStateChanged = lastCharging !== currentCharging;
 
-        if (statusChanged || timestampUpdated) {
-            const statusLabels: Record<string, string> = { 
-                moving: 'EN MOUVEMENT', 
-                stationary: 'AU MOUILLAGE', 
-                offline: 'SIGNAL PERDU',
-                returning: 'RETOUR MAISON',
-                landed: 'À TERRE (HOME)'
-            };
-            
-            const label = vessel.eventLabel || statusLabels[currentStatus] || currentStatus;
-            const pos = { 
-                lat: vessel.location?.latitude || INITIAL_CENTER.lat, 
-                lng: vessel.location?.longitude || INITIAL_CENTER.lng 
-            };
+        const pos = { 
+            lat: vessel.location?.latitude || INITIAL_CENTER.lat, 
+            lng: vessel.location?.longitude || INITIAL_CENTER.lng 
+        };
 
+        const statusLabels: Record<string, string> = { 
+            moving: 'EN MOUVEMENT', 
+            stationary: 'AU MOUILLAGE', 
+            offline: 'SIGNAL PERDU',
+            returning: 'RETOUR MAISON',
+            landed: 'À TERRE (HOME)'
+        };
+
+        const addToHistory = (label: string) => {
             setHistory(prev => {
                 const alreadyAdded = prev.length > 0 && 
                                    prev[0].statusLabel === label && 
                                    prev[0].vesselName === vessel.displayName && 
-                                   Math.abs(prev[0].time.getTime() - timeKey) < 2000;
+                                   Math.abs(prev[0].time.getTime() - Date.now()) < 2000;
                 if (alreadyAdded) return prev;
-                return [{ vesselName: vessel.displayName, statusLabel: label, time: new Date(timeKey), pos }, ...prev].slice(0, 50);
+                return [{ vesselName: vessel.displayName, statusLabel: label, time: new Date(), pos }, ...prev].slice(0, 50);
             });
+        };
+
+        if (statusChanged || timestampUpdated) {
+            const label = vessel.eventLabel || statusLabels[currentStatus] || currentStatus;
+            addToHistory(label);
             
             if (mode === 'receiver' && lastStatus && statusChanged && vesselPrefs.isNotifyEnabled) {
                 const soundKey = (currentStatus === 'returning' || currentStatus === 'landed') ? 'moving' : currentStatus;
@@ -317,10 +330,28 @@ export function VesselTracker() {
                     toast({ title: vessel.displayName, description: `Changement d'état : ${label.toLowerCase()}` });
                 }
             }
-            
             lastStatusesRef.current[vessel.id] = currentStatus;
             lastUpdatesRef.current[vessel.id] = timeKey;
         }
+
+        if (batteryDroppedUnderThreshold) {
+            addToHistory(`BATTERIE FAIBLE (${currentBattery}%)`);
+            if (mode === 'receiver' && vesselPrefs.isNotifyEnabled) {
+                playVesselSound('alerte');
+                toast({ variant: 'destructive', title: "Batterie Critique", description: `${vessel.displayName} : ${currentBattery}%` });
+            }
+        }
+
+        if (chargingStateChanged) {
+            const label = currentCharging ? "BATTERIE EN CHARGE" : "DÉCONNECTÉ DU SECTEUR";
+            addToHistory(label);
+            if (mode === 'receiver' && vesselPrefs.isNotifyEnabled) {
+                playVesselSound('sonar');
+            }
+        }
+
+        lastBatteryLevelsRef.current[vessel.id] = currentBattery;
+        lastChargingStatesRef.current[vessel.id] = currentCharging;
     });
   }, [followedVessels, mode, vesselPrefs, playVesselSound, toast]);
 
@@ -581,6 +612,21 @@ export function VesselTracker() {
                         </Select>
                       </div>
                     </div>
+
+                    <div className="space-y-4 p-4 border-2 rounded-2xl bg-red-50/30 border-red-100">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label className="text-xs font-black uppercase text-red-800">Seuil Batterie Faible</Label>
+                          <p className="text-[9px] font-bold text-red-600/60 uppercase">Alerte journal de bord</p>
+                        </div>
+                        <Badge variant="outline" className="font-black">{vesselPrefs.batteryThreshold || 20}%</Badge>
+                      </div>
+                      <Slider 
+                        value={[vesselPrefs.batteryThreshold || 20]} 
+                        min={5} max={50} step={5}
+                        onValueChange={v => saveVesselPrefs({ ...vesselPrefs, batteryThreshold: v[0] })} 
+                      />
+                    </div>
                   </AccordionContent>
                 </AccordionItem>
               </Accordion>
@@ -642,6 +688,8 @@ export function VesselTracker() {
                                             <span className="font-black text-primary">{h.vesselName}</span>
                                             <span className={cn("font-black uppercase", 
                                                 h.statusLabel.includes('ERREUR') ? 'text-orange-600' :
+                                                h.statusLabel.includes('FAIBLE') ? 'text-red-600' :
+                                                h.statusLabel.includes('CHARGE') ? 'text-green-600' :
                                                 h.statusLabel.includes('MOUILLAGE') ? 'text-orange-600' : 
                                                 h.statusLabel.includes('MOUVEMENT') ? 'text-blue-600' : 
                                                 h.statusLabel.includes('RETOUR') ? 'text-indigo-600' :
