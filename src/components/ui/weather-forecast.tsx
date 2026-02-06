@@ -163,15 +163,23 @@ export function WeatherForecast({
     if (isClient && isToday && scrollRef.current) {
         if (hasCenteredForHour.current !== currentHour) {
             const container = scrollRef.current;
-            const element = container.querySelector(`[data-hour="${currentHour}"]`) as HTMLElement;
-            if (element) {
-                const scrollLeft = element.offsetLeft - (container.clientWidth / 2) + (element.clientWidth / 2);
-                container.scrollTo({ 
-                  left: scrollLeft, 
-                  behavior: hasCenteredForHour.current === null ? 'auto' : 'smooth' 
-                });
-                hasCenteredForHour.current = currentHour;
-            }
+            // Use requestAnimationFrame to avoid Forced Reflow violations
+            const frameId = requestAnimationFrame(() => {
+                const element = container.querySelector(`[data-hour="${currentHour}"]`) as HTMLElement;
+                if (element) {
+                    const containerWidth = container.clientWidth;
+                    const elementWidth = element.clientWidth;
+                    const elementLeft = element.offsetLeft;
+                    
+                    const scrollLeft = elementLeft - (containerWidth / 2) + (elementWidth / 2);
+                    container.scrollTo({ 
+                      left: scrollLeft, 
+                      behavior: hasCenteredForHour.current === null ? 'auto' : 'smooth' 
+                    });
+                    hasCenteredForHour.current = currentHour;
+                }
+            });
+            return () => cancelAnimationFrame(frameId);
         }
     } else if (!isToday) {
         hasCenteredForHour.current = null;
@@ -267,7 +275,7 @@ export function WeatherForecast({
                   <p className="text-[9px] font-black uppercase opacity-60">nds</p>
                 </div>
                 
-                <div className={cn("border-t w-full my-1", isCurrent ? "border-white/30" : "border-border")}></div>
+                <div className={cn("border-t w-full mt-1", isCurrent ? "border-white/30" : "border-border")}></div>
 
                 <div className="w-full space-y-1.5">
                   <div className={cn("flex items-center justify-center", isCurrent ? "text-white" : "text-primary")}>

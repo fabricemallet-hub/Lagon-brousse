@@ -1,4 +1,3 @@
-
 'use client';
 import {
   Sidebar,
@@ -94,15 +93,16 @@ const UsageTimer = React.memo(({ status, auth, userId }: { status: string, auth:
     }
 
     const interval = setInterval(() => {
+      const now = Date.now();
+      
       setTimeLeft(prev => {
         const next = Math.max(0, prev - 1);
         const used = USAGE_LIMIT_SECONDS - next;
         
-        // Optimisation : On ne met à jour le localStorage que toutes les 5 secondes 
-        // ou si on arrive à la fin pour réduire la charge processeur (Forced Reflow)
-        if (Date.now() - lastSyncRef.current > 5000 || next === 0) {
+        // Optimisation : Sync localStorage only every 10 seconds or at the end
+        if (now - lastSyncRef.current > 10000 || next === 0) {
           localStorage.setItem('dailyUsage', String(used));
-          lastSyncRef.current = Date.now();
+          lastSyncRef.current = now;
         }
         
         if (next <= 0) {

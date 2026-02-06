@@ -7,20 +7,24 @@ import { LocationProvider } from '@/context/location-context';
 import { DateProvider } from '@/context/date-context';
 import { CalendarViewProvider } from '@/context/calendar-view-context';
 import './globals.css';
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useRef } from 'react';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { GoogleMapsProvider } from '@/context/google-maps-context';
 
 function AppContent({ children }: { children: React.ReactNode }) {
+  const swRegisteredRef = useRef(false);
+
   useEffect(() => {
-    // Enregistrement optimisé du Service Worker
-    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+    // Enregistrement unique du Service Worker
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator && !swRegisteredRef.current) {
+      swRegisteredRef.current = true;
       navigator.serviceWorker.register('/sw.js', { scope: '/' })
         .then((registration) => {
-          console.log('L&B NC: Service Worker actif (scope:', registration.scope, ')');
+          console.log('L&B NC: Service Worker actif');
         })
         .catch((err) => {
           console.error('L&B NC: Erreur SW:', err);
+          swRegisteredRef.current = false;
         });
     }
   }, []);
@@ -58,8 +62,7 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap"
           rel="stylesheet"
         />
-        {/* Suppression de maximum-scale=1 et user-scalable=0 pour autoriser le zoom */}
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link rel="icon" href="/icon-192x192.png" />
         <link rel="apple-touch-icon" href="/icon-192x192.png" />
         <link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />
@@ -67,7 +70,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="theme-color" content="#3b82f6" />
       </head>
-      <body className={cn('font-body antialiased', 'min-h-screen bg-background font-sans')}>
+      <body className={cn('font-body antialiased', 'min-h-screen bg-background font-sans overflow-x-hidden')}>
         <Suspense fallback={null}>
          <AppContent>{children}</AppContent>
         </Suspense>
