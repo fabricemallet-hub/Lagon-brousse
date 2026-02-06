@@ -74,7 +74,9 @@ import {
   User as UserIcon,
   MessageSquare,
   RotateCcw,
-  AlertCircle
+  AlertCircle,
+  Expand,
+  Shrink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -99,30 +101,6 @@ const defaultVesselSounds = [
   { id: 'alerte', label: 'Alerte Urgence', url: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' },
   { id: 'cloche', label: 'Cloche Classique', url: 'https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3' },
   { id: 'sonar', label: 'Ping Sonar', url: 'https://assets.mixkit.co/active_storage/sfx/2564/2564-preview.mp3' },
-];
-
-const PREDEFINED_MESSAGES = [
-  {
-    category: "1. DÉTRESSE VITALE",
-    urgency: "critical",
-    color: "text-red-600",
-    btnBorder: "border-red-200",
-    btnHover: "hover:bg-red-50",
-    messages: [
-      { id: 'voie_eau', label: "VOIE D'EAU", text: "MAYDAY - Voie d'eau importante à bord." },
-      { id: 'homme_mer', label: "HOMME À LA MER", text: "MAYDAY - Homme à la mer." },
-    ]
-  },
-  {
-    category: "3. PANNE ET ASSISTANCE",
-    urgency: "medium",
-    color: "text-amber-600",
-    btnBorder: "border-orange-200",
-    btnHover: "hover:bg-amber-50",
-    messages: [
-      { id: 'panne', label: "PANNE MOTEUR", text: "PAN PAN - Panne moteur totale. Navire à la dérive." },
-    ]
-  }
 ];
 
 const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
@@ -151,8 +129,7 @@ export function VesselTracker() {
   const [vesselNickname, setVesselNickname] = useState('');
   const [vesselHistory, setVesselHistory] = useState<string[]>([]);
   const [customSmsMessage, setCustomSmsMessage] = useState('');
-  const [isQuickMsgOpen, setIsQuickMsgOpen] = useState(false);
-  const [isSmsConfirmOpen, setIsSmsConfirmOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const [isNotifyEnabled, setIsNotifyEnabled] = useState(false);
   const [vesselVolume, setVesselVolume] = useState(0.8);
@@ -164,25 +141,16 @@ export function VesselTracker() {
   const [watchType, setWatchType] = useState<'moving' | 'stationary' | 'offline'>('stationary');
   const [watchDuration, setWatchDuration] = useState(15);
   const [watchSound, setWatchSound] = useState('alerte');
-  const [isWatchAlerting, setIsWatchAlerting] = useState(false);
   const [statusStartTime, setStatusStartTime] = useState<number | null>(null);
   const [elapsedString, setElapsedString] = useState<string>('0s');
 
   const [currentPos, setCurrentPos] = useState<google.maps.LatLngLiteral | null>(null);
   const [anchorPos, setAnchorPos] = useState<google.maps.LatLngLiteral | null>(null);
-  const [lastMovementTime, setLastMovementTime] = useState<number>(Date.now());
   const [vesselStatus, setVesselStatus] = useState<'moving' | 'stationary'>('moving');
   const [lastValidLocation, setLastValidLocation] = useState<{lat: number, lng: number} | null>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [wakeLock, setWakeLock] = useState<any>(null);
-  const [batteryLevel, setBatteryLevel] = useState<number>(1);
-  const [isCharging, setIsCharging] = useState<boolean>(false);
-  const [initialCenterDone, setInitialCenterDone] = useState(false);
   
   const watchIdRef = useRef<number | null>(null);
-  const lastFirestoreUpdateRef = useRef<number>(0);
-  const statusCheckTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const historyDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
   const activeVesselId = useMemo(() => mode === 'sender' ? sharingId : vesselIdToFollow.trim().toUpperCase(), [mode, sharingId, vesselIdToFollow]);
@@ -217,12 +185,6 @@ export function VesselTracker() {
     return doc(firestore, 'vessels', activeVesselId);
   }, [firestore, activeVesselId]);
   const { data: remoteVessel } = useDoc<VesselStatus>(vesselRef);
-
-  const historyQuery = useMemoFirebase(() => {
-    if (!firestore || !activeVesselId) return null;
-    return query(collection(firestore, 'vessels', activeVesselId, 'history'), orderBy('timestamp', 'desc'));
-  }, [firestore, activeVesselId]);
-  const { data: remoteHistory } = useCollection<StatusEvent>(historyQuery);
 
   const currentEffectiveStatus = useMemo(() => {
     if (mode === 'sender') {
@@ -310,6 +272,13 @@ export function VesselTracker() {
     toast({ title: "ID enregistré" });
   }, [customSharingId, addToHistory, toast]);
 
+  const handleSaveEmergencyContact = () => {
+    if (!user || !firestore || !emergencyContact) return;
+    updateDoc(doc(firestore, 'users', user.uid), { emergencyContact }).then(() => {
+      toast({ title: "Contact enregistré" });
+    });
+  };
+
   const playAlertSound = useCallback((soundId: string) => {
     const sound = availableSounds.find(s => s.id === soundId || s.label === soundId);
     if (sound) {
@@ -374,7 +343,6 @@ export function VesselTracker() {
         if (getDistance(newPos.lat, newPos.lng, anchorPos.lat, anchorPos.lng) > IMMOBILITY_THRESHOLD_METERS) {
           setVesselStatus('moving');
           setAnchorPos(newPos);
-          setLastMovementTime(Date.now());
           updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng }, status: 'moving', isSharing: true });
         }
       },
@@ -400,6 +368,9 @@ export function VesselTracker() {
   };
 
   const displayVessel = mode === 'sender' ? (isSharing ? { location: { latitude: currentPos?.lat || 0, longitude: currentPos?.lng || 0 }, status: vesselStatus, displayName: vesselNickname || 'Moi' } : null) : remoteVessel;
+
+  if (loadError) return <div className="p-4 text-center text-destructive">Erreur de chargement Google Maps</div>;
+  if (!isLoaded) return <Skeleton className="h-96 w-full rounded-2xl" />;
 
   return (
     <div className="space-y-6 pb-12">
@@ -436,16 +407,15 @@ export function VesselTracker() {
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden border-2 shadow-xl rounded-2xl flex flex-col">
-        <div className="h-[350px] relative bg-muted/20">
-          {isLoaded && (
-            <GoogleMap 
-              mapContainerClassName="w-full h-full" 
-              defaultCenter={displayVessel?.location ? { lat: displayVessel.location.latitude, lng: displayVessel.location.longitude } : (lastValidLocation || { lat: -22.27, lng: 166.45 })} 
-              defaultZoom={15} 
-              onLoad={setMap} 
-              options={{ disableDefaultUI: true, mapTypeId: 'satellite' }}
-            >
+      <Card className={cn("overflow-hidden border-2 shadow-xl rounded-2xl flex flex-col transition-all", isFullscreen && "fixed inset-0 z-50 w-screen h-screen rounded-none")}>
+        <div className={cn("relative bg-muted/20", isFullscreen ? "flex-grow" : "h-[350px]")}>
+          <GoogleMap 
+            mapContainerClassName="w-full h-full" 
+            defaultCenter={displayVessel?.location ? { lat: displayVessel.location.latitude, lng: displayVessel.location.longitude } : (lastValidLocation || { lat: -22.27, lng: 166.45 })} 
+            defaultZoom={15} 
+            onLoad={setMap} 
+            options={{ disableDefaultUI: true, mapTypeId: 'satellite' }}
+          >
                 {isGpsActiveForReceiver && currentPos && <OverlayView position={currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}><div style={{ transform: 'translate(-50%, -50%)' }}><div className="size-4 bg-blue-500 rounded-full border-2 border-white shadow-2xl animate-pulse"></div></div></OverlayView>}
                 {displayVessel?.location && (
                     <OverlayView position={{ lat: displayVessel.location.latitude, lng: displayVessel.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
@@ -457,12 +427,14 @@ export function VesselTracker() {
                     </div>
                     </OverlayView>
                 )}
-            </GoogleMap>
-          )}
-          <Button size="icon" className="absolute top-3 right-3 shadow-lg h-10 w-10 bg-background/90 border-2" onClick={handleRecenter}><LocateFixed className="size-5" /></Button>
+          </GoogleMap>
+          <div className="absolute top-3 right-3 flex flex-col gap-2">
+            <Button size="icon" className="shadow-lg h-10 w-10 bg-background/90 border-2" onClick={handleRecenter}><LocateFixed className="size-5" /></Button>
+            <Button size="icon" className="shadow-lg h-10 w-10 bg-background/90 border-2" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink /> : <Expand />}</Button>
+          </div>
         </div>
 
-        <div className="bg-card border-t-2 p-4 flex flex-col gap-3">
+        <div className={cn("bg-card border-t-2 p-4 flex flex-col gap-3", isFullscreen && "shrink-0")}>
             <div className={cn("flex items-center justify-between p-4 rounded-2xl border-2 shadow-sm", currentEffectiveStatus === 'moving' ? "bg-green-50 border-green-200" : currentEffectiveStatus === 'stationary' ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-200")}>
                 <div className="flex items-center gap-4">
                     <div className={cn("size-12 rounded-2xl flex items-center justify-center text-white shadow-md", currentEffectiveStatus === 'moving' ? "bg-green-600" : currentEffectiveStatus === 'stationary' ? "bg-amber-600" : "bg-red-600")}>
