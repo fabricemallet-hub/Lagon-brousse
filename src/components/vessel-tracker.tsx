@@ -262,7 +262,7 @@ export function VesselTracker() {
     toast({ title: "Suivi activé", description: `Connexion au navire ${cleanId}...` });
   };
 
-  // --- RECEIVER LOGIC: Synchronisation automatique de l'historique ---
+  // --- RECEIVER LOGIC: Synchronisation temps réel robuste ---
   useEffect(() => {
     if (mode !== 'receiver' || !remoteVessel || !activeVesselId) {
         return;
@@ -272,16 +272,22 @@ export function VesselTracker() {
     const currentStatus = isSharingActive ? (remoteVessel.status || 'moving') : 'offline';
     const statusTime = remoteVessel.statusChangedAt || remoteVessel.lastActive;
     
-    // Si l'horodatage serveur est en attente (null), on attend la prochaine mise à jour
-    if (!statusTime) return;
-    
-    const timeKey = statusTime.toMillis();
-    
-    const isInitial = lastStatusRef.current === null;
-    const hasStatusChanged = lastStatusRef.current !== currentStatus;
-    const hasTimestampUpdated = timeKey > 0 && lastUpdateRef.current !== timeKey;
+    // Convertisseur universel d'horodatage
+    const getTimeMillis = (t: any) => {
+        if (!t) return 0;
+        if (typeof t.toMillis === 'function') return t.toMillis();
+        if (typeof t.getTime === 'function') return t.getTime();
+        if (t.seconds) return t.seconds * 1000;
+        return 0;
+    };
 
-    if (isInitial || hasStatusChanged || hasTimestampUpdated) {
+    const timeKey = getTimeMillis(statusTime);
+    if (timeKey === 0) return;
+    
+    const statusChanged = lastStatusRef.current !== currentStatus;
+    const timestampUpdated = timeKey > 0 && lastUpdateRef.current !== timeKey;
+
+    if (statusChanged || timestampUpdated || history.length === 0) {
       const statusLabels: Record<string, string> = { 
         moving: 'EN MOUVEMENT', 
         stationary: 'AU MOUILLAGE', 
@@ -291,7 +297,7 @@ export function VesselTracker() {
       };
       
       const label = statusLabels[currentStatus] || currentStatus;
-      const displayLabel = isInitial ? `CONNEXION ÉTABLIE - ${label}` : label;
+      const displayLabel = history.length === 0 ? `CONNEXION ÉTABLIE - ${label}` : label;
       
       const pos = { 
         lat: remoteVessel.location?.latitude || INITIAL_CENTER.lat, 
@@ -299,14 +305,14 @@ export function VesselTracker() {
       };
 
       setHistory(prev => {
-        // Anti-doublons immédiats
-        if (prev.length > 0 && prev[0].statusLabel === displayLabel && Math.abs(prev[0].time.getTime() - timeKey) < 3000) {
+        // Anti-doublons immédiats (2 secondes de fenêtre)
+        if (prev.length > 0 && prev[0].statusLabel === displayLabel && Math.abs(prev[0].time.getTime() - timeKey) < 2000) {
             return prev;
         }
         return [{ statusLabel: displayLabel, time: new Date(timeKey), pos }, ...prev].slice(0, 30);
       });
       
-      if (!isInitial && vesselPrefs.isNotifyEnabled) {
+      if (lastStatusRef.current !== null && statusChanged && vesselPrefs.isNotifyEnabled) {
         const soundKey = (currentStatus === 'returning' || currentStatus === 'landed') ? 'moving' : currentStatus;
         if (vesselPrefs.notifySettings[soundKey as keyof typeof vesselPrefs.notifySettings]) {
           playVesselSound(vesselPrefs.notifySounds[soundKey as keyof typeof vesselPrefs.notifySounds] || 'sonar');
@@ -340,7 +346,7 @@ export function VesselTracker() {
             }
         }
     }
-  }, [remoteVessel, mode, vesselPrefs, playVesselSound, toast, activeVesselId]);
+  }, [remoteVessel, mode, vesselPrefs, playVesselSound, toast, activeVesselId, history.length]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
