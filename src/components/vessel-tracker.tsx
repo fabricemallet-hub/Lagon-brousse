@@ -121,11 +121,9 @@ export function VesselTracker() {
   }, [user, firestore]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
-  // Multi-vessel tracking query
   const savedVesselIds = userProfile?.savedVesselIds || [];
   const vesselsQuery = useMemoFirebase(() => {
     if (!firestore || savedVesselIds.length === 0) return null;
-    // Limit to 10 vessels due to Firestore "in" operator limit
     return query(collection(firestore, 'vessels'), where('id', 'in', savedVesselIds.slice(0, 10)));
   }, [firestore, savedVesselIds]);
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
@@ -264,7 +262,6 @@ export function VesselTracker() {
     }
   };
 
-  // Synchronisation de l'historique pour TOUS les navires suivis
   useEffect(() => {
     if (!followedVessels) return;
 
@@ -306,7 +303,6 @@ export function VesselTracker() {
             };
 
             setHistory(prev => {
-                // Éviter les doublons trop proches
                 if (prev.length > 0 && prev[0].statusLabel === label && prev[0].vesselName === vessel.displayName && Math.abs(prev[0].time.getTime() - timeKey) < 5000) {
                     return prev;
                 }
@@ -324,14 +320,12 @@ export function VesselTracker() {
             lastStatusesRef.current[vessel.id] = currentStatus;
             lastUpdatesRef.current[vessel.id] = timeKey;
             
-            // Reset triggers
             if (statusChanged) {
                 if (watchTriggeredRef.current) watchTriggeredRef.current[vessel.id] = false;
                 if (batteryAlertsRef.current) batteryAlertsRef.current[vessel.id] = false;
             }
         }
 
-        // Monitoring alertes (Batterie / Veille) en mode récepteur
         if (mode === 'receiver') {
             if (vessel.batteryLevel !== undefined && vessel.batteryLevel <= 5 && !vessel.isCharging) {
                 if (!batteryAlertsRef.current[vessel.id]) {
@@ -467,7 +461,7 @@ export function VesselTracker() {
                         </div>
                         
                         <Button variant="ghost" className="w-full h-12 font-black uppercase text-[9px] border-2 border-dashed gap-2 touch-manipulation text-orange-600" onClick={() => handleManualStatus('moving')}>
-                            <RefreshCw className="size-4" /> Erreur / Reprise mode normal (Auto)
+                            <RefreshCw className="size-4" /> Affiché dans l'historique
                         </Button>
                     </div>
 
