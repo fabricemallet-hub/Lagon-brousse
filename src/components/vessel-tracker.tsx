@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -95,6 +96,7 @@ export function VesselTracker() {
   
   const [isSharing, setIsSharing] = useState(false);
   const [emergencyContact, setEmergencyContact] = useState('');
+  const [isEmergencyEnabled, setIsEmergencyEnabled] = useState(true);
   const [vesselSmsMessage, setVesselSmsMessage] = useState('');
   const [customSharingId, setCustomSharingId] = useState('');
   const [vesselNickname, setVesselNickname] = useState('');
@@ -178,6 +180,7 @@ export function VesselTracker() {
       if (userProfile.vesselPrefs) setVesselPrefs(userProfile.vesselPrefs);
       if (userProfile.emergencyContact) setEmergencyContact(userProfile.emergencyContact);
       if (userProfile.vesselSmsMessage) setVesselSmsMessage(userProfile.vesselSmsMessage);
+      setIsEmergencyEnabled(userProfile.isEmergencyEnabled ?? true);
       
       const savedNickname = userProfile.vesselNickname || userProfile.displayName || user?.displayName || user?.email?.split('@')[0] || '';
       if (!vesselNickname) setVesselNickname(savedNickname);
@@ -319,7 +322,8 @@ export function VesselTracker() {
     try {
         await updateDoc(doc(firestore, 'users', user.uid), {
             emergencyContact: emergencyContact,
-            vesselSmsMessage: vesselSmsMessage
+            vesselSmsMessage: vesselSmsMessage,
+            isEmergencyEnabled: isEmergencyEnabled
         });
         toast({ title: "Paramètres SMS sauvegardés" });
     } catch (e) {
@@ -482,6 +486,10 @@ export function VesselTracker() {
   };
 
   const sendEmergencySms = (type: 'SOS' | 'MAYDAY' | 'PAN PAN') => {
+    if (!isEmergencyEnabled) {
+        toast({ variant: "destructive", title: "Service désactivé", description: "Veuillez activer les réglages d'urgence dans vos paramètres." });
+        return;
+    }
     if (!emergencyContact) { toast({ variant: "destructive", title: "Numéro requis" }); return; }
     const pos = mode === 'sender' ? currentPos : (followedVessels?.find(v => v.isSharing)?.location ? { lat: followedVessels.find(v => v.isSharing)!.location.latitude, lng: followedVessels.find(v => v.isSharing)!.location.longitude } : null);
     const posUrl = pos ? `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}` : "[RECHERCHE GPS...]";
@@ -605,33 +613,49 @@ export function VesselTracker() {
                             </AccordionTrigger>
                             <AccordionContent className="pt-4 space-y-6">
                                 <div className="space-y-4 p-4 border-2 rounded-2xl bg-card shadow-inner">
-                                    <div className="space-y-1.5">
-                                        <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Numéro d'urgence (Contact à terre)</Label>
-                                        <Input 
-                                            placeholder="Ex: 77 12 34" 
-                                            value={emergencyContact} 
-                                            onChange={e => setEmergencyContact(e.target.value)} 
-                                            className="h-12 border-2 font-black text-lg" 
+                                    <div className="flex items-center justify-between border-b border-dashed pb-3 mb-2">
+                                        <div className="space-y-0.5">
+                                            <Label className="text-xs font-black uppercase text-orange-800">Service d'Urgence</Label>
+                                            <p className="text-[9px] font-bold text-orange-600/60 uppercase">Activer/Désactiver le contact SMS</p>
+                                        </div>
+                                        <Switch 
+                                            checked={isEmergencyEnabled} 
+                                            onCheckedChange={setIsEmergencyEnabled} 
+                                            className="touch-manipulation"
                                         />
                                     </div>
 
-                                    <div className="space-y-1.5">
-                                        <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Message de détresse personnalisé</Label>
-                                        <Textarea 
-                                            placeholder="Ex: Problème moteur, demande assistance." 
-                                            value={vesselSmsMessage} 
-                                            onChange={e => setVesselSmsMessage(e.target.value)} 
-                                            className="border-2 font-medium min-h-[80px]"
-                                        />
-                                        <p className="text-[8px] font-bold text-muted-foreground italic px-1">Le point GPS sera annexé automatiquement à la fin de votre message.</p>
-                                    </div>
+                                    <div className={cn("space-y-4 transition-opacity", !isEmergencyEnabled && "opacity-40 pointer-events-none")}>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Numéro d'urgence (Contact à terre)</Label>
+                                            <Input 
+                                                placeholder="Ex: 77 12 34" 
+                                                value={emergencyContact} 
+                                                onChange={e => setEmergencyContact(e.target.value)} 
+                                                className="h-12 border-2 font-black text-lg" 
+                                                disabled={!isEmergencyEnabled}
+                                            />
+                                        </div>
 
-                                    <div className="space-y-2 pt-2 border-t border-dashed">
-                                        <p className="text-[9px] font-black uppercase text-primary flex items-center gap-2 ml-1">
-                                            <Eye className="size-3" /> Visualisation du SMS envoyé :
-                                        </p>
-                                        <div className="p-3 bg-muted/30 rounded-xl border-2 italic text-[10px] font-medium leading-relaxed text-slate-600">
-                                            "{smsPreview}"
+                                        <div className="space-y-1.5">
+                                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Message de détresse personnalisé</Label>
+                                            <Textarea 
+                                                placeholder="Ex: Problème moteur, demande assistance." 
+                                                value={vesselSmsMessage} 
+                                                onChange={e => setVesselSmsMessage(e.target.value)} 
+                                                className="border-2 font-medium min-h-[80px]"
+                                                disabled={!isEmergencyEnabled}
+                                            />
+                                            <p className="text-[8px] font-bold text-muted-foreground italic px-1">Le point GPS sera annexé automatiquement à la fin de votre message.</p>
+                                        </div>
+
+                                        <div className="space-y-2 pt-2 border-t border-dashed">
+                                            <p className="text-[9px] font-black uppercase text-primary flex items-center gap-2 ml-1">
+                                                <Eye className="size-3" /> Visualisation du SMS envoyé :
+                                            </p>
+                                            <div className="p-3 bg-muted/30 rounded-xl border-2 italic text-[10px] font-medium leading-relaxed text-slate-600">
+                                                "{smsPreview}"
+                                            </div>
                                         </div>
                                     </div>
 
@@ -834,65 +858,67 @@ export function VesselTracker() {
                 <Button variant="destructive" className="flex-1 h-14 font-black uppercase rounded-xl shadow-lg gap-3 text-xs touch-manipulation" onClick={() => sendEmergencySms('MAYDAY')}><ShieldAlert className="size-5" /> MAYDAY</Button>
                 <Button variant="secondary" className="flex-1 h-14 font-black uppercase rounded-xl shadow-lg gap-3 text-xs border-2 border-primary/20 touch-manipulation" onClick={() => sendEmergencySms('PAN PAN')}><AlertTriangle className="size-5 text-primary" /> PAN PAN</Button>
             </div>
-            <Accordion type="single" collapsible className="w-full">
-                <AccordionItem value="history" className="border rounded-xl bg-muted/10 overflow-hidden">
-                  <div className="flex items-center pr-4">
-                    <AccordionTrigger className="flex-1 text-[10px] font-black uppercase py-3 px-3 hover:no-underline">
-                      <div className="flex items-center gap-2"><History className="size-3"/> Journal de bord unifié</div>
-                    </AccordionTrigger>
-                    <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-6 px-2 text-[8px] font-black text-destructive hover:bg-destructive/10 border border-destructive/20 touch-manipulation"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            handleClearHistory();
-                        }}
-                    >
-                        <Trash2 className="size-3 mr-1" /> Effacer
-                    </Button>
-                  </div>
-                  <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide touch-pan-y">
-                        {history.length > 0 ? (
-                            <div className="space-y-2 px-3">
-                                {history.map((h, i) => (
-                                    <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm animate-in fade-in slide-in-from-left-2">
-                                        <div className="flex flex-col gap-0.5">
-                                          <div className="flex items-center gap-2">
-                                            <span className="font-black text-primary">{h.vesselName}</span>
-                                            <span className={cn("font-black uppercase", 
-                                                h.statusLabel.includes('ERREUR') ? 'text-orange-600' :
-                                                h.statusLabel.includes('FAIBLE') ? 'text-red-600' :
-                                                h.statusLabel.includes('CHARGE') ? 'text-green-600' :
-                                                h.statusLabel.includes('MOUILLAGE') ? 'text-orange-600' : 
-                                                h.statusLabel.includes('MOUVEMENT') ? 'text-blue-600' : 
-                                                h.statusLabel.includes('RETOUR') ? 'text-indigo-600' :
-                                                h.statusLabel.includes('TERRE') ? 'text-green-600' : 'text-red-600')}>
-                                                {h.statusLabel}
-                                            </span>
-                                            {h.batteryLevel !== undefined && (
-                                                <span className="flex items-center gap-1 bg-slate-100 px-1.5 py-0.5 rounded text-[8px] font-black text-slate-500 border border-slate-200">
-                                                    <BatteryIconComp level={h.batteryLevel} charging={h.isCharging} className="size-2.5" />
-                                                    {h.batteryLevel}%
+            <div className="border rounded-xl bg-muted/10 overflow-hidden">
+                <Accordion type="single" collapsible className="w-full">
+                    <AccordionItem value="history" className="border-none">
+                        <div className="flex items-center justify-between px-3 h-12">
+                            <AccordionTrigger className="flex-1 text-[10px] font-black uppercase hover:no-underline py-0">
+                                <div className="flex items-center gap-2"><History className="size-3"/> Journal de bord unifié</div>
+                            </AccordionTrigger>
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-7 px-2 text-[8px] font-black text-destructive hover:bg-destructive/10 border border-destructive/20 touch-manipulation shrink-0"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleClearHistory();
+                                }}
+                            >
+                                <Trash2 className="size-3 mr-1" /> Effacer
+                            </Button>
+                        </div>
+                        <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide touch-pan-y">
+                            {history.length > 0 ? (
+                                <div className="space-y-2 px-3">
+                                    {history.map((h, i) => (
+                                        <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm animate-in fade-in slide-in-from-left-2">
+                                            <div className="flex flex-col gap-0.5">
+                                              <div className="flex items-center gap-2">
+                                                <span className="font-black text-primary">{h.vesselName}</span>
+                                                <span className={cn("font-black uppercase", 
+                                                    h.statusLabel.includes('ERREUR') ? 'text-orange-600' :
+                                                    h.statusLabel.includes('FAIBLE') ? 'text-red-600' :
+                                                    h.statusLabel.includes('CHARGE') ? 'text-green-600' :
+                                                    h.statusLabel.includes('MOUILLAGE') ? 'text-orange-600' : 
+                                                    h.statusLabel.includes('MOUVEMENT') ? 'text-blue-600' : 
+                                                    h.statusLabel.includes('RETOUR') ? 'text-indigo-600' :
+                                                    h.statusLabel.includes('TERRE') ? 'text-green-600' : 'text-red-600')}>
+                                                    {h.statusLabel}
                                                 </span>
-                                            )}
-                                          </div>
-                                          <span className="text-[9px] font-bold opacity-40">{format(h.time, 'HH:mm:ss')}</span>
+                                                {h.batteryLevel !== undefined && (
+                                                    <span className="flex items-center gap-1 bg-slate-100 px-1.5 py-0.5 rounded text-[8px] font-black text-slate-500 border border-slate-200">
+                                                        <BatteryIconComp level={h.batteryLevel} charging={h.isCharging} className="size-2.5" />
+                                                        {h.batteryLevel}%
+                                                    </span>
+                                                )}
+                                              </div>
+                                              <span className="text-[9px] font-bold opacity-40">{format(h.time, 'HH:mm:ss')}</span>
+                                            </div>
+                                            <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase border-2 px-3 gap-2 touch-manipulation" onClick={() => { map?.panTo(h.pos); map?.setZoom(17); }}>
+                                              <MapPin className="size-3 text-primary" /> GPS
+                                            </Button>
                                         </div>
-                                        <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase border-2 px-3 gap-2 touch-manipulation" onClick={() => { map?.panTo(h.pos); map?.setZoom(17); }}>
-                                          <MapPin className="size-3 text-primary" /> GPS
-                                        </Button>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-center py-10 border-2 border-dashed rounded-xl opacity-40 mx-3">
-                              <p className="text-[10px] font-black uppercase tracking-widest">pas d'affichage dans l'historique</p>
-                            </div>
-                        )}
-                    </AccordionContent>
-                </AccordionItem>
-            </Accordion>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-10 border-2 border-dashed rounded-xl opacity-40 mx-3">
+                                  <p className="text-[10px] font-black uppercase tracking-widest">pas d'affichage dans l'historique</p>
+                                </div>
+                            )}
+                        </AccordionContent>
+                    </AccordionItem>
+                </Accordion>
+            </div>
         </div>
       </Card>
 
