@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -61,6 +60,22 @@ const defaultVesselSounds = [
   { id: 'alerte', label: 'Alerte Urgence', url: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' },
   { id: 'bip', label: 'Bip Digital', url: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3' },
 ];
+
+const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
+  if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
+  const props = { className: cn("size-4", className) };
+  if (charging) return <BatteryCharging {...props} className={cn(props.className, "text-blue-500")} />;
+  if (level <= 10) return <BatteryLow {...props} className={cn(props.className, "text-red-600")} />;
+  if (level <= 40) return <BatteryMedium {...props} className={cn(props.className, "text-orange-500")} />;
+  return <BatteryFull {...props} className={cn(props.className, "text-green-600")} />;
+};
+
+const PulsingDot = () => (
+    <div className="absolute" style={{ transform: 'translate(-50%, -50%)' }}>
+      <div className="size-5 rounded-full bg-blue-500 opacity-75 animate-ping absolute"></div>
+      <div className="size-5 rounded-full bg-blue-500 border-2 border-white relative"></div>
+    </div>
+);
 
 export function VesselTracker() {
   const { user } = useUserHook();
@@ -247,7 +262,7 @@ export function VesselTracker() {
     toast({ title: "Suivi activé", description: `Connexion au navire ${cleanId}...` });
   };
 
-  // --- RECEIVER LOGIC: History and status tracking ---
+  // --- RECEIVER LOGIC: Synchronisation automatique de l'historique ---
   useEffect(() => {
     if (mode !== 'receiver' || !remoteVessel || !activeVesselId) return;
     
@@ -256,18 +271,20 @@ export function VesselTracker() {
     const statusTime = remoteVessel.statusChangedAt || remoteVessel.lastActive;
     const timeKey = statusTime?.toMillis?.() || 0;
     
+    // Détection de changement basée sur l'état OU le temps de changement (statusChangedAt)
+    // Cela garantit une synchronisation instantanée dès que le serveur reçoit l'info
     if (lastStatusRef.current !== currentStatus || (timeKey > 0 && lastUpdateRef.current !== timeKey)) {
       const statusLabels: Record<string, string> = { 
-        moving: 'En mouvement', 
-        stationary: 'Au mouillage', 
-        offline: 'Signal perdu',
-        returning: 'Trajet retour lancé',
-        landed: 'Arrivé à terre (Home)'
+        moving: 'EN MOUVEMENT', 
+        stationary: 'AU MOUILLAGE', 
+        offline: 'SIGNAL PERDU',
+        returning: 'TRAJET RETOUR LANCÉ',
+        landed: 'ARRIVÉ À TERRE (HOME)'
       };
       
       const isInitial = lastStatusRef.current === null;
       const label = statusLabels[currentStatus] || currentStatus;
-      const displayLabel = isInitial ? `Connecté - ${label}` : label;
+      const displayLabel = isInitial ? `CONNECTÉ - ${label}` : label;
       
       const pos = { 
         lat: remoteVessel.location?.latitude || INITIAL_CENTER.lat, 
@@ -275,6 +292,7 @@ export function VesselTracker() {
       };
 
       setHistory(prev => {
+        // Éviter les doublons exacts basés sur le temps et le label
         if (prev.length > 0 && prev[0].statusLabel === displayLabel && Math.abs(prev[0].time.getTime() - (timeKey || Date.now())) < 1000) {
             return prev;
         }
@@ -285,7 +303,7 @@ export function VesselTracker() {
         const soundKey = (currentStatus === 'returning' || currentStatus === 'landed') ? 'moving' : currentStatus;
         if (vesselPrefs.notifySettings[soundKey as keyof typeof vesselPrefs.notifySettings]) {
           playVesselSound(vesselPrefs.notifySounds[soundKey as keyof typeof vesselPrefs.notifySounds] || 'sonar');
-          toast({ title: "Changement d'état", description: `Le navire est maintenant : ${label}` });
+          toast({ title: "Changement d'état", description: `Le navire est maintenant : ${label.toLowerCase()}` });
         }
       }
       
@@ -294,6 +312,7 @@ export function VesselTracker() {
       watchTriggeredRef.current = false;
     }
 
+    // Batterie Critique
     if (remoteVessel.batteryLevel !== undefined && remoteVessel.batteryLevel <= 5 && !remoteVessel.isCharging) {
         if (!batteryAlertTriggered.current) {
             toast({ variant: "destructive", title: "BATTERIE CRITIQUE", description: `L'émetteur n'a plus que ${remoteVessel.batteryLevel}% !` });
@@ -302,6 +321,7 @@ export function VesselTracker() {
         }
     } else { batteryAlertTriggered.current = false; }
 
+    // Veille Critique
     if (vesselPrefs.isWatchEnabled && !watchTriggeredRef.current && currentStatus !== 'landed') {
         if (currentStatus === vesselPrefs.watchType) {
             const lastUpdate = remoteVessel.lastActive?.toDate?.() || new Date();
@@ -392,15 +412,6 @@ export function VesselTracker() {
   };
 
   const displayVessel = mode === 'sender' ? (isSharing ? { location: { latitude: currentPos?.lat || 0, longitude: currentPos?.lng || 0 }, status: vesselStatus, displayName: vesselNickname || 'Ma Position', batteryLevel: 100 } : null) : remoteVessel;
-
-  const BatteryIconComp = ({ level, charging }: { level?: number, charging?: boolean }) => {
-    if (level === undefined) return <WifiOff className="size-4 opacity-40" />;
-    const props = { className: "size-4" };
-    if (charging) return <BatteryCharging {...props} className="text-blue-500" />;
-    if (level <= 10) return <BatteryLow {...props} className="text-red-600" />;
-    if (level <= 40) return <BatteryMedium {...props} className="text-orange-500" />;
-    return <BatteryFull {...props} className="text-green-600" />;
-  };
 
   if (isProfileLoading) return <Skeleton className="h-96 w-full" />;
 
@@ -618,12 +629,12 @@ export function VesselTracker() {
                                     <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm animate-in fade-in slide-in-from-left-2">
                                         <div className="flex flex-col gap-0.5">
                                           <span className={cn("font-black uppercase flex items-center gap-2", 
-                                            h.statusLabel.includes('mouillage') ? 'text-orange-600' : 
-                                            h.statusLabel.includes('mouvement') ? 'text-blue-600' : 
-                                            h.statusLabel.includes('retour') ? 'text-indigo-600' :
-                                            h.statusLabel.includes('terre') ? 'text-green-600' : 'text-red-600')}>
-                                            {h.statusLabel.includes('retour') && <Navigation className="size-3" />}
-                                            {h.statusLabel.includes('terre') && <Home className="size-3" />}
+                                            h.statusLabel.includes('MOUILLAGE') ? 'text-orange-600' : 
+                                            h.statusLabel.includes('MOUVEMENT') ? 'text-blue-600' : 
+                                            h.statusLabel.includes('RETOUR') ? 'text-indigo-600' :
+                                            h.statusLabel.includes('TERRE') ? 'text-green-600' : 'text-red-600')}>
+                                            {h.statusLabel.includes('RETOUR') && <Navigation className="size-3" />}
+                                            {h.statusLabel.includes('TERRE') && <Home className="size-3" />}
                                             {h.statusLabel}
                                           </span>
                                           <span className="text-[9px] font-bold opacity-40">{format(h.time, 'HH:mm:ss')}</span>
