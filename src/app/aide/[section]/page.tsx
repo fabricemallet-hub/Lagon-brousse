@@ -85,7 +85,7 @@ const sectionContent: Record<string, {
     ]
   },
   'vessel-tracker': {
-    title: 'Vessel Tracker',
+    title: 'Boat Tracker',
     icon: Navigation,
     color: 'bg-blue-600',
     role: "Un système de sécurité maritime haute-fidélité conçu pour partager votre position GPS, votre statut d'activité et votre niveau de batterie avec vos proches restés à terre.",

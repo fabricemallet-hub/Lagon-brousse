@@ -7,7 +7,7 @@ Bienvenue dans la version 2.0 de l'application de référence pour les passionn�
 
 ## 🚀 Fonctionnalités Majeures
 
-### ⚓ Sécurité & Mer (Vessel Tracker)
+### ⚓ Sécurité & Mer (Boat Tracker)
 - **Partage GPS Haute-Fidélité** : Partagez votre position en temps réel entre émetteur (en mer) et récepteur (à terre).
 - **Alerte SMS d'Urgence** : Génération instantanée d'un message de détresse incluant lien Maps, coordonnées GPS et numéros de secours (196, SNSM).
 - **Détection d'Immobilité** : Système intelligent identifiant les phases de mouillage ou de dérive anormale.
