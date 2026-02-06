@@ -17,7 +17,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { LocationData, FishingSpot, SwellForecast } from '@/lib/types';
 import { getDataForDate } from '@/lib/data';
-import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown, Pencil, History, Sparkles } from 'lucide-react';
+import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown, Pencil, History } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from './alert';
 import { useLocation } from '@/context/location-context';
@@ -25,9 +25,9 @@ import { findSimilarDay, analyzeBestDay } from '@/ai/flows/find-best-fishing-day
 import type { FishingAnalysisOutput } from '@/ai/schemas';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
-import { Badge } from './badge';
 import { useGoogleMaps } from '@/context/google-maps-context';
 
+const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
 const mapIcons = {
     Fish: Fish,
@@ -38,11 +38,11 @@ const availableIcons = Object.keys(mapIcons);
 const availableColors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
 
 const fishingTypes = [
-  { id: 'Dérive', bgColor: 'bg-blue-500', textColor: 'text-blue-600 dark:text-blue-400', label: 'Dérive' },
-  { id: 'Mouillage', bgColor: 'bg-green-500', textColor: 'text-green-600 dark:text-green-400', label: 'Mouillage' },
-  { id: 'Pêche à la ligne', bgColor: 'bg-yellow-500', textColor: 'text-yellow-600 dark:text-yellow-400', label: 'Ligne' },
-  { id: 'Pêche au lancer', bgColor: 'bg-purple-500', textColor: 'text-purple-600 dark:text-purple-400', label: 'Lancer' },
-  { id: 'Traine', bgColor: 'bg-red-500', textColor: 'text-red-600 dark:text-red-400', label: 'Traine' },
+  { id: 'Dérive', bgColor: 'bg-blue-500', label: 'Dérive' },
+  { id: 'Mouillage', bgColor: 'bg-green-500', label: 'Mouillage' },
+  { id: 'Pêche à la ligne', bgColor: 'bg-yellow-500', label: 'Ligne' },
+  { id: 'Pêche au lancer', bgColor: 'bg-purple-500', label: 'Lancer' },
+  { id: 'Traine', bgColor: 'bg-red-500', label: 'Traine' },
 ];
 
 const PulsingDot = () => (
@@ -67,8 +67,8 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     
     const [map, setMap] = useState<google.maps.Map | null>(null);
     const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-    const [initialZoomDone, setInitialZoomDone] = useState(false);
     const watchId = useRef<number | null>(null);
+    const shouldPanOnNextFix = useRef(false);
     const mapContainerRef = useRef<HTMLDivElement>(null);
 
     const { selectedLocation } = useLocation();
@@ -80,7 +80,6 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     const [openSpotId, setOpenSpotId] = useState<string | undefined>(undefined);
     const spotRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-    // State for the unified dialog
     const [isSpotDialogOpen, setIsSpotDialogOpen] = useState(false);
     const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
     const [spotToEdit, setSpotToEdit] = useState<FishingSpot | null>(null);
@@ -107,7 +106,6 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
 
     const onUnmount = useCallback(function callback(map: google.maps.Map) {
         setMap(null);
-        setInitialZoomDone(false);
         if (watchId.current !== null) {
             navigator.geolocation.clearWatch(watchId.current);
             watchId.current = null;
@@ -116,7 +114,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
 
     const startWatchingPosition = useCallback(() => {
         if (!navigator.geolocation) {
-            toast({ variant: "destructive", title: "Non supporté", description: "La géolocalisation n'est pas supportée par votre navigateur." });
+            toast({ variant: "destructive", title: "Non supporté", description: "La géolocalisation n'est pas supportée." });
             return;
         }
 
@@ -127,65 +125,29 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                 const { latitude, longitude } = position.coords;
                 const newLocation = { lat: latitude, lng: longitude };
                 setUserLocation(newLocation);
-                if (map && !initialZoomDone) {
+                
+                if (shouldPanOnNextFix.current && map) {
                     map.panTo(newLocation);
                     map.setZoom(16);
-                    setInitialZoomDone(true);
+                    shouldPanOnNextFix.current = false;
                 }
             },
             (err) => {
                 console.error("Geolocation error:", err);
-                toast({ variant: "destructive", title: "Erreur GPS", description: "Impossible d'accéder à votre position." });
             },
             { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
         );
-    }, [map, initialZoomDone, toast]);
+    }, [map, toast]);
 
     const handleRecenter = () => {
-        if (!navigator.geolocation) {
-            toast({
-                variant: "destructive",
-                title: "Géolocalisation non supportée",
-                description: "Votre navigateur ne supporte pas la géolocalisation.",
-            });
-            return;
-        }
-
         if (watchId.current === null) {
-            toast({ description: "Activation du GPS..." });
+            shouldPanOnNextFix.current = true;
             startWatchingPosition();
+            toast({ description: "Activation du GPS..." });
+        } else if (userLocation && map) {
+            map.panTo(userLocation);
+            map.setZoom(16);
         }
-
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const { latitude, longitude } = position.coords;
-                const newLocation = { lat: latitude, lng: longitude };
-                
-                setUserLocation(newLocation);
-
-                if (map) {
-                    map.panTo(newLocation);
-                    if(!initialZoomDone) {
-                        map.setZoom(16);
-                        setInitialZoomDone(true);
-                    }
-                }
-            },
-            (err) => {
-                 let description = "Impossible d'obtenir votre position actuelle.";
-                 if (err.code === 1) {
-                   description = "Veuillez activer la géolocalisation dans les paramètres de votre navigateur.";
-                 } else if (err.code === 3) {
-                   description = "La demande de localisation a expiré.";
-                 }
-                 toast({
-                     variant: "destructive",
-                     title: "Erreur de localisation",
-                     description: description,
-                 });
-            },
-            { enableHighAccuracy: true, timeout: 10000 }
-        );
     };
 
     const handleMapClick = (e: google.maps.MapMouseEvent) => {
@@ -297,7 +259,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             setIsSpotDialogOpen(false);
             setNewSpotLocation(null);
         } catch (error) {
-            console.error("Erreur lors de la sauvegarde du spot :", error);
+            console.error(error);
             toast({ variant: 'destructive', title: 'Erreur', description: "Impossible de sauvegarder le spot." });
         } finally {
             setIsSaving(false);
@@ -326,7 +288,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             setIsSpotDialogOpen(false);
             setSpotToEdit(null);
         } catch (error) {
-            console.error("Erreur lors de la mise à jour du spot :", error);
+            console.error(error);
             toast({ variant: 'destructive', title: 'Erreur', description: "Impossible de mettre à jour le spot." });
         } finally {
             setIsSaving(false);
@@ -359,7 +321,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             await deleteDoc(spotRef);
             toast({ title: 'Spot supprimé.'});
         } catch (error) {
-            console.error("Erreur lors de la suppression du spot:", error);
+            console.error(error);
             toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de supprimer le spot.' });
         }
     };
@@ -376,12 +338,8 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             });
             setAnalysisResult(result);
         } catch (error) {
-            console.error("AI analysis failed:", error);
-            toast({
-                variant: 'destructive',
-                title: 'Erreur de l\'analyse IA',
-                description: 'Impossible de trouver un jour similaire. Veuillez réessayer.'
-            });
+            console.error(error);
+            toast({ variant: 'destructive', title: 'Erreur IA', description: 'Impossible de trouver un jour similaire.' });
             setIsAnalysisDialogOpen(false);
         } finally {
             setIsAnalyzing(false);
@@ -390,10 +348,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
 
     const handleAnalyzeNext7Days = async () => {
         if (selectedSpotIds.length === 0) {
-            toast({
-                title: 'Aucun spot sélectionné',
-                description: 'Veuillez sélectionner au moins un spot à analyser.'
-            });
+            toast({ title: 'Aucun spot sélectionné', description: 'Sélectionnez au moins un spot.' });
             return;
         }
 
@@ -412,12 +367,8 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             });
             setAnalysisResult(result);
         } catch (error) {
-            console.error("AI analysis failed:", error);
-            toast({
-                variant: 'destructive',
-                title: 'Erreur de l\'analyse IA',
-                description: 'Impossible d\'analyser les spots. Veuillez réessayer.'
-            });
+            console.error(error);
+            toast({ variant: 'destructive', title: 'Erreur IA', description: 'Impossible d\'analyser les spots.' });
             setIsAnalysisDialogOpen(false);
         } finally {
             setIsAnalyzing(false);
@@ -439,7 +390,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                 <CardContent>
                     <Alert>
                         <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>Connectez-vous pour utiliser le carnet de pêche</AlertTitle>
+                        <AlertTitle>Connexion requise</AlertTitle>
                         <AlertDescription>Sauvegardez vos meilleurs coins de pêche et consultez votre historique.</AlertDescription>
                     </Alert>
                 </CardContent>
@@ -451,7 +402,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         <Card className={cn("transition-all", isFullscreen && "fixed inset-0 z-50 w-screen h-screen rounded-none border-none flex flex-col")}>
             <CardHeader className={cn(isFullscreen && "flex-shrink-0")}>
                 <CardTitle className="flex items-center gap-2"><Map /> Carnet de Pêche</CardTitle>
-                <CardDescription>Cliquez sur la carte pour marquer un coin, puis enregistrez-le. Vos spots sauvegardés apparaîtront dans l'historique.</CardDescription>
+                <CardDescription>Cliquez sur la carte pour marquer un coin. Vos spots apparaîtront dans l'historique.</CardDescription>
             </CardHeader>
             <CardContent className={cn("space-y-4", isFullscreen ? "flex-grow flex flex-col p-2 gap-2" : "p-6 pt-0")}>
                 {loadError && <Alert variant="destructive"><AlertTitle>Erreur de chargement de la carte</AlertTitle></Alert>}
@@ -460,7 +411,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                     <div ref={mapContainerRef} className={cn("relative w-full rounded-lg overflow-hidden border", isFullscreen ? "flex-grow" : "h-80")}>
                         <GoogleMap
                             mapContainerClassName="w-full h-full"
-                            defaultCenter={userLocation || { lat: -21.5, lng: 165.5 }}
+                            defaultCenter={INITIAL_CENTER}
                             defaultZoom={7}
                             options={{ disableDefaultUI: true, zoomControl: true, mapTypeControl: true, clickableIcons: false, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
                             onClick={handleMapClick}
@@ -490,25 +441,6 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                         >
                                             <div className="flex flex-col items-center gap-1 px-2 py-1 bg-card/90 backdrop-blur-sm border border-border rounded-md shadow" onClick={(e) => e.stopPropagation()}>
                                                 <span className="text-xs font-bold text-foreground whitespace-nowrap">{spot.name}</span>
-                                                {spot.fishingTypes && spot.fishingTypes.length > 0 && (
-                                                    <div className="flex flex-wrap gap-x-2 gap-y-1 mt-1 justify-center max-w-[150px]">
-                                                        {spot.fishingTypes.map(type => {
-                                                            const typeInfo = fishingTypes.find(t => t.id === type);
-                                                            if (!typeInfo) return null;
-                                                            return (
-                                                                <span
-                                                                    key={type}
-                                                                    className={cn(
-                                                                        "text-[10px] font-bold",
-                                                                        typeInfo.textColor
-                                                                    )}
-                                                                >
-                                                                    {typeInfo.label}
-                                                                </span>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                )}
                                             </div>
                                              <div
                                                 className="p-1.5 rounded-full flex items-center justify-center shadow-lg"
@@ -536,7 +468,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         <Button size="icon" onClick={() => setIsFullscreen(!isFullscreen)} className="absolute top-2 left-2 shadow-lg h-9 w-9 z-10 bg-background/80 backdrop-blur-sm">
                             {isFullscreen ? <Shrink className="h-5 w-5" /> : <Expand className="h-5 w-5" />}
                         </Button>
-                        <Button size="icon" onClick={handleRecenter} className="absolute top-2 right-2 shadow-lg h-9 w-9 z-10 bg-background/80 backdrop-blur-sm">
+                        <Button size="icon" onClick={handleRecenter} className={cn("absolute top-2 right-2 shadow-lg h-9 w-9 z-10 border-2", watchId.current !== null ? "bg-primary text-white border-primary" : "bg-background/80 backdrop-blur-sm")}>
                             <LocateFixed className="size-5" />
                         </Button>
                          <div className={cn("absolute bottom-0 left-0 right-0 z-10", !newSpotLocation && "hidden")}>
@@ -560,21 +492,24 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         </div>
                     </div>
                 )}
-                 <Alert className={cn(isFullscreen && "hidden")}>
-                    
-                    <AlertTitle>Mode Hors Ligne</AlertTitle>
-                    <AlertDescription>
-                        La carte peut être utilisée hors ligne. Pour mettre une zone en cache, naviguez simplement sur la carte lorsque vous êtes connecté.
-                    </AlertDescription>
-                </Alert>
+
+                {watchId.current === null && !isFullscreen && (
+                    <Alert className="bg-primary/5 border-primary/20">
+                        <LocateFixed className="size-4 text-primary" />
+                        <AlertTitle className="text-xs font-black uppercase">Localisation Inactive</AlertTitle>
+                        <AlertDescription className="flex flex-col gap-2">
+                            <p className="text-[10px] font-medium leading-relaxed">Cliquez sur le bouton ci-dessous pour vous situer sur la carte et afficher votre position en temps réel.</p>
+                            <Button size="sm" onClick={handleRecenter} className="font-black uppercase text-[10px] h-8 tracking-widest">
+                                <LocateFixed className="size-3 mr-2" /> Afficher ma position
+                            </Button>
+                        </AlertDescription>
+                    </Alert>
+                )}
                 
                 <Dialog open={isSpotDialogOpen} onOpenChange={(open) => { if (!open) setSpotToEdit(null); setIsSpotDialogOpen(open); }}>
                     <DialogContent className="max-h-[95vh] flex flex-col p-0 overflow-hidden sm:max-w-lg">
                         <DialogHeader className="p-6 pb-2 shrink-0">
-                            <DialogTitle className="font-black uppercase tracking-tight">{dialogMode === 'add' ? 'Enregistrer un nouveau spot' : 'Modifier le spot'}</DialogTitle>
-                            <DialogDescription>
-                                {dialogMode === 'add' ? "Remplissez les détails et sauvegardez pour ajouter ce spot à votre carnet." : "Modifiez les informations de votre spot."}
-                            </DialogDescription>
+                            <DialogTitle className="font-black uppercase tracking-tight">{dialogMode === 'add' ? 'Nouveau spot' : 'Modifier le spot'}</DialogTitle>
                         </DialogHeader>
                         
                         <div className="flex-grow overflow-y-auto p-6 py-2 space-y-4">
@@ -584,7 +519,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="spot-notes" className="text-xs font-bold uppercase text-muted-foreground">Notes</Label>
-                                <Textarea id="spot-notes" placeholder="Ex: Pris à la traîne avec un leurre rouge" value={spotNotes} onChange={(e) => setSpotNotes(e.target.value)} className="border-2 font-medium" />
+                                <Textarea id="spot-notes" placeholder="Détails..." value={spotNotes} onChange={(e) => setSpotNotes(e.target.value)} className="border-2 font-medium" />
                             </div>
                              <div className="space-y-2">
                                 <Label className="text-xs font-bold uppercase text-muted-foreground">Techniques de pêche</Label>
@@ -628,7 +563,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                             </div>
                         </div>
                         
-                        <DialogFooter className="p-6 pt-2 border-t shrink-0 flex flex-row gap-2 sm:flex-row">
+                        <DialogFooter className="p-6 pt-2 border-t shrink-0 flex flex-row gap-2">
                             <Button variant="ghost" onClick={() => { setIsSpotDialogOpen(false); if (dialogMode === 'add') setNewSpotLocation(null); }} className="flex-1 font-bold h-12 uppercase text-xs">Annuler</Button>
                             <Button onClick={handleSave} disabled={isSaving} className="flex-1 font-black h-12 uppercase text-xs shadow-md"><Save className="mr-2 size-4"/>{isSaving ? "Sauvegarde..." : "Sauvegarder"}</Button>
                         </DialogFooter>
@@ -645,13 +580,12 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                 disabled={selectedSpotIds.length === 0 || isAnalyzing}
                             >
                                 <BarChart className="mr-2 size-4"/> 
-                                Analyser {selectedSpotIds.length > 0 ? `(${selectedSpotIds.length}) spot(s)` : ''} (IA)
+                                Analyser {selectedSpotIds.length > 0 ? `(${selectedSpotIds.length})` : ''} (IA)
                             </Button>
                         </div>
                         <h4 className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 mb-2 px-1">
                             <History className="size-3" /> Historique des prises
                         </h4>
-                        {areSpotsLoading && <Skeleton className="h-24 w-full" />}
                         {!areSpotsLoading && savedSpots && savedSpots.length > 0 ? (
                             <AccordionPrimitive.Root 
                                 type="single" 
@@ -660,11 +594,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                 value={openSpotId}
                                 onValueChange={setOpenSpotId}
                             >
-                               {savedSpots.map(spot => {
-                                   const displayLowTide = spot.context.closestLowTide || (spot.context as any).previousLowTide;
-                                   const displayHighTide = spot.context.closestHighTide || (spot.context as any).nextHighTide;
-
-                                   return (
+                               {savedSpots.map(spot => (
                                    <AccordionPrimitive.Item 
                                         ref={(el) => (spotRefs.current[spot.id] = el)}
                                         value={spot.id} 
@@ -672,7 +602,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                         className="border-2 rounded-xl bg-card overflow-hidden shadow-sm"
                                     >
                                        <div className="flex items-center w-full">
-                                            <div className="pl-4 py-4" onClick={(e) => e.stopPropagation()}>
+                                            <div className="pl-3 py-4" onClick={(e) => e.stopPropagation()}>
                                                 <Checkbox
                                                     id={`select-spot-${spot.id}`}
                                                     className="size-5 border-2"
@@ -681,15 +611,15 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                 />
                                             </div>
                                             <AccordionPrimitive.Header asChild>
-                                                <AccordionPrimitive.Trigger className='flex flex-1 items-center justify-between py-4 font-medium transition-all hover:no-underline [&[data-state=open]>svg]:rotate-180 pl-3 pr-4 text-left'>
+                                                <AccordionPrimitive.Trigger className='flex flex-1 items-center justify-between py-4 font-medium transition-all hover:no-underline [&[data-state=open]>svg]:rotate-180 pl-2 pr-4 text-left'>
                                                     <div className="flex items-center gap-3">
                                                         <div className="p-2 rounded-lg" style={{backgroundColor: spot.color + '15'}}>
                                                             {React.createElement(mapIcons[spot.icon as keyof typeof mapIcons] || MapPin, { className: 'size-5', style: {color: spot.color} })}
                                                         </div>
                                                         <div className="min-w-0">
-                                                            <p className="font-black uppercase tracking-tight text-sm leading-none truncate">{spot.name}</p>
-                                                            <p className="text-[10px] font-bold text-muted-foreground/60 mt-1 uppercase">
-                                                                {spot.createdAt ? format(spot.createdAt.toDate(), 'd MMM yyyy à HH:mm', { locale: fr }) : 'Enregistrement...'}
+                                                            <p className="font-black uppercase tracking-tight text-xs leading-none truncate">{spot.name}</p>
+                                                            <p className="text-[9px] font-bold text-muted-foreground/60 mt-1 uppercase">
+                                                                {spot.createdAt ? format(spot.createdAt.toDate(), 'd MMM yyyy', { locale: fr }) : '...'}
                                                             </p>
                                                         </div>
                                                     </div>
@@ -697,37 +627,19 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                 </AccordionPrimitive.Trigger>
                                             </AccordionPrimitive.Header>
                                        </div>
-                                       <AccordionPrimitive.Content className="overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down border-t border-dashed">
-                                           <div className="pb-4 pl-4 sm:pl-12 pr-4 space-y-4 pt-4 bg-muted/5">
-                                            {spot.fishingTypes && spot.fishingTypes.length > 0 && (
-                                                <div className="flex flex-wrap gap-2">
-                                                    {spot.fishingTypes.map(type => {
-                                                        const typeInfo = fishingTypes.find(t => t.id === type);
-                                                        return (
-                                                            <Badge key={type} variant="secondary" className={cn("text-[9px] font-black uppercase text-white border-none", typeInfo?.bgColor)}>
-                                                                {typeInfo?.label}
-                                                            </Badge>
-                                                        )
-                                                    })}
-                                                </div>
-                                            )}
+                                       <AccordionPrimitive.Content className="overflow-hidden text-sm transition-all border-t border-dashed">
+                                           <div className="pb-4 pl-10 pr-4 space-y-4 pt-4 bg-muted/5">
                                            <div className="text-[11px] leading-relaxed text-muted-foreground bg-white border rounded-xl p-4 space-y-2 shadow-inner">
                                                {spot.notes && <p className="italic text-foreground font-medium mb-3">"{spot.notes}"</p>}
-                                                <p><strong>Conditions :</strong> {spot.context.airTemperature}°C (air), {spot.context.waterTemperature}°C (eau)</p>
-                                                <p><strong>Vent :</strong> {spot.context.windSpeed} nœuds de {spot.context.windDirection}</p>
-                                                {spot.context.swellInside && spot.context.swellOutside && (
-                                                    <p><strong>Houle :</strong> {spot.context.swellInside} (lagon), {spot.context.swellOutside} (large)</p>
-                                                )}
+                                                <p><strong>Conditions :</strong> {spot.context.airTemperature}°C, {spot.context.windSpeed} nds {spot.context.windDirection}</p>
                                                 <p><strong>Lune :</strong> {spot.context.moonPhase}</p>
-                                                <p><strong>Marée :</strong> {spot.context.tideMovement} ({spot.context.tideHeight.toFixed(2)}m), courant {spot.context.tideCurrent.toLowerCase()}</p>
-                                                {displayLowTide && <p><strong>Marée basse :</strong> {displayLowTide.time} ({displayLowTide.height.toFixed(2)}m)</p>}
-                                                {displayHighTide && <p><strong>Marée haute :</strong> {displayHighTide.time} ({displayHighTide.height.toFixed(2)}m)</p>}
+                                                <p><strong>Marée :</strong> {spot.context.tideMovement} ({spot.context.tideHeight.toFixed(2)}m)</p>
                                            </div>
                                            <div className="flex flex-wrap gap-2">
-                                               <Button variant="outline" className="flex-1 min-w-[140px] font-black uppercase text-[10px] h-10 border-2" onClick={() => handleFindSimilarDay(spot)} disabled={isAnalyzing}>
+                                               <Button variant="outline" className="flex-1 min-w-[120px] font-black uppercase text-[9px] h-10 border-2" onClick={() => handleFindSimilarDay(spot)} disabled={isAnalyzing}>
                                                    <BrainCircuit className="mr-2 size-4 text-primary"/> Jour similaire
                                                </Button>
-                                               <Button variant="outline" className="flex-1 min-w-[80px] font-black uppercase text-[10px] h-10 border-2 px-3" onClick={() => {
+                                               <Button variant="outline" className="flex-1 min-w-[60px] font-black uppercase text-[9px] h-10 border-2" onClick={() => {
                                                    if (map && spot.location) {
                                                        map.panTo({ lat: spot.location.latitude, lng: spot.location.longitude });
                                                        map.setZoom(16);
@@ -737,14 +649,14 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                    <LocateFixed className="mr-2 size-4 text-primary" /> GPS
                                                </Button>
                                                <div className="flex gap-2 w-full sm:w-auto">
-                                                   <Button variant="outline" size="icon" onClick={() => handleEditClick(spot)} className="flex-1 sm:flex-initial size-10 border-2"><Pencil className="h-4 w-4" /></Button>
-                                                   <Button variant="destructive" size="icon" onClick={() => handleDeleteSpot(spot.id)} className="flex-1 sm:flex-initial size-10 shadow-sm"><Trash2 className="size-4" /></Button>
+                                                   <Button variant="outline" size="icon" onClick={() => handleEditClick(spot)} className="size-10 border-2"><Pencil className="h-4 w-4" /></Button>
+                                                   <Button variant="destructive" size="icon" onClick={() => handleDeleteSpot(spot.id)} className="size-10 shadow-sm"><Trash2 className="size-4" /></Button>
                                                </div>
                                            </div>
                                            </div>
                                        </AccordionPrimitive.Content>
                                    </AccordionPrimitive.Item>
-                               )})}
+                               ))}
                             </AccordionPrimitive.Root>
                         ) : (
                             <div className="text-center py-12 border-2 border-dashed rounded-2xl opacity-40">
@@ -758,22 +670,15 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                 <Dialog open={isAnalysisDialogOpen} onOpenChange={setIsAnalysisDialogOpen}>
                     <DialogContent className="max-w-md rounded-2xl">
                         <DialogHeader>
-                            <DialogTitle className="flex items-center gap-2 font-black uppercase">
-                                <BrainCircuit className="text-primary" /> Analyse de l'IA
-                            </DialogTitle>
-                            <DialogDescription>
-                                Prédiction basée exclusivement sur les marées et la lune.
-                            </DialogDescription>
+                            <DialogTitle className="flex items-center gap-2 font-black uppercase"><BrainCircuit className="text-primary" /> Analyse de l'IA</DialogTitle>
                         </DialogHeader>
                         <div className="py-4 space-y-4">
-                            {isAnalyzing && (
+                            {isAnalyzing ? (
                                 <div className="flex flex-col items-center justify-center py-10 space-y-4">
                                     <BrainCircuit className="size-12 text-primary animate-pulse" />
                                     <p className="text-xs font-bold uppercase text-muted-foreground animate-pulse">Analyse en cours...</p>
-                                    <Skeleton className="h-2 -full" />
                                 </div>
-                            )}
-                            {analysisResult && (
+                            ) : analysisResult && (
                                 <div className="space-y-6 animate-in fade-in zoom-in-95">
                                     <div className="text-center p-6 bg-primary/5 border-2 border-primary/20 rounded-2xl">
                                         <p className="text-[10px] font-black uppercase text-muted-foreground mb-1 tracking-widest">Meilleure fenêtre</p>
@@ -782,19 +687,14 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                         </p>
                                     </div>
                                     <div className="space-y-2">
-                                        <div className="flex justify-between px-1"><Label className="text-[10px] font-black uppercase opacity-60">Indice de confiance</Label><span className="text-xs font-black">{analysisResult.score}%</span></div>
+                                        <div className="flex justify-between px-1"><Label className="text-[10px] font-black uppercase opacity-60">Confiance</Label><span className="text-xs font-black">{analysisResult.score}%</span></div>
                                         <Progress value={analysisResult.score} className="h-2" />
                                     </div>
-                                    <div className="p-4 bg-muted/30 border-2 rounded-2xl max-h-60 overflow-y-auto">
-                                        <h4 className="text-[10px] font-black uppercase mb-3 flex items-center gap-2"><Sparkles className="size-3 text-primary" /> Conclusion</h4>
-                                        <p className="text-xs font-medium leading-relaxed italic text-muted-foreground">"{analysisResult.explanation}"</p>
-                                    </div>
+                                    <p className="text-xs font-medium leading-relaxed italic text-muted-foreground bg-muted/30 p-4 rounded-xl border-2">"{analysisResult.explanation}"</p>
                                 </div>
                             )}
                         </div>
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setIsAnalysisDialogOpen(false)} className="w-full font-black uppercase h-12">Fermer</Button>
-                        </DialogFooter>
+                        <DialogFooter><Button variant="outline" onClick={() => setIsAnalysisDialogOpen(false)} className="w-full font-black uppercase h-12">Fermer</Button></DialogFooter>
                     </DialogContent>
                 </Dialog>
             </CardContent>

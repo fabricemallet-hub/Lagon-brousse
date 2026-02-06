@@ -14,20 +14,12 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Slider } from '@/components/ui/slider';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Users,
   LogOut,
@@ -47,14 +39,9 @@ import {
   Target,
   LocateFixed,
   MapPin,
-  Volume2,
-  VolumeX,
   AlertCircle,
-  Play,
   Settings,
   Zap,
-  Plus,
-  Minus,
 } from 'lucide-react';
 import {
   useUser,
@@ -64,7 +51,6 @@ import {
   useDoc,
 } from '@/firebase';
 import {
-  collection,
   getDoc,
   serverTimestamp,
   doc,
@@ -74,6 +60,7 @@ import {
   updateDoc,
   writeBatch,
   getDocs,
+  collection,
   query,
   orderBy
 } from 'firebase/firestore';
@@ -96,6 +83,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+const INITIAL_CENTER = { lat: -21.45, lng: 165.5 };
 const iconMap = { Navigation, UserIcon, Crosshair, Footprints, Mountain, MapPin };
 
 const defaultHuntingSounds = [
@@ -136,8 +124,8 @@ function HuntingSessionContent() {
   const [isParticipating, setIsParticipating] = useState(false);
   const [isGpsActive, setIsGpsActive] = useState(false);
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [initialZoomDone, setInitialZoomDone] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const shouldPanOnNextFix = useRef(false);
 
   const [nickname, setNickname] = useState('');
   const [selectedIcon, setSelectedIcon] = useState('Navigation');
@@ -155,13 +143,10 @@ function HuntingSessionContent() {
   const [mySessions, setMySessions] = useState<WithId<HuntingSession>[]>([]);
   const [areMySessionsLoading, setAreMySessionsLoading] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
-  
-  // Background/WakeLock State
   const [wakeLock, setWakeLock] = useState<any>(null);
 
   const prevParticipantsRef = useRef<SessionParticipant[] | null>(null);
 
-  // Sound Library from Firestore
   const soundsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
@@ -196,53 +181,36 @@ function HuntingSessionContent() {
 
   const playStatusSound = useCallback((status: string) => {
     if (!isSoundEnabled) return;
-    
-    let soundToIdentify = '';
-    if (status === 'En position') soundToIdentify = soundSettings.position;
-    else if (status === 'Battue en cours') soundToIdentify = soundSettings.battue;
-    else if (status === 'gibier') soundToIdentify = soundSettings.gibier;
+    let sId = '';
+    if (status === 'En position') sId = soundSettings.position;
+    else if (status === 'Battue en cours') sId = soundSettings.battue;
+    else if (status === 'gibier') sId = soundSettings.gibier;
 
-    const sound = availableSounds.find(s => s.id === soundToIdentify || s.label === soundToIdentify);
-    if (sound) {
-        const audio = new Audio(sound.url);
-        audio.volume = soundVolume;
-        audio.play().catch(() => {
-          console.warn(`Could not play sound: ${soundToIdentify}`);
-        });
-    }
-  }, [isSoundEnabled, soundSettings, soundVolume, availableSounds]);
-
-  const previewSound = (soundToIdentify: string) => {
-    const sound = availableSounds.find(s => s.id === soundToIdentify || s.label === soundToIdentify);
+    const sound = availableSounds.find(s => s.id === sId || s.label === sId);
     if (sound) {
         const audio = new Audio(sound.url);
         audio.volume = soundVolume;
         audio.play().catch(() => {});
     }
-  };
+  }, [isSoundEnabled, soundSettings, soundVolume, availableSounds]);
 
   useEffect(() => {
     if (!participants || !user) return;
-    
     if (prevParticipantsRef.current === null) {
       prevParticipantsRef.current = participants;
       return;
     }
-
     participants.forEach(p => {
       if (p.id === user.uid) return;
       const prev = prevParticipantsRef.current?.find(old => old.id === p.id);
-      
       if (p.isGibierEnVue && !prev?.isGibierEnVue) {
         playStatusSound('gibier');
         toast({ title: "GIBIER SIGNALÉ !", description: `Par ${p.displayName}`, variant: "destructive" });
       }
-      
       if (p.baseStatus !== prev?.baseStatus && p.baseStatus) {
         playStatusSound(p.baseStatus);
       }
     });
-
     prevParticipantsRef.current = participants;
   }, [participants, user, playStatusSound, toast]);
 
@@ -255,24 +223,16 @@ function HuntingSessionContent() {
       const sessions = querySnapshot.docs
         .map(doc => ({ ...doc.data(), id: doc.id } as WithId<HuntingSession>))
         .filter(s => s.organizerId === user.uid);
-      
-      sessions.sort((a, b) => {
-        const timeA = a.createdAt?.toMillis?.() || 0;
-        const timeB = b.createdAt?.toMillis?.() || 0;
-        return timeB - timeA;
-      });
-
+      sessions.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
       setMySessions(sessions.slice(0, 5));
     } catch (e) {
-      console.error("Error fetching sessions:", e);
+      console.error(e);
     } finally {
       setAreMySessionsLoading(false);
     }
   }, [firestore, user?.uid]);
 
-  useEffect(() => {
-    fetchMySessions();
-  }, [fetchMySessions]);
+  useEffect(() => { fetchMySessions(); }, [fetchMySessions]);
   
   useEffect(() => {
     if (userProfile) {
@@ -286,18 +246,11 @@ function HuntingSessionContent() {
 
   const toggleWakeLock = async () => {
     if (!('wakeLock' in navigator)) {
-      toast({ variant: "destructive", title: "Non supporté", description: "Votre navigateur ne supporte pas le maintien de l'écran allumé." });
+      toast({ variant: "destructive", title: "Non supporté", description: "Le maintien de l'écran n'est pas supporté." });
       return;
     }
-
     if (wakeLock) {
-      try {
-        await wakeLock.release();
-        setWakeLock(null);
-        toast({ title: "Mode éveil désactivé" });
-      } catch (e) {
-        setWakeLock(null);
-      }
+      try { await wakeLock.release(); setWakeLock(null); toast({ title: "Mode éveil désactivé" }); } catch (e) { setWakeLock(null); }
     } else {
       try {
         const lock = await (navigator as any).wakeLock.request('screen');
@@ -306,80 +259,55 @@ function HuntingSessionContent() {
           toast({ title: "Mode éveil activé" });
           lock.addEventListener('release', () => setWakeLock(null));
         }
-      } catch (err: any) {
-        toast({ variant: "destructive", title: "Permission bloquée", description: "Le maintien de l'écran est bloqué." });
+      } catch (err) {
+        toast({ variant: "destructive", title: "Permission bloquée" });
       }
     }
   };
 
   const handleLeaveSession = useCallback(async () => {
-    if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
-    }
-    
+    if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
     const previousSessionId = session?.id;
     setSession(null);
     setIsParticipating(false);
     setIsGpsActive(false);
     setUserLocation(null);
-    setInitialZoomDone(false);
-
     if (!user || !previousSessionId || !firestore) return;
-
     setIsSessionLoading(true);
     try {
-        const participantDocRef = doc(firestore, 'hunting_sessions', previousSessionId, 'participants', user.uid);
-        await deleteDoc(participantDocRef);
+        await deleteDoc(doc(firestore, 'hunting_sessions', previousSessionId, 'participants', user.uid));
         toast({ title: 'Vous avez quitté la session.' });
-    } catch (e: any) {
-        console.error("Failed to leave session:", e);
-    } finally {
-        setIsSessionLoading(false);
-    }
+    } catch (e) { console.error(e); } finally { setIsSessionLoading(false); }
   }, [user, session, firestore, toast]);
 
   const startTracking = useCallback(() => {
     if (!user || !firestore || !navigator.geolocation || !session?.id) return;
-
-    if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-    }
+    if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
 
     watchIdRef.current = navigator.geolocation.watchPosition(
         async (position) => {
             const { latitude, longitude } = position.coords;
-            const newLocation = { latitude, longitude };
-            setUserLocation(newLocation);
-
-            if (!initialZoomDone && map) {
+            setUserLocation({ latitude, longitude });
+            if (shouldPanOnNextFix.current && map) {
                 map.panTo({ lat: latitude, lng: longitude });
-                setInitialZoomDone(true);
+                map.setZoom(16);
+                shouldPanOnNextFix.current = false;
             }
-
-            const participantDocRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
-            
-            let batteryData = null;
+            const ref = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
+            let batt = null;
             if ('getBattery' in navigator) {
-                const battery: any = await (navigator as any).getBattery();
-                batteryData = { level: battery.level, charging: battery.charging };
+                const b: any = await (navigator as any).getBattery();
+                batt = { level: b.level, charging: b.charging };
             }
-
-            updateDoc(participantDocRef, {
-                location: newLocation,
-                battery: batteryData,
-                updatedAt: serverTimestamp(),
-            }).catch(() => {});
+            updateDoc(ref, { location: { latitude, longitude }, battery: batt, updatedAt: serverTimestamp() }).catch(() => {});
         },
-        (err) => console.error("Geolocation watch error:", err),
+        (err) => console.error(err),
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
-  }, [user, firestore, session, map, initialZoomDone]);
+  }, [user, firestore, session, map]);
   
   useEffect(() => {
-    if (isParticipating && session && isGpsActive) {
-        startTracking();
-    }
+    if (isParticipating && session && isGpsActive) startTracking();
     return () => { if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current); };
   }, [isParticipating, session, isGpsActive, startTracking]);
 
@@ -390,30 +318,16 @@ function HuntingSessionContent() {
         const code = createCode.trim() ? createCode.trim().toUpperCase() : `CH-${Math.floor(1000 + Math.random() * 9000)}`;
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + 24);
-        const newSessionData = { organizerId: user.uid, createdAt: serverTimestamp(), expiresAt: Timestamp.fromDate(expiresAt) };
-        await setDoc(doc(firestore, 'hunting_sessions', code), newSessionData);
-        
-        // Initial participant setup (no location yet)
-        const participantDocRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
-        await setDoc(participantDocRef, { 
-            id: user.uid,
-            displayName: nickname, 
-            mapIcon: selectedIcon, 
-            mapColor: selectedColor, 
-            baseStatus: '', 
-            isGibierEnVue: false,
-            updatedAt: serverTimestamp() 
+        const data = { organizerId: user.uid, createdAt: serverTimestamp(), expiresAt: Timestamp.fromDate(expiresAt) };
+        await setDoc(doc(firestore, 'hunting_sessions', code), data);
+        await setDoc(doc(firestore, 'hunting_sessions', code, 'participants', user.uid), { 
+            id: user.uid, displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor, baseStatus: '', isGibierEnVue: false, updatedAt: serverTimestamp() 
         });
-        
-        setSession({ id: code, ...newSessionData } as any);
+        setSession({ id: code, ...data } as any);
         setIsParticipating(true);
         fetchMySessions();
-        toast({ title: 'Session créée !', description: `Code : ${code}. Activez votre GPS pour être vu.` });
-    } catch (e: any) {
-        toast({ variant: 'destructive', title: 'Erreur', description: e.message });
-    } finally {
-        setIsSessionLoading(false);
-    }
+        toast({ title: 'Session créée !', description: `Code : ${code}` });
+    } catch (e: any) { toast({ variant: 'destructive', title: 'Erreur', description: e.message }); } finally { setIsSessionLoading(false); }
   };
   
   const handleJoinSession = async () => {
@@ -421,74 +335,59 @@ function HuntingSessionContent() {
     setIsSessionLoading(true);
     try {
       const sessionId = joinCode.toUpperCase();
-      const sessionDoc = await getDoc(doc(firestore, 'hunting_sessions', sessionId));
-      if (!sessionDoc.exists()) throw new Error('Session non trouvée.');
-      
-      const participantDocRef = doc(firestore, 'hunting_sessions', sessionId, 'participants', user.uid);
-      await setDoc(participantDocRef, { 
-          id: user.uid,
-          displayName: nickname, 
-          mapIcon: selectedIcon, 
-          mapColor: selectedColor, 
-          baseStatus: '', 
-          isGibierEnVue: false,
-          updatedAt: serverTimestamp() 
+      const snap = await getDoc(doc(firestore, 'hunting_sessions', sessionId));
+      if (!snap.exists()) throw new Error('Session non trouvée.');
+      await setDoc(doc(firestore, 'hunting_sessions', sessionId, 'participants', user.uid), { 
+          id: user.uid, displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor, baseStatus: '', isGibierEnVue: false, updatedAt: serverTimestamp() 
       }, { merge: true });
-      
-      setSession({ id: sessionDoc.id, ...sessionDoc.data() } as any);
+      setSession({ id: snap.id, ...snap.data() } as any);
       setIsParticipating(true);
-      toast({ title: 'Session rejointe', description: "Activez votre GPS pour que vos partenaires vous voient." });
-    } catch (e: any) {
-        toast({ variant: 'destructive', title: 'Erreur', description: e.message });
-    } finally {
-        setIsSessionLoading(false);
-    }
+      toast({ title: 'Session rejointe' });
+    } catch (e: any) { toast({ variant: 'destructive', title: 'Erreur', description: e.message }); } finally { setIsSessionLoading(false); }
   };
 
   const handleToggleGps = () => {
     if (!isGpsActive) {
         setIsGpsActive(true);
-        toast({ title: "GPS Activé", description: "Votre position est maintenant partagée." });
+        shouldPanOnNextFix.current = true;
+        toast({ title: "GPS Activé" });
     } else {
         setIsGpsActive(false);
-        if (watchIdRef.current !== null) {
-            navigator.geolocation.clearWatch(watchIdRef.current);
-            watchIdRef.current = null;
-        }
+        if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
         setUserLocation(null);
-        toast({ title: "GPS Désactivé", description: "Vous n'êtes plus visible sur la carte." });
+        toast({ title: "GPS Désactivé" });
+    }
+  };
+
+  const handleRecenter = () => {
+    if (isGpsActive && userLocation && map) {
+        map.panTo({ lat: userLocation.latitude, lng: userLocation.longitude });
+        map.setZoom(16);
+    } else {
+        handleToggleGps();
     }
   };
 
   const handleDeleteSessionConfirmed = async () => {
     if (!firestore || !sessionToDelete) return;
     try {
-        const participantsRef = collection(firestore, 'hunting_sessions', sessionToDelete, 'participants');
-        const snap = await getDocs(participantsRef);
+        const snap = await getDocs(collection(firestore, 'hunting_sessions', sessionToDelete, 'participants'));
         const batch = writeBatch(firestore);
         snap.forEach(d => batch.delete(d.ref));
         batch.delete(doc(firestore, 'hunting_sessions', sessionToDelete));
         await batch.commit();
         await fetchMySessions();
         toast({ title: 'Session supprimée' });
-    } catch (e) {
-        toast({ variant: 'destructive', title: 'Erreur' });
-    } finally {
-        setSessionToDelete(null);
-    }
+    } catch (e) { console.error(e); } finally { setSessionToDelete(null); }
   };
 
-  const updateTacticalStatus = async (status: string) => {
+  const updateTacticalStatus = async (st: string) => {
     if (!user || !firestore || !session) return;
     const ref = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
     const me = participants?.find(p => p.id === user.uid);
-    const isDeactivating = me?.baseStatus === status;
-    const newStatus = isDeactivating ? '' : status;
-    await updateDoc(ref, { baseStatus: newStatus });
-    if (!isDeactivating) {
-        playStatusSound(status);
-        toast({ title: `Statut : ${status}` });
-    }
+    const newVal = me?.baseStatus === st ? '' : st;
+    await updateDoc(ref, { baseStatus: newVal });
+    if (newVal) { playStatusSound(st); toast({ title: `Statut : ${st}` }); }
   };
 
   const toggleGibierEnVue = async () => {
@@ -507,29 +406,15 @@ function HuntingSessionContent() {
     try {
         const prefs = { displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor };
         await updateDoc(doc(firestore, 'users', user.uid), prefs);
-        if (session && isParticipating) {
-            await updateDoc(doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid), prefs);
-        }
-        toast({ title: 'Préférences sauvegardées !' });
+        if (session && isParticipating) await updateDoc(doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid), prefs);
+        toast({ title: 'Sauvegardé !' });
         setPrefsSection(undefined); 
-    } catch (e) {
-        console.error(e);
-    } finally {
-        setIsSavingPrefs(false);
-    }
+    } catch (e) { console.error(e); } finally { setIsSavingPrefs(false); }
   };
 
-  const mapOptions = useMemo(() => ({
-    disableDefaultUI: true, 
-    zoomControl: true, 
-    mapTypeId: 'satellite',
-    gestureHandling: 'greedy'
-  }), []);
-
   if (session) {
-    if (loadError) return <Card><CardContent><Alert variant="destructive"><AlertTitle>Erreur Google Maps</AlertTitle></Alert></CardContent></Card>;
+    if (loadError) return <Card><CardContent><Alert variant="destructive"><AlertTitle>Erreur Maps</AlertTitle></Alert></CardContent></Card>;
     if (!isLoaded || isProfileLoading) return <Card><CardContent><Skeleton className="h-80 w-full" /></CardContent></Card>;
-
     const me = participants?.find(p => p.id === user?.uid);
 
     return (
@@ -544,176 +429,72 @@ function HuntingSessionContent() {
                  <div className={cn("relative w-full rounded-lg overflow-hidden border", isFullscreen ? "flex-grow" : "h-80")}>
                     <GoogleMap
                         mapContainerClassName="w-full h-full"
-                        defaultCenter={userLocation ? { lat: userLocation.latitude, lng: userLocation.longitude } : { lat: -21.45, lng: 165.5 }}
+                        defaultCenter={INITIAL_CENTER}
                         defaultZoom={16}
                         onLoad={setMap}
-                        options={mapOptions}
+                        options={{ disableDefaultUI: true, zoomControl: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
                     >
                         {userLocation && (
                             <OverlayView position={{ lat: userLocation.latitude, lng: userLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                 <PulsingDot />
                             </OverlayView>
                         )}
-
                         {participants?.map(p => p.location && (
                             <OverlayView key={p.id} position={{ lat: p.location.latitude, lng: p.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                 <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
-                                    <div className={cn(
-                                        "px-2.5 py-1 rounded text-[11px] font-black text-white shadow-lg whitespace-nowrap border border-white/30",
-                                        p.isGibierEnVue ? "bg-red-600 animate-bounce" : "bg-slate-900 backdrop-blur-md"
-                                    )}>
+                                    <div className={cn("px-2 py-1 rounded text-[11px] font-black text-white shadow-lg border", p.isGibierEnVue ? "bg-red-600 animate-bounce" : "bg-slate-900/80 backdrop-blur-md")}>
                                         {p.displayName} {p.baseStatus ? `• ${p.baseStatus}` : ''}
                                     </div>
-                                    <div 
-                                        className={cn(
-                                            "p-1.5 rounded-full shadow-lg border-2 border-white transition-all",
-                                            p.isGibierEnVue && "scale-125 ring-4 ring-red-500/50"
-                                        )} 
-                                        style={{ backgroundColor: p.isGibierEnVue ? '#ef4444' : (p.mapColor || '#3b82f6') }}
-                                    >
+                                    <div className={cn("p-1.5 rounded-full shadow-lg border-2 border-white", p.isGibierEnVue && "scale-125 ring-4 ring-red-500/50")} style={{ backgroundColor: p.isGibierEnVue ? '#ef4444' : (p.mapColor || '#3b82f6') }}>
                                         {React.createElement(iconMap[p.mapIcon as keyof typeof iconMap] || Navigation, { className: "size-4 text-white" })}
                                     </div>
                                 </div>
                             </OverlayView>
                         ))}
                     </GoogleMap>
-                    <Button size="icon" onClick={() => setIsFullscreen(!isFullscreen)} className="absolute top-2 left-2 shadow-lg h-9 w-9 z-10 bg-background/80 backdrop-blur-sm">
-                        {isFullscreen ? <Shrink /> : <Expand />}
-                    </Button>
-                    <Button size="icon" onClick={() => { if(!isGpsActive) handleToggleGps(); else userLocation && map?.panTo({ lat: userLocation.latitude, lng: userLocation.longitude }); }} className={cn("absolute top-2 right-2 shadow-lg h-9 w-9 z-10 border-2", isGpsActive ? "bg-primary text-white border-primary" : "bg-background/80 backdrop-blur-sm")}>
-                        <LocateFixed className="size-5" />
-                    </Button>
+                    <Button size="icon" onClick={() => setIsFullscreen(!isFullscreen)} className="absolute top-2 left-2 shadow-lg h-9 w-9 z-10 bg-background/80 backdrop-blur-sm"><Expand className="size-5" /></Button>
+                    <Button size="icon" onClick={handleRecenter} className={cn("absolute top-2 right-2 shadow-lg h-9 w-9 z-10 border-2", isGpsActive ? "bg-primary text-white" : "bg-background/80 backdrop-blur-sm")}><LocateFixed className="size-5" /></Button>
                 </div>
 
+                {!isGpsActive && (
+                    <Alert className="bg-primary/5 border-primary/20">
+                        <LocateFixed className="size-4 text-primary" />
+                        <AlertTitle className="text-xs font-black uppercase">GPS Inactif</AlertTitle>
+                        <AlertDescription className="flex flex-col gap-2">
+                            <p className="text-[10px] font-medium leading-relaxed">Activez votre position pour que vos coéquipiers puissent vous situer sur la carte.</p>
+                            <Button size="sm" onClick={handleToggleGps} className="font-black h-10 uppercase text-[10px] tracking-widest">Activer ma position</Button>
+                        </AlertDescription>
+                    </Alert>
+                )}
+
                 <div className="grid grid-cols-2 gap-2">
-                    <Button 
-                        variant={me?.baseStatus === 'En position' ? 'default' : 'outline'} 
-                        className="h-12 font-bold"
-                        onClick={() => updateTacticalStatus('En position')}
-                    >
-                        <MapPin className="mr-2 size-4" /> En Position
-                    </Button>
-                    <Button 
-                        variant={me?.baseStatus === 'Battue en cours' ? 'default' : 'outline'} 
-                        className="h-12 font-bold"
-                        onClick={() => updateTacticalStatus('Battue en cours')}
-                    >
-                        <Footprints className="mr-2 size-4" /> En Battue
-                    </Button>
-                    <Button 
-                        variant={me?.isGibierEnVue ? 'destructive' : 'secondary'} 
-                        className={cn("col-span-2 h-14 text-lg font-black shadow-lg", me?.isGibierEnVue && "animate-pulse")}
-                        onClick={toggleGibierEnVue}
-                    >
-                        <Target className="mr-2 size-6" /> {me?.isGibierEnVue ? 'GIBIER SIGNALÉ !' : 'SIGNALER GIBIER'}
-                    </Button>
+                    <Button variant={me?.baseStatus === 'En position' ? 'default' : 'outline'} className="h-12 font-bold" onClick={() => updateTacticalStatus('En position')}><MapPin className="mr-2 size-4" /> En Position</Button>
+                    <Button variant={me?.baseStatus === 'Battue en cours' ? 'default' : 'outline'} className="h-12 font-bold" onClick={() => updateTacticalStatus('Battue en cours')}><Footprints className="mr-2 size-4" /> En Battue</Button>
+                    <Button variant={me?.isGibierEnVue ? 'destructive' : 'secondary'} className={cn("col-span-2 h-14 text-lg font-black shadow-lg", me?.isGibierEnVue && "animate-pulse")} onClick={toggleGibierEnVue}><Target className="mr-2 size-6" /> {me?.isGibierEnVue ? 'GIBIER SIGNALÉ !' : 'SIGNALER GIBIER'}</Button>
                 </div>
 
                 {!isFullscreen && (
                     <div className="space-y-4">
-                        <Button 
-                          onClick={handleToggleGps} 
-                          variant={isGpsActive ? "default" : "outline"} 
-                          className={cn("w-full h-12 font-black uppercase tracking-widest border-2", isGpsActive && "bg-green-600 border-green-700 hover:bg-green-700")}
-                        >
-                          <LocateFixed className="mr-2 size-5" />
-                          {isGpsActive ? "MON GPS EST ACTIF" : "ACTIVER MON GPS"}
-                        </Button>
-
                         <Accordion type="single" collapsible value={prefsSection} onValueChange={setPrefsSection} className="w-full">
                             <AccordionItem value="prefs" className="border-none">
-                                <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-2 bg-muted/50 rounded-lg px-4 mb-2">
-                                    <Settings className="size-4" />
-                                    <span>Mon Profil & Sons</span>
-                                </AccordionTrigger>
+                                <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-2 bg-muted/50 rounded-lg px-4 mb-2"><Settings className="size-4" /><span>Profil & Sons</span></AccordionTrigger>
                                 <AccordionContent className="space-y-4 pt-2 px-1">
                                     <div className="space-y-4 rounded-lg border p-4 bg-muted/30">
-                                        <Label className="text-xs font-bold uppercase text-muted-foreground">Paramètres de session</Label>
-                                        <Input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="Mon surnom..." />
-                                        
-                                        <Button 
-                                          variant={wakeLock ? "secondary" : "outline"} 
-                                          size="sm"
-                                          className={cn("w-full gap-2 font-bold h-11 border-2 my-2", wakeLock && "bg-primary/10 text-primary border-primary")}
-                                          onClick={toggleWakeLock}
-                                        >
-                                          <Zap className={cn("size-4", wakeLock && "fill-current")} />
-                                          {wakeLock ? "MODE ÉVEIL ACTIF" : "ACTIVER MODE ÉVEIL"}
-                                        </Button>
-
-                                        <div className="space-y-4 pt-4 border-t border-border/50">
-                                            <Label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-2">
-                                                <Volume2 className="size-4" /> Paramètres Audio
-                                            </Label>
-                                            
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    {isSoundEnabled ? <Volume2 className="size-4 text-primary" /> : <VolumeX className="size-4 text-muted-foreground" />}
-                                                    <Label className="text-sm">Activer les sons</Label>
-                                                </div>
-                                                <Switch checked={isSoundEnabled} onCheckedChange={setIsSoundEnabled} />
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <div className="flex justify-between text-xs">
-                                                    <span>Volume</span>
-                                                    <span>{Math.round(soundVolume * 100)}%</span>
-                                                </div>
-                                                <Slider value={[soundVolume]} min={0} max={1} step={0.1} onValueChange={(val) => setSoundVolume(val[0])} className="flex-grow" />
-                                            </div>
-
-                                            <div className="grid grid-cols-1 gap-3">
-                                                <div className="space-y-1.5">
-                                                    <Label className="text-[10px] font-bold uppercase flex items-center gap-1">Son : En Position</Label>
-                                                    <Select value={soundSettings.position} onValueChange={(val) => { setSoundSettings(prev => ({...prev, position: val})); previewSound(val); }}>
-                                                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                                                        <SelectContent>{availableSounds.map(s => <SelectItem key={s.id || s.label} value={s.id || s.label}>{s.label}</SelectItem>)}</SelectContent>
-                                                    </Select>
-                                                </div>
-                                                <div className="space-y-1.5">
-                                                    <Label className="text-[10px] font-bold uppercase flex items-center gap-1">Son : En Battue</Label>
-                                                    <Select value={soundSettings.battue} onValueChange={(val) => { setSoundSettings(prev => ({...prev, battue: val})); previewSound(val); }}>
-                                                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                                                        <SelectContent>{availableSounds.map(s => <SelectItem key={s.id || s.label} value={s.id || s.label}>{s.label}</SelectItem>)}</SelectContent>
-                                                    </Select>
-                                                </div>
-                                                <div className="space-y-1.5">
-                                                    <Label className="text-[10px] font-bold uppercase text-destructive flex items-center gap-1">Son : Gibier</Label>
-                                                    <Select value={soundSettings.gibier} onValueChange={(val) => { setSoundSettings(prev => ({...prev, gibier: val})); previewSound(val); }}>
-                                                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                                                        <SelectContent>{availableSounds.map(s => <SelectItem key={s.id || s.label} value={s.id || s.label}>{s.label}</SelectItem>)}</SelectContent>
-                                                    </Select>
-                                                </div>
-                                            </div>
-                                        </div>
-
+                                        <Input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="Surnom..." />
+                                        <Button variant={wakeLock ? "secondary" : "outline"} size="sm" className="w-full h-11 border-2" onClick={toggleWakeLock}><Zap className="size-4 mr-2" />{wakeLock ? "ÉVEIL ACTIF" : "MAINTENIR ÉCRAN"}</Button>
+                                        <div className="flex items-center justify-between pt-2 border-t"><Label className="text-xs font-bold uppercase">Sons actifs</Label><Switch checked={isSoundEnabled} onCheckedChange={setIsSoundEnabled} /></div>
                                         <Button onClick={handleSavePreferences} size="sm" disabled={isSavingPrefs} className="w-full"><Save className="mr-2 h-4 w-4" /> Sauvegarder Profil</Button>
                                     </div>
                                 </AccordionContent>
                             </AccordionItem>
                         </Accordion>
-
                         <div className="space-y-2">
-                            <h4 className="font-bold text-sm flex items-center gap-2">
-                                <Users className="size-4" /> Équipe ({participants?.length || 0})
-                            </h4>
+                            <h4 className="font-bold text-xs uppercase flex items-center gap-2 px-1"><Users className="size-4" /> Équipe ({participants?.length || 0})</h4>
                             <div className="max-h-48 overflow-y-auto space-y-1 divide-y border rounded-lg bg-card">
                                 {participants?.map(p => (
-                                    <div key={p.id} className={cn("flex justify-between items-center p-3 text-sm", p.isGibierEnVue && "bg-red-50 dark:bg-red-950/20")}>
-                                        <div className="flex items-center gap-3">
-                                            <div className="size-3 rounded-full" style={{ backgroundColor: p.mapColor || '#3b82f6' }} />
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-bold">{p.displayName}</span>
-                                                {p.baseStatus && (
-                                                    <Badge className={cn("text-[10px] font-black uppercase px-1.5 py-0 shadow-sm border-none", p.baseStatus === 'En position' ? "bg-blue-600" : "bg-orange-600")}>
-                                                        {p.baseStatus}
-                                                    </Badge>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-3 text-muted-foreground">
-                                            {p.battery && <BatteryIcon level={p.battery.level} charging={p.battery.charging} />}
-                                        </div>
+                                    <div key={p.id} className={cn("flex justify-between items-center p-3 text-sm", p.isGibierEnVue && "bg-red-50")}>
+                                        <div className="flex items-center gap-3"><div className="size-3 rounded-full" style={{ backgroundColor: p.mapColor || '#3b82f6' }} /><span className="font-bold">{p.displayName}</span></div>
+                                        {p.battery && <BatteryIcon level={p.battery.level} charging={p.battery.charging} />}
                                     </div>
                                 ))}
                             </div>
@@ -727,70 +508,24 @@ function HuntingSessionContent() {
 
   return (
     <div className="space-y-6">
-        <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><Users className="size-5 text-primary" /> Session de Chasse</CardTitle></CardHeader>
+        <Card><CardHeader><CardTitle className="flex items-center gap-2"><Users className="size-5 text-primary" /> Session de Chasse</CardTitle></CardHeader>
             <CardContent>
-                <Tabs defaultValue="join">
-                    <TabsList className="grid w-full grid-cols-2"><TabsTrigger value="join">Rejoindre</TabsTrigger><TabsTrigger value="create">Créer</TabsTrigger></TabsList>
-                    <TabsContent value="join" className="space-y-4 pt-4">
-                        <Input placeholder="Code CH-XXXX" value={joinCode} onChange={e => setJoinCode(e.target.value)} className="text-center font-mono text-lg uppercase tracking-widest h-12" />
-                        <Button onClick={handleJoinSession} className="w-full h-12 text-lg font-bold" disabled={isSessionLoading}>Rejoindre le groupe</Button>
-                    </TabsContent>
-                    <TabsContent value="create" className="space-y-4 pt-4">
-                        <Input placeholder="Code personnalisé (optionnel)" value={createCode} onChange={e => setCreateCode(e.target.value)} className="text-center font-mono text-lg uppercase tracking-widest h-12" />
-                        <Button onClick={handleCreateSession} className="w-full h-12 text-lg font-bold" disabled={isSessionLoading}>Créer une session</Button>
-                    </TabsContent>
+                <Tabs defaultValue="join"><TabsList className="grid w-full grid-cols-2"><TabsTrigger value="join">Rejoindre</TabsTrigger><TabsTrigger value="create">Créer</TabsTrigger></TabsList>
+                    <TabsContent value="join" className="space-y-4 pt-4"><Input placeholder="Code CH-XXXX" value={joinCode} onChange={e => setJoinCode(e.target.value)} className="text-center font-mono text-lg uppercase h-12" /><Button onClick={handleJoinSession} className="w-full h-12 text-lg font-bold" disabled={isSessionLoading}>Rejoindre le groupe</Button></TabsContent>
+                    <TabsContent value="create" className="space-y-4 pt-4"><Input placeholder="Code perso (optionnel)" value={createCode} onChange={e => setCreateCode(e.target.value)} className="text-center font-mono text-lg uppercase h-12" /><Button onClick={handleCreateSession} className="w-full h-12 text-lg font-bold" disabled={isSessionLoading}>Créer une session</Button></TabsContent>
                 </Tabs>
             </CardContent>
         </Card>
-        {areMySessionsLoading ? <Skeleton className="h-24 w-full" /> : mySessions && mySessions.length > 0 && (
-            <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm font-bold uppercase text-muted-foreground">Mes sessions récentes</CardTitle></CardHeader>
-                <CardContent className="space-y-2">
-                    {mySessions.map(s => (
-                        <div key={s.id} className="flex justify-between items-center p-3 border rounded-lg text-sm font-mono bg-card hover:bg-muted/50 transition-colors">
-                            <span className="font-bold">{s.id}</span>
-                            <div className="flex items-center gap-2">
-                                <Button variant="ghost" size="sm" onClick={() => setJoinCode(s.id)}>Sélectionner</Button>
-                                <Button variant="ghost" size="icon" onClick={() => setSessionToDelete(s.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                            </div>
-                        </div>
-                    ))}
-                </CardContent>
-            </Card>
-        )}
-
-        {sessionToDelete && (
-            <AlertDialog open={!!sessionToDelete} onOpenChange={(open) => !open && setSessionToDelete(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Supprimer la session ?</AlertDialogTitle>
-                        <AlertDialogDescription>Cette action est irréversible.</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Annuler</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteSessionConfirmed}>Supprimer</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-        )}
+        {mySessions.length > 0 && <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-bold uppercase text-muted-foreground">Mes sessions</CardTitle></CardHeader>
+            <CardContent className="space-y-2">{mySessions.map(s => <div key={s.id} className="flex justify-between items-center p-3 border rounded-lg text-sm bg-card"><span className="font-bold">{s.id}</span><div className="flex gap-2"><Button variant="ghost" size="sm" onClick={() => setJoinCode(s.id)}>Sélectionner</Button><Button variant="ghost" size="icon" onClick={() => setSessionToDelete(s.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></div></div>)}</CardContent></Card>}
+        {sessionToDelete && <AlertDialog open={!!sessionToDelete} onOpenChange={(o) => !o && setSessionToDelete(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Supprimer ?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={handleDeleteSessionConfirmed}>Supprimer</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>}
     </div>
   );
 }
 
 export function HuntingSessionCard() {
   const { user, isUserLoading } = useUser();
-  if (isUserLoading) return <Card><CardContent><Skeleton className="h-48 w-full" /></CardContent></Card>;
-  if (!user) return (
-    <Card>
-        <CardHeader>
-            <CardTitle className="flex items-center gap-2"><AlertCircle className="text-destructive" /> Connexion requise</CardTitle>
-            <CardDescription>Connectez-vous pour rejoindre une session de chasse.</CardDescription>
-        </CardHeader>
-        <CardContent>
-            <Button asChild className="w-full"><Link href="/login">Se connecter</Link></Button>
-        </CardContent>
-    </Card>
-  );
+  if (isUserLoading) return <Skeleton className="h-48 w-full" />;
+  if (!user) return <Card><CardHeader><CardTitle className="flex items-center gap-2"><AlertCircle className="text-destructive" /> Connexion requise</CardTitle></CardHeader><CardContent><Button asChild className="w-full"><Link href="/login">Se connecter</Link></Button></CardContent></Card>;
   return <HuntingSessionContent />;
 }
