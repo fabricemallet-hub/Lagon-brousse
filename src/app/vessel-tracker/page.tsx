@@ -709,7 +709,21 @@ export default function VesselTrackerPage() {
                             const vessel = followedVessels?.find(v => v.id === id);
                             const isActive = vessel?.isSharing === true;
                             return (
-                                <div key={id} className={cn("flex items-center justify-between p-3 border-2 rounded-xl transition-all shadow-sm", isActive ? "bg-primary/5 border-primary/20" : "bg-muted/5 opacity-60")}>
+                                <div 
+                                    key={id} 
+                                    className={cn(
+                                        "flex items-center justify-between p-3 border-2 rounded-xl transition-all shadow-sm cursor-pointer active:scale-95", 
+                                        isActive ? "bg-primary/5 border-primary/20" : "bg-muted/5 opacity-60"
+                                    )}
+                                    onClick={() => {
+                                        setVesselIdToFollow(id);
+                                        if (isActive && vessel.location && map) {
+                                            map.panTo({ lat: vessel.location.latitude, lng: vessel.location.longitude });
+                                            map.setZoom(15);
+                                            toast({ title: `Ouverture de ${vessel.displayName || id}` });
+                                        }
+                                    }}
+                                >
                                     <div className="flex items-center gap-3">
                                         <div className={cn("p-2 rounded-lg", isActive ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>
                                             {isActive ? <Navigation className="size-4" /> : <WifiOff className="size-4" />}
@@ -721,7 +735,17 @@ export default function VesselTrackerPage() {
                                     </div>
                                     <div className="flex items-center gap-2">
                                         {isActive && <BatteryIconComp level={vessel?.batteryLevel} charging={vessel?.isCharging} />}
-                                        <Button variant="ghost" size="icon" onClick={() => handleRemoveSavedVessel(id)} className="size-8 text-destructive/40 hover:text-destructive border-2 touch-manipulation"><Trash2 className="size-3" /></Button>
+                                        <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleRemoveSavedVessel(id);
+                                            }} 
+                                            className="size-8 text-destructive/40 hover:text-destructive border-2 touch-manipulation"
+                                        >
+                                            <Trash2 className="size-3" />
+                                        </Button>
                                     </div>
                                 </div>
                             );
