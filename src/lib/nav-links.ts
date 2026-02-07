@@ -1,4 +1,4 @@
-import { Home, Waves, Leaf, Fish, Calendar, Scale, Crosshair, User, Shield, MessageSquare, BookOpen, Sprout, Sun, Navigation } from 'lucide-react';
+import { Home, Waves, Leaf, Fish, Calendar, Scale, Crosshair, User, Shield, MessageSquare, BookOpen, Sprout, Sun, Navigation, HelpCircle } from 'lucide-react';
 
 export const navLinks = [
   { href: '/', label: 'Accueil', icon: Home, adminOnly: false },
@@ -12,6 +12,7 @@ export const navLinks = [
   { href: '/champs', label: 'Champs', icon: Leaf, adminOnly: false },
   { href: '/semis', label: 'Guide Culture', icon: Sprout, adminOnly: false },
   { href: '/reglementation', label: 'Réglementation', icon: Scale, adminOnly: false },
+  { href: '/aide/faq', label: 'FAQ & Support', icon: HelpCircle, adminOnly: false },
   { href: '/aide', label: 'Mode opératoire', icon: BookOpen, adminOnly: false },
   { href: '/compte', label: 'Compte', icon: User, adminOnly: false },
   { href: '/admin', label: 'Admin', icon: Shield, adminOnly: true },
