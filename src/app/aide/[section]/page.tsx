@@ -97,16 +97,16 @@ const sectionContent: Record<string, {
     role: "Un système de sécurité maritime haute-fidélité conçu pour partager votre position GPS, votre statut d'activité et votre niveau de batterie avec vos proches restés à terre.",
     steps: [
       "Émetteur (A) - Identité : Configurez un ID et votre surnom de navire. Ce surnom est inclus automatiquement au début de vos SMS d'urgence.",
-      "Émetteur (A) - Mode Éveil & Status : Activez 'MODE ÉVEIL' pour maintenir l'écran allumé. Utilisez les boutons 'Retour' ou 'Home' pour signaler vos intentions.",
-      "Émetteur (A) - Urgence SMS : Choisissez entre le message standard ou personnalisé via l'interrupteur. Le point GPS est toujours annexé.",
+      "Émetteur (A) - Signaux Tactiques : Utilisez 'DEMANDE ASSISTANCE' pour une alerte rouge clignotante immédiate, ou 'REGROUPEMENT OISEAUX' pour marquer une chasse par un point GPS horodaté sur la carte.",
       "Récepteur (B) - Flotte & Suivi : Saisissez l'ID d'un navire pour l'ajouter. Vous pouvez suivre plusieurs navires simultanément sur la carte satellite.",
-      "Récepteur (B) - Alertes : Personnalisez les sons et réglez le seuil de batterie basse via les curseurs.",
-      "Journal de Bord : Consultez l'historique synchronisé (batterie, charge, statut). L'émetteur peut effacer l'historique pour tout le monde."
+      "Récepteur (B) - Veille Stratégique : Configurez une alerte d'immobilité (1h à 24h). Si le navire reste immobile trop longtemps, une alarme sonore jouera en boucle jusqu'à votre validation.",
+      "Récepteur (B) - Sons : Personnalisez chaque alerte (Mouvement, Assistance, Oiseaux, Batterie) via les sélecteurs de sons dédiés.",
+      "Journal de Bord : Consultez l'historique permanent. Utilisez le bouton 'Reset' pour vider l'historique et effacer les points de chasse de la carte."
     ],
     tips: [
       "Surnom SMS : Votre surnom de navire (ex: [TITANIC]) est ajouté automatiquement au début du SMS pour une identification immédiate par les secours.",
-      "Mode Auto : Le système détecte l'immobilité après 30s. Le bouton 'Reprise Mode Auto' permet de recalibrer le statut en cas de dérive de pêche.",
-      "Annuaire Maritime : Les numérations d'urgence NC (COSS 16, SAMU 15, etc.) sont disponibles en bas de page."
+      "Lecture en boucle : L'alarme de veille stratégique ne s'arrête que si vous appuyez sur le bouton 'ARRÊTER L'ALARME' sur le téléphone du récepteur.",
+      "Mode Auto : Le système détecte l'immobilité après 30s. Le bouton 'Reprise Mode Auto' permet de recalibrer le statut en cas de dérive de pêche."
     ]
   },
   'peche': {
