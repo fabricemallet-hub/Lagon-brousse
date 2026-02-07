@@ -332,7 +332,10 @@ export default function VesselTrackerPage() {
     if (!firestore || !user) return;
     try {
         if (isSharing) {
-            await updateDoc(doc(firestore, 'vessels', sharingId), { historyClearedAt: serverTimestamp(), huntingMarkers: [] });
+            await updateDoc(doc(firestore, 'vessels', sharingId), { 
+              historyClearedAt: serverTimestamp(), 
+              huntingMarkers: [] 
+            });
             lastClearTimesRef.current[sharingId] = Date.now();
             if (typeof window !== 'undefined') localStorage.setItem('lb_vessel_clear_times_v3', JSON.stringify(lastClearTimesRef.current));
         }
@@ -410,11 +413,15 @@ export default function VesselTrackerPage() {
             
             if (mode === 'receiver' && lastStatus && vesselPrefs.isNotifyEnabled) {
                 if (currentStatus === 'emergency' && statusChanged) {
-                    playVesselSound(vesselPrefs.notifySounds.emergency || 'alerte');
-                    toast({ variant: 'destructive', title: vessel.displayName || vessel.id, description: "DEMANDE ASSISTANCE !" });
+                    if (vesselPrefs.notifySettings.emergency) {
+                      playVesselSound(vesselPrefs.notifySounds.emergency || 'alerte');
+                      toast({ variant: 'destructive', title: vessel.displayName || vessel.id, description: "DEMANDE ASSISTANCE !" });
+                    }
                 } else if (currentEvent.includes('CHASSE') && eventChanged) {
-                    playVesselSound(vesselPrefs.notifySounds.birds || 'sonar');
-                    toast({ title: vessel.displayName || vessel.id, description: "Signal de chasse détecté !" });
+                    if (vesselPrefs.notifySettings.birds) {
+                      playVesselSound(vesselPrefs.notifySounds.birds || 'sonar');
+                      toast({ title: vessel.displayName || vessel.id, description: "Signal de chasse détecté !" });
+                    }
                 } else if (statusChanged) {
                     const soundKey = (currentStatus === 'returning' || currentStatus === 'landed') ? 'moving' : currentStatus;
                     if (vesselPrefs.notifySettings[soundKey as keyof typeof vesselPrefs.notifySettings]) {
@@ -607,7 +614,14 @@ export default function VesselTrackerPage() {
                                     <div className={cn("space-y-4 transition-opacity", !isEmergencyEnabled && "opacity-40 pointer-events-none")}>
                                         <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Numéro d'urgence</Label><Input placeholder="Ex: 77 12 34" value={emergencyContact} onChange={e => setEmergencyContact(e.target.value)} className="h-12 border-2 font-black text-lg" disabled={!isEmergencyEnabled} /></div>
                                         <div className="space-y-1.5"><div className="flex items-center justify-between mb-1"><Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Message personnalisé</Label><Switch checked={isCustomMessageEnabled} onCheckedChange={setIsCustomMessageEnabled} className="scale-75" /></div><Textarea placeholder="Ex: Problème moteur." value={vesselSmsMessage} onChange={e => setVesselSmsMessage(e.target.value)} className={cn("border-2 font-medium min-h-[80px]", !isCustomMessageEnabled && "opacity-50")} disabled={!isEmergencyEnabled || !isCustomMessageEnabled} /></div>
-                                        <div className="p-3 bg-muted/30 rounded-xl border-2 italic text-[10px] font-medium leading-relaxed text-slate-600">"{smsPreview}"</div>
+                                        <div className="space-y-2 pt-2 border-t border-dashed">
+                                            <p className="text-[9px] font-black uppercase text-primary flex items-center gap-2 ml-1">
+                                                <Eye className="size-3" /> Visualisation du SMS envoyé :
+                                            </p>
+                                            <div className="p-3 bg-muted/30 rounded-xl border-2 italic text-[10px] font-medium leading-relaxed text-slate-600">
+                                                "{smsPreview}"
+                                            </div>
+                                        </div>
                                     </div>
                                     <Button onClick={handleSaveSmsSettings} className="w-full h-12 font-black uppercase text-[10px] tracking-widest gap-2 shadow-md"><Save className="size-4" /> Enregistrer mes réglages SMS</Button>
                                 </div>
@@ -656,7 +670,10 @@ export default function VesselTrackerPage() {
                   <AccordionContent className="pt-4 space-y-6">
                     <div className="space-y-4 p-4 border-2 rounded-2xl bg-card shadow-inner">
                       <div className="flex items-center justify-between">
-                        <div className="space-y-0.5"><Label className="text-xs font-black uppercase">Alertes Sonores</Label></div>
+                        <div className="space-y-0.5">
+                          <Label className="text-xs font-black uppercase">Alertes Sonores</Label>
+                          <p className="text-[9px] font-bold text-muted-foreground uppercase">Activer les signaux audio</p>
+                        </div>
                         <Switch checked={vesselPrefs.isNotifyEnabled} onCheckedChange={v => saveVesselPrefs({ ...vesselPrefs, isNotifyEnabled: v })} />
                       </div>
                       <div className="space-y-3 pt-2 border-t border-dashed">
@@ -674,7 +691,22 @@ export default function VesselTrackerPage() {
                             { key: 'birds', label: 'Oiseaux (Chasse)' }
                           ].map(item => (
                             <div key={item.key} className="flex items-center justify-between gap-4">
-                              <span className="text-[10px] font-bold uppercase flex-1">{item.label}</span>
+                              <div className="flex flex-col flex-1">
+                                <span className="text-[10px] font-bold uppercase">{item.label}</span>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Switch 
+                                    checked={vesselPrefs.notifySettings[item.key as keyof typeof vesselPrefs.notifySettings]} 
+                                    onCheckedChange={v => saveVesselPrefs({ 
+                                      ...vesselPrefs, 
+                                      notifySettings: { ...vesselPrefs.notifySettings, [item.key]: v } 
+                                    })}
+                                    className="scale-75 origin-left"
+                                  />
+                                  <span className="text-[8px] font-bold uppercase opacity-40">
+                                    {vesselPrefs.notifySettings[item.key as keyof typeof vesselPrefs.notifySettings] ? 'Actif' : 'Inactif'}
+                                  </span>
+                                </div>
+                              </div>
                               <Select value={vesselPrefs.notifySounds[item.key as keyof typeof vesselPrefs.notifySounds]} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, notifySounds: { ...vesselPrefs.notifySounds, [item.key]: v } })}>
                                 <SelectTrigger className="h-8 text-[9px] font-black uppercase w-32 bg-muted/30"><SelectValue placeholder="Choisir..." /></SelectTrigger>
                                 <SelectContent>{availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] uppercase font-black">{s.label}</SelectItem>)}</SelectContent>
