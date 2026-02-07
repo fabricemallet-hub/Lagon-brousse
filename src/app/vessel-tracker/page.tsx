@@ -47,7 +47,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
-import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
+import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -282,6 +282,39 @@ export default function VesselTrackerPage() {
     toast({ title: label || (st === 'returning' ? 'Retour Maison' : st === 'landed' ? 'À terre' : st === 'emergency' ? 'ASSISTANCE DEMANDÉE' : 'Mode Auto') });
   };
 
+  const handleBirdsSignal = async () => {
+    if (!isSharing || !currentPos || !user || !firestore) {
+        toast({ variant: "destructive", title: "Erreur", description: "Position non disponible ou partage inactif." });
+        return;
+    }
+    
+    const now = new Date();
+    const timeLabel = format(now, 'HH:mm');
+    const newMarker: HuntingMarker = {
+        id: Math.random().toString(36).substring(7),
+        lat: currentPos.lat,
+        lng: currentPos.lng,
+        time: timeLabel
+    };
+
+    try {
+        const vesselRef = doc(firestore, 'vessels', sharingId);
+        await updateDoc(vesselRef, {
+            huntingMarkers: arrayUnion(newMarker),
+            status: 'moving',
+            eventLabel: "CHASSE - REGROUPEMENT D'OISEAUX",
+            statusChangedAt: serverTimestamp()
+        });
+        toast({ 
+          title: "Point de CHASSE enregistré", 
+          description: `Position marquée à ${timeLabel}. Partagée avec vos récepteurs.` 
+        });
+    } catch (e) {
+        console.error("Failed to add hunting marker:", e);
+        toast({ variant: "destructive", title: "Erreur", description: "Impossible de synchroniser le point GPS." });
+    }
+  };
+
   const handleStopSharing = async () => {
     if (!user || !firestore) return;
     setIsSharing(false);
@@ -311,10 +344,11 @@ export default function VesselTrackerPage() {
     try {
         if (isSharing) {
             await updateDoc(doc(firestore, 'vessels', sharingId), {
-                historyClearedAt: serverTimestamp()
+                historyClearedAt: serverTimestamp(),
+                huntingMarkers: [] // NEW: Clear permanent GPS points on Reset
             });
         }
-        toast({ title: "Journal réinitialisé" });
+        toast({ title: "Journal & Points GPS réinitialisés" });
     } catch (e) {
         console.error(e);
     }
@@ -576,7 +610,7 @@ export default function VesselTrackerPage() {
                         <Button 
                             variant="outline" 
                             className="w-full h-14 font-black uppercase text-[11px] border-2 bg-blue-50 border-blue-200 gap-3 touch-manipulation shadow-sm text-blue-700" 
-                            onClick={() => handleManualStatus('moving', "CHASSE - REGROUPEMENT D'OISEAUX")}
+                            onClick={handleBirdsSignal}
                         >
                             <Bird className="size-6 animate-bounce" /> REGROUPEMENT D'OISEAUX (CHASSE)
                         </Button>
@@ -904,42 +938,64 @@ export default function VesselTrackerPage() {
       <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all", isFullscreen && "fixed inset-0 z-[100] w-screen h-screen rounded-none")}>
         <div className={cn("relative bg-muted/20", isFullscreen ? "flex-grow" : "h-[300px]")}>
           <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
-                {followedVessels?.filter(v => v.isSharing).map(vessel => (
-                    <OverlayView key={vessel.id} position={{ lat: vessel.location.latitude, lng: vessel.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                    <div style={{ transform: 'translate(-50%, -100%)' }} className={cn("flex flex-col items-center gap-1", vessel.status === 'emergency' && "animate-pulse")}>
-                        <div className={cn(
-                          "px-2 py-1 rounded text-[10px] font-black shadow-lg border whitespace-nowrap flex items-center gap-2",
-                          vessel.status === 'emergency' ? "bg-red-600 text-white border-white animate-bounce" : "bg-slate-900/90 text-white border-white/20"
-                        )}>
-                          <span className="truncate max-w-[80px]">{vessel.displayName || vessel.id}</span>
-                          <span className={cn(
-                            "text-[8px] font-black border-l pl-2 border-white/10",
-                            vessel.status === 'moving' ? "text-blue-400" :
-                            vessel.status === 'returning' ? "text-indigo-400" :
-                            vessel.status === 'landed' ? "text-green-400" :
-                            vessel.status === 'stationary' ? "text-amber-400" : 
-                            vessel.status === 'emergency' ? "text-white" : "text-red-400"
-                          )}>
-                            {vessel.status === 'moving' ? 'MOUV' : 
-                             vessel.status === 'returning' ? 'RETOUR' :
-                             vessel.status === 'landed' ? 'HOME' :
-                             vessel.status === 'emergency' ? 'URGENCE' :
-                             vessel.status === 'stationary' ? 'MOUIL' : 'OFF'}
-                          </span>
-                          <BatteryIconComp level={vessel.batteryLevel} charging={vessel.isCharging} />
-                        </div>
-                        <div className={cn("p-2 rounded-full border-2 border-white shadow-xl transition-transform", 
-                            vessel.status === 'moving' ? "bg-blue-600" : 
-                            vessel.status === 'returning' ? "bg-indigo-600" :
-                            vessel.status === 'landed' ? "bg-green-600" : 
-                            vessel.status === 'emergency' ? "bg-red-600 scale-125" : "bg-amber-600")}>
-                          {vessel.status === 'stationary' ? <Anchor className="size-5 text-white" /> : 
-                           vessel.status === 'landed' ? <Home className="size-5 text-white" /> : 
-                           vessel.status === 'returning' ? <Navigation className="size-5 text-white" /> : 
-                           vessel.status === 'emergency' ? <AlertCircle className="size-5 text-white" /> : <Navigation className="size-5 text-white" />}
-                        </div>
-                    </div>
-                    </OverlayView>
+                {followedVessels?.map(vessel => (
+                    <React.Fragment key={`vessel-markers-${vessel.id}`}>
+                        {vessel.isSharing && (
+                            <OverlayView position={{ lat: vessel.location.latitude, lng: vessel.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                            <div style={{ transform: 'translate(-50%, -100%)' }} className={cn("flex flex-col items-center gap-1", vessel.status === 'emergency' && "animate-pulse")}>
+                                <div className={cn(
+                                  "px-2 py-1 rounded text-[10px] font-black shadow-lg border whitespace-nowrap flex items-center gap-2",
+                                  vessel.status === 'emergency' ? "bg-red-600 text-white border-white animate-bounce" : "bg-slate-900/90 text-white border-white/20"
+                                )}>
+                                  <span className="truncate max-w-[80px]">{vessel.displayName || vessel.id}</span>
+                                  <span className={cn(
+                                    "text-[8px] font-black border-l pl-2 border-white/10",
+                                    vessel.status === 'moving' ? "text-blue-400" :
+                                    vessel.status === 'returning' ? "text-indigo-400" :
+                                    vessel.status === 'landed' ? "text-green-400" :
+                                    vessel.status === 'stationary' ? "text-amber-400" : 
+                                    vessel.status === 'emergency' ? "text-white" : "text-red-400"
+                                  )}>
+                                    {vessel.status === 'moving' ? 'MOUV' : 
+                                     vessel.status === 'returning' ? 'RETOUR' :
+                                     vessel.status === 'landed' ? 'HOME' :
+                                     vessel.status === 'emergency' ? 'URGENCE' :
+                                     vessel.status === 'stationary' ? 'MOUIL' : 'OFF'}
+                                  </span>
+                                  <BatteryIconComp level={vessel.batteryLevel} charging={vessel.isCharging} />
+                                </div>
+                                <div className={cn("p-2 rounded-full border-2 border-white shadow-xl transition-transform", 
+                                    vessel.status === 'moving' ? "bg-blue-600" : 
+                                    vessel.status === 'returning' ? "bg-indigo-600" :
+                                    vessel.status === 'landed' ? "bg-green-600" : 
+                                    vessel.status === 'emergency' ? "bg-red-600 scale-125" : "bg-amber-600")}>
+                                  {vessel.status === 'stationary' ? <Anchor className="size-5 text-white" /> : 
+                                   vessel.status === 'landed' ? <Home className="size-5 text-white" /> : 
+                                   vessel.status === 'returning' ? <Navigation className="size-5 text-white" /> : 
+                                   vessel.status === 'emergency' ? <AlertCircle className="size-5 text-white" /> : <Navigation className="size-5 text-white" />}
+                                </div>
+                            </div>
+                            </OverlayView>
+                        )}
+
+                        {/* Hunting Markers (Points GPS permanents) */}
+                        {vessel.huntingMarkers?.map(marker => (
+                            <OverlayView 
+                                key={marker.id} 
+                                position={{ lat: marker.lat, lng: marker.lng }} 
+                                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                            >
+                                <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
+                                    <div className="px-2 py-1 bg-blue-600 text-white rounded text-[9px] font-black shadow-lg border border-white/20 whitespace-nowrap">
+                                        CHASSE {marker.time}
+                                    </div>
+                                    <div className="p-1.5 bg-blue-500 rounded-full border-2 border-white shadow-md">
+                                        <Bird className="size-3 text-white" />
+                                    </div>
+                                </div>
+                            </OverlayView>
+                        ))}
+                    </React.Fragment>
                 ))}
                 {mode === 'sender' && currentPos && (
                     <OverlayView position={currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>

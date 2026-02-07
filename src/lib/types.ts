@@ -235,6 +235,13 @@ export interface FishingSpot {
   context: any;
 }
 
+export interface HuntingMarker {
+  id: string;
+  lat: number;
+  lng: number;
+  time: string;
+}
+
 export interface VesselStatus {
   id: string;
   userId: string;
@@ -248,6 +255,7 @@ export interface VesselStatus {
   statusChangedAt?: any;
   eventLabel?: string;
   historyClearedAt?: any;
+  huntingMarkers?: HuntingMarker[];
 }
 
 export interface SoundLibraryEntry {
