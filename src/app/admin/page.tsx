@@ -24,7 +24,7 @@ import Image from 'next/image';
 import { lagoonFishData } from '@/lib/fish-data';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -39,7 +39,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const FAQ_CATEGORIES = ["General", "Peche", "Boat Tracker", "Chasse", "Champs", "Compte"];
 
-// Expanded to 100 questions covering all aspects of the NC context
 const INITIAL_FAQ_DATA = [
   // --- GENERAL (15) ---
   { categorie: "General", ordre: 1, question: "L'application remplace-t-elle les sources officielles ?", reponse: "Non. Pour votre sécurité, consultez toujours meteo.nc et les autorités maritimes (COSS). L'app est un assistant tactique." },
@@ -162,6 +161,7 @@ export default function AdminPage() {
 
   const [activeTab, setActiveTab] = useState('overview');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
 
   // FAQ States
   const [isFaqDialogOpen, setIsFaqDialogOpen] = useState(false);
@@ -215,10 +215,27 @@ export default function AdminPage() {
     }
   };
 
+  const handleClearFaq = async () => {
+    if (!firestore || !isAdmin || !faqs) return;
+    setIsClearing(true);
+    try {
+        const batch = writeBatch(firestore);
+        faqs.forEach(f => {
+            batch.delete(doc(firestore, 'cms_support', 'faq', 'items', f.id));
+        });
+        await batch.commit();
+        toast({ title: "FAQ vidée avec succès." });
+    } catch (e) {
+        toast({ variant: 'destructive', title: "Erreur lors de la suppression" });
+    } finally {
+        setIsClearing(false);
+    }
+  };
+
   const handleSeedFaq = async () => {
     if (!firestore || !isAdmin) return;
     if (faqs && faqs.length > 0) {
-        toast({ variant: 'destructive', title: "Action annulée", description: "La FAQ n'est pas vide." });
+        toast({ variant: 'destructive', title: "Action annulée", description: "Videz d'abord la FAQ pour injecter les 100 nouvelles questions." });
         return;
     }
     setIsGenerating(true);
@@ -232,7 +249,7 @@ export default function AdminPage() {
         await batch.commit();
         toast({ title: "FAQ peuplée avec succès (100 entrées) !" });
     } catch (e) {
-        toast({ variant: 'destructive', title: "Erreur" });
+        toast({ variant: 'destructive', title: "Erreur lors de l'injection" });
     } finally {
         setIsGenerating(false);
     }
@@ -271,7 +288,7 @@ export default function AdminPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20 px-1">
       <Card className="border-2 shadow-sm">
-        <CardHeader><CardTitle className="font-black uppercase tracking-tighter">Tableau de Bord Admin</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="font-black uppercase tracking-tighter text-xl">Tableau de Bord Admin</CardTitle></CardHeader>
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -287,7 +304,7 @@ export default function AdminPage() {
         </TabsList>
 
         <TabsContent value="faq" className="space-y-6">
-          <div className="flex gap-2 mb-4">
+          <div className="flex flex-col sm:flex-row gap-2 mb-4">
             <Button className="flex-1 h-12 font-black uppercase text-[10px] tracking-widest gap-2" onClick={() => { setCurrentFaq({ categorie: 'General', ordre: 0, views: 0 }); setIsFaqDialogOpen(true); }}>
                 <Plus className="size-4" /> Ajouter Manuellement
             </Button>
@@ -295,6 +312,24 @@ export default function AdminPage() {
                 {isGenerating ? <RefreshCw className="size-4 animate-spin" /> : <DatabaseZap className="size-4 text-primary" />}
                 Peupler FAQ (100 Auto)
             </Button>
+            
+            <AlertDialog>
+                <AlertDialogTrigger asChild>
+                    <Button variant="destructive" className="flex-1 h-12 font-black uppercase text-[10px] tracking-widest gap-2" disabled={isClearing || !faqs || faqs.length === 0}>
+                        <Trash2 className="size-4" /> Vider la FAQ ({faqs?.length || 0})
+                    </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Êtes-vous sûr ?</AlertDialogTitle>
+                        <AlertDialogDescription>Cette action supprimera TOUTES les questions de la base de connaissances. Cette action est irréversible.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Annuler</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleClearFaq} className="bg-destructive text-white">Confirmer la suppression</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
           </div>
 
           <Card className="border-2">
