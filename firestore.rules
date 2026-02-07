@@ -12,7 +12,8 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && 
              (request.auth.token.email == 'f.mallet81@gmail.com' || 
-              request.auth.token.email == 'f.mallet81@outlook.com');
+              request.auth.token.email == 'f.mallet81@outlook.com' ||
+              request.auth.token.email == 'fabrice.mallet@gmail.com');
     }
 
     // --- 1. CMS SUPPORT & FAQ ---
