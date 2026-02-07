@@ -45,6 +45,7 @@ const sectionContent: Record<string, {
     role: "L'Accueil est votre centre de contrôle quotidien. Il synthétise les informations les plus importantes pour votre commune sans que vous ayez à parcourir tous les onglets.",
     steps: [
       "Visualisez la météo actuelle et les prévisions heure par heure.",
+      "Surveillez vos alertes de sécurité (péremption fusées/extincteurs).",
       "Consultez les prochaines marées (haute et basse) en un clin d'œil.",
       "Lisez le conseil du jardinier basé sur la lune du jour.",
       "Naviguez entre les jours grâce aux flèches en haut de page pour planifier vos sorties."
@@ -162,7 +163,7 @@ const sectionContent: Record<string, {
       "Consultez la période biologique (Brame, Chute des bois) pour adapter votre stratégie.",
       "Utilisez la carte du vent pour visualiser d'où vient l'air par rapport au relief.",
       "La 'Table de Tir' vous aide à estimer la correction de visée en fonction de la distance et du vent.",
-      "Session de Groupe : Partagez votre position GPS en temps réel avec vos partenaires sur la carte satellite via un code unique.",
+      "Session de Groupe : Partagez votre position GPS en temps réel avec vos partenaires au-dessus de la carte satellite via un code unique.",
       "Alertes Tactiques : Signalez 'Gibier en vue' d'un clic. Une alerte visuelle et sonore préviendra immédiatement vos coéquipiers."
     ],
     tips: [
@@ -233,17 +234,20 @@ const sectionContent: Record<string, {
     ]
   },
   'reglementation': {
-    title: 'Réglementation',
+    title: 'Réglementation & Sécurité',
     icon: Scale,
     color: 'bg-slate-500',
-    role: "L'essentiel des règles de pêche et de chasse en NC pour une pratique responsable.",
+    role: "L'essentiel des règles de pêche, de chasse et de sécurité maritime pour une pratique responsable.",
     steps: [
       "Fermetures : Consultez le calendrier des interdictions (Picot, Crabe, etc.).",
+      "Sécurité : Gérez vos équipements obligatoires (fusées, extincteurs) par navire.",
+      "Alertes : Renseignez les dates de péremption pour activer les rappels automatiques.",
       "Tailles : Vérifiez les dimensions minimales autorisées.",
       "Protection : Identifiez les espèces intégralement protégées (Napoléon, Dugong...)."
     ],
     tips: [
-      "Le marquage de la queue de la langouste est obligatoire dès la capture."
+      "Le marquage de la queue de la langouste est obligatoire dès la capture.",
+      "Un rappel de sécurité s'affiche sur l'accueil 3 mois avant l'expiration d'un matériel."
     ]
   },
   'compte': {
