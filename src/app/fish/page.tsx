@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useRef, useMemo } from 'react';
@@ -108,7 +107,7 @@ export default function FishPage() {
 
   const handleOpenReport = (fish: FishSpeciesInfo) => {
     if (!user) {
-      toast({ variant: 'destructive', title: "Connexion requise", description: "Veuillez vous connecter pour signaler un cas." });
+      toast({ variant: 'destructive', title: "Connexion requise", description: "Veuillez vous connecter pour ajuster le risque." });
       return;
     }
     setSelectedFishForReport(fish);
@@ -146,7 +145,7 @@ export default function FishPage() {
         [sizeCountKey]: newSizeCount
       }, { merge: true });
 
-      toast({ title: "Merci pour votre signalement !", description: "Les statistiques de la commune ont été mises à jour." });
+      toast({ title: "Merci pour votre contribution !", description: "Les statistiques de la commune ont été mises à jour." });
       setIsReportDialogOpen(false);
     } catch (e) {
       toast({ variant: 'destructive', title: "Erreur", description: "Impossible d'enregistrer le signalement." });
@@ -237,7 +236,7 @@ export default function FishPage() {
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle className="font-black uppercase tracking-tighter flex items-center gap-2">
-              <Megaphone className="size-5 text-accent" /> Signaler Gratte
+              <Megaphone className="size-5 text-accent" /> Ajuster le Risque
             </DialogTitle>
             <DialogDescription className="text-xs font-bold uppercase">
               {selectedFishForReport?.name} à {selectedLocation}
@@ -425,7 +424,7 @@ function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo,
                   className="w-full h-10 border-2 font-black uppercase text-[9px] tracking-widest gap-2 bg-primary/5 hover:bg-primary/10"
                   onClick={() => onReport(fish)}
                 >
-                  <ThumbsDown className="size-3" /> Signaler un cas de gratte
+                  <ThumbsDown className="size-3" /> Ajuster le % de gratte : Indice de risque citoyen par commune
                 </Button>
               </div>
 
