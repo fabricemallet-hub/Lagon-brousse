@@ -38,7 +38,8 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && 
              (request.auth.token.email == 'f.mallet81@gmail.com' || 
-              request.auth.token.email == 'f.mallet81@outlook.com');
+              request.auth.token.email == 'f.mallet81@outlook.com' ||
+              request.auth.token.email == 'fabrice.mallet@gmail.com');
     }
 
     // --- 3. DROITS D'ÉCRITURE ADMIN ---
@@ -62,6 +63,17 @@ service cloud.firestore {
     }
 
     // --- 5. FONCTIONNALITÉS APPLICATIVES ---
+
+    match /cms_support/faq/items/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /cms_support/tickets/items/{id} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow update, delete: if isAdmin();
+    }
 
     match /hunting_sessions/{id} {
       allow read, write: if isSignedIn();

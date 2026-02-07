@@ -1,3 +1,4 @@
+
 'use client';
 import { doc, getDoc, setDoc, Firestore } from 'firebase/firestore';
 import { User } from 'firebase/auth';
@@ -15,7 +16,11 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
   const email = user.email?.toLowerCase() || '';
   
   // Comptes Administrateur Système
-  const adminEmails = ['f.mallet81@gmail.com', 'f.mallet81@outlook.com'];
+  const adminEmails = [
+    'f.mallet81@gmail.com', 
+    'f.mallet81@outlook.com', 
+    'fabrice.mallet@gmail.com'
+  ];
   const isAdminUser = adminEmails.includes(email);
 
   try {

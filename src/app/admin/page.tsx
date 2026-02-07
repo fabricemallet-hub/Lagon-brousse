@@ -47,7 +47,6 @@ export default function AdminPage() {
 
   const [activeTab, setActiveTab] = useState('overview');
   
-  // States existants...
   const [tokenDuration, setTokenDuration] = useState('1');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
@@ -68,9 +67,12 @@ export default function AdminPage() {
   const [adminResponse, setAdminResponse] = useState('');
   const [isResponding, setIsResponding] = useState(false);
 
-  const isAdmin = useMemo(() => 
-    user?.email === 'f.mallet81@outlook.com' || user?.email === 'f.mallet81@gmail.com', 
-  [user]);
+  const isAdmin = useMemo(() => {
+    const email = user?.email?.toLowerCase();
+    return email === 'f.mallet81@outlook.com' || 
+           email === 'f.mallet81@gmail.com' || 
+           email === 'fabrice.mallet@gmail.com';
+  }, [user]);
 
   // Queries
   const faqRef = useMemoFirebase(() => {
@@ -210,7 +212,6 @@ export default function AdminPage() {
             <Card className="border-2"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">FAQ Items</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{faqs?.length || 0}</div></CardContent></Card>
           </div>
         </TabsContent>
-        {/* Autres TabsContent existants... */}
       </Tabs>
 
       {/* Dialog FAQ */}

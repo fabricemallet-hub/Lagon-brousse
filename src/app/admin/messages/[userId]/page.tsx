@@ -26,9 +26,13 @@ export default function AdminMessagePage() {
   const [targetUser, setTargetUser] = useState<UserAccount | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   
-  const isAdmin = useMemo(() => 
-    user?.email === 'f.mallet81@outlook.com' || user?.email === 'f.mallet81@gmail.com', 
-  [user]);
+  const isAdmin = useMemo(() => {
+    const email = user?.email?.toLowerCase();
+    return email === 'f.mallet81@outlook.com' || 
+           email === 'f.mallet81@gmail.com' || 
+           email === 'fabrice.mallet@gmail.com';
+  }, [user]);
+
   const conversationId = params.userId as string;
 
   const conversationRef = useMemoFirebase(() => {
