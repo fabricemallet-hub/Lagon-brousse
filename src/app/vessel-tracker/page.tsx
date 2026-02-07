@@ -162,9 +162,11 @@ export default function VesselTrackerPage() {
     }
   }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, availableSounds]);
 
+  // CHARGEMENT DE L'HISTORIQUE PERSISTANT
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedHistory = localStorage.getItem('lb_vessel_history_v2');
+      const savedHistory = localStorage.getItem('lb_vessel_history_v3');
+      const savedClearTimes = localStorage.getItem('lb_vessel_clear_times_v3');
       if (savedHistory) {
         try {
           const parsed = JSON.parse(savedHistory);
@@ -177,12 +179,19 @@ export default function VesselTrackerPage() {
           console.error("Failed to parse history from localStorage", e);
         }
       }
+      if (savedClearTimes) {
+        try {
+          lastClearTimesRef.current = JSON.parse(savedClearTimes);
+        } catch (e) {}
+      }
     }
   }, []);
 
+  // SAUVEGARDE DE L'HISTORIQUE PERSISTANT
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('lb_vessel_history_v2', JSON.stringify(history));
+      localStorage.setItem('lb_vessel_history_v3', JSON.stringify(history));
+      localStorage.setItem('lb_vessel_clear_times_v3', JSON.stringify(lastClearTimesRef.current));
     }
   }, [history]);
 
@@ -343,16 +352,21 @@ export default function VesselTrackerPage() {
   const handleClearHistory = async () => {
     setHistory([]);
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('lb_vessel_history_v2');
+      localStorage.removeItem('lb_vessel_history_v3');
     }
     if (!firestore || !user) return;
     
     try {
         if (isSharing) {
+            const clearTime = Date.now();
             await updateDoc(doc(firestore, 'vessels', sharingId), {
                 historyClearedAt: serverTimestamp(),
                 huntingMarkers: []
             });
+            lastClearTimesRef.current[sharingId] = clearTime;
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('lb_vessel_clear_times_v3', JSON.stringify(lastClearTimesRef.current));
+            }
         }
         toast({ title: "Journal & Points GPS réinitialisés" });
     } catch (e) {
@@ -403,9 +417,13 @@ export default function VesselTrackerPage() {
         const timeKey = getTimeMillis(statusTime);
         const clearTimeKey = getTimeMillis(vessel.historyClearedAt);
 
-        if (clearTimeKey > (lastClearTimesRef.current[vessel.id] || 0)) {
+        // SYNC RESET: Si une action de nettoyage a eu lieu sur le serveur, on l'applique localement
+        if (clearTimeKey > 0 && clearTimeKey > (lastClearTimesRef.current[vessel.id] || 0)) {
             setHistory(prev => prev.filter(h => h.vesselName !== (vessel.displayName || vessel.id)));
             lastClearTimesRef.current[vessel.id] = clearTimeKey;
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('lb_vessel_clear_times_v3', JSON.stringify(lastClearTimesRef.current));
+            }
         }
 
         if (timeKey === 0) return;
