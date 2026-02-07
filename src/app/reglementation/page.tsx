@@ -15,7 +15,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
-import { Ban, Check, Scale, BookOpen, Crosshair, LifeBuoy, ShieldCheck, Info, Zap } from 'lucide-react';
+import { Ban, Check, Scale, BookOpen, Crosshair, LifeBuoy, ShieldCheck, Info, Zap, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const fishingCalendarData = [
