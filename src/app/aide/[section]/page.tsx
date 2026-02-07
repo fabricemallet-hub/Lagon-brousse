@@ -134,18 +134,19 @@ const sectionContent: Record<string, {
     title: 'Guide des Poissons & Gratte',
     icon: BrainCircuit,
     color: 'bg-cyan-600',
-    role: "Un répertoire intelligent des espèces de Nouvelle-Calédonie incluant un système de calcul de risque collaboratif pour la ciguatera (gratte).",
+    role: "Un répertoire intelligent des espèces de Nouvelle-Calédonie incluant un système de calcul de risque collaboratif et différencié par taille pour la ciguatera (gratte).",
     steps: [
-      "Identification IA : Prenez une photo de votre prise pour identifier instantanément l'espèce et son risque théorique.",
-      "Risque Collaboratif : Visualisez le score final pondéré (Moyenne entre les données scientifiques et les retours des pêcheurs locaux).",
-      "Filtrage par Commune : L'indice de risque s'adapte automatiquement à votre position actuelle pour une précision maximale.",
-      "Signalement Citoyen : Contribuez à la sécurité de la communauté en signalant un cas de gratte via le bouton dédié.",
-      "Fiches Techniques : Accédez aux noms scientifiques, conseils de pêche et astuces culinaires pour chaque poisson."
+      "Identification IA : Prenez une photo de votre prise pour identifier instantanément l'espèce et obtenir son profil de risque théorique.",
+      "Analyse par Taille : Le risque est détaillé pour 3 catégories (Petit, Moyen, Grand). Les longueurs estimées en CM vous aident à situer votre prise.",
+      "Risque Collaboratif : Visualisez le score final pondéré (Moyenne entre les données scientifiques et les retours des pêcheurs locaux) pour votre commune.",
+      "Signalement Citoyen : Contribuez à la sécurité de tous en signalant un ressenti de gratte. Précisez la taille du spécimen pour affiner les statistiques.",
+      "Indice de Confiance : Le nombre de 'retours citoyens' s'affiche pour crédibiliser la donnée locale sur chaque fiche."
     ],
     tips: [
-      "Plus le nombre de 'retours citoyens' est élevé sur un poisson dans votre commune, plus l'indice de risque affiché est fiable.",
-      "L'indice de confiance (Vert, Orange, Rouge) vous aide à décider rapidement si la consommation d'un gros spécimen est prudente.",
-      "Consultez systématiquement le guide pratique ciguatera via le lien présent dans chaque fiche pour parfaire vos connaissances."
+      "Le risque de gratte augmente statistiquement avec la taille du poisson. Soyez particulièrement vigilants avec les spécimens de catégorie 'Grand'.",
+      "Les longueurs en CM sont des estimations spécifiques aux spécimens calédoniens pour vous guider lors de vos signalements.",
+      "L'indice de confiance (Vert, Orange, Rouge) est calculé sur la moyenne pondérée pour vous offrir une décision rapide avant consommation.",
+      "Consultez systématiquement le guide pratique ciguatera de la CPS via le lien présent dans chaque fiche."
     ],
     links: [
       { label: "lien vers guide_pratique_ciguatera", url: CIGUATERA_GUIDE_URL }
