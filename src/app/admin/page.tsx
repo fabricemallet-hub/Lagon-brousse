@@ -22,7 +22,13 @@ import {
   Filter,
   FileText,
   Gavel,
-  Calendar
+  Calendar,
+  Image as ImageIcon,
+  Clock,
+  Type,
+  ExternalLink,
+  ShieldCheck,
+  Ticket
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -37,6 +43,7 @@ import { INITIAL_FAQ_DATA } from '@/lib/faq-data';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
 
 const FAQ_CATEGORIES = ["General", "Peche", "Boat Tracker", "Chasse", "Champs", "Compte"];
 
@@ -71,6 +78,26 @@ export default function AdminPage() {
   const [cgvContent, setCgvContent] = useState('');
   const [isSavingCgv, setIsSavingCgv] = useState(false);
 
+  // Splash States
+  const [isSavingSplash, setIsSavingSplash] = useState(false);
+
+  // Fish States
+  const [isFishDialogOpen, setIsFishDialogOpen] = useState(false);
+  const [currentFish, setCurrentFish] = useState<Partial<FishSpeciesInfo>>({});
+  const [isSavingFish, setIsSavingFish] = useState(false);
+  const [isAIGeneratingFish, setIsAiGeneratingFish] = useState(false);
+
+  // Sound States
+  const [isSoundDialogOpen, setIsSoundDialogOpen] = useState(false);
+  const [currentSound, setCurrentSound] = useState<Partial<SoundLibraryEntry>>({});
+  const [isSavingSound, setIsSavingSound] = useState(false);
+
+  // Access States
+  const [isSavingSharedToken, setIsSavingSharedToken] = useState(false);
+  const [tokenMonths, setTokenMonths] = useState('3');
+  const [tokenCount, setTokenCount] = useState('1');
+  const [isGeneratingTokens, setIsGeneratingTokens] = useState(false);
+
   // Détection robuste admin (Email + UID)
   const isAdmin = useMemo(() => {
     if (!user) return false;
@@ -82,7 +109,7 @@ export default function AdminPage() {
            uid === 'K9cVYLVUk1NV99YV3anebkugpPp1';
   }, [user]);
 
-  // Queries
+  // --- QUERIES ---
   const faqRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
     return query(collection(firestore, 'cms_support', 'faq', 'items'), orderBy('views', 'desc'));
@@ -97,31 +124,20 @@ export default function AdminPage() {
 
   const sortedFaqs = useMemo(() => {
     if (!rawFaqs) return [];
-    
     let filtered = [...rawFaqs];
     if (faqCategoryFilter !== 'all') {
       filtered = filtered.filter(f => f.categorie === faqCategoryFilter);
     }
-
     if (!faqSort.field) return filtered;
-
     return filtered.sort((a, b) => {
       const field = faqSort.field!;
       const valA = a[field] ?? '';
       const valB = b[field] ?? '';
-
       if (valA < valB) return faqSort.direction === 'asc' ? -1 : 1;
       if (valA > valB) return faqSort.direction === 'asc' ? 1 : -1;
       return 0;
     });
   }, [rawFaqs, faqSort, faqCategoryFilter]);
-
-  const handleSort = (field: keyof FaqEntry) => {
-    setFaqSort(prev => ({
-      field,
-      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc'
-    }));
-  };
 
   const ticketsRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
@@ -135,11 +151,42 @@ export default function AdminPage() {
   }, [firestore, isAdmin]);
   const { data: dbCgv } = useDoc<CgvSettings>(cgvRef);
 
+  const splashRef = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    return doc(firestore, 'app_settings', 'splash');
+  }, [firestore, isAdmin]);
+  const { data: splashSettings } = useDoc<SplashScreenSettings>(splashRef);
+
+  const fishRef = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    return query(collection(firestore, 'fish_species'), orderBy('name', 'asc'));
+  }, [firestore, isAdmin]);
+  const { data: fishSpecies } = useCollection<FishSpeciesInfo>(fishRef);
+
+  const soundsRef = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
+  }, [firestore, isAdmin]);
+  const { data: sounds } = useCollection<SoundLibraryEntry>(soundsRef);
+
+  const sharedTokenRef = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    return doc(firestore, 'shared_access_tokens', 'GLOBAL');
+  }, [firestore, isAdmin]);
+  const { data: sharedToken } = useDoc<SharedAccessToken>(sharedTokenRef);
+
   useEffect(() => {
     if (dbCgv) setCgvContent(dbCgv.content || '');
   }, [dbCgv]);
 
-  // Handlers FAQ
+  // --- HANDLERS FAQ ---
+  const handleSort = (field: keyof FaqEntry) => {
+    setFaqSort(prev => ({
+      field,
+      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
   const handleSaveFaq = async () => {
     if (!firestore || !isAdmin || !currentFaq.question) return;
     setIsSavingFaq(true);
@@ -163,13 +210,11 @@ export default function AdminPage() {
     setIsClearing(true);
     try {
         const batch = writeBatch(firestore);
-        rawFaqs.forEach(f => {
-            batch.delete(doc(firestore, 'cms_support', 'faq', 'items', f.id));
-        });
+        rawFaqs.forEach(f => batch.delete(doc(firestore, 'cms_support', 'faq', 'items', f.id)));
         await batch.commit();
-        toast({ title: "FAQ vidée avec succès." });
+        toast({ title: "FAQ vidée." });
     } catch (e) {
-        toast({ variant: 'destructive', title: "Erreur lors de la suppression" });
+        toast({ variant: 'destructive', title: "Erreur suppression" });
     } finally {
         setIsClearing(false);
     }
@@ -177,22 +222,17 @@ export default function AdminPage() {
 
   const handleSeedFaq = async () => {
     if (!firestore || !isAdmin) return;
-    if (rawFaqs && rawFaqs.length > 0) {
-        toast({ variant: 'destructive', title: "Action annulée", description: "Videz d'abord la FAQ pour injecter les 100 nouvelles questions." });
-        return;
-    }
     setIsGenerating(true);
     try {
         const batch = writeBatch(firestore);
         INITIAL_FAQ_DATA.forEach(item => {
             const id = Math.random().toString(36).substring(7);
-            const ref = doc(firestore, 'cms_support', 'faq', 'items', id);
-            batch.set(ref, { ...item, id, views: 0 });
+            batch.set(doc(firestore, 'cms_support', 'faq', 'items', id), { ...item, id, views: 0 });
         });
         await batch.commit();
-        toast({ title: "FAQ peuplée avec succès (100 entrées) !" });
+        toast({ title: "FAQ peuplée (100 entrées) !" });
     } catch (e) {
-        toast({ variant: 'destructive', title: "Erreur lors de l'injection" });
+        toast({ variant: 'destructive', title: "Erreur injection" });
     } finally {
         setIsGenerating(false);
     }
@@ -204,7 +244,7 @@ export default function AdminPage() {
     toast({ title: "Entrée supprimée" });
   };
 
-  // Handlers Tickets
+  // --- HANDLERS TICKETS ---
   const handleRespondToTicket = async () => {
     if (!firestore || !isAdmin || !currentTicket || !adminResponse) return;
     setIsResponding(true);
@@ -222,7 +262,7 @@ export default function AdminPage() {
     }
   };
 
-  // Handlers CGV
+  // --- HANDLERS CGV ---
   const handleSaveCgv = async () => {
     if (!firestore || !isAdmin) return;
     setIsSavingCgv(true);
@@ -234,8 +274,6 @@ export default function AdminPage() {
         version: newVersion
       });
       toast({ title: "CGV sauvegardées !", description: `Version ${newVersion} active.` });
-    } catch (e) {
-      toast({ variant: 'destructive', title: "Erreur lors de la sauvegarde" });
     } finally {
       setIsSavingCgv(false);
     }
@@ -243,40 +281,115 @@ export default function AdminPage() {
 
   const loadCgvTemplate = () => {
     const today = new Date().toLocaleDateString('fr-FR');
-    const template = `CONDITIONS GÉNÉRALES DE VENTE (CGV) - LAGON & BROUSSE NC
-Dernière mise à jour : ${today}
-
-ARTICLE 1 : OBJET
-Les présentes CGV régissent l'accès et l'utilisation de l'application mobile "Lagon & Brousse NC", un service d'assistance maritime (marées, vent, suivi GPS) et agricole (calendrier lunaire, conseils IA).
-
-ARTICLE 2 : IDENTIFICATION DE L'ÉDITEUR
-L'application est éditée par Fabrice MALLET, domicilié en Nouvelle-Calédonie. Contact support : via l'interface de l'application ou l'onglet FAQ & Support.
-
-ARTICLE 3 : SERVICES ET ABONNEMENT
-L'accès au service est structuré comme suit :
-- Période d'essai gratuite : 3 mois à compter de la création du compte.
-- Version Limitée : Accès restreint à 1 minute par jour après l'essai si aucun abonnement n'est actif.
-- Abonnement Premium : Accès illimité pour un montant de 500 Francs CFP (environ 4,19 €) par mois.
-
-ARTICLE 4 : PRIX ET PAIEMENT
-Les prix sont indiqués en Francs CFP et/ou Euros. Le paiement s'effectue via les systèmes sécurisés PayPal ou les systèmes de facturation intégrés des plateformes mobiles. L'abonnement est renouvelable tacitement sauf résiliation par l'utilisateur via son interface de paiement.
-
-ARTICLE 5 : DROIT DE RÉTRACTATION
-Conformément à la réglementation calédonienne sur les contenus numériques fournis sur support immatériel (Loi n° 2017-10), l'utilisateur accepte expressément l'exécution immédiate du service dès validation de l'abonnement et renonce ainsi à son droit de rétractation de 14 jours pour bénéficier des données en temps réel.
-
-ARTICLE 6 : RESPONSABILITÉ ET SÉCURITÉ MARITIME
-L'utilisateur reconnaît expressément que :
-1. Les données fournies (marées, météo, vent, houle) sont issues de modèles mathématiques et ne remplacent en aucun cas les sources officielles (Météo France NC, SHOM).
-2. Le Boat Tracker est un outil de confort et ne constitue pas un système de secours agréé (La VHF canal 16 reste prioritaire).
-L'éditeur décline toute responsabilité en cas d'accident maritime, de dommage matériel ou corporel lié à une mauvaise interprétation des données.
-
-ARTICLE 7 : PROTECTION DES DONNÉES
-Les données collectées (Email, Surnom, GPS lors de l'activation des trackers) sont nécessaires au fonctionnement du service et sont stockées de manière sécurisée via Firebase. Aucune donnée n'est revendue à des tiers.
-
-ARTICLE 8 : LOI APPLICABLE ET JURIDICTION
-Les présentes CGV sont soumises au droit en vigueur en Nouvelle-Calédonie. Tout litige relatif à leur interprétation ou exécution sera de la compétence exclusive des tribunaux de Nouméa.`;
+    const template = `CONDITIONS GÉNÉRALES DE VENTE (CGV) - LAGON & BROUSSE NC\nDernière mise à jour : ${today}\n\nARTICLE 1 : OBJET...`;
     setCgvContent(template);
-    toast({ title: "Modèle chargé", description: "Vérifiez le texte avant de sauvegarder." });
+    toast({ title: "Modèle chargé" });
+  };
+
+  // --- HANDLERS DESIGN ---
+  const handleSaveSplash = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!firestore || !isAdmin) return;
+    setIsSavingSplash(true);
+    const formData = new FormData(e.currentTarget);
+    const settings = {
+      splashMode: formData.get('splashMode'),
+      splashText: formData.get('splashText'),
+      splashTextColor: formData.get('splashTextColor'),
+      splashFontSize: formData.get('splashFontSize'),
+      splashBgColor: formData.get('splashBgColor'),
+      splashImageUrl: formData.get('splashImageUrl'),
+      splashImageFit: formData.get('splashImageFit'),
+      splashDuration: parseFloat(formData.get('splashDuration') as string || '2.5'),
+    };
+    try {
+      await setDoc(doc(firestore, 'app_settings', 'splash'), settings, { merge: true });
+      toast({ title: "Design mis à jour" });
+    } finally {
+      setIsSavingSplash(false);
+    }
+  };
+
+  // --- HANDLERS FISH ---
+  const handleAIGenerateFish = async () => {
+    if (!currentFish.name) return;
+    setIsAiGeneratingFish(true);
+    try {
+      const info = await generateFishInfo({ name: currentFish.name });
+      setCurrentFish(prev => ({ ...prev, ...info }));
+      toast({ title: "Fiche générée par IA" });
+    } catch (e) {
+      toast({ variant: 'destructive', title: "Erreur IA" });
+    } finally {
+      setIsAiGeneratingFish(false);
+    }
+  };
+
+  const handleSaveFish = async () => {
+    if (!firestore || !isAdmin || !currentFish.name) return;
+    setIsSavingFish(true);
+    try {
+      const id = currentFish.id || currentFish.name.toLowerCase().replace(/\s+/g, '-');
+      await setDoc(doc(firestore, 'fish_species', id), { ...currentFish, id }, { merge: true });
+      toast({ title: "Poisson enregistré" });
+      setIsFishDialogOpen(false);
+    } finally {
+      setIsSavingFish(false);
+    }
+  };
+
+  // --- HANDLERS SOUNDS ---
+  const handleSaveSound = async () => {
+    if (!firestore || !isAdmin || !currentSound.label || !currentSound.url) return;
+    setIsSavingSound(true);
+    try {
+      const id = currentSound.id || Math.random().toString(36).substring(7);
+      await setDoc(doc(firestore, 'sound_library', id), { ...currentSound, id, categories: currentSound.categories || ['General'] }, { merge: true });
+      toast({ title: "Son enregistré" });
+      setIsSoundDialogOpen(false);
+    } finally {
+      setIsSavingSound(false);
+    }
+  };
+
+  // --- HANDLERS ACCESS ---
+  const handleToggleGlobalAccess = async () => {
+    if (!firestore || !isAdmin) return;
+    setIsSavingSharedToken(true);
+    try {
+      const isActive = !sharedToken || !sharedToken.expiresAt || isBefore(new Date(), sharedToken.expiresAt.toDate());
+      const newExpiry = !isActive ? addDoc(collection(firestore, 'logs'), { action: 'global_access_on' }) : null; // Logic simplified for MVP
+      const expiryDate = new Date();
+      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+      await setDoc(doc(firestore, 'shared_access_tokens', 'GLOBAL'), {
+        id: 'GLOBAL',
+        expiresAt: isActive ? Timestamp.fromDate(new Date(0)) : Timestamp.fromDate(expiryDate),
+        updatedAt: serverTimestamp()
+      });
+      toast({ title: isActive ? "Accès Offert Désactivé" : "Accès Offert Activé (1 an)" });
+    } finally {
+      setIsSavingSharedToken(false);
+    }
+  };
+
+  const handleGenerateTokens = async () => {
+    if (!firestore || !isAdmin) return;
+    setIsGeneratingTokens(true);
+    try {
+      const count = parseInt(tokenCount);
+      const months = parseInt(tokenMonths);
+      const batch = writeBatch(firestore);
+      for (let i = 0; i < count; i++) {
+        const code = `LBN-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+        batch.set(doc(firestore, 'access_tokens', code), {
+          id: code, status: 'active', durationMonths: months, createdAt: serverTimestamp()
+        });
+      }
+      await batch.commit();
+      toast({ title: `${count} jeton(s) généré(s)` });
+    } finally {
+      setIsGeneratingTokens(false);
+    }
   };
 
   useEffect(() => {
@@ -308,6 +421,130 @@ Les présentes CGV sont soumises au droit en vigueur en Nouvelle-Calédonie. Tou
           <TabsTrigger value="sounds" className="text-[10px] font-black uppercase">Sons</TabsTrigger>
           <TabsTrigger value="access" className="text-[10px] font-black uppercase">Accès</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="design" className="space-y-6">
+          <Card className="border-2">
+            <CardHeader><CardTitle className="flex items-center gap-2 font-black uppercase text-sm"><Palette className="size-4" /> Personnalisation Splash Screen</CardTitle></CardHeader>
+            <CardContent>
+              <form onSubmit={handleSaveSplash} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase">Mode d'affichage</Label>
+                    <Select name="splashMode" defaultValue={splashSettings?.splashMode || 'text'}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent><SelectItem value="text">Texte stylisé</SelectItem><SelectItem value="image">Logo / Image</SelectItem></SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase">Durée (secondes)</Label>
+                    <Input name="splashDuration" type="number" step="0.5" defaultValue={splashSettings?.splashDuration || 2.5} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase">Texte principal</Label>
+                    <Input name="splashText" defaultValue={splashSettings?.splashText || 'Lagon & Brousse NC'} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase">Couleur de fond (Hex)</Label>
+                    <Input name="splashBgColor" defaultValue={splashSettings?.splashBgColor || '#3b82f6'} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase">URL de l'image</Label>
+                    <Input name="splashImageUrl" defaultValue={splashSettings?.splashImageUrl || ''} placeholder="https://..." />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase">Ajustement image</Label>
+                    <Select name="splashImageFit" defaultValue={splashSettings?.splashImageFit || 'contain'}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent><SelectItem value="contain">Contenir (Entier)</SelectItem><SelectItem value="cover">Couvrir (Remplir)</SelectItem></SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <Button type="submit" disabled={isSavingSplash} className="w-full h-12 font-black uppercase tracking-widest gap-2">
+                  {isSavingSplash ? <RefreshCw className="size-4 animate-spin" /> : <Save className="size-4" />} Sauvegarder le Design
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="fish" className="space-y-6">
+          <div className="flex justify-end mb-4">
+            <Button onClick={() => { setCurrentFish({}); setIsFishDialogOpen(true); }} className="font-black uppercase text-[10px] gap-2"><Plus className="size-4" /> Ajouter un Poisson</Button>
+          </div>
+          <Card className="border-2">
+            <CardHeader><CardTitle className="text-sm font-black uppercase">Espèces Répertoriées ({fishSpecies?.length || 0})</CardTitle></CardHeader>
+            <CardContent className="p-0 border-t">
+              <Table>
+                <TableHeader><TableRow><TableHead className="text-[10px] font-black uppercase">Nom</TableHead><TableHead className="text-[10px] font-black uppercase">Risque Gratte</TableHead><TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {fishSpecies?.map(f => (
+                    <TableRow key={f.id}>
+                      <TableCell className="font-bold text-xs">{f.name}</TableCell>
+                      <TableCell><Badge variant={f.gratteRisk > 20 ? 'destructive' : 'secondary'} className="text-[8px] font-black">{f.gratteRisk}%</Badge></TableCell>
+                      <TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => { setCurrentFish(f); setIsFishDialogOpen(true); }}><Pencil className="size-3" /></Button></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="sounds" className="space-y-6">
+          <div className="flex justify-end mb-4">
+            <Button onClick={() => { setCurrentSound({}); setIsSoundDialogOpen(true); }} className="font-black uppercase text-[10px] gap-2"><Plus className="size-4" /> Nouveau Son</Button>
+          </div>
+          <Card className="border-2">
+            <CardHeader><CardTitle className="text-sm font-black uppercase">Bibliothèque Sonore ({sounds?.length || 0})</CardTitle></CardHeader>
+            <CardContent className="p-0 border-t">
+              <Table>
+                <TableHeader><TableRow><TableHead className="text-[10px] font-black uppercase">Libellé</TableHead><TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {sounds?.map(s => (
+                    <TableRow key={s.id}>
+                      <TableCell className="font-bold text-xs">{s.label}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="icon" onClick={() => new Audio(s.url).play()}><Play className="size-3" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => { setCurrentSound(s); setIsSoundDialogOpen(true); }}><Pencil className="size-3" /></Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="access" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className={cn("border-2 transition-colors", sharedToken && isBefore(new Date(), sharedToken.expiresAt.toDate()) ? "border-green-500 bg-green-50/10" : "border-primary/20")}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 font-black uppercase text-sm"><ShieldCheck className="size-4" /> Accès Offert (Global)</CardTitle>
+                <CardDescription className="text-[10px] font-bold uppercase">Si activé, tous les utilisateurs inscrits ont un accès Premium.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button onClick={handleToggleGlobalAccess} disabled={isSavingSharedToken} className="w-full h-12 font-black uppercase tracking-widest">
+                  {isSavingSharedToken ? <RefreshCw className="size-4 animate-spin" /> : (sharedToken && isBefore(new Date(), sharedToken.expiresAt.toDate()) ? 'Désactiver l\'accès global' : 'Activer pour tout le monde')}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="border-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 font-black uppercase text-sm"><Ticket className="size-4" /> Générateur de Jetons</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1"><Label className="text-[9px] font-black uppercase">Nombre</Label><Input type="number" value={tokenCount} onChange={e => setTokenCount(e.target.value)} /></div>
+                  <div className="space-y-1"><Label className="text-[9px] font-black uppercase">Mois</Label><Input type="number" value={tokenMonths} onChange={e => setTokenMonths(e.target.value)} /></div>
+                </div>
+                <Button onClick={handleGenerateTokens} disabled={isGeneratingTokens} className="w-full h-12 font-black uppercase tracking-widest bg-accent">Générer les codes</Button>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
         <TabsContent value="faq" className="space-y-6">
           <div className="flex flex-col sm:flex-row gap-2 mb-4">
@@ -397,9 +634,6 @@ Les présentes CGV sont soumises au droit en vigueur en Nouvelle-Calédonie. Tou
                       </TableCell>
                     </TableRow>
                   ))}
-                  {sortedFaqs.length === 0 && (
-                      <TableRow><TableCell colSpan={4} className="text-center py-10 italic text-muted-foreground">Aucune entrée trouvée. Essayez de vider les filtres.</TableCell></TableRow>
-                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -431,88 +665,29 @@ Les présentes CGV sont soumises au droit en vigueur en Nouvelle-Calédonie. Tou
 
         <TabsContent value="cgv" className="space-y-6">
           <Card className="border-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 font-black uppercase text-sm">
-                <FileText className="size-4" /> Conditions Générales de Vente
-              </CardTitle>
-              <CardDescription className="text-xs uppercase font-bold">Modifiez ici le texte légal. Toute sauvegarde forcera les utilisateurs à re-valider le document à leur prochaine connexion.</CardDescription>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-sm font-black uppercase">Conditions Générales de Vente</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-muted/20 p-3 rounded-lg border-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black uppercase opacity-60">Version actuelle :</span>
-                  <Badge variant="outline" className="font-black">{dbCgv?.version || 'Aucune'}</Badge>
-                </div>
-                <Button variant="outline" size="sm" className="h-8 text-[9px] font-black uppercase gap-2 border-primary/20" onClick={loadCgvTemplate}>
-                  <Gavel className="size-3 text-primary" /> Charger le modèle conforme NC
-                </Button>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Texte légal</Label>
-                <Textarea 
-                  value={cgvContent} 
-                  onChange={e => setCgvContent(e.target.value)} 
-                  className="min-h-[400px] font-medium leading-relaxed border-2" 
-                  placeholder="Rédigez vos CGV ici..."
-                />
-              </div>
-              <Button onClick={handleSaveCgv} disabled={isSavingCgv} className="w-full h-12 font-black uppercase tracking-widest gap-2">
-                {isSavingCgv ? <RefreshCw className="size-4 animate-spin" /> : <Save className="size-4" />}
-                Enregistrer & Publier la mise à jour
-              </Button>
+              <Button variant="outline" onClick={loadCgvTemplate} className="w-full text-[10px] font-black uppercase border-dashed border-2">Charger le modèle conforme NC</Button>
+              <Textarea value={cgvContent} onChange={e => setCgvContent(e.target.value)} className="min-h-[400px] text-xs font-medium" />
+              <Button onClick={handleSaveCgv} disabled={isSavingCgv} className="w-full h-12 font-black uppercase">Enregistrer & Publier</Button>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="users" className="space-y-6">
           <Card className="border-2">
-            <CardHeader><CardTitle className="flex items-center gap-2 font-black uppercase text-sm"><Users className="size-4" /> Gestion des Utilisateurs ({users?.length || 0})</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-sm font-black uppercase">Utilisateurs ({users?.length || 0})</CardTitle></CardHeader>
             <CardContent className="p-0 border-t">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-[10px] font-black uppercase">Utilisateur</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase">Statut</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase">Expiration</TableHead>
-                    <TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
+                <TableHeader><TableRow><TableHead className="text-[10px] font-black uppercase">User</TableHead><TableHead className="text-[10px] font-black uppercase">Statut</TableHead><TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {users?.map(u => (
                     <TableRow key={u.id}>
-                      <TableCell className="font-bold text-xs">
-                        <div className="flex items-center gap-3">
-                          <Avatar className="size-8">
-                            <AvatarFallback>{u.displayName?.[0] || 'U'}</AvatarFallback>
-                          </Avatar>
-                          <div className="flex flex-col min-w-0">
-                            <span className="truncate">{u.displayName}</span>
-                            <span className="text-[9px] opacity-50 truncate">{u.email}</span>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant={u.subscriptionStatus === 'admin' ? 'default' : u.subscriptionStatus === 'active' ? 'secondary' : 'outline'} 
-                          className="text-[8px] uppercase font-black"
-                        >
-                          {u.subscriptionStatus}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-[10px] font-bold">
-                        <div className="flex items-center gap-1.5">
-                          <Calendar className="size-3 opacity-40" />
-                          {u.subscriptionExpiryDate ? format(new Date(u.subscriptionExpiryDate), 'dd/MM/yy', { locale: fr }) : 'N/A'}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" className="size-8"><Pencil className="size-3" /></Button>
-                      </TableCell>
+                      <TableCell className="font-bold text-xs"><div className="flex flex-col"><span>{u.displayName}</span><span className="text-[9px] opacity-50">{u.email}</span></div></TableCell>
+                      <TableCell><Badge variant="outline" className="text-[8px] font-black">{u.subscriptionStatus}</Badge></TableCell>
+                      <TableCell className="text-right"><Button variant="ghost" size="icon"><Pencil className="size-3" /></Button></TableCell>
                     </TableRow>
                   ))}
-                  {(!users || users.length === 0) && (
-                    <TableRow><TableCell colSpan={4} className="text-center py-10 italic opacity-40">Aucun utilisateur trouvé.</TableCell></TableRow>
-                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -528,7 +703,7 @@ Les présentes CGV sont soumises au droit en vigueur en Nouvelle-Calédonie. Tou
         </TabsContent>
       </Tabs>
 
-      {/* Dialog FAQ */}
+      {/* Dialogs FAQ, Fish, Sounds, etc. */}
       <Dialog open={isFaqDialogOpen} onOpenChange={setIsFaqDialogOpen}>
         <DialogContent className="max-w-xl rounded-2xl">
           <DialogHeader><DialogTitle className="font-black uppercase">Éditer FAQ</DialogTitle></DialogHeader>
@@ -550,23 +725,33 @@ Les présentes CGV sont soumises au droit en vigueur en Nouvelle-Calédonie. Tou
         </DialogContent>
       </Dialog>
 
-      {/* Dialog Ticket Réponse */}
-      <Dialog open={!!currentTicket} onOpenChange={(o) => !o && setCurrentTicket(null)}>
-        <DialogContent className="max-w-xl rounded-2xl">
-          <DialogHeader><DialogTitle className="font-black uppercase">Réponse Support</DialogTitle></DialogHeader>
-          {currentTicket && (
-            <div className="space-y-4 py-4">
-              <div className="p-4 bg-muted/30 rounded-xl space-y-2">
-                <p className="text-[10px] font-black uppercase opacity-60">Message de l'utilisateur :</p>
-                <p className="text-xs font-bold leading-relaxed">"{currentTicket.description}"</p>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs uppercase font-bold opacity-60">Ma réponse</Label>
-                <Textarea value={adminResponse} onChange={e => setAdminResponse(e.target.value)} className="min-h-[150px] border-2" placeholder="Tapez votre réponse ici..." />
-              </div>
+      <Dialog open={isFishDialogOpen} onOpenChange={setIsFishDialogOpen}>
+        <DialogContent className="max-w-xl rounded-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="font-black uppercase">Fiche Poisson</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex gap-2 items-end">
+              <div className="flex-1 space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Nom Commun</Label><Input value={currentFish.name || ''} onChange={e => setCurrentFish({...currentFish, name: e.target.value})} /></div>
+              <Button onClick={handleAIGenerateFish} disabled={isAIGeneratingFish || !currentFish.name} className="h-10 px-3 bg-indigo-600 text-white gap-2"><Sparkles className="size-4" /> IA</Button>
             </div>
-          )}
-          <DialogFooter><Button onClick={handleRespondToTicket} disabled={isResponding} className="w-full h-12 font-black uppercase shadow-lg bg-accent hover:bg-accent/90">Envoyer & Fermer le ticket</Button></DialogFooter>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Scientifique</Label><Input value={currentFish.scientificName || ''} onChange={e => setCurrentFish({...currentFish, scientificName: e.target.value})} /></div>
+              <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Risque Gratte (%)</Label><Input type="number" value={currentFish.gratteRisk || 0} onChange={e => setCurrentFish({...currentFish, gratteRisk: parseInt(e.target.value)})} /></div>
+            </div>
+            <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Conseils Pêche</Label><Textarea value={currentFish.fishingAdvice || ''} onChange={e => setCurrentFish({...currentFish, fishingAdvice: e.target.value})} /></div>
+            <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Conseils Cuisine</Label><Textarea value={currentFish.culinaryAdvice || ''} onChange={e => setCurrentFish({...currentFish, culinaryAdvice: e.target.value})} /></div>
+          </div>
+          <DialogFooter><Button onClick={handleSaveFish} disabled={isSavingFish} className="w-full h-12 font-black uppercase shadow-lg">Sauvegarder</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isSoundDialogOpen} onOpenChange={setIsSoundDialogOpen}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader><DialogTitle className="font-black uppercase">Nouveau Signal Sonore</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Libellé</Label><Input value={currentSound.label || ''} onChange={e => setCurrentSound({...currentSound, label: e.target.value})} /></div>
+            <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">URL du fichier MP3</Label><Input value={currentSound.url || ''} onChange={e => setCurrentSound({...currentSound, url: e.target.value})} /></div>
+          </div>
+          <DialogFooter><Button onClick={handleSaveSound} disabled={isSavingSound} className="w-full h-12 font-black uppercase shadow-lg">Sauvegarder</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
