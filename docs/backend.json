@@ -24,6 +24,30 @@
       },
       "required": ["id", "email", "subscriptionStatus"]
     },
+    "UserVesselSafety": {
+      "title": "UserVesselSafety",
+      "type": "object",
+      "description": "Information sur la sécurité d'un navire utilisateur.",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "vesselName": { "type": "string" },
+        "equipment": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "type": { "type": "string", "enum": ["fusée", "extincteur", "autre"] },
+              "label": { "type": "string" },
+              "expiryDate": { "type": "string", "format": "date" }
+            }
+          }
+        },
+        "createdAt": { "type": "object" }
+      },
+      "required": ["vesselName", "userId"]
+    },
     "FaqEntry": {
       "title": "FaqEntry",
       "type": "object",
@@ -105,6 +129,14 @@
           "entityName": "User",
           "schema": { "$ref": "#/backend/entities/User" },
           "description": "Profils utilisateurs"
+        }
+      },
+      {
+        "path": "/users/{userId}/vessels_safety/{id}",
+        "definition": {
+          "entityName": "UserVesselSafety",
+          "schema": { "$ref": "#/backend/entities/UserVesselSafety" },
+          "description": "Gestion de la sécurité des navires privés"
         }
       }
     ]

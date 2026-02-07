@@ -17,6 +17,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Ban, Check, Scale, BookOpen, Crosshair, LifeBuoy, ShieldCheck, Info, Zap, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { VesselSafetyManager } from '@/components/vessel-safety-manager';
 
 const fishingCalendarData = [
   {
@@ -235,12 +236,8 @@ export default function ReglementationPage() {
                       Très utile sous le soleil calédonien pour attirer l'attention de loin par réverbération.
                     </p>
                   </div>
-                  <div className="bg-white p-3 rounded-lg border border-amber-100 shadow-sm">
-                    <p className="text-[10px] font-black uppercase text-amber-600 mb-1">Vérification</p>
-                    <p className="text-xs font-medium leading-relaxed">
-                      Pensez à vérifier les dates de péremption de vos fusées et la date de révision de vos extincteurs.
-                    </p>
-                  </div>
+                  
+                  <VesselSafetyManager />
                 </div>
                 <div className="flex items-start gap-2 p-3 bg-slate-100 rounded-lg">
                   <Info className="size-4 text-slate-500 shrink-0 mt-0.5" />

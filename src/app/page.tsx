@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -14,6 +15,10 @@ import {
   Spade,
   TrendingUp,
   TrendingDown,
+  AlertTriangle,
+  Ship,
+  ShieldCheck,
+  ChevronRight
 } from 'lucide-react';
 import { useLocation } from '@/context/location-context';
 import { useDate } from '@/context/date-context';
@@ -21,9 +26,11 @@ import { WeatherForecast } from '@/components/ui/weather-forecast';
 import { cn } from '@/lib/utils';
 import { useMemo, useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
-import type { MeteoLive } from '@/lib/types';
+import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { doc, collection, query } from 'firebase/firestore';
+import type { MeteoLive, UserVesselSafety } from '@/lib/types';
+import { differenceInDays, parseISO } from 'date-fns';
+import Link from 'next/link';
 
 function HomeSkeleton() {
   return (
@@ -55,6 +62,7 @@ const getProgressiveUV = (maxUV: number, date: Date): number => {
 export default function Home() {
   const { selectedLocation } = useLocation();
   const { selectedDate } = useDate();
+  const { user } = useUser();
   const firestore = useFirestore();
   
   const [data, setData] = useState<LocationData | null>(null);
@@ -75,6 +83,31 @@ export default function Home() {
   }, [firestore, selectedLocation]);
   
   const { data: liveMeteo } = useDoc<MeteoLive>(meteoRef);
+
+  // RÉCUPÉRATION ÉQUIPEMENT SÉCURITÉ POUR RAPPELS
+  const safetyRef = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return collection(firestore, 'users', user.uid, 'vessels_safety');
+  }, [user, firestore]);
+  const { data: vesselsSafety } = useCollection<UserVesselSafety>(safetyRef);
+
+  // Détection des alertes de péremption
+  const safetyAlerts = useMemo(() => {
+    if (!vesselsSafety) return [];
+    const alerts: { vessel: string, item: string, daysLeft: number }[] = [];
+    const today = new Date();
+
+    vesselsSafety.forEach(v => {
+      v.equipment?.forEach(item => {
+        const expiry = parseISO(item.expiryDate);
+        const daysLeft = differenceInDays(expiry, today);
+        if (daysLeft < 90) {
+          alerts.push({ vessel: v.vesselName, item: item.label, daysLeft });
+        }
+      });
+    });
+    return alerts.sort((a, b) => a.daysLeft - b.daysLeft);
+  }, [vesselsSafety]);
 
   useEffect(() => {
     setIsLoading(true);
@@ -146,6 +179,32 @@ export default function Home() {
           Résumé pour <span className="font-bold text-primary">{selectedLocation}</span> le {dateString}.
         </p>
       </div>
+
+      {/* RAPPEL ÉQUIPEMENT SÉCURITÉ */}
+      {safetyAlerts.length > 0 && (
+        <Link href="/reglementation" className="block animate-in slide-in-from-top duration-500">
+          <Card className="border-orange-500 bg-orange-50 border-2 shadow-lg overflow-hidden relative">
+            <div className="absolute right-0 top-0 opacity-10 -translate-y-2 translate-x-2">
+              <ShieldCheck className="size-24 text-orange-600" />
+            </div>
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="size-12 rounded-full bg-orange-500 text-white flex items-center justify-center shrink-0 animate-pulse">
+                <AlertTriangle className="size-6" />
+              </div>
+              <div className="flex-grow min-w-0">
+                <p className="text-[10px] font-black uppercase text-orange-800 tracking-widest">Alerte Sécurité Navire</p>
+                <p className="text-sm font-black text-orange-950 truncate">
+                  {safetyAlerts[0].daysLeft < 0 
+                    ? `Équipement EXPIRÉ sur ${safetyAlerts[0].vessel}` 
+                    : `Péremption imminente : ${safetyAlerts[0].item}`}
+                </p>
+                <p className="text-[10px] font-bold text-orange-700/70 uppercase">Cliquez pour gérer vos dates</p>
+              </div>
+              <ChevronRight className="size-5 text-orange-400" />
+            </CardContent>
+          </Card>
+        </Link>
+      )}
 
       <WeatherForecast weather={weatherWithLiveUpdates} tides={sortedTides} isToday={isToday} />
 

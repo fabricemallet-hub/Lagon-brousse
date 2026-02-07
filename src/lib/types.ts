@@ -144,6 +144,21 @@ export interface UserAccount {
   cgvVersionSeen?: number;
 }
 
+export interface SafetyItem {
+  id: string;
+  type: 'fusée' | 'extincteur' | 'autre';
+  label: string;
+  expiryDate: string;
+}
+
+export interface UserVesselSafety {
+  id: string;
+  userId: string;
+  vesselName: string;
+  equipment: SafetyItem[];
+  createdAt: any;
+}
+
 export interface FishSpeciesInfo {
   id: string;
   name: string;
