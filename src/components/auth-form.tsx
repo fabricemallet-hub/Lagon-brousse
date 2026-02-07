@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -13,7 +14,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useAuth, useFirestore } from '@/firebase';
+import { useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
@@ -23,11 +24,15 @@ import {
   updateProfile,
   AuthError,
 } from 'firebase/auth';
+import { doc } from 'firebase/firestore';
 import { ForgotPasswordDialog } from './forgot-password-dialog';
-import { Eye, EyeOff, Ticket } from 'lucide-react';
+import { Eye, EyeOff, Ticket, FileText, ScrollText } from 'lucide-react';
 import { ensureUserDocument } from '@/lib/user-utils';
 import { redeemAccessToken } from '@/lib/token-utils';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import type { CgvSettings } from '@/lib/types';
 
 type AuthFormProps = {
   mode: 'login' | 'signup';
@@ -47,6 +52,9 @@ const signupSchema = z.object({
   email: z.string().email({ message: 'Veuillez entrer une adresse email valide.' }),
   password: z.string().min(6, { message: 'Le mot de passe doit contenir au moins 6 caractères.' }),
   token: z.string().optional(),
+  acceptCgv: z.boolean().refine(val => val === true, {
+    message: "Vous devez accepter les conditions générales de vente."
+  }),
 });
 
 
@@ -68,8 +76,15 @@ export function AuthForm({ mode }: AuthFormProps) {
       password: '',
       token: '',
       rememberMe: false,
+      acceptCgv: false,
     },
   });
+
+  const cgvRef = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return doc(firestore, 'app_settings', 'cgv');
+  }, [firestore]);
+  const { data: cgvData } = useDoc<CgvSettings>(cgvRef);
   
   useEffect(() => {
     if (mode === 'login') {
@@ -320,11 +335,58 @@ export function AuthForm({ mode }: AuthFormProps) {
           )}
         />
 
+        {mode === 'signup' && (
+          <FormField
+            control={form.control}
+            name="acceptCgv"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-start space-x-3 space-y-0 pt-2">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+                <div className="space-y-1 leading-none">
+                  <FormLabel className="text-xs">
+                    J'ai lu et j'accepte les{' '}
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <button type="button" className="text-primary font-bold hover:underline underline-offset-4">
+                          Conditions Générales de Vente
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-0 overflow-hidden">
+                        <DialogHeader className="p-6 bg-muted/30 border-b">
+                          <DialogTitle className="flex items-center gap-2 font-black uppercase tracking-tighter">
+                            <ScrollText className="size-5 text-primary" /> Conditions Générales de Vente
+                          </DialogTitle>
+                        </DialogHeader>
+                        <ScrollArea className="flex-1 p-6">
+                          <div className="prose prose-sm font-medium leading-relaxed text-muted-foreground whitespace-pre-wrap">
+                            {cgvData?.content || "Les conditions générales sont en cours de mise à jour. Veuillez réessayer plus tard."}
+                          </div>
+                        </ScrollArea>
+                        <DialogFooter className="p-4 border-t bg-muted/10">
+                          <DialogClose asChild>
+                            <Button variant="default" className="w-full font-black uppercase">Compris</Button>
+                          </DialogClose>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </FormLabel>
+                  <FormMessage />
+                </div>
+              </FormItem>
+            )}
+          />
+        )}
+
         <div className="pt-4">
           <Button 
             type="submit" 
-            className="w-full" 
-            disabled={isLoading}
+            className="w-full h-12 font-black uppercase tracking-widest shadow-md" 
+            disabled={isLoading || (mode === 'signup' && !form.getValues('acceptCgv'))}
           >
             {isLoading ? "Chargement..." : (mode === 'login' ? 'Se connecter' : "S'inscrire")}
           </Button>

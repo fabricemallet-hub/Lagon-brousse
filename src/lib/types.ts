@@ -234,3 +234,8 @@ export interface MeteoForecast {
   temp_min: number;
   vent_max: number;
 }
+
+export interface CgvSettings {
+  content: string;
+  updatedAt: any;
+}

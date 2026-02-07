@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, serverTimestamp, deleteDoc, doc, Timestamp, orderBy, query, setDoc, writeBatch, getDocs, addDoc, updateDoc } from 'firebase/firestore';
-import type { UserAccount, AccessToken, Conversation, SharedAccessToken, SplashScreenSettings, FishSpeciesInfo, SoundLibraryEntry, FaqEntry, SupportTicket } from '@/lib/types';
+import type { UserAccount, AccessToken, Conversation, SharedAccessToken, SplashScreenSettings, FishSpeciesInfo, SoundLibraryEntry, FaqEntry, SupportTicket, CgvSettings } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +19,8 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Filter
+  Filter,
+  FileText
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -60,6 +61,10 @@ export default function AdminPage() {
   const [currentTicket, setCurrentTicket] = useState<SupportTicket | null>(null);
   const [adminResponse, setAdminResponse] = useState('');
   const [isResponding, setIsResponding] = useState(false);
+
+  // CGV States
+  const [cgvContent, setCgvContent] = useState('');
+  const [isSavingCgv, setIsSavingCgv] = useState(false);
 
   const isAdmin = useMemo(() => {
     if (!user) return false;
@@ -113,6 +118,16 @@ export default function AdminPage() {
     return query(collection(firestore, 'cms_support', 'tickets', 'items'), orderBy('createdAt', 'desc'));
   }, [firestore, isAdmin]);
   const { data: tickets } = useCollection<SupportTicket>(ticketsRef);
+
+  const cgvRef = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    return doc(firestore, 'app_settings', 'cgv');
+  }, [firestore, isAdmin]);
+  const { data: dbCgv } = useDoc<CgvSettings>(cgvRef);
+
+  useEffect(() => {
+    if (dbCgv) setCgvContent(dbCgv.content || '');
+  }, [dbCgv]);
 
   // Handlers FAQ
   const handleSaveFaq = async () => {
@@ -197,6 +212,23 @@ export default function AdminPage() {
     }
   };
 
+  // Handlers CGV
+  const handleSaveCgv = async () => {
+    if (!firestore || !isAdmin) return;
+    setIsSavingCgv(true);
+    try {
+      await setDoc(doc(firestore, 'app_settings', 'cgv'), {
+        content: cgvContent,
+        updatedAt: serverTimestamp()
+      });
+      toast({ title: "CGV sauvegardées !" });
+    } catch (e) {
+      toast({ variant: 'destructive', title: "Erreur lors de la sauvegarde" });
+    } finally {
+      setIsSavingCgv(false);
+    }
+  };
+
   useEffect(() => {
     if (!isUserLoading && !isAdmin) router.push('/compte');
   }, [isAdmin, isUserLoading, router]);
@@ -215,10 +247,11 @@ export default function AdminPage() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 sm:grid-cols-8 mb-6 h-auto p-1 bg-muted/50 border rounded-xl">
+        <TabsList className="grid w-full grid-cols-4 sm:grid-cols-9 mb-6 h-auto p-1 bg-muted/50 border rounded-xl">
           <TabsTrigger value="overview" className="text-[10px] font-black uppercase">Stats</TabsTrigger>
           <TabsTrigger value="faq" className="text-[10px] font-black uppercase">FAQ</TabsTrigger>
           <TabsTrigger value="tickets" className="text-[10px] font-black uppercase">Tickets</TabsTrigger>
+          <TabsTrigger value="cgv" className="text-[10px] font-black uppercase">CGV</TabsTrigger>
           <TabsTrigger value="users" className="text-[10px] font-black uppercase">Users</TabsTrigger>
           <TabsTrigger value="design" className="text-[10px] font-black uppercase">Design</TabsTrigger>
           <TabsTrigger value="fish" className="text-[10px] font-black uppercase">Fish</TabsTrigger>
@@ -342,6 +375,32 @@ export default function AdminPage() {
                   ))}
                 </TableBody>
               </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="cgv" className="space-y-6">
+          <Card className="border-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 font-black uppercase text-sm">
+                <FileText className="size-4" /> Conditions Générales de Vente
+              </CardTitle>
+              <CardDescription className="text-xs uppercase font-bold">Modifiez ici le texte affiché lors de l'inscription.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Texte légal</Label>
+                <Textarea 
+                  value={cgvContent} 
+                  onChange={e => setCgvContent(e.target.value)} 
+                  className="min-h-[400px] font-medium leading-relaxed border-2" 
+                  placeholder="Rédigez vos CGV ici..."
+                />
+              </div>
+              <Button onClick={handleSaveCgv} disabled={isSavingCgv} className="w-full h-12 font-black uppercase tracking-widest gap-2">
+                {isSavingCgv ? <RefreshCw className="size-4 animate-spin" /> : <Save className="size-4" />}
+                Enregistrer les CGV
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
