@@ -320,12 +320,10 @@ export default function AdminPage() {
     setIsAIGeneratingFish(true);
     try {
       const info = await generateFishInfo({ name: currentFish.name });
-      // On fusionne mais on garde l'image existante si présente
+      // On fusionne mais on garde les données existantes pour ne pas écraser les images
       setCurrentFish(prev => ({ 
-        imageUrl: prev.imageUrl,
-        imagePlaceholder: prev.imagePlaceholder,
+        ...prev,
         ...info, 
-        name: prev.name 
       }));
       toast({ title: "Fiche générée par IA" });
     } catch (e) {
@@ -339,7 +337,6 @@ export default function AdminPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Protocole de redimensionnement côté client pour éviter de saturer Firestore (1MB limit)
     const reader = new FileReader();
     reader.onload = (event) => {
       const base64 = event.target?.result as string;
@@ -354,15 +351,29 @@ export default function AdminPage() {
     setIsSavingFish(true);
     try {
       const id = currentFish.id || currentFish.name.toLowerCase().replace(/\s+/g, '-');
-      // Pour compatibilité, on garde aussi gratteRisk égal au risque moyen
-      const payload = { 
-        ...currentFish, 
-        id, 
-        gratteRisk: currentFish.gratteRiskMedium || currentFish.gratteRisk || 0 
+      
+      // Sanitisation du payload pour éviter les erreurs "undefined" de Firebase
+      const payload: any = { 
+        id,
+        name: currentFish.name || "",
+        scientificName: currentFish.scientificName || "",
+        gratteRiskSmall: Number(currentFish.gratteRiskSmall) || 0,
+        gratteRiskMedium: Number(currentFish.gratteRiskMedium) || 0,
+        gratteRiskLarge: Number(currentFish.gratteRiskLarge) || 0,
+        gratteRisk: Number(currentFish.gratteRiskMedium || currentFish.gratteRisk || 0),
+        culinaryAdvice: currentFish.culinaryAdvice || "",
+        fishingAdvice: currentFish.fishingAdvice || "",
+        category: currentFish.category || "Lagon",
+        imageUrl: currentFish.imageUrl || null,
+        imagePlaceholder: currentFish.imagePlaceholder || null
       };
+
       await setDoc(doc(firestore, 'fish_species', id), payload, { merge: true });
       toast({ title: "Poisson enregistré" });
       setIsFishDialogOpen(false);
+    } catch (e) {
+      console.error("Firestore Save Error:", e);
+      toast({ variant: 'destructive', title: "Erreur enregistrement", description: "Une valeur invalide a bloqué l'accès à Firestore." });
     } finally {
       setIsSavingFish(false);
     }
@@ -769,7 +780,7 @@ export default function AdminPage() {
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           <Button variant="ghost" size="icon" className="size-8" onClick={() => { setCurrentFaq(f); setIsFaqDialogOpen(true); }}><Pencil className="size-3" /></Button>
-                          <Button variant="ghost" size="icon" className="size-8" onClick={() => handleDeleteFaq(f.id)}><Trash2 className="size-3 text-destructive" /></Button>
+                          <Button variant="ghost" size="icon" className="size-8" onClick={() => handleDeleteFaq(id)}><Trash2 className="size-3 text-destructive" /></Button>
                         </div>
                       </TableCell>
                     </TableRow>
