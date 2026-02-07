@@ -1,3 +1,4 @@
+
 'use client';
     
 import { useState, useEffect } from 'react';
@@ -57,7 +58,6 @@ export function useDoc<T = any>(
 
     setIsLoading(true);
     setError(null);
-    // Optional: setData(null); // Clear previous data instantly
 
     const unsubscribe = onSnapshot(
       memoizedDocRef,
@@ -72,17 +72,23 @@ export function useDoc<T = any>(
         setIsLoading(false);
       },
       (error: FirestoreError) => {
-        const contextualError = new FirestorePermissionError({
-          operation: 'get',
-          path: memoizedDocRef.path,
-        })
+        // Only report permission errors through the global emitter
+        if (error.code === 'permission-denied') {
+          const contextualError = new FirestorePermissionError({
+            operation: 'get',
+            path: memoizedDocRef.path,
+          })
 
-        setError(contextualError)
+          setError(contextualError)
+          // trigger global error propagation
+          errorEmitter.emit('permission-error', contextualError);
+        } else {
+          // For other errors, just set the local error state
+          setError(error);
+        }
+        
         setData(null)
         setIsLoading(false)
-
-        // trigger global error propagation
-        errorEmitter.emit('permission-error', contextualError);
       }
     );
 

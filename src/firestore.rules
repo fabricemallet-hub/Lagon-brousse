@@ -12,16 +12,17 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         request.auth.uid == "K9cVYLVUk1NV99YV3anebkugpPp1" ||
-        request.auth.token.email == "fabrice.mallet@gmail.com" ||
-        request.auth.token.email == "f.mallet81@gmail.com" || 
-        request.auth.token.email == "f.mallet81@outlook.com"
+        request.auth.uid == "ipupi3Pg4RfrSEpFyT69BtlCdpi2" ||
+        request.auth.token.email.matches("(?i)fabrice.mallet@gmail.com") ||
+        request.auth.token.email.matches("(?i)f.mallet81@gmail.com") || 
+        request.auth.token.email.matches("(?i)f.mallet81@outlook.com")
       );
     }
 
     // --- 1. CMS SUPPORT & FAQ ---
     match /cms_support/faq/items/{id} {
-      // Public : Tout le monde voit la FAQ
-      allow read: if true;
+      // Public : Tout le monde voit la FAQ (Lecture seule)
+      allow get, list: if true;
       allow write: if isAdmin();
     }
 
