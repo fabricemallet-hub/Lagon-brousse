@@ -106,7 +106,8 @@ export default function VesselTrackerPage() {
     watchType: 'stationary',
     watchDuration: 60,
     watchSound: '',
-    batteryThreshold: 20
+    batteryThreshold: 20,
+    batterySound: ''
   });
   
   const [history, setHistory] = useState<{ vesselName: string, statusLabel: string, time: Date, pos: google.maps.LatLngLiteral, batteryLevel?: number, isCharging?: boolean }[]>([]);
@@ -486,7 +487,7 @@ export default function VesselTrackerPage() {
         if (lastBattery >= (vesselPrefs.batteryThreshold || 20) && currentBattery < (vesselPrefs.batteryThreshold || 20)) {
             addToHistory(`BATTERIE FAIBLE`);
             if (mode === 'receiver' && vesselPrefs.isNotifyEnabled) {
-                playVesselSound('alerte');
+                playVesselSound(vesselPrefs.batterySound || 'alerte');
                 toast({ variant: 'destructive', title: "Batterie Critique", description: `${vessel.displayName || vessel.id} : ${currentBattery}%` });
             }
         }
@@ -832,6 +833,18 @@ export default function VesselTrackerPage() {
                       <div className="flex justify-between text-[8px] font-black uppercase opacity-40 px-1">
                         <span>5%</span>
                         <span>50%</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4 pt-2 border-t border-dashed border-red-200">
+                        <span className="text-[10px] font-bold uppercase flex-1 text-red-800/60">Son de l'alerte</span>
+                        <Select value={vesselPrefs.batterySound} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, batterySound: v })}>
+                            <SelectTrigger className="h-8 text-[9px] font-black uppercase w-32 bg-white/50 border-red-200">
+                                <SelectValue placeholder="Choisir..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] uppercase font-black">{s.label}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600" onClick={() => playVesselSound(vesselPrefs.batterySound)}><Play className="size-3" /></Button>
                       </div>
                     </div>
                   </AccordionContent>
