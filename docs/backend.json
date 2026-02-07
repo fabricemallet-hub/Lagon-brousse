@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -23,6 +24,33 @@
       },
       "required": ["id", "email", "subscriptionStatus"]
     },
+    "FaqEntry": {
+      "title": "FaqEntry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "question": { "type": "string" },
+        "reponse": { "type": "string" },
+        "categorie": { "type": "string", "enum": ["General", "Peche", "Boat Tracker", "Chasse", "Champs", "Compte"] },
+        "ordre": { "type": "integer" }
+      },
+      "required": ["question", "reponse", "categorie"]
+    },
+    "SupportTicket": {
+      "title": "SupportTicket",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "sujet": { "type": "string" },
+        "description": { "type": "string" },
+        "statut": { "type": "string", "enum": ["ouvert", "ferme"] },
+        "createdAt": { "type": "object" },
+        "captureUrl": { "type": "string" }
+      },
+      "required": ["userId", "sujet", "description"]
+    },
     "GardenPlant": {
       "title": "GardenPlant",
       "type": "object",
@@ -38,102 +66,15 @@
       },
       "required": ["name", "category"]
     },
-    "MeteoLive": {
-      "title": "MeteoLive",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string", "description": "Nom de la commune" },
-        "vent": { "type": "number" },
-        "temperature": { "type": "number" },
-        "uv": { "type": "number" },
-        "direction_vent": { "type": "number", "description": "Direction en degrés (0-360)" }
-      }
-    },
-    "MeteoForecast": {
-      "title": "MeteoForecast",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string", "description": "jour_1, jour_2..." },
-        "code_meteo": { "type": "number" },
-        "date": { "type": "string" },
-        "prob_pluie": { "type": "number" },
-        "rafales_max": { "type": "number" },
-        "temp_max": { "type": "number" },
-        "temp_min": { "type": "number" },
-        "vent_max": { "type": "number" }
-      }
-    },
-    "FishSpecies": {
-      "title": "FishSpecies",
-      "type": "object",
-      "description": "Information about a fish species in New Caledonia.",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "scientificName": { "type": "string" },
-        "gratteRisk": { "type": "number" },
-        "culinaryAdvice": { "type": "string" },
-        "fishingAdvice": { "type": "string" },
-        "category": { "type": "string", "enum": ["Lagon", "Large", "Recif"] },
-        "imageUrl": { "type": "string" },
-        "imagePlaceholder": { "type": "string" }
-      },
-      "required": ["name", "category"]
-    },
-    "AppSetting": {
-      "title": "AppSetting",
-      "type": "object",
-      "properties": {
-        "splashMode": { "type": "string" },
-        "splashText": { "type": "string" },
-        "splashBgColor": { "type": "string" },
-        "splashDuration": { "type": "number" },
-        "splashImageUrl": { "type": "string" },
-        "splashTextColor": { "type": "string" },
-        "splashFontSize": { "type": "string" },
-        "splashImageFit": { "type": "string" }
-      }
-    },
-    "HuntingSession": {
-      "title": "HuntingSession",
-      "type": "object",
-      "properties": {
-        "organizerId": { "type": "string" },
-        "createdAt": { "type": "object" },
-        "expiresAt": { "type": "object" }
-      }
-    },
     "VesselStatus": {
       "title": "VesselStatus",
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
         "displayName": { "type": "string" },
-        "location": { 
-          "type": "object",
-          "properties": {
-            "latitude": { "type": "number" },
-            "longitude": { "type": "number" }
-          }
-        },
         "status": { "type": "string", "enum": ["moving", "stationary", "offline", "returning", "landed"] },
-        "isSharing": { "type": "boolean" },
-        "lastActive": { "type": "object" },
-        "statusChangedAt": { "type": "object" },
-        "batteryLevel": { "type": "number" },
-        "isCharging": { "type": "boolean" }
+        "isSharing": { "type": "boolean" }
       }
-    },
-    "SoundLibraryEntry": {
-      "title": "SoundLibraryEntry",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "label": { "type": "string" },
-        "url": { "type": "string" },
-        "categories": { "type": "array", "items": { "type": "string" } }
-      },
-      "required": ["label", "url"]
     }
   },
   "auth": {
@@ -142,35 +83,19 @@
   "firestore": {
     "structure": [
       {
-        "path": "/app_settings/{id}",
+        "path": "/cms_support/faq/items/{id}",
         "definition": {
-          "entityName": "AppSetting",
-          "schema": { "$ref": "#/backend/entities/AppSetting" },
-          "description": "Configuration globale de l'application (Splash screen, etc.)"
+          "entityName": "FaqEntry",
+          "schema": { "$ref": "#/backend/entities/FaqEntry" },
+          "description": "Base de connaissances dynamique (FAQ)"
         }
       },
       {
-        "path": "/meteo_caledonie/{communeId}",
+        "path": "/cms_support/tickets/items/{id}",
         "definition": {
-          "entityName": "MeteoLive",
-          "schema": { "$ref": "#/backend/entities/MeteoLive" },
-          "description": "Données météo en temps réel pour les communes de NC"
-        }
-      },
-      {
-        "path": "/meteo_caledonie/{communeId}/previsions/{prevId}",
-        "definition": {
-          "entityName": "MeteoForecast",
-          "schema": { "$ref": "#/backend/entities/MeteoForecast" },
-          "description": "Prévisions météo journalières sur 7 jours"
-        }
-      },
-      {
-        "path": "/fish_species/{fishId}",
-        "definition": {
-          "entityName": "FishSpecies",
-          "schema": { "$ref": "#/backend/entities/FishSpecies" },
-          "description": "Catalogue complet des poissons du lagon et du large"
+          "entityName": "SupportTicket",
+          "schema": { "$ref": "#/backend/entities/SupportTicket" },
+          "description": "Tickets de support utilisateur"
         }
       },
       {
@@ -178,39 +103,7 @@
         "definition": {
           "entityName": "User",
           "schema": { "$ref": "#/backend/entities/User" },
-          "description": "Profils utilisateurs et statut d'abonnement"
-        }
-      },
-      {
-        "path": "/users/{userId}/garden_plants/{plantId}",
-        "definition": {
-          "entityName": "GardenPlant",
-          "schema": { "$ref": "#/backend/entities/GardenPlant" },
-          "description": "Plantes et arbres du jardin de l'utilisateur"
-        }
-      },
-      {
-        "path": "/hunting_sessions/{sessionId}",
-        "definition": {
-          "entityName": "HuntingSession",
-          "schema": { "$ref": "#/backend/entities/HuntingSession" },
-          "description": "Sessions de chasse collective"
-        }
-      },
-      {
-        "path": "/vessels/{vesselId}",
-        "definition": {
-          "entityName": "VesselStatus",
-          "schema": { "$ref": "#/backend/entities/VesselStatus" },
-          "description": "Positions des navires en temps réel (Boat Tracker)"
-        }
-      },
-      {
-        "path": "/sound_library/{soundId}",
-        "definition": {
-          "entityName": "SoundLibraryEntry",
-          "schema": { "$ref": "#/backend/entities/SoundLibraryEntry" },
-          "description": "Bibliothèque de sons pour les notifications et alertes"
+          "description": "Profils utilisateurs"
         }
       }
     ]

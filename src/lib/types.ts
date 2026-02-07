@@ -3,7 +3,7 @@ export type WindDirection = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
 
 export interface WindForecast {
   time: string;
-  speed: number; // Primary/Lagon for compatibility
+  speed: number;
   speedLagon: number;
   speedLarge: number;
   speedLand: number;
@@ -19,7 +19,7 @@ export interface SwellForecast {
 }
 
 export interface HourlyForecast {
-  date: string; // ISO string
+  date: string;
   condition:
     | 'Peu nuageux'
     | 'Ensoleillé'
@@ -27,7 +27,7 @@ export interface HourlyForecast {
     | 'Averses'
     | 'Pluvieux'
     | 'Nuit claire';
-  windSpeed: number; // in knots
+  windSpeed: number;
   windDirection: WindDirection;
   stability: 'Stable' | 'Tournant';
   isNight: boolean;
@@ -41,21 +41,12 @@ export interface HourlyForecast {
 export interface WeatherData {
   wind: WindForecast[];
   swell: SwellForecast[];
-  sun: {
-    sunrise: string;
-    sunset: string;
-  };
-  moon: {
-    moonrise: string;
-    moonset: string;
-    phase: string;
-    percentage: number;
-  };
+  sun: { sunrise: string; sunset: string; };
+  moon: { moonrise: string; moonset: string; phase: string; percentage: number; };
   rain: 'Aucune' | 'Fine' | 'Forte';
   trend: 'Ensoleillé' | 'Nuageux' | 'Averses' | 'Pluvieux';
   uvIndex: number;
   temp: number;
-  uv?: number; // Real-time UV for MeteoLive fusion
   tempMin: number;
   tempMax: number;
   waterTemperature: number;
@@ -87,7 +78,7 @@ export interface FarmingData {
 
 export interface FishRating {
   name: string;
-  rating: number; // 1 to 10
+  rating: number;
   location?: 'Lagon' | 'Large' | 'Mixte';
   advice: {
     activity: string;
@@ -105,34 +96,9 @@ export interface FishingSlot {
   fish: FishRating[];
 }
 
-export interface HuntingPeriod {
-  name: 'Brame' | 'Chute des bois' | 'Normal';
-  description: string;
-}
-
-export interface HuntingAdvice {
-  rain: string;
-  scent: string;
-}
-
 export interface HuntingData {
-  period: HuntingPeriod;
-  description?: string;
-  advice: HuntingAdvice;
-}
-
-export interface PelagicInfo {
-  inSeason: boolean;
-  message: string;
-}
-
-export interface CrabLobsterData {
-  crabStatus: 'Plein' | 'Mout' | 'Vide';
-  crabMessage: string;
-  lobsterActivity: 'Élevée' | 'Moyenne' | 'Faible';
-  lobsterMessage: string;
-  octopusActivity: 'Élevée' | 'Moyenne' | 'Faible' | null;
-  octopusMessage: string;
+  period: { name: 'Brame' | 'Chute des bois' | 'Normal'; description: string; };
+  advice: { rain: string; scent: string; };
 }
 
 export interface LocationData {
@@ -141,13 +107,17 @@ export interface LocationData {
   farming: FarmingData;
   fishing: FishingSlot[];
   hunting: HuntingData;
-  pelagicInfo?: PelagicInfo;
-  crabAndLobster: CrabLobsterData;
-  tideStation: string;
-  tideThresholds: {
-    high: number;
-    low: number;
+  pelagicInfo?: { inSeason: boolean; message: string; };
+  crabAndLobster: {
+    crabStatus: 'Plein' | 'Mout' | 'Vide';
+    crabMessage: string;
+    lobsterActivity: 'Élevée' | 'Moyenne' | 'Faible';
+    lobsterMessage: string;
+    octopusActivity: 'Élevée' | 'Moyenne' | 'Faible' | null;
+    octopusMessage: string;
   };
+  tideStation: string;
+  tideThresholds: { high: number; low: number; };
 }
 
 export interface UserAccount {
@@ -160,7 +130,6 @@ export interface UserAccount {
   subscriptionStatus: 'active' | 'inactive' | 'trial' | 'admin';
   subscriptionStartDate?: string;
   subscriptionExpiryDate?: string;
-  favoriteLocationIds?: string[];
   lastSelectedLocation?: string;
   emergencyContact?: string;
   isEmergencyEnabled?: boolean;
@@ -168,17 +137,29 @@ export interface UserAccount {
   vesselSmsMessage?: string;
   savedVesselIds?: string[];
   lastVesselId?: string;
-  vesselPrefs?: {
-    isNotifyEnabled: boolean;
-    vesselVolume: number;
-    notifySettings: { moving: boolean; stationary: boolean; offline: boolean };
-    notifySounds: { moving: string; stationary: string; offline: string };
-    isWatchEnabled: boolean;
-    watchType: 'moving' | 'stationary' | 'offline';
-    watchDuration: number;
-    watchSound: string;
-    batteryThreshold?: number;
-  };
+  vesselPrefs?: any;
+  notificationsEnabled?: boolean;
+}
+
+export interface FaqEntry {
+  id: string;
+  question: string;
+  reponse: string;
+  categorie: 'General' | 'Peche' | 'Boat Tracker' | 'Chasse' | 'Champs' | 'Compte';
+  ordre: number;
+}
+
+export interface SupportTicket {
+  id: string;
+  userId: string;
+  userEmail: string;
+  sujet: string;
+  description: string;
+  statut: 'ouvert' | 'ferme';
+  createdAt: any;
+  captureUrl?: string;
+  adminResponse?: string;
+  respondedAt?: any;
 }
 
 export interface GardenPlant {
@@ -186,8 +167,6 @@ export interface GardenPlant {
   userId: string;
   name: string;
   category: 'Arbre Fruitier' | 'Potager' | 'Fleur' | 'Aromatique' | 'Autre';
-  plantingDate?: string;
-  notes?: string;
   createdAt: any;
 }
 
@@ -196,105 +175,34 @@ export interface FishingSpot {
   userId: string;
   name: string;
   notes?: string;
-  location: {
-    latitude: number;
-    longitude: number;
-  };
+  location: { latitude: number; longitude: number; };
   icon: string;
   color: string;
   fishingTypes?: string[];
-  createdAt: any; // Firestore ServerTimestamp
-  context: {
-    timestamp: string; // ISO string
-    moonPhase: string;
-    tideHeight: number;
-    tideMovement: 'montante' | 'descendante' | 'étale';
-    tideCurrent: 'Nul' | 'Faible' | 'Modéré' | 'Fort';
-    weatherCondition: string;
-    windSpeed: number;
-    windDirection: WindDirection;
-    airTemperature: number;
-    waterTemperature: number;
-    closestLowTide?: { time: string; height: number };
-    closestHighTide?: { time: string; height: number };
-    swellInside?: string;
-    swellOutside?: string;
-  };
-}
-
-export interface SessionParticipant {
-  id: string; // user UID
-  displayName: string;
-  mapIcon?: string;
-  mapColor?: string;
-  baseStatus?: 'En position' | 'Battue en cours';
-  isGibierEnVue?: boolean;
-  location?: {
-    latitude: number;
-    longitude: number;
-  };
-  battery?: {
-    level: number; // 0 to 1
-    charging: boolean;
-  };
-  updatedAt: any; // Firestore ServerTimestamp
-}
-
-export interface HuntingSession {
-  organizerId: string;
-  createdAt: any; // Firestore ServerTimestamp
-  expiresAt: any; // Firestore ServerTimestamp for TTL
-}
-
-export interface AccessToken {
-  id: string;
-  durationMonths: number;
-  createdAt: any; // Firestore ServerTimestamp
-  status: 'active' | 'redeemed';
-  redeemedBy?: string;
-  redeemedAt?: any; // Firestore ServerTimestamp
-}
-
-export interface SharedAccessToken {
-  id: string;
-  durationMonths: number;
-  createdAt: any; // Firestore ServerTimestamp
-  expiresAt: any; // Firestore ServerTimestamp
-}
-
-export interface Conversation {
-  id: string;
-  userId: string;
-  userEmail: string;
-  userDisplayName: string;
-  lastMessageContent: string;
-  lastMessageAt: any; // Firestore ServerTimestamp
-  isReadByAdmin: boolean;
-  isReadByUser: boolean;
-}
-
-export interface ChatMessage {
-  id: string;
-  senderId: string; // user.uid or 'admin'
-  content: string;
-  createdAt: any; // Firestore ServerTimestamp
+  createdAt: any;
+  context: any;
 }
 
 export interface VesselStatus {
   id: string;
   userId: string;
   displayName: string;
-  location: {
-    latitude: number;
-    longitude: number;
-  };
+  location: { latitude: number; longitude: number; };
   status: 'moving' | 'stationary' | 'offline' | 'returning' | 'landed';
-  lastActive: any; // ServerTimestamp
+  lastActive: any;
   isSharing: boolean;
   batteryLevel?: number;
   isCharging?: boolean;
-  statusChangedAt?: any; // ServerTimestamp
-  eventLabel?: string; // Libellé personnalisé pour l'historique
+  statusChangedAt?: any;
+  eventLabel?: string;
+  historyClearedAt?: any;
+}
+
+export interface SoundLibraryEntry {
+  id: string;
+  label: string;
+  url: string;
+  categories: string[];
 }
 
 export interface SplashScreenSettings {
@@ -309,70 +217,19 @@ export interface SplashScreenSettings {
 }
 
 export interface MeteoLive {
-  id: string; // Document ID (Commune)
+  id: string;
   vent: number;
-  rafales?: number;
   temperature: number;
   uv: number;
   direction?: WindDirection;
-  direction_vent?: number; // Nouveau: degrés (ex: 120)
-  meteo?: number; // Nouveau: code météo (ex: 1)
-  pression?: number;
-  derniere_maj?: any;
+  direction_vent?: number;
 }
 
 export interface MeteoForecast {
-  id: string; // jour_1, jour_2...
+  id: string;
   code_meteo: number;
   date: string;
-  prob_pluie: number;
-  rafales_max: number;
   temp_max: number;
   temp_min: number;
   vent_max: number;
-}
-
-export interface FishSpeciesInfo {
-  id: string;
-  name: string;
-  scientificName: string;
-  gratteRisk: number; // Percentage 0-100
-  culinaryAdvice: string;
-  fishingAdvice: string;
-  category: 'Lagon' | 'Large' | 'Recif';
-  imagePlaceholder?: string;
-}
-
-export interface SoundLibraryEntry {
-  id: string;
-  label: string;
-  url: string;
-  categories: string[];
-}
-
-export interface SystemNotification {
-  id: string;
-  title: string;
-  content: string;
-  type: 'info' | 'warning' | 'error' | 'success';
-  isActive: boolean;
-  createdAt: any;
-}
-
-export interface SowingRecord {
-  id: string;
-  userId: string;
-  seedName: string;
-  sowingDate: string;
-  plantType: string;
-  cultureAdvice: string;
-  estimatedHarvestDate: string;
-  transplantingAdvice: string;
-  moonWarning: string;
-  isValidForMoon: boolean;
-  lunarContext?: {
-    phase: string;
-    zodiac: string;
-  };
-  createdAt: any;
 }

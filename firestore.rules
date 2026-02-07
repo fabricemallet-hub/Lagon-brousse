@@ -4,10 +4,33 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. ACCÈS PUBLICS ---
-    
+    // --- FONCTIONS DE BASE ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && 
+             (request.auth.token.email == 'f.mallet81@gmail.com' || 
+              request.auth.token.email == 'f.mallet81@outlook.com');
+    }
+
+    // --- 1. CMS SUPPORT & FAQ ---
+    match /cms_support/faq/items/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /cms_support/tickets/items/{id} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow update, delete: if isAdmin();
+    }
+
+    // --- 2. ACCÈS PUBLICS / GÉNÉRAUX ---
     match /app_settings/{id} {
       allow get, list: if true;
+      allow write: if isAdmin();
     }
 
     match /meteo_caledonie/{id} {
@@ -19,41 +42,15 @@ service cloud.firestore {
 
     match /fish_species/{id} {
       allow get, list: if true;
+      allow write: if isAdmin();
     }
     
     match /sound_library/{id} {
       allow get, list: if true;
-    }
-    
-    match /shared_access_tokens/{id} {
-      allow get, list: if true;
+      allow write: if isAdmin();
     }
 
-    // --- 2. FONCTIONS DE SÉCURITÉ ---
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isAdmin() {
-      return isSignedIn() && 
-             (request.auth.token.email == 'f.mallet81@gmail.com' || 
-              request.auth.token.email == 'f.mallet81@outlook.com');
-    }
-
-    // --- 3. DROITS D'ÉCRITURE ADMIN ---
-
-    match /app_settings/{id} { allow write: if isAdmin(); }
-    match /meteo_caledonie/{id} { 
-      allow write: if isAdmin(); 
-      match /previsions/{prevId} { allow write: if isAdmin(); }
-    }
-    match /fish_species/{id} { allow write: if isAdmin(); }
-    match /sound_library/{id} { allow write: if isAdmin(); }
-    match /shared_access_tokens/{id} { allow write: if isAdmin(); }
-
-    // --- 4. COLLECTIONS PROTÉGÉES (UTILISATEURS) ---
-
+    // --- 3. UTILISATEURS & DONNÉES PERSO ---
     match /users/{userId} {
       allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       match /{allPaths=**} {
@@ -61,8 +58,7 @@ service cloud.firestore {
       }
     }
 
-    // --- 5. FONCTIONNALITÉS APPLICATIVES ---
-
+    // --- 4. FONCTIONNALITÉS TEMPS RÉEL ---
     match /hunting_sessions/{id} {
       allow read, write: if isSignedIn();
       match /{allPaths=**} {
@@ -77,19 +73,12 @@ service cloud.firestore {
       }
     }
 
-    match /conversations/{id} {
-      allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin());
-      match /{allPaths=**} {
-        allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin());
-      }
-    }
-
     match /access_tokens/{id} {
       allow read, write: if isSignedIn() || isAdmin();
     }
 
-    match /stations/{document=**} {
-      allow read: if isSignedIn() || isAdmin();
+    match /shared_access_tokens/{id} {
+      allow get, list: if true;
       allow write: if isAdmin();
     }
   }
