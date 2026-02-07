@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -62,13 +61,6 @@ import { Textarea } from '@/components/ui/textarea';
 const INITIAL_CENTER = { lat: -22.27, lng: 166.45 };
 const IMMOBILITY_THRESHOLD_METERS = 20; 
 
-const defaultVesselSounds = [
-  { id: 'sonar', label: 'Ping Sonar', url: 'https://assets.mixkit.co/active_storage/sfx/2564/2564-preview.mp3' },
-  { id: 'cloche', label: 'Cloche Classique', url: 'https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3' },
-  { id: 'alerte', label: 'Alerte Urgence', url: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' },
-  { id: 'bip', label: 'Bip Digital', url: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3' },
-];
-
 const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
   if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
   const props = { className: cn("size-4", className) };
@@ -116,11 +108,11 @@ export function VesselTracker() {
     isNotifyEnabled: true,
     vesselVolume: 0.8,
     notifySettings: { moving: true, stationary: true, offline: true },
-    notifySounds: { moving: 'sonar', stationary: 'cloche', offline: 'alerte' },
+    notifySounds: { moving: '', stationary: '', offline: '' },
     isWatchEnabled: false,
     watchType: 'stationary',
     watchDuration: 60,
-    watchSound: 'alerte',
+    watchSound: '',
     batteryThreshold: 20
   });
   
@@ -156,14 +148,10 @@ export function VesselTracker() {
   const { data: dbSounds } = useCollection<SoundLibraryEntry>(soundsQuery);
 
   const availableSounds = useMemo(() => {
-    const list = [...defaultVesselSounds];
-    if (dbSounds) {
-      dbSounds.forEach(s => {
-        const isVessel = !s.categories || s.categories.includes('Vessel') || s.categories.includes('General');
-        if (isVessel && !list.find(l => l.url === s.url)) list.push({ id: s.id, label: s.label, url: s.url });
-      });
-    }
-    return list;
+    if (!dbSounds) return [];
+    return dbSounds.filter(s => 
+      !s.categories || s.categories.includes('Vessel') || s.categories.includes('General')
+    ).map(s => ({ id: s.id, label: s.label, url: s.url }));
   }, [dbSounds]);
 
   const playVesselSound = useCallback((soundId: string) => {
@@ -767,10 +755,14 @@ export function VesselTracker() {
                                 onValueChange={v => saveVesselPrefs({ ...vesselPrefs, notifySounds: { ...vesselPrefs.notifySounds, [key]: v } })}
                               >
                                 <SelectTrigger className="h-8 text-[9px] font-black uppercase w-32 bg-muted/30">
-                                  <SelectValue />
+                                  <SelectValue placeholder="Choisir..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] uppercase font-black">{s.label}</SelectItem>)}
+                                  {availableSounds.length > 0 ? (
+                                    availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] uppercase font-black">{s.label}</SelectItem>)
+                                  ) : (
+                                    <p className="p-2 text-[8px] text-center opacity-50 uppercase">Aucun son disponible</p>
+                                  )}
                                 </SelectContent>
                               </Select>
                               <Button variant="ghost" size="icon" className="h-8 w-8 touch-manipulation" onClick={() => playVesselSound(vesselPrefs.notifySounds[key as keyof typeof vesselPrefs.notifySounds])}><Play className="size-3" /></Button>

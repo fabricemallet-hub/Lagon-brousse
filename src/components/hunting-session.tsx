@@ -98,13 +98,6 @@ import {
 const INITIAL_CENTER = { lat: -21.45, lng: 165.5 };
 const iconMap = { Navigation, UserIcon, Crosshair, Footprints, Mountain, MapPin };
 
-const defaultHuntingSounds = [
-  { id: 'trompette', label: 'Fanfare Trompette', url: 'https://assets.mixkit.co/active_storage/sfx/2700/2700-preview.mp3' },
-  { id: 'cloche', label: 'Cloche Classique', url: 'https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3' },
-  { id: 'alerte', label: 'Alerte Urgence', url: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' },
-  { id: 'cor', label: 'Cor de chasse', url: 'https://assets.mixkit.co/active_storage/sfx/2701/2701-preview.mp3' },
-];
-
 const BatteryIcon = React.memo(({ level, charging }: { level: number; charging: boolean }) => {
   const props = { className: 'w-4 h-4 inline-block' };
   if (charging) return <BatteryCharging {...props} className="text-blue-500" />;
@@ -145,9 +138,9 @@ function HuntingSessionContent() {
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const [soundVolume, setSoundVolume] = useState(0.8);
   const [soundSettings, setSoundSettings] = useState({
-    position: 'cloche',
-    battue: 'trompette',
-    gibier: 'alerte'
+    position: '',
+    battue: '',
+    gibier: ''
   });
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
   const [prefsSection, setPrefsSection] = useState<string | undefined>(undefined);
@@ -167,16 +160,10 @@ function HuntingSessionContent() {
   const { data: dbSounds } = useCollection<SoundLibraryEntry>(soundsQuery);
 
   const availableSounds = useMemo(() => {
-    const list = [...defaultHuntingSounds];
-    if (dbSounds) {
-        dbSounds.forEach(s => {
-            const hasRightCategory = !s.categories || s.categories.includes('Hunting') || s.categories.includes('General');
-            if (hasRightCategory && !list.find(l => l.url === s.url)) {
-                list.push({ id: s.id, label: s.label, url: s.url });
-            }
-        });
-    }
-    return list;
+    if (!dbSounds) return [];
+    return dbSounds.filter(s => 
+      !s.categories || s.categories.includes('Hunting') || s.categories.includes('General')
+    ).map(s => ({ id: s.id, label: s.label, url: s.url }));
   }, [dbSounds]);
 
   const userDocRef = useMemoFirebase(() => {
@@ -593,10 +580,14 @@ function HuntingSessionContent() {
                                                     onValueChange={v => setSoundSettings({ ...soundSettings, [item.key]: v })}
                                                   >
                                                     <SelectTrigger className="h-8 text-[9px] font-black uppercase w-32 bg-muted/30">
-                                                      <SelectValue />
+                                                      <SelectValue placeholder="Choisir..." />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                      {availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] uppercase font-black">{s.label}</SelectItem>)}
+                                                      {availableSounds.length > 0 ? (
+                                                        availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] uppercase font-black">{s.label}</SelectItem>)
+                                                      ) : (
+                                                        <p className="p-2 text-[8px] text-center opacity-50 uppercase">Aucun son disponible</p>
+                                                      )}
                                                     </SelectContent>
                                                   </Select>
                                                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
