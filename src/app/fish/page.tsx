@@ -42,6 +42,7 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { lagoonFishData } from '@/lib/fish-data';
 
 const CIGUATERA_GUIDE_URL = "https://coastfish.spc.int/fr/component/content/article/340-ciguatera-field-reference-guide.html";
 
@@ -316,6 +317,9 @@ function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo,
 
   const { data: stats } = useDoc<FishCommuneStats>(statsRef);
 
+  // Fallback logic: if Firestore data is empty, check the hardcoded lagoonFishData
+  const referenceFish = useMemo(() => lagoonFishData.find(f => f.id === fish.id), [fish.id]);
+
   const getIndiceConfiance = (score: number) => {
     if (score <= 10) return { label: 'Élevé', color: 'text-green-600', dot: '🟢' };
     if (score <= 30) return { label: 'Modéré', color: 'text-orange-500', dot: '🟠' };
@@ -330,12 +334,26 @@ function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo,
   };
 
   const risksBySize = [
-    { label: 'Petit', length: fish.lengthSmall, admin: fish.gratteRiskSmall || 0, final: calculateFinalScore(fish.gratteRiskSmall || 0, 'small') },
-    { label: 'Moyen', length: fish.lengthMedium, admin: fish.gratteRiskMedium || 0, final: calculateFinalScore(fish.gratteRiskMedium || 0, 'medium') },
-    { label: 'Grand', length: fish.lengthLarge, admin: fish.gratteRiskLarge || 0, final: calculateFinalScore(fish.gratteRiskLarge || 0, 'large') },
+    { 
+      label: 'Petit', 
+      length: fish.lengthSmall || referenceFish?.lengthSmall, 
+      admin: fish.gratteRiskSmall || referenceFish?.gratteRiskSmall || 0, 
+      final: calculateFinalScore(fish.gratteRiskSmall || referenceFish?.gratteRiskSmall || 0, 'small') 
+    },
+    { 
+      label: 'Moyen', 
+      length: fish.lengthMedium || referenceFish?.lengthMedium, 
+      admin: fish.gratteRiskMedium || referenceFish?.gratteRiskMedium || 0, 
+      final: calculateFinalScore(fish.gratteRiskMedium || referenceFish?.gratteRiskMedium || 0, 'medium') 
+    },
+    { 
+      label: 'Grand', 
+      length: fish.lengthLarge || referenceFish?.lengthLarge, 
+      admin: fish.gratteRiskLarge || referenceFish?.gratteRiskLarge || 0, 
+      final: calculateFinalScore(fish.gratteRiskLarge || referenceFish?.gratteRiskLarge || 0, 'large') 
+    },
   ];
 
-  // Le score affiché sur le badge principal est celui du spécimen "Moyen"
   const mainScore = risksBySize[1].final;
   const confidence = getIndiceConfiance(mainScore);
 
@@ -403,9 +421,9 @@ function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo,
                         <div className="text-center w-full">
                           <span className="text-[9px] font-black uppercase opacity-60 leading-none block">{risk.label}</span>
                           {risk.length ? (
-                            <span className="text-[8px] font-bold text-primary uppercase block mt-1">{risk.length}</span>
+                            <span className="text-[8px] font-bold text-primary uppercase block mt-1 leading-none">{risk.length}</span>
                           ) : (
-                            <span className="text-[8px] font-bold text-muted-foreground/40 uppercase block mt-1">Non précisé</span>
+                            <span className="text-[7px] font-bold text-muted-foreground/40 uppercase block mt-1 leading-tight italic">Non précisé</span>
                           )}
                         </div>
                         <div className="flex flex-col items-center gap-0.5">

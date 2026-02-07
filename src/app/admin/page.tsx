@@ -46,6 +46,7 @@ import { format, isBefore } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
+import { lagoonFishData } from '@/lib/fish-data';
 import Image from 'next/image';
 
 const FAQ_CATEGORIES = ["General", "Peche", "Boat Tracker", "Chasse", "Champs", "Compte"];
@@ -442,6 +443,42 @@ export default function AdminPage() {
     }
   };
 
+  const handleRepairLengths = async () => {
+    if (!firestore || !isAdmin || !fishSpecies) return;
+    setIsClearing(true);
+    try {
+      const batch = writeBatch(firestore);
+      let count = 0;
+      
+      for (const fish of fishSpecies) {
+        const refFish = lagoonFishData.find(f => f.id === fish.id || f.name.toLowerCase() === fish.name.toLowerCase());
+        if (refFish) {
+          const updates: any = {};
+          if (!fish.lengthSmall) updates.lengthSmall = refFish.lengthSmall;
+          if (!fish.lengthMedium) updates.lengthMedium = refFish.lengthMedium;
+          if (!fish.lengthLarge) updates.lengthLarge = refFish.lengthLarge;
+          
+          if (Object.keys(updates).length > 0) {
+            batch.update(doc(firestore, 'fish_species', fish.id), updates);
+            count++;
+          }
+        }
+      }
+      
+      if (count > 0) {
+        await batch.commit();
+        toast({ title: "Données réparées", description: `${count} fiches mises à jour avec les longueurs NC.` });
+      } else {
+        toast({ title: "Tout est à jour", description: "Aucune fiche ne nécessite de réparation." });
+      }
+    } catch (e) {
+      console.error(e);
+      toast({ variant: 'destructive', title: "Erreur réparation" });
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
   // --- HANDLERS SOUNDS ---
   const handleSaveSound = async () => {
     if (!firestore || !isAdmin || !currentSound.label || !currentSound.url) return;
@@ -584,6 +621,15 @@ export default function AdminPage() {
           <div className="flex flex-col sm:flex-row justify-end mb-4 gap-2">
             <Button 
               variant="outline"
+              onClick={handleRepairLengths} 
+              disabled={isClearing || !fishSpecies || fishSpecies.length === 0}
+              className="font-black uppercase text-[10px] gap-2 border-orange-500/20 bg-orange-500/5 text-orange-700"
+            >
+              {isClearing ? <RefreshCw className="size-4 animate-spin" /> : <Ruler className="size-4" />}
+              Réparer Tailles (Auto NC)
+            </Button>
+            <Button 
+              variant="outline"
               onClick={handleReadjustRisks} 
               disabled={isReadjustingRisks || !fishSpecies || fishSpecies.length === 0}
               className="font-black uppercase text-[10px] gap-2 border-primary/20 bg-primary/5"
@@ -714,7 +760,7 @@ export default function AdminPage() {
             <AlertDialog>
                 <AlertDialogTrigger asChild>
                     <Button variant="destructive" className="flex-1 h-12 font-black uppercase text-[10px] tracking-widest gap-2" disabled={isClearing || !rawFaqs || rawFaqs.length === 0}>
-                        <Trash2 className="size-4" /> Vider la FAQ ({rawFaqs?.length || 0})
+                        <Trash2 className="size-4" /> vider la FAQ ({rawFaqs?.length || 0})
                     </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
@@ -899,7 +945,7 @@ export default function AdminPage() {
                   <Input type="number" value={currentFish.gratteRiskSmall || 0} onChange={e => setCurrentFish({...currentFish, gratteRiskSmall: parseInt(e.target.value)})} />
                   <div className="flex items-center gap-1">
                     <Ruler className="size-3 opacity-40" />
-                    <Input placeholder="< 30cm" value={currentFish.lengthSmall || ''} onChange={e => setCurrentFish({...currentFish, lengthSmall: e.target.value})} className="h-7 text-[10px]" />
+                    <Input placeholder="Ex: < 30cm" value={currentFish.lengthSmall || ''} onChange={e => setCurrentFish({...currentFish, lengthSmall: e.target.value})} className="h-7 text-[10px]" />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -907,7 +953,7 @@ export default function AdminPage() {
                   <Input type="number" value={currentFish.gratteRiskMedium || 0} onChange={e => setCurrentFish({...currentFish, gratteRiskMedium: parseInt(e.target.value)})} />
                   <div className="flex items-center gap-1">
                     <Ruler className="size-3 opacity-40" />
-                    <Input placeholder="30-60cm" value={currentFish.lengthMedium || ''} onChange={e => setCurrentFish({...currentFish, lengthMedium: e.target.value})} className="h-7 text-[10px]" />
+                    <Input placeholder="Ex: 30-60cm" value={currentFish.lengthMedium || ''} onChange={e => setCurrentFish({...currentFish, lengthMedium: e.target.value})} className="h-7 text-[10px]" />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -915,7 +961,7 @@ export default function AdminPage() {
                   <Input type="number" value={currentFish.gratteRiskLarge || 0} onChange={e => setCurrentFish({...currentFish, gratteRiskLarge: parseInt(e.target.value)})} />
                   <div className="flex items-center gap-1">
                     <Ruler className="size-3 opacity-40" />
-                    <Input placeholder="> 60cm" value={currentFish.lengthLarge || ''} onChange={e => setCurrentFish({...currentFish, lengthLarge: e.target.value})} className="h-7 text-[10px]" />
+                    <Input placeholder="Ex: > 60cm" value={currentFish.lengthLarge || ''} onChange={e => setCurrentFish({...currentFish, lengthLarge: e.target.value})} className="h-7 text-[10px]" />
                   </div>
                 </div>
               </div>
