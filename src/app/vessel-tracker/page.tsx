@@ -43,7 +43,8 @@ import {
   Waves,
   Eye,
   Bird,
-  AlertCircle
+  AlertCircle,
+  Clock
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -717,6 +718,54 @@ export default function VesselTrackerPage() {
                         </div>
                       </div>
                     </div>
+
+                    <div className="space-y-4 p-4 border-2 rounded-2xl bg-orange-50/30 border-orange-100 shadow-inner">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label className="text-xs font-black uppercase text-orange-800">Veille Stratégique</Label>
+                          <p className="text-[9px] font-bold text-orange-600/60 uppercase">Alarme si immobile (mouillage) trop longtemps</p>
+                        </div>
+                        <Switch checked={vesselPrefs.isWatchEnabled} onCheckedChange={v => saveVesselPrefs({ ...vesselPrefs, isWatchEnabled: v })} />
+                      </div>
+                      
+                      <div className={cn("space-y-4 pt-2 border-t border-orange-100 transition-opacity", !vesselPrefs.isWatchEnabled && "opacity-40")}>
+                        <div className="flex justify-between items-center px-1">
+                          <Label className="text-[10px] font-black uppercase text-orange-800/60">Seuil d'immobilité</Label>
+                          <Badge variant="outline" className="font-black bg-white">{vesselPrefs.watchDuration >= 60 ? `${Math.floor(vesselPrefs.watchDuration / 60)}h` : `${vesselPrefs.watchDuration} min`}</Badge>
+                        </div>
+                        <Slider 
+                          value={[vesselPrefs.watchDuration || 60]} 
+                          min={60} 
+                          max={1440} 
+                          step={60}
+                          disabled={!vesselPrefs.isWatchEnabled}
+                          onValueChange={v => saveVesselPrefs({ ...vesselPrefs, watchDuration: v[0] })} 
+                        />
+                        <div className="flex justify-between text-[8px] font-black uppercase opacity-40 px-1">
+                          <span>1h</span>
+                          <span>24h</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 p-4 border-2 rounded-2xl bg-red-50/30 border-red-100 shadow-inner">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label className="text-xs font-black uppercase text-red-800">Seuil Batterie Faible</Label>
+                          <p className="text-[9px] font-bold text-red-600/60 uppercase">Alerte niveau bas batterie smartphone</p>
+                        </div>
+                        <Badge variant="outline" className="font-black bg-white">{vesselPrefs.batteryThreshold || 20}%</Badge>
+                      </div>
+                      <Slider 
+                        value={[vesselPrefs.batteryThreshold || 20]} 
+                        min={5} max={50} step={5}
+                        onValueChange={v => saveVesselPrefs({ ...vesselPrefs, batteryThreshold: v[0] })} 
+                      />
+                      <div className="flex justify-between text-[8px] font-black uppercase opacity-40 px-1">
+                        <span>5%</span>
+                        <span>50%</span>
+                      </div>
+                    </div>
                   </AccordionContent>
                 </AccordionItem>
               </Accordion>
@@ -782,7 +831,9 @@ export default function VesselTrackerPage() {
                                             <div className="flex flex-col gap-0.5">
                                               <div className="flex items-center gap-2">
                                                 <span className="font-black text-primary">{h.vesselName}</span>
-                                                <span className={cn("font-black uppercase", h.statusLabel.includes('ASSISTANCE') ? 'text-red-600 animate-pulse font-black' : h.statusLabel.includes('CHASSE') ? 'text-blue-600' : h.statusLabel.includes('ERREUR') ? 'text-orange-600' : h.statusLabel.includes('FAIBLE') ? 'text-red-600' : h.statusLabel.includes('CHARGE') ? 'text-green-600' : h.statusLabel.includes('MOUILLAGE') ? 'text-orange-600' : h.statusLabel.includes('MOUVEMENT') ? 'text-blue-600' : h.statusLabel.includes('RETOUR') ? 'text-indigo-600' : h.statusLabel.includes('TERRE') ? 'text-green-600' : 'text-red-600')}>{h.statusLabel}</span>
+                                                <span className={cn("font-black uppercase", h.statusLabel.includes('ASSISTANCE') ? 'text-red-600 animate-pulse font-black' : h.statusLabel.includes('CHASSE') ? 'text-blue-600' : h.statusLabel.includes('ERREUR') ? 'text-orange-600' : h.statusLabel.includes('FAIBLE') ? 'text-red-600' : h.statusLabel.includes('CHARGE') ? 'text-green-600' : h.statusLabel.includes('MOUILLAGE') ? 'text-orange-600' : h.statusLabel.includes('MOUVEMENT') ? 'text-blue-600' : h.statusLabel.includes('RETOUR') ? 'text-indigo-600' : h.statusLabel.includes('TERRE') ? 'text-green-600' : 'text-red-600')}>
+                                                    {h.statusLabel}
+                                                </span>
                                                 {h.batteryLevel !== undefined && <span className="flex items-center gap-1 bg-slate-100 px-1.5 py-0.5 rounded text-[8px] font-black text-slate-500 border border-slate-200"><BatteryIconComp level={h.batteryLevel} charging={h.isCharging} className="size-2.5" />{h.batteryLevel}%</span>}
                                               </div>
                                               <span className="text-[9px] font-bold opacity-40">{format(h.time, 'dd/MM HH:mm:ss')}</span>
