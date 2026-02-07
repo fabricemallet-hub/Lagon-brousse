@@ -29,7 +29,8 @@ import {
   ExternalLink,
   ShieldCheck,
   Ticket,
-  Scale
+  Scale,
+  Ruler
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -361,6 +362,9 @@ export default function AdminPage() {
         gratteRiskMedium: Number(currentFish.gratteRiskMedium) || 0,
         gratteRiskLarge: Number(currentFish.gratteRiskLarge) || 0,
         gratteRisk: Number(currentFish.gratteRiskMedium || currentFish.gratteRisk || 0),
+        lengthSmall: currentFish.lengthSmall || "",
+        lengthMedium: currentFish.lengthMedium || "",
+        lengthLarge: currentFish.lengthLarge || "",
         culinaryAdvice: currentFish.culinaryAdvice || "",
         fishingAdvice: currentFish.fishingAdvice || "",
         category: currentFish.category || "Lagon",
@@ -888,19 +892,31 @@ export default function AdminPage() {
             <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Scientifique</Label><Input value={currentFish.scientificName || ''} onChange={e => setCurrentFish({...currentFish, scientificName: e.target.value})} /></div>
 
             <div className="bg-muted/30 p-4 rounded-xl border-2 space-y-4">
-              <Label className="text-[10px] font-black uppercase text-primary">Risques de Gratte par Taille (%)</Label>
+              <Label className="text-[10px] font-black uppercase text-primary">Risques & Longueurs par Taille</Label>
               <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <Label className="text-[9px] font-bold uppercase opacity-60">Petit</Label>
+                <div className="space-y-2">
+                  <Label className="text-[9px] font-bold uppercase opacity-60">Petit (%)</Label>
                   <Input type="number" value={currentFish.gratteRiskSmall || 0} onChange={e => setCurrentFish({...currentFish, gratteRiskSmall: parseInt(e.target.value)})} />
+                  <div className="flex items-center gap-1">
+                    <Ruler className="size-3 opacity-40" />
+                    <Input placeholder="< 30cm" value={currentFish.lengthSmall || ''} onChange={e => setCurrentFish({...currentFish, lengthSmall: e.target.value})} className="h-7 text-[10px]" />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-[9px] font-bold uppercase opacity-60">Moyen</Label>
+                <div className="space-y-2">
+                  <Label className="text-[9px] font-bold uppercase opacity-60">Moyen (%)</Label>
                   <Input type="number" value={currentFish.gratteRiskMedium || 0} onChange={e => setCurrentFish({...currentFish, gratteRiskMedium: parseInt(e.target.value)})} />
+                  <div className="flex items-center gap-1">
+                    <Ruler className="size-3 opacity-40" />
+                    <Input placeholder="30-60cm" value={currentFish.lengthMedium || ''} onChange={e => setCurrentFish({...currentFish, lengthMedium: e.target.value})} className="h-7 text-[10px]" />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-[9px] font-bold uppercase opacity-60">Grand</Label>
+                <div className="space-y-2">
+                  <Label className="text-[9px] font-bold uppercase opacity-60">Grand (%)</Label>
                   <Input type="number" value={currentFish.gratteRiskLarge || 0} onChange={e => setCurrentFish({...currentFish, gratteRiskLarge: parseInt(e.target.value)})} />
+                  <div className="flex items-center gap-1">
+                    <Ruler className="size-3 opacity-40" />
+                    <Input placeholder="> 60cm" value={currentFish.lengthLarge || ''} onChange={e => setCurrentFish({...currentFish, lengthLarge: e.target.value})} className="h-7 text-[10px]" />
+                  </div>
                 </div>
               </div>
             </div>

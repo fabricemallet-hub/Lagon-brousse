@@ -33,9 +33,11 @@ Règles à suivre :
    - Moyen spécimen (taille standard de capture)
    - Grand spécimen (vieux géniteur, souvent très accumulé en toxines)
    Donne ces taux en pourcentage (0-100).
-3. Détermine si c'est un poisson de "Lagon", du "Large" ou de "Recif".
-4. Rédige des conseils culinaires adaptés aux habitudes locales (ex: salade tahitienne, bougna, grillade).
-5. Fournis des conseils de pêche précis pour le Caillou (type d'appât, profondeur, zone).
+3. Détermine les tranches de longueurs réalistes en CM pour chaque catégorie (Petit, Moyen, Grand) pour cette espèce précise en Nouvelle-Calédonie.
+   Format attendu pour les longueurs : '< 30cm', '30-60cm', '> 60cm'.
+4. Détermine si c'est un poisson de "Lagon", du "Large" ou de "Recif".
+5. Rédige des conseils culinaires adaptés aux habitudes locales (ex: salade tahitienne, bougna, grillade).
+6. Fournis des conseils de pêche précis pour le Caillou (type d'appât, profondeur, zone).
 
 Réponds en français avec expertise.`,
 });

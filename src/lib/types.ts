@@ -152,6 +152,9 @@ export interface FishSpeciesInfo {
   gratteRiskSmall: number;  // Risque petit spécimen
   gratteRiskMedium: number; // Risque moyen spécimen
   gratteRiskLarge: number;  // Risque grand spécimen
+  lengthSmall?: string;     // Longueur estimée petit
+  lengthMedium?: string;    // Longueur estimée moyen
+  lengthLarge?: string;     // Longueur estimée grand
   culinaryAdvice: string;
   fishingAdvice: string;
   category: 'Lagon' | 'Large' | 'Recif';

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef, useMemo } from 'react';
@@ -332,9 +333,9 @@ function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo,
   };
 
   const risksBySize = [
-    { label: 'Petit', admin: fish.gratteRiskSmall || 0, final: calculateFinalScore(fish.gratteRiskSmall || 0, 'small') },
-    { label: 'Moyen', admin: fish.gratteRiskMedium || 0, final: calculateFinalScore(fish.gratteRiskMedium || 0, 'medium') },
-    { label: 'Grand', admin: fish.gratteRiskLarge || 0, final: calculateFinalScore(fish.gratteRiskLarge || 0, 'large') },
+    { label: 'Petit', length: fish.lengthSmall, admin: fish.gratteRiskSmall || 0, final: calculateFinalScore(fish.gratteRiskSmall || 0, 'small') },
+    { label: 'Moyen', length: fish.lengthMedium, admin: fish.gratteRiskMedium || 0, final: calculateFinalScore(fish.gratteRiskMedium || 0, 'medium') },
+    { label: 'Grand', length: fish.lengthLarge, admin: fish.gratteRiskLarge || 0, final: calculateFinalScore(fish.gratteRiskLarge || 0, 'large') },
   ];
 
   // Le score affiché sur le badge principal est celui du spécimen "Moyen"
@@ -398,11 +399,12 @@ function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo,
                 </div>
 
                 <div className="space-y-3">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-center opacity-40">Analyse par taille de spécimen</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-center opacity-40">Analyse par taille & longueur</p>
                   <div className="grid grid-cols-3 gap-2">
                     {risksBySize.map((risk) => (
                       <div key={risk.label} className="flex flex-col items-center gap-1.5 p-2 bg-muted/30 rounded-xl border">
-                        <span className="text-[8px] font-black uppercase opacity-60">{risk.label}</span>
+                        <span className="text-[8px] font-black uppercase opacity-60 leading-none">{risk.label}</span>
+                        {risk.length && <span className="text-[7px] font-bold text-primary uppercase">{risk.length}</span>}
                         <div className="flex flex-col items-center">
                           <span className={cn("text-xs font-black", risk.final > 30 ? "text-red-600" : "text-green-600")}>{risk.final}%</span>
                           <span className="text-[7px] font-bold text-muted-foreground">Scien: {risk.admin}%</span>
