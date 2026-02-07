@@ -897,7 +897,7 @@ export default function VesselTrackerPage() {
                 <Button variant="secondary" className="flex-1 h-14 font-black uppercase rounded-xl shadow-lg gap-3 text-xs border-2 border-primary/20 touch-manipulation" onClick={() => sendEmergencySms('PAN PAN')}><AlertTriangle className="size-5 text-primary" /> PAN PAN</Button>
             </div>
             <div className="border rounded-xl bg-muted/10 overflow-hidden">
-                <Accordion type="single" collapsible className="w-full">
+                <Accordion type="single" collapsible className="w-full" defaultValue="history">
                     <AccordionItem value="history" className="border-none">
                         <div className="flex items-center justify-between px-3 h-12">
                             <AccordionTrigger className="flex-1 text-[10px] font-black uppercase hover:no-underline py-0">
