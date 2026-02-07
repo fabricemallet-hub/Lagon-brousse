@@ -66,6 +66,7 @@ export default function AdminPage() {
   const [cgvContent, setCgvContent] = useState('');
   const [isSavingCgv, setIsSavingCgv] = useState(false);
 
+  // Détection robuste admin (Email + UID)
   const isAdmin = useMemo(() => {
     if (!user) return false;
     const email = user.email?.toLowerCase();
@@ -79,20 +80,18 @@ export default function AdminPage() {
   // Queries
   const faqRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
-    return query(collection(firestore, 'cms_support', 'faq', 'items'), orderBy('ordre', 'asc'));
+    return query(collection(firestore, 'cms_support', 'faq', 'items'), orderBy('views', 'desc'));
   }, [firestore, isAdmin]);
   const { data: rawFaqs } = useCollection<FaqEntry>(faqRef);
 
   const sortedFaqs = useMemo(() => {
     if (!rawFaqs) return [];
     
-    // 1. Filtrage par catégorie
     let filtered = [...rawFaqs];
     if (faqCategoryFilter !== 'all') {
       filtered = filtered.filter(f => f.categorie === faqCategoryFilter);
     }
 
-    // 2. Tri
     if (!faqSort.field) return filtered;
 
     return filtered.sort((a, b) => {
@@ -217,11 +216,14 @@ export default function AdminPage() {
     if (!firestore || !isAdmin) return;
     setIsSavingCgv(true);
     try {
+      // Create a version based on current time
+      const newVersion = Date.now();
       await setDoc(doc(firestore, 'app_settings', 'cgv'), {
         content: cgvContent,
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
+        version: newVersion
       });
-      toast({ title: "CGV sauvegardées !" });
+      toast({ title: "CGV sauvegardées !", description: `Version ${newVersion} active.` });
     } catch (e) {
       toast({ variant: 'destructive', title: "Erreur lors de la sauvegarde" });
     } finally {
@@ -385,9 +387,13 @@ export default function AdminPage() {
               <CardTitle className="flex items-center gap-2 font-black uppercase text-sm">
                 <FileText className="size-4" /> Conditions Générales de Vente
               </CardTitle>
-              <CardDescription className="text-xs uppercase font-bold">Modifiez ici le texte affiché lors de l'inscription.</CardDescription>
+              <CardDescription className="text-xs uppercase font-bold">Modifiez ici le texte légal. Toute sauvegarde forcera les utilisateurs à re-valider le document à leur prochaine connexion.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="flex items-center justify-between bg-muted/20 p-3 rounded-lg border-2">
+                <span className="text-[10px] font-black uppercase opacity-60">Version actuelle :</span>
+                <Badge variant="outline" className="font-black">{dbCgv?.version || 'Aucune'}</Badge>
+              </div>
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Texte légal</Label>
                 <Textarea 
@@ -399,7 +405,7 @@ export default function AdminPage() {
               </div>
               <Button onClick={handleSaveCgv} disabled={isSavingCgv} className="w-full h-12 font-black uppercase tracking-widest gap-2">
                 {isSavingCgv ? <RefreshCw className="size-4 animate-spin" /> : <Save className="size-4" />}
-                Enregistrer les CGV
+                Enregistrer & Publier la mise à jour
               </Button>
             </CardContent>
           </Card>

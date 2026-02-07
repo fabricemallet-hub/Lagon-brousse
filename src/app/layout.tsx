@@ -1,3 +1,4 @@
+
 'use client';
 
 import { AppShell } from '@/components/app-shell';
@@ -10,8 +11,9 @@ import './globals.css';
 import { Suspense, useEffect, useRef } from 'react';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { GoogleMapsProvider } from '@/context/google-maps-context';
+import { CgvConsentGuard } from '@/components/cgv-consent-guard';
 
-function AppContent({ children }: { children: React.ReactNode }) {
+function AppContent({ children }: { children: React.Node }) {
   const swRegisteredRef = useRef(false);
 
   useEffect(() => {
@@ -35,7 +37,9 @@ function AppContent({ children }: { children: React.ReactNode }) {
         <CalendarViewProvider>
           <DateProvider>
             <LocationProvider>
-              <AppShell>{children}</AppShell>
+              <CgvConsentGuard>
+                <AppShell>{children}</AppShell>
+              </CgvConsentGuard>
             </LocationProvider>
           </DateProvider>
         </CalendarViewProvider>

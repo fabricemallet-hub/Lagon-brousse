@@ -24,7 +24,7 @@ import {
   updateProfile,
   AuthError,
 } from 'firebase/auth';
-import { doc } from 'firebase/firestore';
+import { doc, collection, addDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { ForgotPasswordDialog } from './forgot-password-dialog';
 import { Eye, EyeOff, Ticket, FileText, ScrollText } from 'lucide-react';
 import { ensureUserDocument } from '@/lib/user-utils';
@@ -160,6 +160,23 @@ export function AuthForm({ mode }: AuthFormProps) {
 
           // Ensure user document is created BEFORE attempting to redeem a token.
           await ensureUserDocument(firestore, user, signupValues.displayName);
+
+          // RECORD CGV ACCEPTANCE
+          if (cgvData) {
+            const acceptanceRef = collection(firestore, 'users', user.uid, 'cgv_acceptances');
+            await addDoc(acceptanceRef, {
+              userId: user.uid,
+              acceptedAt: serverTimestamp(),
+              version: cgvData.version || 0,
+              content: cgvData.content || ""
+            });
+            
+            // Update user profile with latest version seen
+            await updateDoc(doc(firestore, 'users', user.uid), {
+              cgvAcceptedAt: new Date().toISOString(),
+              cgvVersionSeen: cgvData.version || 0
+            });
+          }
 
           if (signupValues.token) {
             const result = await redeemAccessToken(firestore, user, signupValues.token);

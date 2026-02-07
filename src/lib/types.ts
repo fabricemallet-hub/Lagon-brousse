@@ -139,6 +139,9 @@ export interface UserAccount {
   lastVesselId?: string;
   vesselPrefs?: any;
   notificationsEnabled?: boolean;
+  // CGV Tracking
+  cgvAcceptedAt?: string;
+  cgvVersionSeen?: number;
 }
 
 export interface FaqEntry {
@@ -238,4 +241,13 @@ export interface MeteoForecast {
 export interface CgvSettings {
   content: string;
   updatedAt: any;
+  version: number; // Unix timestamp used as version
+}
+
+export interface CgvAcceptance {
+  id: string;
+  userId: string;
+  acceptedAt: any;
+  version: number;
+  content: string;
 }
