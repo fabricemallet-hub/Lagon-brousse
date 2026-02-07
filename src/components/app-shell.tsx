@@ -26,6 +26,7 @@ import {
   AlertCircle,
   Fish,
   Leaf,
+  Calendar as CalendarIcon
 } from 'lucide-react';
 import {
   Select,
@@ -99,7 +100,6 @@ const UsageTimer = React.memo(({ status, auth, userId }: { status: string, auth:
         const next = Math.max(0, prev - 1);
         const used = USAGE_LIMIT_SECONDS - next;
         
-        // Optimisation : Sync localStorage only every 10 seconds or at the end
         if (now - lastSyncRef.current > 10000 || next === 0) {
           localStorage.setItem('dailyUsage', String(used));
           lastSyncRef.current = now;
@@ -301,17 +301,20 @@ function InnerAppShell({
 
           <div className="flex items-center justify-between w-full gap-2">
             {showDayNavigator && (
-              <div className="flex flex-1 items-center gap-1 rounded-md border bg-background p-1 h-9">
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handlePrevDay}><ChevronLeft className="h-4 w-4" /></Button>
+              <div className="flex flex-1 items-center gap-1 rounded-full border-2 border-primary/10 bg-background/80 backdrop-blur-md p-1 h-11 shadow-sm overflow-hidden">
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-primary/10 text-primary transition-all active:scale-75 shrink-0" onClick={handlePrevDay}><ChevronLeft className="h-5 w-5" /></Button>
                 <Popover open={isDatePickerOpen} onOpenChange={setDatePickerOpen}>
                   <PopoverTrigger asChild>
-                    <Button variant={'ghost'} className="flex-1 justify-center text-center font-bold h-7 text-xs px-1">
-                      {format(selectedDate, 'dd MMM yyyy', { locale: fr })}
+                    <Button variant={'ghost'} className="flex-1 justify-center text-center font-black h-9 text-xs px-1 uppercase tracking-tight hover:bg-transparent active:scale-95 flex items-center min-w-0">
+                      <CalendarIcon className="mr-2 h-4 w-4 text-accent shrink-0" />
+                      <span className="truncate">{format(selectedDate, 'dd MMMM yyyy', { locale: fr })}</span>
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="center"><Calendar mode="single" selected={selectedDate} onSelect={(d) => { if(d) { setSelectedDate(d); setDatePickerOpen(false); } }} initialFocus /></PopoverContent>
+                  <PopoverContent className="w-auto p-0 border-none bg-transparent shadow-none" align="center">
+                    <Calendar mode="single" selected={selectedDate} onSelect={(d) => { if(d) { setSelectedDate(d); setDatePickerOpen(false); } }} initialFocus />
+                  </PopoverContent>
                 </Popover>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleNextDay}><ChevronRight className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-primary/10 text-primary transition-all active:scale-75 shrink-0" onClick={handleNextDay}><ChevronRight className="h-5 w-5" /></Button>
               </div>
             )}
 
