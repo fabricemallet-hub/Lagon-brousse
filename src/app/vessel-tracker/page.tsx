@@ -40,7 +40,8 @@ import {
   Settings,
   Smartphone,
   Phone,
-  Waves
+  Waves,
+  Eye
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -152,7 +153,7 @@ export default function VesselTrackerPage() {
     }
   }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, availableSounds]);
 
-  // Load history from localStorage on mount
+  // Charge l'historique depuis localStorage au démarrage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedHistory = localStorage.getItem('lb_vessel_history_v2');
@@ -171,7 +172,7 @@ export default function VesselTrackerPage() {
     }
   }, []);
 
-  // Save history to localStorage when it changes
+  // Sauvegarde l'historique dans localStorage quand il change
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('lb_vessel_history_v2', JSON.stringify(history));
