@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
@@ -80,7 +81,7 @@ const sectionContent: Record<string, {
     ],
     tips: [
       "AVERTISSEMENT CRITIQUE : Cette application ne remplace PAS le site officiel de Météo Nouvelle-Calédonie (meteo.nc). Consultez-le toujours avant de prévoir une sortie en mer.",
-      "L'assistant IA vous aide à identifier la 'meilleure fenêtre' de la semaine pour vos activités, mas la décision finale et la sécurité vous incombent.",
+      "L'assistant IA vous aide à identifier la 'meilleure fenêtre' de la semaine pour vos activités, mais la décision finale et la sécurité vous incombent.",
       "La flèche du vent indique la provenance réelle de l'air : une flèche pointant vers le bas indique un vent de Nord."
     ]
   },
@@ -90,19 +91,17 @@ const sectionContent: Record<string, {
     color: 'bg-blue-600',
     role: "Un système de sécurité maritime haute-fidélité conçu pour partager votre position GPS, votre statut d'activité et votre niveau de batterie avec vos proches restés à terre.",
     steps: [
-      "Émetteur (A) - Identité : Configurez un ID et votre surnom de navire. Ce surnom est indépendant de la chasse et sera inclus automatiquement dans vos SMS d'urgence.",
-      "Émetteur (A) - Mode Éveil & Status : Activez 'MODE ÉVEIL' pour maintenir l'écran allumé. Utilisez les boutons 'Retour' ou 'Home' pour signaler vos intentions, ou 'Reprise Mode Auto' en cas d'erreur.",
-      "Émetteur (A) - Urgence SMS : Configurez un numéro de contact. Vous pouvez utiliser un message personnalisé ou le texte standard via l'interrupteur. Le point GPS est toujours annexé.",
-      "Récepteur (B) - Flotte & Suivi : Saisissez l'ID d'un navire pour l'ajouter à votre liste. Vous pouvez suivre plusieurs navires simultanément sur la même carte satellite.",
-      "Récepteur (B) - Alertes & Veille : Personnalisez les sons. Réglez via les curseurs le seuil de batterie basse (5-50%) et l'alarme d'immobilité prolongée (1h à 24h).",
-      "Journal de Bord Unifié : Consultez l'historique synchronisé (batterie, charge, statut). L'émetteur peut effacer l'historique globalement pour tous les récepteurs."
+      "Émetteur (A) - Identité : Configurez un ID et votre surnom de navire. Ce surnom est inclus automatiquement au début de vos SMS d'urgence.",
+      "Émetteur (A) - Mode Éveil & Status : Activez 'MODE ÉVEIL' pour maintenir l'écran allumé. Utilisez les boutons 'Retour' ou 'Home' pour signaler vos intentions.",
+      "Émetteur (A) - Urgence SMS : Choisissez entre le message standard ou personnalisé via l'interrupteur. Le point GPS est toujours annexé.",
+      "Récepteur (B) - Flotte & Suivi : Saisissez l'ID d'un navire pour l'ajouter. Vous pouvez suivre plusieurs navires simultanément sur la carte satellite.",
+      "Récepteur (B) - Alertes : Personnalisez les sons et réglez le seuil de batterie basse via les curseurs.",
+      "Journal de Bord : Consultez l'historique synchronisé (batterie, charge, statut). L'émetteur peut effacer l'historique pour tout le monde."
     ],
     tips: [
-      "Surnom SMS : Votre surnom de navire est ajouté automatiquement au début de chaque SMS d'urgence pour vous identifier immédiatement auprès des secours.",
-      "Bouton GPS Historique : Dans le journal, cliquez sur 'GPS' pour situer précisément l'endroit où s'est produit un événement (ex: batterie faible ou passage au mouillage).",
-      "Sécurité SMS : L'aperçu vous montre le message exact qui sera envoyé. Le lien Maps est verrouillé sur votre position réelle pour garantir l'efficacité des secours.",
-      "Mode Auto : Le système détecte l'immobilité après 30s dans un rayon de 20m. En cas de dérive de pêche, le bouton 'Reprise Mode Auto' permet de recalibrer le statut.",
-      "Annuaire Maritime : Les numéros d'urgence NC (COSS 16, SAMU 15, etc.) sont disponibles en bas de page pour un appel instantané."
+      "Surnom SMS : Votre surnom de navire (ex: [TITANIC]) est ajouté automatiquement au début du SMS pour une identification immédiate par les secours.",
+      "Mode Auto : Le système détecte l'immobilité après 30s. Le bouton 'Reprise Mode Auto' permet de recalibrer le statut en cas de dérive de pêche.",
+      "Annuaire Maritime : Les numéros d'urgence NC (COSS 16, SAMU 15, etc.) sont disponibles en bas de page."
     ]
   },
   'peche': {
@@ -115,13 +114,11 @@ const sectionContent: Record<string, {
       "Déroulez une fiche espèce pour obtenir des conseils de profondeur et de technique.",
       "Suivez l'activité des crabes, langoustes et poulpes selon le cycle lunaire.",
       "Enregistrez vos 'Coins de Pêche' par GPS sur la carte satellite interactive.",
-      "Consultez l'historique détaillé de vos prises : l'application mémorise automatiquement le contexte exact (lune, marée, vent, température) au moment de l'enregistrement.",
-      "Utilisez l'IA 'Chercher un jour similaire' sur un spot : elle analyse votre succès passé pour trouver la date idéale dans les 30 prochains jours.",
-      "Sélectionnez plusieurs spots pour obtenir une tendance globale du meilleur jour de la semaine."
+      "Consultez l'historique détaillé de vos prises : l'application mémorise automatiquement le contexte exact (lune, marée, vent, température).",
+      "Utilisez l'IA 'Chercher un jour similaire' sur un spot pour trouver la date idéale dans les 30 prochains jours."
     ],
     tips: [
-      "Le mode satellite de la carte est idéal pour repérer les patates de corail et les têtes de roche.",
-      "Un spot enregistré avec 9/10 d'indice est un précieux indicator pour l'IA prédictive.",
+      "Le mode satellite de la carte est idéal pour repérer les patates de corail.",
       "L'IA ignore météo et vent pour se concentrer sur les cycles immuables de la lune et des marées."
     ]
   },
@@ -134,114 +131,99 @@ const sectionContent: Record<string, {
       "Consultez la période biologique (Brame, Chute des bois) pour adapter votre stratégie.",
       "Utilisez la carte du vent pour visualiser d'où vient l'air par rapport au relief.",
       "La 'Table de Tir' vous aide à estimer la correction de visée en fonction de la distance et du vent.",
-      "Session de Groupe : Créez une session ou rejoignez-en une via un code unique (ex: CH-1234) pour partager votre position GPS en temps réel avec vos partenaires sur la carte satellite.",
-      "Alertes Tactiques : Informez instantanément votre groupe de votre statut ('En position', 'Battue en cours') ou signalez 'Gibier en vue' d'un clic. Une alerte visuelle et sonore préviendra immédiatement vos coéquipiers.",
-      "Sécurité & Batterie : Surveillez le niveau de batterie de chaque participant sur la carte. Les informations (GPS + Batterie) sont actualisées toutes les 5 minutes pour préserver l'autonomie de vos appareils en zone isolée."
+      "Session de Groupe : Partagez votre position GPS en temps réel avec vos partenaires sur la carte satellite via un code unique.",
+      "Alertes Tactiques : Signalez 'Gibier en vue' d'un clic. Une alerte visuelle et sonore préviendra immédiatement vos coéquipiers."
     ],
     tips: [
-      "En période de Brame, l'alerte orange vous rappelle que les cerfs sont plus actifs mais aussi plus vigilants.",
-      "Le mode hors-ligne de la carte de chasse permet de naviguer sans réseau si vous avez consulté la zone auparavant.",
-      "Personnalisez votre icône et votre couleur dans les paramètres de la session pour être identifié au premier coup d'œil."
+      "En période de Brame, les cerfs sont plus actifs mais aussi plus vigilants.",
+      "Personnalisez votre icône et votre couleur dans les paramètres pour être identifié au premier coup d'œil."
     ]
   },
   'champs': {
     title: 'Champs & Jardin',
     icon: Leaf,
     color: 'bg-green-600',
-    role: "Jardiner selon les traditions calédoniennes et l'influence lunaire pour des récoltes plus abondantes.",
+    role: "Jardiner selon les traditions calédoniennes et l'influence lunaire. Cette section inclut désormais un gestionnaire de jardin intelligent par IA.",
     steps: [
-      "Identifiez la tendance du jour : Lune Montante (pour ce qui pousse hors de terre) ou Descendante (pour les racines).",
-      "Consultez le signe du zodiaque : Jour Fruits, Racines, Fleurs ou Feuilles.",
-      "Suivez les recommandations : l'application vous guide pour la taille, le bouturage ou la tonte de la pelouse selon la sève.",
-      "Accédez à l'onglet 'Mes Semis' pour enregistrez vos travaux. L'application mémorise le contexte lunaire exact (phase et zodiaque), calcule les dates de récolte prévisionnelles et planifie les périodes de repiquage pour assurer la réussite de votre potager."
+      "Tendance du Jour : Identifiez si la lune est Montante ou Descendante et le signe du zodiaque actuel.",
+      "Inventaire Réel : Enregistrez vos plantes dans 'Mon Jardin'. L'IA corrige les noms et suggère les variétés locales optimales.",
+      "Bilan Stratégique IA : Générez un rapport global pour votre jardin. L'IA planifie les priorités et calcule l'arrosage au jet (en secondes) selon la météo.",
+      "Conseils de Taille : Cliquez sur une plante pour savoir précisément OÙ et COMMENT couper selon la sève actuelle.",
+      "Scanner Plante (IA) : Utilisez la photo pour identifier une plante, un nuisible ou diagnostiquer une maladie."
     ],
     tips: [
-      "La spécialisation des travaux (Le Calendrier Lunaire) : Signes de Terre (Taur., Vierg., Capr.) = Racines ; Signes d'Eau (Canc., Scorp., Pois.) = Feuilles ; Signes d'Air (Gém., Bal., Vers.) = Fleurs ; Signes de Feu (Bél., Lion, Sag.) = Fruits.",
-      "Le signe du zodiaque change tous les 2 à 3 jours environ.",
-      "Suivre le calendrier permet de réduire naturellement l'usage d'engrais et de pesticides.",
-      "L'historique 'Mes Semis' vous permet de comparer la réussite de vos cultures d'une saison à l'autre."
+      "Le Bilan Stratégique réduit automatiquement les besoins en eau s'il a plu récemment à votre commune.",
+      "Suivre le calendrier permet de renforcer naturellement vos plantes sans pesticides."
     ]
   },
   'semis': {
     title: 'Guide Culture & IA',
     icon: Sprout,
     color: 'bg-emerald-500',
-    role: "Un assistant horticole intelligent propulsé par l'IA qui crée vos fiches de culture et occupe vos dates de semis selon les cycles de sève.",
+    role: "Un assistant intelligent pour planifier vos cultures de A à Z selon les cycles biologiques et climatiques.",
     steps: [
-      "Recherche & Identification : Tapez le nom de n'importe quelle graine. Si elle est absente du guide, l'IA créera instantanément sa fiche technique personnalisée.",
-      "Calcul de Fiche IA : L'intelligence artificielle analyse la plante, définit son type (Fruit, Racine...) et génère des conseils spécifiques (arrosage, exposition).",
-      "Optimisation Lunaire : L'IA vérifie votre date de semis. Si elle est déconseillée, elle scanne les 30 prochains jours pour vous suggérer la date idéale précise.",
-      "Planification Dynamique : Obtenez des estimations pour la date de récolte et la période de repiquage en pleine terre basées sur les cycles biologiques.",
-      "Historique : Sauvegardez vos fiches pour suivre l'évolution de vos semis dans votre session personnelle."
+      "Recherche & Scanner : Tapez le nom d'une graine ou scannez un sachet/pousse pour identifier la variété.",
+      "Calcul de Fiche IA : L'IA définit le type de plante et génère les conseils d'arrosage et d'exposition spécifiques à la NC.",
+      "Validation Lunaire : L'IA vérifie votre date de semis. Si elle est mauvaise, elle vous donne la date idéale précise sur les 30 prochains jours.",
+      "Planification : Obtenez les dates estimées de récolte et les périodes de repiquage en pleine terre.",
+      "Top Semis : Consultez la liste 'Idéal pour aujourd'hui' basée sur l'influence lunaire actuelle."
     ],
     tips: [
-      "L'IA suggère toujours la date la plus proche respectant les 'règles d'or' (ex: Légume Fruit = Lune Montante + Jour Fruit).",
-      "Une alerte visuelle rouge dans votre historique vous signalera si une plantation a été effectuée hors de la période lunaire optimale.",
-      "Utilisez le bouton 'Calculer la fiche IA' avant d'enregistrer pour bénéficier du conseil lunaire."
+      "L'IA suggère systématiquement des variétés résistantes à la chaleur calédonienne (ex: Tomate Heatmaster).",
+      "Une alerte visuelle vous signale dans votre historique si un semis a été fait hors période optimale."
     ]
   },
   'calendrier-peche': {
     title: 'Calendrier Pêche',
     icon: Calendar,
     color: 'bg-slate-700',
-    role: "Le Calendrier Pêche est un outil de planification stratégique à long terme. Il vous permet d'anticiper les cycles biologiques marins sur tout le mois pour choisir la technique de pêche la plus adaptée à chaque coefficient de marée et phase lunaire.",
+    role: "Planification stratégique à long terme basée sur les cycles biologiques marins.",
     steps: [
-      "Suivi des Crustacés : Repérez les jours 'Crabe Plein' (vives-eaux) ou 'Crabe Mout' (mortes-eaux/mue). Ne perdez plus de temps à poser des casiers durant la mue.",
-      "Saisons Pélagiques : Identifiez les périodes de passage des espèces comme le Tazard (pic en Nov/Déc) via les alertes de saison intégrées aux fiches journalières.",
-      "Analyse des Marées : Visualisez instantanément les marées les plus hautes et les plus basses du mois (grandes marées) pour cibler les platiers ou les passes.",
-      "Comportement des Espèces : Accédez aux fiches détaillées par jour pour connaître les habitudes alimentaires, les profondeurs idéales (ex: 2-10m pour le Bec de cane) et les spots stratégiques.",
-      "Stratégie Langoustes : Adaptez votre sortie selon l'activité prévue. En lune noire (Nouvelle Lune), privilégiez le récif extérieur ; en lune claire, elles restent souvent à l'abri ou à l'intérieur."
+      "Suivi des Crustacés : Repérez les jours 'Crabe Plein' (vives-eaux) ou 'Crabe Mout' (mue).",
+      "Saisons : Identifiez les périodes de passage (ex: Tazard en Nov/Déc) via les alertes intégrées.",
+      "Analyse des Marées : Visualisez les coefficients et les records de hauteur pour cibler les platiers."
     ],
     tips: [
-      "Un indice de poisson de 10/10 coïncide souvent avec les jours de grandes marées (Nouvelle ou Pleine lune).",
-      "Pour le Tazard, privilégiez les créneaux d'aube lors des marées montantes avec un fort courant.",
-      "Cliquez sur n'importe quel jour pour ouvrir la fiche 'Expert' qui synthétise tous les facteurs (Lune + Marée + Espèce).",
-      "Le calendrier affiche les hauteurs exactes pour détecter les marées 'records' du mois."
+      "Un indice 10/10 coïncide souvent avec les jours de grandes marées (Nouvelle ou Pleine lune)."
     ]
   },
   'calendrier-champs': {
     title: 'Calendrier Champs',
     icon: Calendar,
     color: 'bg-green-800',
-    role: "Le calendrier lunaire complet pour organiser les travaux du jardin sur le mois.",
+    role: "Le calendrier lunaire complet pour organiser vos travaux du jardin.",
     steps: [
-      "Repérez visuellement les jours Fruits (Pique), Racines (Carotte), etc.",
-      "Les symboles de ciseaux indiquent les jours propices à la taille ou à la tonte de la pelouse.",
-      "Le symbole de recyclage indique les jours de bouturage.",
-      "Cliquez sur une date pour ouvrir la fiche de recommandation complète : l'IA analyse pour vous la phase lunaire précise (montante/descendante), l'influence du zodiaque et vous délivre le conseil d'expert pour réussir vos travaux ce jour-là."
+      "Zodiaque : Repérez visuellement les jours Fruits, Racines, Fleurs ou Feuilles.",
+      "Travaux Spéciaux : Les icônes indiquent les jours propices à la taille, au bouturage ou à la tonte.",
+      "Fiche Expert : Cliquez sur une date pour obtenir l'analyse IA complète de la journée."
     ],
     tips: [
-      "La spécialisation des travaux (Le Calendrier Lunaire) : Signes de Terre (Taur., Vierg., Capr.) = Racines ; Signes d'Eau (Canc., Scorp., Pois.) = Feuilles ; Signes d'Air (Gém., Bal., Vers.) = Fleurs ; Signes de Feu (Bél., Lion, Sag.) = Fruits.",
-      "Le signe du zodiaque change tous les 2 à 3 jours environ.",
-      "Basculez entre Calendrier Pêche et Champs grâce au bouton en haut du calendrier.",
-      "Le jour actuel est toujours entouré d'un cercle bleu."
+      "Le signe du zodiaque change environ tous les 2 à 3 jours."
     ]
   },
   'reglementation': {
     title: 'Réglementation',
     icon: Scale,
     color: 'bg-slate-500',
-    role: "L'essentiel des règles de pêche et de chasse en Province Sud pour une pratique responsable.",
+    role: "L'essentiel des règles de pêche et de chasse en NC pour une pratique responsable.",
     steps: [
-      "Consultez le calendrier des fermetures (Picot, Crabe, etc.).",
-      "Vérifiez les tailles minimales autorisées pour les bénitiers, trocas et huîtres.",
-      "Identifiez les espèces intégralement protégées (interdiction totale).",
-      "Consultez les quotas de chasse pour le Notou et la Roussette."
+      "Fermetures : Consultez le calendrier des interdictions (Picot, Crabe, etc.).",
+      "Tailles : Vérifiez les dimensions minimales autorisées.",
+      "Protection : Identifiez les espèces intégralement protégées (Napoléon, Dugong...)."
     ],
     tips: [
-      "Le marquage de la queue de la langouste est obligatoire dès la capture.",
-      "Ces informations sont des résumés, consultez toujours les textes officiels en cas de doute."
+      "Le marquage de la queue de la langouste est obligatoire dès la capture."
     ]
   },
   'compte': {
     title: 'Compte & Abonnement',
     icon: User,
     color: 'bg-zinc-600',
-    role: "Gérez vos informations personnelles et votre accès aux fonctionnalités premium.",
+    role: "Gérez votre profil et votre accès premium.",
     steps: [
-      "Consultez votre statut actuel (Essai, Actif, Limité).",
-      "Si vous avez un code promo ou un jeton d'accès, saisissez-le dans le champ dédié.",
-      "Activez l'abonnement mensuel pour un accès illimité."
+      "Statut : Consultez votre état actuel (Abonné, Essai, Limité).",
+      "Jetons : Saisissez vos codes d'accès offerts.",
+      "Notifications : Activez les alertes push pour la sécurité et la chasse."
     ],
     tips: [
       "En mode 'Limité', vous disposez d'une minute d'accès par jour pour les consultations rapides."

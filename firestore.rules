@@ -20,12 +20,14 @@ service cloud.firestore {
 
     // --- 1. CMS SUPPORT & FAQ ---
     match /cms_support/faq/items/{id} {
-      allow read: if isSignedIn();
+      // Public : Tout le monde voit la FAQ
+      allow read: if true;
       allow write: if isAdmin();
     }
 
     match /cms_support/tickets/items/{id} {
       allow create: if isSignedIn();
+      // Un utilisateur voit ses tickets, l'admin voit tout
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow update, delete: if isAdmin();
     }
