@@ -240,7 +240,7 @@ export interface VesselStatus {
   userId: string;
   displayName: string;
   location: { latitude: number; longitude: number; };
-  status: 'moving' | 'stationary' | 'offline' | 'returning' | 'landed';
+  status: 'moving' | 'stationary' | 'offline' | 'returning' | 'landed' | 'emergency';
   lastActive: any;
   isSharing: boolean;
   batteryLevel?: number;
