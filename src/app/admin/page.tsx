@@ -21,7 +21,8 @@ import {
   ArrowDown,
   Filter,
   FileText,
-  Gavel
+  Gavel,
+  Calendar
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -33,6 +34,9 @@ import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { INITIAL_FAQ_DATA } from '@/lib/faq-data';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 const FAQ_CATEGORIES = ["General", "Peche", "Boat Tracker", "Chasse", "Champs", "Compte"];
 
@@ -84,6 +88,12 @@ export default function AdminPage() {
     return query(collection(firestore, 'cms_support', 'faq', 'items'), orderBy('views', 'desc'));
   }, [firestore, isAdmin]);
   const { data: rawFaqs } = useCollection<FaqEntry>(faqRef);
+
+  const usersRef = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    return query(collection(firestore, 'users'), orderBy('email', 'asc'));
+  }, [firestore, isAdmin]);
+  const { data: users } = useCollection<UserAccount>(usersRef);
 
   const sortedFaqs = useMemo(() => {
     if (!rawFaqs) return [];
@@ -454,10 +464,66 @@ Les présentes CGV sont soumises au droit en vigueur en Nouvelle-Calédonie. Tou
           </Card>
         </TabsContent>
 
+        <TabsContent value="users" className="space-y-6">
+          <Card className="border-2">
+            <CardHeader><CardTitle className="flex items-center gap-2 font-black uppercase text-sm"><Users className="size-4" /> Gestion des Utilisateurs ({users?.length || 0})</CardTitle></CardHeader>
+            <CardContent className="p-0 border-t">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-[10px] font-black uppercase">Utilisateur</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase">Statut</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase">Expiration</TableHead>
+                    <TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users?.map(u => (
+                    <TableRow key={u.id}>
+                      <TableCell className="font-bold text-xs">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="size-8">
+                            <AvatarFallback>{u.displayName?.[0] || 'U'}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col min-w-0">
+                            <span className="truncate">{u.displayName}</span>
+                            <span className="text-[9px] opacity-50 truncate">{u.email}</span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant={u.subscriptionStatus === 'admin' ? 'default' : u.subscriptionStatus === 'active' ? 'secondary' : 'outline'} 
+                          className="text-[8px] uppercase font-black"
+                        >
+                          {u.subscriptionStatus}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-[10px] font-bold">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="size-3 opacity-40" />
+                          {u.subscriptionExpiryDate ? format(new Date(u.subscriptionExpiryDate), 'dd/MM/yy', { locale: fr }) : 'N/A'}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" className="size-8"><Pencil className="size-3" /></Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {(!users || users.length === 0) && (
+                    <TableRow><TableCell colSpan={4} className="text-center py-10 italic opacity-40">Aucun utilisateur trouvé.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="overview" className="space-y-6">
           <div className="grid gap-4 md:grid-cols-3">
             <Card className="border-2"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Tickets Ouverts</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{tickets?.filter(t => t.statut === 'ouvert').length || 0}</div></CardContent></Card>
             <Card className="border-2"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">FAQ Items</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{rawFaqs?.length || 0}</div></CardContent></Card>
+            <Card className="border-2"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Total Utilisateurs</CardTitle></CardHeader><CardContent><div className="text-2xl font-black text-primary">{users?.length || 0}</div></CardContent></Card>
           </div>
         </TabsContent>
       </Tabs>
