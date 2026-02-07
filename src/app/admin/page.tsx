@@ -34,7 +34,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -778,7 +778,7 @@ export default function AdminPage() {
                   className="h-10 font-black uppercase text-[10px] gap-2 border-2" 
                   onClick={() => window.open('/RIB_Lagon_Brousse_NC.pdf', '_blank')}
                 >
-                  <Download className="size-3" /> Télécharger mon RIB
+                  <Download className="size-3" /> telecharger sur le smartphone
                 </Button>
               </div>
             </CardContent>
@@ -973,7 +973,7 @@ export default function AdminPage() {
               <Button onClick={handleAIGenerateFish} disabled={isAIGeneratingFish || !currentFish.name} className="h-10 px-3 bg-indigo-600 text-white gap-2"><Sparkles className="size-4" /> IA</Button>
             </div>
             
-            <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Scientifique</Label><Input value={currentFish.scientificName || ''} onChange={e => setCurrentFish({...currentFish, scientificName: e.target.value})} /></div>
+            <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Scientifique</Label><Input value={currentFish.scientificName || ''} onChange={currentFish.scientificName = e.target.value)} /></div>
 
             <div className="bg-muted/30 p-4 rounded-xl border-2 space-y-4">
               <Label className="text-[10px] font-black uppercase text-primary">Risques & Longueurs par Taille</Label>
