@@ -52,22 +52,6 @@ export default function AidePage() {
         </p>
       </div>
 
-      {/* SUPPORT & FAQ SECTION */}
-      <div className="grid grid-cols-2 gap-3">
-        <Button asChild variant="outline" className="h-24 flex-col border-2 border-primary/20 bg-primary/5 hover:bg-primary/10 transition-all active:scale-95 gap-2">
-          <Link href="/aide/faq">
-            <HelpCircle className="size-6 text-primary" />
-            <span className="text-[10px] font-black uppercase tracking-widest">FAQ &amp; Aide</span>
-          </Link>
-        </Button>
-        <Button asChild variant="outline" className="h-24 flex-col border-2 border-accent/20 bg-accent/5 hover:bg-accent/10 transition-all active:scale-95 gap-2">
-          <Link href="/aide/support">
-            <LifeBuoy className="size-6 text-accent" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Support</span>
-          </Link>
-        </Button>
-      </div>
-
       <div className="flex flex-col gap-3 w-full">
         <h2 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Guides détaillés</h2>
         {helpSections.map((section) => (
