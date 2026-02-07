@@ -148,7 +148,10 @@ export interface FishSpeciesInfo {
   id: string;
   name: string;
   scientificName: string;
-  gratteRisk: number; // Base Admin Risk
+  gratteRisk: number; // Base Admin Risk (legacy/fallback)
+  gratteRiskSmall: number;  // Risque petit spécimen
+  gratteRiskMedium: number; // Risque moyen spécimen
+  gratteRiskLarge: number;  // Risque grand spécimen
   culinaryAdvice: string;
   fishingAdvice: string;
   category: 'Lagon' | 'Large' | 'Recif';
@@ -162,6 +165,13 @@ export interface FishCommuneStats {
   nombre_de_votants: number;
   moyenne_calculee: number;
   dernier_update: any;
+  // Stats par taille
+  small_sum?: number;
+  small_count?: number;
+  medium_sum?: number;
+  medium_count?: number;
+  large_sum?: number;
+  large_count?: number;
 }
 
 export interface FaqEntry {

@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import Image from 'next/image';
 import type { FishSpeciesInfo, FishCommuneStats } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,7 +27,8 @@ import {
   RefreshCw,
   Save,
   Navigation,
-  LocateFixed
+  LocateFixed,
+  Ruler
 } from 'lucide-react';
 import { identifyFish } from '@/ai/flows/identify-fish-flow';
 import type { IdentifyFishOutput } from '@/ai/schemas';
@@ -43,6 +44,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const CIGUATERA_GUIDE_URL = "https://coastfish.spc.int/fr/component/content/article/340-ciguatera-field-reference-guide.html";
 
@@ -60,6 +62,7 @@ export default function FishPage() {
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [selectedFishForReport, setSelectedFishForReport] = useState<FishSpeciesInfo | null>(null);
   const [userRiskValue, setUserRiskValue] = useState(50);
+  const [selectedSize, setSelectedSize] = useState<'small' | 'medium' | 'large'>('medium');
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
 
   // Fetch dynamic fish species from Firestore
@@ -122,16 +125,25 @@ export default function FishPage() {
       
       const currentStats = statsSnap.exists() ? statsSnap.data() as FishCommuneStats : { somme_des_notes: 0, nombre_de_votants: 0 };
       
+      // Mise à jour globale
       const newVoterCount = currentStats.nombre_de_votants + 1;
       const newTotalScore = currentStats.somme_des_notes + userRiskValue;
       const newAverage = parseFloat((newTotalScore / newVoterCount).toFixed(1));
+
+      // Mise à jour spécifique par taille
+      const sizeSumKey = `${selectedSize}_sum` as keyof FishCommuneStats;
+      const sizeCountKey = `${selectedSize}_count` as keyof FishCommuneStats;
+      const newSizeSum = (currentStats[sizeSumKey] as number || 0) + userRiskValue;
+      const newSizeCount = (currentStats[sizeCountKey] as number || 0) + 1;
 
       await setDoc(statsRef, {
         id: selectedLocation,
         somme_des_notes: newTotalScore,
         nombre_de_votants: newVoterCount,
         moyenne_calculee: newAverage,
-        dernier_update: serverTimestamp()
+        dernier_update: serverTimestamp(),
+        [sizeSumKey]: newSizeSum,
+        [sizeCountKey]: newSizeCount
       }, { merge: true });
 
       toast({ title: "Merci pour votre signalement !", description: "Les statistiques de la commune ont été mises à jour." });
@@ -232,6 +244,32 @@ export default function FishPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-6">
+            <div className="space-y-3">
+              <Label className="text-[10px] font-black uppercase opacity-60 flex items-center gap-2">
+                <Ruler className="size-3" /> Taille du spécimen
+              </Label>
+              <RadioGroup value={selectedSize} onValueChange={(v: any) => setSelectedSize(v)} className="grid grid-cols-3 gap-2">
+                <div>
+                  <RadioGroupItem value="small" id="size-small" className="peer sr-only" />
+                  <Label htmlFor="size-small" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-2 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                    <span className="text-[10px] font-black uppercase">Petit</span>
+                  </Label>
+                </div>
+                <div>
+                  <RadioGroupItem value="medium" id="size-medium" className="peer sr-only" />
+                  <Label htmlFor="size-medium" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-2 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                    <span className="text-[10px] font-black uppercase">Moyen</span>
+                  </Label>
+                </div>
+                <div>
+                  <RadioGroupItem value="large" id="size-large" className="peer sr-only" />
+                  <Label htmlFor="size-large" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-2 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                    <span className="text-[10px] font-black uppercase">Grand</span>
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <Label className="text-[10px] font-black uppercase opacity-60">Risque constaté / ressenti</Label>
@@ -281,18 +319,28 @@ function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo,
 
   const { data: stats } = useDoc<FishCommuneStats>(statsRef);
 
-  const adminRisk = fish.gratteRisk;
-  const communityRisk = stats?.moyenne_calculee ?? adminRisk;
-  const finalScore = stats ? parseFloat(((adminRisk + communityRisk) / 2).toFixed(1)) : adminRisk;
-  const voterCount = stats?.nombre_de_votants ?? 0;
-
   const getIndiceConfiance = (score: number) => {
     if (score <= 10) return { label: 'Élevé', color: 'text-green-600', dot: '🟢' };
     if (score <= 30) return { label: 'Modéré', color: 'text-orange-500', dot: '🟠' };
     return { label: 'Faible', color: 'text-red-600', dot: '🔴' };
   };
 
-  const confidence = getIndiceConfiance(finalScore);
+  const calculateFinalScore = (admin: number, sizeKey: 'small' | 'medium' | 'large') => {
+    const sum = stats?.[`${sizeKey}_sum` as keyof FishCommuneStats] as number || 0;
+    const count = stats?.[`${sizeKey}_count` as keyof FishCommuneStats] as number || 0;
+    const localAvg = count > 0 ? sum / count : admin;
+    return parseFloat(((admin + localAvg) / 2).toFixed(1));
+  };
+
+  const risksBySize = [
+    { label: 'Petit', admin: fish.gratteRiskSmall || 0, final: calculateFinalScore(fish.gratteRiskSmall || 0, 'small') },
+    { label: 'Moyen', admin: fish.gratteRiskMedium || 0, final: calculateFinalScore(fish.gratteRiskMedium || 0, 'medium') },
+    { label: 'Grand', admin: fish.gratteRiskLarge || 0, final: calculateFinalScore(fish.gratteRiskLarge || 0, 'large') },
+  ];
+
+  // Le score affiché sur le badge principal est celui du spécimen "Moyen"
+  const mainScore = risksBySize[1].final;
+  const confidence = getIndiceConfiance(mainScore);
 
   return (
     <Card className="overflow-hidden border-2 hover:border-primary/30 transition-all shadow-sm">
@@ -313,7 +361,7 @@ function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo,
                 ) : <Fish className="size-6 text-primary/40" />}
               </div>
               <div className="flex flex-col min-w-0 flex-1 gap-0.5">
-                <h4 className="font-black uppercase tracking-tighter text-sm leading-tight break-words pr-2">
+                <h4 className="font-black uppercase tracking-tighter text-sm leading-none break-words pr-2">
                   {fish.name}
                 </h4>
                 <p className="text-[9px] text-muted-foreground italic truncate">
@@ -321,13 +369,13 @@ function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo,
                 </p>
                 <div className="flex items-center gap-2 mt-1">
                   <Badge 
-                    variant={finalScore > 20 ? "destructive" : "outline"} 
+                    variant={mainScore > 20 ? "destructive" : "outline"} 
                     className={cn(
                       "text-[7px] h-4 px-1.5 font-black uppercase tracking-tight", 
-                      finalScore <= 20 && "border-green-500 text-green-600"
+                      mainScore <= 20 && "border-green-500 text-green-600"
                     )}
                   >
-                    Risque {finalScore}%
+                    Risque {mainScore}%
                   </Badge>
                   <Badge variant="outline" className="text-[7px] h-4 px-1.5 font-black uppercase opacity-60 border-muted-foreground/30">
                     {fish.category}
@@ -341,34 +389,34 @@ function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo,
               <div className="bg-white border-2 rounded-2xl p-4 shadow-sm space-y-4">
                 <div className="flex justify-between items-center border-b pb-2">
                   <div className="flex flex-col">
-                    <span className="text-[9px] font-black uppercase text-muted-foreground">Indice de confiance</span>
+                    <span className="text-[9px] font-black uppercase text-muted-foreground">Indice de confiance (Moyen)</span>
                     <span className={cn("text-xs font-black uppercase", confidence.color)}>{confidence.dot} {confidence.label}</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-[9px] font-black uppercase text-muted-foreground">Score Final</span>
-                    <p className="text-xl font-black text-slate-800 leading-none">{finalScore}%</p>
+                    <span className="text-[9px] font-black uppercase text-muted-foreground">Moyenne Globale</span>
+                    <p className="text-xl font-black text-slate-800 leading-none">{mainScore}%</p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-[8px] font-black uppercase text-muted-foreground">Risque théorique (Scientifique)</p>
-                    <p className="text-sm font-bold">{adminRisk}%</p>
+                <div className="space-y-3">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-center opacity-40">Analyse par taille de spécimen</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {risksBySize.map((risk) => (
+                      <div key={risk.label} className="flex flex-col items-center gap-1.5 p-2 bg-muted/30 rounded-xl border">
+                        <span className="text-[8px] font-black uppercase opacity-60">{risk.label}</span>
+                        <div className="flex flex-col items-center">
+                          <span className={cn("text-xs font-black", risk.final > 30 ? "text-red-600" : "text-green-600")}>{risk.final}%</span>
+                          <span className="text-[7px] font-bold text-muted-foreground">Scien: {risk.admin}%</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="space-y-1 border-l pl-4">
-                    <p className="text-[8px] font-black uppercase text-primary">Risque local (Communautaire)</p>
-                    <p className="text-sm font-bold">{communityRisk}%</p>
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                  <Progress value={finalScore} className={cn("h-2", finalScore > 30 ? "bg-red-100" : "bg-green-100")} />
                 </div>
 
                 <p className="text-[9px] leading-relaxed font-medium text-muted-foreground italic flex items-start gap-2">
                   <Megaphone className="size-3 shrink-0 mt-0.5 text-primary" />
                   <span>
-                    Ce score a été ajusté par <strong>{voterCount} pêcheur{voterCount > 1 ? 's' : ''}</strong> dans la commune de <strong>{selectedLocation}</strong>. Plus il y a de signalements, plus la donnée est fiable.
+                    Ce score a été ajusté par <strong>{stats?.nombre_de_votants || 0} pêcheur{ (stats?.nombre_de_votants || 0) > 1 ? 's' : ''}</strong> dans la commune de <strong>{selectedLocation}</strong>. Plus il y a de signalements par taille, plus la donnée est fiable.
                   </span>
                 </p>
 
@@ -403,7 +451,7 @@ function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo,
                     <ExternalLink className="size-2" /> lien vers guide_pratique_ciguatera
                   </a>
                 </div>
-                {finalScore > 30 && (
+                {mainScore > 30 && (
                   <div className="p-3 bg-red-50 border border-red-100 rounded-lg flex gap-3 text-red-800">
                     <AlertTriangle className="size-4 shrink-0 mt-0.5" />
                     <p className="text-[10px] font-bold leading-tight">Attention : Risque de ciguatera élevé. La consommation de gros spécimens est déconseillée.</p>

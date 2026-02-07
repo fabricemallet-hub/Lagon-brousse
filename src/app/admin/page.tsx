@@ -339,7 +339,13 @@ export default function AdminPage() {
     setIsSavingFish(true);
     try {
       const id = currentFish.id || currentFish.name.toLowerCase().replace(/\s+/g, '-');
-      await setDoc(doc(firestore, 'fish_species', id), { ...currentFish, id }, { merge: true });
+      // Pour compatibilité, on garde aussi gratteRisk égal au risque moyen
+      const payload = { 
+        ...currentFish, 
+        id, 
+        gratteRisk: currentFish.gratteRiskMedium || currentFish.gratteRisk || 0 
+      };
+      await setDoc(doc(firestore, 'fish_species', id), payload, { merge: true });
       toast({ title: "Poisson enregistré" });
       setIsFishDialogOpen(false);
     } finally {
@@ -355,33 +361,38 @@ export default function AdminPage() {
       let count = 0;
 
       for (const fish of fishSpecies) {
-        // Query all commune stats for this fish
         const statsRef = collection(firestore, 'fish_species', fish.id, 'commune_stats');
         const statsSnap = await getDocs(statsRef);
         
-        let totalNotes = 0;
-        let totalVotants = 0;
+        const sums = { small: 0, medium: 0, large: 0 };
+        const counts = { small: 0, medium: 0, large: 0 };
 
         statsSnap.forEach(docSnap => {
           const d = docSnap.data();
-          totalNotes += d.somme_des_notes || 0;
-          totalVotants += d.nombre_de_votants || 0;
+          sums.small += d.small_sum || 0;
+          counts.small += d.small_count || 0;
+          sums.medium += d.medium_sum || 0;
+          counts.medium += d.medium_count || 0;
+          sums.large += d.large_sum || 0;
+          counts.large += d.large_count || 0;
         });
 
-        if (totalVotants > 0) {
-          const globalAvg = parseFloat((totalNotes / totalVotants).toFixed(1));
-          batch.update(doc(firestore, 'fish_species', fish.id), {
-            gratteRisk: globalAvg
-          });
+        const updates: any = {};
+        if (counts.small > 0) updates.gratteRiskSmall = parseFloat((sums.small / counts.small).toFixed(1));
+        if (counts.medium > 0) updates.gratteRiskMedium = parseFloat((sums.medium / counts.medium).toFixed(1));
+        if (counts.large > 0) updates.gratteRiskLarge = parseFloat((sums.large / counts.large).toFixed(1));
+
+        if (Object.keys(updates).length > 0) {
+          batch.update(doc(firestore, 'fish_species', fish.id), updates);
           count++;
         }
       }
 
       if (count > 0) {
         await batch.commit();
-        toast({ title: "Risques réajustés !", description: `${count} espèces mises à jour sur la base des moyennes territoriales.` });
+        toast({ title: "Risques réajustés !", description: `${count} espèces mises à jour par taille.` });
       } else {
-        toast({ title: "Aucun réajustement", description: "Pas de notes utilisateurs trouvées pour les espèces listées." });
+        toast({ title: "Aucun réajustement", description: "Pas de notes spécifiques par taille trouvées." });
       }
     } catch (e) {
       console.error(e);
@@ -542,7 +553,7 @@ export default function AdminPage() {
                   <TableRow>
                     <TableHead className="text-[10px] font-black uppercase">Photo</TableHead>
                     <TableHead className="text-[10px] font-black uppercase">Nom</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase">Risque Gratte</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase">Risque (P/M/G)</TableHead>
                     <TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -561,7 +572,13 @@ export default function AdminPage() {
                           </div>
                         </TableCell>
                         <TableCell className="font-bold text-xs">{f.name}</TableCell>
-                        <TableCell><Badge variant={f.gratteRisk > 20 ? 'destructive' : 'secondary'} className="text-[8px] font-black">{f.gratteRisk}%</Badge></TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Badge variant="outline" className="text-[7px] font-black px-1">{f.gratteRiskSmall || 0}%</Badge>
+                            <Badge variant="outline" className="text-[7px] font-black px-1">{f.gratteRiskMedium || 0}%</Badge>
+                            <Badge variant="outline" className="text-[7px] font-black px-1">{f.gratteRiskLarge || 0}%</Badge>
+                          </div>
+                        </TableCell>
                         <TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => { setCurrentFish(f); setIsFishDialogOpen(true); }}><Pencil className="size-3" /></Button></TableCell>
                       </TableRow>
                     )
@@ -815,9 +832,25 @@ export default function AdminPage() {
               <div className="flex-1 space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Nom Commun</Label><Input value={currentFish.name || ''} onChange={e => setCurrentFish({...currentFish, name: e.target.value})} /></div>
               <Button onClick={handleAIGenerateFish} disabled={isAIGeneratingFish || !currentFish.name} className="h-10 px-3 bg-indigo-600 text-white gap-2"><Sparkles className="size-4" /> IA</Button>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Scientifique</Label><Input value={currentFish.scientificName || ''} onChange={e => setCurrentFish({...currentFish, scientificName: e.target.value})} /></div>
-              <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Risque Gratte (%)</Label><Input type="number" value={currentFish.gratteRisk || 0} onChange={e => setCurrentFish({...currentFish, gratteRisk: parseInt(e.target.value)})} /></div>
+            
+            <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Scientifique</Label><Input value={currentFish.scientificName || ''} onChange={e => setCurrentFish({...currentFish, scientificName: e.target.value})} /></div>
+
+            <div className="bg-muted/30 p-4 rounded-xl border-2 space-y-4">
+              <Label className="text-[10px] font-black uppercase text-primary">Risques de Gratte par Taille (%)</Label>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-[9px] font-bold uppercase opacity-60">Petit</Label>
+                  <Input type="number" value={currentFish.gratteRiskSmall || 0} onChange={e => setCurrentFish({...currentFish, gratteRiskSmall: parseInt(e.target.value)})} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[9px] font-bold uppercase opacity-60">Moyen</Label>
+                  <Input type="number" value={currentFish.gratteRiskMedium || 0} onChange={e => setCurrentFish({...currentFish, gratteRiskMedium: parseInt(e.target.value)})} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[9px] font-bold uppercase opacity-60">Grand</Label>
+                  <Input type="number" value={currentFish.gratteRiskLarge || 0} onChange={e => setCurrentFish({...currentFish, gratteRiskLarge: parseInt(e.target.value)})} />
+                </div>
+              </div>
             </div>
             
             <div className="grid grid-cols-2 gap-4">
