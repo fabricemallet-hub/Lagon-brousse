@@ -31,16 +31,12 @@ export default function LoginPage() {
   };
 
   const handlePaypalDonate = () => {
-    const donationLink = process.env.NEXT_PUBLIC_DONATION_LINK;
-    if (donationLink) {
-      window.open(donationLink, '_blank');
-    } else {
-      window.open("https://www.paypal.com/donate", '_blank');
-    }
+    // Lien de paiement PayPal spécifique fourni par l'utilisateur
+    const donationLink = "https://www.paypal.com/ncp/payment/G5GSMQHE3P6NA";
+    window.open(donationLink, '_blank');
   };
 
   const handleDownloadRib = () => {
-    // Lien vers le RIB (à placer dans public/ ou via une URL de stockage)
     window.open('/RIB_Lagon_Brousse_NC.pdf', '_blank');
     toast({
       title: "Téléchargement lancé",

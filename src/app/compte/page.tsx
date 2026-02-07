@@ -64,12 +64,9 @@ export default function ComptePage() {
   };
 
   const handlePaypalDonate = () => {
-    const donationLink = process.env.NEXT_PUBLIC_DONATION_LINK;
-    if (donationLink) {
-      window.open(donationLink, '_blank');
-    } else {
-      window.open("https://www.paypal.com/donate", '_blank');
-    }
+    // Lien de paiement PayPal spécifique fourni par l'utilisateur
+    const donationLink = "https://www.paypal.com/ncp/payment/G5GSMQHE3P6NA";
+    window.open(donationLink, '_blank');
   };
 
   const handleDownloadRib = () => {

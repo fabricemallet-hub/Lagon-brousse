@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -30,7 +29,8 @@ import {
   ShieldCheck,
   Ticket,
   Scale,
-  Ruler
+  Ruler,
+  Landmark
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -173,7 +173,7 @@ export default function AdminPage() {
     if (!firestore || !isAdmin) return null;
     return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
   }, [firestore, isAdmin]);
-  const { data: sounds } = useCollection<SoundLibraryEntry>(soundsRef);
+  const { data: sounds } = useCollection<SoundLibraryEntry>(soundsQuery);
 
   const sharedTokenRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
@@ -565,7 +565,7 @@ export default function AdminPage() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 sm:grid-cols-9 mb-6 h-auto p-1 bg-muted/50 border rounded-xl">
+        <TabsList className="grid w-full grid-cols-4 sm:grid-cols-10 mb-6 h-auto p-1 bg-muted/50 border rounded-xl">
           <TabsTrigger value="overview" className="text-[10px] font-black uppercase">Stats</TabsTrigger>
           <TabsTrigger value="faq" className="text-[10px] font-black uppercase">FAQ</TabsTrigger>
           <TabsTrigger value="tickets" className="text-[10px] font-black uppercase">Tickets</TabsTrigger>
@@ -575,6 +575,7 @@ export default function AdminPage() {
           <TabsTrigger value="fish" className="text-[10px] font-black uppercase">Fish</TabsTrigger>
           <TabsTrigger value="sounds" className="text-[10px] font-black uppercase">Sons</TabsTrigger>
           <TabsTrigger value="access" className="text-[10px] font-black uppercase">Accès</TabsTrigger>
+          <TabsTrigger value="docs" className="text-[10px] font-black uppercase">Docs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="design" className="space-y-6">
@@ -628,7 +629,7 @@ export default function AdminPage() {
               variant="outline"
               onClick={handleRepairLengths} 
               disabled={isClearing || !fishSpecies || fishSpecies.length === 0}
-              className="font-black uppercase text-[10px] gap-2 border-orange-500/20 bg-orange-500/5 text-orange-700"
+              className="font-black uppercase text-[10px] gap-2 border-orange-500/20 bg-orange-50/5 text-orange-700"
             >
               {isClearing ? <RefreshCw className="size-4 animate-spin" /> : <Ruler className="size-4" />}
               Réparer Tailles (Auto NC)
@@ -643,7 +644,7 @@ export default function AdminPage() {
               Réajuster via Moyennes NC
             </Button>
             <Button onClick={() => { setCurrentFish({}); setIsFishDialogOpen(true); }} className="font-black uppercase text-[10px] gap-2">
-              <Plus className="size-4" /> Ajouter un Poisson
+              <Fish className="size-4" /> Ajouter un Poisson
             </Button>
           </div>
           <Card className="border-2">
@@ -752,6 +753,38 @@ export default function AdminPage() {
           </div>
         </TabsContent>
 
+        <TabsContent value="docs" className="space-y-6">
+          <Card className="border-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 font-black uppercase text-sm">
+                <FileText className="size-4" /> Documents Administratifs
+              </CardTitle>
+              <CardDescription className="text-[10px] font-bold uppercase">Accès rapide aux fichiers de gestion.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border-2 border-dashed border-primary/20">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-background rounded-lg shadow-sm">
+                    <Landmark className="size-5 text-primary" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black uppercase text-muted-foreground">RIB Officiel</span>
+                    <span className="text-xs font-bold">RIB_Lagon_Brousse_NC.pdf</span>
+                  </div>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-10 font-black uppercase text-[10px] gap-2 border-2" 
+                  onClick={() => window.open('/RIB_Lagon_Brousse_NC.pdf', '_blank')}
+                >
+                  <Download className="size-3" /> Télécharger mon RIB
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="faq" className="space-y-6">
           <div className="flex flex-col sm:flex-row gap-2 mb-4">
             <Button className="flex-1 h-12 font-black uppercase text-[10px] tracking-widest gap-2" onClick={() => { setCurrentFaq({ categorie: 'General', ordre: 0, views: 0 }); setIsFaqDialogOpen(true); }}>
@@ -835,7 +868,7 @@ export default function AdminPage() {
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           <Button variant="ghost" size="icon" className="size-8" onClick={() => { setCurrentFaq(f); setIsFaqDialogOpen(true); }}><Pencil className="size-3" /></Button>
-                          <Button variant="ghost" size="icon" className="size-8" onClick={() => handleDeleteFaq(f.id)}><Trash2 className="size-3 text-destructive" /></Button>
+                          <Button variant="ghost" size="icon" className="size-8" onClick={() => handleDeleteFaq(id)}><Trash2 className="size-3 text-destructive" /></Button>
                         </div>
                       </TableCell>
                     </TableRow>
