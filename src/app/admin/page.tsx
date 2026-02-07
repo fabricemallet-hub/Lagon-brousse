@@ -20,7 +20,8 @@ import {
   ArrowUp,
   ArrowDown,
   Filter,
-  FileText
+  FileText,
+  Gavel
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -216,7 +217,6 @@ export default function AdminPage() {
     if (!firestore || !isAdmin) return;
     setIsSavingCgv(true);
     try {
-      // Create a version based on current time
       const newVersion = Date.now();
       await setDoc(doc(firestore, 'app_settings', 'cgv'), {
         content: cgvContent,
@@ -229,6 +229,44 @@ export default function AdminPage() {
     } finally {
       setIsSavingCgv(false);
     }
+  };
+
+  const loadCgvTemplate = () => {
+    const today = new Date().toLocaleDateString('fr-FR');
+    const template = `CONDITIONS GÉNÉRALES DE VENTE (CGV) - LAGON & BROUSSE NC
+Dernière mise à jour : ${today}
+
+ARTICLE 1 : OBJET
+Les présentes CGV régissent l'accès et l'utilisation de l'application mobile "Lagon & Brousse NC", un service d'assistance maritime (marées, vent, suivi GPS) et agricole (calendrier lunaire, conseils IA).
+
+ARTICLE 2 : IDENTIFICATION DE L'ÉDITEUR
+L'application est éditée par Fabrice MALLET, domicilié en Nouvelle-Calédonie. Contact support : via l'interface de l'application ou l'onglet FAQ & Support.
+
+ARTICLE 3 : SERVICES ET ABONNEMENT
+L'accès au service est structuré comme suit :
+- Période d'essai gratuite : 3 mois à compter de la création du compte.
+- Version Limitée : Accès restreint à 1 minute par jour après l'essai si aucun abonnement n'est actif.
+- Abonnement Premium : Accès illimité pour un montant de 500 Francs CFP (environ 4,19 €) par mois.
+
+ARTICLE 4 : PRIX ET PAIEMENT
+Les prix sont indiqués en Francs CFP et/ou Euros. Le paiement s'effectue via les systèmes sécurisés PayPal ou les systèmes de facturation intégrés des plateformes mobiles. L'abonnement est renouvelable tacitement sauf résiliation par l'utilisateur via son interface de paiement.
+
+ARTICLE 5 : DROIT DE RÉTRACTATION
+Conformément à la réglementation calédonienne sur les contenus numériques fournis sur support immatériel (Loi n° 2017-10), l'utilisateur accepte expressément l'exécution immédiate du service dès validation de l'abonnement et renonce ainsi à son droit de rétractation de 14 jours pour bénéficier des données en temps réel.
+
+ARTICLE 6 : RESPONSABILITÉ ET SÉCURITÉ MARITIME
+L'utilisateur reconnaît expressément que :
+1. Les données fournies (marées, météo, vent, houle) sont issues de modèles mathématiques et ne remplacent en aucun cas les sources officielles (Météo France NC, SHOM).
+2. Le Boat Tracker est un outil de confort et ne constitue pas un système de secours agréé (La VHF canal 16 reste prioritaire).
+L'éditeur décline toute responsabilité en cas d'accident maritime, de dommage matériel ou corporel lié à une mauvaise interprétation des données.
+
+ARTICLE 7 : PROTECTION DES DONNÉES
+Les données collectées (Email, Surnom, GPS lors de l'activation des trackers) sont nécessaires au fonctionnement du service et sont stockées de manière sécurisée via Firebase. Aucune donnée n'est revendue à des tiers.
+
+ARTICLE 8 : LOI APPLICABLE ET JURIDICTION
+Les présentes CGV sont soumises au droit en vigueur en Nouvelle-Calédonie. Tout litige relatif à leur interprétation ou exécution sera de la compétence exclusive des tribunaux de Nouméa.`;
+    setCgvContent(template);
+    toast({ title: "Modèle chargé", description: "Vérifiez le texte avant de sauvegarder." });
   };
 
   useEffect(() => {
@@ -390,9 +428,14 @@ export default function AdminPage() {
               <CardDescription className="text-xs uppercase font-bold">Modifiez ici le texte légal. Toute sauvegarde forcera les utilisateurs à re-valider le document à leur prochaine connexion.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between bg-muted/20 p-3 rounded-lg border-2">
-                <span className="text-[10px] font-black uppercase opacity-60">Version actuelle :</span>
-                <Badge variant="outline" className="font-black">{dbCgv?.version || 'Aucune'}</Badge>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-muted/20 p-3 rounded-lg border-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase opacity-60">Version actuelle :</span>
+                  <Badge variant="outline" className="font-black">{dbCgv?.version || 'Aucune'}</Badge>
+                </div>
+                <Button variant="outline" size="sm" className="h-8 text-[9px] font-black uppercase gap-2 border-primary/20" onClick={loadCgvTemplate}>
+                  <Gavel className="size-3 text-primary" /> Charger le modèle conforme NC
+                </Button>
               </div>
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Texte légal</Label>
