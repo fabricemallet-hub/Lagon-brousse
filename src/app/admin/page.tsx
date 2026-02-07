@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, serverTimestamp, deleteDoc, doc, Timestamp, orderBy, query, setDoc, writeBatch, getDocs, addDoc, updateDoc } from 'firebase/firestore';
 import type { UserAccount, AccessToken, Conversation, SharedAccessToken, SplashScreenSettings, FishSpeciesInfo, SoundLibraryEntry, FaqEntry, SupportTicket, CgvSettings } from '@/lib/types';
@@ -89,6 +89,7 @@ export default function AdminPage() {
   const [isSavingFish, setIsSavingFish] = useState(false);
   const [isAIGeneratingFish, setIsAiGeneratingFish] = useState(false);
   const [isReadjustingRisks, setIsReadjustingRisks] = useState(false);
+  const fishFileInputRef = useRef<HTMLInputElement>(null);
 
   // Sound States
   const [isSoundDialogOpen, setIsSoundDialogOpen] = useState(false);
@@ -332,6 +333,20 @@ export default function AdminPage() {
     } finally {
       setIsAiGeneratingFish(false);
     }
+  };
+
+  const handleFishPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Protocole de redimensionnement côté client pour éviter de saturer Firestore (1MB limit)
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setCurrentFish(prev => ({ ...prev, imageUrl: base64 }));
+      toast({ title: "Photo prête" });
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSaveFish = async () => {
@@ -853,15 +868,51 @@ export default function AdminPage() {
               </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label className="text-xs font-bold uppercase opacity-60">URL de l'image</Label>
-                <Input value={currentFish.imageUrl || ''} onChange={e => setCurrentFish({...currentFish, imageUrl: e.target.value})} placeholder="https://..." />
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase opacity-60">Photo du poisson</Label>
+              <div className="grid grid-cols-1 gap-2">
+                <div className="flex gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    className="flex-1 h-12 border-2 border-dashed gap-2 text-[10px] font-black uppercase"
+                    onClick={() => fishFileInputRef.current?.click()}
+                  >
+                    <Upload className="size-4" />
+                    Télécharger Photo
+                  </Button>
+                  <input 
+                    type="file" 
+                    ref={fishFileInputRef} 
+                    className="hidden" 
+                    accept="image/*" 
+                    onChange={handleFishPhotoUpload} 
+                  />
+                </div>
+                
+                <div className="space-y-1">
+                  <Label className="text-[9px] font-black uppercase opacity-40">Ou URL directe</Label>
+                  <Input value={currentFish.imageUrl || ''} onChange={e => setCurrentFish({...currentFish, imageUrl: e.target.value})} placeholder="https://..." className="h-9 text-xs" />
+                </div>
+
+                {currentFish.imageUrl && (
+                  <div className="relative size-24 rounded-lg overflow-hidden border-2 mt-1">
+                    <img src={currentFish.imageUrl} alt="Fish Preview" className="object-cover w-full h-full" />
+                    <button 
+                      type="button"
+                      className="absolute top-0 right-0 p-1 bg-destructive text-white rounded-bl-lg"
+                      onClick={() => setCurrentFish(prev => ({ ...prev, imageUrl: '' }))}
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                )}
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs font-bold uppercase opacity-60">ID Placeholder (Picsum)</Label>
-                <Input value={currentFish.imagePlaceholder || ''} onChange={e => setCurrentFish({...currentFish, imagePlaceholder: e.target.value})} placeholder="fish-nom" />
-              </div>
+            </div>
+
+            <div className="space-y-1 pt-2 border-t">
+              <Label className="text-xs font-bold uppercase opacity-60">ID Placeholder (Picsum)</Label>
+              <Input value={currentFish.imagePlaceholder || ''} onChange={e => setCurrentFish({...currentFish, imagePlaceholder: e.target.value})} placeholder="fish-nom" />
             </div>
 
             <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Conseils Pêche</Label><Textarea value={currentFish.fishingAdvice || ''} onChange={e => setCurrentFish({...currentFish, fishingAdvice: e.target.value})} /></div>
