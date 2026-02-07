@@ -144,6 +144,26 @@ export interface UserAccount {
   cgvVersionSeen?: number;
 }
 
+export interface FishSpeciesInfo {
+  id: string;
+  name: string;
+  scientificName: string;
+  gratteRisk: number; // Base Admin Risk
+  culinaryAdvice: string;
+  fishingAdvice: string;
+  category: 'Lagon' | 'Large' | 'Recif';
+  imageUrl?: string;
+  imagePlaceholder?: string;
+}
+
+export interface FishCommuneStats {
+  id: string; // communeId
+  somme_des_notes: number;
+  nombre_de_votants: number;
+  moyenne_calculee: number;
+  dernier_update: any;
+}
+
 export interface FaqEntry {
   id: string;
   question: string;
