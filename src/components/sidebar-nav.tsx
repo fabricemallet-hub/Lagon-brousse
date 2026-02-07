@@ -1,3 +1,4 @@
+
 'use client';
 
 import { usePathname } from 'next/navigation';
@@ -11,6 +12,7 @@ import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import type { UserAccount } from '@/lib/types';
 import { doc } from 'firebase/firestore';
 import { navLinks } from '@/lib/nav-links';
+import { useMemo } from 'react';
 
 
 export function SidebarNav() {
@@ -25,7 +27,17 @@ export function SidebarNav() {
 
   const { data: userProfile } = useDoc<UserAccount>(userDocRef);
 
-  const isAdmin = userProfile?.subscriptionStatus === 'admin';
+  // Détection robuste du rôle admin (Email + UID) pour un affichage immédiat
+  const isAdmin = useMemo(() => {
+    if (!user) return false;
+    const email = user.email?.toLowerCase();
+    const uid = user.uid;
+    return email === 'f.mallet81@outlook.com' || 
+           email === 'f.mallet81@gmail.com' || 
+           email === 'fabrice.mallet@gmail.com' ||
+           uid === 'K9cVYLVUk1NV99YV3anebkugpPp1' ||
+           userProfile?.subscriptionStatus === 'admin';
+  }, [user, userProfile]);
 
   return (
     <div className="flex flex-col h-full">

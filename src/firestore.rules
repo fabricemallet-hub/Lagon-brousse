@@ -10,11 +10,12 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && 
-             (request.auth.token.email == 'f.mallet81@gmail.com' || 
-              request.auth.token.email == 'f.mallet81@outlook.com' ||
-              request.auth.token.email == 'fabrice.mallet@gmail.com' ||
-              request.auth.uid == 'K9cVYLVUk1NV99YV3anebkugpPp1');
+      return isSignedIn() && (
+        request.auth.uid == "K9cVYLVUk1NV99YV3anebkugpPp1" ||
+        request.auth.token.email == "fabrice.mallet@gmail.com" ||
+        request.auth.token.email == "f.mallet81@gmail.com" || 
+        request.auth.token.email == "f.mallet81@outlook.com"
+      );
     }
 
     // --- 1. CMS SUPPORT & FAQ ---
@@ -25,7 +26,7 @@ service cloud.firestore {
 
     match /cms_support/tickets/items/{id} {
       allow create: if isSignedIn();
-      allow read: if isSignedIn() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow update, delete: if isAdmin();
     }
 
@@ -40,6 +41,7 @@ service cloud.firestore {
       match /previsions/{prevId} {
         allow get, list: if true;
       }
+      allow write: if isAdmin();
     }
 
     match /fish_species/{id} {
