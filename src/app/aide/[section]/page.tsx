@@ -105,7 +105,7 @@ const sectionContent: Record<string, {
     tips: [
       "Surnom SMS : Votre surnom de navire (ex: [TITANIC]) est ajouté automatiquement au début du SMS pour une identification immédiate par les secours.",
       "Mode Auto : Le système détecte l'immobilité après 30s. Le bouton 'Reprise Mode Auto' permet de recalibrer le statut en cas de dérive de pêche.",
-      "Annuaire Maritime : Les numéros d'urgence NC (COSS 16, SAMU 15, etc.) sont disponibles en bas de page."
+      "Annuaire Maritime : Les numérations d'urgence NC (COSS 16, SAMU 15, etc.) sont disponibles en bas de page."
     ]
   },
   'peche': {
@@ -138,6 +138,7 @@ const sectionContent: Record<string, {
     steps: [
       "Identification IA : Prenez une photo de votre prise pour identifier instantanément l'espèce et obtenir son profil de risque théorique.",
       "Analyse par Taille : Le risque est détaillé pour 3 catégories (Petit, Moyen, Grand). Les longueurs estimées en CM vous aident à situer votre prise.",
+      "Pêche & Cuisine : Accédez à des fiches détaillées incluant les techniques de capture (appâts, profondeur) et les meilleurs conseils culinaires locaux.",
       "Risque Collaboratif : Visualisez le score final pondéré (Moyenne entre les données scientifiques et les retours des pêcheurs locaux) pour votre commune.",
       "Signalement Citoyen : Contribuez à la sécurité de tous en signalant un ressenti de gratte. Précisez la taille du spécimen pour affiner les statistiques.",
       "Indice de Confiance : Le nombre de 'retours citoyens' s'affiche pour crédibiliser la donnée locale sur chaque fiche."
