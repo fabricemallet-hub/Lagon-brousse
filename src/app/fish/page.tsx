@@ -317,8 +317,13 @@ function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo,
 
   const { data: stats } = useDoc<FishCommuneStats>(statsRef);
 
-  // Fallback logic: if Firestore data is empty, check the hardcoded lagoonFishData
-  const referenceFish = useMemo(() => lagoonFishData.find(f => f.id === fish.id), [fish.id]);
+  // Robust matching logic: check by ID or normalized Name
+  const referenceFish = useMemo(() => {
+    return lagoonFishData.find(f => 
+      f.id === fish.id || 
+      f.name.toLowerCase().trim() === fish.name.toLowerCase().trim()
+    );
+  }, [fish.id, fish.name]);
 
   const getIndiceConfiance = (score: number) => {
     if (score <= 10) return { label: 'Élevé', color: 'text-green-600', dot: '🟢' };

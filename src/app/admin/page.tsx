@@ -451,7 +451,12 @@ export default function AdminPage() {
       let count = 0;
       
       for (const fish of fishSpecies) {
-        const refFish = lagoonFishData.find(f => f.id === fish.id || f.name.toLowerCase() === fish.name.toLowerCase());
+        // Robust matching: by ID or normalized Name
+        const refFish = lagoonFishData.find(f => 
+          f.id === fish.id || 
+          f.name.toLowerCase().trim() === fish.name.toLowerCase().trim()
+        );
+
         if (refFish) {
           const updates: any = {};
           if (!fish.lengthSmall) updates.lengthSmall = refFish.lengthSmall;
