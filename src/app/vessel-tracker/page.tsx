@@ -118,6 +118,9 @@ export default function VesselTrackerPage() {
   const lastChargingStatesRef = useRef<Record<string, boolean>>({});
   const lastClearTimesRef = useRef<Record<string, number>>({});
 
+  // Loop Alarm state
+  const [activeWatchAlarm, setActiveWatchAlarm] = useState<HTMLAudioElement | null>(null);
+
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
   const userDocRef = useMemoFirebase(() => {
@@ -157,6 +160,49 @@ export default function VesselTrackerPage() {
       audio.play().catch(() => {});
     }
   }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, availableSounds]);
+
+  const stopWatchAlarm = () => {
+    if (activeWatchAlarm) {
+        activeWatchAlarm.pause();
+        setActiveWatchAlarm(null);
+        toast({ title: "Alarme de veille arrêtée" });
+    }
+  };
+
+  // Strategic Watch (Veille) Checker
+  useEffect(() => {
+    if (mode !== 'receiver' || !vesselPrefs.isWatchEnabled || !followedVessels || activeWatchAlarm) return;
+
+    const interval = setInterval(() => {
+        followedVessels.forEach(vessel => {
+            if (vessel.isSharing && vessel.status === 'stationary' && vessel.statusChangedAt) {
+                const startTime = vessel.statusChangedAt.toMillis();
+                const now = Date.now();
+                const diffMinutes = (now - startTime) / (1000 * 60);
+
+                if (diffMinutes >= vesselPrefs.watchDuration) {
+                    // Trigger Alarm
+                    const soundId = vesselPrefs.watchSound;
+                    const sound = availableSounds.find(s => s.id === soundId || s.label === soundId);
+                    if (sound && !activeWatchAlarm) {
+                        const audio = new Audio(sound.url);
+                        audio.volume = vesselPrefs.vesselVolume;
+                        audio.loop = true;
+                        audio.play().catch(e => console.error("Alarm play error:", e));
+                        setActiveWatchAlarm(audio);
+                        toast({ 
+                            variant: "destructive", 
+                            title: "ALERTE VEILLE !", 
+                            description: `${vessel.displayName || vessel.id} est immobile depuis plus de ${Math.floor(diffMinutes / 60)}h.` 
+                        });
+                    }
+                }
+            }
+        });
+    }, 30000); // Check every 30s
+
+    return () => clearInterval(interval);
+  }, [mode, vesselPrefs, followedVessels, activeWatchAlarm, availableSounds, toast]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -512,6 +558,13 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
+      {activeWatchAlarm && (
+        <div className="fixed top-12 left-0 right-0 z-[200] p-4 bg-red-600 animate-pulse text-white shadow-2xl flex flex-col items-center gap-2">
+            <p className="font-black text-center uppercase tracking-tighter text-lg">ALERTE : IMMOBILITÉ PROLONGÉE !</p>
+            <Button variant="outline" className="bg-white text-red-600 font-black h-12 uppercase w-full border-none shadow-xl" onClick={stopWatchAlarm}>ARRÊTER L'ALARME DE VEILLE</Button>
+        </div>
+      )}
+
       <Card className="border-2 shadow-sm overflow-hidden">
         <div className="flex bg-muted/30 p-1">
           <Button variant={mode === 'sender' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => setMode('sender')}>Émetteur (A)</Button>
@@ -720,7 +773,6 @@ export default function VesselTrackerPage() {
                       </div>
                     </div>
 
-                    {/* VEILLE STRATÉGIQUE REGAVAMPED */}
                     <div className="space-y-4 p-4 border-2 rounded-2xl bg-orange-50/30 border-orange-100 shadow-inner">
                       <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
@@ -747,10 +799,23 @@ export default function VesselTrackerPage() {
                           <span>1h</span>
                           <span>24h</span>
                         </div>
+
+                        <div className="flex items-center justify-between gap-4 pt-2 border-t border-dashed border-orange-200">
+                            <span className="text-[10px] font-bold uppercase flex-1 text-orange-800/60">Son de l'alarme</span>
+                            <Select value={vesselPrefs.watchSound} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, watchSound: v })}>
+                                <SelectTrigger className="h-8 text-[9px] font-black uppercase w-32 bg-white/50 border-orange-200">
+                                    <SelectValue placeholder="Choisir..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] uppercase font-black">{s.label}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-orange-600" onClick={() => playVesselSound(vesselPrefs.watchSound)}><Play className="size-3" /></Button>
+                        </div>
+                        <p className="text-[8px] font-bold text-orange-700/60 leading-tight italic px-1">Note : L'alarme de veille jouera en boucle jusqu'à validation manuelle de votre part.</p>
                       </div>
                     </div>
 
-                    {/* SEUIL BATTERIE REVAMPED */}
                     <div className="space-y-4 p-4 border-2 rounded-2xl bg-red-50/30 border-red-100 shadow-inner">
                       <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
