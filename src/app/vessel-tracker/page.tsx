@@ -41,7 +41,8 @@ import {
   Smartphone,
   Phone,
   Waves,
-  Eye
+  Eye,
+  Bird
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -153,7 +154,6 @@ export default function VesselTrackerPage() {
     }
   }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, availableSounds]);
 
-  // Charge l'historique depuis localStorage au démarrage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedHistory = localStorage.getItem('lb_vessel_history_v2');
@@ -172,7 +172,6 @@ export default function VesselTrackerPage() {
     }
   }, []);
 
-  // Sauvegarde l'historique dans localStorage quand il change
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('lb_vessel_history_v2', JSON.stringify(history));
@@ -553,6 +552,15 @@ export default function VesselTrackerPage() {
 
                     <div className="bg-muted/20 p-4 rounded-2xl border-2 border-dashed space-y-3">
                         <p className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest flex items-center gap-2"><Zap className="size-3" /> Signalisation manuelle</p>
+                        
+                        <Button 
+                            variant="outline" 
+                            className="w-full h-14 font-black uppercase text-[11px] border-2 bg-blue-50 border-blue-200 gap-3 touch-manipulation shadow-sm text-blue-700" 
+                            onClick={() => handleManualStatus('moving', "CHASSE - REGROUPEMENT D'OISEAUX")}
+                        >
+                            <Bird className="size-6 animate-bounce" /> REGROUPEMENT D'OISEAUX (CHASSE)
+                        </Button>
+
                         <div className="grid grid-cols-2 gap-2">
                             <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2 touch-manipulation" onClick={() => handleManualStatus('returning')} disabled={vesselStatus === 'returning'}>
                                 <Navigation className="size-4 text-blue-600" /> Retour Maison
