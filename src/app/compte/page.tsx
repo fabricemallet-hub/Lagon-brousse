@@ -1,4 +1,3 @@
-
 'use client';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, getDoc, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
@@ -54,6 +53,15 @@ export default function ComptePage() {
     const paypalLink = process.env.NEXT_PUBLIC_PAYPAL_LINK;
     if (paypalLink) window.open(paypalLink, '_blank');
     else toast({ variant: "destructive", title: "Erreur", description: "Lien non configuré." });
+  };
+
+  const handleDonate = () => {
+    const donationLink = process.env.NEXT_PUBLIC_DONATION_LINK;
+    if (donationLink) {
+      window.open(donationLink, '_blank');
+    } else {
+      window.open("https://www.paypal.com/donate", '_blank');
+    }
   };
 
   const handleRedeemToken = async () => {
@@ -151,6 +159,14 @@ export default function ComptePage() {
                   S'abonner (4.19€ / mois)
                 </Button>
               )}
+              
+              <Button 
+                onClick={handleDonate} 
+                className="w-full h-14 text-base font-black uppercase tracking-widest shadow-lg bg-accent hover:bg-accent/90"
+              >
+                DONS
+              </Button>
+
               <Button variant="outline" onClick={handleLogout} className="w-full h-12 font-black uppercase text-xs tracking-widest border-2">
                 <LogOut className="mr-2 size-4" /> Déconnexion
               </Button>

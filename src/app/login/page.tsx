@@ -21,6 +21,16 @@ export default function LoginPage() {
     }
   };
 
+  const handleDonate = () => {
+    const donationLink = process.env.NEXT_PUBLIC_DONATION_LINK;
+    if (donationLink) {
+      window.open(donationLink, '_blank');
+    } else {
+      // Lien par défaut vers PayPal Donate si non configuré
+      window.open("https://www.paypal.com/donate", '_blank');
+    }
+  };
+
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-200px)] p-4">
       <Card className="w-full max-w-sm mx-auto shadow-xl border-2">
@@ -46,17 +56,26 @@ export default function LoginPage() {
                 <span className="w-full border-t" />
               </div>
               <div className="relative flex justify-center text-[10px] uppercase font-black tracking-widest">
-                <span className="bg-background px-2 text-muted-foreground">Accès Premium</span>
+                <span className="bg-background px-2 text-muted-foreground">Soutien & Premium</span>
               </div>
             </div>
 
-            <Button 
-              variant="default" 
-              className="w-full h-14 font-black uppercase tracking-widest shadow-lg text-sm bg-primary hover:bg-primary/90 transition-all active:scale-[0.98]"
-              onClick={handleSubscribe}
-            >
-              S'abonner (4.19€ / mois)
-            </Button>
+            <div className="flex flex-col gap-3">
+              <Button 
+                variant="default" 
+                className="w-full h-14 font-black uppercase tracking-widest shadow-lg text-sm bg-primary hover:bg-primary/90 transition-all active:scale-[0.98]"
+                onClick={handleSubscribe}
+              >
+                S'abonner (4.19€ / mois)
+              </Button>
+              <Button 
+                variant="default" 
+                className="w-full h-14 font-black uppercase tracking-widest shadow-lg text-sm bg-accent hover:bg-accent/90 transition-all active:scale-[0.98]"
+                onClick={handleDonate}
+              >
+                DONS
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
