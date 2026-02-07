@@ -69,11 +69,14 @@ export const INITIAL_FAQ_DATA = [
   { categorie: "Boat Tracker", ordre: 58, question: "Le Boat Tracker fonctionne-t-il en avion ?", reponse: "Non, les vitesses élevées perturbent l'algorithme conçu pour la mer." },
   { categorie: "Boat Tracker", ordre: 59, question: "Le SMS contient-il l'heure ?", reponse: "Oui, ainsi qu'un lien Google Maps direct vers votre position." },
   { categorie: "Boat Tracker", ordre: 60, question: "Puis-je être émetteur et récepteur à la fois ?", reponse: "Non, il faut choisir un mode par appareil." },
+  { categorie: "Boat Tracker", ordre: 101, question: "Comment suivre la péremption de mon matériel de sécurité ?", reponse: "Allez dans l'onglet 'Réglementation' > 'Sécurité & Armement'. Cliquez sur 'CONSEILS EXPERTS NC' puis 'Ajouter un Navire'. Vous pourrez alors lister vos fusées et extincteurs avec leurs dates." },
+  { categorie: "Boat Tracker", ordre: 102, question: "Où s'affichent les alertes de péremption ?", reponse: "Un bandeau orange d'alerte apparaît automatiquement en haut de la page 'Accueil' dès qu'un équipement est à moins de 90 jours (3 mois) de sa fin de validité." },
+  { categorie: "Boat Tracker", ordre: 103, question: "Peut-on gérer plusieurs bateaux ?", reponse: "Oui, vous pouvez créer autant de profils de navires que vous le souhaitez dans la section Réglementation et gérer le matériel de chacun séparément." },
 
   // --- CHASSE (15) ---
   { categorie: "Chasse", ordre: 61, question: "Comment rejoindre une battue ?", reponse: "Entrez le code session (CH-XXXX) fourni par l'organisateur." },
   { categorie: "Chasse", ordre: 62, question: "Pourquoi signaler 'Gibier en vue' ?", reponse: "Cela envoie une notification push et un son immédiat à tous vos partenaires." },
-  { categorie: "Chasse", ordre: 63, question: "La table de tir est-elle balistique ?", reponse: "C'est une simulation théorique basée sur un zérotage à 100m. Réglez toujours votre arme en réel." },
+  { categorie: "Chasse", ordre: 63, question: "La table de tir est-elle balistique ?", reponse: "C'est une simulation théorique basée on un zérotage à 100m. Réglez toujours votre arme en réel." },
   { categorie: "Chasse", ordre: 64, question: "Comment voir le vent en brousse ?", reponse: "Consultez la carte du vent dans l'onglet Chasse pour anticiper votre approche." },
   { categorie: "Chasse", ordre: 65, question: "Puis-je changer ma couleur sur la carte ?", reponse: "Oui, dans vos préférences de profil ou dans les réglages de la session." },
   { categorie: "Chasse", ordre: 66, question: "C'est quoi la période de Brame ?", reponse: "La saison de reproduction (souvent Juillet/Août). Les cerfs sont très actifs et bruyants." },
