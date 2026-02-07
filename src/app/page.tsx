@@ -59,10 +59,11 @@ export default function Home() {
   
   const [data, setData] = useState<LocationData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [now, setNow] = useState(new Date());
+  const [now, setNow] = useState<Date | null>(null);
 
-  // Update time for real-time UV changes
+  // Avoid hydration mismatch by setting time after mount
   useEffect(() => {
+    setNow(new Date());
     const timer = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
@@ -79,7 +80,7 @@ export default function Home() {
     setIsLoading(true);
     const fetchedData = getDataForDate(selectedLocation, selectedDate);
     setData(fetchedData);
-    setIsLoading(false);
+    setIsLocationLoading(false);
   }, [selectedLocation, selectedDate]);
 
   const dateString = selectedDate.toLocaleDateString('fr-FR', {
@@ -100,7 +101,7 @@ export default function Home() {
 
   // Fusion des données Live dans l'objet météo procédural pour l'affichage
   const weatherWithLiveUpdates = useMemo(() => {
-    if (!data?.weather) return null;
+    if (!data?.weather || !now) return null;
     
     // On n'applique le Live que si on regarde la date d'aujourd'hui
     const isToday = now.toDateString() === selectedDate.toDateString();
@@ -130,7 +131,7 @@ export default function Home() {
     };
   }, [data, liveMeteo, selectedDate, now]);
 
-  if (isLoading || !data || !weatherWithLiveUpdates) {
+  if (isLoading || !data || !weatherWithLiveUpdates || !now) {
     return <HomeSkeleton />;
   }
 

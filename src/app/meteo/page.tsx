@@ -84,9 +84,10 @@ export default function MeteoLivePage() {
   const { selectedLocation } = useLocation();
   const [search, setSearch] = useState('');
   const [selectedCommuneId, setSelectedCommuneId] = useState<string | null>(null);
-  const [now, setNow] = useState(new Date());
+  const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
+    setNow(new Date());
     const timer = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
@@ -145,7 +146,7 @@ export default function MeteoLivePage() {
         communeId={selectedCommuneId} 
         liveData={liveData} 
         onBack={() => setSelectedCommuneId(null)} 
-        now={now}
+        now={now || new Date()}
       />
     );
   }
@@ -181,7 +182,7 @@ export default function MeteoLivePage() {
         />
       </div>
 
-      {isLoading ? (
+      {isLoading || !now ? (
         <div className="space-y-3">
           {[1, 2, 3, 4, 5].map(i => (
             <Skeleton key={i} className="h-20 w-full rounded-xl" />

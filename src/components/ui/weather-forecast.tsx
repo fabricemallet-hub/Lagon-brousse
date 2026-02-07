@@ -94,21 +94,22 @@ export function WeatherForecast({
   isToday?: boolean;
 }) {
   const [isClient, setIsClient] = useState(false);
-  const [now, setNow] = useState(new Date());
+  const [now, setNow] = useState<Date | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   
   const hasCenteredForHour = useRef<number | null>(null);
 
   useEffect(() => {
     setIsClient(true);
+    setNow(new Date());
     const timer = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
 
-  const currentHour = now.getHours();
+  const currentHour = now ? now.getHours() : 0;
 
   const { summary, selectedForecast, hourlyForecastsToShow } = useMemo(() => {
-    if (!weather.hourly.length || !tides.length) {
+    if (!weather.hourly.length || !tides.length || !now) {
       return { summary: null, selectedForecast: null, hourlyForecastsToShow: [] };
     }
 
@@ -160,7 +161,7 @@ export function WeatherForecast({
   }, [now, weather, tides, currentHour]);
 
   useEffect(() => {
-    if (isClient && isToday && scrollRef.current) {
+    if (isClient && isToday && scrollRef.current && now) {
         if (hasCenteredForHour.current !== currentHour) {
             const container = scrollRef.current;
             // Use requestAnimationFrame to avoid Forced Reflow violations
@@ -184,9 +185,9 @@ export function WeatherForecast({
     } else if (!isToday) {
         hasCenteredForHour.current = null;
     }
-  }, [isClient, isToday, currentHour]);
+  }, [isClient, isToday, currentHour, now]);
 
-  if (!isClient || !selectedForecast) {
+  if (!isClient || !selectedForecast || !now) {
     return <Skeleton className="h-96 w-full rounded-lg" />;
   }
 
