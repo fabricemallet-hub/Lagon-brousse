@@ -445,7 +445,7 @@ function HuntingSessionContent() {
                             <OverlayView key={p.id} position={{ lat: p.location.latitude, lng: p.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                 <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
                                     <div className={cn(
-                                        "px-2 py-1 rounded text-[11px] font-black text-white shadow-lg border transition-all", 
+                                        "px-2 py-1 rounded text-[11px] font-black text-white shadow-lg border transition-all whitespace-nowrap", 
                                         p.isGibierEnVue 
                                             ? "bg-red-600 animate-bounce border-red-400" 
                                             : p.baseStatus === 'En position' 
@@ -496,7 +496,7 @@ function HuntingSessionContent() {
                         <AlertTitle className="text-xs font-black uppercase">GPS Inactif</AlertTitle>
                         <AlertDescription className="flex flex-col gap-2">
                             <p className="text-[10px] font-medium leading-relaxed">Activez votre position pour que vos coéquipiers puissent vous situer sur la carte.</p>
-                            <Button size="sm" onClick={handleToggleGps} className="font-black h-10 uppercase text-[10px] tracking-widest">Activer ma position</Button>
+                            <Button size="sm" onClick={handleToggleGps} className="font-black h-10 uppercase text-[10px] tracking-widest">Activez ma position</Button>
                         </AlertDescription>
                     </Alert>
                 )}
