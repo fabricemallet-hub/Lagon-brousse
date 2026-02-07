@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef } from 'react';
@@ -286,7 +287,8 @@ function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo,
                     alt={fish.name} 
                     width={64} 
                     height={64} 
-                    className="object-contain w-full h-full p-1" 
+                    className="object-contain w-full h-full p-1"
+                    data-ai-hint="fish photo"
                   />
                 ) : <Fish className="size-6 text-primary/40" />}
               </div>

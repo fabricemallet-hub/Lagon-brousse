@@ -45,6 +45,7 @@ import { format, isBefore } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
+import Image from 'next/image';
 
 const FAQ_CATEGORIES = ["General", "Peche", "Boat Tracker", "Chasse", "Champs", "Compte"];
 
@@ -318,7 +319,13 @@ export default function AdminPage() {
     setIsAiGeneratingFish(true);
     try {
       const info = await generateFishInfo({ name: currentFish.name });
-      setCurrentFish(prev => ({ ...prev, ...info }));
+      // On fusionne mais on garde l'image existante si présente
+      setCurrentFish(prev => ({ 
+        imageUrl: prev.imageUrl,
+        imagePlaceholder: prev.imagePlaceholder,
+        ...info, 
+        name: prev.name 
+      }));
       toast({ title: "Fiche générée par IA" });
     } catch (e) {
       toast({ variant: 'destructive', title: "Erreur IA" });
@@ -531,15 +538,34 @@ export default function AdminPage() {
             <CardHeader><CardTitle className="text-sm font-black uppercase">Espèces Répertoriées ({fishSpecies?.length || 0})</CardTitle></CardHeader>
             <CardContent className="p-0 border-t">
               <Table>
-                <TableHeader><TableRow><TableHead className="text-[10px] font-black uppercase">Nom</TableHead><TableHead className="text-[10px] font-black uppercase">Risque Gratte</TableHead><TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead></TableRow></TableHeader>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-[10px] font-black uppercase">Photo</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase">Nom</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase">Risque Gratte</TableHead>
+                    <TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
                 <TableBody>
-                  {fishSpecies?.map(f => (
-                    <TableRow key={f.id}>
-                      <TableCell className="font-bold text-xs">{f.name}</TableCell>
-                      <TableCell><Badge variant={f.gratteRisk > 20 ? 'destructive' : 'secondary'} className="text-[8px] font-black">{f.gratteRisk}%</Badge></TableCell>
-                      <TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => { setCurrentFish(f); setIsFishDialogOpen(true); }}><Pencil className="size-3" /></Button></TableCell>
-                    </TableRow>
-                  ))}
+                  {fishSpecies?.map(f => {
+                    const finalImg = f.imageUrl || (f.imagePlaceholder ? `https://picsum.photos/seed/${f.imagePlaceholder}/100/100` : null);
+                    return (
+                      <TableRow key={f.id}>
+                        <TableCell>
+                          <div className="size-10 rounded border bg-muted flex items-center justify-center overflow-hidden">
+                            {finalImg ? (
+                              <Image src={finalImg} alt={f.name} width={40} height={40} className="object-cover" />
+                            ) : (
+                              <Fish className="size-4 opacity-20" />
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-bold text-xs">{f.name}</TableCell>
+                        <TableCell><Badge variant={f.gratteRisk > 20 ? 'destructive' : 'secondary'} className="text-[8px] font-black">{f.gratteRisk}%</Badge></TableCell>
+                        <TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => { setCurrentFish(f); setIsFishDialogOpen(true); }}><Pencil className="size-3" /></Button></TableCell>
+                      </TableRow>
+                    )
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
@@ -793,6 +819,18 @@ export default function AdminPage() {
               <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Scientifique</Label><Input value={currentFish.scientificName || ''} onChange={e => setCurrentFish({...currentFish, scientificName: e.target.value})} /></div>
               <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Risque Gratte (%)</Label><Input type="number" value={currentFish.gratteRisk || 0} onChange={e => setCurrentFish({...currentFish, gratteRisk: parseInt(e.target.value)})} /></div>
             </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label className="text-xs font-bold uppercase opacity-60">URL de l'image</Label>
+                <Input value={currentFish.imageUrl || ''} onChange={e => setCurrentFish({...currentFish, imageUrl: e.target.value})} placeholder="https://..." />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-bold uppercase opacity-60">ID Placeholder (Picsum)</Label>
+                <Input value={currentFish.imagePlaceholder || ''} onChange={e => setCurrentFish({...currentFish, imagePlaceholder: e.target.value})} placeholder="fish-nom" />
+              </div>
+            </div>
+
             <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Conseils Pêche</Label><Textarea value={currentFish.fishingAdvice || ''} onChange={e => setCurrentFish({...currentFish, fishingAdvice: e.target.value})} /></div>
             <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Conseils Cuisine</Label><Textarea value={currentFish.culinaryAdvice || ''} onChange={e => setCurrentFish({...currentFish, culinaryAdvice: e.target.value})} /></div>
           </div>
