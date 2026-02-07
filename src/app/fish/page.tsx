@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Search, Camera, Fish, AlertTriangle, ChefHat, Target, Sparkles, BrainCircuit, X } from 'lucide-react';
+import { Search, Camera, Fish, AlertTriangle, ChefHat, Target, Sparkles, BrainCircuit, X, ExternalLink } from 'lucide-react';
 import { identifyFish } from '@/ai/flows/identify-fish-flow';
 import type { IdentifyFishOutput } from '@/ai/schemas';
 import { cn } from '@/lib/utils';
@@ -17,6 +17,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, orderBy, query } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
+
+const CIGUATERA_GUIDE_URL = "https://coastfish.spc.int/fr/component/content/article/340-ciguatera-field-reference-guide.html";
 
 export default function FishPage() {
   const { toast } = useToast();
@@ -114,6 +116,16 @@ export default function FishPage() {
             <div className="p-3 bg-white/80 rounded-lg border space-y-2">
               <div className="flex justify-between items-center"><span className="text-[10px] font-black uppercase text-muted-foreground">Risque de Gratte</span><span className={cn("text-xs font-black", aiResult.gratteRisk > 30 ? "text-red-600" : "text-green-600")}>{aiResult.gratteRisk}%</span></div>
               <Progress value={aiResult.gratteRisk} className={cn("h-2", aiResult.gratteRisk > 30 ? "bg-red-100" : "bg-green-100")} />
+              <div className="pt-1 flex justify-center">
+                <a 
+                  href={CIGUATERA_GUIDE_URL} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="text-[9px] font-black uppercase text-primary underline flex items-center gap-1 hover:text-primary/80 transition-colors"
+                >
+                  <ExternalLink className="size-2" /> lien vers guide_pratique_ciguatera
+                </a>
+              </div>
             </div>
             <div className="grid grid-cols-1 gap-3">
               <div className="flex items-start gap-3"><div className="p-2 bg-primary/10 rounded-lg text-primary shrink-0"><Target className="size-4" /></div><div className="space-y-0.5"><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Pêche</p><p className="text-xs font-medium">{aiResult.fishingAdvice}</p></div></div>
@@ -184,12 +196,24 @@ export default function FishPage() {
                           <p className="text-xs font-medium leading-relaxed">{fish.culinaryAdvice}</p>
                         </div>
                       </div>
-                      {fish.gratteRisk > 30 && (
-                        <div className="p-3 bg-red-50 border border-red-100 rounded-lg flex gap-3 text-red-800">
-                          <AlertTriangle className="size-4 shrink-0 mt-0.5" />
-                          <p className="text-[10px] font-bold leading-tight">Attention : Risque de ciguatera élevé. La consommation de gros spécimens est déconseillée.</p>
+                      <div className="pt-2 border-t border-slate-200/50 flex flex-col gap-3">
+                        <div className="flex justify-center">
+                          <a 
+                            href={CIGUATERA_GUIDE_URL} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-[9px] font-black uppercase text-primary underline flex items-center gap-1 hover:text-primary/80 transition-colors"
+                          >
+                            <ExternalLink className="size-2" /> lien vers guide_pratique_ciguatera
+                          </a>
                         </div>
-                      )}
+                        {fish.gratteRisk > 30 && (
+                          <div className="p-3 bg-red-50 border border-red-100 rounded-lg flex gap-3 text-red-800">
+                            <AlertTriangle className="size-4 shrink-0 mt-0.5" />
+                            <p className="text-[10px] font-bold leading-tight">Attention : Risque de ciguatera élevé. La consommation de gros spécimens est déconseillée.</p>
+                          </div>
+                        )}
+                      </div>
                     </AccordionContent>
                   </AccordionItem>
                 </Accordion>

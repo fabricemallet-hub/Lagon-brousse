@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
@@ -26,6 +25,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+const CIGUATERA_GUIDE_URL = "https://coastfish.spc.int/fr/component/content/article/340-ciguatera-field-reference-guide.html";
+
 const sectionContent: Record<string, {
   title: string;
   icon: any;
@@ -33,6 +34,7 @@ const sectionContent: Record<string, {
   role: string;
   steps: string[];
   tips: string[];
+  links?: { label: string, url: string }[];
 }> = {
   'accueil': {
     title: 'Accueil',
@@ -119,7 +121,11 @@ const sectionContent: Record<string, {
     ],
     tips: [
       "Le mode satellite de la carte est idéal pour repérer les patates de corail.",
-      "L'IA ignore météo et vent pour se concentrer sur les cycles immuables de la lune et des marées."
+      "L'IA ignore météo et vent pour se concentrer sur les cycles immuables de la lune et des marées.",
+      "SÉCURITÉ : Consultez toujours le guide de la CPS pour limiter les risques de ciguatera."
+    ],
+    links: [
+      { label: "lien vers guide_pratique_ciguatera", url: CIGUATERA_GUIDE_URL }
     ]
   },
   'chasse': {
@@ -306,6 +312,22 @@ export default function AideSectionPage() {
                   </li>
                 ))}
               </ul>
+              
+              {content.links && content.links.length > 0 && (
+                <div className="pt-4 mt-2 border-t border-muted-foreground/10 space-y-2">
+                  {content.links.map((link, idx) => (
+                    <a 
+                      key={idx} 
+                      href={link.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="flex items-center gap-2 text-[10px] font-black uppercase text-primary hover:underline"
+                    >
+                      <ExternalLink className="size-3" /> {link.label}
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </CardContent>
