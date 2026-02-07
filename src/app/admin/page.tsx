@@ -15,7 +15,10 @@ import {
   DollarSign, Users, Crown, KeyRound, Trash2, Mail, 
   Palette, Save, Upload, 
   Fish, Plus, Minus, Pencil, DatabaseZap, Sparkles, UserX,
-  Eye, Music, Volume2, Play, Download, HelpCircle, MessageSquare, Check, X, RefreshCw
+  Eye, Music, Volume2, Play, Download, HelpCircle, MessageSquare, Check, X, RefreshCw,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -29,6 +32,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { INITIAL_FAQ_DATA } from '@/lib/faq-data';
 
 const FAQ_CATEGORIES = ["General", "Peche", "Boat Tracker", "Chasse", "Champs", "Compte"];
+
+type SortConfig = {
+  field: keyof FaqEntry | null;
+  direction: 'asc' | 'desc';
+};
 
 export default function AdminPage() {
   const { user, isUserLoading } = useUser();
@@ -44,6 +52,7 @@ export default function AdminPage() {
   const [isFaqDialogOpen, setIsFaqDialogOpen] = useState(false);
   const [currentFaq, setCurrentFaq] = useState<Partial<FaqEntry>>({});
   const [isSavingFaq, setIsSavingFaq] = useState(false);
+  const [faqSort, setFaqSort] = useState<SortConfig>({ field: null, direction: 'asc' });
 
   // Tickets States
   const [currentTicket, setCurrentTicket] = useState<SupportTicket | null>(null);
@@ -65,7 +74,29 @@ export default function AdminPage() {
     if (!firestore || !isAdmin) return null;
     return query(collection(firestore, 'cms_support', 'faq', 'items'), orderBy('ordre', 'asc'));
   }, [firestore, isAdmin]);
-  const { data: faqs } = useCollection<FaqEntry>(faqRef);
+  const { data: rawFaqs } = useCollection<FaqEntry>(faqRef);
+
+  const sortedFaqs = useMemo(() => {
+    if (!rawFaqs) return [];
+    if (!faqSort.field) return rawFaqs;
+
+    return [...rawFaqs].sort((a, b) => {
+      const field = faqSort.field!;
+      const valA = a[field] ?? '';
+      const valB = b[field] ?? '';
+
+      if (valA < valB) return faqSort.direction === 'asc' ? -1 : 1;
+      if (valA > valB) return faqSort.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [rawFaqs, faqSort]);
+
+  const handleSort = (field: keyof FaqEntry) => {
+    setFaqSort(prev => ({
+      field,
+      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
 
   const ticketsRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
@@ -93,11 +124,11 @@ export default function AdminPage() {
   };
 
   const handleClearFaq = async () => {
-    if (!firestore || !isAdmin || !faqs) return;
+    if (!firestore || !isAdmin || !rawFaqs) return;
     setIsClearing(true);
     try {
         const batch = writeBatch(firestore);
-        faqs.forEach(f => {
+        rawFaqs.forEach(f => {
             batch.delete(doc(firestore, 'cms_support', 'faq', 'items', f.id));
         });
         await batch.commit();
@@ -111,7 +142,7 @@ export default function AdminPage() {
 
   const handleSeedFaq = async () => {
     if (!firestore || !isAdmin) return;
-    if (faqs && faqs.length > 0) {
+    if (rawFaqs && rawFaqs.length > 0) {
         toast({ variant: 'destructive', title: "Action annulée", description: "Videz d'abord la FAQ pour injecter les 100 nouvelles questions." });
         return;
     }
@@ -162,6 +193,11 @@ export default function AdminPage() {
 
   if (isUserLoading || !isAdmin) return <div className="p-8"><Skeleton className="h-48 w-full" /></div>;
 
+  const SortIcon = ({ field }: { field: keyof FaqEntry }) => {
+    if (faqSort.field !== field) return <ArrowUpDown className="ml-1 size-3 opacity-20" />;
+    return faqSort.direction === 'asc' ? <ArrowUp className="ml-1 size-3 text-primary" /> : <ArrowDown className="ml-1 size-3 text-primary" />;
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20 px-1">
       <Card className="border-2 shadow-sm">
@@ -185,15 +221,15 @@ export default function AdminPage() {
             <Button className="flex-1 h-12 font-black uppercase text-[10px] tracking-widest gap-2" onClick={() => { setCurrentFaq({ categorie: 'General', ordre: 0, views: 0 }); setIsFaqDialogOpen(true); }}>
                 <Plus className="size-4" /> Ajouter Manuellement
             </Button>
-            <Button variant="outline" className="flex-1 h-12 font-black uppercase text-[10px] tracking-widest gap-2 border-primary/20 bg-primary/5" onClick={handleSeedFaq} disabled={isGenerating || (faqs && faqs.length > 0)}>
+            <Button variant="outline" className="flex-1 h-12 font-black uppercase text-[10px] tracking-widest gap-2 border-primary/20 bg-primary/5" onClick={handleSeedFaq} disabled={isGenerating || (rawFaqs && rawFaqs.length > 0)}>
                 {isGenerating ? <RefreshCw className="size-4 animate-spin" /> : <DatabaseZap className="size-4 text-primary" />}
                 Peupler FAQ (100 Auto)
             </Button>
             
             <AlertDialog>
                 <AlertDialogTrigger asChild>
-                    <Button variant="destructive" className="flex-1 h-12 font-black uppercase text-[10px] tracking-widest gap-2" disabled={isClearing || !faqs || faqs.length === 0}>
-                        <Trash2 className="size-4" /> Vider la FAQ ({faqs?.length || 0})
+                    <Button variant="destructive" className="flex-1 h-12 font-black uppercase text-[10px] tracking-widest gap-2" disabled={isClearing || !rawFaqs || rawFaqs.length === 0}>
+                        <Trash2 className="size-4" /> Vider la FAQ ({rawFaqs?.length || 0})
                     </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
@@ -211,13 +247,35 @@ export default function AdminPage() {
 
           <Card className="border-2">
             <CardHeader className="flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2 font-black uppercase text-sm"><HelpCircle className="size-4" /> Base de connaissances ({faqs?.length || 0})</CardTitle>
+              <CardTitle className="flex items-center gap-2 font-black uppercase text-sm"><HelpCircle className="size-4" /> Base de connaissances ({rawFaqs?.length || 0})</CardTitle>
             </CardHeader>
             <CardContent className="p-0 border-t">
               <Table>
-                <TableHeader><TableRow><TableHead className="text-[10px] font-black uppercase">Question</TableHead><TableHead className="text-[10px] font-black uppercase">Vues</TableHead><TableHead className="text-[10px] font-black uppercase">Catégorie</TableHead><TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead></TableRow></TableHeader>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead 
+                      className="text-[10px] font-black uppercase cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => handleSort('question')}
+                    >
+                      <div className="flex items-center">Question <SortIcon field="question" /></div>
+                    </TableHead>
+                    <TableHead 
+                      className="text-[10px] font-black uppercase cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => handleSort('views')}
+                    >
+                      <div className="flex items-center">Vues <SortIcon field="views" /></div>
+                    </TableHead>
+                    <TableHead 
+                      className="text-[10px] font-black uppercase cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => handleSort('categorie')}
+                    >
+                      <div className="flex items-center">Catégorie <SortIcon field="categorie" /></div>
+                    </TableHead>
+                    <TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
                 <TableBody>
-                  {faqs?.map(f => (
+                  {sortedFaqs.map(f => (
                     <TableRow key={f.id}>
                       <TableCell className="font-bold text-xs max-w-[200px] truncate">{f.question}</TableCell>
                       <TableCell><Badge variant="secondary" className="text-[8px] font-black">{f.views || 0}</Badge></TableCell>
@@ -230,7 +288,7 @@ export default function AdminPage() {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {faqs?.length === 0 && (
+                  {rawFaqs?.length === 0 && (
                       <TableRow><TableCell colSpan={4} className="text-center py-10 italic text-muted-foreground">Aucune entrée. Utilisez le bouton "Peupler FAQ" pour démarrer.</TableCell></TableRow>
                   )}
                 </TableBody>
@@ -265,7 +323,7 @@ export default function AdminPage() {
         <TabsContent value="overview" className="space-y-6">
           <div className="grid gap-4 md:grid-cols-3">
             <Card className="border-2"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Tickets Ouverts</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{tickets?.filter(t => t.statut === 'ouvert').length || 0}</div></CardContent></Card>
-            <Card className="border-2"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">FAQ Items</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{faqs?.length || 0}</div></CardContent></Card>
+            <Card className="border-2"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">FAQ Items</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{rawFaqs?.length || 0}</div></CardContent></Card>
           </div>
         </TabsContent>
       </Tabs>
