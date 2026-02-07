@@ -52,7 +52,8 @@ import {
   Zap,
   Volume2,
   Play,
-  X
+  X,
+  RefreshCw
 } from 'lucide-react';
 import {
   useUser,
@@ -157,6 +158,7 @@ function HuntingSessionContent() {
   const [wakeLock, setWakeLock] = useState<any>(null);
 
   const prevParticipantsRef = useRef<SessionParticipant[] | null>(null);
+  const hasLoadedInitialPrefs = useRef(false);
 
   const soundsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -246,15 +248,18 @@ function HuntingSessionContent() {
   useEffect(() => { fetchMySessions(); }, [fetchMySessions]);
   
   useEffect(() => {
-    if (userProfile) {
+    if (userProfile && !hasLoadedInitialPrefs.current) {
       setNickname(userProfile.displayName || user?.displayName || user?.email?.split('@')[0] || '');
       setSelectedIcon(userProfile.mapIcon || 'Navigation');
       setSelectedColor(userProfile.mapColor || '#3b82f6');
-      if (userProfile.vesselPrefs?.huntingSoundSettings) {
-        setSoundSettings(userProfile.vesselPrefs.huntingSoundSettings);
-        setSoundVolume(userProfile.vesselPrefs.huntingVolume || 0.8);
-        setIsSoundEnabled(userProfile.vesselPrefs.huntingSoundEnabled ?? true);
+      
+      const savedVesselPrefs = userProfile.vesselPrefs;
+      if (savedVesselPrefs?.huntingSoundSettings) {
+        setSoundSettings(savedVesselPrefs.huntingSoundSettings);
+        setSoundVolume(savedVesselPrefs.huntingVolume !== undefined ? savedVesselPrefs.huntingVolume : 0.8);
+        setIsSoundEnabled(savedVesselPrefs.huntingSoundEnabled ?? true);
       }
+      hasLoadedInitialPrefs.current = true;
     }
   }, [userProfile, user]);
   
@@ -422,24 +427,27 @@ function HuntingSessionContent() {
     if (!user || !firestore || !nickname) return;
     setIsSavingPrefs(true);
     try {
+        const currentVesselPrefs = userProfile?.vesselPrefs || {};
         const prefs = { 
           displayName: nickname, 
           mapIcon: selectedIcon, 
           mapColor: selectedColor,
           vesselPrefs: {
-            ...userProfile?.vesselPrefs,
+            ...currentVesselPrefs,
             huntingSoundSettings: soundSettings,
             huntingVolume: soundVolume,
             huntingSoundEnabled: isSoundEnabled
           }
         };
         await updateDoc(doc(firestore, 'users', user.uid), prefs);
-        if (session && isParticipating) await updateDoc(doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid), {
-          displayName: nickname,
-          mapIcon: selectedIcon,
-          mapColor: selectedColor
-        });
-        toast({ title: 'Sauvegardé !' });
+        if (session && isParticipating) {
+          await updateDoc(doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid), {
+            displayName: nickname,
+            mapIcon: selectedIcon,
+            mapColor: selectedColor
+          });
+        }
+        toast({ title: 'Préférences sauvegardées !' });
         setPrefsSection(undefined); 
     } catch (e) { console.error(e); } finally { setIsSavingPrefs(false); }
   };
@@ -605,7 +613,10 @@ function HuntingSessionContent() {
                                           </div>
                                         </div>
 
-                                        <Button onClick={handleSavePreferences} size="sm" disabled={isSavingPrefs} className="w-full h-12 font-black uppercase tracking-widest"><Save className="mr-2 h-4 w-4" /> Sauvegarder Profil & Sons</Button>
+                                        <Button onClick={handleSavePreferences} size="sm" disabled={isSavingPrefs} className="w-full h-12 font-black uppercase tracking-widest">
+                                          {isSavingPrefs ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} 
+                                          Sauvegarder Profil & Sons
+                                        </Button>
                                     </div>
                                 </AccordionContent>
                             </AccordionItem>
