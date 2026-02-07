@@ -23,14 +23,12 @@ import {
   Shrink, 
   Zap, 
   AlertTriangle,
-  Bell,
   BatteryFull,
   BatteryMedium,
   BatteryLow,
   BatteryCharging,
   History,
   MapPin,
-  ChevronDown,
   X,
   Play,
   Volume2,
@@ -40,9 +38,6 @@ import {
   Home,
   RefreshCw,
   Settings,
-  Battery,
-  MessageSquare,
-  Eye,
   Smartphone,
   Phone,
   Waves
@@ -70,14 +65,7 @@ const BatteryIconComp = ({ level, charging, className }: { level?: number, charg
   return <BatteryFull {...props} className={cn(props.className, "text-green-600")} />;
 };
 
-const PulsingDot = () => (
-    <div className="absolute" style={{ transform: 'translate(-50%, -50%)' }}>
-      <div className="size-5 rounded-full bg-blue-500 opacity-75 animate-ping absolute"></div>
-      <div className="size-5 rounded-full bg-blue-500 border-2 border-white relative"></div>
-    </div>
-);
-
-export function VesselTracker() {
+export default function VesselTrackerPage() {
   const { user } = useUserHook();
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -116,7 +104,7 @@ export function VesselTracker() {
     batteryThreshold: 20
   });
   
-  const [history, setHistory] = useState<{ vesselId?: string, vesselName: string, statusLabel: string, time: Date, pos: google.maps.LatLngLiteral, batteryLevel?: number, isCharging?: boolean }[]>([]);
+  const [history, setHistory] = useState<{ vesselName: string, statusLabel: string, time: Date, pos: google.maps.LatLngLiteral, batteryLevel?: number, isCharging?: boolean }[]>([]);
   const lastStatusesRef = useRef<Record<string, string>>({});
   const lastUpdatesRef = useRef<Record<string, number>>({});
   const lastSentStatusRef = useRef<string | null>(null);
@@ -203,7 +191,7 @@ export function VesselTracker() {
       
       if (userProfile.lastVesselId && !customSharingId) setCustomSharingId(userProfile.lastVesselId);
     }
-  }, [userProfile, user]);
+  }, [userProfile, user, vesselNickname, customSharingId]);
 
   useEffect(() => {
     if (!user || !firestore || !vesselNickname) return;
@@ -374,7 +362,7 @@ export function VesselTracker() {
         const clearTimeKey = getTimeMillis(vessel.historyClearedAt);
 
         if (clearTimeKey > (lastClearTimesRef.current[vessel.id] || 0)) {
-            setHistory(prev => prev.filter(h => h.vesselId !== vessel.id));
+            setHistory(prev => prev.filter(h => h.vesselName !== (vessel.displayName || vessel.id)));
             lastClearTimesRef.current[vessel.id] = clearTimeKey;
         }
 
@@ -407,11 +395,10 @@ export function VesselTracker() {
             setHistory(prev => {
                 const alreadyAdded = prev.length > 0 && 
                                    prev[0].statusLabel === label && 
-                                   prev[0].vesselId === vessel.id && 
+                                   prev[0].vesselName === (vessel.displayName || vessel.id) && 
                                    Math.abs(prev[0].time.getTime() - Date.now()) < 2000;
                 if (alreadyAdded) return prev;
                 return [{ 
-                    vesselId: vessel.id,
                     vesselName: vessel.displayName || vessel.id, 
                     statusLabel: label, 
                     time: new Date(), 
