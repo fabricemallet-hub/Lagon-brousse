@@ -444,10 +444,33 @@ function HuntingSessionContent() {
                         {participants?.map(p => p.location && (
                             <OverlayView key={p.id} position={{ lat: p.location.latitude, lng: p.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                 <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
-                                    <div className={cn("px-2 py-1 rounded text-[11px] font-black text-white shadow-lg border", p.isGibierEnVue ? "bg-red-600 animate-bounce" : "bg-slate-900/80 backdrop-blur-md")}>
-                                        {p.displayName} {p.baseStatus ? `• ${p.baseStatus}` : ''}
+                                    <div className={cn(
+                                        "px-2 py-1 rounded text-[11px] font-black text-white shadow-lg border transition-all", 
+                                        p.isGibierEnVue 
+                                            ? "bg-red-600 animate-bounce border-red-400" 
+                                            : p.baseStatus === 'En position' 
+                                                ? "bg-blue-600 border-blue-400" 
+                                                : p.baseStatus === 'Battue en cours' 
+                                                    ? "bg-indigo-600 border-indigo-400" 
+                                                    : "bg-slate-900/80 backdrop-blur-md border-white/20"
+                                    )}>
+                                        {p.displayName} {p.baseStatus && <span className="ml-1 opacity-80">| {p.baseStatus.toUpperCase()}</span>}
                                     </div>
-                                    <div className={cn("p-1.5 rounded-full shadow-lg border-2 border-white", p.isGibierEnVue && "scale-125 ring-4 ring-red-500/50")} style={{ backgroundColor: p.isGibierEnVue ? '#ef4444' : (p.mapColor || '#3b82f6') }}>
+                                    <div 
+                                        className={cn(
+                                            "p-1.5 rounded-full shadow-lg border-2 border-white transition-all", 
+                                            p.isGibierEnVue && "scale-125 ring-4 ring-red-500/50"
+                                        )} 
+                                        style={{ 
+                                            backgroundColor: p.isGibierEnVue 
+                                                ? '#ef4444' 
+                                                : p.baseStatus === 'En position' 
+                                                    ? '#2563eb' 
+                                                    : p.baseStatus === 'Battue en cours' 
+                                                        ? '#4f46e5' 
+                                                        : (p.mapColor || '#3b82f6') 
+                                        }}
+                                    >
                                         {React.createElement(iconMap[p.mapIcon as keyof typeof iconMap] || Navigation, { className: "size-4 text-white" })}
                                     </div>
                                 </div>
