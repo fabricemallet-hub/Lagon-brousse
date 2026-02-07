@@ -40,18 +40,41 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 const FAQ_CATEGORIES = ["General", "Peche", "Boat Tracker", "Chasse", "Champs", "Compte"];
 
 const INITIAL_FAQ_DATA = [
+  // --- GENERAL ---
   { categorie: "General", ordre: 1, question: "L'application remplace-t-elle les sources officielles ?", reponse: "Non. Pour votre sécurité, consultez toujours meteo.nc et les autorités maritimes (COSS). L'app est un assistant d'aide à la décision tactique, pas une source de sécurité légale." },
   { categorie: "General", ordre: 2, question: "Pourquoi l'application demande-t-elle ma position ?", reponse: "Pour vous fournir la météo de votre commune exacte, calculer les marées de la station la plus proche et permettre le fonctionnement en temps réel du Boat Tracker." },
-  { categorie: "Boat Tracker", ordre: 3, question: "Mon contact reçoit-il ma position automatiquement ?", reponse: "Oui, tant que le mode Émetteur est actif et que vous avez une connexion internet (3G/4G). Votre contact doit utiliser le mode Récepteur avec votre ID unique." },
-  { categorie: "Boat Tracker", ordre: 4, question: "Que contient le SMS d'urgence ?", reponse: "Votre surnom de navire, votre message de détresse (personnalisé ou standard), le type d'alerte (MAYDAY/PAN PAN) et un lien Google Maps direct vers votre position GPS." },
-  { categorie: "Peche", ordre: 5, question: "Comment utiliser l'IA 'Jour Similaire' ?", reponse: "Enregistrez un spot après une belle prise. Plus tard, cliquez sur 'Jour Similaire' : l'IA cherchera dans les 14 prochains jours la date où la marée et la lune sont identiques à ce succès passé." },
-  { categorie: "Peche", ordre: 6, question: "Les marées sont-elles précises pour tout le territoire ?", reponse: "L'app utilise les 7 stations de référence du SHOM en NC. Les horaires sont ajustés selon la commune sélectionnée pour une précision maximale dans le lagon." },
-  { categorie: "Chasse", ordre: 7, question: "Pourquoi le vent est-il crucial pour la chasse ?", reponse: "Le cerf a l'odorat très sensible. L'app vous montre la provenance du vent pour vous aider à approcher 'à bon vent' (vent dans votre visage) sans être détecté." },
-  { categorie: "Chasse", ordre: 8, question: "Comment inviter des amis dans une session ?", reponse: "Créez une session de groupe, notez le code (ex: CH-1234) et donnez-le à vos partenaires. Ils pourront alors rejoindre la carte tactique commune." },
-  { categorie: "Champs", ordre: 9, question: "Comment est calculé l'arrosage au jet (en secondes) ?", reponse: "L'IA estime le besoin en eau en Litres selon la plante et la météo locale, puis convertit ce volume en secondes basé sur un débit standard de jet d'eau (12L/min)." },
-  { categorie: "Champs", ordre: 10, question: "C'est quoi un 'Jour Fruits' ou 'Jour Racines' ?", reponse: "C'est l'influence du zodiaque sur la plante. On sème les tomates en jour Fruits et les carottes en jour Racines pour optimiser la vigueur et le rendement naturellement." },
-  { categorie: "Compte", ordre: 11, question: "Puis-je utiliser l'app sur plusieurs téléphones ?", reponse: "Oui, connectez-vous simplement avec le même email. Vos spots, votre inventaire jardin et vos réglages sont synchronisés via votre compte Cloud." },
-  { categorie: "Compte", ordre: 12, question: "Qu'est-ce que le mode 'Limité' ?", reponse: "Si votre abonnement n'est pas actif, vous disposez d'une minute d'accès par jour pour des consultations rapides. L'abonnement Premium débloque l'accès illimité." }
+  { categorie: "General", ordre: 3, question: "Comment utiliser l'application hors-ligne ?", reponse: "L'application est une PWA (Progressive Web App). Une fois ouverte avec internet, les données consultées sont mises en cache. Le GPS fonctionne sans réseau, mais les mises à jour météo live et le partage Boat Tracker nécessitent la 3G/4G." },
+  { categorie: "General", ordre: 4, question: "Comment changer ma commune favorite ?", reponse: "Utilisez le sélecteur de commune en haut de l'écran (Accueil ou Météo Live). Votre choix est automatiquement enregistré sur votre profil pour votre prochaine connexion." },
+
+  // --- BOAT TRACKER ---
+  { categorie: "Boat Tracker", ordre: 5, question: "Mon contact reçoit-il ma position automatiquement ?", reponse: "Oui, tant que le mode Émetteur est actif et que vous avez une connexion internet (3G/4G). Votre contact doit utiliser le mode Récepteur avec votre ID unique." },
+  { categorie: "Boat Tracker", ordre: 6, question: "Que contient le SMS d'urgence ?", reponse: "Votre surnom de navire (ex: [TITANIC]), votre message personnalisé, le type d'alerte (MAYDAY/PAN PAN) et un lien Google Maps direct vers votre position GPS exacte." },
+  { categorie: "Boat Tracker", ordre: 7, question: "Puis-je suivre plusieurs navires à la fois ?", reponse: "Oui. En mode Récepteur, vous pouvez ajouter autant d'identifiants de navires que vous le souhaitez. Ils apparaîtront tous simultanément sur votre carte satellite." },
+  { categorie: "Boat Tracker", ordre: 8, question: "Pourquoi mon statut affiche 'Signal perdu' ?", reponse: "Cela signifie que l'émetteur n'a pas mis à jour sa position depuis plus de 10 minutes. Cela arrive généralement en cas de zone blanche (pas de réseau) ou si le téléphone de l'émetteur est éteint." },
+
+  // --- PECHE ---
+  { categorie: "Peche", ordre: 9, question: "Comment utiliser l'IA 'Jour Similaire' ?", reponse: "Enregistrez un spot après une belle prise. Plus tard, cliquez sur 'Jour Similaire' sur ce spot : l'IA analysera les 14 prochains jours pour trouver la date où la marée et la lune reproduisent les conditions de votre succès passé." },
+  { categorie: "Peche", ordre: 10, question: "Qu'est-ce qu'un indice de réussite 10/10 ?", reponse: "Il indique une coïncidence parfaite entre un coefficient de marée élevé (vives-eaux), une phase lunaire optimale (Pleine ou Nouvelle lune) et un créneau horaire où l'espèce est naturellement plus active." },
+  { categorie: "Peche", ordre: 11, question: "Comment fonctionne le scanner de poissons (IA) ?", reponse: "Prenez une photo de votre prise bien de profil. L'IA analyse les nageoires, la forme et les motifs pour identifier l'espèce calédonienne et vous alerter sur le risque de ciguatera (gratte)." },
+  { categorie: "Peche", ordre: 12, question: "Les marées sont-elles précises pour tout le territoire ?", reponse: "L'app utilise les 7 stations de référence du SHOM (Nouméa, Koumac, Thio, etc.). Les horaires sont automatiquement ajustés par l'algorithme selon la commune sélectionnée pour une précision maximale dans le lagon." },
+
+  // --- CHASSE ---
+  { categorie: "Chasse", ordre: 13, question: "Pourquoi le vent est-il crucial pour la chasse ?", reponse: "Le cerf a l'odorat extrêmement sensible. L'app vous montre la provenance du vent sur la carte pour vous aider à approcher 'à bon vent' (vent de face) sans être détecté." },
+  { categorie: "Chasse", ordre: 14, question: "Comment fonctionne l'alerte 'Gibier en vue' ?", reponse: "Lorsque vous cliquez sur le bouton rouge en session de groupe, une notification push instantanée et un signal sonore spécifique sont envoyés à tous vos partenaires pour qu'ils se tiennent prêts." },
+  { categorie: "Chasse", ordre: 15, question: "La table de tir est-elle valable pour tous les calibres ?", reponse: "Non, c'est une simulation basée sur une trajectoire standard (zéro à 100m). Elle sert d'aide à la décision, mais vous devez impérativement régler votre arme en condition réelle avant la chasse." },
+  { categorie: "Chasse", ordre: 16, question: "Puis-je personnaliser mon icône sur la carte ?", reponse: "Oui, allez dans 'Compte' ou dans les réglages de la session de chasse pour choisir une icône (Cerf, Navigation, etc.) et une couleur unique pour être reconnu par vos amis." },
+
+  // --- CHAMPS ---
+  { categorie: "Champs", ordre: 17, question: "Comment est calculé l'arrosage au jet (en secondes) ?", reponse: "L'IA estime le besoin en eau en Litres selon la plante et la météo live, puis convertit ce volume en secondes basé sur un débit standard de jet d'eau (12L/min). C'est une aide pour ne pas gaspiller l'eau." },
+  { categorie: "Champs", ordre: 18, question: "C'est quoi un 'Jour Fruits' ou 'Jour Racines' ?", reponse: "C'est l'influence du zodiaque. On sème les tomates en jour Fruits et les carottes en jour Racines. Cela optimise la vigueur de la plante en suivant les cycles naturels de la sève." },
+  { categorie: "Champs", ordre: 19, question: "Le scanner peut-il identifier les maladies ?", reponse: "Oui. Photographiez les feuilles abîmées de près. L'IA cherchera des signes de carence, de parasites locaux (cochenilles, oïdium) et vous donnera un conseil de traitement traditionnel ou biologique." },
+  { categorie: "Champs", ordre: 20, question: "Pourquoi l'IA me déconseille de planter aujourd'hui ?", reponse: "Si vous tentez de planifier un semis hors période optimale (ex: planter des racines en lune montante), l'IA vous avertit et vous propose la date idéale la plus proche dans les 30 prochains jours." },
+
+  // --- COMPTE ---
+  { categorie: "Compte", ordre: 21, question: "Puis-je utiliser l'app sur plusieurs téléphones ?", reponse: "Oui, connectez-vous simplement avec le même email. Vos spots secrets, votre inventaire jardin et vos réglages sont synchronisés sur tous vos appareils via votre compte Cloud." },
+  { categorie: "Compte", ordre: 22, question: "Qu'est-ce que le mode 'Limité' ?", reponse: "Si votre abonnement n'est pas actif, vous disposez d'une minute d'accès par jour pour des consultations rapides. L'abonnement Premium débloque l'accès illimité et toutes les fonctions IA." },
+  { categorie: "Compte", ordre: 23, question: "Comment activer mon code jeton ?", reponse: "Allez dans l'onglet 'Compte', descendez jusqu'à 'Activer un jeton' et saisissez votre code (ex: LBN-XXXX). L'accès sera activé instantanément pour la durée prévue." },
+  { categorie: "Compte", ordre: 24, question: "Mes données personnelles sont-elles partagées ?", reponse: "Non. Vos positions GPS et vos coins de pêche sont strictement privés. Seul le partage volontaire via Boat Tracker ou Chasse permet à vos amis choisis de vous voir." }
 ];
 
 export default function AdminPage() {
