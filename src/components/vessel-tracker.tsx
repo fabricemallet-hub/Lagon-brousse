@@ -835,7 +835,19 @@ export function VesselTracker() {
                     <OverlayView key={vessel.id} position={{ lat: vessel.location.latitude, lng: vessel.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                     <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
                         <div className="px-2 py-1 bg-slate-900/90 text-white rounded text-[10px] font-black shadow-lg border border-white/20 whitespace-nowrap flex items-center gap-2">
-                          {vessel.displayName || vessel.id}
+                          <span className="truncate max-w-[80px]">{vessel.displayName || vessel.id}</span>
+                          <span className={cn(
+                            "text-[8px] font-black border-l pl-2 border-white/10",
+                            vessel.status === 'moving' ? "text-blue-400" :
+                            vessel.status === 'returning' ? "text-indigo-400" :
+                            vessel.status === 'landed' ? "text-green-400" :
+                            vessel.status === 'stationary' ? "text-amber-400" : "text-red-400"
+                          )}>
+                            {vessel.status === 'moving' ? 'MOUV' : 
+                             vessel.status === 'returning' ? 'RETOUR' :
+                             vessel.status === 'landed' ? 'HOME' :
+                             vessel.status === 'stationary' ? 'MOUIL' : 'OFF'}
+                          </span>
                           <BatteryIconComp level={vessel.batteryLevel} charging={vessel.isCharging} />
                         </div>
                         <div className={cn("p-2 rounded-full border-2 border-white shadow-xl", 
