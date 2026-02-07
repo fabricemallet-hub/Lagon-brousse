@@ -15,7 +15,7 @@ import {
   DollarSign, Users, Crown, KeyRound, Trash2, Mail, 
   Palette, Save, Upload, 
   Fish, Plus, Minus, Pencil, DatabaseZap, Sparkles, UserX,
-  Eye, Music, Volume2, Play, Download, HelpCircle, MessageSquare, Check, X
+  Eye, Music, Volume2, Play, Download, HelpCircle, MessageSquare, Check, X, RefreshCw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
@@ -39,6 +39,21 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const FAQ_CATEGORIES = ["General", "Peche", "Boat Tracker", "Chasse", "Champs", "Compte"];
 
+const INITIAL_FAQ_DATA = [
+  { categorie: "General", ordre: 1, question: "L'application remplace-t-elle les sources officielles ?", reponse: "Non. Pour votre sécurité, consultez toujours meteo.nc et les autorités maritimes (COSS). L'app est un assistant d'aide à la décision tactique, pas une source de sécurité légale." },
+  { categorie: "General", ordre: 2, question: "Pourquoi l'application demande-t-elle ma position ?", reponse: "Pour vous fournir la météo de votre commune exacte, calculer les marées de la station la plus proche et permettre le fonctionnement en temps réel du Boat Tracker." },
+  { categorie: "Boat Tracker", ordre: 3, question: "Mon contact reçoit-il ma position automatiquement ?", reponse: "Oui, tant que le mode Émetteur est actif et que vous avez une connexion internet (3G/4G). Votre contact doit utiliser le mode Récepteur avec votre ID unique." },
+  { categorie: "Boat Tracker", ordre: 4, question: "Que contient le SMS d'urgence ?", reponse: "Votre surnom de navire, votre message de détresse (personnalisé ou standard), le type d'alerte (MAYDAY/PAN PAN) et un lien Google Maps direct vers votre position GPS." },
+  { categorie: "Peche", ordre: 5, question: "Comment utiliser l'IA 'Jour Similaire' ?", reponse: "Enregistrez un spot après une belle prise. Plus tard, cliquez sur 'Jour Similaire' : l'IA cherchera dans les 14 prochains jours la date où la marée et la lune sont identiques à ce succès passé." },
+  { categorie: "Peche", ordre: 6, question: "Les marées sont-elles précises pour tout le territoire ?", reponse: "L'app utilise les 7 stations de référence du SHOM en NC. Les horaires sont ajustés selon la commune sélectionnée pour une précision maximale dans le lagon." },
+  { categorie: "Chasse", ordre: 7, question: "Pourquoi le vent est-il crucial pour la chasse ?", reponse: "Le cerf a l'odorat très sensible. L'app vous montre la provenance du vent pour vous aider à approcher 'à bon vent' (vent dans votre visage) sans être détecté." },
+  { categorie: "Chasse", ordre: 8, question: "Comment inviter des amis dans une session ?", reponse: "Créez une session de groupe, notez le code (ex: CH-1234) et donnez-le à vos partenaires. Ils pourront alors rejoindre la carte tactique commune." },
+  { categorie: "Champs", ordre: 9, question: "Comment est calculé l'arrosage au jet (en secondes) ?", reponse: "L'IA estime le besoin en eau en Litres selon la plante et la météo locale, puis convertit ce volume en secondes basé sur un débit standard de jet d'eau (12L/min)." },
+  { categorie: "Champs", ordre: 10, question: "C'est quoi un 'Jour Fruits' ou 'Jour Racines' ?", reponse: "C'est l'influence du zodiaque sur la plante. On sème les tomates en jour Fruits et les carottes en jour Racines pour optimiser la vigueur et le rendement naturellement." },
+  { categorie: "Compte", ordre: 11, question: "Puis-je utiliser l'app sur plusieurs téléphones ?", reponse: "Oui, connectez-vous simplement avec le même email. Vos spots, votre inventaire jardin et vos réglages sont synchronisés via votre compte Cloud." },
+  { categorie: "Compte", ordre: 12, question: "Qu'est-ce que le mode 'Limité' ?", reponse: "Si votre abonnement n'est pas actif, vous disposez d'une minute d'accès par jour pour des consultations rapides. L'abonnement Premium débloque l'accès illimité." }
+];
+
 export default function AdminPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
@@ -46,16 +61,7 @@ export default function AdminPage() {
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState('overview');
-  
-  const [tokenDuration, setTokenDuration] = useState('1');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedToken, setGeneratedToken] = useState<string | null>(null);
-  const [splashMode, setSplashMode] = useState<'text' | 'image'>('text');
-  const [splashText, setSplashText] = useState('Lagon & Brousse NC');
-  const [splashBgColor, setSplashBgColor] = useState('#3b82f6');
-  const [splashDuration, setSplashDuration] = useState(3);
-  const [isSavingSplash, setIsSavingSplash] = useState(false);
-  const [isPreviewing, setIsPreviewing] = useState(false);
 
   // FAQ States
   const [isFaqDialogOpen, setIsFaqDialogOpen] = useState(false);
@@ -108,6 +114,29 @@ export default function AdminPage() {
     }
   };
 
+  const handleSeedFaq = async () => {
+    if (!firestore || !isAdmin) return;
+    if (faqs && faqs.length > 0) {
+        toast({ variant: 'destructive', title: "Action annulée", description: "La FAQ n'est pas vide." });
+        return;
+    }
+    setIsGenerating(true);
+    try {
+        const batch = writeBatch(firestore);
+        INITIAL_FAQ_DATA.forEach(item => {
+            const id = Math.random().toString(36).substring(7);
+            const ref = doc(firestore, 'cms_support', 'faq', 'items', id);
+            batch.set(ref, { ...item, id });
+        });
+        await batch.commit();
+        toast({ title: "FAQ peuplée avec succès !" });
+    } catch (e) {
+        toast({ variant: 'destructive', title: "Erreur" });
+    } finally {
+        setIsGenerating(false);
+    }
+  };
+
   const handleDeleteFaq = async (id: string) => {
     if (!firestore || !isAdmin) return;
     await deleteDoc(doc(firestore, 'cms_support', 'faq', 'items', id));
@@ -139,39 +168,46 @@ export default function AdminPage() {
   if (isUserLoading || !isAdmin) return <div className="p-8"><Skeleton className="h-48 w-full" /></div>;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-20">
-      {isPreviewing && <SplashScreen settings={{ splashMode, splashText, splashBgColor, splashDuration }} isExiting={false} />}
-
+    <div className="max-w-4xl mx-auto space-y-6 pb-20 px-1">
       <Card className="border-2 shadow-sm">
         <CardHeader><CardTitle className="font-black uppercase tracking-tighter">Tableau de Bord Admin</CardTitle></CardHeader>
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-4 sm:grid-cols-8 mb-6 h-auto p-1 bg-muted/50 border rounded-xl">
-          <TabsTrigger value="overview">Stats</TabsTrigger>
-          <TabsTrigger value="faq">FAQ</TabsTrigger>
-          <TabsTrigger value="tickets">Tickets</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="design">Design</TabsTrigger>
-          <TabsTrigger value="fish">Fish</TabsTrigger>
-          <TabsTrigger value="sounds">Sons</TabsTrigger>
-          <TabsTrigger value="access">Accès</TabsTrigger>
+          <TabsTrigger value="overview" className="text-[10px] font-black uppercase">Stats</TabsTrigger>
+          <TabsTrigger value="faq" className="text-[10px] font-black uppercase">FAQ</TabsTrigger>
+          <TabsTrigger value="tickets" className="text-[10px] font-black uppercase">Tickets</TabsTrigger>
+          <TabsTrigger value="users" className="text-[10px] font-black uppercase">Users</TabsTrigger>
+          <TabsTrigger value="design" className="text-[10px] font-black uppercase">Design</TabsTrigger>
+          <TabsTrigger value="fish" className="text-[10px] font-black uppercase">Fish</TabsTrigger>
+          <TabsTrigger value="sounds" className="text-[10px] font-black uppercase">Sons</TabsTrigger>
+          <TabsTrigger value="access" className="text-[10px] font-black uppercase">Accès</TabsTrigger>
         </TabsList>
 
         <TabsContent value="faq" className="space-y-6">
+          <div className="flex gap-2 mb-4">
+            <Button className="flex-1 h-12 font-black uppercase text-[10px] tracking-widest gap-2" onClick={() => { setCurrentFaq({ categorie: 'General', ordre: 0 }); setIsFaqDialogOpen(true); }}>
+                <Plus className="size-4" /> Ajouter Manuellement
+            </Button>
+            <Button variant="outline" className="flex-1 h-12 font-black uppercase text-[10px] tracking-widest gap-2 border-primary/20 bg-primary/5" onClick={handleSeedFaq} disabled={isGenerating || (faqs && faqs.length > 0)}>
+                {isGenerating ? <RefreshCw className="size-4 animate-spin" /> : <DatabaseZap className="size-4 text-primary" />}
+                Peupler FAQ (Auto)
+            </Button>
+          </div>
+
           <Card className="border-2">
             <CardHeader className="flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2 font-black uppercase text-sm"><HelpCircle className="size-4" /> FAQ Dynamique</CardTitle>
-              <Button size="sm" onClick={() => { setCurrentFaq({ categorie: 'General', ordre: 0 }); setIsFaqDialogOpen(true); }} className="text-[10px] uppercase font-black"><Plus className="size-3 mr-1" /> Ajouter</Button>
+              <CardTitle className="flex items-center gap-2 font-black uppercase text-sm"><HelpCircle className="size-4" /> Base de connaissances ({faqs?.length || 0})</CardTitle>
             </CardHeader>
             <CardContent className="p-0 border-t">
               <Table>
-                <TableHeader><TableRow><TableHead>Question</TableHead><TableHead>Catégorie</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead className="text-[10px] font-black uppercase">Question</TableHead><TableHead className="text-[10px] font-black uppercase">Catégorie</TableHead><TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {faqs?.map(f => (
                     <TableRow key={f.id}>
-                      <TableCell className="font-bold text-xs">{f.question}</TableCell>
-                      <TableCell><Badge variant="outline" className="text-[8px] uppercase">{f.categorie}</Badge></TableCell>
+                      <TableCell className="font-bold text-xs max-w-[200px] truncate">{f.question}</TableCell>
+                      <TableCell><Badge variant="outline" className="text-[8px] uppercase font-black">{f.categorie}</Badge></TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           <Button variant="ghost" size="icon" className="size-8" onClick={() => { setCurrentFaq(f); setIsFaqDialogOpen(true); }}><Pencil className="size-3" /></Button>
@@ -180,6 +216,9 @@ export default function AdminPage() {
                       </TableCell>
                     </TableRow>
                   ))}
+                  {faqs?.length === 0 && (
+                      <TableRow><TableCell colSpan={3} className="text-center py-10 italic text-muted-foreground">Aucune entrée. Utilisez le bouton "Peupler FAQ" pour démarrer.</TableCell></TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -191,15 +230,15 @@ export default function AdminPage() {
             <CardHeader><CardTitle className="flex items-center gap-2 font-black uppercase text-sm"><MessageSquare className="size-4" /> Tickets Support</CardTitle></CardHeader>
             <CardContent className="p-0 border-t">
               <Table>
-                <TableHeader><TableRow><TableHead>Utilisateur</TableHead><TableHead>Sujet</TableHead><TableHead>Statut</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead className="text-[10px] font-black uppercase">Utilisateur</TableHead><TableHead className="text-[10px] font-black uppercase">Sujet</TableHead><TableHead className="text-[10px] font-black uppercase">Statut</TableHead><TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {tickets?.map(t => (
                     <TableRow key={t.id} className={cn(t.statut === 'ouvert' && "bg-primary/5")}>
                       <TableCell className="text-[10px] font-bold">{t.userEmail}</TableCell>
                       <TableCell className="text-[10px] font-black uppercase">{t.sujet}</TableCell>
-                      <TableCell><Badge variant={t.statut === 'ouvert' ? 'default' : 'secondary'} className="text-[8px] uppercase">{t.statut}</Badge></TableCell>
+                      <TableCell><Badge variant={t.statut === 'ouvert' ? 'default' : 'secondary'} className="text-[8px] uppercase font-black">{t.statut}</Badge></TableCell>
                       <TableCell className="text-right">
-                        <Button variant="outline" size="sm" className="h-8 text-[9px] uppercase font-black" onClick={() => { setCurrentTicket(t); setAdminResponse(t.adminResponse || ''); }}>Répondre</Button>
+                        <Button variant="outline" size="sm" className="h-8 text-[9px] font-black uppercase" onClick={() => { setCurrentTicket(t); setAdminResponse(t.adminResponse || ''); }}>Répondre</Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -223,7 +262,7 @@ export default function AdminPage() {
           <DialogHeader><DialogTitle className="font-black uppercase">Éditer FAQ</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-1"><Label className="text-xs uppercase font-bold opacity-60">Question</Label><Input value={currentFaq.question || ''} onChange={e => setCurrentFaq({...currentFaq, question: e.target.value})} /></div>
-            <div className="space-y-1"><Label className="text-xs uppercase font-bold opacity-60">Réponse</Label><Textarea value={currentFaq.reponse || ''} onChange={e => setCurrentFaq({...currentFaq, reponse: e.target.value})} /></div>
+            <div className="space-y-1"><Label className="text-xs uppercase font-bold opacity-60">Réponse</Label><Textarea value={currentFaq.reponse || ''} onChange={e => setCurrentFaq({...currentFaq, reponse: e.target.value})} className="min-h-[120px]" /></div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label className="text-xs uppercase font-bold opacity-60">Catégorie</Label>
@@ -235,7 +274,7 @@ export default function AdminPage() {
               <div className="space-y-1"><Label className="text-xs uppercase font-bold opacity-60">Ordre</Label><Input type="number" value={currentFaq.ordre || 0} onChange={e => setCurrentFaq({...currentFaq, ordre: parseInt(e.target.value)})} /></div>
             </div>
           </div>
-          <DialogFooter><Button onClick={handleSaveFaq} disabled={isSavingFaq} className="w-full h-12 font-black uppercase">Sauvegarder</Button></DialogFooter>
+          <DialogFooter><Button onClick={handleSaveFaq} disabled={isSavingFaq} className="w-full h-12 font-black uppercase shadow-lg">Sauvegarder</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -255,7 +294,7 @@ export default function AdminPage() {
               </div>
             </div>
           )}
-          <DialogFooter><Button onClick={handleRespondToTicket} disabled={isResponding} className="w-full h-12 font-black uppercase">Envoyer & Fermer le ticket</Button></DialogFooter>
+          <DialogFooter><Button onClick={handleRespondToTicket} disabled={isResponding} className="w-full h-12 font-black uppercase shadow-lg bg-accent hover:bg-accent/90">Envoyer & Fermer le ticket</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
