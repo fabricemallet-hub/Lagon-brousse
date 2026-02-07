@@ -21,7 +21,9 @@ import {
   Sparkles,
   Sun,
   ShieldAlert,
-  ExternalLink
+  ExternalLink,
+  BrainCircuit,
+  Megaphone
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -123,6 +125,27 @@ const sectionContent: Record<string, {
       "Le mode satellite de la carte est idéal pour repérer les patates de corail.",
       "L'IA ignore météo et vent pour se concentrer sur les cycles immuables de la lune et des marées.",
       "SÉCURITÉ : Consultez toujours le guide de la CPS pour limiter les risques de ciguatera."
+    ],
+    links: [
+      { label: "lien vers guide_pratique_ciguatera", url: CIGUATERA_GUIDE_URL }
+    ]
+  },
+  'fish': {
+    title: 'Guide des Poissons & Gratte',
+    icon: BrainCircuit,
+    color: 'bg-cyan-600',
+    role: "Un répertoire intelligent des espèces de Nouvelle-Calédonie incluant un système de calcul de risque collaboratif pour la ciguatera (gratte).",
+    steps: [
+      "Identification IA : Prenez une photo de votre prise pour identifier instantanément l'espèce et son risque théorique.",
+      "Risque Collaboratif : Visualisez le score final pondéré (Moyenne entre les données scientifiques et les retours des pêcheurs locaux).",
+      "Filtrage par Commune : L'indice de risque s'adapte automatiquement à votre position actuelle pour une précision maximale.",
+      "Signalement Citoyen : Contribuez à la sécurité de la communauté en signalant un cas de gratte via le bouton dédié.",
+      "Fiches Techniques : Accédez aux noms scientifiques, conseils de pêche et astuces culinaires pour chaque poisson."
+    ],
+    tips: [
+      "Plus le nombre de 'retours citoyens' est élevé sur un poisson dans votre commune, plus l'indice de risque affiché est fiable.",
+      "L'indice de confiance (Vert, Orange, Rouge) vous aide à décider rapidement si la consommation d'un gros spécimen est prudente.",
+      "Consultez systématiquement le guide pratique ciguatera via le lien présent dans chaque fiche pour parfaire vos connaissances."
     ],
     links: [
       { label: "lien vers guide_pratique_ciguatera", url: CIGUATERA_GUIDE_URL }
@@ -302,7 +325,7 @@ export default function AideSectionPage() {
             {/* Astuces */}
             <div className="bg-muted/50 p-5 rounded-2xl border-2 border-dashed border-muted-foreground/20 space-y-3">
               <h3 className="font-bold flex items-center gap-2 text-accent">
-                <Lightbulb className="size-5" /> Astuces & Conseils
+                <Lightbulb className="size-5" /> Astuces &amp; Conseils
               </h3>
               <ul className="space-y-2">
                 {content.tips.map((tip, index) => (

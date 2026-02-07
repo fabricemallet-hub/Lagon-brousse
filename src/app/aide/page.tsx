@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -18,7 +17,8 @@ import {
   ChevronRight,
   Sun,
   HelpCircle,
-  LifeBuoy
+  LifeBuoy,
+  BrainCircuit
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -30,6 +30,7 @@ const helpSections = [
   { id: 'meteo', title: 'Météo Live', desc: 'Stations en direct et prévisions J+7.', icon: Sun, color: 'bg-yellow-500' },
   { id: 'vessel-tracker', title: 'Boat Tracker', desc: 'Sécurité et partage GPS.', icon: Navigation, color: 'bg-blue-600' },
   { id: 'peche', title: 'Pêche', desc: 'Indices et carnet de prises.', icon: Fish, color: 'bg-indigo-500' },
+  { id: 'fish', title: 'Guide Poissons', desc: 'Expertise Gratte & Communauté.', icon: BrainCircuit, color: 'bg-cyan-600' },
   { id: 'chasse', title: 'Chasse', desc: 'Cerf, vent et balistique.', icon: Crosshair, color: 'bg-orange-600' },
   { id: 'champs', title: 'Champs', desc: 'Jardiner avec la lune.', icon: Leaf, color: 'bg-green-600' },
   { id: 'semis', title: 'Guide Culture', desc: 'Planification par IA.', icon: Sprout, color: 'bg-emerald-500' },
@@ -56,7 +57,7 @@ export default function AidePage() {
         <Button asChild variant="outline" className="h-24 flex-col border-2 border-primary/20 bg-primary/5 hover:bg-primary/10 transition-all active:scale-95 gap-2">
           <Link href="/aide/faq">
             <HelpCircle className="size-6 text-primary" />
-            <span className="text-[10px] font-black uppercase tracking-widest">FAQ & Aide</span>
+            <span className="text-[10px] font-black uppercase tracking-widest">FAQ &amp; Aide</span>
           </Link>
         </Button>
         <Button asChild variant="outline" className="h-24 flex-col border-2 border-accent/20 bg-accent/5 hover:bg-accent/10 transition-all active:scale-95 gap-2">
