@@ -19,14 +19,11 @@ import {
   BrainCircuit, 
   X, 
   ExternalLink, 
-  MessageSquare, 
-  ThumbsUp, 
   ThumbsDown, 
   Megaphone, 
   Info, 
   RefreshCw,
   Save,
-  Navigation,
   LocateFixed,
   Ruler
 } from 'lucide-react';
@@ -37,7 +34,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
-import { collection, orderBy, query, doc, setDoc, serverTimestamp, increment, getDoc } from 'firebase/firestore';
+import { collection, orderBy, query, doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLocation } from '@/context/location-context';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -402,12 +399,18 @@ function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo,
                   <p className="text-[10px] font-black uppercase tracking-widest text-center opacity-40">Analyse par taille & longueur</p>
                   <div className="grid grid-cols-3 gap-2">
                     {risksBySize.map((risk) => (
-                      <div key={risk.label} className="flex flex-col items-center gap-1.5 p-2 bg-muted/30 rounded-xl border">
-                        <span className="text-[8px] font-black uppercase opacity-60 leading-none">{risk.label}</span>
-                        {risk.length && <span className="text-[7px] font-bold text-primary uppercase">{risk.length}</span>}
-                        <div className="flex flex-col items-center">
+                      <div key={risk.label} className="flex flex-col items-center gap-1 p-2 bg-muted/30 rounded-xl border min-h-[85px] justify-between">
+                        <div className="text-center w-full">
+                          <span className="text-[9px] font-black uppercase opacity-60 leading-none block">{risk.label}</span>
+                          {risk.length ? (
+                            <span className="text-[8px] font-bold text-primary uppercase block mt-1">{risk.length}</span>
+                          ) : (
+                            <span className="text-[8px] font-bold text-muted-foreground/40 uppercase block mt-1">N/A cm</span>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-center gap-0.5">
                           <span className={cn("text-xs font-black", risk.final > 30 ? "text-red-600" : "text-green-600")}>{risk.final}%</span>
-                          <span className="text-[7px] font-bold text-muted-foreground">Scien: {risk.admin}%</span>
+                          <span className="text-[7px] font-bold text-muted-foreground uppercase opacity-60">Scien: {risk.admin}%</span>
                         </div>
                       </div>
                     ))}
