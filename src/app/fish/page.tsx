@@ -123,8 +123,8 @@ export default function FishPage() {
       const currentStats = statsSnap.exists() ? statsSnap.data() as FishCommuneStats : { somme_des_notes: 0, nombre_de_votants: 0 };
       
       // Mise à jour globale
-      const newVoterCount = currentStats.nombre_de_votants + 1;
-      const newTotalScore = currentStats.somme_des_notes + userRiskValue;
+      const newVoterCount = (currentStats.nombre_de_votants || 0) + 1;
+      const newTotalScore = (currentStats.somme_des_notes || 0) + userRiskValue;
       const newAverage = parseFloat((newTotalScore / newVoterCount).toFixed(1));
 
       // Mise à jour spécifique par taille
@@ -405,7 +405,7 @@ function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo,
                           {risk.length ? (
                             <span className="text-[8px] font-bold text-primary uppercase block mt-1">{risk.length}</span>
                           ) : (
-                            <span className="text-[8px] font-bold text-muted-foreground/40 uppercase block mt-1">N/A cm</span>
+                            <span className="text-[8px] font-bold text-muted-foreground/40 uppercase block mt-1">Non précisé</span>
                           )}
                         </div>
                         <div className="flex flex-col items-center gap-0.5">
