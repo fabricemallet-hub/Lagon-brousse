@@ -784,7 +784,7 @@ export default function AdminPage() {
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           <Button variant="ghost" size="icon" className="size-8" onClick={() => { setCurrentFaq(f); setIsFaqDialogOpen(true); }}><Pencil className="size-3" /></Button>
-                          <Button variant="ghost" size="icon" className="size-8" onClick={() => handleDeleteFaq(id)}><Trash2 className="size-3 text-destructive" /></Button>
+                          <Button variant="ghost" size="icon" className="size-8" onClick={() => handleDeleteFaq(f.id)}><Trash2 className="size-3 text-destructive" /></Button>
                         </div>
                       </TableCell>
                     </TableRow>
