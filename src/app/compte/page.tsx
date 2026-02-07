@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, isBefore, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Crown, Star, XCircle, KeyRound, Ticket, Gift, LogOut, Mail, Calendar, User, Bell, BellOff } from 'lucide-react';
+import { Crown, Star, XCircle, KeyRound, Ticket, Gift, LogOut, Mail, Calendar, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,14 @@ import { useAuth } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { PushNotificationManager } from '@/components/push-notification-manager';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 
 export default function ComptePage() {
   const { user, isUserLoading } = useUser();
@@ -55,13 +63,21 @@ export default function ComptePage() {
     else toast({ variant: "destructive", title: "Erreur", description: "Lien non configuré." });
   };
 
-  const handleDonate = () => {
+  const handlePaypalDonate = () => {
     const donationLink = process.env.NEXT_PUBLIC_DONATION_LINK;
     if (donationLink) {
       window.open(donationLink, '_blank');
     } else {
       window.open("https://www.paypal.com/donate", '_blank');
     }
+  };
+
+  const handleDownloadRib = () => {
+    window.open('/RIB_Lagon_Brousse_NC.pdf', '_blank');
+    toast({
+      title: "RIB ouvert",
+      description: "Vous pouvez désormais effectuer votre virement."
+    });
   };
 
   const handleRedeemToken = async () => {
@@ -160,12 +176,48 @@ export default function ComptePage() {
                 </Button>
               )}
               
-              <Button 
-                onClick={handleDonate} 
-                className="w-full h-14 text-base font-black uppercase tracking-widest shadow-lg bg-accent hover:bg-accent/90"
-              >
-                DONS
-              </Button>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button 
+                    className="w-full h-14 text-base font-black uppercase tracking-widest shadow-lg bg-accent hover:bg-accent/90"
+                  >
+                    DONS
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-xs rounded-2xl">
+                  <DialogHeader>
+                    <DialogTitle className="font-black uppercase tracking-tighter text-center">Soutenir le projet</DialogTitle>
+                    <DialogDescription className="text-center text-[10px] uppercase font-bold">Votre aide est précieuse</DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <Button 
+                      variant="outline" 
+                      className="h-16 flex flex-col items-center justify-center gap-1 border-2 hover:bg-primary/5"
+                      onClick={handleDownloadRib}
+                    >
+                      <div className="flex items-center gap-2 text-xs font-black uppercase">
+                        <Landmark className="size-4 text-primary" /> Virement Bancaire
+                      </div>
+                      <span className="text-[8px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                        <Download className="size-2" /> Télécharger mon RIB
+                      </span>
+                    </Button>
+
+                    <Button 
+                      variant="outline" 
+                      className="h-16 flex flex-col items-center justify-center gap-1 border-2 hover:bg-accent/5"
+                      onClick={handlePaypalDonate}
+                    >
+                      <div className="flex items-center gap-2 text-xs font-black uppercase">
+                        <CreditCard className="size-4 text-accent" /> PayPal
+                      </div>
+                      <span className="text-[8px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                        <ExternalLink className="size-2" /> Montant libre
+                      </span>
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
 
               <Button variant="outline" onClick={handleLogout} className="w-full h-12 font-black uppercase text-xs tracking-widest border-2">
                 <LogOut className="mr-2 size-4" /> Déconnexion

@@ -4,6 +4,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Landmark, CreditCard, Download, ExternalLink } from 'lucide-react';
 
 export default function LoginPage() {
   const { toast } = useToast();
@@ -21,14 +30,22 @@ export default function LoginPage() {
     }
   };
 
-  const handleDonate = () => {
+  const handlePaypalDonate = () => {
     const donationLink = process.env.NEXT_PUBLIC_DONATION_LINK;
     if (donationLink) {
       window.open(donationLink, '_blank');
     } else {
-      // Lien par défaut vers PayPal Donate si non configuré
       window.open("https://www.paypal.com/donate", '_blank');
     }
+  };
+
+  const handleDownloadRib = () => {
+    // Lien vers le RIB (à placer dans public/ ou via une URL de stockage)
+    window.open('/RIB_Lagon_Brousse_NC.pdf', '_blank');
+    toast({
+      title: "Téléchargement lancé",
+      description: "Le RIB de Lagon & Brousse est en cours d'ouverture."
+    });
   };
 
   return (
@@ -68,13 +85,50 @@ export default function LoginPage() {
               >
                 S'abonner (4.19€ / mois)
               </Button>
-              <Button 
-                variant="default" 
-                className="w-full h-14 font-black uppercase tracking-widest shadow-lg text-sm bg-accent hover:bg-accent/90 transition-all active:scale-[0.98]"
-                onClick={handleDonate}
-              >
-                DONS
-              </Button>
+              
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button 
+                    variant="default" 
+                    className="w-full h-14 font-black uppercase tracking-widest shadow-lg text-sm bg-accent hover:bg-accent/90 transition-all active:scale-[0.98]"
+                  >
+                    DONS
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-xs rounded-2xl">
+                  <DialogHeader>
+                    <DialogTitle className="font-black uppercase tracking-tighter text-center">Soutenir le projet</DialogTitle>
+                    <DialogDescription className="text-center text-[10px] uppercase font-bold">Choisissez votre mode de contribution</DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <Button 
+                      variant="outline" 
+                      className="h-16 flex flex-col items-center justify-center gap-1 border-2 hover:bg-primary/5"
+                      onClick={handleDownloadRib}
+                    >
+                      <div className="flex items-center gap-2 text-xs font-black uppercase">
+                        <Landmark className="size-4 text-primary" /> Virement Bancaire
+                      </div>
+                      <span className="text-[8px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                        <Download className="size-2" /> Télécharger mon RIB
+                      </span>
+                    </Button>
+
+                    <Button 
+                      variant="outline" 
+                      className="h-16 flex flex-col items-center justify-center gap-1 border-2 hover:bg-accent/5"
+                      onClick={handlePaypalDonate}
+                    >
+                      <div className="flex items-center gap-2 text-xs font-black uppercase">
+                        <CreditCard className="size-4 text-accent" /> PayPal
+                      </div>
+                      <span className="text-[8px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                        <ExternalLink className="size-2" /> Montant libre
+                      </span>
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </CardContent>
