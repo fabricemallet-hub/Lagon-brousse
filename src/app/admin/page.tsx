@@ -23,7 +23,7 @@ import {
   FileText,
   Gavel,
   Calendar,
-  Image as ImageIcon,
+  ImageIcon,
   Clock,
   Type,
   ExternalLink,
@@ -87,7 +87,7 @@ export default function AdminPage() {
   const [isFishDialogOpen, setIsFishDialogOpen] = useState(false);
   const [currentFish, setCurrentFish] = useState<Partial<FishSpeciesInfo>>({});
   const [isSavingFish, setIsSavingFish] = useState(false);
-  const [isAIGeneratingFish, setIsAiGeneratingFish] = useState(false);
+  const [isAIGeneratingFish, setIsAIGeneratingFish] = useState(false);
   const [isReadjustingRisks, setIsReadjustingRisks] = useState(false);
   const fishFileInputRef = useRef<HTMLInputElement>(null);
 
