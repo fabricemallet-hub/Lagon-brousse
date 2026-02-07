@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -208,7 +209,7 @@ export default function VesselTrackerPage() {
       
       if (userProfile.lastVesselId && !customSharingId) setCustomSharingId(userProfile.lastVesselId);
     }
-  }, [userProfile, user, vesselNickname, customSharingId]);
+  }, [userProfile, user]);
 
   useEffect(() => {
     if (!user || !firestore || !vesselNickname) return;
@@ -719,6 +720,7 @@ export default function VesselTrackerPage() {
                       </div>
                     </div>
 
+                    {/* VEILLE STRATÉGIQUE REGAVAMPED */}
                     <div className="space-y-4 p-4 border-2 rounded-2xl bg-orange-50/30 border-orange-100 shadow-inner">
                       <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
@@ -748,6 +750,7 @@ export default function VesselTrackerPage() {
                       </div>
                     </div>
 
+                    {/* SEUIL BATTERIE REVAMPED */}
                     <div className="space-y-4 p-4 border-2 rounded-2xl bg-red-50/30 border-red-100 shadow-inner">
                       <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
