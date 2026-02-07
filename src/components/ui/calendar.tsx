@@ -41,11 +41,11 @@ function Calendar({
           nav_button_previous: "absolute left-1",
           nav_button_next: "absolute right-1",
           table: "w-full border-collapse",
-          head_row: "flex w-full mb-4",
+          head_row: "flex w-full mb-2 justify-between",
           head_cell:
-            "text-muted-foreground font-black text-[10px] uppercase tracking-[0.2em] text-center flex-1 h-9 flex items-center justify-center opacity-40",
-          row: "flex w-full mt-2",
-          cell: "h-12 flex-1 text-center text-sm p-0 relative flex items-center justify-center focus-within:relative focus-within:z-20",
+            "text-muted-foreground font-black text-[10px] uppercase tracking-tight text-center w-11 h-9 flex items-center justify-center opacity-60 [&:nth-child(6)]:text-primary/80 [&:nth-child(7)]:text-primary/80",
+          row: "flex w-full mt-2 justify-between",
+          cell: "h-12 w-11 text-center text-sm p-0 relative flex items-center justify-center focus-within:relative focus-within:z-20",
           day: cn(
             buttonVariants({ variant: "ghost" }),
             "h-11 w-11 p-0 font-bold aria-selected:opacity-100 hover:bg-primary/10 hover:text-primary rounded-2xl transition-all active:scale-90"
