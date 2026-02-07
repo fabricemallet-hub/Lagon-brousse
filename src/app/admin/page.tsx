@@ -18,7 +18,8 @@ import {
   Eye, Music, Volume2, Play, Download, HelpCircle, MessageSquare, Check, X, RefreshCw,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Filter
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -53,6 +54,7 @@ export default function AdminPage() {
   const [currentFaq, setCurrentFaq] = useState<Partial<FaqEntry>>({});
   const [isSavingFaq, setIsSavingFaq] = useState(false);
   const [faqSort, setFaqSort] = useState<SortConfig>({ field: null, direction: 'asc' });
+  const [faqCategoryFilter, setFaqCategoryFilter] = useState<string>('all');
 
   // Tickets States
   const [currentTicket, setCurrentTicket] = useState<SupportTicket | null>(null);
@@ -78,9 +80,17 @@ export default function AdminPage() {
 
   const sortedFaqs = useMemo(() => {
     if (!rawFaqs) return [];
-    if (!faqSort.field) return rawFaqs;
+    
+    // 1. Filtrage par catégorie
+    let filtered = [...rawFaqs];
+    if (faqCategoryFilter !== 'all') {
+      filtered = filtered.filter(f => f.categorie === faqCategoryFilter);
+    }
 
-    return [...rawFaqs].sort((a, b) => {
+    // 2. Tri
+    if (!faqSort.field) return filtered;
+
+    return filtered.sort((a, b) => {
       const field = faqSort.field!;
       const valA = a[field] ?? '';
       const valB = b[field] ?? '';
@@ -89,7 +99,7 @@ export default function AdminPage() {
       if (valA > valB) return faqSort.direction === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [rawFaqs, faqSort]);
+  }, [rawFaqs, faqSort, faqCategoryFilter]);
 
   const handleSort = (field: keyof FaqEntry) => {
     setFaqSort(prev => ({
@@ -246,8 +256,24 @@ export default function AdminPage() {
           </div>
 
           <Card className="border-2">
-            <CardHeader className="flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2 font-black uppercase text-sm"><HelpCircle className="size-4" /> Base de connaissances ({rawFaqs?.length || 0})</CardTitle>
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <CardTitle className="flex items-center gap-2 font-black uppercase text-sm">
+                <HelpCircle className="size-4" /> Base de connaissances ({sortedFaqs.length})
+              </CardTitle>
+              <div className="flex items-center gap-2 min-w-[200px]">
+                <Filter className="size-3 text-muted-foreground" />
+                <Select value={faqCategoryFilter} onValueChange={setFaqCategoryFilter}>
+                  <SelectTrigger className="h-9 text-[10px] font-black uppercase bg-muted/30 border-2">
+                    <SelectValue placeholder="Catégorie..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-[10px] font-black uppercase">Toutes les catégories</SelectItem>
+                    {FAQ_CATEGORIES.map(cat => (
+                      <SelectItem key={cat} value={cat} className="text-[10px] font-black uppercase">{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent className="p-0 border-t">
               <Table>
@@ -288,8 +314,8 @@ export default function AdminPage() {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {rawFaqs?.length === 0 && (
-                      <TableRow><TableCell colSpan={4} className="text-center py-10 italic text-muted-foreground">Aucune entrée. Utilisez le bouton "Peupler FAQ" pour démarrer.</TableCell></TableRow>
+                  {sortedFaqs.length === 0 && (
+                      <TableRow><TableCell colSpan={4} className="text-center py-10 italic text-muted-foreground">Aucune entrée trouvée. Essayez de vider les filtres.</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
