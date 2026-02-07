@@ -172,7 +172,7 @@ export default function FishPage() {
           disabled={isIdentifying}
         >
           {isIdentifying ? <BrainCircuit className="size-6 animate-pulse" /> : <Camera className="size-6" />}
-          {isIdentifying ? "Analyse..." : "Prendre en Photo (IA)"}
+          {isIdentifying ? "Analyse..." : "Prendre en Photo (Gemini AI)"}
         </Button>
         <input type="file" accept="image/*" capture="environment" ref={fileInputRef} onChange={handleCapture} className="hidden" />
 
@@ -446,8 +446,8 @@ function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo,
                       Ce score a été ajusté par <strong>{stats?.nombre_de_votants || 0} pêcheur{ (stats?.nombre_de_votants || 0) > 1 ? 's' : ''}</strong> dans la commune de <strong>{selectedLocation}</strong>. Plus il y a de signalements par taille, plus la donnée est fiable.
                     </span>
                   </p>
-                  <p className="text-[9px] leading-relaxed font-medium text-muted-foreground italic flex items-start gap-2 pl-5">
-                    <span>Le taux <strong>SCIEN</strong> représente la donnée scientifique de référence.</span>
+                  <p className="text-[9px] leading-relaxed font-medium text-muted-foreground italic flex items-start gap-2 pl-5 border-t border-dashed pt-1.5 mt-1.5">
+                    <span>Le taux <strong>SCIEN</strong> représente la donnée scientifique de référence (Admin ou IA).</span>
                   </p>
                 </div>
 

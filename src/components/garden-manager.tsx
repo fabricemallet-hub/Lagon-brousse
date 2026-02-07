@@ -283,7 +283,7 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
           disabled={isIdentifying}
         >
           {isIdentifying ? <BrainCircuit className="size-6 animate-pulse" /> : <Camera className="size-6" />}
-          {isIdentifying ? "Analyse..." : "Scanner Plante (IA)"}
+          {isIdentifying ? "Analyse..." : "Scanner via Gemini AI"}
         </Button>
         <input type="file" accept="image/*" capture="environment" ref={fileInputRef} onChange={handleCapture} className="hidden" />
       </div>

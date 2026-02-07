@@ -277,7 +277,7 @@ export default function SemisPage() {
           disabled={isIdentifying}
         >
           {isIdentifying ? <BrainCircuit className="size-6 animate-pulse" /> : <Camera className="size-6" />}
-          {isIdentifying ? "Analyse..." : "Scanner Plante / Graine (IA)"}
+          {isIdentifying ? "Analyse..." : "Scanner via Gemini AI"}
         </Button>
         <input type="file" accept="image/*" capture="environment" ref={fileInputRef} onChange={handleCapture} className="hidden" />
       </div>
@@ -378,7 +378,7 @@ export default function SemisPage() {
                     <AdviceDetail icon={BookHeart} title="Astuce du guide" content={veg.advice.grandmaRecipe} />
                   </div>
                 </AccordionContent>
-              </AccordionItem>
+              </Accordion>
             ))}
           </Accordion>
         )}
