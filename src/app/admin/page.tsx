@@ -317,7 +317,7 @@ export default function AdminPage() {
   // --- HANDLERS FISH ---
   const handleAIGenerateFish = async () => {
     if (!currentFish.name) return;
-    setIsAiGeneratingFish(true);
+    setIsAIGeneratingFish(true);
     try {
       const info = await generateFishInfo({ name: currentFish.name });
       // On fusionne mais on garde l'image existante si présente
@@ -331,7 +331,7 @@ export default function AdminPage() {
     } catch (e) {
       toast({ variant: 'destructive', title: "Erreur IA" });
     } finally {
-      setIsAiGeneratingFish(false);
+      setIsAIGeneratingFish(false);
     }
   };
 
@@ -365,6 +365,16 @@ export default function AdminPage() {
       setIsFishDialogOpen(false);
     } finally {
       setIsSavingFish(false);
+    }
+  };
+
+  const handleDeleteFish = async (id: string) => {
+    if (!firestore || !isAdmin) return;
+    try {
+      await deleteDoc(doc(firestore, 'fish_species', id));
+      toast({ title: "Poisson supprimé" });
+    } catch (e) {
+      toast({ variant: 'destructive', title: "Erreur suppression" });
     }
   };
 
@@ -428,6 +438,16 @@ export default function AdminPage() {
       setIsSoundDialogOpen(false);
     } finally {
       setIsSavingSound(false);
+    }
+  };
+
+  const handleDeleteSound = async (id: string) => {
+    if (!firestore || !isAdmin) return;
+    try {
+      await deleteDoc(doc(firestore, 'sound_library', id));
+      toast({ title: "Son supprimé" });
+    } catch (e) {
+      toast({ variant: 'destructive', title: "Erreur suppression" });
     }
   };
 
@@ -594,7 +614,12 @@ export default function AdminPage() {
                             <Badge variant="outline" className="text-[7px] font-black px-1">{f.gratteRiskLarge || 0}%</Badge>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => { setCurrentFish(f); setIsFishDialogOpen(true); }}><Pencil className="size-3" /></Button></TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => { setCurrentFish(f); setIsFishDialogOpen(true); }}><Pencil className="size-3" /></Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteFish(f.id)}><Trash2 className="size-3 text-destructive" /></Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     )
                   })}
@@ -621,6 +646,7 @@ export default function AdminPage() {
                         <div className="flex justify-end gap-2">
                           <Button variant="ghost" size="icon" onClick={() => new Audio(s.url).play()}><Play className="size-3" /></Button>
                           <Button variant="ghost" size="icon" onClick={() => { setCurrentSound(s); setIsSoundDialogOpen(true); }}><Pencil className="size-3" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDeleteSound(s.id)}><Trash2 className="size-3 text-destructive" /></Button>
                         </div>
                       </TableCell>
                     </TableRow>
