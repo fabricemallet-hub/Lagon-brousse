@@ -28,7 +28,8 @@ import {
   Type,
   ExternalLink,
   ShieldCheck,
-  Ticket
+  Ticket,
+  Scale
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -40,7 +41,7 @@ import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { INITIAL_FAQ_DATA } from '@/lib/faq-data';
-import { format } from 'date-fns';
+import { format, isBefore } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
@@ -86,6 +87,7 @@ export default function AdminPage() {
   const [currentFish, setCurrentFish] = useState<Partial<FishSpeciesInfo>>({});
   const [isSavingFish, setIsSavingFish] = useState(false);
   const [isAIGeneratingFish, setIsAiGeneratingFish] = useState(false);
+  const [isReadjustingRisks, setIsReadjustingRisks] = useState(false);
 
   // Sound States
   const [isSoundDialogOpen, setIsSoundDialogOpen] = useState(false);
@@ -338,6 +340,50 @@ export default function AdminPage() {
     }
   };
 
+  const handleReadjustRisks = async () => {
+    if (!firestore || !isAdmin || !fishSpecies) return;
+    setIsReadjustingRisks(true);
+    try {
+      const batch = writeBatch(firestore);
+      let count = 0;
+
+      for (const fish of fishSpecies) {
+        // Query all commune stats for this fish
+        const statsRef = collection(firestore, 'fish_species', fish.id, 'commune_stats');
+        const statsSnap = await getDocs(statsRef);
+        
+        let totalNotes = 0;
+        let totalVotants = 0;
+
+        statsSnap.forEach(docSnap => {
+          const d = docSnap.data();
+          totalNotes += d.somme_des_notes || 0;
+          totalVotants += d.nombre_de_votants || 0;
+        });
+
+        if (totalVotants > 0) {
+          const globalAvg = parseFloat((totalNotes / totalVotants).toFixed(1));
+          batch.update(doc(firestore, 'fish_species', fish.id), {
+            gratteRisk: globalAvg
+          });
+          count++;
+        }
+      }
+
+      if (count > 0) {
+        await batch.commit();
+        toast({ title: "Risques réajustés !", description: `${count} espèces mises à jour sur la base des moyennes territoriales.` });
+      } else {
+        toast({ title: "Aucun réajustement", description: "Pas de notes utilisateurs trouvées pour les espèces listées." });
+      }
+    } catch (e) {
+      console.error(e);
+      toast({ variant: 'destructive', title: "Erreur de réajustement" });
+    } finally {
+      setIsReadjustingRisks(false);
+    }
+  };
+
   // --- HANDLERS SOUNDS ---
   const handleSaveSound = async () => {
     if (!firestore || !isAdmin || !currentSound.label || !currentSound.url) return;
@@ -358,7 +404,6 @@ export default function AdminPage() {
     setIsSavingSharedToken(true);
     try {
       const isActive = !sharedToken || !sharedToken.expiresAt || isBefore(new Date(), sharedToken.expiresAt.toDate());
-      const newExpiry = !isActive ? addDoc(collection(firestore, 'logs'), { action: 'global_access_on' }) : null; // Logic simplified for MVP
       const expiryDate = new Date();
       expiryDate.setFullYear(expiryDate.getFullYear() + 1);
       await setDoc(doc(firestore, 'shared_access_tokens', 'GLOBAL'), {
@@ -468,8 +513,19 @@ export default function AdminPage() {
         </TabsContent>
 
         <TabsContent value="fish" className="space-y-6">
-          <div className="flex justify-end mb-4">
-            <Button onClick={() => { setCurrentFish({}); setIsFishDialogOpen(true); }} className="font-black uppercase text-[10px] gap-2"><Plus className="size-4" /> Ajouter un Poisson</Button>
+          <div className="flex flex-col sm:flex-row justify-end mb-4 gap-2">
+            <Button 
+              variant="outline"
+              onClick={handleReadjustRisks} 
+              disabled={isReadjustingRisks || !fishSpecies || fishSpecies.length === 0}
+              className="font-black uppercase text-[10px] gap-2 border-primary/20 bg-primary/5"
+            >
+              {isReadjustingRisks ? <RefreshCw className="size-4 animate-spin" /> : <Scale className="size-4" />}
+              Réajuster via Moyennes NC
+            </Button>
+            <Button onClick={() => { setCurrentFish({}); setIsFishDialogOpen(true); }} className="font-black uppercase text-[10px] gap-2">
+              <Plus className="size-4" /> Ajouter un Poisson
+            </Button>
           </div>
           <Card className="border-2">
             <CardHeader><CardTitle className="text-sm font-black uppercase">Espèces Répertoriées ({fishSpecies?.length || 0})</CardTitle></CardHeader>
