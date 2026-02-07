@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useRef, useMemo } from 'react';
@@ -443,7 +442,7 @@ function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo,
                 <p className="text-[9px] leading-relaxed font-medium text-muted-foreground italic flex items-start gap-2">
                   <Megaphone className="size-3 shrink-0 mt-0.5 text-primary" />
                   <span>
-                    Ce score a été ajusté par <strong>{stats?.nombre_de_votants || 0} pêcheur{ (stats?.nombre_de_votants || 0) > 1 ? 's' : ''}</strong> dans la commune de <strong>{selectedLocation}</strong>. Plus il y a de signalements par taille, plus la donnée est fiable.
+                    Ce score a été ajusté par <strong>{stats?.nombre_de_votants || 0} pêcheur{ (stats?.nombre_de_votants || 0) > 1 ? 's' : ''}</strong> dans la commune de <strong>{selectedLocation}</strong>. Plus il y a de signalements par taille, plus la donnée est fiable. Le taux <strong>SCIEN</strong> représente la donnée scientifique de référence.
                   </span>
                 </p>
 
