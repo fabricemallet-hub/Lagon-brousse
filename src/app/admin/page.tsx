@@ -68,10 +68,13 @@ export default function AdminPage() {
   const [isResponding, setIsResponding] = useState(false);
 
   const isAdmin = useMemo(() => {
-    const email = user?.email?.toLowerCase();
+    if (!user) return false;
+    const email = user.email?.toLowerCase();
+    const uid = user.uid;
     return email === 'f.mallet81@outlook.com' || 
            email === 'f.mallet81@gmail.com' || 
-           email === 'fabrice.mallet@gmail.com';
+           email === 'fabrice.mallet@gmail.com' ||
+           uid === 'K9cVYLVUk1NV99YV3anebkugpPp1';
   }, [user]);
 
   // Queries

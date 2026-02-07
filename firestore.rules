@@ -4,34 +4,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- FONCTIONS DE BASE ---
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isAdmin() {
-      return isSignedIn() && 
-             (request.auth.token.email == 'f.mallet81@gmail.com' || 
-              request.auth.token.email == 'f.mallet81@outlook.com' ||
-              request.auth.token.email == 'fabrice.mallet@gmail.com');
-    }
-
-    // --- 1. CMS SUPPORT & FAQ ---
-    match /cms_support/faq/items/{id} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    match /cms_support/tickets/items/{id} {
-      allow create: if isSignedIn();
-      allow read: if isSignedIn() && (request.auth.uid == resource.data.userId || isAdmin());
-      allow update, delete: if isAdmin();
-    }
-
-    // --- 2. ACCÈS PUBLICS / GÉNÉRAUX ---
+    // --- 1. ACCÈS PUBLICS ---
+    
     match /app_settings/{id} {
       allow get, list: if true;
-      allow write: if isAdmin();
     }
 
     match /meteo_caledonie/{id} {
@@ -43,15 +19,43 @@ service cloud.firestore {
 
     match /fish_species/{id} {
       allow get, list: if true;
-      allow write: if isAdmin();
     }
     
     match /sound_library/{id} {
       allow get, list: if true;
-      allow write: if isAdmin();
+    }
+    
+    match /shared_access_tokens/{id} {
+      allow get, list: if true;
     }
 
-    // --- 3. UTILISATEURS & DONNÉES PERSO ---
+    // --- 2. FONCTIONS DE SÉCURITÉ ---
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && 
+             (request.auth.token.email == 'f.mallet81@gmail.com' || 
+              request.auth.token.email == 'f.mallet81@outlook.com' ||
+              request.auth.token.email == 'fabrice.mallet@gmail.com' ||
+              request.auth.uid == 'K9cVYLVUk1NV99YV3anebkugpPp1');
+    }
+
+    // --- 3. DROITS D'ÉCRITURE ADMIN ---
+
+    match /app_settings/{id} { allow write: if isAdmin(); }
+    match /meteo_caledonie/{id} { 
+      allow write: if isAdmin(); 
+      match /previsions/{prevId} { allow write: if isAdmin(); }
+    }
+    match /fish_species/{id} { allow write: if isAdmin(); }
+    match /sound_library/{id} { allow write: if isAdmin(); }
+    match /shared_access_tokens/{id} { allow write: if isAdmin(); }
+
+    // --- 4. COLLECTIONS PROTÉGÉES (UTILISATEURS) ---
+
     match /users/{userId} {
       allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       match /{allPaths=**} {
@@ -59,7 +63,19 @@ service cloud.firestore {
       }
     }
 
-    // --- 4. FONCTIONNALITÉS TEMPS RÉEL ---
+    // --- 5. FONCTIONNALITÉS APPLICATIVES ---
+
+    match /cms_support/faq/items/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /cms_support/tickets/items/{id} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow update, delete: if isAdmin();
+    }
+
     match /hunting_sessions/{id} {
       allow read, write: if isSignedIn();
       match /{allPaths=**} {
@@ -74,12 +90,19 @@ service cloud.firestore {
       }
     }
 
+    match /conversations/{id} {
+      allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin());
+      match /{allPaths=**} {
+        allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin());
+      }
+    }
+
     match /access_tokens/{id} {
       allow read, write: if isSignedIn() || isAdmin();
     }
 
-    match /shared_access_tokens/{id} {
-      allow get, list: if true;
+    match /stations/{document=**} {
+      allow read: if isSignedIn() || isAdmin();
       allow write: if isAdmin();
     }
   }

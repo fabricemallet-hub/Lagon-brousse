@@ -14,6 +14,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
 
   const userDocRef = doc(firestore, 'users', user.uid);
   const email = user.email?.toLowerCase() || '';
+  const uid = user.uid;
   
   // Comptes Administrateur Système
   const adminEmails = [
@@ -21,7 +22,11 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
     'f.mallet81@outlook.com', 
     'fabrice.mallet@gmail.com'
   ];
-  const isAdminUser = adminEmails.includes(email);
+  const adminUids = [
+    'K9cVYLVUk1NV99YV3anebkugpPp1'
+  ];
+  
+  const isAdminUser = adminEmails.includes(email) || adminUids.includes(uid);
 
   try {
     const docSnap = await getDoc(userDocRef);
