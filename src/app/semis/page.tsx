@@ -378,7 +378,7 @@ export default function SemisPage() {
                     <AdviceDetail icon={BookHeart} title="Astuce du guide" content={veg.advice.grandmaRecipe} />
                   </div>
                 </AccordionContent>
-              </Accordion>
+              </AccordionItem>
             ))}
           </Accordion>
         )}
@@ -394,7 +394,7 @@ export default function SemisPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={isPlanningOpen} onOpenChange={(open) => !open && setIsPlanningOpen(false)}>
+      <Dialog open={isPlanningOpen} onOpenChange={setIsPlanningOpen}>
         <DialogContent className="max-h-[95vh] flex flex-col p-0 overflow-hidden sm:max-w-lg rounded-2xl border-none">
           <DialogHeader className="p-6 pb-2 shrink-0 bg-slate-50 border-b">
             <DialogTitle className="flex items-center gap-2 font-black uppercase tracking-tighter">
@@ -412,9 +412,13 @@ export default function SemisPage() {
                   </div>
                   <Button onClick={handleStartAnalysis} className="w-full h-14 text-base font-black uppercase tracking-widest shadow-lg" disabled={isAnalyzing}>
                     {isAnalyzing ? (
-                      <><BrainCircuit className="mr-2 animate-pulse" /> Analyse en cours...</>
+                      <>
+                        <BrainCircuit className="mr-2 animate-pulse" /> Analyse en cours...
+                      </>
                     ) : (
-                      <><BrainCircuit className="mr-2" /> Calculer la fiche IA</>
+                      <>
+                        <BrainCircuit className="mr-2" /> Calculer la fiche IA
+                      </>
                     )}
                   </Button>
                 </div>
@@ -428,8 +432,14 @@ export default function SemisPage() {
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-white p-3 rounded-xl border-2"><p className="text-[8px] font-black uppercase opacity-40">Catégorie</p><Badge variant="outline" className="mt-1 font-black text-[10px]">{aiAdvice.plantType}</Badge></div>
-                    <div className="bg-white p-3 rounded-xl border-2"><p className="text-[8px] font-black uppercase opacity-40">Récolte prévue</p><p className="font-black text-xs mt-1 text-emerald-700">{aiAdvice.harvestDate}</p></div>
+                    <div className="bg-white p-3 rounded-xl border-2">
+                      <p className="text-[8px] font-black uppercase opacity-40">Catégorie</p>
+                      <Badge variant="outline" className="mt-1 font-black text-[10px]">{aiAdvice.plantType}</Badge>
+                    </div>
+                    <div className="bg-white p-3 rounded-xl border-2">
+                      <p className="text-[8px] font-black uppercase opacity-40">Récolte prévue</p>
+                      <p className="font-black text-xs mt-1 text-emerald-700">{aiAdvice.harvestDate}</p>
+                    </div>
                   </div>
                   <div className="bg-white p-4 rounded-2xl border-2 space-y-4 shadow-inner">
                     <AdviceDetail icon={Sun} title="Culture & Exposition" content={aiAdvice.cultureAdvice} />
@@ -442,7 +452,10 @@ export default function SemisPage() {
 
           <DialogFooter className="p-4 bg-white border-t shrink-0 flex flex-row gap-2">
             {aiAdvice ? (
-              <><Button variant="ghost" onClick={() => setAiAdvice(null)} className="flex-1 font-bold uppercase text-[10px] border-2">Modifier</Button><Button onClick={handleConfirmSowing} disabled={isSaving} className="flex-[2] font-black uppercase h-12 shadow-md">Enregistrer</Button></>
+              <>
+                <Button variant="ghost" onClick={() => setAiAdvice(null)} className="flex-1 font-bold uppercase text-[10px] border-2">Modifier</Button>
+                <Button onClick={handleConfirmSowing} disabled={isSaving} className="flex-[2] font-black uppercase h-12 shadow-md">Enregistrer</Button>
+              </>
             ) : (
               <Button variant="outline" onClick={() => setIsPlanningOpen(false)} className="w-full font-black uppercase h-12 border-2">Annuler</Button>
             )}
