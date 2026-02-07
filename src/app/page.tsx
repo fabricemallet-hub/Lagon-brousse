@@ -80,7 +80,7 @@ export default function Home() {
     setIsLoading(true);
     const fetchedData = getDataForDate(selectedLocation, selectedDate);
     setData(fetchedData);
-    setIsLocationLoading(false);
+    setIsLoading(false);
   }, [selectedLocation, selectedDate]);
 
   const dateString = selectedDate.toLocaleDateString('fr-FR', {
