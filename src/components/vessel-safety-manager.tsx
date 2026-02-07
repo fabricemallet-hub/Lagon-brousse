@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { Ship, Plus, Trash2, CalendarAlert, AlertTriangle, CheckCircle2, ShieldCheck, X } from 'lucide-react';
+import { Ship, Plus, Trash2, Clock, AlertTriangle, Check, ShieldCheck, X } from 'lucide-react';
 import { format, differenceInDays, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { UserVesselSafety, SafetyItem } from '@/lib/types';
@@ -115,8 +115,8 @@ export function VesselSafetyManager() {
     const daysLeft = differenceInDays(expiryDate, today);
     
     if (daysLeft < 0) return { label: 'EXPIRÉ', color: 'text-red-600', bg: 'bg-red-50', icon: AlertTriangle };
-    if (daysLeft < 90) return { label: `Expire dans ${daysLeft} j`, color: 'text-orange-600', bg: 'bg-orange-50', icon: CalendarAlert };
-    return { label: 'Conforme', color: 'text-green-600', bg: 'bg-green-50', icon: CheckCircle2 };
+    if (daysLeft < 90) return { label: `Expire dans ${daysLeft} j`, color: 'text-orange-600', bg: 'bg-orange-50', icon: Clock };
+    return { label: 'Conforme', color: 'text-green-600', bg: 'bg-green-50', icon: Check };
   };
 
   if (!user) return null;
