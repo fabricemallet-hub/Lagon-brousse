@@ -18,140 +18,17 @@ import {
   Eye, Music, Volume2, Play, Download, HelpCircle, MessageSquare, Check, X, RefreshCw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Slider } from '@/components/ui/slider';
-import Link from 'next/link';
-import Image from 'next/image';
-import { lagoonFishData } from '@/lib/fish-data';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { format, isBefore, addDays } from 'date-fns';
-import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { SplashScreen } from '@/components/splash-screen';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { INITIAL_FAQ_DATA } from '@/lib/faq-data';
 
 const FAQ_CATEGORIES = ["General", "Peche", "Boat Tracker", "Chasse", "Champs", "Compte"];
-
-const INITIAL_FAQ_DATA = [
-  // --- GENERAL (15) ---
-  { categorie: "General", ordre: 1, question: "L'application remplace-t-elle les sources officielles ?", reponse: "Non. Pour votre sécurité, consultez toujours meteo.nc et les autorités maritimes (COSS). L'app est un assistant tactique." },
-  { categorie: "General", ordre: 2, question: "Pourquoi la géolocalisation est-elle indispensable ?", reponse: "Elle permet de calculer les marées de la station la plus proche de VOUS et d'activer le Boat Tracker." },
-  { categorie: "General", ordre: 3, question: "Comment fonctionne le mode hors-ligne ?", reponse: "Les données consultées avec internet sont mises en cache (PWA). Le GPS fonctionne sans réseau, mais pas les mises à jour live." },
-  { categorie: "General", ordre: 4, question: "L'application consomme-t-elle beaucoup de batterie ?", reponse: "Le GPS en continu (Boat Tracker) est énergivore. Utilisez le 'Mode Éveil' uniquement quand nécessaire et prévoyez une batterie externe." },
-  { categorie: "General", ordre: 5, question: "Quelle est la précision des marées ?", reponse: "Nous utilisons les constantes du SHOM ajustées par algorithme selon votre commune. La précision est de +/- 10 min." },
-  { categorie: "General", ordre: 6, question: "Puis-je changer ma commune favorite ?", reponse: "Oui, via le sélecteur en haut de l'écran. Votre choix est mémorisé sur votre profil." },
-  { categorie: "General", ordre: 7, question: "L'application est-elle gratuite ?", reponse: "Il existe un mode 'Limité' gratuit (1 min/jour) et un mode 'Premium' illimité par abonnement." },
-  { categorie: "General", ordre: 8, question: "Comment installer l'app sur mon iPhone ?", reponse: "Ouvrez Safari, appuyez sur 'Partager' puis 'Sur l'écran d'accueil'. C'est une PWA." },
-  { categorie: "General", ordre: 9, question: "Comment installer l'app sur Android ?", reponse: "Via Chrome, appuyez sur les 3 points puis 'Installer l'application'." },
-  { categorie: "General", ordre: 10, question: "Mes données GPS sont-elles privées ?", reponse: "Oui. Elles ne sont partagées QUE si vous activez volontairement le Boat Tracker ou une session de Chasse." },
-  { categorie: "General", ordre: 11, question: "L'app fonctionne-t-elle aux Îles Loyauté ?", reponse: "Oui, les stations de Lifou, Maré et Ouvéa sont intégrées." },
-  { categorie: "General", ordre: 12, question: "Qui a développé cette application ?", reponse: "Une équipe de passionnés du terroir calédonien, pour les gens du pays." },
-  { categorie: "General", ordre: 13, question: "Comment signaler un bug ?", reponse: "Via l'onglet 'FAQ & Support', ouvrez un ticket technique." },
-  { categorie: "General", ordre: 14, question: "L'heure affichée est-elle celle de NC ?", reponse: "Oui, l'application est configurée sur le fuseau GMT+11 (Nouméa)." },
-  { categorie: "General", ordre: 15, question: "Peut-on utiliser l'app sur tablette ?", reponse: "Oui, l'interface est responsive et s'adapte aux grands écrans." },
-
-  // --- PECHE (25) ---
-  { categorie: "Peche", ordre: 16, question: "Qu'est-ce qu'un indice de réussite 10/10 ?", reponse: "C'est une coïncidence parfaite entre vive-eau, phase lunaire optimale et créneau d'activité de l'espèce." },
-  { categorie: "Peche", ordre: 17, question: "Comment fonctionne l'IA 'Jour Similaire' ?", reponse: "Elle compare la marée et la lune d'un succès passé pour trouver une date identique dans le futur." },
-  { categorie: "Peche", ordre: 18, question: "Le scanner de poisson est-il fiable ?", reponse: "Il est très précis pour les espèces communes de NC, mais vérifiez toujours via la fiche technique pour la gratte." },
-  { categorie: "Peche", ordre: 19, question: "Comment éviter la gratte (ciguatera) ?", reponse: "L'IA vous donne un risque théorique. Évitez les gros prédateurs (loches, carangues) dans les zones rouges connues." },
-  { categorie: "Peche", ordre: 20, question: "Où sont mes coins de pêche secrets ?", reponse: "Dans l'onglet 'Pêche' > 'Carnet de Spots'. Ils sont strictement personnels et cryptés." },
-  { categorie: "Peche", ordre: 21, question: "Puis-je partager mes spots ?", reponse: "Pour l'instant, les spots sont privés pour garantir votre tranquillité." },
-  { categorie: "Peche", ordre: 22, question: "Quels poissons sont pélagiques ?", reponse: "Wahoo, Tazard, Thon, Mahi-mahi. L'app vous alerte quand ils sont en saison." },
-  { categorie: "Peche", ordre: 23, question: "C'est quoi une marée montante ?", reponse: "C'est le flux. Souvent le meilleur moment car les poissons rentrent sur le platier pour manger." },
-  { categorie: "Peche", ordre: 24, question: "Comment pêcher le bec de cane ?", reponse: "Cherchez les herbiers ou zones sableuses entre 2 et 10m. Utilisez du bernard-l'ermite." },
-  { categorie: "Peche", ordre: 25, question: "Quelle lune pour le crabe de palétuvier ?", reponse: "Le crabe est 'plein' autour de la nouvelle et pleine lune (vives-eaux)." },
-  { categorie: "Peche", ordre: 26, question: "Pourquoi mon spot a disparu ?", reponse: "Vérifiez que vous êtes connecté au même compte. Les spots sont liés à votre email." },
-  { categorie: "Peche", ordre: 27, question: "Comment utiliser l'IA 'Quel spot maintenant ?' ?", reponse: "L'IA analyse vos spots enregistrés et choisit le meilleur selon votre position GPS et la marée actuelle." },
-  { categorie: "Peche", ordre: 28, question: "L'indice de vent impacte-t-il la note de pêche ?", reponse: "Non, la note de l'espèce est biologique. Le vent est une contrainte de confort et sécurité pour vous." },
-  { categorie: "Peche", ordre: 29, question: "Comment pêcher à la traîne ?", reponse: "Visez les cassants et les passes entre 6 et 9 nœuds pour le Tazard ou le Wahoo." },
-  { categorie: "Peche", ordre: 30, question: "C'est quoi le 'Similar Day Finder' ?", reponse: "C'est notre outil IA exclusif qui prédit vos chances de succès basées sur l'historique lunaire." },
-  { categorie: "Peche", ordre: 31, question: "Peut-on supprimer un spot ?", reponse: "Oui, cliquez sur l'icône poubelle dans votre carnet de spots." },
-  { categorie: "Peche", ordre: 32, question: "Comment modifier le nom d'un spot ?", reponse: "Appuyez sur le bouton crayon dans les détails du spot." },
-  { categorie: "Peche", ordre: 33, question: "L'app gère-t-elle les records de prises ?", reponse: "Vous pouvez noter vos records dans les 'Notes' de chaque spot." },
-  { categorie: "Peche", ordre: 34, question: "Pourquoi la météo marine est payante sur d'autres sites ?", reponse: "Nous incluons une estimation de houle et vent gratuitement pour nos abonnés Premium." },
-  { categorie: "Peche", ordre: 35, question: "Comment lire la flèche du vent ?", reponse: "La pointe indique où va le vent. Une flèche vers le bas signifie un vent de Nord." },
-  { categorie: "Peche", ordre: 36, question: "Qu'est-ce que l'étale de marée ?", reponse: "Le moment où l'eau ne monte ni ne descend. Souvent un moment calme pour la pêche." },
-  { categorie: "Peche", ordre: 37, question: "Comment pêcher la loche truite ?", reponse: "Au jig ou leurre souple près des patates de corail, entre 10 et 25m." },
-  { categorie: "Peche", ordre: 38, question: "Où pêcher à Nouméa ?", reponse: "Le lagon sud regorge de spots, utilisez la carte satellite pour repérer les fonds clairs." },
-  { categorie: "Peche", ordre: 39, question: "L'IA connaît-elle tous les poissons ?", reponse: "Elle connaît les 50 espèces les plus communes du lagon calédonien." },
-  { categorie: "Peche", ordre: 40, question: "Le vent d'Est est-il bon pour la pêche ?", reponse: "En NC, l'Alizé d'Est est le vent dominant. Il est régulier mais peut lever de la mer." },
-
-  // --- BOAT TRACKER (20) ---
-  { categorie: "Boat Tracker", ordre: 41, question: "Comment mon contact me suit-il ?", reponse: "Il doit entrer votre ID unique dans son onglet 'Récepteur'." },
-  { categorie: "Boat Tracker", ordre: 42, question: "Le SMS d'urgence est-il automatique ?", reponse: "Non, c'est une action manuelle sécurisée. Vous choisissez le type d'alerte." },
-  { categorie: "Boat Tracker", ordre: 43, question: "Que signifie 'Signal perdu' ?", reponse: "L'émetteur n'a plus de réseau ou son téléphone est éteint depuis plus de 10 min." },
-  { categorie: "Boat Tracker", ordre: 44, question: "Puis-je suivre plusieurs bateaux ?", reponse: "Oui, ajoutez autant d'IDs que vous voulez dans votre flotte." },
-  { categorie: "Boat Tracker", ordre: 45, question: "Le mode éveil est-il risqué ?", reponse: "Il empêche l'écran de s'éteindre pour ne pas couper le GPS. Attention à la batterie." },
-  { categorie: "Boat Tracker", ordre: 46, question: "Comment fonctionne la détection d'immobilité ?", reponse: "Si vous bougez de moins de 20m en 30s, l'app vous bascule en statut 'Au mouillage'." },
-  { categorie: "Boat Tracker", ordre: 47, question: "Le surnom du navire est-il obligatoire ?", reponse: "Non, mais fortement recommandé pour que les secours vous identifient vite dans le SMS." },
-  { categorie: "Boat Tracker", ordre: 48, question: "Puis-je personnaliser le message SOS ?", reponse: "Oui, activez l'option 'Message personnalisé' dans les réglages de l'émetteur." },
-  { categorie: "Boat Tracker", ordre: 49, question: "Comment arrêter le partage ?", reponse: "Cliquez sur le gros bouton rouge 'Quitter' ou 'Arrêter le partage'." },
-  { categorie: "Boat Tracker", ordre: 50, question: "L'historique est-il partagé ?", reponse: "Oui, le journal de bord est synchronisé en temps réel entre émetteur et récepteur." },
-  { categorie: "Boat Tracker", ordre: 51, question: "Qui peut effacer l'historique ?", reponse: "Seul l'émetteur peut vider le journal de bord pour tout le monde." },
-  { categorie: "Boat Tracker", ordre: 52, question: "Le Boat Tracker remplace-t-il la VHF ?", reponse: "ABSOLUMENT PAS. C'est un complément de confort. Gardez toujours votre VHF sur le canal 16." },
-  { categorie: "Boat Tracker", ordre: 53, question: "L'app envoie-t-elle ma position aux secours directement ?", reponse: "Non, elle prépare un SMS pour votre contact d'urgence, qui devra prévenir les secours." },
-  { categorie: "Boat Tracker", ordre: 54, question: "Peut-on changer l'icône du bateau ?", reponse: "Cette fonction est en cours de développement pour une future mise à jour." },
-  { categorie: "Boat Tracker", ordre: 55, question: "L'ID de partage est-il définitif ?", reponse: "Vous pouvez le changer dans les réglages de l'émetteur si besoin." },
-  { categorie: "Boat Tracker", ordre: 56, question: "Comment régler le volume des alertes ?", reponse: "Utilisez le curseur de volume dans l'onglet 'Récepteur'." },
-  { categorie: "Boat Tracker", ordre: 57, question: "Pourquoi mon téléphone chauffe en mode émetteur ?", reponse: "Le GPS et l'écran allumé demandent beaucoup de ressources processeur." },
-  { categorie: "Boat Tracker", ordre: 58, question: "Le Boat Tracker fonctionne-t-il en avion ?", reponse: "Non, les vitesses élevées perturbent l'algorithme conçu pour la mer." },
-  { categorie: "Boat Tracker", ordre: 59, question: "Le SMS contient-il l'heure ?", reponse: "Oui, ainsi qu'un lien Google Maps direct vers votre position." },
-  { categorie: "Boat Tracker", ordre: 60, question: "Puis-je être émetteur et récepteur à la fois ?", reponse: "Non, il faut choisir un mode par appareil." },
-
-  // --- CHASSE (15) ---
-  { categorie: "Chasse", ordre: 61, question: "Comment rejoindre une battue ?", reponse: "Entrez le code session (CH-XXXX) fourni par l'organisateur." },
-  { categorie: "Chasse", ordre: 62, question: "Pourquoi signaler 'Gibier en vue' ?", reponse: "Cela envoie une notification push et un son immédiat à tous vos partenaires." },
-  { categorie: "Chasse", ordre: 63, question: "La table de tir est-elle balistique ?", reponse: "C'est une simulation théorique basée sur un zérotage à 100m. Réglez toujours votre arme en réel." },
-  { categorie: "Chasse", ordre: 64, question: "Comment voir le vent en brousse ?", reponse: "Consultez la carte du vent dans l'onglet Chasse pour anticiper votre approche." },
-  { categorie: "Chasse", ordre: 65, question: "Puis-je changer ma couleur sur la carte ?", reponse: "Oui, dans vos préférences de profil ou dans les réglages de la session." },
-  { categorie: "Chasse", ordre: 66, question: "C'est quoi la période de Brame ?", reponse: "La saison de reproduction (souvent Juillet/Août). Les cerfs sont très actifs et bruyants." },
-  { categorie: "Chasse", ordre: 67, question: "L'app fonctionne-t-elle en zone blanche ?", reponse: "Le GPS oui, mais vous ne verrez pas la position de vos amis sans 3G/4G." },
-  { categorie: "Chasse", ordre: 68, question: "Comment créer un code de session ?", reponse: "Dans l'onglet Chasse > Créer. Vous pouvez même choisir un code personnalisé." },
-  { categorie: "Chasse", ordre: 69, question: "Qui voit ma position en chasse ?", reponse: "Uniquement les personnes ayant rejoint votre code de session spécifique." },
-  { categorie: "Chasse", ordre: 70, question: "Peut-on supprimer une ancienne session ?", reponse: "Les sessions expirent automatiquement après 24 heures." },
-  { categorie: "Chasse", ordre: 71, question: "Comment gérer le vent de face ?", reponse: "Approchez toujours le gibier avec le vent qui vous souffle dans le visage." },
-  { categorie: "Chasse", ordre: 72, question: "L'app gère-t-elle les quotas ?", reponse: "Consultez l'onglet 'Réglementation' pour les quotas officiels par province." },
-  { categorie: "Chasse", ordre: 73, question: "Quels sont les sons de gibier ?", reponse: "Vous pouvez choisir différents sons d'alerte dans vos préférences." },
-  { categorie: "Chasse", ordre: 74, question: "Le mode satellite aide-t-il ?", reponse: "Oui, il permet de repérer les clairières, les points d'eau et les coulées." },
-  { categorie: "Chasse", ordre: 75, question: "Comment quitter une session ?", reponse: "Cliquez sur le bouton rouge 'Quitter' en haut de l'onglet Chasse." },
-
-  // --- CHAMPS (15) ---
-  { categorie: "Champs", ordre: 76, question: "Pourquoi l'arrosage est en secondes ?", reponse: "Pour vous aider à doser précisément au jet d'eau selon les besoins de chaque plante." },
-  { categorie: "Champs", ordre: 77, question: "C'est quoi un jour 'Racines' ?", reponse: "Un jour où l'influence lunaire favorise les carottes, oignons, radis, etc." },
-  { categorie: "Champs", ordre: 78, question: "Le scanner diagnostique-t-il les maladies ?", reponse: "Oui, photographiez une feuille abîmée pour obtenir un conseil de traitement local." },
-  { categorie: "Champs", ordre: 79, question: "Comment marche le Bilan Stratégique ?", reponse: "L'IA analyse votre inventaire jardin et la météo live pour créer votre plan d'action du jour." },
-  { categorie: "Champs", ordre: 80, question: "Peut-on planter des tomates toute l'année ?", reponse: "Oui, mais elles préfèrent la saison fraîche pour éviter le mildiou excessif." },
-  { categorie: "Champs", ordre: 81, question: "Quelle lune pour tailler les arbres ?", reponse: "Lune descendante (sève en bas) pour ne pas épuiser l'arbre." },
-  { categorie: "Champs", ordre: 82, question: "Pourquoi l'IA me dit de ne pas arroser ?", reponse: "Elle a détecté une pluie récente ou forte prévue à votre commune via la météo live." },
-  { categorie: "Champs", ordre: 83, question: "Comment identifier une graine ?", reponse: "Utilisez le scanner IA dans l'onglet 'Guide Culture'." },
-  { categorie: "Champs", ordre: 84, question: "C'est quoi l'engrais vert ?", reponse: "Des plantes (trèfle, phacélie) semées pour enrichir naturellement votre terre." },
-  { categorie: "Champs", ordre: 85, question: "L'IA connaît-elle les plantes de NC ?", reponse: "Oui, elle est entraînée sur la flore tropicale et les variétés spécifiques du Caillou." },
-  { categorie: "Champs", ordre: 86, question: "Comment ajouter une plante au jardin ?", reponse: "Dans 'Mon Jardin', cliquez sur Ajouter et saisissez le nom ou utilisez le scanner." },
-  { categorie: "Champs", ordre: 87, question: "Peut-on suivre les arbres fruitiers ?", reponse: "Oui, l'onglet Jardin permet de gérer arbres, fleurs et potager." },
-  { categorie: "Champs", ordre: 88, question: "Comment marche le calendrier lunaire ?", reponse: "Il affiche visuellement les phases et le zodiaque pour chaque jour du mois." },
-  { categorie: "Champs", ordre: 89, question: "Quelles sont les variétés de tomates en NC ?", reponse: "Heatmaster et Floradade sont les plus résistantes à notre chaleur." },
-  { categorie: "Champs", ordre: 90, question: "L'IA corrige-t-elle les noms de plantes ?", reponse: "Oui, si vous écrivez 'mangue', elle corrigera en 'Manguier' pour un suivi correct." },
-
-  // --- COMPTE (10) ---
-  { categorie: "Compte", ordre: 91, question: "Comment activer un jeton cadeau ?", reponse: "Allez dans 'Compte', saisissez le code dans 'Activer un jeton' et validez." },
-  { categorie: "Compte", ordre: 92, question: "Puis-je utiliser l'app sur 2 téléphones ?", reponse: "Oui, connectez-vous simplement avec le même email sur les deux appareils." },
-  { categorie: "Compte", ordre: 93, question: "Comment résilier mon abonnement ?", reponse: "L'abonnement est géré via votre compte PayPal ou les réglages de votre store." },
-  { categorie: "Compte", ordre: 94, question: "J'ai oublié mon mot de passe ?", reponse: "Sur l'écran de connexion, cliquez sur 'Mot de passe oublié' pour recevoir un mail de reset." },
-  { categorie: "Compte", ordre: 95, question: "À quoi sert le mode 'Limité' ?", reponse: "À consulter rapidement une info (marée, vent) sans être abonné." },
-  { categorie: "Compte", ordre: 96, question: "Comment changer mon email ?", reponse: "Pour des raisons de sécurité, contactez le support via un ticket." },
-  { categorie: "Compte", ordre: 97, question: "Les notifications push sont-elles gratuites ?", reponse: "Oui, elles sont incluses pour tous les utilisateurs." },
-  { categorie: "Compte", ordre: 98, question: "Comment supprimer mon compte ?", reponse: "Envoyez une demande de suppression via le support technique." },
-  { categorie: "Compte", ordre: 99, question: "L'abonnement est-il remboursable ?", reponse: "Consultez nos conditions générales de vente sur le site officiel." },
-  { categorie: "Compte", ordre: 100, question: "Comment devenir testeur bêta ?", reponse: "Contactez l'administrateur via la messagerie du support." },
-];
 
 export default function AdminPage() {
   const { user, isUserLoading } = useUser();
