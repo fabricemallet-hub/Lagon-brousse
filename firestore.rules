@@ -30,6 +30,7 @@ service cloud.firestore {
       allow create: if isSignedIn();
       // Un utilisateur voit ses tickets, l'admin voit tout
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAdmin() || (isSignedIn() && request.query.limit <= 100);
       allow update, delete: if isAdmin();
     }
 

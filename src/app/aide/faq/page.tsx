@@ -10,7 +10,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Search, ChevronLeft, HelpCircle, MessageSquare, Sparkles, Send, RefreshCw, TrendingUp } from 'lucide-react';
+import { Search, ChevronLeft, HelpCircle, MessageSquare, Sparkles, Send, RefreshCw, TrendingUp, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
@@ -36,13 +36,12 @@ export default function FaqPage() {
   const [description, setDescription] = useState('');
   const [isSending, setIsSending] = useState(false);
 
-  // La requête est maintenant ordonnée par VUES (Décroissant) pour mettre les plus lues en haut
+  // Utilisation d'un tri unique pour éviter le besoin d'index composite complexe
   const faqRef = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(
       collection(firestore, 'cms_support', 'faq', 'items'), 
-      orderBy('views', 'desc'),
-      orderBy('ordre', 'asc')
+      orderBy('views', 'desc')
     );
   }, [firestore]);
 
@@ -58,7 +57,6 @@ export default function FaqPage() {
   const handleTrackView = async (id: string) => {
     if (!firestore) return;
     const itemRef = doc(firestore, 'cms_support', 'faq', 'items', id);
-    // Incrémente le compteur de vues de manière atomique
     updateDoc(itemRef, { views: increment(1) }).catch(e => console.warn("View tracking failed", e));
   };
 
@@ -146,7 +144,7 @@ export default function FaqPage() {
                   <div className="flex flex-col gap-1.5 min-w-0 pr-4">
                     <div className="flex items-center gap-2">
                         <Badge variant="outline" className="w-fit text-[8px] font-black uppercase h-4 px-1.5 bg-primary/5 text-primary border-primary/10">{faq.categorie}</Badge>
-                        {faq.views && faq.views > 10 && (
+                        {faq.views !== undefined && faq.views > 10 && (
                             <Badge variant="secondary" className="bg-orange-100 text-orange-700 border-none text-[7px] font-black h-4 px-1.5 uppercase tracking-tighter">Populaire</Badge>
                         )}
                     </div>
@@ -186,12 +184,14 @@ export default function FaqPage() {
                 Ouvrir un ticket support
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md rounded-2xl">
-              <DialogHeader>
-                <DialogTitle className="font-black uppercase">Nouveau Ticket Support</DialogTitle>
-                <DialogDescription className="text-xs">Votre message sera traité par un administrateur sous 24h.</DialogDescription>
+            <DialogContent className="max-w-md rounded-2xl p-0 overflow-hidden">
+              <DialogHeader className="p-6 bg-slate-50 border-b">
+                <DialogTitle className="font-black uppercase tracking-tighter flex items-center justify-between">
+                  <span>Nouveau Ticket Support</span>
+                </DialogTitle>
+                <DialogDescription className="text-[10px] font-bold uppercase">Votre message sera traité sous 24h.</DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleSendTicket} className="space-y-4 py-4">
+              <form onSubmit={handleSendTicket} className="p-6 space-y-4">
                 <div className="space-y-1.5">
                   <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Sujet</Label>
                   <Input 
@@ -216,7 +216,11 @@ export default function FaqPage() {
                   {isSending ? <RefreshCw className="size-5 animate-spin" /> : <Send className="size-5" />}
                   {isSending ? "Envoi en cours..." : "Envoyer mon ticket"}
                 </Button>
-                {!user && <p className="text-[10px] text-center text-destructive font-bold uppercase">Connexion requise pour envoyer un ticket</p>}
+                {!user && (
+                  <p className="text-[10px] text-center text-destructive font-black uppercase bg-destructive/10 p-2 rounded-lg">
+                    Connexion requise pour envoyer un ticket
+                  </p>
+                )}
               </form>
             </DialogContent>
           </Dialog>
