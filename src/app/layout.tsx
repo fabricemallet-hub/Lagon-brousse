@@ -1,52 +1,27 @@
-
-'use client';
-
-import { AppShell } from '@/components/app-shell';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
-import { LocationProvider } from '@/context/location-context';
-import { DateProvider } from '@/context/date-context';
-import { CalendarViewProvider } from '@/context/calendar-view-context';
 import './globals.css';
-import { Suspense, useEffect, useRef } from 'react';
-import { FirebaseClientProvider } from '@/firebase/client-provider';
-import { GoogleMapsProvider } from '@/context/google-maps-context';
-import { CgvConsentGuard } from '@/components/cgv-consent-guard';
+import { Suspense } from 'react';
+import { RootProviders } from '@/components/root-providers';
+import type { Metadata, Viewport } from 'next';
 
-function AppContent({ children }: { children: React.Node }) {
-  const swRegisteredRef = useRef(false);
+export const metadata: Metadata = {
+  title: 'Lagon & Brousse NC',
+  description: 'Assistant intelligent pour le terroir calédonien',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Lagon & Brousse NC',
+  },
+};
 
-  useEffect(() => {
-    // Enregistrement unique du Service Worker
-    if (typeof window !== 'undefined' && 'serviceWorker' in navigator && !swRegisteredRef.current) {
-      swRegisteredRef.current = true;
-      navigator.serviceWorker.register('/sw.js', { scope: '/' })
-        .then((registration) => {
-          console.log('L&B NC: Service Worker actif');
-        })
-        .catch((err) => {
-          console.error('L&B NC: Erreur SW:', err);
-          swRegisteredRef.current = false;
-        });
-    }
-  }, []);
-
-  return (
-    <FirebaseClientProvider>
-      <GoogleMapsProvider>
-        <CalendarViewProvider>
-          <DateProvider>
-            <LocationProvider>
-              <CgvConsentGuard>
-                <AppShell>{children}</AppShell>
-              </CgvConsentGuard>
-            </LocationProvider>
-          </DateProvider>
-        </CalendarViewProvider>
-      </GoogleMapsProvider>
-    </FirebaseClientProvider>
-  )
-}
+export const viewport: Viewport = {
+  themeColor: '#3b82f6',
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+};
 
 export default function RootLayout({
   children,
@@ -66,17 +41,12 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap"
           rel="stylesheet"
         />
-        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <link rel="icon" href="/icon-192x192.png" />
         <link rel="apple-touch-icon" href="/icon-192x192.png" />
-        <link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="theme-color" content="#3b82f6" />
       </head>
       <body className={cn('font-body antialiased', 'min-h-screen bg-background font-sans overflow-x-hidden')}>
         <Suspense fallback={null}>
-         <AppContent>{children}</AppContent>
+          <RootProviders>{children}</RootProviders>
         </Suspense>
         <Toaster />
       </body>
