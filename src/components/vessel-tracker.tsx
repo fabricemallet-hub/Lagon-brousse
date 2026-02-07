@@ -910,7 +910,7 @@ export function VesselTracker() {
                                                     </span>
                                                 )}
                                               </div>
-                                              <span className="text-[9px] font-bold opacity-40">{format(h.time, 'HH:mm:ss')}</span>
+                                              <span className="text-[9px] font-bold opacity-40">{format(h.time, 'dd/MM HH:mm:ss')}</span>
                                             </div>
                                             <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase border-2 px-3 gap-2 touch-manipulation" onClick={() => { map?.panTo(h.pos); map?.setZoom(17); }}>
                                               <MapPin className="size-3 text-primary" /> GPS
