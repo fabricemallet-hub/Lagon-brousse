@@ -45,7 +45,7 @@ const sectionContent: Record<string, {
     role: "L'Accueil est votre centre de contrôle quotidien. Il synthétise les informations les plus importantes pour votre commune sans que vous ayez à parcourir tous les onglets.",
     steps: [
       "Visualisez la météo actuelle et les prévisions heure par heure.",
-      "Surveillez vos alertes de sécurité (péremption fusées/extincteurs).",
+      "Sécurité Prioritaire : Un bandeau orange clignotant apparaîtra automatiquement en haut de l'écran 90 jours (3 mois) avant la péremption d'un de vos équipements de sécurité.",
       "Consultez les prochaines marées (haute et basse) en un clin d'œil.",
       "Lisez le conseil du jardinier basé sur la lune du jour.",
       "Naviguez entre les jours grâce aux flèches en haut de page pour planifier vos sorties."
@@ -239,15 +239,15 @@ const sectionContent: Record<string, {
     color: 'bg-slate-500',
     role: "L'essentiel des règles de pêche, de chasse et de sécurité maritime pour une pratique responsable.",
     steps: [
-      "Fermetures : Consultez le calendrier des interdictions (Picot, Crabe, etc.).",
-      "Sécurité : Gérez vos équipements obligatoires (fusées, extincteurs) par navire.",
-      "Alertes : Renseignez les dates de péremption pour activer les rappels automatiques.",
-      "Tailles : Vérifiez les dimensions minimales autorisées.",
-      "Protection : Identifiez les espèces intégralement protégées (Napoléon, Dugong...)."
+      "Fermetures : Consultez le calendrier annuel des interdictions de pêche (Picot, Crabe de palétuvier, etc.).",
+      "Gestion de Flotte : Créez des profils pour vos navires en les nommant pour organiser votre matériel séparément.",
+      "Inventaire de Sécurité : Ajoutez vos équipements obligatoires (Fusées parachute, extincteurs, feux à main) pour chaque navire.",
+      "Suivi des Péremptions : Saisissez les dates limites de chaque objet. L'application calcule automatiquement l'état de conformité (Conforme, Alerte, Expiré).",
+      "Tailles & Espèces : Vérifiez les dimensions minimales autorisées et la liste des espèces strictement protégées (Napoléon, Dugong, etc.)."
     ],
     tips: [
       "Le marquage de la queue de la langouste est obligatoire dès la capture.",
-      "Un rappel de sécurité s'affiche sur l'accueil 3 mois avant l'expiration d'un matériel."
+      "Consultez régulièrement cette section pour vérifier que votre armement est à jour avant de prendre la mer."
     ]
   },
   'compte': {
