@@ -21,6 +21,14 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import {
   Users,
   LogOut,
   BatteryFull,
@@ -42,6 +50,9 @@ import {
   AlertCircle,
   Settings,
   Zap,
+  Volume2,
+  Play,
+  X
 } from 'lucide-react';
 import {
   useUser,
@@ -239,6 +250,11 @@ function HuntingSessionContent() {
       setNickname(userProfile.displayName || user?.displayName || user?.email?.split('@')[0] || '');
       setSelectedIcon(userProfile.mapIcon || 'Navigation');
       setSelectedColor(userProfile.mapColor || '#3b82f6');
+      if (userProfile.vesselPrefs?.huntingSoundSettings) {
+        setSoundSettings(userProfile.vesselPrefs.huntingSoundSettings);
+        setSoundVolume(userProfile.vesselPrefs.huntingVolume || 0.8);
+        setIsSoundEnabled(userProfile.vesselPrefs.huntingSoundEnabled ?? true);
+      }
     }
   }, [userProfile, user]);
   
@@ -406,9 +422,23 @@ function HuntingSessionContent() {
     if (!user || !firestore || !nickname) return;
     setIsSavingPrefs(true);
     try {
-        const prefs = { displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor };
+        const prefs = { 
+          displayName: nickname, 
+          mapIcon: selectedIcon, 
+          mapColor: selectedColor,
+          vesselPrefs: {
+            ...userProfile?.vesselPrefs,
+            huntingSoundSettings: soundSettings,
+            huntingVolume: soundVolume,
+            huntingSoundEnabled: isSoundEnabled
+          }
+        };
         await updateDoc(doc(firestore, 'users', user.uid), prefs);
-        if (session && isParticipating) await updateDoc(doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid), prefs);
+        if (session && isParticipating) await updateDoc(doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid), {
+          displayName: nickname,
+          mapIcon: selectedIcon,
+          mapColor: selectedColor
+        });
         toast({ title: 'Sauvegardé !' });
         setPrefsSection(undefined); 
     } catch (e) { console.error(e); } finally { setIsSavingPrefs(false); }
@@ -514,10 +544,68 @@ function HuntingSessionContent() {
                                 <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-2 bg-muted/50 rounded-lg px-4 mb-2"><Settings className="size-4" /><span>Profil & Sons</span></AccordionTrigger>
                                 <AccordionContent className="space-y-4 pt-2 px-1">
                                     <div className="space-y-4 rounded-lg border p-4 bg-muted/30">
-                                        <Input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="Surnom..." />
+                                        <div className="space-y-1.5">
+                                          <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Mon Surnom</Label>
+                                          <Input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="Surnom..." />
+                                        </div>
+                                        
                                         <Button variant={wakeLock ? "secondary" : "outline"} size="sm" className="w-full h-11 border-2" onClick={toggleWakeLock}><Zap className="size-4 mr-2" />{wakeLock ? "ÉVEIL ACTIF" : "MAINTENIR ÉCRAN"}</Button>
-                                        <div className="flex items-center justify-between pt-2 border-t"><Label className="text-xs font-bold uppercase">Sons actifs</Label><Switch checked={isSoundEnabled} onCheckedChange={setIsSoundEnabled} /></div>
-                                        <Button onClick={handleSavePreferences} size="sm" disabled={isSavingPrefs} className="w-full"><Save className="mr-2 h-4 w-4" /> Sauvegarder Profil</Button>
+                                        
+                                        <div className="space-y-4 pt-4 border-t border-dashed">
+                                          <div className="flex items-center justify-between">
+                                            <div className="space-y-0.5">
+                                              <Label className="text-xs font-black uppercase">Sons actifs</Label>
+                                              <p className="text-[9px] font-bold text-muted-foreground uppercase">Alertes audio session</p>
+                                            </div>
+                                            <Switch checked={isSoundEnabled} onCheckedChange={setIsSoundEnabled} />
+                                          </div>
+
+                                          <div className={cn("space-y-4 transition-opacity", !isSoundEnabled && "opacity-40 pointer-events-none")}>
+                                            <div className="space-y-3">
+                                              <Label className="text-[10px] font-black uppercase opacity-60 flex items-center gap-2">
+                                                <Volume2 className="size-3" /> Volume des alertes
+                                              </Label>
+                                              <Slider 
+                                                value={[soundVolume * 100]} 
+                                                max={100} step={1} 
+                                                onValueChange={v => setSoundVolume(v[0] / 100)} 
+                                              />
+                                            </div>
+
+                                            <div className="grid gap-3">
+                                              {[
+                                                { key: 'position', label: 'En position' },
+                                                { key: 'battue', label: 'Battue' },
+                                                { key: 'gibier', label: 'Gibier' }
+                                              ].map(item => (
+                                                <div key={item.key} className="flex items-center justify-between gap-4">
+                                                  <span className="text-[10px] font-bold uppercase flex-1">{item.label}</span>
+                                                  <Select 
+                                                    value={soundSettings[item.key as keyof typeof soundSettings]} 
+                                                    onValueChange={v => setSoundSettings({ ...soundSettings, [item.key]: v })}
+                                                  >
+                                                    <SelectTrigger className="h-8 text-[9px] font-black uppercase w-32 bg-muted/30">
+                                                      <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                      {availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] uppercase font-black">{s.label}</SelectItem>)}
+                                                    </SelectContent>
+                                                  </Select>
+                                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                                                    const s = availableSounds.find(snd => snd.id === soundSettings[item.key as keyof typeof soundSettings]);
+                                                    if (s) {
+                                                      const a = new Audio(s.url);
+                                                      a.volume = soundVolume;
+                                                      a.play();
+                                                    }
+                                                  }}><Play className="size-3" /></Button>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <Button onClick={handleSavePreferences} size="sm" disabled={isSavingPrefs} className="w-full h-12 font-black uppercase tracking-widest"><Save className="mr-2 h-4 w-4" /> Sauvegarder Profil & Sons</Button>
                                     </div>
                                 </AccordionContent>
                             </AccordionItem>
