@@ -147,6 +147,7 @@ export interface FaqEntry {
   reponse: string;
   categorie: 'General' | 'Peche' | 'Boat Tracker' | 'Chasse' | 'Champs' | 'Compte';
   ordre: number;
+  views?: number;
 }
 
 export interface SupportTicket {

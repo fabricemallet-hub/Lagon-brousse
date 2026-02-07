@@ -1,15 +1,16 @@
+
 'use client';
 
 import { useState } from 'react';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
 import type { FaqEntry } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Search, ChevronLeft, HelpCircle, MessageSquare, Sparkles, Send, RefreshCw } from 'lucide-react';
+import { Search, ChevronLeft, HelpCircle, MessageSquare, Sparkles, Send, RefreshCw, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
@@ -35,9 +36,14 @@ export default function FaqPage() {
   const [description, setDescription] = useState('');
   const [isSending, setIsSending] = useState(false);
 
+  // La requête est maintenant ordonnée par VUES (Décroissant) pour mettre les plus lues en haut
   const faqRef = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'cms_support', 'faq', 'items'), orderBy('ordre', 'asc'));
+    return query(
+      collection(firestore, 'cms_support', 'faq', 'items'), 
+      orderBy('views', 'desc'),
+      orderBy('ordre', 'asc')
+    );
   }, [firestore]);
 
   const { data: faqs, isLoading } = useCollection<FaqEntry>(faqRef);
@@ -48,6 +54,13 @@ export default function FaqPage() {
     const matchesCategory = activeCategory ? f.categorie === activeCategory : true;
     return matchesSearch && matchesCategory;
   });
+
+  const handleTrackView = async (id: string) => {
+    if (!firestore) return;
+    const itemRef = doc(firestore, 'cms_support', 'faq', 'items', id);
+    // Incrémente le compteur de vues de manière atomique
+    updateDoc(itemRef, { views: increment(1) }).catch(e => console.warn("View tracking failed", e));
+  };
 
   const handleSendTicket = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,6 +129,9 @@ export default function FaqPage() {
       </div>
 
       <div className="space-y-4">
+        <div className="flex items-center gap-2 px-1 text-[10px] font-black uppercase text-muted-foreground tracking-widest">
+            <TrendingUp className="size-3 text-primary" /> Classé par popularité
+        </div>
         {isLoading ? (
           <div className="space-y-3">
             <Skeleton className="h-16 w-full rounded-xl" />
@@ -123,12 +139,17 @@ export default function FaqPage() {
             <Skeleton className="h-16 w-full rounded-xl" />
           </div>
         ) : filteredFaqs && filteredFaqs.length > 0 ? (
-          <Accordion type="single" collapsible className="w-full space-y-3">
+          <Accordion type="single" collapsible className="w-full space-y-3" onValueChange={(val) => val && handleTrackView(val)}>
             {filteredFaqs.map((faq) => (
               <AccordionItem key={faq.id} value={faq.id} className="border-2 rounded-2xl bg-card overflow-hidden shadow-sm transition-all border-transparent hover:border-primary/20">
                 <AccordionTrigger className="px-4 py-4 hover:no-underline text-left">
                   <div className="flex flex-col gap-1.5 min-w-0 pr-4">
-                    <Badge variant="outline" className="w-fit text-[8px] font-black uppercase h-4 px-1.5 bg-primary/5 text-primary border-primary/10">{faq.categorie}</Badge>
+                    <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="w-fit text-[8px] font-black uppercase h-4 px-1.5 bg-primary/5 text-primary border-primary/10">{faq.categorie}</Badge>
+                        {faq.views && faq.views > 10 && (
+                            <Badge variant="secondary" className="bg-orange-100 text-orange-700 border-none text-[7px] font-black h-4 px-1.5 uppercase tracking-tighter">Populaire</Badge>
+                        )}
+                    </div>
                     <span className="font-black text-sm leading-tight text-slate-800">{faq.question}</span>
                   </div>
                 </AccordionTrigger>
