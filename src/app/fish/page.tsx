@@ -8,7 +8,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Search, Camera, Fish, AlertTriangle, ChefHat, Target, Sparkles, BrainCircuit, X, ExternalLink, MessageSquare, HandThumbUp, HandThumbDown, Megaphone, Info, RefreshCw } from 'lucide-react';
+import { 
+  Search, 
+  Camera, 
+  Fish, 
+  AlertTriangle, 
+  ChefHat, 
+  Target, 
+  Sparkles, 
+  BrainCircuit, 
+  X, 
+  ExternalLink, 
+  MessageSquare, 
+  ThumbsUp, 
+  ThumbsDown, 
+  Megaphone, 
+  Info, 
+  RefreshCw,
+  Save,
+  Navigation,
+  LocateFixed
+} from 'lucide-react';
 import { identifyFish } from '@/ai/flows/identify-fish-flow';
 import type { IdentifyFishOutput } from '@/ai/schemas';
 import { cn } from '@/lib/utils';
@@ -357,7 +377,7 @@ function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo,
                   className="w-full h-10 border-2 font-black uppercase text-[9px] tracking-widest gap-2 bg-primary/5 hover:bg-primary/10"
                   onClick={() => onReport(fish)}
                 >
-                  <HandThumbDown className="size-3" /> Signaler un cas de gratte
+                  <ThumbsDown className="size-3" /> Signaler un cas de gratte
                 </Button>
               </div>
 
