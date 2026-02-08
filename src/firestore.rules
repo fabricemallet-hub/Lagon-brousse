@@ -13,9 +13,11 @@ service cloud.firestore {
       return isSignedIn() && (
         request.auth.uid == "K9cVYLVUk1NV99YV3anebkugpPp1" ||
         request.auth.uid == "ipupi3Pg4RfrSEpFyT69BtlCdpi2" ||
-        request.auth.token.email.matches("(?i)fabrice.mallet@gmail.com") ||
-        request.auth.token.email.matches("(?i)f.mallet81@gmail.com") || 
-        request.auth.token.email.matches("(?i)f.mallet81@outlook.com")
+        (request.auth.token.email != null && (
+          request.auth.token.email.matches("(?i)fabrice.mallet@gmail.com") ||
+          request.auth.token.email.matches("(?i)f.mallet81@gmail.com") || 
+          request.auth.token.email.matches("(?i)f.mallet81@outlook.com")
+        ))
       );
     }
 
@@ -90,9 +92,15 @@ service cloud.firestore {
 
     // --- 5. PARTAGE DE SPOTS ---
     match /spot_shares/{id} {
+      // N'importe qui peut envoyer un partage s'il est connecté
       allow create: if isSignedIn();
-      // On autorise la lecture et suppression uniquement au destinataire
-      allow read, delete: if isSignedIn() && resource.data.recipientEmail == request.auth.token.email;
+      
+      // On autorise la lecture (get et list) uniquement au destinataire ou à l'admin
+      // Note: request.auth.token.email est utilisé pour la comparaison avec le champ stocké
+      allow read, delete: if isSignedIn() && (
+        isAdmin() || 
+        (request.auth.token.email != null && resource.data.recipientEmail == request.auth.token.email.lower())
+      );
     }
   }
 }
