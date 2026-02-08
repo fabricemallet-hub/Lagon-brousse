@@ -47,6 +47,9 @@ export const INITIAL_FAQ_DATA = [
   { categorie: "Peche", ordre: 38, question: "Où pêcher à Nouméa ?", reponse: "Le lagon sud regorge de spots, utilisez la carte satellite pour repérer les fonds clairs." },
   { categorie: "Peche", ordre: 39, question: "L'IA connaît-elle tous les poissons ?", reponse: "Elle connaît les espèces les plus communes du lagon calédonien. Vous pouvez en rajouter via l'admin." },
   { categorie: "Peche", ordre: 40, question: "Le vent d'Est est-il bon pour la pêche ?", reponse: "En NC, l'Alizé d'Est est le vent dominant. Il est régulier mais peut lever de la mer." },
+  { categorie: "Peche", ordre: 104, question: "Comment partager un coin de pêche avec un ami ?", reponse: "Dans votre carnet de pêche, ouvrez les détails du spot et cliquez sur l'icône 'Partager' (avion en papier). Saisissez l'e-mail de votre ami et validez l'envoi." },
+  { categorie: "Peche", ordre: 105, question: "L'importation d'un spot partagé est-elle automatique ?", reponse: "Oui. Dès que le destinataire ouvre son carnet de pêche, une notification s'affiche et le spot est automatiquement ajouté à sa liste personnelle." },
+  { categorie: "Peche", ordre: 106, question: "Pourquoi mon ami ne reçoit-il pas mon spot ?", reponse: "Le destinataire doit posséder un compte sur l'application enregistré avec l'e-mail exact que vous avez saisi lors du partage." },
 
   // --- BOAT TRACKER (25) ---
   { categorie: "Boat Tracker", ordre: 41, question: "Comment mon contact me suit-il ?", reponse: "Il doit entrer votre ID unique dans son onglet 'Récepteur'." },
@@ -80,7 +83,7 @@ export const INITIAL_FAQ_DATA = [
   { categorie: "Chasse", ordre: 64, question: "Comment voir le vent en brousse ?", reponse: "Consultez la carte du vent dans l'onglet Chasse pour anticiper votre approche." },
   { categorie: "Chasse", ordre: 65, question: "Puis-je changer ma couleur sur la carte ?", reponse: "Oui, dans vos préférences de profil ou dans les réglages de la session." },
   { categorie: "Chasse", ordre: 66, question: "C'est quoi la période de Brame ?", reponse: "La saison de reproduction (souvent Juillet/Août). Les cerfs sont très actifs et bruyants." },
-  { categorie: "Chasse", ordre: 67, question: "L'app fonctionne-t-elle en zone blanche ?", reponse: "Le GPS oui, mais vous ne verrez pas la position de vos amis sans 3G/4G." },
+  { categorie: "Chasse", ordre: 67, question: "L'app fonctionne-t-elle en zone blanche ?", reponse: "Le GPS oui, mas vous ne verrez pas la position de vos amis sans 3G/4G." },
   { categorie: "Chasse", ordre: 68, question: "Comment créer un code de session ?", reponse: "Dans l'onglet Chasse > Créer. Vous pouvez même choisir un code personnalisé." },
   { categorie: "Chasse", ordre: 69, question: "Qui voit ma position en chasse ?", reponse: "Uniquement les personnes ayant rejoint votre code de session spécifique." },
   { categorie: "Chasse", ordre: 70, question: "Peut-on supprimer une ancienne session ?", reponse: "Les sessions expirent automatiquement après 24 heures." },

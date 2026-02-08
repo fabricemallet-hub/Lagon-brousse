@@ -86,7 +86,7 @@ const sectionContent: Record<string, {
     ],
     tips: [
       "AVERTISSEMENT CRITIQUE : Cette application ne remplace PAS le site officiel de Météo Nouvelle-Calédonie (meteo.nc). Consultez-le toujours avant de prévoir une sortie en mer.",
-      "L'assistant IA vous aide à identifier la 'meilleure fenêtre' de la semaine pour vos activités, mais la décision finale et la sécurité vous incombent.",
+      "L'assistant IA vous aide à identifier la 'meilleure fenêtre' de la semaine pour vos activités, mas la décision finale et la sécurité vous incombent.",
       "La flèche du vent indique la provenance réelle de l'air : une flèche pointant vers le bas indique un vent de Nord."
     ]
   },
@@ -119,11 +119,13 @@ const sectionContent: Record<string, {
       "Déroulez une fiche espèce pour obtenir des conseils de profondeur et de technique.",
       "Suivez l'activité des crabes, langoustes et poulpes selon le cycle lunaire.",
       "Enregistrez vos 'Coins de Pêche' par GPS sur la carte satellite interactive.",
+      "Partagez vos spots : Envoyez un coin secret à un ami via son e-mail. Il sera automatiquement ajouté à son carnet dès son ouverture.",
       "Consultez l'historique détaillé de vos prises : l'application mémorise automatiquement le contexte exact (lune, marée, vent, température).",
       "Utilisez l'IA 'Chercher un jour similaire' sur un spot pour trouver la date idéale dans les 30 prochains jours."
     ],
     tips: [
       "Le mode satellite de la carte est idéal pour repérer les patates de corail.",
+      "Le partage de spots inclut automatiquement tout le contexte environnemental enregistré lors du marquage.",
       "L'IA ignore météo et vent pour se concentrer sur les cycles immuables de la lune et des marées.",
       "SÉCURITÉ : Consultez toujours le guide de la CPS pour limiter les risques de ciguatera."
     ],
