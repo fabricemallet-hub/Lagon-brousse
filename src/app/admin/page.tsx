@@ -320,14 +320,18 @@ export default function AdminPage() {
 
   // --- HANDLERS FISH ---
   const handleAIGenerateFish = async () => {
-    if (!currentFish.name) return;
+    if (!currentFish.name && !currentFish.scientificName) return;
     setIsAIGeneratingFish(true);
     try {
-      const info = await generateFishInfo({ name: currentFish.name });
-      // On fusionne mais on garde les données existantes pour ne pas écraser les images
+      const info = await generateFishInfo({ 
+        name: currentFish.name || "", 
+        scientificName: currentFish.scientificName || "" 
+      });
+      // Fusion intelligente : on préserve le nom scientifique s'il était déjà saisi par l'utilisateur
       setCurrentFish(prev => ({ 
         ...prev,
-        ...info, 
+        ...info,
+        scientificName: prev.scientificName || info.scientificName,
       }));
       toast({ title: "Fiche générée par IA" });
     } catch (e) {
@@ -972,7 +976,7 @@ export default function AdminPage() {
           <div className="space-y-4 py-4">
             <div className="flex gap-2 items-end">
               <div className="flex-1 space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Nom Commun</Label><Input value={currentFish.name || ''} onChange={e => setCurrentFish({...currentFish, name: e.target.value})} /></div>
-              <Button onClick={handleAIGenerateFish} disabled={isAIGeneratingFish || !currentFish.name} className="h-10 px-3 bg-indigo-600 text-white gap-2"><Sparkles className="size-4" /> IA</Button>
+              <Button onClick={handleAIGenerateFish} disabled={isAIGeneratingFish || (!currentFish.name && !currentFish.scientificName)} className="h-10 px-3 bg-indigo-600 text-white gap-2"><Sparkles className="size-4" /> IA</Button>
             </div>
             
             <div className="space-y-1">

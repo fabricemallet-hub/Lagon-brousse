@@ -25,9 +25,10 @@ const generateFishInfoPrompt = ai.definePrompt({
 Ta mission est de fournir des informations techniques précises pour le poisson suivant :
 
 NOM COMMUN : {{{name}}}
+{{#if scientificName}}NOM SCIENTIFIQUE FOURNI : {{{scientificName}}}{{/if}}
 
 Règles à suivre :
-1. Identifie le nom scientifique exact.
+1. Identifie le nom scientifique exact. {{#if scientificName}}IMPORTANT : Si un NOM SCIENTIFIQUE FOURNI est présent, utilise-le comme identifiant unique et prioritaire pour garantir que toutes les données retournées concernent précisément ce spécimen. Ne le change pas dans ta réponse sauf s'il s'agit d'une erreur manifeste.{{/if}}
 2. Évalue le risque de "gratte" (ciguatera) spécifiquement dans les lagons calédoniens pour trois tailles :
    - Petit spécimen (inférieur à la taille de maturité habituelle)
    - Moyen spécimen (taille standard de capture)
