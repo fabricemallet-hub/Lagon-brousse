@@ -46,6 +46,9 @@ import {
   Waves,
   Clock,
   X,
+  SearchPlus,
+  SearchMinus,
+  Maximize2
 } from 'lucide-react';
 import { Button } from './button';
 import { cn } from '@/lib/utils';
@@ -54,6 +57,7 @@ import type { FishRating, Tide } from '@/lib/types';
 import { CrabIcon, LobsterIcon, OctopusIcon } from '../icons';
 import { Skeleton } from './skeleton';
 import { Badge } from './badge';
+import { Slider } from './slider';
 
 export const MoonPhaseIcon = ({
   phase,
@@ -215,6 +219,11 @@ export function LunarCalendar() {
   const [detailedDay, setDetailedDay] = useState<Date | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // ZOOM STATES
+  const [zoom, setZoom] = useState(1);
+  const [initialDistance, setInitialDistance] = useState<number | null>(null);
+  const calendarInnerRef = useRef<HTMLDivElement>(null);
+
   const handleDayClick = (day: Date) => { setSelectedDate(day); setDetailedDay(day); };
   const handlePrevMonth = () => setDisplayDate((d) => subMonths(d, 1));
   const handleNextMonth = () => setDisplayDate((d) => addMonths(d, 1));
@@ -245,10 +254,82 @@ export function LunarCalendar() {
     return () => clearTimeout(timer);
   }, [displayDate, calendarView]);
 
+  // TOUCH PINCH HANDLERS
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      setInitialDistance(dist);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && initialDistance !== null) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      
+      // Sensibilité du zoom
+      const zoomFactor = dist / initialDistance;
+      const newZoom = Math.max(0.4, Math.min(2, zoom * zoomFactor));
+      
+      setZoom(newZoom);
+      setInitialDistance(dist);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setInitialDistance(null);
+  };
+
   return (
     <div className="flex flex-col items-start py-4 w-full">
-      <div className="w-full overflow-x-auto pb-4 scrollbar-hide" ref={scrollContainerRef}>
-        <div className="w-[1200px] border rounded-lg bg-card shadow-lg overflow-hidden flex flex-col shrink-0">
+      {/* ZOOM CONTROLS */}
+      <div className="w-full flex items-center justify-between mb-4 px-2 bg-muted/20 p-2 rounded-xl border border-dashed border-primary/20">
+        <div className="flex items-center gap-2">
+          <SearchMinus className="size-4 text-muted-foreground" />
+          <Slider 
+            value={[zoom * 100]} 
+            min={40} 
+            max={200} 
+            step={1}
+            onValueChange={(v) => setZoom(v[0] / 100)}
+            className="w-32"
+          />
+          <SearchPlus className="size-4 text-muted-foreground" />
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-black uppercase text-muted-foreground tabular-nums">{Math.round(zoom * 100)}%</span>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="size-8 rounded-full" 
+            onClick={() => setZoom(1)}
+            title="Réinitialiser le zoom"
+          >
+            <RefreshCw className="size-3" />
+          </Button>
+        </div>
+      </div>
+
+      <div 
+        className="w-full overflow-x-auto pb-4 scrollbar-hide touch-pan-x" 
+        ref={scrollContainerRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        <div 
+          className="w-fit border rounded-lg bg-card shadow-lg overflow-hidden flex flex-col shrink-0 origin-top-left transition-transform duration-75"
+          style={{ 
+            transform: `scale(${zoom})`,
+            width: '1200px', // Largeur fixe du calendrier pour le zoom cohérent
+          }}
+          ref={calendarInnerRef}
+        >
           <div className="flex justify-between items-center p-4 border-b bg-muted/10">
             <Button variant="ghost" size="icon" className="size-10" onClick={handlePrevMonth}><ChevronLeft className="size-6" /></Button>
             <h2 className="text-lg font-black uppercase tracking-tighter capitalize">{format(displayDate, 'MMMM yyyy', { locale: fr })}</h2>
@@ -282,6 +363,9 @@ export function LunarCalendar() {
         </div>
       </div>
       
+      {/* Ajuster l'espace occupé après le scale pour éviter les chevauchements */}
+      <div style={{ height: `calc(${zoom} * 100%)`, minHeight: '20px' }}></div>
+
       <div className="mt-6 px-1 w-full lg:w-[1200px] shrink-0">
         {calendarView === 'champs' ? (
           <div className="space-y-3">
