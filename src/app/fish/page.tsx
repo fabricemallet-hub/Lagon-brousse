@@ -277,7 +277,7 @@ export default function FishPage() {
                 min={0} max={100} step={1} 
                 onValueChange={(v) => setUserRiskValue(v[0])} 
               />
-              <div className="flex justify-between text-[8px] font-black uppercase opacity-40">
+              <div className="flex justify-between text-[8px] font-black uppercase opacity-40 px-1">
                 <span>Faible</span>
                 <span>Critique</span>
               </div>
@@ -444,6 +444,12 @@ function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo,
                     <Megaphone className="size-3 shrink-0 mt-0.5 text-primary" />
                     <span>
                       Ce score a été ajusté par <strong>{stats?.nombre_de_votants || 0} pêcheur{ (stats?.nombre_de_votants || 0) > 1 ? 's' : ''}</strong> dans la commune de <strong>{selectedLocation}</strong>.
+                    </span>
+                  </p>
+                  <p className="text-[9px] leading-relaxed font-medium text-muted-foreground italic flex items-start gap-2">
+                    <Info className="size-3 shrink-0 mt-0.5 text-slate-400" />
+                    <span>
+                      <strong>SCIEN :</strong> Risque théorique moyen basé sur les données scientifiques de référence.
                     </span>
                   </p>
                 </div>
