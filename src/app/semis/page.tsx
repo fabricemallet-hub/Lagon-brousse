@@ -48,7 +48,8 @@ import {
   Zap,
   TrendingUp,
   TrendingDown,
-  ChevronRight
+  ChevronRight,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -60,6 +61,7 @@ import { fr } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { getGardeningAdvice } from '@/ai/flows/gardening-flow';
 import { identifyPlant } from '@/ai/flows/identify-plant-flow';
+import { getGardenSuggestions } from '@/ai/flows/garden-suggestions-flow';
 import { useLocation } from '@/context/location-context';
 import { generateProceduralData, getDataForDate } from '@/lib/data';
 import { cn } from '@/lib/utils';
@@ -102,6 +104,7 @@ export default function SemisPage() {
   const [sowingDate, setSowingDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isSuggestingToday, setIsSuggestingToday] = useState(false);
   const [aiAdvice, setAiAdvice] = useState<GardeningAdviceOutput | null>(null);
   const [isIdentifying, setIsIdentifying] = useState(false);
   const [idResult, setIdResult] = useState<IdentifyPlantOutput | null>(null);
@@ -123,6 +126,41 @@ export default function SemisPage() {
   const filteredData = semisData.filter(veg => 
     veg.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleQueSemer = async () => {
+    if (topSeedsForToday.length > 0) {
+      const best = topSeedsForToday[0];
+      setSearchQuery(best.name);
+      toast({ 
+        title: "Conseil du jour", 
+        description: `L'influence ${todayData.farming.zodiac} favorise : ${best.name} !` 
+      });
+      return;
+    }
+
+    setIsSuggestingToday(true);
+    try {
+      const month = format(new Date(), 'MMMM', { locale: fr });
+      const suggestions = await getGardenSuggestions(month);
+      if (suggestions && suggestions.length > 0) {
+        setSearchQuery(suggestions[0].name);
+        toast({ 
+          title: "Suggestions du mois", 
+          description: `Pas d'idéal aujourd'hui, mais en ${month} le guide recommande : ${suggestions[0].name}` 
+        });
+      } else {
+        toast({ 
+          variant: "destructive",
+          title: "Repos au jardin", 
+          description: "Le cycle actuel n'est pas propice aux nouveaux semis majeurs." 
+        });
+      }
+    } catch (e) {
+      toast({ variant: "destructive", title: "Erreur IA", description: "Impossible de récupérer les suggestions." });
+    } finally {
+      setIsSuggestingToday(false);
+    }
+  };
 
   const handleCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -260,14 +298,10 @@ export default function SemisPage() {
         <Button 
           variant="secondary" 
           className="w-full font-black uppercase h-14 text-sm tracking-tight shadow-md border-2 border-primary/20 gap-3"
-          onClick={() => {
-            if (topSeedsForToday.length > 0) {
-              setSearchQuery(topSeedsForToday[0].name);
-              toast({ title: "Analyse en cours", description: `Focus sur : ${topSeedsForToday[0].name}` });
-            }
-          }}
+          onClick={handleQueSemer}
+          disabled={isSuggestingToday}
         >
-          <BrainCircuit className="size-6 text-primary" />
+          {isSuggestingToday ? <RefreshCw className="size-6 animate-spin text-primary" /> : <BrainCircuit className="size-6 text-primary" />}
           Que semer aujourd'hui ? (IA)
         </Button>
 
