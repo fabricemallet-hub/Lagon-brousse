@@ -80,6 +80,7 @@ export default function VesselTrackerPage() {
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
   
   const [isSharing, setIsSharing] = useState(false);
+  const [isReceiverGpsActive, setIsReceiverGpsActive] = useState(false);
   const [emergencyContact, setEmergencyContact] = useState('');
   const [isEmergencyEnabled, setIsEmergencyEnabled] = useState(true);
   const [isCustomMessageEnabled, setIsCustomMessageEnabled] = useState(true);
@@ -337,11 +338,18 @@ export default function VesselTrackerPage() {
     toast({ title: label || (st === 'emergency' ? 'ALERTE ASSISTANCE' : 'Statut mis à jour') });
   };
 
-  const handleBirdsSignal = async () => {
-    if (!isSharing || !currentPos || !user || !firestore) {
-        toast({ variant: "destructive", title: "Erreur", description: "GPS non disponible." });
+  const handleBirdsSignal = async (targetId?: string) => {
+    const vesselId = targetId || sharingId;
+    if (!vesselId || !user || !firestore) {
+        toast({ variant: "destructive", title: "Erreur", description: "Navire non sélectionné." });
         return;
     }
+    
+    if (!currentPos) {
+        toast({ variant: "destructive", title: "GPS Requis", description: "Veuillez activer votre position sur la carte pour marquer un point." });
+        return;
+    }
+
     const now = new Date();
     const timeLabel = format(now, 'HH:mm');
     const newMarker: HuntingMarker = {
@@ -351,11 +359,11 @@ export default function VesselTrackerPage() {
         time: timeLabel
     };
     try {
-        const vesselRef = doc(firestore, 'vessels', sharingId);
+        const vesselRef = doc(firestore, 'vessels', vesselId);
         await updateDoc(vesselRef, {
             huntingMarkers: arrayUnion(newMarker),
             status: 'moving',
-            eventLabel: `CHASSE - OISEAUX À ${timeLabel}`,
+            eventLabel: mode === 'sender' ? `CHASSE - OISEAUX À ${timeLabel}` : `CHASSE (SIGNAL B) À ${timeLabel}`,
             statusChangedAt: serverTimestamp()
         });
         toast({ title: "Point de CHASSE marqué" });
@@ -367,6 +375,7 @@ export default function VesselTrackerPage() {
   const handleStopSharing = async () => {
     if (!user || !firestore) return;
     setIsSharing(false);
+    setIsReceiverGpsActive(false);
     await setDoc(doc(firestore, 'vessels', sharingId), { isSharing: false, lastActive: serverTimestamp() }, { merge: true });
     if (watchIdRef.current) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
     setCurrentPos(null);
@@ -497,8 +506,10 @@ export default function VesselTrackerPage() {
   }, [followedVessels, mode, vesselPrefs, playVesselSound, toast]);
 
   useEffect(() => {
-    if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
+    const shouldRunGps = (mode === 'sender' && isSharing) || (mode === 'receiver' && isReceiverGpsActive);
+    if (!shouldRunGps || !navigator.geolocation) {
       if (watchIdRef.current) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
+      if (!shouldRunGps) setCurrentPos(null);
       return;
     }
     watchIdRef.current = navigator.geolocation.watchPosition(
@@ -506,25 +517,28 @@ export default function VesselTrackerPage() {
         const newPos = { lat: position.coords.latitude, lng: position.coords.longitude };
         setCurrentPos(newPos);
         if (shouldPanOnNextFix.current && map) { map.panTo(newPos); map.setZoom(15); shouldPanOnNextFix.current = false; }
-        if (vesselStatus !== 'returning' && vesselStatus !== 'landed' && vesselStatus !== 'emergency') {
-            if (!anchorPos) { setAnchorPos(newPos); updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng }, status: 'moving', isSharing: true }); return; }
-            const dist = getDistance(newPos.lat, newPos.lng, anchorPos.lat, anchorPos.lng);
-            if (dist > IMMOBILITY_THRESHOLD_METERS) {
-              setVesselStatus('moving'); setAnchorPos(newPos); immobilityStartTime.current = null;
-              updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng }, status: 'moving', isSharing: true, eventLabel: null });
-            } else {
-              if (!immobilityStartTime.current) immobilityStartTime.current = Date.now();
-              if (Date.now() - immobilityStartTime.current > 30000 && vesselStatus !== 'stationary') {
-                setVesselStatus('stationary'); updateVesselInFirestore({ status: 'stationary', eventLabel: null });
-              }
-            }
-        } else { updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng } }); }
+        
+        if (mode === 'sender') {
+            if (vesselStatus !== 'returning' && vesselStatus !== 'landed' && vesselStatus !== 'emergency') {
+                if (!anchorPos) { setAnchorPos(newPos); updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng }, status: 'moving', isSharing: true }); return; }
+                const dist = getDistance(newPos.lat, newPos.lng, anchorPos.lat, anchorPos.lng);
+                if (dist > IMMOBILITY_THRESHOLD_METERS) {
+                  setVesselStatus('moving'); setAnchorPos(newPos); immobilityStartTime.current = null;
+                  updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng }, status: 'moving', isSharing: true, eventLabel: null });
+                } else {
+                  if (!immobilityStartTime.current) immobilityStartTime.current = Date.now();
+                  if (Date.now() - immobilityStartTime.current > 30000 && vesselStatus !== 'stationary') {
+                    setVesselStatus('stationary'); updateVesselInFirestore({ status: 'stationary', eventLabel: null });
+                  }
+                }
+            } else { updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng } }); }
+        }
       },
       () => toast({ variant: "destructive", title: "Erreur GPS" }),
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
-  }, [isSharing, mode, anchorPos, updateVesselInFirestore, map, toast, vesselStatus]);
+  }, [isSharing, isReceiverGpsActive, mode, anchorPos, updateVesselInFirestore, map, toast, vesselStatus]);
 
   const toggleWakeLock = async () => {
     if (!('wakeLock' in navigator)) return;
@@ -533,8 +547,27 @@ export default function VesselTrackerPage() {
   };
 
   const handleRecenter = () => {
-    const pos = mode === 'sender' ? currentPos : (followedVessels?.find(v => v.isSharing)?.location ? { lat: followedVessels.find(v => v.isSharing)!.location.latitude, lng: followedVessels.find(v => v.isSharing)!.location.longitude } : null);
-    if (pos && map) { map.panTo(pos); map.setZoom(15); } else { shouldPanOnNextFix.current = true; }
+    let pos = null;
+    if (mode === 'sender') {
+        pos = currentPos;
+    } else {
+        if (isReceiverGpsActive && currentPos) {
+            pos = currentPos;
+        } else {
+            const activeVessel = followedVessels?.find(v => v.isSharing);
+            if (activeVessel?.location) {
+                pos = { lat: activeVessel.location.latitude, lng: activeVessel.location.longitude };
+            }
+        }
+    }
+    
+    if (pos && map) { 
+        map.panTo(pos); 
+        map.setZoom(15); 
+    } else { 
+        shouldPanOnNextFix.current = true; 
+        if (mode === 'receiver' && !isReceiverGpsActive) setIsReceiverGpsActive(true);
+    }
   };
 
   const sendEmergencySms = (type: 'SOS' | 'MAYDAY' | 'PAN PAN') => {
@@ -607,7 +640,7 @@ export default function VesselTrackerPage() {
                             <AlertCircle className="size-6" /> DEMANDE ASSISTANCE (PROBLÈME)
                         </Button>
 
-                        <Button variant="outline" className="w-full h-14 font-black uppercase text-[11px] border-2 bg-blue-50 border-blue-200 gap-3 touch-manipulation shadow-sm text-blue-700" onClick={handleBirdsSignal}>
+                        <Button variant="outline" className="w-full h-14 font-black uppercase text-[11px] border-2 bg-blue-50 border-blue-200 gap-3 touch-manipulation shadow-sm text-blue-700" onClick={() => handleBirdsSignal()}>
                             <Bird className="size-6 animate-bounce" /> REGROUPEMENT D'OISEAUX (CHASSE)
                         </Button>
 
@@ -714,6 +747,36 @@ export default function VesselTrackerPage() {
                                 </div>
                             );
                         })}
+                    </div>
+                </div>
+              )}
+
+              {/* Receiver Manual Signaling */}
+              {followedVessels?.some(v => v.isSharing) && (
+                <div className="bg-muted/20 p-4 rounded-2xl border-2 border-dashed space-y-3 animate-in fade-in slide-in-from-top-2">
+                    <p className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest flex items-center gap-2">
+                        <Zap className="size-3" /> Signalisation (Vers Navire)
+                    </p>
+                    
+                    {!isReceiverGpsActive ? (
+                        <Button variant="outline" className="w-full h-12 font-black uppercase text-[10px] border-primary/20 bg-primary/5 text-primary" onClick={() => { setIsReceiverGpsActive(true); shouldPanOnNextFix.current = true; }}>
+                            <LocateFixed className="size-4 mr-2" /> Activer mon GPS pour signaler
+                        </Button>
+                    ) : (
+                        <div className="flex items-center justify-between px-1">
+                            <span className="text-[9px] font-black uppercase text-green-600 flex items-center gap-1"><LocateFixed className="size-3" /> GPS Actif (Moi)</span>
+                            <Button variant="ghost" size="sm" className="h-6 text-[8px] font-black uppercase underline" onClick={() => setIsReceiverGpsActive(false)}>Désactiver</Button>
+                        </div>
+                    )}
+
+                    <div className={cn("space-y-2", !isReceiverGpsActive && "opacity-40 pointer-events-none")}>
+                        <Button variant="outline" className="w-full h-14 font-black uppercase text-[11px] border-2 bg-blue-50 border-blue-200 gap-3 touch-manipulation shadow-sm text-blue-700" onClick={() => {
+                            const target = followedVessels.find(v => v.isSharing);
+                            if (target) handleBirdsSignal(target.id);
+                        }}>
+                            <Bird className="size-6 animate-bounce" /> REGROUPEMENT D'OISEAUX (CHASSE)
+                        </Button>
+                        <p className="text-[8px] font-bold text-muted-foreground text-center italic">Le point sera marqué sur la carte du navire à VOTRE position actuelle.</p>
                     </div>
                 </div>
               )}
@@ -882,7 +945,7 @@ export default function VesselTrackerPage() {
                         ))}
                     </React.Fragment>
                 ))}
-                {mode === 'sender' && currentPos && (
+                {currentPos && (
                     <OverlayView position={currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}><div style={{ transform: 'translate(-50%, -50%)' }} className="size-6 bg-blue-500 border-4 border-white rounded-full shadow-lg animate-pulse" /></OverlayView>
                 )}
           </GoogleMap>
