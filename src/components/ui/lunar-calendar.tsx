@@ -46,8 +46,8 @@ import {
   Waves,
   Clock,
   X,
-  SearchPlus,
-  SearchMinus,
+  ZoomIn,
+  ZoomOut,
   Maximize2
 } from 'lucide-react';
 import { Button } from './button';
@@ -290,7 +290,7 @@ export function LunarCalendar() {
       {/* ZOOM CONTROLS */}
       <div className="w-full flex items-center justify-between mb-4 px-2 bg-muted/20 p-2 rounded-xl border border-dashed border-primary/20">
         <div className="flex items-center gap-2">
-          <SearchMinus className="size-4 text-muted-foreground" />
+          <ZoomOut className="size-4 text-muted-foreground" />
           <Slider 
             value={[zoom * 100]} 
             min={40} 
@@ -299,7 +299,7 @@ export function LunarCalendar() {
             onValueChange={(v) => setZoom(v[0] / 100)}
             className="w-32"
           />
-          <SearchPlus className="size-4 text-muted-foreground" />
+          <ZoomIn className="size-4 text-muted-foreground" />
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-black uppercase text-muted-foreground tabular-nums">{Math.round(zoom * 100)}%</span>
