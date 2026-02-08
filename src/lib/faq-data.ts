@@ -7,7 +7,7 @@ export const INITIAL_FAQ_DATA = [
   // --- GENERAL (15) ---
   { categorie: "General", ordre: 1, question: "L'application remplace-t-elle les sources officielles ?", reponse: "Non. Pour votre sécurité, consultez toujours meteo.nc et les autorités maritimes (COSS). L'app est un assistant tactique." },
   { categorie: "General", ordre: 2, question: "Pourquoi la géolocalisation est-elle indispensable ?", reponse: "Elle permet de calculer les marées de la station la plus proche de VOUS, d'activer le Boat Tracker et de vous donner les risques de gratte locaux." },
-  { categorie: "General", ordre: 3, question: "Comment fonctionne le mode hors-ligne ?", reponse: "Les données consultées avec internet sont mises en cache (PWA). Le GPS fonctionne sans réseau, mais pas les mises à jour live." },
+  { categorie: "General", ordre: 3, question: "Comment fonctionne le mode hors-ligne ?", reponse: "Les données consultées avec internet sont mises en cache (PWA). Le GPS fonctionne sans réseau, mas pas les mises à jour live." },
   { categorie: "General", ordre: 4, question: "L'application consomme-t-elle beaucoup de batterie ?", reponse: "Le GPS en continu (Boat Tracker) est énergivore. Utilisez le 'Mode Éveil' uniquement quand nécessaire et prévoyez une batterie externe." },
   { categorie: "General", ordre: 5, question: "Quelle est la précision des marées ?", reponse: "Nous utilisons les constantes du SHOM ajustées par algorithme selon votre commune. La précision est de +/- 10 min." },
   { categorie: "General", ordre: 6, question: "Puis-je changer ma commune favorite ?", reponse: "Oui, via le sélecteur en haut de l'écran. Votre choix est mémorisé sur votre profil." },
@@ -26,7 +26,7 @@ export const INITIAL_FAQ_DATA = [
   { categorie: "Peche", ordre: 17, question: "Comment fonctionne l'IA 'Jour Similaire' ?", reponse: "Elle compare la marée et la lune d'un succès passé pour trouver une date identique dans le futur." },
   { categorie: "Peche", ordre: 18, question: "Le scanner de poisson identifie-t-il le risque de gratte ?", reponse: "Oui, il identifie l'espèce et affiche instantanément le profil de risque différencié par taille (Petit, Moyen, Grand)." },
   { categorie: "Peche", ordre: 19, question: "Comment éviter la gratte (ciguatera) ?", reponse: "L'app vous donne un score pondéré. Évitez les spécimens de catégorie 'Grand' dans les zones à risque et consultez toujours le lien vers le guide de la CPS présent sur chaque fiche." },
-  { categorie: "Peche", ordre: 20, question: "Pourquoi le risque de gratte varie-t-il selon la taille ?", reponse: "Les toxines s'accumulent tout au long de la vie du poisson. Un grand spécimen est statistiquement beaucoup plus dangereux qu'un petit." },
+  { categorie: "Peche", ordre: 20, question: "Pourquoi le risque de gratte varie-t-ils selon la taille ?", reponse: "Les toxines s'accumulent tout au long de la vie du poisson. Un grand spécimen est statistiquement beaucoup plus dangereux qu'un petit." },
   { categorie: "Peche", ordre: 21, question: "C'est quoi le 'Risque local' (Communautaire) ?", reponse: "C'est la moyenne des signalements effectués par les pêcheurs de votre commune. Elle reflète la réalité du terrain." },
   { categorie: "Peche", ordre: 22, question: "Comment est calculé le Score Final de risque ?", reponse: "C'est la moyenne exacte entre les données scientifiques (Admin) et la moyenne des signalements citoyens de la commune." },
   { categorie: "Peche", ordre: 23, question: "Que signifient les longueurs en CM sur les fiches ?", reponse: "Ce sont des repères pour vous aider à classer votre prise (ex: < 30cm = Petit) afin de consulter le bon taux de risque." },
@@ -75,6 +75,7 @@ export const INITIAL_FAQ_DATA = [
   { categorie: "Boat Tracker", ordre: 101, question: "Comment suivre la péremption de mon matériel de sécurité ?", reponse: "Allez dans l'onglet 'Réglementation' > 'Sécurité & Armement'. Cliquez sur 'CONSEILS EXPERTS NC' puis 'Ajouter un Navire'. Vous pourrez alors lister vos fusées et extincteurs avec leurs dates." },
   { categorie: "Boat Tracker", ordre: 102, question: "Où s'affichent les alertes de péremption ?", reponse: "Un bandeau orange d'alerte apparaît automatiquement en haut de la page 'Accueil' dès qu'un équipement est à moins de 90 jours (3 mois) de sa fin de validité." },
   { categorie: "Boat Tracker", ordre: 103, question: "Peut-on gérer plusieurs bateaux ?", reponse: "Oui, vous pouvez créer autant de profils de navires que vous le souhaitez dans la section Réglementation et gérer le matériel de chacun séparément." },
+  { categorie: "Boat Tracker", ordre: 107, question: "Le récepteur peut-il envoyer un signal au navire ?", reponse: "Oui. En activant son propre GPS dans l'onglet Récepteur, il peut marquer un 'Regroupement d'oiseaux'. Le point GPS s'affichera instantanément sur la carte de l'émetteur et une alerte sonore retentira à bord." },
 
   // --- CHASSE (15) ---
   { categorie: "Chasse", ordre: 61, question: "Comment rejoindre une battue ?", reponse: "Entrez le code session (CH-XXXX) fourni par l'organisateur." },

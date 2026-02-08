@@ -99,6 +99,7 @@ const sectionContent: Record<string, {
       "Émetteur (A) - Identité : Configurez un ID et votre surnom de navire. Ce surnom est inclus automatiquement au début de vos SMS d'urgence.",
       "Émetteur (A) - Signaux Tactiques : Utilisez 'DEMANDE ASSISTANCE' pour une alerte rouge clignotante immédiate, ou 'REGROUPEMENT OISEAUX' pour marquer une chasse par un point GPS horodaté sur la carte.",
       "Récepteur (B) - Flotte & Suivi : Saisissez l'ID d'un navire pour l'ajouter. Vous pouvez suivre plusieurs navires simultanément sur la carte satellite.",
+      "Récepteur (B) - Signalisation Inverse : Activez votre propre GPS pour signaler un 'REGROUPEMENT OISEAUX' à votre tour. Le point s'affichera sur la carte du capitaine.",
       "Récepteur (B) - Veille Stratégique : Configurez une alerte d'immobilité (1h à 24h). Si le navire reste immobile trop longtemps, une alarme sonore jouera en boucle jusqu'à votre validation.",
       "Récepteur (B) - Sons : Personnalisez chaque alerte (Mouvement, Assistance, Oiseaux, Batterie) via les sélecteurs de sons dédiés.",
       "Journal de Bord : Consultez l'historique permanent. Utilisez le bouton 'Reset' pour vider l'historique et effacer les points de chasse de la carte."
@@ -160,7 +161,7 @@ const sectionContent: Record<string, {
     title: 'Chasse au Cerf',
     icon: Crosshair,
     color: 'bg-orange-600',
-    role: "Optimisez vos sorties en brousse grâce à l'analyse du vent et au suivi de groupe en temps réel.",
+    role: "Optimisez vos sorties en brousse grâce l'analyse du vent et au suivi de groupe en temps réel.",
     steps: [
       "Consultez la période biologique (Brame, Chute des bois) pour adapter votre stratégie.",
       "Utilisez la carte du vent pour visualiser d'où vient l'air par rapport au relief.",
