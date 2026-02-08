@@ -23,7 +23,8 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
     'fabrice.mallet@gmail.com'
   ];
   const adminUids = [
-    'K9cVYLVUk1NV99YV3anebkugpPp1'
+    'K9cVYLVUk1NV99YV3anebkugpPp1',
+    'Irglq69MasYdNwBmUu8yKvw6h4G2'
   ];
   
   const isAdminUser = adminEmails.includes(email) || adminUids.includes(uid);
