@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
@@ -19,7 +18,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { LocationData, FishingSpot, SwellForecast, Tide, SpotShare } from '@/lib/types';
 import { getDataForDate, generateProceduralData } from '@/lib/data';
-import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown, Pencil, History, Navigation, Map as MapIcon, RefreshCw, X, Share2, Send } from 'lucide-react';
+import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown, Pencil, History, Navigation, Map as MapIcon, RefreshCw, X, Share2, Send, Info } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from './alert';
 import { useLocation } from '@/context/location-context';
