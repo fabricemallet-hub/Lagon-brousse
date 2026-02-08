@@ -33,7 +33,8 @@ export default function AdminMessagePage() {
     return email === 'f.mallet81@outlook.com' || 
            email === 'f.mallet81@gmail.com' || 
            email === 'fabrice.mallet@gmail.com' ||
-           uid === 'K9cVYLVUk1NV99YV3anebkugpPp1';
+           uid === 'K9cVYLVUk1NV99YV3anebkugpPp1' ||
+           uid === 'Irglq69MasYdNwBmUu8yKvw6h4G2';
   }, [user]);
 
   const conversationId = params.userId as string;

@@ -36,6 +36,7 @@ export function SidebarNav() {
            email === 'f.mallet81@gmail.com' || 
            email === 'fabrice.mallet@gmail.com' ||
            uid === 'K9cVYLVUk1NV99YV3anebkugpPp1' ||
+           uid === 'Irglq69MasYdNwBmUu8yKvw6h4G2' ||
            userProfile?.subscriptionStatus === 'admin';
   }, [user, userProfile]);
 

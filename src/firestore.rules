@@ -11,9 +11,7 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.uid == "K9cVYLVUk1NV99YV3anebkugpPp1" ||
-        request.auth.uid == "ipupi3Pg4RfrSEpFyT69BtlCdpi2" ||
-        request.auth.uid == "Irglq69MasYdNwBmUu8yKvw6h4G2" ||
+        request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2", "Irglq69MasYdNwBmUu8yKvw6h4G2"] ||
         (request.auth.token.email != null && 
          request.auth.token.email.lower() in [
            "fabrice.mallet@gmail.com",

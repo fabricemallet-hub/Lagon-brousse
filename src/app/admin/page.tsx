@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -112,7 +113,8 @@ export default function AdminPage() {
     return email === 'f.mallet81@outlook.com' || 
            email === 'f.mallet81@gmail.com' || 
            email === 'fabrice.mallet@gmail.com' ||
-           uid === 'K9cVYLVUk1NV99YV3anebkugpPp1';
+           uid === 'K9cVYLVUk1NV99YV3anebkugpPp1' ||
+           uid === 'Irglq69MasYdNwBmUu8yKvw6h4G2';
   }, [user]);
 
   // --- QUERIES ---
@@ -868,7 +870,7 @@ export default function AdminPage() {
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           <Button variant="ghost" size="icon" className="size-8" onClick={() => { setCurrentFaq(f); setIsFaqDialogOpen(true); }}><Pencil className="size-3" /></Button>
-                          <Button variant="ghost" size="icon" className="size-8" onClick={() => handleDeleteFaq(id)}><Trash2 className="size-3 text-destructive" /></Button>
+                          <Button variant="ghost" size="icon" className="size-8" onClick={() => handleDeleteFaq(f.id)}><Trash2 className="size-3 text-destructive" /></Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -977,7 +979,7 @@ export default function AdminPage() {
               <Label className="text-xs font-bold uppercase opacity-60">Scientifique</Label>
               <Input 
                 value={currentFish.scientificName || ''} 
-                onChange={e => setCurrentFish({...currentFish, scientificName: e.target.value})} 
+                onChange={e => setCurrentFish(prev => ({ ...prev, scientificName: e.target.value }))} 
               />
             </div>
 

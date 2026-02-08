@@ -11,11 +11,14 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.uid == "K9cVYLVUk1NV99YV3anebkugpPp1" ||
-        request.auth.uid == "ipupi3Pg4RfrSEpFyT69BtlCdpi2" ||
-        request.auth.token.email.matches("(?i)fabrice.mallet@gmail.com") ||
-        request.auth.token.email.matches("(?i)f.mallet81@gmail.com") || 
-        request.auth.token.email.matches("(?i)f.mallet81@outlook.com")
+        request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2"] ||
+        (request.auth.token.email != null && 
+         request.auth.token.email.lower() in [
+           "fabrice.mallet@gmail.com",
+           "f.mallet81@gmail.com",
+           "f.mallet81@outlook.com"
+         ]
+        )
       );
     }
 
@@ -93,6 +96,15 @@ service cloud.firestore {
     match /shared_access_tokens/{id} {
       allow get, list: if true;
       allow write: if isAdmin();
+    }
+
+    // --- 5. PARTAGE DE SPOTS ---
+    match /spot_shares/{id} {
+      allow create: if isSignedIn();
+      allow read, delete: if isSignedIn() && (
+        isAdmin() || 
+        (request.auth.token.email != null && resource.data.recipientEmail == request.auth.token.email.lower())
+      );
     }
   }
 }
