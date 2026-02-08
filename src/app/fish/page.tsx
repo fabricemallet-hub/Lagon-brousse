@@ -453,10 +453,11 @@ function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo,
 
                 <Button 
                   variant="outline" 
-                  className="w-full h-10 border-2 font-black uppercase text-[9px] tracking-widest gap-2 bg-primary/5 hover:bg-primary/10"
+                  className="w-full h-auto py-3 border-2 font-black uppercase text-[11px] leading-tight tracking-tight gap-2 bg-primary/5 hover:bg-primary/10 whitespace-normal"
                   onClick={() => onReport(fish)}
                 >
-                  <ThumbsDown className="size-3" /> Ajuster le % de gratte : Indice de risque citoyen par commune
+                  <ThumbsDown className="size-4 shrink-0" /> 
+                  <span className="text-center">Ajuster le % de gratte : Indice de risque citoyen par commune</span>
                 </Button>
               </div>
 
