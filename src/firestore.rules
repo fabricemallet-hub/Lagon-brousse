@@ -21,14 +21,12 @@ service cloud.firestore {
 
     // --- 1. CMS SUPPORT & FAQ ---
     match /cms_support/faq/items/{id} {
-      // Public : Tout le monde voit la FAQ (Lecture seule)
       allow get, list: if true;
       allow write: if isAdmin();
     }
 
     match /cms_support/tickets/items/{id} {
       allow create: if isSignedIn();
-      // Un utilisateur voit ses tickets, l'admin voit tout
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow list: if isAdmin() || (isSignedIn() && request.query.limit <= 100);
       allow update, delete: if isAdmin();
@@ -88,6 +86,13 @@ service cloud.firestore {
     match /shared_access_tokens/{id} {
       allow get, list: if true;
       allow write: if isAdmin();
+    }
+
+    // --- 5. PARTAGE DE SPOTS ---
+    match /spot_shares/{id} {
+      allow create: if isSignedIn();
+      // On autorise la lecture et suppression uniquement au destinataire
+      allow read, delete: if isSignedIn() && resource.data.recipientEmail == request.auth.token.email;
     }
   }
 }

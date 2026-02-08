@@ -35,7 +35,7 @@
         "equipment": {
           "type": "array",
           "items": {
-            "type": "object",
+            "object",
             "properties": {
               "id": { "type": "string" },
               "type": { "type": "string", "enum": ["fusée", "extincteur", "autre"] },
@@ -100,6 +100,20 @@
         "status": { "type": "string", "enum": ["moving", "stationary", "offline", "returning", "landed"] },
         "isSharing": { "type": "boolean" }
       }
+    },
+    "SpotShare": {
+      "title": "SpotShare",
+      "type": "object",
+      "description": "Partage de point GPS entre utilisateurs",
+      "properties": {
+        "id": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "recipientEmail": { "type": "string" },
+        "spotData": { "type": "object" },
+        "createdAt": { "type": "object" }
+      },
+      "required": ["senderId", "recipientEmail", "spotData"]
     }
   },
   "auth": {
@@ -137,6 +151,14 @@
           "entityName": "UserVesselSafety",
           "schema": { "$ref": "#/backend/entities/UserVesselSafety" },
           "description": "Gestion de la sécurité des navires privés"
+        }
+      },
+      {
+        "path": "/spot_shares/{id}",
+        "definition": {
+          "entityName": "SpotShare",
+          "schema": { "$ref": "#/backend/entities/SpotShare" },
+          "description": "Transfert de spots entre utilisateurs"
         }
       }
     ]

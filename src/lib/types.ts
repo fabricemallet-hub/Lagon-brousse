@@ -233,6 +233,7 @@ export interface FishingSpot {
   fishingTypes?: string[];
   createdAt: any;
   context: any;
+  sharedBy?: string;
 }
 
 export interface HuntingMarker {
@@ -306,4 +307,13 @@ export interface CgvAcceptance {
   acceptedAt: any;
   version: number;
   content: string;
+}
+
+export interface SpotShare {
+  id: string;
+  senderId: string;
+  senderName: string;
+  recipientEmail: string;
+  spotData: any;
+  createdAt: any;
 }

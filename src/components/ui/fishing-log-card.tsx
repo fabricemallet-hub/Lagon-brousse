@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
@@ -13,12 +14,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, deleteDoc, doc, updateDoc, where, getDocs } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import type { LocationData, FishingSpot, SwellForecast, Tide } from '@/lib/types';
+import type { LocationData, FishingSpot, SwellForecast, Tide, SpotShare } from '@/lib/types';
 import { getDataForDate, generateProceduralData } from '@/lib/data';
-import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown, Pencil, History, Navigation, Map as MapIcon, RefreshCw, X } from 'lucide-react';
+import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown, Pencil, History, Navigation, Map as MapIcon, RefreshCw, X, Share2, Send } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from './alert';
 import { useLocation } from '@/context/location-context';
@@ -89,6 +90,12 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     const [dialogMode, setDialogMode] = useState<'add' | 'edit'>('add');
     const [spotToEdit, setSpotToEdit] = useState<FishingSpot | null>(null);
 
+    // Share States
+    const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+    const [sharingSpot, setSharingSpot] = useState<FishingSpot | null>(null);
+    const [recipientEmail, setRecipientEmail] = useState('');
+    const [isSendingShare, setIsSendingShare] = useState(false);
+
     const { isLoaded, loadError } = useGoogleMaps();
 
     const fishingSpotsRef = useMemoFirebase(() => {
@@ -96,6 +103,40 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         return query(collection(firestore, 'users', user.uid, 'fishing_spots'), orderBy('createdAt', 'desc'));
     }, [user, firestore]);
     const { data: savedSpots, isLoading: areSpotsLoading } = useCollection<FishingSpot>(fishingSpotsRef);
+
+    // Listener pour les spots reçus
+    const sharesRef = useMemoFirebase(() => {
+        if (!firestore || !user?.email) return null;
+        return query(collection(firestore, 'spot_shares'), where('recipientEmail', '==', user.email.toLowerCase()));
+    }, [firestore, user?.email]);
+
+    const { data: incomingShares } = useCollection<SpotShare>(sharesRef);
+
+    useEffect(() => {
+        if (incomingShares && incomingShares.length > 0 && user && firestore) {
+            incomingShares.forEach(async (share) => {
+                try {
+                    // Ajouter le spot reçu à la liste de l'utilisateur
+                    await addDoc(collection(firestore, 'users', user.uid, 'fishing_spots'), {
+                        ...share.spotData,
+                        userId: user.uid,
+                        createdAt: serverTimestamp(),
+                        sharedBy: share.senderName || 'Un ami'
+                    });
+                    // Supprimer le document de partage pour ne pas le ré-importer
+                    await deleteDoc(doc(firestore, 'spot_shares', share.id));
+                    
+                    toast({ 
+                        title: "Nouveau spot reçu !", 
+                        description: `Le coin "${share.spotData.name}" a été ajouté à votre carnet par ${share.senderName}.`,
+                        duration: 5000
+                    });
+                } catch (e) {
+                    console.error("Error importing share:", e);
+                }
+            });
+        }
+    }, [incomingShares, user, firestore, toast]);
 
     const handleSpotClick = (spotId: string) => {
         setOpenSpotId(prevId => (prevId === spotId ? undefined : spotId));
@@ -309,6 +350,43 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         } catch (error) {
             console.error(error);
             toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de supprimer le spot.' });
+        }
+    };
+
+    // Fonctions de partage
+    const handleOpenShare = (spot: FishingSpot) => {
+        setSharingSpot(spot);
+        setRecipientEmail('');
+        setIsShareDialogOpen(true);
+    };
+
+    const handleSendShare = async () => {
+        if (!user || !firestore || !sharingSpot || !recipientEmail.trim()) return;
+        setIsSendingShare(true);
+        try {
+            // Créer un document de partage
+            await addDoc(collection(firestore, 'spot_shares'), {
+                senderId: user.uid,
+                senderName: user.displayName || user.email?.split('@')[0] || 'Un ami',
+                recipientEmail: recipientEmail.trim().toLowerCase(),
+                spotData: {
+                    name: sharingSpot.name,
+                    notes: sharingSpot.notes || '',
+                    location: sharingSpot.location,
+                    icon: sharingSpot.icon,
+                    color: sharingSpot.color,
+                    fishingTypes: sharingSpot.fishingTypes || [],
+                    context: sharingSpot.context
+                },
+                createdAt: serverTimestamp()
+            });
+            toast({ title: "Spot partagé !", description: `Envoyé à ${recipientEmail}` });
+            setIsShareDialogOpen(false);
+        } catch (e) {
+            console.error(e);
+            toast({ variant: 'destructive', title: "Erreur", description: "Impossible de partager le spot." });
+        } finally {
+            setIsSendingShare(false);
         }
     };
 
@@ -596,9 +674,14 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                         </div>
                                                         <div className="min-w-0">
                                                             <p className="font-black uppercase tracking-tight text-xs leading-none truncate">{spot.name}</p>
-                                                            <p className="text-[9px] font-bold text-muted-foreground/60 mt-1 uppercase">
-                                                                {spot.createdAt ? format(spot.createdAt.toDate(), 'd MMM yyyy', { locale: fr }) : '...'}
-                                                            </p>
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                <p className="text-[9px] font-bold text-muted-foreground/60 uppercase">
+                                                                    {spot.createdAt ? format(spot.createdAt.toDate(), 'd MMM yyyy', { locale: fr }) : '...'}
+                                                                </p>
+                                                                {spot.sharedBy && (
+                                                                    <Badge variant="outline" className="text-[7px] font-black uppercase h-3.5 px-1 border-primary/30 text-primary">Reçu de {spot.sharedBy}</Badge>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                     <ChevronDown className="size-4 shrink-0 transition-transform duration-200 opacity-30" />
@@ -627,6 +710,9 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                    <LocateFixed className="size-4 text-primary shrink-0" /> GPS
                                                </Button>
                                                <div className="flex w-full sm:w-auto gap-2">
+                                                   <Button variant="outline" size="icon" className="h-12 w-12 border-2 shrink-0 text-primary hover:bg-primary/5" onClick={() => handleOpenShare(spot)}>
+                                                       <Share2 className="size-4" />
+                                                   </Button>
                                                    <Button variant="outline" size="icon" className="h-12 w-12 border-2 shrink-0" onClick={() => handleEditClick(spot)}><Pencil className="size-4" /></Button>
                                                    <Button variant="destructive" size="icon" className="h-12 w-12 shrink-0" onClick={() => handleDeleteSpot(spot.id)}><Trash2 className="size-4" /></Button>
                                                </div>
@@ -645,6 +731,48 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                     </div>
                 )}
             </CardContent>
+
+            {/* Dialog Partage */}
+            <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
+                <DialogContent className="max-w-md rounded-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="font-black uppercase tracking-tight flex items-center gap-2">
+                            <Share2 className="size-5 text-primary" /> Partager ce spot
+                        </DialogTitle>
+                        <DialogDescription className="text-xs font-bold uppercase">
+                            Envoyer "{sharingSpot?.name}" à un ami
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-6 space-y-4">
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Email du destinataire</Label>
+                            <Input 
+                                type="email" 
+                                placeholder="ami@exemple.com" 
+                                value={recipientEmail} 
+                                onChange={e => setRecipientEmail(e.target.value)} 
+                                className="h-12 border-2 font-bold"
+                            />
+                        </div>
+                        <Alert className="bg-primary/5 border-dashed border-2">
+                            <Info className="size-4 text-primary" />
+                            <AlertDescription className="text-[10px] leading-relaxed font-medium">
+                                Le destinataire recevra ce point GPS automatiquement dans son carnet de pêche dès qu'il ouvrira l'application.
+                            </AlertDescription>
+                        </Alert>
+                    </div>
+                    <DialogFooter>
+                        <Button 
+                            className="w-full h-14 font-black uppercase tracking-widest shadow-lg gap-2"
+                            onClick={handleSendShare}
+                            disabled={isSendingShare || !recipientEmail.trim()}
+                        >
+                            {isSendingShare ? <RefreshCw className="size-5 animate-spin" /> : <Send className="size-5" />}
+                            {isSendingShare ? "Envoi en cours..." : "Partager le point"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <Dialog open={isSpotDialogOpen} onOpenChange={(open) => { if (!open) setSpotToEdit(null); setIsSpotDialogOpen(open); }}>
                 <DialogContent className="max-h-[95vh] flex flex-col p-0 overflow-hidden sm:max-w-lg">
