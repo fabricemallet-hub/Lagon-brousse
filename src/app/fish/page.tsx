@@ -423,11 +423,11 @@ function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo,
                     {risksBySize.map((risk) => (
                       <div key={risk.label} className="flex flex-col items-center gap-1 p-2 bg-muted/30 rounded-xl border min-h-[85px] justify-between">
                         <div className="text-center w-full">
-                          <span className="text-[9px] font-black uppercase opacity-60 leading-none block">{risk.label}</span>
+                          <span className="text-[8px] font-black uppercase opacity-60 leading-none block">{risk.label}</span>
                           {risk.length ? (
-                            <span className="text-[8px] font-bold text-primary uppercase block mt-1 leading-none">{risk.length}</span>
+                            <span className="text-[7px] font-bold text-primary uppercase block mt-1 leading-none">{risk.length}</span>
                           ) : (
-                            <span className="text-[7px] font-bold text-muted-foreground/40 uppercase block mt-1 leading-tight italic">Non précisé</span>
+                            <span className="text-[7px] font-bold text-muted-foreground/40 uppercase block mt-1 leading-tight italic">N/A</span>
                           )}
                         </div>
                         <div className="flex flex-col items-center gap-0.5">
@@ -443,21 +443,22 @@ function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo,
                   <p className="text-[9px] leading-relaxed font-medium text-muted-foreground italic flex items-start gap-2">
                     <Megaphone className="size-3 shrink-0 mt-0.5 text-primary" />
                     <span>
-                      Ce score a été ajusté par <strong>{stats?.nombre_de_votants || 0} pêcheur{ (stats?.nombre_de_votants || 0) > 1 ? 's' : ''}</strong> dans la commune de <strong>{selectedLocation}</strong>. Plus il y a de signalements par taille, plus la donnée est fiable.
+                      Ce score a été ajusté par <strong>{stats?.nombre_de_votants || 0} pêcheur{ (stats?.nombre_de_votants || 0) > 1 ? 's' : ''}</strong> dans la commune de <strong>{selectedLocation}</strong>.
                     </span>
-                  </p>
-                  <p className="text-[9px] leading-relaxed font-medium text-muted-foreground italic flex items-start gap-2 pl-5 border-t border-dashed pt-1.5 mt-1.5">
-                    <span>Le taux <strong>SCIEN</strong> représente la donnée scientifique de référence (Admin ou IA).</span>
                   </p>
                 </div>
 
                 <Button 
                   variant="outline" 
-                  className="w-full h-auto py-3 border-2 font-black uppercase text-[11px] leading-tight tracking-tight gap-2 bg-primary/5 hover:bg-primary/10 whitespace-normal"
+                  className="w-full h-auto py-3 px-4 border-2 font-black uppercase bg-primary/5 hover:bg-primary/10 whitespace-normal text-center"
                   onClick={() => onReport(fish)}
                 >
-                  <ThumbsDown className="size-4 shrink-0" /> 
-                  <span className="text-center">Ajuster le % de gratte : Indice de risque citoyen par commune</span>
+                  <div className="flex items-center justify-center gap-2">
+                    <ThumbsDown className="size-4 shrink-0" /> 
+                    <span className="text-[10px] leading-snug flex-1">
+                      Ajuster le % de gratte : Indice de risque citoyen par commune
+                    </span>
+                  </div>
                 </Button>
               </div>
 
