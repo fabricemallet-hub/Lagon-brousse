@@ -1,4 +1,3 @@
-
 'use client';
 import { AuthForm } from '@/components/auth-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -136,13 +135,6 @@ export default function LoginPage() {
                             {hasCopied ? <Check className="size-4 text-green-600" /> : <Copy className="size-4" />}
                           </Button>
                         </div>
-                        <Button 
-                          variant="outline" 
-                          className="w-full h-10 text-[9px] font-black uppercase border-2 gap-2"
-                          onClick={handleDownloadRib}
-                        >
-                          <Download className="size-3" /> Télécharger mon RIB (PDF)
-                        </Button>
                       </div>
                     ) : (
                       <Button 
