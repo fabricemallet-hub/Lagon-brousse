@@ -1,8 +1,7 @@
-
 'use client';
 
 import type { ReactNode } from 'react';
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { SplashScreen } from '@/components/splash-screen';
@@ -20,6 +19,7 @@ export function DateProvider({ children }: { children: ReactNode }) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [isExiting, setIsExiting] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   // Fetch splash settings from Firestore
   const settingsRef = useMemoFirebase(() => {
@@ -30,18 +30,27 @@ export function DateProvider({ children }: { children: ReactNode }) {
   const { data: splashSettings, isLoading: isSettingsLoading } = useDoc<SplashScreenSettings>(settingsRef);
 
   useEffect(() => {
-    // Determine duration: use settings if available, else default to 2.5s
+    // Nettoyage des anciens timers si splashSettings change
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+
     const duration = (splashSettings?.splashDuration || 2.5) * 1000;
 
-    const timer = setTimeout(() => {
+    const timer1 = setTimeout(() => {
       setIsExiting(true);
-      setTimeout(() => {
+      const timer2 = setTimeout(() => {
         setShowSplash(false);
         setSelectedDate(new Date());
       }, 1000); // Wait for fade out animation
+      timersRef.current.push(timer2);
     }, duration);
 
-    return () => clearTimeout(timer);
+    timersRef.current.push(timer1);
+
+    return () => {
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
+    };
   }, [splashSettings]);
 
   // Default settings using the NEW logo

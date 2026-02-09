@@ -1,4 +1,3 @@
-
 'use client';
 import {
   Sidebar,
@@ -58,12 +57,16 @@ import { BottomNav } from './bottom-nav';
 
 const USAGE_LIMIT_SECONDS = 60;
 
+/**
+ * Minuteur optimisé pour éviter les violations de performance.
+ */
 const UsageTimer = React.memo(({ status, auth, userId }: { status: string, auth: any, userId?: string }) => {
   const [timeLeft, setTimeLeft] = useState(USAGE_LIMIT_SECONDS);
   const { toast } = useToast();
   const router = useRouter();
   const pathname = usePathname();
   const lastSyncRef = useRef<number>(0);
+  const timeLeftRef = useRef<number>(USAGE_LIMIT_SECONDS);
 
   useEffect(() => {
     if ((status !== 'limited' && status !== 'trial') || !auth || !userId) {
@@ -83,6 +86,7 @@ const UsageTimer = React.memo(({ status, auth, userId }: { status: string, auth:
     }
     
     const initialRemaining = Math.max(0, USAGE_LIMIT_SECONDS - dailyUsage);
+    timeLeftRef.current = initialRemaining;
     setTimeLeft(initialRemaining);
 
     if (initialRemaining <= 0) {
@@ -95,27 +99,29 @@ const UsageTimer = React.memo(({ status, auth, userId }: { status: string, auth:
     }
 
     const interval = setInterval(() => {
-      setTimeLeft(prev => {
-        const next = Math.max(0, prev - 1);
-        const used = USAGE_LIMIT_SECONDS - next;
-        
-        // On ne synchronise le localStorage que toutes les 10 secondes pour les performances
-        const now = Date.now();
-        if (now - lastSyncRef.current > 10000 || next === 0) {
-          localStorage.setItem('dailyUsage', String(used));
-          lastSyncRef.current = now;
-        }
-        
-        if (next <= 0) {
-          clearInterval(interval);
-          toast({ variant: 'destructive', title: 'Limite atteinte', description: 'Déconnexion automatique...' });
-          signOut(auth).then(() => {
-            sessionStorage.clear();
-            if (pathname !== '/login') router.push('/login');
-          });
-        }
-        return next;
-      });
+      const next = Math.max(0, timeLeftRef.current - 1);
+      timeLeftRef.current = next;
+      
+      // On ne met à jour le state que si la valeur change pour éviter des re-renders inutiles
+      setTimeLeft(next);
+
+      const used = USAGE_LIMIT_SECONDS - next;
+      const now = Date.now();
+      
+      // Synchronisation localStorage espacée (toutes les 15s) pour la performance
+      if (now - lastSyncRef.current > 15000 || next === 0) {
+        localStorage.setItem('dailyUsage', String(used));
+        lastSyncRef.current = now;
+      }
+      
+      if (next <= 0) {
+        clearInterval(interval);
+        toast({ variant: 'destructive', title: 'Limite atteinte', description: 'Déconnexion automatique...' });
+        signOut(auth).then(() => {
+          sessionStorage.clear();
+          if (pathname !== '/login') router.push('/login');
+        });
+      }
     }, 1000);
 
     return () => clearInterval(interval);

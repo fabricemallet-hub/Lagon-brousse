@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -237,15 +236,14 @@ export function LunarCalendar() {
   const days = eachDayOfInterval({ start: startDate, end: endDate });
   const weekdays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
-  // Centrage automatique optimisé pour la performance
+  // Centrage automatique optimisé
   useEffect(() => {
     const today = new Date();
     const isInCurrentMonth = displayDate.getMonth() === today.getMonth() && displayDate.getFullYear() === today.getFullYear();
     
     if (!isInCurrentMonth) return;
 
-    // On utilise requestAnimationFrame pour un défilement plus fluide sans violation de timeout
-    const centerToday = () => {
+    const timer = setTimeout(() => {
       const container = scrollContainerRef.current;
       if (!container) return;
       
@@ -261,10 +259,6 @@ export function LunarCalendar() {
           behavior: 'auto'
         });
       }
-    };
-
-    const timer = setTimeout(() => {
-      requestAnimationFrame(centerToday);
     }, 100);
     
     return () => clearTimeout(timer);
@@ -316,36 +310,35 @@ export function LunarCalendar() {
 
   return (
     <div className="flex flex-col items-start py-2 w-full">
-      {/* LÉGENDE FIXE EN HAUT */}
-      <div className="mb-4 px-1 w-full shrink-0 z-20">
+      {/* LÉGENDE FIXE EN HAUT - RÉDUITE POUR MOBILE */}
+      <div className="sticky top-0 mb-4 px-1 w-full shrink-0 z-30 bg-background/95 backdrop-blur-md pb-2 border-b-2 border-primary/10">
         {calendarView === 'champs' ? (
-          <div className="space-y-2">
-            <div className="flex flex-wrap gap-x-3 gap-y-1.5 p-3 bg-white border-2 rounded-xl shadow-sm">
-              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase"><Spade className="size-4 text-primary"/> Fruits</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase"><Carrot className="size-4 text-primary"/> Racines</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase"><Flower className="size-4 text-primary"/> Fleurs</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase"><Leaf className="size-4 text-primary"/> Feuilles</div>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 py-1">
+              <div className="flex items-center gap-1 text-[9px] font-black uppercase"><Spade className="size-3 text-primary"/> Fruits</div>
+              <div className="flex items-center gap-1 text-[9px] font-black uppercase"><Carrot className="size-3 text-primary"/> Racines</div>
+              <div className="flex items-center gap-1 text-[9px] font-black uppercase"><Flower className="size-3 text-primary"/> Fleurs</div>
+              <div className="flex items-center gap-1 text-[9px] font-black uppercase"><Leaf className="size-3 text-primary"/> Feuilles</div>
             </div>
-            <div className="flex flex-wrap gap-x-3 gap-y-1.5 p-3 bg-muted/10 border-2 border-dashed rounded-xl">
-              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-muted-foreground"><Scissors className="size-4 text-orange-600"/> TAILLE</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-muted-foreground"><RefreshCw className="size-4 text-pink-600"/> BOUTURAGE</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-muted-foreground"><Leaf className="size-4 text-green-600"/> TONTE</div>
+            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 py-1 border-t border-dashed border-primary/10">
+              <div className="flex items-center gap-1 text-[8px] font-black uppercase text-orange-600"><Scissors className="size-3"/> TAILLE</div>
+              <div className="flex items-center gap-1 text-[8px] font-black uppercase text-pink-600"><RefreshCw className="size-3"/> BOUTURAGE</div>
+              <div className="flex items-center gap-1 text-[8px] font-black uppercase text-green-600"><Leaf className="size-3"/> TONTE</div>
             </div>
           </div>
         ) : (
-          <div className="space-y-2">
-            <div className="flex flex-wrap gap-x-3 gap-y-1.5 p-3 bg-white border-2 rounded-xl shadow-sm">
-              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase"><Fish className="size-4 text-primary"/> Lagon</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase"><Fish className="size-4 text-orange-500"/><Star className="size-2 text-yellow-500 -ml-1" /> Pélagiques</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase"><CrabIcon className="size-4 text-green-600"/> Crabe Plein</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase"><LobsterIcon className="size-4 text-blue-600"/> Langouste</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase"><OctopusIcon className="size-4 text-purple-600"/> Poulpe</div>
+          <div className="flex flex-col gap-1.5">
+            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 py-1">
+              <div className="flex items-center gap-1 text-[9px] font-black uppercase"><Fish className="size-3 text-primary"/> Lagon</div>
+              <div className="flex items-center gap-1 text-[9px] font-black uppercase"><Fish className="size-3 text-orange-500"/><Star className="size-1.5 text-yellow-500 -ml-1" /> Pélagiques</div>
+              <div className="flex items-center gap-1 text-[9px] font-black uppercase"><CrabIcon className="size-3.5 text-green-600"/> Crabe</div>
+              <div className="flex items-center gap-1 text-[9px] font-black uppercase"><LobsterIcon className="size-3.5 text-blue-600"/> Langouste</div>
+              <div className="flex items-center gap-1 text-[9px] font-black uppercase"><OctopusIcon className="size-3.5 text-purple-600"/> Poulpe</div>
             </div>
-            <div className="flex flex-wrap gap-x-3 gap-y-1.5 p-3 bg-primary/5 border-2 border-primary/20 rounded-xl">
-              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-primary"><Waves className="size-4"/> Heure/Haut.</div>
-              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-primary"><Star className="size-3 fill-primary" /> Grandes Marées</div>
-              <div className="flex items-center gap-1.5 text-[9px] font-black uppercase"><span className="bg-primary text-white px-1.5 py-0.5 rounded-[2px]">Haute Max</span></div>
-              <div className="flex items-center gap-1.5 text-[9px] font-black uppercase"><span className="bg-destructive text-white px-1.5 py-0.5 rounded-[2px]">Basse Min</span></div>
+            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 py-1 border-t border-dashed border-primary/10">
+              <div className="flex items-center gap-1 text-[8px] font-black uppercase text-primary"><Waves className="size-3"/> Heure/Haut.</div>
+              <div className="flex items-center gap-1 text-[8px] font-black uppercase"><span className="bg-primary text-white px-1 py-0.5 rounded-[2px]">Haute Max</span></div>
+              <div className="flex items-center gap-1 text-[8px] font-black uppercase"><span className="bg-destructive text-white px-1 py-0.5 rounded-[2px]">Basse Min</span></div>
             </div>
           </div>
         )}
@@ -419,8 +412,7 @@ export function LunarCalendar() {
         </div>
       </div>
       
-      {/* Spacer pour compenser l'espace vide créé par le scale du calendrier */}
-      <div style={{ height: `calc(320px * ${Math.max(0, zoom - 1)})`, minHeight: '10px' }} className="w-full"></div>
+      <div style={{ height: `calc(350px * ${Math.max(0, zoom - 1)})`, minHeight: '10px' }} className="w-full"></div>
 
       <Dialog open={!!detailedDay} onOpenChange={(isOpen) => !isOpen && setDetailedDay(null)}>
         <DialogContent className="w-[95vw] sm:max-w-lg h-[95vh] sm:h-auto max-h-[95vh] flex flex-col p-0 overflow-hidden rounded-t-2xl sm:rounded-2xl border-none shadow-2xl">
