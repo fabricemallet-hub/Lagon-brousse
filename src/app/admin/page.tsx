@@ -1,10 +1,9 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, serverTimestamp, deleteDoc, doc, Timestamp, orderBy, query, setDoc, writeBatch, getDocs, addDoc, updateDoc } from 'firebase/firestore';
-import type { UserAccount, AccessToken, Conversation, SharedAccessToken, SplashScreenSettings, FishSpeciesInfo, SoundLibraryEntry, FaqEntry, SupportTicket, CgvSettings } from '@/lib/types';
+import type { UserAccount, AccessToken, Conversation, SharedAccessToken, SplashScreenSettings, FishSpeciesInfo, SoundLibraryEntry, FaqEntry, SupportTicket, CgvSettings, RibSettings } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,7 +30,8 @@ import {
   Ticket,
   Scale,
   Ruler,
-  Landmark
+  Landmark,
+  CreditCard
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -82,6 +82,10 @@ export default function AdminPage() {
   // CGV States
   const [cgvContent, setCgvContent] = useState('');
   const [isSavingCgv, setIsSavingCgv] = useState(false);
+
+  // RIB States
+  const [ribDetails, setRibDetails] = useState('');
+  const [isSavingRib, setIsSavingRib] = useState(false);
 
   // Splash States
   const [isSavingSplash, setIsSavingSplash] = useState(false);
@@ -159,6 +163,12 @@ export default function AdminPage() {
   }, [firestore, isAdmin]);
   const { data: dbCgv } = useDoc<CgvSettings>(cgvRef);
 
+  const ribRef = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    return doc(firestore, 'app_settings', 'rib');
+  }, [firestore, isAdmin]);
+  const { data: dbRib } = useDoc<RibSettings>(ribRef);
+
   const splashRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
     return doc(firestore, 'app_settings', 'splash');
@@ -175,7 +185,7 @@ export default function AdminPage() {
     if (!firestore || !isAdmin) return null;
     return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
   }, [firestore, isAdmin]);
-  const { data: sounds } = useCollection<SoundLibraryEntry>(soundsRef);
+  const { data: sounds } = useCollection<SoundLibraryEntry>(soundsQuery);
 
   const sharedTokenRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
@@ -186,6 +196,10 @@ export default function AdminPage() {
   useEffect(() => {
     if (dbCgv) setCgvContent(dbCgv.content || '');
   }, [dbCgv]);
+
+  useEffect(() => {
+    if (dbRib) setRibDetails(dbRib.details || '');
+  }, [dbRib]);
 
   // --- HANDLERS FAQ ---
   const handleSort = (field: keyof FaqEntry) => {
@@ -292,6 +306,21 @@ export default function AdminPage() {
     const template = `CONDITIONS GÉNÉRALES DE VENTE (CGV) - LAGON & BROUSSE NC\nDernière mise à jour : ${today}\n\nARTICLE 1 : OBJET...`;
     setCgvContent(template);
     toast({ title: "Modèle chargé" });
+  };
+
+  // --- HANDLERS RIB ---
+  const handleSaveRib = async () => {
+    if (!firestore || !isAdmin) return;
+    setIsSavingRib(true);
+    try {
+      await setDoc(doc(firestore, 'app_settings', 'rib'), {
+        details: ribDetails,
+        updatedAt: serverTimestamp(),
+      });
+      toast({ title: "RIB sauvegardé !", description: "Les utilisateurs verront ces détails lors du clic sur DONS." });
+    } finally {
+      setIsSavingRib(false);
+    }
   };
 
   // --- HANDLERS DESIGN ---
@@ -458,16 +487,16 @@ export default function AdminPage() {
       
       for (const fish of fishSpecies) {
         // Robust matching: by ID or normalized Name
-        const refFish = lagoonFishData.find(f => 
+        const referenceFish = lagoonFishData.find(f => 
           f.id === fish.id || 
           f.name.toLowerCase().trim() === fish.name.toLowerCase().trim()
         );
 
-        if (refFish) {
+        if (referenceFish) {
           const updates: any = {};
-          if (!fish.lengthSmall) updates.lengthSmall = refFish.lengthSmall;
-          if (!fish.lengthMedium) updates.lengthMedium = refFish.lengthMedium;
-          if (!fish.lengthLarge) updates.lengthLarge = refFish.lengthLarge;
+          if (!fish.lengthSmall) updates.lengthSmall = referenceFish.lengthSmall;
+          if (!fish.lengthMedium) updates.lengthMedium = referenceFish.lengthMedium;
+          if (!fish.lengthLarge) updates.lengthLarge = referenceFish.lengthLarge;
           
           if (Object.keys(updates).length > 0) {
             batch.update(doc(firestore, 'fish_species', fish.id), updates);
@@ -765,27 +794,53 @@ export default function AdminPage() {
               <CardTitle className="flex items-center gap-2 font-black uppercase text-sm">
                 <FileText className="size-4" /> Documents Administratifs
               </CardTitle>
-              <CardDescription className="text-[10px] font-bold uppercase">Accès rapide aux fichiers de gestion.</CardDescription>
+              <CardDescription className="text-[10px] font-bold uppercase">Gerez les fichiers et informations bancaires pour les dons.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border-2 border-dashed border-primary/20">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-background rounded-lg shadow-sm">
-                    <Landmark className="size-5 text-primary" />
+            <CardContent className="space-y-6">
+              <div className="space-y-4 border-b pb-6">
+                <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border-2 border-dashed border-primary/20">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-background rounded-lg shadow-sm">
+                      <Landmark className="size-5 text-primary" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black uppercase text-muted-foreground">Fichier PDF (RIB)</span>
+                      <span className="text-xs font-bold">RIB_Lagon_Brousse_NC.pdf</span>
+                    </div>
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black uppercase text-muted-foreground">RIB Officiel</span>
-                    <span className="text-xs font-bold">RIB_Lagon_Brousse_NC.pdf</span>
-                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-10 font-black uppercase text-[10px] gap-2 border-2" 
+                    onClick={() => window.open('/RIB_Lagon_Brousse_NC.pdf', '_blank')}
+                  >
+                    <Download className="size-3" /> tester le téléchargement
+                  </Button>
                 </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="size-4 text-accent" />
+                  <Label className="text-[10px] font-black uppercase">Coordonnées Bancaires (Texte)</Label>
+                </div>
+                <Textarea 
+                  placeholder="Saisissez ici le RIB au format texte (Banque, IBAN, BIC, Titulaire)..." 
+                  value={ribDetails}
+                  onChange={e => setRibDetails(e.target.value)}
+                  className="min-h-[150px] font-mono text-xs"
+                />
                 <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-10 font-black uppercase text-[10px] gap-2 border-2" 
-                  onClick={() => window.open('/RIB_Lagon_Brousse_NC.pdf', '_blank')}
+                  onClick={handleSaveRib} 
+                  disabled={isSavingRib} 
+                  className="w-full h-12 font-black uppercase tracking-widest gap-2 bg-accent hover:bg-accent/90"
                 >
-                  <Download className="size-3" /> telecharger sur le smartphone
+                  {isSavingRib ? <RefreshCw className="size-4 animate-spin" /> : <Save className="size-4" />}
+                  Mettre à jour le RIB texte
                 </Button>
+                <p className="text-[10px] text-muted-foreground italic font-medium">
+                  Note : Ce texte s'affichera aux utilisateurs lorsqu'ils cliqueront sur "DONS" &gt; "Virement Bancaire".
+                </p>
               </div>
             </CardContent>
           </Card>

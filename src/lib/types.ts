@@ -301,6 +301,11 @@ export interface CgvSettings {
   version: number; // Unix timestamp used as version
 }
 
+export interface RibSettings {
+  details: string;
+  updatedAt: any;
+}
+
 export interface CgvAcceptance {
   id: string;
   userId: string;

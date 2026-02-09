@@ -1,3 +1,4 @@
+
 'use client';
 import { AuthForm } from '@/components/auth-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,10 +13,23 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Landmark, CreditCard, Download, ExternalLink } from 'lucide-react';
+import { Landmark, CreditCard, Download, ExternalLink, Copy, Check } from 'lucide-react';
+import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import type { RibSettings } from '@/lib/types';
+import { useState } from 'react';
+import { cn } from '@/lib/utils';
 
 export default function LoginPage() {
   const { toast } = useToast();
+  const firestore = useFirestore();
+  const [hasCopied, setHasCopied] = useState(false);
+
+  const ribRef = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return doc(firestore, 'app_settings', 'rib');
+  }, [firestore]);
+  const { data: ribData } = useDoc<RibSettings>(ribRef);
 
   const handleSubscribe = () => {
     const paypalLink = process.env.NEXT_PUBLIC_PAYPAL_LINK;
@@ -31,7 +45,6 @@ export default function LoginPage() {
   };
 
   const handlePaypalDonate = () => {
-    // Lien de paiement PayPal spécifique fourni par l'utilisateur
     const donationLink = "https://www.paypal.com/ncp/payment/G5GSMQHE3P6NA";
     window.open(donationLink, '_blank');
   };
@@ -42,6 +55,14 @@ export default function LoginPage() {
       title: "Téléchargement lancé",
       description: "Le RIB de Lagon & Brousse est en cours d'ouverture."
     });
+  };
+
+  const handleCopyRib = () => {
+    if (!ribData?.details) return;
+    navigator.clipboard.writeText(ribData.details);
+    setHasCopied(true);
+    toast({ title: "Copié !", description: "Les coordonnées ont été copiées dans le presse-papier." });
+    setTimeout(() => setHasCopied(false), 2000);
   };
 
   return (
@@ -91,24 +112,52 @@ export default function LoginPage() {
                     DONS
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-xs rounded-2xl">
-                  <DialogHeader>
+                <DialogContent className="max-w-xs rounded-2xl overflow-hidden p-0">
+                  <DialogHeader className="p-6 bg-slate-50 border-b">
                     <DialogTitle className="font-black uppercase tracking-tighter text-center">Soutenir le projet</DialogTitle>
                     <DialogDescription className="text-center text-[10px] uppercase font-bold">Choisissez votre mode de contribution</DialogDescription>
                   </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <Button 
-                      variant="outline" 
-                      className="h-16 flex flex-col items-center justify-center gap-1 border-2 hover:bg-primary/5"
-                      onClick={handleDownloadRib}
-                    >
-                      <div className="flex items-center gap-2 text-xs font-black uppercase">
-                        <Landmark className="size-4 text-primary" /> Virement Bancaire
+                  <div className="grid gap-4 p-6">
+                    {ribData?.details ? (
+                      <div className="space-y-3">
+                        <div className="p-4 bg-muted/30 rounded-xl border-2 border-dashed border-primary/20 relative">
+                          <p className="text-[10px] font-black uppercase text-primary mb-2 flex items-center gap-2">
+                            <Landmark className="size-3" /> Virement Bancaire
+                          </p>
+                          <pre className="text-[10px] font-mono whitespace-pre-wrap leading-tight break-all">
+                            {ribData.details}
+                          </pre>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="absolute top-2 right-2 h-8 w-8 hover:bg-primary/10"
+                            onClick={handleCopyRib}
+                          >
+                            {hasCopied ? <Check className="size-4 text-green-600" /> : <Copy className="size-4" />}
+                          </Button>
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          className="w-full h-10 text-[9px] font-black uppercase border-2 gap-2"
+                          onClick={handleDownloadRib}
+                        >
+                          <Download className="size-3" /> Télécharger mon RIB (PDF)
+                        </Button>
                       </div>
-                      <span className="text-[8px] font-bold text-muted-foreground uppercase flex items-center gap-1">
-                        <Download className="size-2" /> Télécharger mon RIB
-                      </span>
-                    </Button>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        className="h-16 flex flex-col items-center justify-center gap-1 border-2 hover:bg-primary/5"
+                        onClick={handleDownloadRib}
+                      >
+                        <div className="flex items-center gap-2 text-xs font-black uppercase">
+                          <Landmark className="size-4 text-primary" /> Virement Bancaire
+                        </div>
+                        <span className="text-[8px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                          <Download className="size-2" /> Télécharger mon RIB (PDF)
+                        </span>
+                      </Button>
+                    )}
 
                     <Button 
                       variant="outline" 

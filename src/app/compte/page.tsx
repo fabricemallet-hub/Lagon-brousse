@@ -1,7 +1,8 @@
+
 'use client';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, getDoc, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
-import type { UserAccount, AccessToken, SharedAccessToken } from '@/lib/types';
+import type { UserAccount, AccessToken, SharedAccessToken, RibSettings } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, isBefore, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Crown, Star, XCircle, KeyRound, Ticket, Gift, LogOut, Mail, Calendar, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink } from 'lucide-react';
+import { Crown, Star, XCircle, KeyRound, Ticket, Gift, LogOut, Mail, Calendar, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink, Copy, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
@@ -35,6 +36,7 @@ export default function ComptePage() {
   const { toast } = useToast();
   const [accessToken, setAccessToken] = useState('');
   const [isRedeeming, setIsRedeeming] = useState(false);
+  const [hasCopied, setHasCopied] = useState(false);
 
   const userDocRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -48,6 +50,12 @@ export default function ComptePage() {
     return doc(firestore, 'shared_access_tokens', 'GLOBAL');
   }, [firestore, user]);
   const { data: sharedToken, isLoading: isSharedTokenLoading } = useDoc<SharedAccessToken>(sharedTokenRef);
+
+  const ribRef = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return doc(firestore, 'app_settings', 'rib');
+  }, [firestore]);
+  const { data: ribData } = useDoc<RibSettings>(ribRef);
 
   const isSharedAccessActive = sharedToken && sharedToken.expiresAt && isBefore(new Date(), sharedToken.expiresAt.toDate());
 
@@ -64,7 +72,6 @@ export default function ComptePage() {
   };
 
   const handlePaypalDonate = () => {
-    // Lien de paiement PayPal spécifique fourni par l'utilisateur
     const donationLink = "https://www.paypal.com/ncp/payment/G5GSMQHE3P6NA";
     window.open(donationLink, '_blank');
   };
@@ -75,6 +82,14 @@ export default function ComptePage() {
       title: "RIB ouvert",
       description: "Vous pouvez désormais effectuer votre virement."
     });
+  };
+
+  const handleCopyRib = () => {
+    if (!ribData?.details) return;
+    navigator.clipboard.writeText(ribData.details);
+    setHasCopied(true);
+    toast({ title: "Copié !", description: "Les coordonnées ont été copiées." });
+    setTimeout(() => setHasCopied(false), 2000);
   };
 
   const handleRedeemToken = async () => {
@@ -181,24 +196,52 @@ export default function ComptePage() {
                     DONS
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-xs rounded-2xl">
-                  <DialogHeader>
+                <DialogContent className="max-w-xs rounded-2xl overflow-hidden p-0">
+                  <DialogHeader className="p-6 bg-slate-50 border-b">
                     <DialogTitle className="font-black uppercase tracking-tighter text-center">Soutenir le projet</DialogTitle>
                     <DialogDescription className="text-center text-[10px] uppercase font-bold">Votre aide est précieuse</DialogDescription>
                   </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <Button 
-                      variant="outline" 
-                      className="h-16 flex flex-col items-center justify-center gap-1 border-2 hover:bg-primary/5"
-                      onClick={handleDownloadRib}
-                    >
-                      <div className="flex items-center gap-2 text-xs font-black uppercase">
-                        <Landmark className="size-4 text-primary" /> Virement Bancaire
+                  <div className="grid gap-4 p-6">
+                    {ribData?.details ? (
+                      <div className="space-y-3">
+                        <div className="p-4 bg-muted/30 rounded-xl border-2 border-dashed border-primary/20 relative">
+                          <p className="text-[10px] font-black uppercase text-primary mb-2 flex items-center gap-2">
+                            <Landmark className="size-3" /> Virement Bancaire
+                          </p>
+                          <pre className="text-[10px] font-mono whitespace-pre-wrap leading-tight break-all">
+                            {ribData.details}
+                          </pre>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="absolute top-2 right-2 h-8 w-8 hover:bg-primary/10"
+                            onClick={handleCopyRib}
+                          >
+                            {hasCopied ? <Check className="size-4 text-green-600" /> : <Copy className="size-4" />}
+                          </Button>
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          className="w-full h-10 text-[9px] font-black uppercase border-2 gap-2"
+                          onClick={handleDownloadRib}
+                        >
+                          <Download className="size-3" /> Télécharger mon RIB (PDF)
+                        </Button>
                       </div>
-                      <span className="text-[8px] font-bold text-muted-foreground uppercase flex items-center gap-1">
-                        <Download className="size-2" /> Télécharger mon RIB
-                      </span>
-                    </Button>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        className="h-16 flex flex-col items-center justify-center gap-1 border-2 hover:bg-primary/5"
+                        onClick={handleDownloadRib}
+                      >
+                        <div className="flex items-center gap-2 text-xs font-black uppercase">
+                          <Landmark className="size-4 text-primary" /> Virement Bancaire
+                        </div>
+                        <span className="text-[8px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                          <Download className="size-2" /> Télécharger mon RIB (PDF)
+                        </span>
+                      </Button>
+                    )}
 
                     <Button 
                       variant="outline" 
