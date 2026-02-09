@@ -162,14 +162,14 @@ const DayCell = React.memo(({
 
       {calendarView === 'peche' ? (
         <div className="flex-grow flex flex-col justify-center items-center gap-0.5 pt-1">
-          <div className="flex items-center justify-center gap-0.5 h-3 h-3 overflow-hidden flex-nowrap whitespace-nowrap w-full">
+          <div className="flex items-center justify-center gap-0.5 h-3 overflow-hidden flex-nowrap whitespace-nowrap w-full">
             {data.crabAndLobster.crabStatus === 'Plein' && <CrabIcon className="size-2.5 text-green-600 shrink-0" />}
             {data.crabAndLobster.crabStatus === 'Mout' && <CrabIcon className="size-2.5 text-destructive shrink-0" />}
             {data.crabAndLobster.lobsterActivity === 'Élevée' && <LobsterIcon className="size-2.5 text-blue-600 shrink-0" />}
             {data.crabAndLobster.octopusActivity === 'Élevée' && <OctopusIcon className="size-2.5 text-purple-600 shrink-0" />}
           </div>
 
-          <div className="flex items-center justify-center gap-0.5 h-3 h-3 overflow-hidden flex-nowrap whitespace-nowrap w-full">
+          <div className="flex items-center justify-center gap-0.5 h-3 overflow-hidden flex-nowrap whitespace-nowrap w-full">
             {fishingIcons?.lagon}
             {fishingIcons?.pelagic}
           </div>
@@ -257,7 +257,7 @@ export function LunarCalendar() {
           
           container.scrollTo({
             left: targetScroll,
-            behavior: 'auto' // 'auto' pour éviter les violations scheduler au chargement
+            behavior: 'auto'
           });
         });
       }
@@ -265,7 +265,6 @@ export function LunarCalendar() {
     return () => clearTimeout(timer);
   }, [displayDate, calendarView]);
 
-  // TOUCH PINCH & SWIPE HANDLERS
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
       const dist = Math.hypot(
@@ -312,7 +311,7 @@ export function LunarCalendar() {
 
   return (
     <div className="flex flex-col items-start py-2 w-full">
-      {/* LÉGENDE FIXE EN HAUT - Toujours visible à l'ouverture */}
+      {/* LÉGENDE FIXE EN HAUT */}
       <div className="mb-4 px-1 w-full shrink-0 z-20">
         {calendarView === 'champs' ? (
           <div className="space-y-2">
@@ -347,7 +346,6 @@ export function LunarCalendar() {
         )}
       </div>
 
-      {/* ZOOM CONTROLS */}
       <div className="w-full flex items-center justify-between mb-4 px-2 bg-muted/20 p-2 rounded-xl border border-dashed border-primary/20">
         <div className="flex items-center gap-2">
           <ZoomOut className="size-4 text-muted-foreground" />
@@ -376,7 +374,7 @@ export function LunarCalendar() {
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         <div 
-          className="w-fit border-2 rounded-2xl bg-card shadow-lg overflow-hidden flex flex-col shrink-0 origin-top-left transition-transform duration-75"
+          className="w-fit border-2 rounded-2xl bg-card shadow-lg overflow-hidden flex flex-col shrink-0 origin-top-left transition-transform duration-75 will-change-transform"
           style={{ 
             transform: `scale(${zoom})`,
             width: '1200px', 
@@ -424,6 +422,7 @@ export function LunarCalendar() {
             <DialogTitle className="text-xl font-black uppercase tracking-tight text-slate-800">
               {detailedDay ? format(detailedDay, 'eeee d MMMM', { locale: fr }) : ''}
             </DialogTitle>
+            <DialogDescription className="sr-only">Détails tactiques pour la journée sélectionnée</DialogDescription>
             <DialogClose className="opacity-40 hover:opacity-100 transition-opacity">
               <X className="size-6" />
             </DialogClose>

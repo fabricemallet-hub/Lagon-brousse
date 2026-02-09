@@ -18,35 +18,26 @@ export function RootProviders({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     /**
-     * CRITIQUE : Nettoyage des Service Workers en mode développement.
-     * 
-     * En environnement de développement (Firebase Studio / Workstations), le cache du 
-     * Service Worker entre souvent en conflit avec le rechargement à chaud (HMR) 
-     * de Next.js. Cela provoque des erreurs de type "ChunkLoadError".
+     * CRITIQUE : Nettoyage et gestion des Service Workers.
      */
     if (process.env.NODE_ENV === 'development') {
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then((registrations) => {
-          if (registrations.length > 0) {
-            console.log('L&B NC: Nettoyage des SW en mode développement...');
-            for (const registration of registrations) {
-              registration.unregister();
-            }
+          for (const registration of registrations) {
+            registration.unregister();
           }
         });
       }
       return;
     }
 
-    // Enregistrement unique du Service Worker pour la production uniquement
+    // Enregistrement Production
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator && !swRegisteredRef.current) {
       swRegisteredRef.current = true;
-      navigator.serviceWorker.register('/sw.js', { scope: '/' })
-        .then((registration) => {
-          console.log('L&B NC: Service Worker enregistré (Production)');
-        })
+      navigator.serviceWorker.register('/sw.js')
+        .then(() => console.log('L&B NC: PWA active'))
         .catch((err) => {
-          console.error('L&B NC: Échec de l\'enregistrement du SW:', err);
+          console.error('L&B NC: SW Error', err);
           swRegisteredRef.current = false;
         });
     }
