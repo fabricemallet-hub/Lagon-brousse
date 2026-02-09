@@ -309,7 +309,7 @@ export default function FishPage() {
       {/* Agrandissement Photo */}
       <Dialog open={!!fullscreenImage} onOpenChange={(open) => !open && setFullscreenImage(null)}>
         <DialogContent className="max-w-[95vw] w-full p-0 bg-black/95 border-none rounded-3xl overflow-hidden shadow-2xl z-[200]">
-          <div className="relative w-full h-[70vh] flex flex-col">
+          <div className="relative w-full h-[90vh] flex flex-col">
             <button 
               onClick={() => setFullscreenImage(null)}
               className="absolute top-4 right-4 z-[210] p-2 bg-white/10 hover:bg-white/20 rounded-full text-white backdrop-blur-md transition-colors shadow-lg"
@@ -317,17 +317,17 @@ export default function FishPage() {
               <X className="size-6" />
             </button>
             
-            <div className="flex-1 w-full relative flex items-center justify-center p-4">
+            <div className="flex-1 w-full relative flex items-center justify-center p-2">
               {fullscreenImage && (
                 <img 
                   src={fullscreenImage.url} 
                   alt={fullscreenImage.name}
-                  className="max-w-full max-h-full object-contain rounded-xl shadow-2xl animate-in zoom-in-95 duration-300"
+                  className="max-w-full max-h-full object-contain shadow-2xl animate-in zoom-in-95 duration-300"
                 />
               )}
             </div>
 
-            <div className="p-6 bg-gradient-to-t from-black/90 via-black/40 to-transparent">
+            <div className="p-6 bg-gradient-to-t from-black/90 via-black/40 to-transparent shrink-0">
               <h3 className="text-white font-black uppercase tracking-tighter text-xl text-center drop-shadow-md">
                 {fullscreenImage?.name}
               </h3>
