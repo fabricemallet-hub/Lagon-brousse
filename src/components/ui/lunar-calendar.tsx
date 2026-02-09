@@ -219,9 +219,10 @@ export function LunarCalendar() {
   const [detailedDay, setDetailedDay] = useState<Date | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // ZOOM STATES
+  // ZOOM & TOUCH STATES
   const [zoom, setZoom] = useState(1);
   const [initialDistance, setInitialDistance] = useState<number | null>(null);
+  const touchStartPos = useRef<{ x: number, y: number } | null>(null);
   const calendarInnerRef = useRef<HTMLDivElement>(null);
 
   const handleDayClick = (day: Date) => { setSelectedDate(day); setDetailedDay(day); };
@@ -235,7 +236,13 @@ export function LunarCalendar() {
   const days = eachDayOfInterval({ start: startDate, end: endDate });
   const weekdays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
+  // Centrage automatique sur aujourd'hui au chargement
   useEffect(() => {
+    const today = new Date();
+    const isInCurrentMonth = displayDate.getMonth() === today.getMonth() && displayDate.getFullYear() === today.getFullYear();
+    
+    if (!isInCurrentMonth) return;
+
     const timer = setTimeout(() => {
       const container = scrollContainerRef.current;
       if (!container) return;
@@ -243,18 +250,24 @@ export function LunarCalendar() {
       const todayEl = container.querySelector('.calendar-today-cell') as HTMLElement;
       if (todayEl) {
         requestAnimationFrame(() => {
-          const scrollLeft = todayEl.offsetLeft - (container.clientWidth / 2) + (todayEl.clientWidth / 2);
+          const containerWidth = container.clientWidth;
+          const todayOffsetLeft = todayEl.offsetLeft;
+          const todayWidth = todayEl.clientWidth;
+          
+          // On calcule le centre relatif. Note: offsetLeft n'est pas affecté par scale() mais scrollTo opère sur les dimensions de scroll
+          const targetScroll = (todayOffsetLeft + todayWidth / 2) - (containerWidth / 2);
+          
           container.scrollTo({
-            left: scrollLeft,
+            left: targetScroll,
             behavior: 'smooth'
           });
         });
       }
-    }, 500);
+    }, 800);
     return () => clearTimeout(timer);
   }, [displayDate, calendarView]);
 
-  // TOUCH PINCH HANDLERS
+  // TOUCH PINCH & SWIPE HANDLERS
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
       const dist = Math.hypot(
@@ -262,6 +275,8 @@ export function LunarCalendar() {
         e.touches[0].clientY - e.touches[1].clientY
       );
       setInitialDistance(dist);
+    } else if (e.touches.length === 1) {
+      touchStartPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     }
   };
 
@@ -271,18 +286,26 @@ export function LunarCalendar() {
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
       );
-      
-      // Sensibilité du zoom
       const zoomFactor = dist / initialDistance;
       const newZoom = Math.max(0.4, Math.min(2, zoom * zoomFactor));
-      
       setZoom(newZoom);
       setInitialDistance(dist);
     }
   };
 
-  const handleTouchEnd = () => {
+  const handleTouchEnd = (e: React.TouchEvent) => {
     setInitialDistance(null);
+    if (touchStartPos.current && e.changedTouches.length === 1) {
+      const deltaX = e.changedTouches[0].clientX - touchStartPos.current.x;
+      const deltaY = e.changedTouches[0].clientY - touchStartPos.current.y;
+      
+      // Si le mouvement horizontal est significatif et plus grand que le vertical
+      if (Math.abs(deltaX) > 100 && Math.abs(deltaX) > Math.abs(deltaY)) {
+        if (deltaX > 0) handlePrevMonth();
+        else handleNextMonth();
+      }
+    }
+    touchStartPos.current = null;
   };
 
   return (
@@ -308,7 +331,7 @@ export function LunarCalendar() {
             size="icon" 
             className="size-8 rounded-full" 
             onClick={() => setZoom(1)}
-            title="Réinitialiser le zoom"
+            title="Réinitialiser"
           >
             <RefreshCw className="size-3" />
           </Button>
@@ -321,12 +344,13 @@ export function LunarCalendar() {
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        style={{ WebkitOverflowScrolling: 'touch' }}
       >
         <div 
           className="w-fit border rounded-lg bg-card shadow-lg overflow-hidden flex flex-col shrink-0 origin-top-left transition-transform duration-75"
           style={{ 
             transform: `scale(${zoom})`,
-            width: '1200px', // Largeur fixe du calendrier pour le zoom cohérent
+            width: '1200px', 
           }}
           ref={calendarInnerRef}
         >
@@ -337,7 +361,7 @@ export function LunarCalendar() {
           </div>
           
           <div className="grid grid-cols-7 bg-muted/30 border-b">
-            {weekdays.map((day, idx) => (
+            {weekdays.map((day) => (
               <div 
                 key={day} 
                 className="text-center text-[10px] font-black uppercase text-muted-foreground p-3 flex items-center justify-center border-l first:border-l-0 border-transparent"
@@ -363,10 +387,10 @@ export function LunarCalendar() {
         </div>
       </div>
       
-      {/* Ajuster l'espace occupé après le scale pour éviter les chevauchements */}
-      <div style={{ height: `calc(${zoom} * 100%)`, minHeight: '20px' }}></div>
+      {/* Ajustement de l'espace occupé après scale() */}
+      <div style={{ height: `calc(320px * ${zoom - 1})`, minHeight: '10px' }} className="w-full"></div>
 
-      <div className="mt-6 px-1 w-full lg:w-[1200px] shrink-0">
+      <div className="mt-6 px-1 w-full shrink-0">
         {calendarView === 'champs' ? (
           <div className="space-y-3">
             <div className="flex flex-wrap gap-x-4 gap-y-2 p-4 bg-muted/20 border rounded-xl shadow-sm">
