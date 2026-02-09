@@ -254,7 +254,6 @@ export function LunarCalendar() {
           const todayOffsetLeft = todayEl.offsetLeft;
           const todayWidth = todayEl.clientWidth;
           
-          // On calcule le centre relatif. Note: offsetLeft n'est pas affecté par scale() mais scrollTo opère sur les dimensions de scroll
           const targetScroll = (todayOffsetLeft + todayWidth / 2) - (containerWidth / 2);
           
           container.scrollTo({
@@ -290,6 +289,8 @@ export function LunarCalendar() {
       const newZoom = Math.max(0.4, Math.min(2, zoom * zoomFactor));
       setZoom(newZoom);
       setInitialDistance(dist);
+      // On empêche le scroll natif pendant le pinch-to-zoom
+      if (e.cancelable) e.preventDefault();
     }
   };
 
@@ -299,8 +300,8 @@ export function LunarCalendar() {
       const deltaX = e.changedTouches[0].clientX - touchStartPos.current.x;
       const deltaY = e.changedTouches[0].clientY - touchStartPos.current.y;
       
-      // Si le mouvement horizontal est significatif et plus grand que le vertical
-      if (Math.abs(deltaX) > 100 && Math.abs(deltaX) > Math.abs(deltaY)) {
+      // Si le mouvement horizontal est significatif et nettement supérieur au vertical
+      if (Math.abs(deltaX) > 80 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
         if (deltaX > 0) handlePrevMonth();
         else handleNextMonth();
       }
@@ -338,8 +339,12 @@ export function LunarCalendar() {
         </div>
       </div>
 
+      {/* 
+          CRITIQUE : touch-pan-y permet au navigateur de gérer le défilement vertical du site 
+          même quand on touche cette zone, tout en nous laissant gérer le swipe horizontal et le zoom.
+      */}
       <div 
-        className="w-full overflow-x-auto pb-4 scrollbar-hide touch-pan-x" 
+        className="w-full overflow-x-auto pb-4 scrollbar-hide touch-pan-y" 
         ref={scrollContainerRef}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -387,7 +392,7 @@ export function LunarCalendar() {
         </div>
       </div>
       
-      {/* Ajustement de l'espace occupé après scale() */}
+      {/* Ajustement de l'espace occupé après scale() pour éviter les trous blancs ou chevauchements */}
       <div style={{ height: `calc(320px * ${zoom - 1})`, minHeight: '10px' }} className="w-full"></div>
 
       <div className="mt-6 px-1 w-full shrink-0">
