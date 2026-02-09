@@ -193,6 +193,12 @@ export default function AdminPage() {
   }, [firestore, isAdmin]);
   const { data: sharedToken } = useDoc<SharedAccessToken>(sharedTokenRef);
 
+  const accessTokensRef = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    return query(collection(firestore, 'access_tokens'), orderBy('createdAt', 'desc'));
+  }, [firestore, isAdmin]);
+  const { data: accessTokens } = useCollection<AccessToken>(accessTokensRef);
+
   useEffect(() => {
     if (dbCgv) setCgvContent(dbCgv.content || '');
   }, [dbCgv]);
@@ -582,6 +588,16 @@ export default function AdminPage() {
     }
   };
 
+  const handleDeleteToken = async (id: string) => {
+    if (!firestore || !isAdmin) return;
+    try {
+      await deleteDoc(doc(firestore, 'access_tokens', id));
+      toast({ title: "Jeton supprimé" });
+    } catch (e) {
+      toast({ variant: 'destructive', title: "Erreur suppression" });
+    }
+  };
+
   useEffect(() => {
     if (!isUserLoading && !isAdmin) router.push('/compte');
   }, [isAdmin, isUserLoading, router]);
@@ -786,6 +802,52 @@ export default function AdminPage() {
               </CardContent>
             </Card>
           </div>
+
+          <Card className="border-2">
+            <CardHeader>
+              <CardTitle className="text-sm font-black uppercase">Historique des Jetons ({accessTokens?.length || 0})</CardTitle>
+              <CardDescription className="text-[10px] font-bold uppercase">Suivi des codes d'accès générés.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0 border-t">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-[10px] font-black uppercase">Code</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase">Durée</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase">Statut</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase">Créé le</TableHead>
+                    <TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {accessTokens?.map(token => (
+                    <TableRow key={token.id}>
+                      <TableCell className="font-mono font-black text-xs">{token.id}</TableCell>
+                      <TableCell className="text-xs font-bold">{token.durationMonths} mois</TableCell>
+                      <TableCell>
+                        <Badge variant={token.status === 'active' ? 'default' : 'secondary'} className="text-[8px] uppercase font-black">
+                          {token.status === 'active' ? 'Actif' : 'Utilisé'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-[10px] opacity-60">
+                        {token.createdAt ? format(token.createdAt.toDate(), 'dd/MM/yy', { locale: fr }) : '...'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteToken(token.id)} className="size-8 text-destructive/40">
+                          <Trash2 className="size-3" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {(!accessTokens || accessTokens.length === 0) && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-10 text-xs italic opacity-40">Aucun jeton généré.</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="docs" className="space-y-6">
@@ -929,7 +991,7 @@ export default function AdminPage() {
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           <Button variant="ghost" size="icon" className="size-8" onClick={() => { setCurrentFaq(f); setIsFaqDialogOpen(true); }}><Pencil className="size-3" /></Button>
-                          <Button variant="ghost" size="icon" className="size-8" onClick={() => handleDeleteFaq(id)}><Trash2 className="size-3 text-destructive" /></Button>
+                          <Button variant="ghost" size="icon" className="size-8" onClick={() => handleDeleteFaq(f.id)}><Trash2 className="size-3 text-destructive" /></Button>
                         </div>
                       </TableCell>
                     </TableRow>
