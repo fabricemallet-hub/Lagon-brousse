@@ -308,7 +308,7 @@ export default function FishPage() {
 
       {/* Agrandissement Photo */}
       <Dialog open={!!fullscreenImage} onOpenChange={(open) => !open && setFullscreenImage(null)}>
-        <DialogContent className="max-w-[95vw] w-full p-0 bg-black/95 border-none rounded-3xl overflow-hidden shadow-2xl z-[200]">
+        <DialogContent className="max-w-[95vw] w-full p-0 bg-black border-none rounded-3xl overflow-hidden shadow-2xl z-[200]">
           <div className="relative w-full h-[90vh] flex flex-col">
             <button 
               onClick={() => setFullscreenImage(null)}
@@ -317,12 +317,12 @@ export default function FishPage() {
               <X className="size-6" />
             </button>
             
-            <div className="flex-1 w-full relative flex items-center justify-center p-2">
+            <div className="flex-1 w-full relative flex items-center justify-center overflow-hidden">
               {fullscreenImage && (
                 <img 
                   src={fullscreenImage.url} 
                   alt={fullscreenImage.name}
-                  className="max-w-full max-h-full object-contain shadow-2xl animate-in zoom-in-95 duration-300"
+                  className="w-full h-full object-contain shadow-2xl animate-in zoom-in-95 duration-300"
                 />
               )}
             </div>
