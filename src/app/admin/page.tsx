@@ -185,7 +185,7 @@ export default function AdminPage() {
     if (!firestore || !isAdmin) return null;
     return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
   }, [firestore, isAdmin]);
-  const { data: sounds } = useCollection<SoundLibraryEntry>(soundsQuery);
+  const { data: sounds } = useCollection<SoundLibraryEntry>(soundsRef);
 
   const sharedTokenRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
@@ -929,7 +929,7 @@ export default function AdminPage() {
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           <Button variant="ghost" size="icon" className="size-8" onClick={() => { setCurrentFaq(f); setIsFaqDialogOpen(true); }}><Pencil className="size-3" /></Button>
-                          <Button variant="ghost" size="icon" className="size-8" onClick={() => handleDeleteFaq(f.id)}><Trash2 className="size-3 text-destructive" /></Button>
+                          <Button variant="ghost" size="icon" className="size-8" onClick={() => handleDeleteFaq(id)}><Trash2 className="size-3 text-destructive" /></Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1127,7 +1127,7 @@ export default function AdminPage() {
       </Dialog>
 
       <Dialog open={isSoundDialogOpen} onOpenChange={setIsSoundDialogOpen}>
-        <DialogContent className="max-w-md rounded-2xl">
+        <DialogContent className="max-md rounded-2xl">
           <DialogHeader><DialogTitle className="font-black uppercase"> Nouveau Signal Sonore</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Libellé</Label><Input value={currentSound.label || ''} onChange={e => setCurrentSound({...currentSound, label: e.target.value})} /></div>
