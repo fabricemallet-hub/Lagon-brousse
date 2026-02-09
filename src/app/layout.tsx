@@ -8,7 +8,6 @@ import type { Metadata, Viewport } from 'next';
 export const metadata: Metadata = {
   title: 'Lagon & Brousse NC',
   description: 'Assistant intelligent pour le terroir calédonien',
-  manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
@@ -17,7 +16,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#3b82f6',
+  themeColor: '#3498db',
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
@@ -43,7 +42,6 @@ export default function RootLayout({
         />
         <link rel="icon" href="/icon-192x192.png" />
         <link rel="apple-touch-icon" href="/icon-192x192.png" />
-        <link rel="manifest" href="/manifest.json" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>

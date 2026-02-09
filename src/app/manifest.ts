@@ -1,4 +1,3 @@
-
 import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
@@ -9,7 +8,7 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: '/',
     display: 'standalone',
     background_color: '#ffffff',
-    theme_color: '#3b82f6',
+    theme_color: '#3498db',
     orientation: 'portrait',
     scope: '/',
     categories: ['weather', 'navigation', 'lifestyle'],
@@ -27,5 +26,19 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: 'any',
       },
     ],
+    screenshots: [
+      {
+        src: 'https://picsum.photos/seed/lb-narrow/1080/1920',
+        sizes: '1080x1920',
+        type: 'image/png',
+        form_factor: 'narrow'
+      },
+      {
+        src: 'https://picsum.photos/seed/lb-wide/1920/1080',
+        sizes: '1920x1080',
+        type: 'image/png',
+        form_factor: 'wide'
+      }
+    ]
   }
 }
