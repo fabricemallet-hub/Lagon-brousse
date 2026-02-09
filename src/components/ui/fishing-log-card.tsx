@@ -246,6 +246,14 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         const currentHour = now.getHours();
         const currentForecast = todayData.weather.hourly.find(f => new Date(f.date).getHours() === currentHour) || todayData.weather.hourly[0];
 
+        const closestLowTide = combinedTides
+            .filter(t => t.type === 'basse')
+            .sort((a, b) => Math.abs(a.timeMinutes - nowMinutes) - Math.abs(b.timeMinutes - nowMinutes))[0];
+            
+        const closestHighTide = combinedTides
+            .filter(t => t.type === 'haute')
+            .sort((a, b) => Math.abs(a.timeMinutes - nowMinutes) - Math.abs(b.timeMinutes - nowMinutes))[0];
+
         return {
             timestamp: now.toISOString(),
             moonPhase: todayData.weather.moon.phase,
@@ -257,6 +265,8 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             windDirection: currentForecast.windDirection,
             airTemperature: currentForecast.temp,
             waterTemperature: todayData.weather.waterTemperature,
+            closestLowTide: closestLowTide ? { time: closestLowTide.time, height: closestLowTide.height } : null,
+            closestHighTide: closestHighTide ? { time: closestHighTide.time, height: closestHighTide.height } : null,
         };
     };
 
@@ -694,6 +704,8 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                 <p><strong>Conditions :</strong> {spot.context.airTemperature}°C, {spot.context.windSpeed} nds {spot.context.windDirection}</p>
                                                 <p><strong>Lune :</strong> {spot.context.moonPhase}</p>
                                                 <p><strong>Marée :</strong> {spot.context.tideMovement} ({spot.context.tideHeight.toFixed(2)}m)</p>
+                                                {spot.context.closestLowTide && <p><strong>Basse Mer :</strong> {spot.context.closestLowTide.time} ({spot.context.closestLowTide.height.toFixed(2)}m)</p>}
+                                                {spot.context.closestHighTide && <p><strong>Pleine Mer :</strong> {spot.context.closestHighTide.time} ({spot.context.closestHighTide.height.toFixed(2)}m)</p>}
                                            </div>
                                            <div className="flex flex-wrap gap-2">
                                                <Button variant="outline" className="flex-1 min-h-12 py-2 font-black uppercase text-[10px] border-2 px-3 whitespace-normal text-center leading-tight gap-2" onClick={() => handleFindSimilarDay(spot)} disabled={isAnalyzing}>
