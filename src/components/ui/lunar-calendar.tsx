@@ -236,7 +236,7 @@ export function LunarCalendar() {
   const days = eachDayOfInterval({ start: startDate, end: endDate });
   const weekdays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
-  // Centrage automatique sur aujourd'hui au chargement
+  // Centrage automatique optimisé
   useEffect(() => {
     const today = new Date();
     const isInCurrentMonth = displayDate.getMonth() === today.getMonth() && displayDate.getFullYear() === today.getFullYear();
@@ -253,16 +253,15 @@ export function LunarCalendar() {
           const containerWidth = container.clientWidth;
           const todayOffsetLeft = todayEl.offsetLeft;
           const todayWidth = todayEl.clientWidth;
-          
           const targetScroll = (todayOffsetLeft + todayWidth / 2) - (containerWidth / 2);
           
           container.scrollTo({
             left: targetScroll,
-            behavior: 'smooth'
+            behavior: 'auto' // 'auto' pour éviter les violations scheduler au chargement
           });
         });
       }
-    }, 800);
+    }, 500);
     return () => clearTimeout(timer);
   }, [displayDate, calendarView]);
 
@@ -289,7 +288,6 @@ export function LunarCalendar() {
       const newZoom = Math.max(0.4, Math.min(2, zoom * zoomFactor));
       setZoom(newZoom);
       setInitialDistance(dist);
-      // On empêche le scroll natif uniquement pendant le pinch-to-zoom
       if (e.cancelable) e.preventDefault();
     }
   };
@@ -299,15 +297,11 @@ export function LunarCalendar() {
     if (touchStartPos.current && e.changedTouches.length === 1) {
       const deltaX = e.changedTouches[0].clientX - touchStartPos.current.x;
       const deltaY = e.changedTouches[0].clientY - touchStartPos.current.y;
-      
-      // Si le mouvement horizontal est significatif ET dépasse le mouvement vertical
-      // ET que le conteneur n'est pas déjà en train de scroller (ou est au bord)
       if (Math.abs(deltaX) > 100 && Math.abs(deltaX) > Math.abs(deltaY) * 2) {
         const container = scrollContainerRef.current;
         if (container) {
-            const isAtLeft = container.scrollLeft <= 5;
-            const isAtRight = container.scrollLeft >= (container.scrollWidth - container.clientWidth - 5);
-            
+            const isAtLeft = container.scrollLeft <= 10;
+            const isAtRight = container.scrollLeft >= (container.scrollWidth - container.clientWidth - 10);
             if (deltaX > 0 && isAtLeft) handlePrevMonth();
             else if (deltaX < 0 && isAtRight) handleNextMonth();
         }
@@ -317,7 +311,42 @@ export function LunarCalendar() {
   };
 
   return (
-    <div className="flex flex-col items-start py-4 w-full">
+    <div className="flex flex-col items-start py-2 w-full">
+      {/* LÉGENDE FIXE EN HAUT - Toujours visible à l'ouverture */}
+      <div className="mb-4 px-1 w-full shrink-0 z-20">
+        {calendarView === 'champs' ? (
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-x-3 gap-y-1.5 p-3 bg-white border-2 rounded-xl shadow-sm">
+              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase"><Spade className="size-4 text-primary"/> Fruits</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase"><Carrot className="size-4 text-primary"/> Racines</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase"><Flower className="size-4 text-primary"/> Fleurs</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase"><Leaf className="size-4 text-primary"/> Feuilles</div>
+            </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-1.5 p-3 bg-muted/10 border-2 border-dashed rounded-xl">
+              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-muted-foreground"><Scissors className="size-4 text-orange-600"/> TAILLE</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-muted-foreground"><RefreshCw className="size-4 text-pink-600"/> BOUTURAGE</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-muted-foreground"><Leaf className="size-4 text-green-600"/> TONTE</div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-x-3 gap-y-1.5 p-3 bg-white border-2 rounded-xl shadow-sm">
+              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase"><Fish className="size-4 text-primary"/> Lagon</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase"><Fish className="size-4 text-orange-500"/><Star className="size-2 text-yellow-500 -ml-1" /> Pélagiques</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase"><CrabIcon className="size-4 text-green-600"/> Crabe Plein</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase"><LobsterIcon className="size-4 text-blue-600"/> Langouste</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase"><OctopusIcon className="size-4 text-purple-600"/> Poulpe</div>
+            </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-1.5 p-3 bg-primary/5 border-2 border-primary/20 rounded-xl">
+              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-primary"><Waves className="size-4"/> Heure/Haut.</div>
+              <div className="flex items-center gap-1.5 text-[10px] font-black uppercase text-primary"><Star className="size-3 fill-primary" /> Grandes Marées</div>
+              <div className="flex items-center gap-1.5 text-[9px] font-black uppercase"><span className="bg-primary text-white px-1.5 py-0.5 rounded-[2px]">Haute Max</span></div>
+              <div className="flex items-center gap-1.5 text-[9px] font-black uppercase"><span className="bg-destructive text-white px-1.5 py-0.5 rounded-[2px]">Basse Min</span></div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* ZOOM CONTROLS */}
       <div className="w-full flex items-center justify-between mb-4 px-2 bg-muted/20 p-2 rounded-xl border border-dashed border-primary/20">
         <div className="flex items-center gap-2">
@@ -334,52 +363,8 @@ export function LunarCalendar() {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-black uppercase text-muted-foreground tabular-nums">{Math.round(zoom * 100)}%</span>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="size-8 rounded-full" 
-            onClick={() => setZoom(1)}
-            title="Réinitialiser"
-          >
-            <RefreshCw className="size-3" />
-          </Button>
+          <Button variant="ghost" size="icon" className="size-8 rounded-full" onClick={() => setZoom(1)}><RefreshCw className="size-3" /></Button>
         </div>
-      </div>
-
-      {/* LÉGENDE DÉPLACÉE EN HAUT POUR VISIBILITÉ IMMÉDIATE */}
-      <div className="mb-6 px-1 w-full shrink-0">
-        {calendarView === 'champs' ? (
-          <div className="space-y-3">
-            <div className="flex flex-wrap gap-x-4 gap-y-2 p-4 bg-muted/20 border rounded-xl shadow-sm">
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Spade className="size-5 text-primary"/> Fruits</div>
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Carrot className="size-5 text-primary"/> Racines</div>
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Flower className="size-5 text-primary"/> Fleurs</div>
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Leaf className="size-5 text-primary"/> Feuilles</div>
-            </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-2 p-4 bg-muted/10 border border-dashed rounded-xl">
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase text-muted-foreground"><Scissors className="size-5 text-orange-600"/> TAILLE</div>
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase text-muted-foreground"><RefreshCw className="size-5 text-pink-600"/> BOUTURAGE</div>
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase text-muted-foreground"><Leaf className="size-5 text-green-600"/> TONTE</div>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="flex flex-wrap gap-x-4 gap-y-2 p-4 bg-muted/20 border rounded-xl shadow-sm">
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Fish className="size-5 text-primary"/> Lagon (Indice)</div>
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Fish className="size-5 text-orange-500"/><Star className="size-3 text-yellow-500 -ml-1 mr-1" /> Pélagiques</div>
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><CrabIcon className="size-5 text-green-600"/> Crabe (Plein)</div>
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><CrabIcon className="size-5 text-destructive"/> Crabe (Mout)</div>
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><LobsterIcon className="size-5 text-blue-600"/> Langouste (Activité)</div>
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><OctopusIcon className="size-5 text-purple-600"/> Poulpe (Activité)</div>
-            </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-2 p-4 bg-primary/5 border border-primary/20 rounded-xl">
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase text-primary"><Waves className="size-5"/> Heure/Hauteur</div>
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase text-primary"><Star className="size-4 fill-primary" /> Grandes Marées</div>
-              <div className="flex items-center gap-2 text-[10px] font-black uppercase"><span className="bg-primary text-white px-2 py-0.5 rounded-[2px]">Haute {'>'} Seuil</span></div>
-              <div className="flex items-center gap-2 text-[10px] font-black uppercase"><span className="bg-destructive text-white px-2 py-0.5 rounded-[2px]">Basse {'<'} Seuil</span></div>
-            </div>
-          </div>
-        )}
       </div>
 
       <div 
@@ -391,7 +376,7 @@ export function LunarCalendar() {
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         <div 
-          className="w-fit border rounded-lg bg-card shadow-lg overflow-hidden flex flex-col shrink-0 origin-top-left transition-transform duration-75"
+          className="w-fit border-2 rounded-2xl bg-card shadow-lg overflow-hidden flex flex-col shrink-0 origin-top-left transition-transform duration-75"
           style={{ 
             transform: `scale(${zoom})`,
             width: '1200px', 
@@ -431,7 +416,6 @@ export function LunarCalendar() {
         </div>
       </div>
       
-      {/* Ajustement de l'espace occupé après scale() pour éviter les trous blancs ou chevauchements */}
       <div style={{ height: `calc(320px * ${Math.max(0, zoom - 1)})`, minHeight: '10px' }} className="w-full"></div>
 
       <Dialog open={!!detailedDay} onOpenChange={(isOpen) => !isOpen && setDetailedDay(null)}>
@@ -513,7 +497,6 @@ function PecheDetailDialogContent({ day, location }: { day: Date; location: stri
   const { fishing, weather, crabAndLobster } = data;
   return (
     <div className="space-y-8">
-      {/* MARÉES */}
       <div className="bg-blue-50/80 border-2 border-blue-100 rounded-2xl p-5 space-y-4 shadow-sm">
         <h3 className="text-[11px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
             <Waves className="size-4" /> Marées du jour
@@ -529,7 +512,6 @@ function PecheDetailDialogContent({ day, location }: { day: Date; location: stri
         </div>
       </div>
 
-      {/* CRUSTACÉS */}
       <div className="space-y-3">
         <h3 className="text-[11px] font-black uppercase tracking-widest text-blue-800/60 flex items-center gap-2 px-1">
             <CrabIcon className="size-4" /> Crustacés & Mollusques
@@ -566,7 +548,6 @@ function PecheDetailDialogContent({ day, location }: { day: Date; location: stri
         </div>
       </div>
 
-      {/* ESPÈCES PAR CRÉNEAU */}
       <div className="space-y-4">
         <h3 className="text-[11px] font-black uppercase tracking-widest text-blue-800/60 flex items-center gap-2 px-1">
             <Fish className="size-4" /> Prévisions par Espèces

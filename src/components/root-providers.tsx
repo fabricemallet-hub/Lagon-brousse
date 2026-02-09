@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useRef, ReactNode } from 'react';
@@ -23,19 +22,16 @@ export function RootProviders({ children }: { children: ReactNode }) {
      * 
      * En environnement de développement (Firebase Studio / Workstations), le cache du 
      * Service Worker entre souvent en conflit avec le rechargement à chaud (HMR) 
-     * de Next.js. Cela provoque des erreurs de type "ChunkLoadError" ou des échecs 
-     * de mise en cache ("Failed to execute 'addAll' on 'Cache'") car les noms des 
-     * fichiers générés changent à chaque modification du code.
+     * de Next.js. Cela provoque des erreurs de type "ChunkLoadError".
      */
     if (process.env.NODE_ENV === 'development') {
-      console.log('L&B NC: Mode développement détecté. Désactivation et nettoyage des SW...');
-      
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then((registrations) => {
-          for (const registration of registrations) {
-            registration.unregister().then((success) => {
-              if (success) console.log('L&B NC: Ancien Service Worker supprimé (Nettoyage dev)');
-            });
+          if (registrations.length > 0) {
+            console.log('L&B NC: Nettoyage des SW en mode développement...');
+            for (const registration of registrations) {
+              registration.unregister();
+            }
           }
         });
       }

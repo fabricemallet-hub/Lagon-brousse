@@ -160,11 +160,12 @@ export function WeatherForecast({
     };
   }, [now, weather, tides, currentHour]);
 
+  // Centrage auto : On retire 'now' des dépendances pour ne pas recalculer à chaque minute,
+  // seulement quand l'heure change réellement ou que le composant est prêt.
   useEffect(() => {
-    if (isClient && isToday && scrollRef.current && now) {
+    if (isClient && isToday && scrollRef.current) {
         if (hasCenteredForHour.current !== currentHour) {
             const container = scrollRef.current;
-            // Use requestAnimationFrame to avoid Forced Reflow violations
             const frameId = requestAnimationFrame(() => {
                 const element = container.querySelector(`[data-hour="${currentHour}"]`) as HTMLElement;
                 if (element) {
@@ -175,6 +176,7 @@ export function WeatherForecast({
                     const scrollLeft = elementLeft - (containerWidth / 2) + (elementWidth / 2);
                     container.scrollTo({ 
                       left: scrollLeft, 
+                      // 'auto' au premier coup pour éviter les violations scheduler, 'smooth' ensuite
                       behavior: hasCenteredForHour.current === null ? 'auto' : 'smooth' 
                     });
                     hasCenteredForHour.current = currentHour;
@@ -185,7 +187,7 @@ export function WeatherForecast({
     } else if (!isToday) {
         hasCenteredForHour.current = null;
     }
-  }, [isClient, isToday, currentHour, now]);
+  }, [isClient, isToday, currentHour]);
 
   if (!isClient || !selectedForecast || !now) {
     return <Skeleton className="h-96 w-full rounded-lg" />;
