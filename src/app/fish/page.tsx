@@ -328,12 +328,14 @@ export default function FishPage() {
             </div>
 
             <div className="p-6 bg-gradient-to-t from-black/90 via-black/40 to-transparent shrink-0">
-              <h3 className="text-white font-black uppercase tracking-tighter text-xl text-center drop-shadow-md">
-                {fullscreenImage?.name}
-              </h3>
-              <p className="text-white/60 text-[10px] font-bold uppercase text-center mt-1 tracking-widest">
-                Vue détaillée du spécimen
-              </p>
+              <DialogHeader className="space-y-0 sm:text-center">
+                <DialogTitle className="text-white font-black uppercase tracking-tighter text-xl text-center drop-shadow-md">
+                  {fullscreenImage?.name}
+                </DialogTitle>
+                <DialogDescription className="text-white/60 text-[10px] font-bold uppercase text-center mt-1 tracking-widest">
+                  Vue détaillée du spécimen
+                </DialogDescription>
+              </DialogHeader>
             </div>
           </div>
         </DialogContent>
