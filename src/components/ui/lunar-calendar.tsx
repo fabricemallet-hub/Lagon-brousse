@@ -346,10 +346,42 @@ export function LunarCalendar() {
         </div>
       </div>
 
-      {/* 
-          CRITIQUE : touch-auto permet au navigateur de gérer TOUS les défilements (X et Y) 
-          naturellement. On laisse le scroll-x natif fonctionner pour naviguer dans les 1200px.
-      */}
+      {/* LÉGENDE DÉPLACÉE EN HAUT POUR VISIBILITÉ IMMÉDIATE */}
+      <div className="mb-6 px-1 w-full shrink-0">
+        {calendarView === 'champs' ? (
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-x-4 gap-y-2 p-4 bg-muted/20 border rounded-xl shadow-sm">
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Spade className="size-5 text-primary"/> Fruits</div>
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Carrot className="size-5 text-primary"/> Racines</div>
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Flower className="size-5 text-primary"/> Fleurs</div>
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Leaf className="size-5 text-primary"/> Feuilles</div>
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-2 p-4 bg-muted/10 border border-dashed rounded-xl">
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase text-muted-foreground"><Scissors className="size-5 text-orange-600"/> TAILLE</div>
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase text-muted-foreground"><RefreshCw className="size-5 text-pink-600"/> BOUTURAGE</div>
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase text-muted-foreground"><Leaf className="size-5 text-green-600"/> TONTE</div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-x-4 gap-y-2 p-4 bg-muted/20 border rounded-xl shadow-sm">
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Fish className="size-5 text-primary"/> Lagon (Indice)</div>
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Fish className="size-5 text-orange-500"/><Star className="size-3 text-yellow-500 -ml-1 mr-1" /> Pélagiques</div>
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><CrabIcon className="size-5 text-green-600"/> Crabe (Plein)</div>
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><CrabIcon className="size-5 text-destructive"/> Crabe (Mout)</div>
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><LobsterIcon className="size-5 text-blue-600"/> Langouste (Activité)</div>
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><OctopusIcon className="size-5 text-purple-600"/> Poulpe (Activité)</div>
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-2 p-4 bg-primary/5 border border-primary/20 rounded-xl">
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase text-primary"><Waves className="size-5"/> Heure/Hauteur</div>
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase text-primary"><Star className="size-4 fill-primary" /> Grandes Marées</div>
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase"><span className="bg-primary text-white px-2 py-0.5 rounded-[2px]">Haute {'>'} Seuil</span></div>
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase"><span className="bg-destructive text-white px-2 py-0.5 rounded-[2px]">Basse {'<'} Seuil</span></div>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div 
         className="w-full overflow-x-auto pb-4 scrollbar-hide touch-auto" 
         ref={scrollContainerRef}
@@ -400,42 +432,7 @@ export function LunarCalendar() {
       </div>
       
       {/* Ajustement de l'espace occupé après scale() pour éviter les trous blancs ou chevauchements */}
-      <div style={{ height: `calc(320px * ${zoom - 1})`, minHeight: '10px' }} className="w-full"></div>
-
-      <div className="mt-6 px-1 w-full shrink-0">
-        {calendarView === 'champs' ? (
-          <div className="space-y-3">
-            <div className="flex flex-wrap gap-x-4 gap-y-2 p-4 bg-muted/20 border rounded-xl shadow-sm">
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Spade className="size-5 text-primary"/> Fruits</div>
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Carrot className="size-5 text-primary"/> Racines</div>
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Flower className="size-5 text-primary"/> Fleurs</div>
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Leaf className="size-5 text-primary"/> Feuilles</div>
-            </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-2 p-4 bg-muted/10 border border-dashed rounded-xl">
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase text-muted-foreground"><Scissors className="size-5 text-orange-600"/> TAILLE</div>
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase text-muted-foreground"><RefreshCw className="size-5 text-pink-600"/> BOUTURAGE</div>
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase text-muted-foreground"><Leaf className="size-5 text-green-600"/> TONTE</div>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="flex flex-wrap gap-x-4 gap-y-2 p-4 bg-muted/20 border rounded-xl shadow-sm">
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Fish className="size-5 text-primary"/> Lagon (Indice)</div>
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><Fish className="size-5 text-orange-500"/><Star className="size-3 text-yellow-500 -ml-1 mr-1" /> Pélagiques</div>
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><CrabIcon className="size-5 text-green-600"/> Crabe (Plein)</div>
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><CrabIcon className="size-5 text-destructive"/> Crabe (Mout)</div>
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><LobsterIcon className="size-5 text-blue-600"/> Langouste (Activité)</div>
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase"><OctopusIcon className="size-5 text-purple-600"/> Poulpe (Activité)</div>
-            </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-2 p-4 bg-primary/5 border border-primary/20 rounded-xl">
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase text-primary"><Waves className="size-5"/> Heure/Hauteur</div>
-              <div className="flex items-center gap-2 text-[11px] font-black uppercase text-primary"><Star className="size-4 fill-primary" /> Grandes Marées</div>
-              <div className="flex items-center gap-2 text-[10px] font-black uppercase"><span className="bg-primary text-white px-2 py-0.5 rounded-[2px]">Haute {'>'} Seuil</span></div>
-              <div className="flex items-center gap-2 text-[10px] font-black uppercase"><span className="bg-destructive text-white px-2 py-0.5 rounded-[2px]">Basse {'<'} Seuil</span></div>
-            </div>
-          </div>
-        )}
-      </div>
+      <div style={{ height: `calc(320px * ${Math.max(0, zoom - 1)})`, minHeight: '10px' }} className="w-full"></div>
 
       <Dialog open={!!detailedDay} onOpenChange={(isOpen) => !isOpen && setDetailedDay(null)}>
         <DialogContent className="w-[95vw] sm:max-w-lg h-[95vh] sm:h-auto max-h-[95vh] flex flex-col p-0 overflow-hidden rounded-t-2xl sm:rounded-2xl border-none shadow-2xl">
