@@ -289,7 +289,7 @@ export function LunarCalendar() {
       const newZoom = Math.max(0.4, Math.min(2, zoom * zoomFactor));
       setZoom(newZoom);
       setInitialDistance(dist);
-      // On empêche le scroll natif pendant le pinch-to-zoom
+      // On empêche le scroll natif uniquement pendant le pinch-to-zoom
       if (e.cancelable) e.preventDefault();
     }
   };
@@ -300,10 +300,17 @@ export function LunarCalendar() {
       const deltaX = e.changedTouches[0].clientX - touchStartPos.current.x;
       const deltaY = e.changedTouches[0].clientY - touchStartPos.current.y;
       
-      // Si le mouvement horizontal est significatif et nettement supérieur au vertical
-      if (Math.abs(deltaX) > 80 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) {
-        if (deltaX > 0) handlePrevMonth();
-        else handleNextMonth();
+      // Si le mouvement horizontal est significatif ET dépasse le mouvement vertical
+      // ET que le conteneur n'est pas déjà en train de scroller (ou est au bord)
+      if (Math.abs(deltaX) > 100 && Math.abs(deltaX) > Math.abs(deltaY) * 2) {
+        const container = scrollContainerRef.current;
+        if (container) {
+            const isAtLeft = container.scrollLeft <= 5;
+            const isAtRight = container.scrollLeft >= (container.scrollWidth - container.clientWidth - 5);
+            
+            if (deltaX > 0 && isAtLeft) handlePrevMonth();
+            else if (deltaX < 0 && isAtRight) handleNextMonth();
+        }
       }
     }
     touchStartPos.current = null;
@@ -340,11 +347,11 @@ export function LunarCalendar() {
       </div>
 
       {/* 
-          CRITIQUE : touch-pan-y permet au navigateur de gérer le défilement vertical du site 
-          même quand on touche cette zone, tout en nous laissant gérer le swipe horizontal et le zoom.
+          CRITIQUE : touch-auto permet au navigateur de gérer TOUS les défilements (X et Y) 
+          naturellement. On laisse le scroll-x natif fonctionner pour naviguer dans les 1200px.
       */}
       <div 
-        className="w-full overflow-x-auto pb-4 scrollbar-hide touch-pan-y" 
+        className="w-full overflow-x-auto pb-4 scrollbar-hide touch-auto" 
         ref={scrollContainerRef}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
