@@ -685,7 +685,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                             <p className="font-black uppercase tracking-tight text-xs leading-none truncate">{spot.name}</p>
                                                             <div className="flex items-center gap-2 mt-1">
                                                                 <p className="text-[9px] font-bold text-muted-foreground/60 uppercase">
-                                                                    {spot.createdAt ? format(spot.createdAt.toDate(), 'd MMM yyyy', { locale: fr }) : '...'}
+                                                                    {spot.createdAt ? format(spot.createdAt.toDate(), 'd MMM yyyy à HH:mm', { locale: fr }) : '...'}
                                                                 </p>
                                                                 {spot.sharedBy && (
                                                                     <Badge variant="outline" className="text-[7px] font-black uppercase h-3.5 px-1 border-primary/30 text-primary">Reçu de {spot.sharedBy}</Badge>
