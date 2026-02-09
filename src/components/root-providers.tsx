@@ -18,7 +18,7 @@ export function RootProviders({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     /**
-     * CRITIQUE : Nettoyage et gestion des Service Workers.
+     * CRITIQUE : Nettoyage en mode développement pour éviter les erreurs de cache.
      */
     if (process.env.NODE_ENV === 'development') {
       if ('serviceWorker' in navigator) {
@@ -34,12 +34,15 @@ export function RootProviders({ children }: { children: ReactNode }) {
     // Enregistrement Production
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator && !swRegisteredRef.current) {
       swRegisteredRef.current = true;
-      navigator.serviceWorker.register('/sw.js')
-        .then(() => console.log('L&B NC: PWA active'))
-        .catch((err) => {
-          console.error('L&B NC: SW Error', err);
-          swRegisteredRef.current = false;
-        });
+      // On attend que la page soit totalement chargée pour ne pas ralentir le rendu initial
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then((reg) => console.log('L&B NC: Service Worker enregistré sur le scope:', reg.scope))
+          .catch((err) => {
+            console.warn('L&B NC: Échec de l\'enregistrement du SW:', err);
+            swRegisteredRef.current = false;
+          });
+      });
     }
   }, []);
 

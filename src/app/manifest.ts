@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'Assistant intelligent pour le terroir calédonien (Pêche, Chasse, Jardinage)',
     start_url: '/',
     display: 'standalone',
-    background_color: '#f3f4f6',
+    background_color: '#ffffff',
     theme_color: '#3b82f6',
     orientation: 'portrait',
     scope: '/',

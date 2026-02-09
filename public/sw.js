@@ -1,11 +1,14 @@
 /**
- * @fileOverview Service Worker robuste pour Lagon & Brousse NC.
- * Gère le mode hors-ligne basique et la conformité PWA sans bloquer le développement.
+ * Lagon & Brousse NC - Service Worker v2.0
+ * Script optimisé pour la compatibilité PWABuilder et le mode hors-ligne.
  */
 
-const CACHE_NAME = 'lb-nc-v2';
-const ASSETS = [
-  '/',
+const CACHE_NAME = 'lb-nc-cache-v2';
+const OFFLINE_URL = '/';
+
+// Fichiers critiques à mettre en cache
+const PRECACHE_ASSETS = [
+  OFFLINE_URL,
   '/manifest.webmanifest',
   '/icon-192x192.png',
   '/icon-512x512.png'
@@ -14,10 +17,9 @@ const ASSETS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      // On utilise Promise.allSettled pour ne pas faire échouer l'installation
-      // si une icône est manquante temporairement.
+      // On utilise settled pour ne pas bloquer si une icône est manquante
       return Promise.allSettled(
-        ASSETS.map(url => cache.add(url).catch(err => console.warn(`Cache skip: ${url}`)))
+        PRECACHE_ASSETS.map(url => cache.add(url).catch(err => console.warn('SW Precache error:', url)))
       );
     })
   );
@@ -26,9 +28,9 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
+    caches.keys().then((cacheNames) => {
       return Promise.all(
-        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+        cacheNames.filter(name => name !== CACHE_NAME).map(name => caches.delete(name))
       );
     })
   );
@@ -36,10 +38,18 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Stratégie : Réseau d'abord, cache en secours
+  // Stratégie : Réseau d'abord, secours sur le cache pour la navigation
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match(OFFLINE_URL))
+    );
+    return;
+  }
+
+  // Pour les autres ressources : Cache d'abord, puis réseau
   event.respondWith(
-    fetch(event.request).catch(() => {
-      return caches.match(event.request);
+    caches.match(event.request).then((response) => {
+      return response || fetch(event.request);
     })
   );
 });
