@@ -17,7 +17,15 @@ export function RootProviders({ children }: { children: ReactNode }) {
   const swRegisteredRef = useRef(false);
 
   useEffect(() => {
-    // Enregistrement unique du Service Worker
+    // CRITIQUE : Désactiver le Service Worker en mode développement (Studio)
+    // Le cache du SW entre en conflit avec le rechargement à chaud (HMR) de Next.js,
+    // provoquant des "ChunkLoadError" lors de la modification du code.
+    if (process.env.NODE_ENV === 'development') {
+      console.log('L&B NC: Service Worker désactivé en développement pour éviter les ChunkLoadError');
+      return;
+    }
+
+    // Enregistrement unique du Service Worker pour la production uniquement
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator && !swRegisteredRef.current) {
       swRegisteredRef.current = true;
       navigator.serviceWorker.register('/sw.js', { scope: '/' })
