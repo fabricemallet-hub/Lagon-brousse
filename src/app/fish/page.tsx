@@ -24,7 +24,8 @@ import {
   RefreshCw,
   Save,
   LocateFixed,
-  Ruler
+  Ruler,
+  Maximize2
 } from 'lucide-react';
 import { identifyFish } from '@/ai/flows/identify-fish-flow';
 import type { IdentifyFishOutput } from '@/ai/schemas';
@@ -54,6 +55,9 @@ export default function FishPage() {
   const [isIdentifying, setIsIdentifying] = useState(false);
   const [aiResult, setAiResult] = useState<IdentifyFishOutput | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Lightbox State
+  const [fullscreenImage, setFullscreenImage] = useState<{url: string, name: string} | null>(null);
 
   // Stats Reporting States
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
@@ -225,7 +229,7 @@ export default function FishPage() {
         
         <div className="grid gap-2">
           {isLoading ? [1,2,3].map(i => <Skeleton key={i} className="h-20 w-full rounded-xl" />) : filteredFish.map((fish) => (
-            <FishCard key={fish.id} fish={fish} selectedLocation={selectedLocation} onReport={handleOpenReport} />
+            <FishCard key={fish.id} fish={fish} selectedLocation={selectedLocation} onReport={handleOpenReport} onImageClick={(url, name) => setFullscreenImage({url, name})} />
           ))}
         </div>
       </div>
@@ -301,11 +305,54 @@ export default function FishPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Agrandissement Photo */}
+      <Dialog open={!!fullscreenImage} onOpenChange={(open) => !open && setFullscreenImage(null)}>
+        <DialogContent className="max-w-[95vw] w-full p-0 bg-black/95 border-none rounded-3xl overflow-hidden shadow-2xl z-[200]">
+          <div className="relative w-full h-[70vh] flex flex-col">
+            <button 
+              onClick={() => setFullscreenImage(null)}
+              className="absolute top-4 right-4 z-[210] p-2 bg-white/10 hover:bg-white/20 rounded-full text-white backdrop-blur-md transition-colors shadow-lg"
+            >
+              <X className="size-6" />
+            </button>
+            
+            <div className="flex-1 w-full relative flex items-center justify-center p-4">
+              {fullscreenImage && (
+                <img 
+                  src={fullscreenImage.url} 
+                  alt={fullscreenImage.name}
+                  className="max-w-full max-h-full object-contain rounded-xl shadow-2xl animate-in zoom-in-95 duration-300"
+                />
+              )}
+            </div>
+
+            <div className="p-6 bg-gradient-to-t from-black/90 via-black/40 to-transparent">
+              <h3 className="text-white font-black uppercase tracking-tighter text-xl text-center drop-shadow-md">
+                {fullscreenImage?.name}
+              </h3>
+              <p className="text-white/60 text-[10px] font-bold uppercase text-center mt-1 tracking-widest">
+                Vue détaillée du spécimen
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo, selectedLocation: string, onReport: (f: FishSpeciesInfo) => void }) {
+function FishCard({ 
+  fish, 
+  selectedLocation, 
+  onReport, 
+  onImageClick 
+}: { 
+  fish: FishSpeciesInfo, 
+  selectedLocation: string, 
+  onReport: (f: FishSpeciesInfo) => void,
+  onImageClick: (url: string, name: string) => void
+}) {
   const firestore = useFirestore();
   const finalImageUrl = fish.imageUrl || (fish.imagePlaceholder ? `https://picsum.photos/seed/${fish.imagePlaceholder}/400/400` : '');
 
@@ -367,16 +414,29 @@ function FishCard({ fish, selectedLocation, onReport }: { fish: FishSpeciesInfo,
         <AccordionItem value={fish.id} className="border-none">
           <AccordionTrigger className="p-3 hover:no-underline [&[data-state=open]]:bg-muted/30">
             <div className="flex items-center gap-3 text-left w-full overflow-hidden">
-              <div className="size-16 rounded-xl bg-white flex items-center justify-center shrink-0 overflow-hidden border shadow-sm">
+              <div 
+                className="size-16 rounded-xl bg-white flex items-center justify-center shrink-0 overflow-hidden border shadow-sm relative group"
+                onClick={(e) => {
+                  if (finalImageUrl) {
+                    e.stopPropagation();
+                    onImageClick(finalImageUrl, fish.name);
+                  }
+                }}
+              >
                 {finalImageUrl ? (
-                  <Image 
-                    src={finalImageUrl} 
-                    alt={fish.name} 
-                    width={64} 
-                    height={64} 
-                    className="object-contain w-full h-full p-1"
-                    data-ai-hint="fish photo"
-                  />
+                  <>
+                    <Image 
+                      src={finalImageUrl} 
+                      alt={fish.name} 
+                      width={64} 
+                      height={64} 
+                      className="object-contain w-full h-full p-1 transition-transform group-hover:scale-110"
+                      data-ai-hint="fish photo"
+                    />
+                    <div className="absolute inset-0 bg-black/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Maximize2 className="size-4 text-primary" />
+                    </div>
+                  </>
                 ) : <Fish className="size-6 text-primary/40" />}
               </div>
               <div className="flex flex-col min-w-0 flex-1 gap-0.5">
