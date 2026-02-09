@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useRef, ReactNode } from 'react';
@@ -10,39 +11,35 @@ import { CgvConsentGuard } from '@/components/cgv-consent-guard';
 import { AppShell } from '@/components/app-shell';
 
 /**
- * Client-side component that wraps the application with all necessary providers
- * and handles client-only logic like Service Worker registration.
+ * Client-side component that wraps the application with all necessary providers.
  */
 export function RootProviders({ children }: { children: ReactNode }) {
   const swRegisteredRef = useRef(false);
 
   useEffect(() => {
-    /**
-     * CRITIQUE : Nettoyage en mode développement pour éviter les erreurs de cache.
-     */
-    if (process.env.NODE_ENV === 'development') {
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then((registrations) => {
-          for (const registration of registrations) {
-            registration.unregister();
-          }
-        });
-      }
-      return;
-    }
+    // On n'enregistre le Service Worker que sur les domaines de production ou de test Firebase
+    const isPublicUrl = window.location.hostname.includes('hosted.app') || 
+                        window.location.hostname.includes('web.app') || 
+                        window.location.hostname.includes('firebaseapp.com');
 
-    // Enregistrement Production
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator && !swRegisteredRef.current) {
       swRegisteredRef.current = true;
-      // On attend que la page soit totalement chargée pour ne pas ralentir le rendu initial
-      window.addEventListener('load', () => {
+      
+      // Enregistrement différé pour ne pas bloquer le chargement initial (important pour PWABuilder)
+      const registerSW = () => {
         navigator.serviceWorker.register('/sw.js')
-          .then((reg) => console.log('L&B NC: Service Worker enregistré sur le scope:', reg.scope))
+          .then((reg) => console.log('L&B NC: PWA Service Worker prêt.'))
           .catch((err) => {
-            console.warn('L&B NC: Échec de l\'enregistrement du SW:', err);
+            console.warn('L&B NC: Échec SW:', err);
             swRegisteredRef.current = false;
           });
-      });
+      };
+
+      if (document.readyState === 'complete') {
+        registerSW();
+      } else {
+        window.addEventListener('load', registerSW);
+      }
     }
   }, []);
 

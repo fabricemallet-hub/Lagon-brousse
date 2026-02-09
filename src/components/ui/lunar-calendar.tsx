@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -236,32 +237,36 @@ export function LunarCalendar() {
   const days = eachDayOfInterval({ start: startDate, end: endDate });
   const weekdays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
-  // Centrage automatique optimisé
+  // Centrage automatique optimisé pour la performance
   useEffect(() => {
     const today = new Date();
     const isInCurrentMonth = displayDate.getMonth() === today.getMonth() && displayDate.getFullYear() === today.getFullYear();
     
     if (!isInCurrentMonth) return;
 
-    const timer = setTimeout(() => {
+    // On utilise requestAnimationFrame pour un défilement plus fluide sans violation de timeout
+    const centerToday = () => {
       const container = scrollContainerRef.current;
       if (!container) return;
       
       const todayEl = container.querySelector('.calendar-today-cell') as HTMLElement;
       if (todayEl) {
-        requestAnimationFrame(() => {
-          const containerWidth = container.clientWidth;
-          const todayOffsetLeft = todayEl.offsetLeft;
-          const todayWidth = todayEl.clientWidth;
-          const targetScroll = (todayOffsetLeft + todayWidth / 2) - (containerWidth / 2);
-          
-          container.scrollTo({
-            left: targetScroll,
-            behavior: 'auto'
-          });
+        const containerWidth = container.clientWidth;
+        const todayOffsetLeft = todayEl.offsetLeft;
+        const todayWidth = todayEl.clientWidth;
+        const targetScroll = (todayOffsetLeft + todayWidth / 2) - (containerWidth / 2);
+        
+        container.scrollTo({
+          left: targetScroll,
+          behavior: 'auto'
         });
       }
-    }, 500);
+    };
+
+    const timer = setTimeout(() => {
+      requestAnimationFrame(centerToday);
+    }, 100);
+    
     return () => clearTimeout(timer);
   }, [displayDate, calendarView]);
 
@@ -414,6 +419,7 @@ export function LunarCalendar() {
         </div>
       </div>
       
+      {/* Spacer pour compenser l'espace vide créé par le scale du calendrier */}
       <div style={{ height: `calc(320px * ${Math.max(0, zoom - 1)})`, minHeight: '10px' }} className="w-full"></div>
 
       <Dialog open={!!detailedDay} onOpenChange={(isOpen) => !isOpen && setDetailedDay(null)}>

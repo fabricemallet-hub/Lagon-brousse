@@ -1,25 +1,20 @@
-/**
- * Lagon & Brousse NC - Service Worker v2.0
- * Script optimisé pour la compatibilité PWABuilder et le mode hors-ligne.
- */
 
-const CACHE_NAME = 'lb-nc-cache-v2';
+const CACHE_NAME = 'lb-nc-v2.1.0';
 const OFFLINE_URL = '/';
 
-// Fichiers critiques à mettre en cache
-const PRECACHE_ASSETS = [
-  OFFLINE_URL,
+const ASSETS_TO_CACHE = [
+  '/',
   '/manifest.webmanifest',
   '/icon-192x192.png',
-  '/icon-512x512.png'
+  '/icon-512x512.png',
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      // On utilise settled pour ne pas bloquer si une icône est manquante
+      // On utilise allSettled pour ne pas faire échouer l'install si une icône manque
       return Promise.allSettled(
-        PRECACHE_ASSETS.map(url => cache.add(url).catch(err => console.warn('SW Precache error:', url)))
+        ASSETS_TO_CACHE.map(url => cache.add(url).catch(err => console.warn(`PWA: Failed to cache ${url}`, err)))
       );
     })
   );
@@ -28,9 +23,9 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
+    caches.keys().then((keys) => {
       return Promise.all(
-        cacheNames.filter(name => name !== CACHE_NAME).map(name => caches.delete(name))
+        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
       );
     })
   );
@@ -38,18 +33,14 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Stratégie : Réseau d'abord, secours sur le cache pour la navigation
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request).catch(() => caches.match(OFFLINE_URL))
-    );
-    return;
-  }
+  if (event.request.method !== 'GET') return;
 
-  // Pour les autres ressources : Cache d'abord, puis réseau
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
-    })
+    fetch(event.request)
+      .catch(() => {
+        return caches.match(event.request).then(response => {
+          return response || caches.match(OFFLINE_URL);
+        });
+      })
   );
 });

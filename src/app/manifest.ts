@@ -1,3 +1,4 @@
+
 import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
@@ -11,6 +12,7 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: '#3b82f6',
     orientation: 'portrait',
     scope: '/',
+    categories: ['weather', 'navigation', 'lifestyle'],
     icons: [
       {
         src: '/icon-192x192.png',
