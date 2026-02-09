@@ -1,8 +1,6 @@
-
 'use client';
 
 import React from 'react';
-import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import type { SplashScreenSettings } from '@/lib/types';
 
@@ -43,18 +41,15 @@ export function SplashScreen({ settings, isExiting }: SplashScreenProps) {
             {splashText}
           </h1>
         ) : (
-          <div className="relative w-full h-full max-w-[90%] max-h-[80%] animate-in fade-in zoom-in duration-1000">
+          <div className="relative w-full h-full max-w-[90%] max-h-[80%] animate-in fade-in zoom-in duration-1000 flex items-center justify-center">
             {splashImageUrl ? (
-              <Image
+              <img
                 src={splashImageUrl}
                 alt="Splash Logo"
-                fill
                 className={cn(
-                  "transition-all",
-                  splashImageFit === 'cover' ? "object-cover" : "object-contain"
+                  "max-w-full max-h-full transition-all",
+                  splashImageFit === 'cover' ? "object-cover w-full h-full" : "object-contain"
                 )}
-                sizes="100vw"
-                priority
               />
             ) : (
               <div className="flex flex-col items-center gap-4 text-white/50">
@@ -65,7 +60,6 @@ export function SplashScreen({ settings, isExiting }: SplashScreenProps) {
         )}
       </div>
       
-      {/* Simple pulse loading indicator at the bottom */}
       <div className="absolute bottom-12 left-1/2 -translate-x-1/2">
         <div className="flex gap-1.5">
           <div className="size-2 rounded-full bg-white/40 animate-pulse"></div>

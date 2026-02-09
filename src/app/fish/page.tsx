@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, useMemo } from 'react';
-import Image from 'next/image';
 import type { FishSpeciesInfo, FishCommuneStats } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -126,12 +125,10 @@ export default function FishPage() {
       
       const currentStats = statsSnap.exists() ? statsSnap.data() as FishCommuneStats : { somme_des_notes: 0, nombre_de_votants: 0 };
       
-      // Mise à jour globale
       const newVoterCount = (currentStats.nombre_de_votants || 0) + 1;
       const newTotalScore = (currentStats.somme_des_notes || 0) + userRiskValue;
       const newAverage = parseFloat((newTotalScore / newVoterCount).toFixed(1));
 
-      // Mise à jour spécifique par taille
       const sizeSumKey = `${selectedSize}_sum` as keyof FishCommuneStats;
       const sizeCountKey = `${selectedSize}_count` as keyof FishCommuneStats;
       const newSizeSum = (currentStats[sizeSumKey] as number || 0) + userRiskValue;
@@ -365,7 +362,6 @@ function FishCard({
 
   const { data: stats } = useDoc<FishCommuneStats>(statsRef);
 
-  // Robust matching logic: check by ID or normalized Name
   const referenceFish = useMemo(() => {
     return lagoonFishData.find(f => 
       f.id === fish.id || 
@@ -426,19 +422,16 @@ function FishCard({
                 }}
               >
                 {finalImageUrl ? (
-                  <>
-                    <Image 
+                  <div className="relative w-full h-full p-1 transition-transform group-hover:scale-110 flex items-center justify-center">
+                    <img 
                       src={finalImageUrl} 
                       alt={fish.name} 
-                      width={64} 
-                      height={64} 
-                      className="object-contain w-full h-full p-1 transition-transform group-hover:scale-110"
-                      data-ai-hint="fish photo"
+                      className="max-w-full max-h-full object-contain"
                     />
                     <div className="absolute inset-0 bg-black/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                       <Maximize2 className="size-4 text-primary" />
                     </div>
-                  </>
+                  </div>
                 ) : <Fish className="size-6 text-primary/40" />}
               </div>
               <div className="flex flex-col min-w-0 flex-1 gap-0.5">

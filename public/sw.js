@@ -1,20 +1,25 @@
+/**
+ * Service Worker L&B NC - v2.0.1
+ * Optimisé pour PWABuilder et la stabilité hors-ligne.
+ */
 
-const CACHE_NAME = 'lb-nc-v2.1.0';
+const CACHE_NAME = 'lagon-brousse-cache-v2';
 const OFFLINE_URL = '/';
 
 const ASSETS_TO_CACHE = [
   '/',
-  '/manifest.webmanifest',
+  '/manifest.json',
   '/icon-192x192.png',
-  '/icon-512x512.png',
+  '/icon-512x512.png'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      // On utilise allSettled pour ne pas faire échouer l'install si une icône manque
+      // On utilise addAll mais on catch individuellement pour éviter de planter
+      // si une icône manque (souvent le cas au début du projet)
       return Promise.allSettled(
-        ASSETS_TO_CACHE.map(url => cache.add(url).catch(err => console.warn(`PWA: Failed to cache ${url}`, err)))
+        ASSETS_TO_CACHE.map(url => cache.add(url))
       );
     })
   );
@@ -23,9 +28,13 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
+    caches.keys().then((cacheNames) => {
       return Promise.all(
-        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
+          }
+        })
       );
     })
   );
@@ -33,14 +42,22 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
+  // Ignorer les requêtes vers Firebase, Google Maps et les analytics pour le cache
+  const url = event.request.url;
+  if (
+    url.includes('firestore.googleapis.com') || 
+    url.includes('maps.googleapis.com') ||
+    url.includes('google-analytics.com') ||
+    url.includes('identitytoolkit.googleapis.com')
+  ) {
+    return;
+  }
 
+  // Stratégie : Network First avec fallback sur le cache
   event.respondWith(
     fetch(event.request)
       .catch(() => {
-        return caches.match(event.request).then(response => {
-          return response || caches.match(OFFLINE_URL);
-        });
+        return caches.match(event.request) || caches.match(OFFLINE_URL);
       })
   );
 });
