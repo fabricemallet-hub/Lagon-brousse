@@ -331,7 +331,7 @@ export function LunarCalendar() {
               <div className="flex items-center gap-1 text-[9px] font-black uppercase"><Fish className="size-3 text-orange-500"/><Star className="size-1.5 text-yellow-500 -ml-1" /> Pélagiques</div>
               <div className="flex items-center gap-1 text-[9px] font-black uppercase"><CrabIcon className="size-3.5 text-green-600"/> Crabe</div>
               <div className="flex items-center gap-1 text-[9px] font-black uppercase"><LobsterIcon className="size-3.5 text-blue-600"/> Langouste</div>
-              <div className="flex items-center gap-1 text-[9px] font-black uppercase"><OctopusIcon className="size-3.5 text-purple-600"/> Poulpe</div>
+              <div className="flex items-center gap-1 text-[9px) font-black uppercase"><OctopusIcon className="size-3.5 text-purple-600"/> Poulpe</div>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 py-1 border-t border-dashed border-primary/10">
               <div className="flex items-center gap-1 text-[8px] font-black uppercase text-primary"><Waves className="size-3"/> Heure/Haut.</div>
