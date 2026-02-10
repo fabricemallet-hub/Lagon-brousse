@@ -10,6 +10,11 @@ export const metadata: Metadata = {
   description: 'Assistant intelligent pour le terroir calédonien (Pêche, Chasse, Jardinage)',
   applicationName: 'L&B NC',
   manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'L&B NC',
+  },
 };
 
 export const viewport: Viewport = {
@@ -27,15 +32,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr" suppressHydrationWarning>
-      <head>
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="theme-color" content="#3498db" />
-        <link rel="icon" href="/icon-192x192.png" />
-        <link rel="apple-touch-icon" href="/icon-192x192.png" />
-      </head>
       <body className={cn('font-body antialiased', 'min-h-screen bg-background font-sans overflow-x-hidden')}>
         <Suspense fallback={null}>
           <RootProviders>{children}</RootProviders>
