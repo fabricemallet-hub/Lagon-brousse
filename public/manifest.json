@@ -29,15 +29,13 @@
       "src": "https://picsum.photos/seed/lb-narrow/1080/1920",
       "sizes": "1080x1920",
       "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Accueil de l'application"
+      "form_factor": "narrow"
     },
     {
       "src": "https://picsum.photos/seed/lb-wide/1920/1080",
       "sizes": "1920x1080",
       "type": "image/png",
-      "form_factor": "wide",
-      "label": "Vue calendrier tactique"
+      "form_factor": "wide"
     }
   ]
 }

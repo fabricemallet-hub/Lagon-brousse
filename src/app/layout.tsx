@@ -8,11 +8,14 @@ import type { Metadata, Viewport } from 'next';
 export const metadata: Metadata = {
   title: 'Lagon & Brousse NC',
   description: 'Assistant intelligent pour le terroir calédonien',
-  manifest: '/manifest.json',
+  applicationName: 'L&B NC',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
     title: 'Lagon & Brousse NC',
+  },
+  formatDetection: {
+    telephone: false,
   },
 };
 
@@ -20,6 +23,7 @@ export const viewport: Viewport = {
   themeColor: '#3498db',
   width: 'device-width',
   initialScale: 1,
+  maximumScale: 1,
   viewportFit: 'cover',
 };
 
@@ -31,6 +35,7 @@ export default function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning>
       <head>
+        <link rel="manifest" href="/manifest.json" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"
@@ -45,7 +50,6 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icon-192x192.png" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="application-name" content="L&B NC" />
       </head>
       <body className={cn('font-body antialiased', 'min-h-screen bg-background font-sans overflow-x-hidden')}>
         <Suspense fallback={null}>

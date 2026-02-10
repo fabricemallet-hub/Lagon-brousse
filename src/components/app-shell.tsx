@@ -23,10 +23,9 @@ import {
   ChevronLeft,
   ChevronRight,
   User,
-  AlertCircle,
+  Calendar as CalendarIcon,
   Fish,
-  Leaf,
-  Calendar as CalendarIcon
+  Leaf
 } from 'lucide-react';
 import {
   Select,
@@ -49,91 +48,11 @@ import { Skeleton } from './ui/skeleton';
 import { signOut } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
 import type { UserAccount } from '@/lib/types';
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useToast } from '@/hooks/use-toast';
-import { Badge } from './ui/badge';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Badge } from './badge';
 import { cn } from '@/lib/utils';
 import { BottomNav } from './bottom-nav';
-
-const USAGE_LIMIT_SECONDS = 60;
-
-/**
- * Minuteur optimisé pour éviter les Violations de performance.
- */
-const UsageTimer = React.memo(({ status, auth, userId }: { status: string, auth: any, userId?: string }) => {
-  const [timeLeft, setTimeLeft] = useState(USAGE_LIMIT_SECONDS);
-  const router = useRouter();
-  
-  const lastSyncRef = useRef<number>(0);
-  const timeLeftRef = useRef<number>(USAGE_LIMIT_SECONDS);
-
-  useEffect(() => {
-    if ((status !== 'limited' && status !== 'trial') || !auth || !userId) {
-      return;
-    }
-
-    const today = new Date().toISOString().split('T')[0];
-    const lastUsageDate = localStorage.getItem('lastUsageDate');
-    const lastUserId = localStorage.getItem('lastUserId');
-    let dailyUsage = parseInt(localStorage.getItem('dailyUsage') || '0', 10);
-
-    if (lastUsageDate !== today || lastUserId !== userId) {
-      dailyUsage = 0;
-      localStorage.setItem('lastUsageDate', today);
-      localStorage.setItem('lastUserId', userId);
-      localStorage.setItem('dailyUsage', '0');
-    }
-    
-    const initialRemaining = Math.max(0, USAGE_LIMIT_SECONDS - dailyUsage);
-    timeLeftRef.current = initialRemaining;
-    setTimeLeft(initialRemaining);
-
-    if (initialRemaining <= 0) {
-        signOut(auth).then(() => {
-            sessionStorage.clear();
-            router.push('/login');
-        });
-        return;
-    }
-
-    const interval = setInterval(() => {
-      const next = Math.max(0, timeLeftRef.current - 1);
-      timeLeftRef.current = next;
-      
-      // Update local UI only
-      setTimeLeft(next);
-
-      if (next <= 0) {
-        clearInterval(interval);
-        localStorage.setItem('dailyUsage', String(USAGE_LIMIT_SECONDS));
-        signOut(auth).then(() => {
-          sessionStorage.clear();
-          router.push('/login');
-        });
-        return;
-      }
-
-      // Sync to disk only every 30 seconds to avoid performance violations
-      const now = Date.now();
-      if (now - lastSyncRef.current > 30000) {
-        localStorage.setItem('dailyUsage', String(USAGE_LIMIT_SECONDS - next));
-        lastSyncRef.current = now;
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [status, auth, userId, router]);
-
-  if (status !== 'limited' && status !== 'trial') return null;
-
-  return (
-    <div className="fixed top-0 left-0 right-0 h-10 bg-red-600 text-white flex items-center justify-center text-xs font-black z-[100] shadow-xl px-4 text-center border-b border-white/20 transform-gpu">
-        <AlertCircle className="size-4 mr-2 shrink-0" />
-        {status === 'trial' ? 'Session d\'essai' : 'Mode Limité'} : {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')} restant
-    </div>
-  );
-});
-UsageTimer.displayName = 'UsageTimer';
+import { UsageTimer } from './usage-timer';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { locations, selectedLocation, setSelectedLocation, isLocationLoading } = useLocation();
@@ -178,12 +97,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       router.push('/login');
     }
   }, [user, isUserLoading, isAuthPage, pathname, router]);
-
-  useEffect(() => {
-    if (!isUserLoading && user && isAuthPage) {
-      router.push('/');
-    }
-  }, [user, isUserLoading, isAuthPage, router]);
 
   const handleLogout = useCallback(async () => { 
     if (auth) { 
