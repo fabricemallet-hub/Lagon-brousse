@@ -1,3 +1,4 @@
+
 'use client';
 import {
   Sidebar,
@@ -25,7 +26,10 @@ import {
   User,
   Calendar as CalendarIcon,
   Fish,
-  Leaf
+  Leaf,
+  MailWarning,
+  RefreshCw,
+  ShieldCheck
 } from 'lucide-react';
 import {
   Select,
@@ -45,7 +49,7 @@ import { fr } from 'date-fns/locale';
 import Link from 'next/link';
 import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { Skeleton } from './ui/skeleton';
-import { signOut } from 'firebase/auth';
+import { signOut, sendEmailVerification } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
 import type { UserAccount } from '@/lib/types';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -53,6 +57,8 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { BottomNav } from './bottom-nav';
 import { UsageTimer } from './usage-timer';
+import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { locations, selectedLocation, setSelectedLocation, isLocationLoading } = useLocation();
@@ -63,7 +69,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
   const firestore = useFirestore();
+  const { toast } = useToast();
   const [isDatePickerOpen, setDatePickerOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const userDocRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -106,10 +114,75 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     } 
   }, [auth, router]);
 
+  const handleResendEmail = async () => {
+    if (!user) return;
+    try {
+      await sendEmailVerification(user);
+      toast({ title: "Email envoyé", description: "Le lien de validation a été renvoyé à votre adresse." });
+    } catch (e) {
+      toast({ variant: 'destructive', title: "Erreur", description: "Veuillez patienter avant de renvoyer un e-mail." });
+    }
+  };
+
+  const handleCheckVerification = async () => {
+    if (!user) return;
+    setIsRefreshing(true);
+    try {
+      await user.reload();
+      if (user.emailVerified) {
+        toast({ title: "Compte validé !", description: "Vous pouvez désormais accéder à l'application." });
+      } else {
+        toast({ title: "Non validé", description: "L'e-mail n'a pas encore été vérifié." });
+      }
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const handlePrevDay = useCallback(() => setSelectedDate(subDays(selectedDate, 1)), [selectedDate, setSelectedDate]);
   const handleNextDay = useCallback(() => setSelectedDate(addDays(selectedDate, 1)), [selectedDate, setSelectedDate]);
 
   if (isAuthPage) return <div className="w-full min-h-screen">{children}</div>;
+
+  // EMAIL VERIFICATION GUARD
+  if (user && !user.isAnonymous && !user.emailVerified && !isAuthPage) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-md w-full border-2 shadow-2xl">
+          <CardHeader className="text-center space-y-4">
+            <div className="mx-auto size-20 rounded-full bg-primary/10 flex items-center justify-center border-4 border-background shadow-lg">
+              <MailWarning className="size-10 text-primary animate-pulse" />
+            </div>
+            <div className="space-y-1">
+              <CardTitle className="text-2xl font-black uppercase tracking-tighter">Vérifiez votre Email</CardTitle>
+              <CardDescription className="font-bold text-xs uppercase text-muted-foreground">
+                Validation requise pour {user.email}
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6 text-center">
+            <p className="text-sm font-medium leading-relaxed text-muted-foreground">
+              Un lien de validation vous a été envoyé. Veuillez cliquer dessus pour activer votre compte et accéder aux outils tactiques.
+            </p>
+            <div className="bg-muted/30 p-4 rounded-xl border-2 border-dashed space-y-3">
+              <Button onClick={handleCheckVerification} disabled={isRefreshing} className="w-full h-12 font-black uppercase text-xs tracking-widest gap-2">
+                {isRefreshing ? <RefreshCw className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
+                J'ai vérifié mon adresse
+              </Button>
+              <Button variant="outline" onClick={handleResendEmail} className="w-full h-10 font-black uppercase text-[10px] tracking-widest border-2">
+                Renvoyer le lien
+              </Button>
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button variant="ghost" onClick={handleLogout} className="w-full font-bold uppercase text-[10px] text-destructive hover:bg-destructive/5">
+              <LogOut className="mr-2 size-3" /> Se déconnecter
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
 
   const showDayNavigator = ['/', '/lagon', '/peche', '/champs', '/chasse', '/calendrier'].includes(pathname);
 

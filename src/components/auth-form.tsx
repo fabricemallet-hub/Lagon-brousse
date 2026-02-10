@@ -22,6 +22,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   updateProfile,
+  sendEmailVerification,
   AuthError,
 } from 'firebase/auth';
 import { doc, collection, addDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
@@ -154,6 +155,10 @@ export function AuthForm({ mode }: AuthFormProps) {
         
         if (userCredential.user) {
           const user = userCredential.user;
+          
+          // SEND VERIFICATION EMAIL
+          await sendEmailVerification(user);
+
           await updateProfile(user, {
               displayName: signupValues.displayName
           });
@@ -197,7 +202,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         
         toast({
           title: 'Inscription réussie!',
-          description: "Vous allez être redirigé vers la page d'accueil.",
+          description: "Un lien de validation a été envoyé par e-mail. Veuillez vérifier votre boîte de réception pour activer votre compte.",
         });
         router.push('/');
       }

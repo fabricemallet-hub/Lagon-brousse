@@ -1,3 +1,4 @@
+
 {
   "id": "nc.lagonbrousse.app",
   "name": "Lagon & Brousse NC",
@@ -6,11 +7,15 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "fullscreen"],
   "background_color": "#ffffff",
   "theme_color": "#3498db",
   "orientation": "portrait",
   "lang": "fr-FR",
   "categories": ["weather", "navigation", "lifestyle", "sports"],
+  "iarc_rating_id": "none",
+  "related_applications": [],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icon-192x192.png",
