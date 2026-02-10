@@ -335,8 +335,8 @@ export function LunarCalendar() {
             </div>
             <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 py-1 border-t border-dashed border-primary/10">
               <div className="flex items-center gap-1 text-[8px] font-black uppercase text-primary"><Waves className="size-3"/> Heure/Haut.</div>
-              <div className="flex items-center gap-1 text-[8px] font-black uppercase"><span className="bg-primary text-white px-1 py-0.5 rounded-[2px]">Haute Max</span></div>
-              <div className="flex items-center gap-1 text-[8px] font-black uppercase"><span className="bg-destructive text-white px-1 py-0.5 rounded-[2px]">Basse Min</span></div>
+              <div className="flex items-center gap-1 text-[8px] font-black uppercase"><span className="bg-primary text-white px-1 py-0.5 rounded-[2px]">Haute Mer</span></div>
+              <div className="flex items-center gap-1 text-[8px] font-black uppercase"><span className="bg-destructive text-white px-1 py-0.5 rounded-[2px]">Basse Mer</span></div>
             </div>
           </div>
         )}
