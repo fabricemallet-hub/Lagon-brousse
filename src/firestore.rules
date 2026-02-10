@@ -11,7 +11,7 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2", "Irglq69MasYdNwBmUu8yKvw6h4G2"] ||
+        request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2"] ||
         (request.auth.token.email != null && 
          request.auth.token.email.lower() in [
            "fabrice.mallet@gmail.com",
@@ -39,6 +39,10 @@ service cloud.firestore {
     match /app_settings/{id} {
       allow get, list: if true;
       allow write: if isAdmin();
+    }
+
+    match /system_notifications/{id} {
+      allow read: if true;
     }
 
     match /meteo_caledonie/{id} {

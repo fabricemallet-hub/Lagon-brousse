@@ -1,3 +1,4 @@
+
 'use client';
 import {
   Sidebar,
@@ -161,12 +162,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (!user) return 'limited';
     if (!userProfile) return 'limited';
 
+    const expiryDate = userProfile.subscriptionExpiryDate ? new Date(userProfile.subscriptionExpiryDate) : null;
+    const isValid = expiryDate && !isNaN(expiryDate.getTime()) && isBefore(new Date(), expiryDate);
+
     switch (userProfile.subscriptionStatus) {
       case 'admin': return 'admin';
       case 'active':
-        return isBefore(new Date(), new Date(userProfile.subscriptionExpiryDate!)) ? 'active' : 'limited';
+        return isValid ? 'active' : 'limited';
       case 'trial':
-        return isBefore(new Date(), new Date(userProfile.subscriptionExpiryDate!)) ? 'trial' : 'limited';
+        return isValid ? 'trial' : 'limited';
       default: return 'limited';
     }
   }, [user, isUserLoading, userProfile, isProfileLoading]);
