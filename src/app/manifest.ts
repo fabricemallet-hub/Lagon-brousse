@@ -1,4 +1,3 @@
-
 import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
@@ -10,10 +9,15 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: '/',
     scope: '/',
     display: 'standalone',
+    display_override: ['window-controls-overlay', 'standalone', 'fullscreen'],
     background_color: '#ffffff',
     theme_color: '#3498db',
     orientation: 'portrait',
-    categories: ['weather', 'navigation', 'lifestyle'],
+    lang: 'fr-FR',
+    categories: ['weather', 'navigation', 'lifestyle', 'sports'],
+    iarc_rating_id: 'none',
+    related_applications: [],
+    prefer_related_applications: false,
     icons: [
       {
         src: '/icon-192x192.png',

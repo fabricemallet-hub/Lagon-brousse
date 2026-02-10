@@ -1,4 +1,9 @@
-const CACHE_NAME = 'lb-nc-v2';
+/**
+ * Lagon & Brousse NC - Service Worker
+ * Stratégie : Network-First avec fallback cache
+ */
+
+const CACHE_NAME = 'lb-nc-cache-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/manifest.json',
@@ -12,26 +17,14 @@ self.addEventListener('install', (event) => {
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
-  );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
-  // Stratégie simple pour PWABuilder : Network-First
+  // Ignorer les requêtes vers Firebase et les analytics
+  if (event.request.url.includes('google.com') || event.request.url.includes('firebase')) {
+    return;
+  }
+
   event.respondWith(
     fetch(event.request).catch(() => {
       return caches.match(event.request);
