@@ -1,7 +1,4 @@
-// Service Worker statique pour Lagon & Brousse NC
-// Assure la validation PWABuilder et une base de support hors-ligne
-
-const CACHE_NAME = 'lb-nc-v2';
+const CACHE_NAME = 'lb-nc-cache-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/manifest.json',
@@ -9,22 +6,31 @@ const ASSETS_TO_CACHE = [
 ];
 
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE).catch(() => {
-        // Optionnel : ignorer les erreurs de cache au démarrage
-      });
+      return cache.addAll(ASSETS_TO_CACHE);
     })
   );
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(clients.claim());
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    })
+  );
+  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
-  // Stratégie simple : Network first, fallback to cache
+  // Stratégie Network First avec fallback sur cache
   event.respondWith(
     fetch(event.request).catch(() => {
       return caches.match(event.request);

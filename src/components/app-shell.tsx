@@ -173,7 +173,7 @@ function InnerAppShell({
   return (
     <>
       <Sidebar>
-        <SidebarHeader><div className="flex items-center gap-3 p-2"><AppLogo className="size-8 text-primary" /><h1 className="font-bold text-lg group-data-[collapsible=icon]:hidden">Lagon & Brousse</h1></div></SidebarHeader>
+        <SidebarHeader><div className="flex items-center gap-3 p-2 group-data-[collapsible=icon]:p-1"><AppLogo className="size-8 text-primary" /><h1 className="font-black uppercase tracking-tighter text-sm group-data-[collapsible=icon]:hidden">Lagon & Brousse</h1></div></SidebarHeader>
         <SidebarContent><SidebarNav /></SidebarContent>
         <SidebarFooter>
           {isUserLoading || (user && isProfileLoading) ? (
@@ -181,9 +181,9 @@ function InnerAppShell({
           ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="w-full justify-start h-12 p-2 gap-3 bg-accent text-accent-foreground shadow-sm">
-                  <Avatar className="h-8 w-8 border-2 border-background"><AvatarFallback>{user.email?.[0].toUpperCase()}</AvatarFallback></Avatar>
-                  <div className="text-left group-data-[collapsible=icon]:hidden"><p className="font-bold text-xs truncate w-32">{user.email}</p></div>
+                <Button variant="ghost" className="w-full justify-start h-12 p-2 gap-3 bg-accent text-accent-foreground shadow-sm overflow-hidden">
+                  <Avatar className="h-8 w-8 border-2 border-background shrink-0"><AvatarFallback className="font-black">{user.email?.[0].toUpperCase()}</AvatarFallback></Avatar>
+                  <div className="text-left group-data-[collapsible=icon]:hidden min-w-0 flex-1"><p className="font-bold text-xs truncate w-full">{user.email}</p></div>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" side="right" sideOffset={10} className="w-56">
@@ -202,19 +202,19 @@ function InnerAppShell({
           )}
         </SidebarFooter>
       </Sidebar>
-      <main className="flex-1 flex flex-col min-h-screen w-full">
+      <main className="flex-1 flex flex-col min-h-screen w-full relative">
         <UsageTimer status={status} auth={auth} userId={user?.uid} />
-        <header className={cn("flex flex-col gap-2 border-b bg-card px-4 sticky top-0 z-30 py-3 transition-transform duration-300 transform-gpu", (status === 'limited' || status === 'trial') && 'mt-10')}>
+        <header className={cn("flex flex-col gap-2 border-b bg-card px-4 sticky top-0 z-30 py-3 transition-all duration-300", (status === 'limited' || status === 'trial') && 'mt-10')}>
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-2">
               <SidebarTrigger />
-              {status === 'trial' && <Badge variant="secondary" className="text-[10px] h-5">Essai</Badge>}
-              {status === 'limited' && <Badge variant="destructive" className="text-[10px] h-5">Limité</Badge>}
+              {status === 'trial' && <Badge variant="secondary" className="text-[10px] h-5 font-black uppercase">Essai</Badge>}
+              {status === 'limited' && <Badge variant="destructive" className="text-[10px] h-5 font-black uppercase">Limité</Badge>}
             </div>
             {isLocationLoading ? <Skeleton className="h-9 w-[120px]" /> : (
               <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-                <SelectTrigger className="w-[130px] h-9 text-xs"><SelectValue placeholder="Commune" /></SelectTrigger>
-                <SelectContent>{locations.map((loc: string) => <SelectItem key={loc} value={loc}>{loc}</SelectItem>)}</SelectContent>
+                <SelectTrigger className="w-[130px] h-9 text-xs font-bold border-2"><SelectValue placeholder="Commune" /></SelectTrigger>
+                <SelectContent className="max-h-80">{locations.map((loc: string) => <SelectItem key={loc} value={loc} className="text-xs font-bold">{loc}</SelectItem>)}</SelectContent>
               </Select>
             )}
           </div>
@@ -225,7 +225,7 @@ function InnerAppShell({
                 <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-primary/10 text-primary transition-all active:scale-75 shrink-0" onClick={handlePrevDay}><ChevronLeft className="h-5 w-5" /></Button>
                 <Popover open={isDatePickerOpen} onOpenChange={setDatePickerOpen}>
                   <PopoverTrigger asChild>
-                    <Button variant={'ghost'} className="flex-1 justify-center text-center font-black h-9 text-xs px-1 uppercase tracking-tight hover:bg-transparent active:scale-95 flex items-center min-w-0">
+                    <Button variant={'ghost'} className="flex-1 justify-center text-center font-black h-9 text-[11px] px-1 uppercase tracking-tight hover:bg-transparent active:scale-95 flex items-center min-w-0">
                       <CalendarIcon className="mr-2 h-4 w-4 text-accent shrink-0" />
                       <span className="truncate">{format(selectedDate, 'dd MMMM yyyy', { locale: fr })}</span>
                     </Button>
@@ -239,11 +239,11 @@ function InnerAppShell({
             )}
 
             {pathname === '/calendrier' && (
-              <div className="flex items-center gap-1 bg-muted p-1 rounded-lg h-9 ml-auto">
+              <div className="flex items-center gap-1 bg-muted p-1 rounded-lg h-9 ml-auto shrink-0">
                 <Button 
                   variant={calendarView === 'peche' ? 'secondary' : 'ghost'} 
                   size="sm" 
-                  className={cn("h-7 px-3 text-[10px] font-bold", calendarView === 'peche' && "bg-background shadow-sm")}
+                  className={cn("h-7 px-3 text-[10px] font-black uppercase", calendarView === 'peche' && "bg-background shadow-sm")}
                   onClick={() => setCalendarView('peche')}
                 >
                   <Fish className="mr-1 size-3" /> Pêche
@@ -251,7 +251,7 @@ function InnerAppShell({
                 <Button 
                   variant={calendarView === 'champs' ? 'secondary' : 'ghost'} 
                   size="sm" 
-                  className={cn("h-7 px-3 text-[10px] font-bold", calendarView === 'champs' && "bg-background shadow-sm")}
+                  className={cn("h-7 px-3 text-[10px] font-black uppercase", calendarView === 'champs' && "bg-background shadow-sm")}
                   onClick={() => setCalendarView('champs')}
                 >
                   <Leaf className="mr-1 size-3" /> Champs
@@ -260,7 +260,7 @@ function InnerAppShell({
             )}
           </div>
         </header>
-        <div className="flex-1 flex flex-col gap-6 p-4 pb-32 md:pb-12 w-full">
+        <div className="flex-1 flex flex-col gap-6 p-4 pb-32 md:pb-12 w-full transform-gpu">
           {children}
         </div>
         <BottomNav />

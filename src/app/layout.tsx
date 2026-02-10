@@ -9,6 +9,7 @@ export const metadata: Metadata = {
   title: 'Lagon & Brousse NC',
   description: 'Assistant intelligent pour le terroir calédonien',
   applicationName: 'L&B NC',
+  manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
@@ -17,7 +18,6 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false,
   },
-  manifest: '/manifest.json',
 };
 
 export const viewport: Viewport = {
