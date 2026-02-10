@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -448,7 +447,7 @@ export function LunarCalendar() {
 function ChampsDetailDialogContent({ day, location }: { day: Date; location: string }) {
   const [data, setData] = useState<LocationData | null>(null);
   useEffect(() => { setData(getDataForDate(location, day)); }, [location, day]);
-  if (!data) return <div className="space-y-4"><Skeleton className="h-20 w-full" /><Skeleton className="h-40 w-full" /></div>;
+  if (!data) return <div className="space-y-4"><Skeleton className="h-20 w-full" /></div>;
   const { farming, weather } = data;
   const GardeningIcon = { Fruits: Spade, Racines: Carrot, Fleurs: Flower, Feuilles: Leaf }[farming.zodiac];
   return (
@@ -489,7 +488,7 @@ function ChampsDetailDialogContent({ day, location }: { day: Date; location: str
 function PecheDetailDialogContent({ day, location }: { day: Date; location: string }) {
   const [data, setData] = useState<LocationData | null>(null);
   useEffect(() => { setData(getDataForDate(location, day)); }, [location, day]);
-  if (!data) return <div className="space-y-4"><Skeleton className="h-20 w-full" /><Skeleton className="h-40 w-full" /></div>;
+  if (!data) return <div className="space-y-4"><Skeleton className="h-20 w-full" /></div>;
   const { fishing, weather, crabAndLobster } = data;
   return (
     <div className="space-y-8">

@@ -1,4 +1,3 @@
-
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import './globals.css';
@@ -11,14 +10,6 @@ export const metadata: Metadata = {
   description: 'Assistant intelligent pour le terroir calédonien (Pêche, Chasse, Jardinage)',
   applicationName: 'L&B NC',
   manifest: '/manifest.json',
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'black-translucent',
-    title: 'Lagon & Brousse NC',
-  },
-  formatDetection: {
-    telephone: false,
-  },
 };
 
 export const viewport: Viewport = {
