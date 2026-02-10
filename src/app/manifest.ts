@@ -1,3 +1,4 @@
+
 import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
@@ -32,13 +33,15 @@ export default function manifest(): MetadataRoute.Manifest {
         src: 'https://picsum.photos/seed/lb-narrow/1080/1920',
         sizes: '1080x1920',
         type: 'image/png',
-        form_factor: 'narrow'
+        form_factor: 'narrow',
+        label: 'Accueil de l\'application'
       },
       {
         src: 'https://picsum.photos/seed/lb-wide/1920/1080',
         sizes: '1920x1080',
         type: 'image/png',
-        form_factor: 'wide'
+        form_factor: 'wide',
+        label: 'Tableau de bord Pêche'
       }
     ]
   }

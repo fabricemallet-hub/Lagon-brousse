@@ -1,3 +1,4 @@
+
 'use client';
 import {
   Sidebar,
@@ -88,7 +89,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         return isValid ? 'trial' : 'limited';
       default: return 'limited';
     }
-  }, [user, isUserLoading, userProfile, isProfileLoading]);
+  }, [user, isUserLoading, userProfile, iisProfileLoading]);
 
   const isAuthPage = pathname === '/login' || pathname === '/signup';
 

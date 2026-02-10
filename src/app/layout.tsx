@@ -1,3 +1,4 @@
+
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import './globals.css';
@@ -7,7 +8,7 @@ import type { Metadata, Viewport } from 'next';
 
 export const metadata: Metadata = {
   title: 'Lagon & Brousse NC',
-  description: 'Assistant intelligent pour le terroir calédonien',
+  description: 'Assistant intelligent pour le terroir calédonien (Pêche, Chasse, Jardinage)',
   applicationName: 'L&B NC',
   manifest: '/manifest.json',
   appleWebApp: {
