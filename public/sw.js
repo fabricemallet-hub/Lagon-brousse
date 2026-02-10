@@ -1,18 +1,20 @@
-const CACHE_NAME = 'lb-nc-v2';
-const OFFLINE_URL = '/';
+const CACHE_NAME = 'lb-nc-v2.1';
+const ASSETS_TO_CACHE = [
+  '/',
+  '/manifest.json',
+  '/icon-192x192.png',
+  '/icon-512x512.png'
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      // Liste de fichiers critiques minimale pour PWABuilder
-      const urlsToCache = [
-        OFFLINE_URL,
-        '/manifest.json',
-        '/icon-192x192.png'
-      ];
-      
       return Promise.allSettled(
-        urlsToCache.map(url => cache.add(url))
+        ASSETS_TO_CACHE.map(url => 
+          fetch(url).then(response => {
+            if (response.ok) return cache.put(url, response);
+          }).catch(() => {})
+        )
       );
     })
   );
@@ -21,13 +23,9 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
+    caches.keys().then((keys) => {
       return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
+        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
       );
     })
   );
@@ -35,17 +33,23 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request).catch(() => {
-        return caches.match(OFFLINE_URL);
-      })
-    );
-  } else {
-    event.respondWith(
-      caches.match(event.request).then((response) => {
-        return response || fetch(event.request);
-      })
-    );
+  // Ignorer les requêtes Firebase et Google Services
+  if (
+    event.request.url.includes('firestore.googleapis.com') ||
+    event.request.url.includes('identitytoolkit.googleapis.com') ||
+    event.request.url.includes('google.com') ||
+    event.request.method !== 'GET'
+  ) {
+    return;
   }
+
+  event.respondWith(
+    fetch(event.request)
+      .then(response => {
+        const resClone = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, resClone));
+        return response;
+      })
+      .catch(() => caches.match(event.request))
+  );
 });

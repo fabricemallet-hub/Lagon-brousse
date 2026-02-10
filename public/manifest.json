@@ -1,20 +1,21 @@
 {
+  "id": "nc.lagonbrousse.app",
   "name": "Lagon & Brousse NC",
   "short_name": "L&B NC",
   "description": "Assistant intelligent pour le terroir calédonien (Pêche, Chasse, Jardinage)",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#3498db",
   "orientation": "portrait",
-  "scope": "/",
   "categories": ["weather", "navigation", "lifestyle"],
   "icons": [
     {
       "src": "/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "maskable"
     },
     {
       "src": "/icon-512x512.png",
@@ -28,13 +29,15 @@
       "src": "https://picsum.photos/seed/lb-narrow/1080/1920",
       "sizes": "1080x1920",
       "type": "image/png",
-      "form_factor": "narrow"
+      "form_factor": "narrow",
+      "label": "Accueil de l'application"
     },
     {
       "src": "https://picsum.photos/seed/lb-wide/1920/1080",
       "sizes": "1920x1080",
       "type": "image/png",
-      "form_factor": "wide"
+      "form_factor": "wide",
+      "label": "Vue calendrier tactique"
     }
   ]
 }

@@ -12,21 +12,10 @@ import { AppShell } from '@/components/app-shell';
 export function RootProviders({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      // 1. Nettoyage des SW obsolètes
-      navigator.serviceWorker.getRegistrations().then(registrations => {
-        for (let registration of registrations) {
-          // On désinstalle tout SW qui n'est pas à la racine correcte
-          if (registration.active?.scriptURL.includes('cloudworkstations.dev')) {
-            registration.unregister();
-          }
-        }
-      });
-
-      // 2. Enregistrement simplifié pour PWABuilder
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .then(() => console.log('L&B NC: PWA Service Worker prêt.'))
-          .catch((err) => console.warn('L&B NC: Erreur SW:', err));
+        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+          .then(reg => console.log('L&B NC: Service Worker enregistré.', reg.scope))
+          .catch(err => console.warn('L&B NC: Erreur SW:', err));
       });
     }
   }, []);

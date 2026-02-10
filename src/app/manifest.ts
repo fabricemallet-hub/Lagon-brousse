@@ -2,15 +2,16 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: 'nc.lagonbrousse.app',
     name: 'Lagon & Brousse NC',
     short_name: 'L&B NC',
     description: 'Assistant intelligent pour le terroir calédonien (Pêche, Chasse, Jardinage)',
     start_url: '/',
+    scope: '/',
     display: 'standalone',
     background_color: '#ffffff',
     theme_color: '#3498db',
     orientation: 'portrait',
-    scope: '/',
     categories: ['weather', 'navigation', 'lifestyle'],
     icons: [
       {

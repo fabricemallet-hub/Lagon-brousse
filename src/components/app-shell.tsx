@@ -58,15 +58,12 @@ import { BottomNav } from './bottom-nav';
 const USAGE_LIMIT_SECONDS = 60;
 
 /**
- * Minuteur ultra-optimisé pour éviter les Violations.
+ * Minuteur optimisé pour éviter les Violations de performance.
  */
 const UsageTimer = React.memo(({ status, auth, userId }: { status: string, auth: any, userId?: string }) => {
   const [timeLeft, setTimeLeft] = useState(USAGE_LIMIT_SECONDS);
-  const { toast } = useToast();
   const router = useRouter();
-  const pathname = usePathname();
   
-  // Utilisation de Refs pour éviter les dépendances changeantes dans setInterval
   const lastSyncRef = useRef<number>(0);
   const timeLeftRef = useRef<number>(USAGE_LIMIT_SECONDS);
 
@@ -103,24 +100,24 @@ const UsageTimer = React.memo(({ status, auth, userId }: { status: string, auth:
       const next = Math.max(0, timeLeftRef.current - 1);
       timeLeftRef.current = next;
       
-      // Update UI
+      // Update local UI only
       setTimeLeft(next);
 
-      const used = USAGE_LIMIT_SECONDS - next;
-      const now = Date.now();
-      
-      // Sync to localStorage only every 15 seconds to save CPU
-      if (now - lastSyncRef.current > 15000 || next === 0) {
-        localStorage.setItem('dailyUsage', String(used));
-        lastSyncRef.current = now;
-      }
-      
       if (next <= 0) {
         clearInterval(interval);
+        localStorage.setItem('dailyUsage', String(USAGE_LIMIT_SECONDS));
         signOut(auth).then(() => {
           sessionStorage.clear();
           router.push('/login');
         });
+        return;
+      }
+
+      // Sync to disk only every 30 seconds to avoid performance violations
+      const now = Date.now();
+      if (now - lastSyncRef.current > 30000) {
+        localStorage.setItem('dailyUsage', String(USAGE_LIMIT_SECONDS - next));
+        lastSyncRef.current = now;
       }
     }, 1000);
 
