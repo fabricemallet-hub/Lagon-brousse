@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -8,8 +9,8 @@ import { AlertCircle } from 'lucide-react';
 const USAGE_LIMIT_SECONDS = 60;
 
 /**
- * Minuteur de session optimisé pour PWABuilder et performances mobiles.
- * Les écritures disque (localStorage) sont limitées à une fois toutes les 15 secondes.
+ * Minuteur de session optimisé pour la performance mobile.
+ * Les écritures disque sont limitées pour éviter les Violations de performance.
  */
 export function UsageTimer({ status, auth, userId }: { status: string, auth: any, userId?: string }) {
   const [timeLeft, setTimeLeft] = useState(USAGE_LIMIT_SECONDS);
@@ -44,12 +45,12 @@ export function UsageTimer({ status, auth, userId }: { status: string, auth: any
       timeLeftRef.current -= 1;
       const current = timeLeftRef.current;
       
-      // Mise à jour de l'UI toutes les 5 secondes pour économiser les cycles CPU
+      // UI mise à jour seulement toutes les 5s ou si critique
       if (current % 5 === 0 || current <= 5) {
         setTimeLeft(current);
       }
       
-      // Sauvegarde persistante espacée (toutes les 15s) pour éviter les "Violations" de performance
+      // Stockage seulement toutes les 15s pour préserver les performances
       if (current % 15 === 0 || current <= 0) {
         localStorage.setItem('usage_seconds', String(USAGE_LIMIT_SECONDS - current));
       }

@@ -58,7 +58,7 @@ import { cn } from '@/lib/utils';
 import { BottomNav } from './bottom-nav';
 import { UsageTimer } from './usage-timer';
 import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { locations, selectedLocation, setSelectedLocation, isLocationLoading } = useLocation();
