@@ -1,41 +1,33 @@
+// Service Worker statique pour Lagon & Brousse NC
+// Assure la validation PWABuilder et une base de support hors-ligne
+
 const CACHE_NAME = 'lb-nc-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/manifest.json',
-  '/icon-192x192.png',
-  '/icon-512x512.png'
+  '/icon-192x192.png'
 ];
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS_TO_CACHE).catch(() => {
-        console.warn('Certains assets n’ont pas pu être cachés au démarrage.');
+        // Optionnel : ignorer les erreurs de cache au démarrage
       });
     })
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)));
-    })
-  );
-  self.clients.claim();
+  event.waitUntil(clients.claim());
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
-
+  // Stratégie simple : Network first, fallback to cache
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-        return response;
-      })
-      .catch(() => caches.match(event.request))
+    fetch(event.request).catch(() => {
+      return caches.match(event.request);
+    })
   );
 });
