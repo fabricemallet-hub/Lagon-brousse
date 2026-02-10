@@ -1,4 +1,3 @@
-
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import './globals.css';
@@ -49,6 +48,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="application-name" content="L&B NC" />
         <meta name="apple-mobile-web-app-title" content="L&B NC" />
+        <link rel="manifest" href="/manifest.json" />
       </head>
       <body className={cn('font-body antialiased', 'min-h-screen bg-background font-sans overflow-x-hidden')}>
         <Suspense fallback={null}>

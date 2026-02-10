@@ -220,7 +220,6 @@ export function LunarCalendar() {
   const [detailedDay, setDetailedDay] = useState<Date | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // ZOOM & TOUCH STATES
   const [zoom, setZoom] = useState(1);
   const [initialDistance, setInitialDistance] = useState<number | null>(null);
   const touchStartPos = useRef<{ x: number, y: number } | null>(null);
@@ -237,7 +236,6 @@ export function LunarCalendar() {
   const days = eachDayOfInterval({ start: startDate, end: endDate });
   const weekdays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
-  // Centrage automatique optimisé
   useEffect(() => {
     const today = new Date();
     const isInCurrentMonth = displayDate.getMonth() === today.getMonth() && displayDate.getFullYear() === today.getFullYear();
@@ -311,7 +309,6 @@ export function LunarCalendar() {
 
   return (
     <div className="flex flex-col items-start py-2 w-full">
-      {/* LÉGENDE FIXE EN HAUT - RÉDUITE POUR MOBILE */}
       <div className="sticky top-0 mb-4 px-1 w-full shrink-0 z-30 bg-background/95 backdrop-blur-md pb-2 border-b-2 border-primary/10">
         {calendarView === 'champs' ? (
           <div className="flex flex-col gap-1.5">
@@ -373,7 +370,7 @@ export function LunarCalendar() {
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         <div 
-          className="w-fit border-2 rounded-2xl bg-card shadow-lg overflow-hidden flex flex-col shrink-0 origin-top-left transition-transform duration-75 will-change-transform"
+          className="w-fit border-2 rounded-2xl bg-card shadow-lg overflow-hidden flex flex-col shrink-0 origin-top-left transition-transform duration-75 will-change-transform transform-gpu"
           style={{ 
             transform: `scale(${zoom})`,
             width: '1200px', 

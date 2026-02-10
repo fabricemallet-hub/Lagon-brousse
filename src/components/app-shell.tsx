@@ -1,4 +1,3 @@
-
 'use client';
 import {
   Sidebar,
@@ -59,13 +58,15 @@ import { BottomNav } from './bottom-nav';
 const USAGE_LIMIT_SECONDS = 60;
 
 /**
- * Minuteur optimisé pour éviter les violations de performance.
+ * Minuteur ultra-optimisé pour éviter les Violations.
  */
 const UsageTimer = React.memo(({ status, auth, userId }: { status: string, auth: any, userId?: string }) => {
   const [timeLeft, setTimeLeft] = useState(USAGE_LIMIT_SECONDS);
   const { toast } = useToast();
   const router = useRouter();
   const pathname = usePathname();
+  
+  // Utilisation de Refs pour éviter les dépendances changeantes dans setInterval
   const lastSyncRef = useRef<number>(0);
   const timeLeftRef = useRef<number>(USAGE_LIMIT_SECONDS);
 
@@ -82,7 +83,7 @@ const UsageTimer = React.memo(({ status, auth, userId }: { status: string, auth:
     if (lastUsageDate !== today || lastUserId !== userId) {
       dailyUsage = 0;
       localStorage.setItem('lastUsageDate', today);
-      localStorage.setItem('lastUserId', userId || '');
+      localStorage.setItem('lastUserId', userId);
       localStorage.setItem('dailyUsage', '0');
     }
     
@@ -91,10 +92,9 @@ const UsageTimer = React.memo(({ status, auth, userId }: { status: string, auth:
     setTimeLeft(initialRemaining);
 
     if (initialRemaining <= 0) {
-        toast({ variant: 'destructive', title: 'Limite atteinte', description: 'Votre minute quotidienne est épuisée.' });
         signOut(auth).then(() => {
             sessionStorage.clear();
-            if (pathname !== '/login') router.push('/login');
+            router.push('/login');
         });
         return;
     }
@@ -103,13 +103,13 @@ const UsageTimer = React.memo(({ status, auth, userId }: { status: string, auth:
       const next = Math.max(0, timeLeftRef.current - 1);
       timeLeftRef.current = next;
       
-      // On ne met à jour le state que si la valeur change pour éviter des re-renders inutiles
+      // Update UI
       setTimeLeft(next);
 
       const used = USAGE_LIMIT_SECONDS - next;
       const now = Date.now();
       
-      // Synchronisation localStorage espacée (toutes les 15s) pour la performance
+      // Sync to localStorage only every 15 seconds to save CPU
       if (now - lastSyncRef.current > 15000 || next === 0) {
         localStorage.setItem('dailyUsage', String(used));
         lastSyncRef.current = now;
@@ -117,21 +117,20 @@ const UsageTimer = React.memo(({ status, auth, userId }: { status: string, auth:
       
       if (next <= 0) {
         clearInterval(interval);
-        toast({ variant: 'destructive', title: 'Limite atteinte', description: 'Déconnexion automatique...' });
         signOut(auth).then(() => {
           sessionStorage.clear();
-          if (pathname !== '/login') router.push('/login');
+          router.push('/login');
         });
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [status, auth, userId, toast, router, pathname]);
+  }, [status, auth, userId, router]);
 
   if (status !== 'limited' && status !== 'trial') return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 h-10 bg-red-600 text-white flex items-center justify-center text-xs font-black z-[100] shadow-xl px-4 text-center border-b border-white/20">
+    <div className="fixed top-0 left-0 right-0 h-10 bg-red-600 text-white flex items-center justify-center text-xs font-black z-[100] shadow-xl px-4 text-center border-b border-white/20 transform-gpu">
         <AlertCircle className="size-4 mr-2 shrink-0" />
         {status === 'trial' ? 'Session d\'essai' : 'Mode Limité'} : {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')} restant
     </div>
@@ -295,7 +294,7 @@ function InnerAppShell({
       </Sidebar>
       <main className="flex-1 flex flex-col min-h-screen w-full">
         <UsageTimer status={status} auth={auth} userId={user?.uid} />
-        <header className={cn("flex flex-col gap-2 border-b bg-card px-4 sticky top-0 z-30 py-3", (status === 'limited' || status === 'trial') && 'mt-10')}>
+        <header className={cn("flex flex-col gap-2 border-b bg-card px-4 sticky top-0 z-30 py-3 transition-transform duration-300 transform-gpu", (status === 'limited' || status === 'trial') && 'mt-10')}>
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-2">
               <SidebarTrigger />
