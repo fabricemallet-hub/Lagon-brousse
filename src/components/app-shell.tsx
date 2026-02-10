@@ -49,7 +49,7 @@ import { signOut } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
 import type { UserAccount } from '@/lib/types';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Badge } from './badge';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { BottomNav } from './bottom-nav';
 import { UsageTimer } from './usage-timer';
