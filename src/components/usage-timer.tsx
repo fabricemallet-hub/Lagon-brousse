@@ -44,8 +44,8 @@ export function UsageTimer({ status, auth, userId }: { status: string, auth: any
       timeLeftRef.current -= 1;
       const current = timeLeftRef.current;
       
-      // Mise à jour de l'UI et du stockage toutes les 30 secondes pour économiser les ressources
-      if (current % 30 === 0 || current <= 5) {
+      // Mise à jour de l'UI et du stockage toutes les 15 secondes pour économiser les ressources
+      if (current % 15 === 0 || current <= 5) {
         setTimeLeft(current);
         localStorage.setItem('usage_seconds', String(USAGE_LIMIT_SECONDS - current));
       }

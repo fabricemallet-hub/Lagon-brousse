@@ -9,11 +9,7 @@
   "background_color": "#ffffff",
   "theme_color": "#3498db",
   "orientation": "portrait",
-  "categories": [
-    "weather",
-    "navigation",
-    "lifestyle"
-  ],
+  "categories": ["weather", "navigation", "lifestyle"],
   "icons": [
     {
       "src": "/icon-192x192.png",
