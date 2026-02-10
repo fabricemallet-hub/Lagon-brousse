@@ -8,8 +8,8 @@ import { AlertCircle } from 'lucide-react';
 const USAGE_LIMIT_SECONDS = 60;
 
 /**
- * Minuteur de session optimisé pour PWABuilder (réduit la charge CPU).
- * Mise à jour de l'interface toutes les 30 secondes pour éliminer les violations.
+ * Minuteur de session optimisé pour réduire la charge CPU et éviter les violations de performance.
+ * Synchronise les données avec le stockage local toutes les 10 secondes.
  */
 export function UsageTimer({ status, auth, userId }: { status: string, auth: any, userId?: string }) {
   const [timeLeft, setTimeLeft] = useState(USAGE_LIMIT_SECONDS);
@@ -44,8 +44,8 @@ export function UsageTimer({ status, auth, userId }: { status: string, auth: any
       timeLeftRef.current -= 1;
       const current = timeLeftRef.current;
       
-      // Mise à jour de l'UI et du stockage toutes les 15 secondes pour économiser les ressources
-      if (current % 15 === 0 || current <= 5) {
+      // Mise à jour de l'UI et du stockage local toutes les 10 secondes pour économiser les ressources processeur
+      if (current % 10 === 0 || current <= 5) {
         setTimeLeft(current);
         localStorage.setItem('usage_seconds', String(USAGE_LIMIT_SECONDS - current));
       }
