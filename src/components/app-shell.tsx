@@ -89,7 +89,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         return isValid ? 'trial' : 'limited';
       default: return 'limited';
     }
-  }, [user, isUserLoading, userProfile, iisProfileLoading]);
+  }, [user, isUserLoading, userProfile, isProfileLoading]);
 
   const isAuthPage = pathname === '/login' || pathname === '/signup';
 
