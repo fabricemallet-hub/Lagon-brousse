@@ -13,6 +13,8 @@ service cloud.firestore {
       return isSignedIn() && (
         // Accès par UID maître
         request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2"] ||
+        // Accès par email maître
+        request.auth.token.email.lower() in ["f.mallet81@outlook.com", "fabrice.mallet@gmail.com", "f.mallet81@gmail.com"] ||
         // Accès par statut dans le document utilisateur (dynamique)
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'admin'
       );

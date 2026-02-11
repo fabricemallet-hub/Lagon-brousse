@@ -24,7 +24,6 @@ import {
   ChevronRight,
   User,
   Calendar as CalendarIcon,
-  Fish,
   Leaf,
   MailWarning,
   RefreshCw,
@@ -48,7 +47,7 @@ import { fr } from 'date-fns/locale';
 import Link from 'next/link';
 import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { Skeleton } from './ui/skeleton';
-import { signOut, sendEmailVerification } from 'firebase/auth';
+import { signOut } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
 import type { UserAccount } from '@/lib/types';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';

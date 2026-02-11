@@ -1,34 +1,27 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, serverTimestamp, deleteDoc, doc, Timestamp, orderBy, query, setDoc, writeBatch, getDocs, addDoc, updateDoc } from 'firebase/firestore';
-import type { UserAccount, AccessToken, Conversation, SharedAccessToken, SplashScreenSettings, FishSpeciesInfo, SoundLibraryEntry, FaqEntry, SupportTicket, CgvSettings, RibSettings, Business } from '@/lib/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { collection, serverTimestamp, deleteDoc, doc, orderBy, query, setDoc } from 'firebase/firestore';
+import type { UserAccount, Business } from '@/lib/types';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { 
-  DollarSign, Users, Crown, KeyRound, Trash2, Mail, 
-  Fish, Plus, Pencil, DatabaseZap, Sparkles, UserX,
-  Music, Volume2, Play, HelpCircle, MessageSquare, Check, X, RefreshCw,
-  TrendingUp,
-  Store,
-  Briefcase
+  Trash2, Plus, Pencil, RefreshCw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
-import { INITIAL_FAQ_DATA } from '@/lib/faq-data';
 
 export default function AdminPage() {
   const { user, isUserLoading } = useUser();
@@ -49,7 +42,7 @@ export default function AdminPage() {
   const [currentBusiness, setCurrentBusiness] = useState<Partial<Business>>({});
   const [isSavingBusiness, setIsSavingBusiness] = useState(false);
 
-  // Detection Admin basée sur UID et profil
+  // Detection Admin robuste
   const userProfileRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return doc(firestore, 'users', user.uid);
@@ -63,7 +56,11 @@ export default function AdminPage() {
       'ipupi3Pg4RfrSEpFyT69BtlCdpi2',
       'Irglq69MasYdNwBmUu8yKvw6h4G2'
     ];
-    return masterAdminUids.includes(user.uid) || adminProfile?.subscriptionStatus === 'admin' || adminProfile?.role === 'admin';
+    const masterAdminEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
+    return masterAdminUids.includes(user.uid) || 
+           (user.email && masterAdminEmails.includes(user.email.toLowerCase())) ||
+           adminProfile?.subscriptionStatus === 'admin' || 
+           adminProfile?.role === 'admin';
   }, [user, adminProfile]);
 
   const usersRef = useMemoFirebase(() => {
@@ -101,7 +98,7 @@ export default function AdminPage() {
     if (!firestore || !isAdmin) return;
     try {
       await deleteDoc(doc(firestore, 'users', userId));
-      toast({ title: "Compte utilisateur supprimé de Firestore." });
+      toast({ title: "Profil supprimé de Firestore." });
     } catch (e) {
       toast({ variant: 'destructive', title: "Erreur suppression" });
     } finally {
@@ -119,10 +116,10 @@ export default function AdminPage() {
         id,
         createdAt: currentBusiness.createdAt || serverTimestamp()
       }, { merge: true });
-      toast({ title: "Commerce enregistré !", description: `ID à lier : ${id}` });
+      toast({ title: "Commerce enregistré !", description: `ID : ${id}` });
       setIsBusinessDialogOpen(false);
     } catch (e) {
-      toast({ variant: 'destructive', title: "Erreur sauvegarde commerce" });
+      toast({ variant: 'destructive', title: "Erreur sauvegarde" });
     } finally {
       setIsSavingBusiness(false);
     }
@@ -147,7 +144,7 @@ export default function AdminPage() {
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20 px-1">
       <Card className="border-2 shadow-sm">
-        <CardHeader><CardTitle className="font-black uppercase tracking-tighter text-xl text-primary">Tableau de Bord Admin</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="font-black uppercase tracking-tighter text-xl text-primary">Admin : {user?.email}</CardTitle></CardHeader>
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -215,7 +212,6 @@ export default function AdminPage() {
                   <TableRow>
                     <TableHead className="text-[10px] font-black uppercase">Nom</TableHead>
                     <TableHead className="text-[10px] font-black uppercase">Commune</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase">ID à lier</TableHead>
                     <TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -224,7 +220,6 @@ export default function AdminPage() {
                     <TableRow key={b.id}>
                       <TableCell className="font-bold text-xs">{b.name}</TableCell>
                       <TableCell className="text-xs uppercase font-bold opacity-60">{b.commune}</TableCell>
-                      <TableCell className="text-xs font-mono bg-muted/30 px-2 py-1 rounded select-all">{b.id}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           <Button variant="ghost" size="icon" onClick={() => { setCurrentBusiness(b); setIsBusinessDialogOpen(true); }}><Pencil className="size-3" /></Button>
@@ -277,10 +272,10 @@ export default function AdminPage() {
             </div>
             <div className="space-y-1">
               <Label className="text-xs uppercase font-bold opacity-60">ID Commerce (Pro)</Label>
-              <Input value={userToEdit?.businessId || ''} onChange={e => setUserToEdit(p => p ? {...p, businessId: e.target.value} : null)} placeholder="Copiez l'ID du commerce ici" />
+              <Input value={userToEdit?.businessId || ''} onChange={e => setUserToEdit(p => p ? {...p, businessId: e.target.value} : null)} placeholder="Lier à un commerce" />
             </div>
           </div>
-          <DialogFooter><Button onClick={handleSaveUser} disabled={isSavingUser} className="w-full h-12 font-black uppercase">Mettre à jour</Button></DialogFooter>
+          <DialogFooter><Button onClick={handleSaveUser} disabled={isSavingUser} className="w-full h-12 font-black uppercase">Sauvegarder</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -288,7 +283,6 @@ export default function AdminPage() {
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle className="font-black uppercase">Gérer le Commerce</DialogTitle>
-            <DialogDescription className="text-[10px] font-bold uppercase">Profil magasin</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-1">
@@ -325,7 +319,7 @@ export default function AdminPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Supprimer cet utilisateur ?</AlertDialogTitle>
-            <AlertDialogDescription>Cette action supprimera uniquement le document profil de Firestore. L'authentification Firebase ne sera pas affectée.</AlertDialogDescription>
+            <AlertDialogDescription>Cette action supprimera uniquement le document profil de Firestore.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
