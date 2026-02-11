@@ -21,22 +21,9 @@ service cloud.firestore {
       );
     }
 
-    // --- 1. CMS SUPPORT & FAQ ---
-    match /cms_support/faq/items/{id} {
-      allow get, list: if true;
-      allow write: if isAdmin();
-    }
-
-    match /cms_support/tickets/items/{id} {
-      allow create: if isSignedIn();
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow list: if isAdmin() || (isSignedIn() && request.query.limit <= 100);
-      allow update, delete: if isAdmin();
-    }
-
-    // --- 2. ACCÈS PUBLICS / GÉNÉRAUX ---
+    // --- 0. ACCÈS PUBLICS (Indispensable pour Splash Screen & PWABuilder) ---
     match /app_settings/{id} {
-      allow get, list: if true;
+      allow read: if true;
       allow write: if isAdmin();
     }
 
@@ -55,6 +42,11 @@ service cloud.firestore {
     match /fish_species/{id} {
       allow get, list: if true;
       allow write: if isAdmin();
+      
+      match /commune_stats/{communeId} {
+        allow get, list: if true;
+        allow create, update: if isSignedIn();
+      }
     }
     
     match /sound_library/{id} {
@@ -62,7 +54,20 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // --- 3. UTILISATEURS & DONNÉES PERSO ---
+    // --- 1. CMS SUPPORT & FAQ ---
+    match /cms_support/faq/items/{id} {
+      allow get, list: if true;
+      allow write: if isAdmin();
+    }
+
+    match /cms_support/tickets/items/{id} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // --- 2. UTILISATEURS & DONNÉES PERSO ---
     match /users/{userId} {
       allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       match /{allPaths=**} {
@@ -70,7 +75,7 @@ service cloud.firestore {
       }
     }
 
-    // --- 4. FONCTIONNALITÉS TEMPS RÉEL ---
+    // --- 3. FONCTIONNALITÉS TEMPS RÉEL ---
     match /hunting_sessions/{id} {
       allow read, write: if isSignedIn();
       match /{allPaths=**} {
@@ -94,13 +99,30 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // --- 5. PARTAGE DE SPOTS ---
+    // --- 4. PARTAGE DE SPOTS ---
     match /spot_shares/{id} {
       allow create: if isSignedIn();
       allow read, delete: if isSignedIn() && (
         isAdmin() || 
         (request.auth.token.email != null && resource.data.recipientEmail == request.auth.token.email.lower())
       );
+    }
+
+    // --- 5. COMMERCES & BUSINESS ---
+    match /businesses/{businessId} {
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
+
+      match /promotions/{promoId} {
+        allow get, list: if true;
+        allow write: if isSignedIn();
+      }
+    }
+
+    match /campaigns/{campaignId} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
     }
   }
 }

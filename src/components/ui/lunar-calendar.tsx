@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -165,10 +164,10 @@ const DayCell = React.memo(({
       {calendarView === 'peche' ? (
         <div className="flex-grow flex flex-col justify-center items-center gap-0.5 pt-1">
           <div className="flex items-center justify-center gap-0.5 h-3 overflow-hidden flex-nowrap whitespace-nowrap w-full">
-            {data.crabAndLobster.crabStatus === 'Plein' && <CrabIcon className="size-2.5 text-green-600 shrink-0" />}
-            {data.crabAndLobster.crabStatus === 'Mout' && <CrabIcon className="size-2.5 text-destructive shrink-0" />}
-            {data.crabAndLobster.lobsterActivity === 'Élevée' && <LobsterIcon className="size-2.5 text-blue-600 shrink-0" />}
-            {data.crabAndLobster.octopusActivity === 'Élevée' && <OctopusIcon className="size-2.5 text-purple-600 shrink-0" />}
+            {data.crabAndLobster.crabStatus === 'Plein' && <CrabIcon className="size-3.5 text-green-600 shrink-0" />}
+            {data.crabAndLobster.crabStatus === 'Mout' && <CrabIcon className="size-3.5 text-destructive shrink-0" />}
+            {data.crabAndLobster.lobsterActivity === 'Élevée' && <LobsterIcon className="size-3.5 text-blue-600 shrink-0" />}
+            {data.crabAndLobster.octopusActivity === 'Élevée' && <OctopusIcon className="size-3.5 text-purple-600 shrink-0" />}
           </div>
 
           <div className="flex items-center justify-center gap-0.5 h-3 overflow-hidden flex-nowrap whitespace-nowrap w-full">
