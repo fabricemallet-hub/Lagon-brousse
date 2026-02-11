@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -11,34 +10,51 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.role == "admin" ||
-        request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2"]
+        request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2"] ||
+        (request.auth.token.email != null && 
+         request.auth.token.email.lower() in [
+           "fabrice.mallet@gmail.com",
+           "f.mallet81@gmail.com",
+           "f.mallet81@outlook.com"
+         ]
+        )
       );
     }
 
-    function isPro() {
-      return isSignedIn() && request.auth.token.role == "professional";
+    // --- 0. ACCÈS PUBLICS (Indispensable pour Splash Screen & PWABuilder) ---
+    match /app_settings/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
-    // --- COMMERCES & BUSINESS ---
-    match /businesses/{businessId} {
-      allow get, list: if true;
-      allow create: if isPro();
-      allow update, delete: if isPro() && resource.data.ownerId == request.auth.uid;
+    match /system_notifications/{id} {
+      allow read: if true;
+    }
 
-      match /promotions/{promoId} {
+    match /meteo_caledonie/{id} {
+      allow get, list: if true;
+      match /previsions/{prevId} {
         allow get, list: if true;
-        allow write: if isPro() && get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerId == request.auth.uid;
+      }
+      allow write: if isAdmin();
+    }
+
+    match /fish_species/{id} {
+      allow get, list: if true;
+      allow write: if isAdmin();
+      
+      match /commune_stats/{communeId} {
+        allow get, list: if true;
+        allow create, update: if isSignedIn();
       }
     }
-
-    // --- CAMPAGNES ---
-    match /campaigns/{id} {
-      allow create: if isPro();
-      allow read: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
+    
+    match /sound_library/{id} {
+      allow get, list: if true;
+      allow write: if isAdmin();
     }
 
-    // --- CMS SUPPORT & FAQ ---
+    // --- 1. CMS SUPPORT & FAQ ---
     match /cms_support/faq/items/{id} {
       allow get, list: if true;
       allow write: if isAdmin();
@@ -51,19 +67,62 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // --- UTILISATEURS ---
+    // --- 2. UTILISATEURS & DONNÉES PERSO ---
     match /users/{userId} {
-      allow read: if isSignedIn(); // Permet aux pros de compter le reach
-      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       match /{allPaths=**} {
         allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       }
     }
 
-    // --- DEFAUT ---
-    match /{allPaths=**} {
-      allow read: if isSignedIn();
+    // --- 3. FONCTIONNALITÉS TEMPS RÉEL ---
+    match /hunting_sessions/{id} {
+      allow read, write: if isSignedIn();
+      match /{allPaths=**} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    match /vessels/{id} {
+      allow read, write: if isSignedIn();
+      match /{allPaths=**} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    match /access_tokens/{id} {
+      allow read, write: if isSignedIn() || isAdmin();
+    }
+
+    match /shared_access_tokens/{id} {
+      allow get, list: if true;
       allow write: if isAdmin();
+    }
+
+    // --- 4. PARTAGE DE SPOTS ---
+    match /spot_shares/{id} {
+      allow create: if isSignedIn();
+      allow read, delete: if isSignedIn() && (
+        isAdmin() || 
+        (request.auth.token.email != null && resource.data.recipientEmail == request.auth.token.email.lower())
+      );
+    }
+
+    // --- 5. COMMERCES & BUSINESS ---
+    match /businesses/{businessId} {
+      allow get, list: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
+
+      match /promotions/{promoId} {
+        allow get, list: if true;
+        allow write: if isSignedIn();
+      }
+    }
+
+    match /campaigns/{campaignId} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
     }
   }
 }

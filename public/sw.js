@@ -1,5 +1,3 @@
-const CACHE_NAME = 'lb-cache-v3';
-
 self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
@@ -9,10 +7,6 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Nécessaire pour que PWABuilder valide le support hors-ligne
-  event.respondWith(
-    fetch(event.request).catch(() => {
-      return caches.match(event.request);
-    })
-  );
+  // Pass-through simple pour valider les critères PWA hors-ligne
+  event.respondWith(fetch(event.request));
 });
