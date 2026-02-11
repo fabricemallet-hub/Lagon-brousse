@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, serverTimestamp, deleteDoc, doc, Timestamp, orderBy, query, setDoc, writeBatch, getDocs, addDoc, updateDoc } from 'firebase/firestore';
-import type { UserAccount, AccessToken, Conversation, SharedAccessToken, SplashScreenSettings, FishSpeciesInfo, SoundLibraryEntry, FaqEntry, SupportTicket, CgvSettings, RibSettings } from '@/lib/types';
+import type { UserAccount, AccessToken, Conversation, SharedAccessToken, SplashScreenSettings, FishSpeciesInfo, SoundLibraryEntry, FaqEntry, SupportTicket, CgvSettings, RibSettings, Business } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,7 +33,8 @@ import {
   Ruler,
   Landmark,
   CreditCard,
-  Briefcase
+  Briefcase,
+  Store
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -117,6 +118,11 @@ export default function AdminPage() {
   const [tokenCount, setTokenCount] = useState('1');
   const [isGeneratingTokens, setIsGeneratingTokens] = useState(false);
 
+  // Business States
+  const [isBusinessDialogOpen, setIsBusinessDialogOpen] = useState(false);
+  const [currentBusiness, setCurrentBusiness] = useState<Partial<Business>>({});
+  const [isSavingBusiness, setIsSavingBusiness] = useState(false);
+
   const isAdmin = useMemo(() => {
     if (!user) return false;
     const email = user.email?.toLowerCase();
@@ -139,6 +145,12 @@ export default function AdminPage() {
     return query(collection(firestore, 'users'), orderBy('email', 'asc'));
   }, [firestore, isAdmin]);
   const { data: users } = useCollection<UserAccount>(usersRef);
+
+  const businessRef = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    return query(collection(firestore, 'businesses'), orderBy('name', 'asc'));
+  }, [firestore, isAdmin]);
+  const { data: businesses } = useCollection<Business>(businessRef);
 
   const sortedFaqs = useMemo(() => {
     if (!rawFaqs) return [];
@@ -244,6 +256,35 @@ export default function AdminPage() {
     }
   };
 
+  const handleSaveBusiness = async () => {
+    if (!firestore || !isAdmin || !currentBusiness.name || !currentBusiness.ownerId) return;
+    setIsSavingBusiness(true);
+    try {
+      const id = currentBusiness.id || currentBusiness.name.toLowerCase().replace(/\s+/g, '-');
+      await setDoc(doc(firestore, 'businesses', id), {
+        ...currentBusiness,
+        id,
+        createdAt: currentBusiness.createdAt || serverTimestamp()
+      }, { merge: true });
+      toast({ title: "Commerce enregistré !", description: `ID à lier : ${id}` });
+      setIsBusinessDialogOpen(false);
+    } catch (e) {
+      toast({ variant: 'destructive', title: "Erreur sauvegarde commerce" });
+    } finally {
+      setIsSavingBusiness(false);
+    }
+  };
+
+  const handleDeleteBusiness = async (id: string) => {
+    if (!firestore || !isAdmin) return;
+    try {
+      await deleteDoc(doc(firestore, 'businesses', id));
+      toast({ title: "Commerce supprimé" });
+    } catch (e) {
+      toast({ variant: 'destructive', title: "Erreur suppression" });
+    }
+  };
+
   const handleSort = (field: keyof FaqEntry) => {
     setFaqSort(prev => ({
       field,
@@ -341,13 +382,6 @@ export default function AdminPage() {
     }
   };
 
-  const loadCgvTemplate = () => {
-    const today = new Date().toLocaleDateString('fr-FR');
-    const template = `CONDITIONS GÉNÉRALES DE VENTE (CGV) - LAGON & BROUSSE NC\nDernière mise à jour : ${today}\n\nARTICLE 1 : OBJET...`;
-    setCgvContent(template);
-    toast({ title: "Modèle chargé" });
-  };
-
   const handleSaveRib = async () => {
     if (!firestore || !isAdmin) return;
     setIsSavingRib(true);
@@ -406,19 +440,6 @@ export default function AdminPage() {
     }
   };
 
-  const handleFishPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      setCurrentFish(prev => ({ ...prev, imageUrl: base64 }));
-      toast({ title: "Photo prête" });
-    };
-    reader.readAsDataURL(file);
-  };
-
   const handleSaveFish = async () => {
     if (!firestore || !isAdmin || !currentFish.name) return;
     setIsSavingFish(true);
@@ -452,178 +473,11 @@ export default function AdminPage() {
     }
   };
 
-  const handleDeleteFish = async (id: string) => {
-    if (!firestore || !isAdmin) return;
-    try {
-      await deleteDoc(doc(firestore, 'fish_species', id));
-      toast({ title: "Poisson supprimé" });
-    } catch (e) {
-      toast({ variant: 'destructive', title: "Erreur suppression" });
-    }
-  };
-
-  const handleReadjustRisks = async () => {
-    if (!firestore || !isAdmin || !fishSpecies) return;
-    setIsReadjustingRisks(true);
-    try {
-      const batch = writeBatch(firestore);
-      let count = 0;
-
-      for (const fish of fishSpecies) {
-        const statsRef = collection(firestore, 'fish_species', fish.id, 'commune_stats');
-        const statsSnap = await getDocs(statsRef);
-        
-        const sums = { small: 0, medium: 0, large: 0 };
-        const counts = { small: 0, medium: 0, large: 0 };
-
-        statsSnap.forEach(docSnap => {
-          const d = docSnap.data();
-          sums.small += d.small_sum || 0;
-          counts.small += d.small_count || 0;
-          sums.medium += d.medium_sum || 0;
-          counts.medium += d.medium_count || 0;
-          sums.large += d.large_sum || 0;
-          counts.large += d.large_count || 0;
-        });
-
-        const updates: any = {};
-        if (counts.small > 0) updates.gratteRiskSmall = parseFloat((sums.small / counts.small).toFixed(1));
-        if (counts.medium > 0) updates.gratteRiskMedium = parseFloat((sums.medium / counts.medium).toFixed(1));
-        if (counts.large > 0) updates.gratteRiskLarge = parseFloat((sums.large / counts.large).toFixed(1));
-
-        if (Object.keys(updates).length > 0) {
-          batch.update(doc(firestore, 'fish_species', fish.id), updates);
-          count++;
-        }
-      }
-
-      if (count > 0) {
-        await batch.commit();
-        toast({ title: "Risques réajustés !", description: `${count} espèces mises à jour.` });
-      } else {
-        toast({ title: "Aucun réajustement nécessaire" });
-      }
-    } finally {
-      setIsReadjustingRisks(false);
-    }
-  };
-
-  const handleRepairLengths = async () => {
-    if (!firestore || !isAdmin || !fishSpecies) return;
-    setIsClearing(true);
-    try {
-      const batch = writeBatch(firestore);
-      let count = 0;
-      
-      for (const fish of fishSpecies) {
-        const referenceFish = lagoonFishData.find(f => 
-          f.id === fish.id || 
-          f.name.toLowerCase().trim() === fish.name.toLowerCase().trim()
-        );
-
-        if (referenceFish) {
-          const updates: any = {};
-          if (!fish.lengthSmall) updates.lengthSmall = referenceFish.lengthSmall;
-          if (!fish.lengthMedium) updates.lengthMedium = referenceFish.lengthMedium;
-          if (!fish.lengthLarge) updates.lengthLarge = referenceFish.lengthLarge;
-          
-          if (Object.keys(updates).length > 0) {
-            batch.update(doc(firestore, 'fish_species', fish.id), updates);
-            count++;
-          }
-        }
-      }
-      
-      if (count > 0) {
-        await batch.commit();
-        toast({ title: "Données réparées" });
-      }
-    } finally {
-      setIsClearing(false);
-    }
-  };
-
-  const handleSaveSound = async () => {
-    if (!firestore || !isAdmin || !currentSound.label || !currentSound.url) return;
-    setIsSavingSound(true);
-    try {
-      const id = currentSound.id || Math.random().toString(36).substring(7);
-      await setDoc(doc(firestore, 'sound_library', id), { ...currentSound, id, categories: currentSound.categories || ['General'] }, { merge: true });
-      toast({ title: "Son enregistré" });
-      setIsSoundDialogOpen(false);
-    } finally {
-      setIsSavingSound(false);
-    }
-  };
-
-  const handleDeleteSound = async (id: string) => {
-    if (!firestore || !isAdmin) return;
-    try {
-      await deleteDoc(doc(firestore, 'sound_library', id));
-      toast({ title: "Son supprimé" });
-    } catch (e) {
-      toast({ variant: 'destructive', title: "Erreur suppression" });
-    }
-  };
-
-  const handleToggleGlobalAccess = async () => {
-    if (!firestore || !isAdmin) return;
-    setIsSavingSharedToken(true);
-    try {
-      const isActive = !sharedToken || !sharedToken.expiresAt || isBefore(new Date(), sharedToken.expiresAt.toDate());
-      const expiryDate = new Date();
-      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
-      await setDoc(doc(firestore, 'shared_access_tokens', 'GLOBAL'), {
-        id: 'GLOBAL',
-        expiresAt: isActive ? Timestamp.fromDate(new Date(0)) : Timestamp.fromDate(expiryDate),
-        updatedAt: serverTimestamp()
-      });
-      toast({ title: isActive ? "Accès Global Désactivé" : "Accès Global Activé" });
-    } finally {
-      setIsSavingSharedToken(false);
-    }
-  };
-
-  const handleGenerateTokens = async () => {
-    if (!firestore || !isAdmin) return;
-    setIsGeneratingTokens(true);
-    try {
-      const count = parseInt(tokenCount);
-      const months = parseInt(tokenMonths);
-      const batch = writeBatch(firestore);
-      for (let i = 0; i < count; i++) {
-        const code = `LBN-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-        batch.set(doc(firestore, 'access_tokens', code), {
-          id: code, status: 'active', durationMonths: months, createdAt: serverTimestamp()
-        });
-      }
-      await batch.commit();
-      toast({ title: `${count} jeton(s) généré(s)` });
-    } finally {
-      setIsGeneratingTokens(false);
-    }
-  };
-
-  const handleDeleteToken = async (id: string) => {
-    if (!firestore || !isAdmin) return;
-    try {
-      await deleteDoc(doc(firestore, 'access_tokens', id));
-      toast({ title: "Jeton supprimé" });
-    } catch (e) {
-      toast({ variant: 'destructive', title: "Erreur suppression" });
-    }
-  };
-
   useEffect(() => {
     if (!isUserLoading && !isAdmin) router.push('/compte');
   }, [isAdmin, isUserLoading, router]);
 
   if (isUserLoading || !isAdmin) return <div className="p-8"><Skeleton className="h-48 w-full" /></div>;
-
-  const SortIcon = ({ field }: { field: keyof FaqEntry }) => {
-    if (faqSort.field !== field) return <ArrowUpDown className="ml-1 size-3 opacity-20" />;
-    return faqSort.direction === 'asc' ? <ArrowUp className="ml-1 size-3 text-primary" /> : <ArrowDown className="ml-1 size-3 text-primary" />;
-  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20 px-1">
@@ -632,12 +486,13 @@ export default function AdminPage() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 sm:grid-cols-10 mb-6 h-auto p-1 bg-muted/50 border rounded-xl overflow-x-auto">
+        <TabsList className="grid w-full grid-cols-4 sm:grid-cols-6 lg:grid-cols-11 mb-6 h-auto p-1 bg-muted/50 border rounded-xl overflow-x-auto">
           <TabsTrigger value="overview" className="text-[10px] font-black uppercase">Stats</TabsTrigger>
+          <TabsTrigger value="users" className="text-[10px] font-black uppercase">Users</TabsTrigger>
+          <TabsTrigger value="commerces" className="text-[10px] font-black uppercase">Commerces</TabsTrigger>
           <TabsTrigger value="faq" className="text-[10px] font-black uppercase">FAQ</TabsTrigger>
           <TabsTrigger value="tickets" className="text-[10px] font-black uppercase">Tickets</TabsTrigger>
           <TabsTrigger value="cgv" className="text-[10px] font-black uppercase">CGV</TabsTrigger>
-          <TabsTrigger value="users" className="text-[10px] font-black uppercase">Users</TabsTrigger>
           <TabsTrigger value="design" className="text-[10px] font-black uppercase">Design</TabsTrigger>
           <TabsTrigger value="fish" className="text-[10px] font-black uppercase">Fish</TabsTrigger>
           <TabsTrigger value="sounds" className="text-[10px] font-black uppercase">Sons</TabsTrigger>
@@ -654,7 +509,6 @@ export default function AdminPage() {
                   <TableRow>
                     <TableHead className="text-[10px] font-black uppercase">User</TableHead>
                     <TableHead className="text-[10px] font-black uppercase">Statut</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase">Rôle</TableHead>
                     <TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -670,11 +524,6 @@ export default function AdminPage() {
                       <TableCell>
                         <Badge variant="outline" className={cn("text-[8px] font-black", u.subscriptionStatus === 'professional' && "border-primary text-primary")}>
                           {u.subscriptionStatus}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="text-[8px] font-black uppercase">
-                          {u.role || 'client'}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -695,92 +544,35 @@ export default function AdminPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="design" className="space-y-6">
-          <Card className="border-2">
-            <CardHeader><CardTitle className="flex items-center gap-2 font-black uppercase text-sm"><Palette className="size-4" /> Design Splash Screen</CardTitle></CardHeader>
-            <CardContent>
-              <form onSubmit={handleSaveSplash} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase">Mode</Label>
-                    <Select name="splashMode" defaultValue={splashSettings?.splashMode || 'text'}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent><SelectItem value="text">Texte</SelectItem><SelectItem value="image">Image</SelectItem></SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase">Durée</Label>
-                    <Input name="splashDuration" type="number" step="0.5" defaultValue={splashSettings?.splashDuration || 2.5} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase">Texte</Label>
-                    <Input name="splashText" defaultValue={splashSettings?.splashText || 'Lagon & Brousse NC'} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase">Couleur Fond</Label>
-                    <Input name="splashBgColor" defaultValue={splashSettings?.splashBgColor || '#3b82f6'} />
-                  </div>
-                </div>
-                <Button type="submit" disabled={isSavingSplash} className="w-full h-12 font-black uppercase gap-2">
-                  <Save className="size-4" /> Sauvegarder
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="fish" className="space-y-6">
-          <div className="flex justify-end gap-2 mb-4">
-            <Button variant="outline" onClick={handleRepairLengths} disabled={isClearing} className="font-black uppercase text-[10px] gap-2"><Ruler className="size-4" /> Réparer Longueurs</Button>
-            <Button variant="outline" onClick={handleReadjustRisks} disabled={isReadjustingRisks} className="font-black uppercase text-[10px] gap-2"><Scale className="size-4" /> Réajuster Risques</Button>
-            <Button onClick={() => { setCurrentFish({}); setIsFishDialogOpen(true); }} className="font-black uppercase text-[10px] gap-2"><Plus className="size-4" /> Ajouter Poisson</Button>
+        <TabsContent value="commerces" className="space-y-6">
+          <div className="flex justify-end mb-4">
+            <Button onClick={() => { setCurrentBusiness({}); setIsBusinessDialogOpen(true); }} className="font-black uppercase text-[10px] gap-2">
+              <Plus className="size-4" /> Nouveau Commerce
+            </Button>
           </div>
           <Card className="border-2">
-            <CardHeader><CardTitle className="text-sm font-black uppercase">Espèces ({fishSpecies?.length || 0})</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-sm font-black uppercase">Commerces ({businesses?.length || 0})</CardTitle></CardHeader>
             <CardContent className="p-0 border-t">
               <Table>
-                <TableHeader><TableRow><TableHead className="text-[10px] font-black uppercase">Photo</TableHead><TableHead className="text-[10px] font-black uppercase">Nom</TableHead><TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead></TableRow></TableHeader>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-[10px] font-black uppercase">Nom</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase">Commune</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase">ID à lier</TableHead>
+                    <TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
                 <TableBody>
-                  {fishSpecies?.map(f => (
-                    <TableRow key={f.id}>
-                      <TableCell>
-                        <div className="size-10 rounded border bg-muted flex items-center justify-center overflow-hidden">
-                          {f.imageUrl ? <img src={f.imageUrl} className="object-cover w-full h-full" /> : <Fish className="size-4 opacity-20" />}
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-bold text-xs">{f.name}</TableCell>
+                  {businesses?.map(b => (
+                    <TableRow key={b.id}>
+                      <TableCell className="font-bold text-xs">{b.name}</TableCell>
+                      <TableCell className="text-xs uppercase font-bold opacity-60">{b.commune}</TableCell>
+                      <TableCell className="text-xs font-mono bg-muted/30 px-2 py-1 rounded select-all">{b.id}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => { setCurrentFish(f); setIsFishDialogOpen(true); }}><Pencil className="size-3" /></Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDeleteFish(f.id)}><Trash2 className="size-3 text-destructive" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => { setCurrentBusiness(b); setIsBusinessDialogOpen(true); }}><Pencil className="size-3" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDeleteBusiness(b.id)}><Trash2 className="size-3 text-destructive" /></Button>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="faq" className="space-y-6">
-          <div className="flex gap-2 mb-4">
-            <Button className="flex-1 font-black uppercase text-[10px]" onClick={() => { setCurrentFaq({ categorie: 'General', ordre: 0, views: 0 }); setIsFaqDialogOpen(true); }}>Ajouter FAQ</Button>
-            <Button variant="outline" className="flex-1 font-black uppercase text-[10px]" onClick={handleSeedFaq} disabled={isGenerating}>Peupler 100 Auto</Button>
-            <Button variant="destructive" className="flex-1 font-black uppercase text-[10px]" onClick={handleClearFaq} disabled={isClearing}>Tout Supprimer</Button>
-          </div>
-          <Card className="border-2">
-            <CardHeader><CardTitle className="text-sm font-black uppercase">Base FAQ ({sortedFaqs.length})</CardTitle></CardHeader>
-            <CardContent className="p-0 border-t">
-              <Table>
-                <TableHeader><TableRow><TableHead className="text-[10px] font-black uppercase">Question</TableHead><TableHead className="text-[10px] font-black uppercase text-right">Action</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {sortedFaqs.map(f => (
-                    <TableRow key={f.id}>
-                      <TableCell className="font-bold text-xs truncate max-w-[200px]">{f.question}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => { setCurrentFaq(f); setIsFaqDialogOpen(true); }}><Pencil className="size-3" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteFaq(f.id)}><Trash2 className="size-3 text-destructive" /></Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -808,10 +600,6 @@ export default function AdminPage() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-1">
-              <Label className="text-xs uppercase font-bold opacity-60">Nom d'affichage</Label>
-              <Input value={userToEdit?.displayName || ''} onChange={e => setUserToEdit(p => p ? {...p, displayName: e.target.value} : null)} />
-            </div>
-            <div className="space-y-1">
               <Label className="text-xs uppercase font-bold opacity-60">Rôle</Label>
               <Select value={userToEdit?.role || 'client'} onValueChange={(v: any) => setUserToEdit(p => p ? {...p, role: v} : null)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -833,10 +621,47 @@ export default function AdminPage() {
             </div>
             <div className="space-y-1">
               <Label className="text-xs uppercase font-bold opacity-60">ID Commerce (Pro)</Label>
-              <Input value={userToEdit?.businessId || ''} onChange={e => setUserToEdit(p => p ? {...p, businessId: e.target.value} : null)} placeholder="Lier à un business" />
+              <Input value={userToEdit?.businessId || ''} onChange={e => setUserToEdit(p => p ? {...p, businessId: e.target.value} : null)} placeholder="Copiez l'ID du commerce ici" />
             </div>
           </div>
-          <DialogFooter><Button onClick={handleSaveUser} disabled={isSavingUser} className="w-full h-12 font-black uppercase">{isSavingUser ? <RefreshCw className="animate-spin" /> : 'Mettre à jour'}</Button></DialogFooter>
+          <DialogFooter><Button onClick={handleSaveUser} disabled={isSavingUser} className="w-full h-12 font-black uppercase">Mettre à jour</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isBusinessDialogOpen} onOpenChange={setIsBusinessDialogOpen}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-black uppercase">Gérer le Commerce</DialogTitle>
+            <DialogDescription className="text-[10px] font-bold uppercase">Création d'un profil magasin</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-1">
+              <Label className="text-xs uppercase font-bold opacity-60">Nom du magasin</Label>
+              <Input value={currentBusiness.name || ''} onChange={e => setCurrentBusiness({...currentBusiness, name: e.target.value})} placeholder="Ex: Pêche Passion" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs uppercase font-bold opacity-60">UID Propriétaire</Label>
+              <Input value={currentBusiness.ownerId || ''} onChange={e => setCurrentBusiness({...currentBusiness, ownerId: e.target.value})} placeholder="UID Firebase du pro" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs uppercase font-bold opacity-60">Commune</Label>
+                <Input value={currentBusiness.commune || ''} onChange={e => setCurrentBusiness({...currentBusiness, commune: e.target.value})} placeholder="Nouméa" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs uppercase font-bold opacity-60">Catégorie</Label>
+                <Select value={currentBusiness.category || ''} onValueChange={(v: any) => setCurrentBusiness({...currentBusiness, category: v})}>
+                  <SelectTrigger><SelectValue placeholder="..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Pêche">Pêche</SelectItem>
+                    <SelectItem value="Chasse">Chasse</SelectItem>
+                    <SelectItem value="Jardinage">Jardinage</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter><Button onClick={handleSaveBusiness} disabled={isSavingBusiness} className="w-full h-12 font-black uppercase">Sauvegarder</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -844,43 +669,14 @@ export default function AdminPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Supprimer cet utilisateur ?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Cette action supprimera uniquement le document profil de Firestore. L'authentification Firebase ne sera pas affectée.
-            </AlertDialogDescription>
+            <AlertDialogDescription>Cette action supprimera uniquement le document profil de Firestore. L'authentification Firebase ne sera pas affectée.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={() => userToDelete && handleDeleteUser(userToDelete)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Supprimer</AlertDialogAction>
+            <AlertDialogAction onClick={() => userToDelete && handleDeleteUser(userToDelete)} className="bg-destructive text-destructive-foreground">Supprimer</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <Dialog open={isFaqDialogOpen} onOpenChange={setIsFaqDialogOpen}>
-        <DialogContent className="max-w-xl rounded-2xl">
-          <DialogHeader><DialogTitle className="font-black uppercase">FAQ</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-1"><Label className="text-xs font-bold opacity-60">Question</Label><Input value={currentFaq.question || ''} onChange={e => setCurrentFaq({...currentFaq, question: e.target.value})} /></div>
-            <div className="space-y-1"><Label className="text-xs font-bold opacity-60">Réponse</Label><Textarea value={currentFaq.reponse || ''} onChange={e => setCurrentFaq({...currentFaq, reponse: e.target.value})} className="min-h-[120px]" /></div>
-          </div>
-          <DialogFooter><Button onClick={handleSaveFaq} disabled={isSavingFaq} className="w-full h-12 font-black uppercase">Enregistrer</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isFishDialogOpen} onOpenChange={setIsFishDialogOpen}>
-        <DialogContent className="max-w-xl rounded-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="font-black uppercase">Poisson</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="flex gap-2 items-end"><div className="flex-1 space-y-1"><Label className="text-xs font-bold opacity-60">Nom</Label><Input value={currentFish.name || ''} onChange={e => setCurrentFish({...currentFish, name: e.target.value})} /></div><Button onClick={handleAIGenerateFish} disabled={isAIGeneratingFish} className="h-10 px-3 bg-indigo-600 gap-2"><Sparkles className="size-4" /> IA</Button></div>
-            <div className="space-y-1"><Label className="text-xs font-bold opacity-60">Scientifique</Label><Input value={currentFish.scientificName || ''} onChange={e => setCurrentFish({...currentFish, scientificName: e.target.value})} /></div>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="space-y-1"><Label className="text-[9px] font-bold">Risque P (%)</Label><Input type="number" value={currentFish.gratteRiskSmall || 0} onChange={e => setCurrentFish({...currentFish, gratteRiskSmall: parseInt(e.target.value)})} /></div>
-              <div className="space-y-1"><Label className="text-[9px] font-bold">Risque M (%)</Label><Input type="number" value={currentFish.gratteRiskMedium || 0} onChange={e => setCurrentFish({...currentFish, gratteRiskMedium: parseInt(e.target.value)})} /></div>
-              <div className="space-y-1"><Label className="text-[9px] font-bold">Risque G (%)</Label><Input type="number" value={currentFish.gratteRiskLarge || 0} onChange={e => setCurrentFish({...currentFish, gratteRiskLarge: parseInt(e.target.value)})} /></div>
-            </div>
-          </div>
-          <DialogFooter><Button onClick={handleSaveFish} disabled={isSavingFish} className="w-full h-12 font-black uppercase">Sauvegarder</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

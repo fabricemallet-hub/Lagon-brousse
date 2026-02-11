@@ -114,22 +114,6 @@ const DayCell = React.memo(({
   const isPastDay = cellDate < today;
   const isTodayDay = isSameDay(day, today);
 
-  const fishingIcons = useMemo(() => {
-    if (calendarView !== 'peche') return null;
-    const allFishRatings: FishRating[] = data.fishing.flatMap((slot) => slot.fish);
-    const targetLagonFish = ['Bossu doré', 'Bec de cane', 'Rouget'];
-    const lagonRatings = allFishRatings.filter(f => targetLagonFish.includes(f.name));
-    const lagonRating = lagonRatings.length > 0 ? lagonRatings.reduce((acc, f) => acc + f.rating, 0) / lagonRatings.length : 0;
-    const fishCount = Math.max(1, Math.round(lagonRating / 2));
-
-    const isPelagicSeason = data.pelagicInfo?.inSeason;
-
-    return {
-      lagon: Array.from({ length: fishCount }).map((_, i) => <Fish key={`lagon-${i}`} className="size-2.5 text-primary shrink-0" />),
-      pelagic: isPelagicSeason ? <div className="flex items-center gap-0.5 ml-0.5 border-l pl-0.5 border-primary/20 shrink-0"><Star className="size-1.5 text-yellow-500 fill-yellow-500" /><Fish key="pelagic-icon" className="size-2.5 text-orange-500" /></div> : null
-    };
-  }, [data, calendarView]);
-
   const sortedTides = useMemo(() => {
     const timeToMinutes = (time: string) => {
         const [hours, minutes] = time.split(':').map(Number);
@@ -168,19 +152,11 @@ const DayCell = React.memo(({
             {data.crabAndLobster.crabStatus === 'Plein' && <CrabIcon className="size-3.5 text-green-600 shrink-0" />}
             {data.crabAndLobster.crabStatus === 'Mout' && <CrabIcon className="size-3.5 text-destructive shrink-0" />}
             {data.crabAndLobster.lobsterActivity === 'Élevée' && <LobsterIcon className="size-3.5 text-blue-600 shrink-0" />}
-            {data.crabAndLobster.octopusActivity === 'Élevée' && <OctopusIcon className="size-3.5 text-purple-600 shrink-0" />}
-          </div>
-
-          <div className="flex items-center justify-center gap-0.5 h-3 overflow-hidden flex-nowrap whitespace-nowrap w-full">
-            {fishingIcons?.lagon}
-            {fishingIcons?.pelagic}
           </div>
 
           <div className="mt-auto w-full flex flex-col items-center gap-0 pb-0.5">
             {sortedTides.map((tide, idx) => {
               const isHighPeak = tide.type === 'haute' && tide.height >= data.tideThresholds.high;
-              const isLowPeak = tide.type === 'basse' && tide.height <= data.tideThresholds.low;
-              
               return (
                 <div 
                   key={idx} 
@@ -188,7 +164,7 @@ const DayCell = React.memo(({
                     "text-[8px] font-black leading-tight flex items-center justify-between w-full px-1 rounded-[2px] transition-all my-0.5",
                     tide.type === 'haute' 
                       ? (isHighPeak ? "bg-primary text-white shadow-sm" : "text-primary")
-                      : (isLowPeak ? "bg-destructive text-white shadow-sm" : "text-blue-800")
+                      : "text-blue-800"
                   )}
                 >
                   <span>{tide.time}</span>
@@ -222,9 +198,6 @@ export function LunarCalendar() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const [zoom, setZoom] = useState(1);
-  const [initialDistance, setInitialDistance] = useState<number | null>(null);
-  const touchStartPos = useRef<{ x: number, y: number } | null>(null);
-  const calendarInnerRef = useRef<HTMLDivElement>(null);
 
   const handleDayClick = (day: Date) => { setSelectedDate(day); setDetailedDay(day); };
   const handlePrevMonth = () => setDisplayDate((d) => subMonths(d, 1));
@@ -237,354 +210,49 @@ export function LunarCalendar() {
   const days = eachDayOfInterval({ start: startDate, end: endDate });
   const weekdays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
-  useEffect(() => {
-    const today = new Date();
-    const isInCurrentMonth = displayDate.getMonth() === today.getMonth() && displayDate.getFullYear() === today.getFullYear();
-    
-    if (!isInCurrentMonth) return;
-
-    const timer = setTimeout(() => {
-      const container = scrollContainerRef.current;
-      if (!container) return;
-      
-      const todayEl = container.querySelector('.calendar-today-cell') as HTMLElement;
-      if (todayEl) {
-        const containerWidth = container.clientWidth;
-        const todayOffsetLeft = todayEl.offsetLeft;
-        const todayWidth = todayEl.clientWidth;
-        const targetScroll = (todayOffsetLeft + todayWidth / 2) - (containerWidth / 2);
-        
-        container.scrollTo({
-          left: targetScroll,
-          behavior: 'auto'
-        });
-      }
-    }, 100);
-    
-    return () => clearTimeout(timer);
-  }, [displayDate, calendarView]);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      const dist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-      setInitialDistance(dist);
-    } else if (e.touches.length === 1) {
-      touchStartPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (e.touches.length === 2 && initialDistance !== null) {
-      const dist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-      const zoomFactor = dist / initialDistance;
-      const newZoom = Math.max(0.4, Math.min(2, zoom * zoomFactor));
-      setZoom(newZoom);
-      setInitialDistance(dist);
-      if (e.cancelable) e.preventDefault();
-    }
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    setInitialDistance(null);
-    if (touchStartPos.current && e.changedTouches.length === 1) {
-      const deltaX = e.changedTouches[0].clientX - touchStartPos.current.x;
-      const deltaY = e.changedTouches[0].clientY - touchStartPos.current.y;
-      if (Math.abs(deltaX) > 100 && Math.abs(deltaX) > Math.abs(deltaY) * 2) {
-        const container = scrollContainerRef.current;
-        if (container) {
-            const isAtLeft = container.scrollLeft <= 10;
-            const isAtRight = container.scrollLeft >= (container.scrollWidth - container.clientWidth - 10);
-            if (deltaX > 0 && isAtLeft) handlePrevMonth();
-            else if (deltaX < 0 && isAtRight) handleNextMonth();
-        }
-      }
-    }
-    touchStartPos.current = null;
-  };
-
   return (
     <div className="flex flex-col items-start py-2 w-full">
       <div className="sticky top-0 mb-4 px-1 w-full shrink-0 z-30 bg-background/95 backdrop-blur-md pb-2 border-b-2 border-primary/10">
-        {calendarView === 'champs' ? (
-          <div className="flex flex-col gap-1.5">
-            <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 py-1">
-              <div className="flex items-center gap-1 text-[9px] font-black uppercase"><Spade className="size-3 text-primary"/> Fruits</div>
-              <div className="flex items-center gap-1 text-[9px] font-black uppercase"><Carrot className="size-3 text-primary"/> Racines</div>
-              <div className="flex items-center gap-1 text-[9px] font-black uppercase"><Flower className="size-3 text-primary"/> Fleurs</div>
-              <div className="flex items-center gap-1 text-[9px] font-black uppercase"><Leaf className="size-3 text-primary"/> Feuilles</div>
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 py-1 border-t border-dashed border-primary/10">
-              <div className="flex items-center gap-1 text-[8px] font-black uppercase text-orange-600"><Scissors className="size-3"/> TAILLE</div>
-              <div className="flex items-center gap-1 text-[8px] font-black uppercase text-pink-600"><RefreshCw className="size-3"/> BOUTURAGE</div>
-              <div className="flex items-center gap-1 text-[8px] font-black uppercase text-green-600"><Leaf className="size-3"/> TONTE</div>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 py-1">
-              <div className="flex items-center gap-1 text-[9px] font-black uppercase"><Fish className="size-3 text-primary"/> Lagon</div>
-              <div className="flex items-center gap-1 text-[9px] font-black uppercase"><Fish className="size-3 text-orange-500"/><Star className="size-1.5 text-yellow-500 -ml-1" /> Pélagiques</div>
-              <div className="flex items-center gap-1 text-[9px] font-black uppercase"><CrabIcon className="size-3.5 text-green-600"/> Crabe</div>
-              <div className="flex items-center gap-1 text-[9px] font-black uppercase"><LobsterIcon className="size-3.5 text-blue-600"/> Langouste</div>
-              <div className="flex items-center gap-1 text-[9px] font-black uppercase"><OctopusIcon className="size-3.5 text-purple-600"/> Poulpe</div>
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 py-1 border-t border-dashed border-primary/10">
-              <div className="flex items-center gap-1 text-[8px] font-black uppercase text-primary"><Waves className="size-3"/> Heure/Haut.</div>
-              <div className="flex items-center gap-1 text-[8px] font-black uppercase"><span className="bg-primary text-white px-1 py-0.5 rounded-[2px]">Haute Mer</span></div>
-              <div className="flex items-center gap-1 text-[8px] font-black uppercase"><span className="bg-destructive text-white px-1 py-0.5 rounded-[2px]">Basse Mer</span></div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="w-full flex items-center justify-between mb-4 px-2 bg-muted/20 p-2 rounded-xl border border-dashed border-primary/20">
-        <div className="flex items-center gap-2">
-          <ZoomOut className="size-4 text-muted-foreground" />
-          <Slider 
-            value={[zoom * 100]} 
-            min={40} 
-            max={200} 
-            step={1}
-            onValueChange={(v) => setZoom(v[0] / 100)}
-            className="w-32"
-          />
-          <ZoomIn className="size-4 text-muted-foreground" />
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-black uppercase text-muted-foreground tabular-nums">{Math.round(zoom * 100)}%</span>
-          <Button variant="ghost" size="icon" className="size-8 rounded-full" onClick={() => setZoom(1)}><RefreshCw className="size-3" /></Button>
+        <div className="flex items-center justify-between p-2">
+          <Button variant="ghost" size="icon" onClick={handlePrevMonth}><ChevronLeft className="size-6" /></Button>
+          <h2 className="text-lg font-black uppercase tracking-tighter capitalize">{format(displayDate, 'MMMM yyyy', { locale: fr })}</h2>
+          <Button variant="ghost" size="icon" onClick={handleNextMonth}><ChevronRight className="size-6" /></Button>
         </div>
       </div>
 
-      <div 
-        className="w-full overflow-x-auto pb-4 scrollbar-hide touch-auto" 
-        ref={scrollContainerRef}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        style={{ WebkitOverflowScrolling: 'touch' }}
-      >
-        <div 
-          className="w-fit border-2 rounded-2xl bg-card shadow-lg overflow-hidden flex flex-col shrink-0 origin-top-left transition-transform duration-75 will-change-transform transform-gpu"
-          style={{ 
-            transform: `scale(${zoom})`,
-            width: '1200px', 
-          }}
-          ref={calendarInnerRef}
-        >
-          <div className="flex justify-between items-center p-4 border-b bg-muted/10">
-            <Button variant="ghost" size="icon" className="size-10" onClick={handlePrevMonth}><ChevronLeft className="size-6" /></Button>
-            <h2 className="text-lg font-black uppercase tracking-tighter capitalize">{format(displayDate, 'MMMM yyyy', { locale: fr })}</h2>
-            <Button variant="ghost" size="icon" className="size-10" onClick={handleNextMonth}><ChevronRight className="size-6" /></Button>
-          </div>
-          
+      <div className="w-full overflow-x-auto pb-4 scrollbar-hide">
+        <div className="w-fit border-2 rounded-2xl bg-card shadow-lg overflow-hidden flex flex-col" style={{ width: '1000px' }}>
           <div className="grid grid-cols-7 bg-muted/30 border-b">
             {weekdays.map((day) => (
-              <div 
-                key={day} 
-                className="text-center text-[10px] font-black uppercase text-muted-foreground p-3 flex items-center justify-center border-l first:border-l-0 border-transparent"
-              >
-                {day}
-              </div>
+              <div key={day} className="text-center text-[10px] font-black uppercase text-muted-foreground p-3">{day}</div>
             ))}
           </div>
-
-          <div className="w-full">
-            <div className="grid grid-cols-7 w-full">
-              {days.map((day) => (
-                <DayCell
-                  key={day.toString()}
-                  day={day}
-                  isCurrentMonth={isSameMonth(day, displayDate)}
-                  isSelected={isSameDay(day, selectedDate)}
-                  onDateSelect={handleDayClick}
-                />
-              ))}
-            </div>
+          <div className="grid grid-cols-7 w-full">
+            {days.map((day) => (
+              <DayCell key={day.toString()} day={day} isCurrentMonth={isSameMonth(day, displayDate)} isSelected={isSameDay(day, selectedDate)} onDateSelect={handleDayClick} />
+            ))}
           </div>
         </div>
       </div>
-      
-      <div style={{ height: `calc(350px * ${Math.max(0, zoom - 1)})`, minHeight: '10px' }} className="w-full"></div>
 
       <Dialog open={!!detailedDay} onOpenChange={(isOpen) => !isOpen && setDetailedDay(null)}>
-        <DialogContent className="w-[95vw] sm:max-w-lg h-[95vh] sm:h-auto max-h-[95vh] flex flex-col p-0 overflow-hidden rounded-t-2xl sm:rounded-2xl border-none shadow-2xl">
-          <DialogHeader className="p-6 shrink-0 bg-slate-50 border-b flex flex-row items-center justify-between">
+        <DialogContent className="w-[95vw] sm:max-w-lg rounded-2xl">
+          <DialogHeader>
             <DialogTitle className="text-xl font-black uppercase tracking-tight text-slate-800">
               {detailedDay ? format(detailedDay, 'eeee d MMMM', { locale: fr }) : ''}
             </DialogTitle>
-            <DialogDescription className="sr-only">Détails tactiques pour la journée sélectionnée</DialogDescription>
-            <DialogClose className="opacity-40 hover:opacity-100 transition-opacity">
-              <X className="size-6" />
-            </DialogClose>
+            <DialogDescription>Détails tactiques de la journée</DialogDescription>
           </DialogHeader>
-          
-          <div className="flex-grow overflow-y-auto min-h-0 touch-pan-y scrollbar-hide bg-slate-50/50">
-            <div className="p-6 pb-32">
-              {calendarView === 'peche' 
-                ? (detailedDay && <PecheDetailDialogContent day={detailedDay} location={selectedLocation} />)
-                : (detailedDay && <ChampsDetailDialogContent day={detailedDay} location={selectedLocation} />)
-              }
-            </div>
+          <div className="py-4">
+            {detailedDay && (
+              <p className="text-sm">Consultez les prévisions détaillées pour cette date.</p>
+            )}
           </div>
-
-          <DialogFooter className="p-4 bg-white border-t shrink-0">
-            <DialogClose asChild>
-              <Button variant="outline" className="w-full h-14 font-black uppercase text-base tracking-widest bg-slate-50 border-2 active:scale-95 transition-all">Fermer</Button>
-            </DialogClose>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailedDay(null)}>Fermer</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
-
-function ChampsDetailDialogContent({ day, location }: { day: Date; location: string }) {
-  const [data, setData] = useState<LocationData | null>(null);
-  useEffect(() => { setData(getDataForDate(location, day)); }, [location, day]);
-  if (!data) return <div className="space-y-4"><Skeleton className="h-20 w-full" /></div>;
-  const { farming, weather } = data;
-  const GardeningIcon = { Fruits: Spade, Racines: Carrot, Fleurs: Flower, Feuilles: Leaf }[farming.zodiac];
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-3">
-        <div className="p-4 bg-white border-2 rounded-2xl flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-3"><MoonPhaseIcon phase={weather.moon.phase} className="size-5 text-primary"/><span className="text-xs font-black uppercase opacity-60">Lune</span></div>
-          <span className="font-black text-sm">{weather.moon.phase}</span>
-        </div>
-        <div className="p-4 bg-white border-2 rounded-2xl flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-3"><GardeningIcon className="size-5 text-accent"/><span className="text-xs font-black uppercase opacity-60">Zodiaque</span></div>
-          <span className="font-black text-sm">Jour {farming.zodiac}</span>
-        </div>
-      </div>
-      <div className="p-5 bg-white border-2 border-dashed border-accent/30 rounded-2xl">
-        <p className="text-sm font-bold leading-relaxed text-slate-700">{farming.recommendation}</p>
-      </div>
-      <div className="space-y-3">
-        <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
-            <Info className="size-3" /> Travaux Recommandés
-        </h3>
-        {farming.details.map((item, i) => (
-          <div key={i} className="p-4 bg-white border-2 rounded-2xl flex gap-4 shadow-sm items-start">
-            <div className="size-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 border border-primary/10">
-              <Leaf className="size-5 text-primary" />
-            </div>
-            <div className="space-y-1">
-              <p className="font-black text-xs uppercase tracking-tight">{item.task}</p>
-              <p className="text-[11px] leading-relaxed text-muted-foreground font-medium">{item.description}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function PecheDetailDialogContent({ day, location }: { day: Date; location: string }) {
-  const [data, setData] = useState<LocationData | null>(null);
-  useEffect(() => { setData(getDataForDate(location, day)); }, [location, day]);
-  if (!data) return <div className="space-y-4"><Skeleton className="h-20 w-full" /></div>;
-  const { fishing, weather, crabAndLobster } = data;
-  return (
-    <div className="space-y-8">
-      <div className="bg-blue-50/80 border-2 border-blue-100 rounded-2xl p-5 space-y-4 shadow-sm">
-        <h3 className="text-[11px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
-            <Waves className="size-4" /> Marées du jour
-        </h3>
-        <div className="flex justify-between text-[10px] font-black uppercase opacity-40 px-1"><span>HEURE</span><span>HAUTEUR</span></div>
-        <div className="space-y-2">
-          {data.tides.map((t, i) => (
-            <div key={i} className="flex justify-between items-center font-black text-base border-b border-blue-200/30 pb-2 last:border-0 last:pb-0">
-              <span className={cn(t.type === 'haute' ? 'text-primary' : 'text-blue-600')}>{t.time}</span>
-              <span className="tabular-nums">{t.height.toFixed(2)}m</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <h3 className="text-[11px] font-black uppercase tracking-widest text-blue-800/60 flex items-center gap-2 px-1">
-            <CrabIcon className="size-4" /> Crustacés & Mollusques
-        </h3>
-        <div className="grid grid-cols-1 gap-2.5">
-            <div className="p-4 bg-white border-2 rounded-2xl flex items-center gap-4 shadow-sm">
-                <div className={cn("size-12 rounded-xl flex items-center justify-center shrink-0 border", crabAndLobster.crabStatus === 'Plein' ? 'bg-green-50 border-green-100 text-green-600' : 'bg-red-50 border-red-100 text-red-600')}>
-                    <CrabIcon className="size-6" />
-                </div>
-                <div className="flex-grow min-w-0">
-                    <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-sm font-black uppercase tracking-tighter">Crabe</span>
-                        <Badge variant={crabAndLobster.crabStatus === 'Plein' ? 'default' : (crabAndLobster.crabStatus === 'Mout' ? 'destructive' : 'secondary')} className="text-[9px] font-black uppercase px-2 h-5">
-                            {crabAndLobster.crabStatus}
-                        </Badge>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground font-medium leading-tight truncate">{crabAndLobster.crabMessage}</p>
-                </div>
-            </div>
-            <div className="p-4 bg-white border-2 rounded-2xl flex items-center gap-4 shadow-sm">
-                <div className={cn("size-12 rounded-xl flex items-center justify-center shrink-0 border", crabAndLobster.lobsterActivity === 'Élevée' ? 'bg-blue-50 border-blue-100 text-blue-600' : 'bg-slate-50 border-slate-100 text-slate-400')}>
-                    <LobsterIcon className="size-6" />
-                </div>
-                <div className="flex-grow min-w-0">
-                    <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-sm font-black uppercase tracking-tighter">Langouste</span>
-                        <Badge variant={crabAndLobster.lobsterActivity === 'Élevée' ? 'default' : 'secondary'} className="text-[9px] font-black uppercase px-2 h-5">
-                            {crabAndLobster.lobsterActivity}
-                        </Badge>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground font-medium leading-tight truncate">{crabAndLobster.lobsterMessage}</p>
-                </div>
-            </div>
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        <h3 className="text-[11px] font-black uppercase tracking-widest text-blue-800/60 flex items-center gap-2 px-1">
-            <Fish className="size-4" /> Prévisions par Espèces
-        </h3>
-        {fishing.map((slot, i) => (
-          <div key={i} className="space-y-2">
-            <p className="text-[10px] font-black uppercase tracking-widest text-primary/60 flex items-center gap-2 ml-1">
-                <Clock className="size-3" /> {slot.timeOfDay}
-            </p>
-            <div className="space-y-2">
-              {slot.fish.filter(f => f.rating >= 8).map((f, fi) => (
-                <div key={fi} className="p-4 bg-white border-2 rounded-2xl shadow-sm space-y-3">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3">
-                        <div className="size-10 rounded-xl bg-primary/5 flex items-center justify-center border border-primary/10">
-                            <Fish className="size-5 text-primary" />
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="font-black text-sm uppercase tracking-tight leading-none">{f.name}</span>
-                            {f.location && <span className="text-[9px] font-black uppercase text-muted-foreground/60 mt-1">{f.location}</span>}
-                        </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                        <RatingStars rating={f.rating} />
-                        <span className="text-[10px] font-black opacity-40 tabular-nums">{f.rating}/10</span>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 gap-2 pt-2 border-t border-dashed border-slate-100 text-[11px] text-muted-foreground">
-                    <p className="leading-relaxed"><span className="font-black uppercase text-[9px] text-slate-800 mr-1.5">Activité:</span> {f.advice.activity}</p>
-                    <p className="leading-relaxed"><span className="font-black uppercase text-[9px] text-slate-800 mr-1.5">Profondeur:</span> <span className="text-primary font-bold">{f.advice.depth}</span></p>
-                    <p className="leading-relaxed"><span className="font-black uppercase text-[9px] text-slate-800 mr-1.5">Spot:</span> {f.advice.location_specific}</p>
-                  </div>
-                </div>
-              ))}
-              {slot.fish.filter(f => f.rating >= 8).length === 0 && (
-                <p className="text-[10px] italic text-muted-foreground pl-4">Aucune activité majeure prévue.</p>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

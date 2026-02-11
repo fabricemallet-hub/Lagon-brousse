@@ -114,16 +114,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     } 
   }, [auth, router]);
 
-  const handleResendEmail = async () => {
-    if (!user) return;
-    try {
-      await sendEmailVerification(user);
-      toast({ title: "Email envoyé", description: "Le lien de validation a été renvoyé à votre adresse." });
-    } catch (e) {
-      toast({ variant: 'destructive', title: "Erreur", description: "Veuillez patienter avant de renvoyer un e-mail." });
-    }
-  };
-
   const handleCheckVerification = async () => {
     if (!user) return;
     setIsRefreshing(true);
@@ -167,9 +157,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Button onClick={handleCheckVerification} disabled={isRefreshing} className="w-full h-12 font-black uppercase text-xs tracking-widest gap-2">
                 {isRefreshing ? <RefreshCw className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
                 J'ai vérifié mon adresse
-              </Button>
-              <Button variant="outline" onClick={handleResendEmail} className="w-full h-10 font-black uppercase text-[10px] tracking-widest border-2">
-                Renvoyer le lien
               </Button>
             </div>
           </CardContent>
@@ -257,27 +244,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       </PopoverContent>
                     </Popover>
                     <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-primary/10 text-primary transition-all active:scale-75 shrink-0" onClick={handleNextDay}><ChevronRight className="h-5 w-5" /></Button>
-                  </div>
-                )}
-
-                {pathname === '/calendrier' && (
-                  <div className="flex items-center gap-1 bg-muted p-1 rounded-lg h-9 ml-auto shrink-0">
-                    <Button 
-                      variant={calendarView === 'peche' ? 'secondary' : 'ghost'} 
-                      size="sm" 
-                      className={cn("h-7 px-3 text-[10px] font-black uppercase", calendarView === 'peche' && "bg-background shadow-sm")}
-                      onClick={() => setCalendarView('peche')}
-                    >
-                      <Fish className="mr-1 size-3" /> Pêche
-                    </Button>
-                    <Button 
-                      variant={calendarView === 'champs' ? 'secondary' : 'ghost'} 
-                      size="sm" 
-                      className={cn("h-7 px-3 text-[10px] font-black uppercase", calendarView === 'champs' && "bg-background shadow-sm")}
-                      onClick={() => setCalendarView('champs')}
-                    >
-                      <Leaf className="mr-1 size-3" /> Champs
-                    </Button>
                   </div>
                 )}
               </div>
