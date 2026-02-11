@@ -2,163 +2,99 @@
 {
   "entities": {
     "User": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User",
       "type": "object",
-      "description": "Represents a user of the application with subscription details.",
       "properties": {
         "id": { "type": "string" },
         "email": { "type": "string", "format": "email" },
         "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["client", "professional", "admin"] },
         "subscriptionStatus": { "type": "string", "enum": ["active", "inactive", "trial", "admin"] },
-        "subscriptionExpiryDate": { "type": "string", "format": "date-time" },
+        "businessId": { "type": "string", "description": "ID du commerce associé pour les pros" },
         "lastSelectedLocation": { "type": "string" },
-        "emergencyContact": { "type": "string" },
-        "mapIcon": { "type": "string" },
-        "mapColor": { "type": "string" },
-        "fcmToken": { "type": "string", "description": "Token pour les notifications Push" },
-        "notificationsEnabled": { "type": "boolean" },
-        "savedVesselIds": { "type": "array", "items": { "type": "string" } },
-        "lastVesselId": { "type": "string" },
-        "vesselPrefs": { "type": "object" }
+        "favoriteCategory": { "type": "string", "enum": ["Pêche", "Chasse", "Jardinage"] }
       },
-      "required": ["id", "email", "subscriptionStatus"]
+      "required": ["id", "email", "role"]
     },
-    "UserVesselSafety": {
-      "title": "UserVesselSafety",
+    "Business": {
+      "title": "Business",
       "type": "object",
-      "description": "Information sur la sécurité d'un navire utilisateur.",
+      "description": "Représente un commerce professionnel sur la plateforme.",
       "properties": {
         "id": { "type": "string" },
-        "userId": { "type": "string" },
-        "vesselName": { "type": "string" },
-        "equipment": {
-          "type": "array",
-          "items": {
-            "object",
-            "properties": {
-              "id": { "type": "string" },
-              "type": { "type": "string", "enum": ["fusée", "extincteur", "autre"] },
-              "label": { "type": "string" },
-              "expiryDate": { "type": "string", "format": "date" }
-            }
-          }
-        },
+        "ownerId": { "type": "string" },
+        "name": { "type": "string" },
+        "commune": { "type": "string" },
+        "category": { "type": "string", "enum": ["Pêche", "Chasse", "Jardinage"] },
+        "logoUrl": { "type": "string" },
+        "description": { "type": "string" },
         "createdAt": { "type": "object" }
       },
-      "required": ["vesselName", "userId"]
+      "required": ["ownerId", "name", "commune", "category"]
     },
-    "FaqEntry": {
-      "title": "FaqEntry",
+    "Promotion": {
+      "title": "Promotion",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "question": { "type": "string" },
-        "reponse": { "type": "string" },
-        "categorie": { "type": "string", "enum": ["General", "Peche", "Boat Tracker", "Chasse", "Champs", "Compte"] },
-        "ordre": { "type": "integer" },
-        "views": { "type": "integer", "description": "Nombre de consultations pour le classement dynamique" }
-      },
-      "required": ["question", "reponse", "categorie"]
-    },
-    "SupportTicket": {
-      "title": "SupportTicket",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "userId": { "type": "string" },
-        "userEmail": { "type": "string" },
-        "sujet": { "type": "string" },
-        "description": { "type": "string" },
-        "statut": { "type": "string", "enum": ["ouvert", "ferme"] },
-        "createdAt": { "type": "object" },
-        "captureUrl": { "type": "string" }
-      },
-      "required": ["userId", "sujet", "description"]
-    },
-    "GardenPlant": {
-      "title": "GardenPlant",
-      "type": "object",
-      "description": "A plant currently growing in the user's garden.",
-      "properties": {
-        "id": { "type": "string" },
-        "userId": { "type": "string" },
-        "name": { "type": "string" },
-        "category": { "type": "string", "enum": ["Arbre Fruitier", "Potager", "Fleur", "Aromatique", "Autre"] },
-        "plantingDate": { "type": "string", "format": "date-time" },
-        "notes": { "type": "string" },
-        "lastAdvice": { "type": "object" }
-      },
-      "required": ["name", "category"]
-    },
-    "VesselStatus": {
-      "title": "VesselStatus",
-      "type": "object",
-      "properties": {
-        "userId": { "type": "string" },
-        "displayName": { "type": "string" },
-        "status": { "type": "string", "enum": ["moving", "stationary", "offline", "returning", "landed"] },
-        "isSharing": { "type": "boolean" }
+        "businessId": { "type": "string" },
+        "title": { "type": "string" },
+        "price": { "type": "number" },
+        "promoType": { "type": "string", "enum": ["Promo", "Nouvel Arrivage"] },
+        "imageUrl": { "type": "string" },
+        "createdAt": { "type": "object" }
       }
     },
-    "SpotShare": {
-      "title": "SpotShare",
+    "Campaign": {
+      "title": "Campaign",
       "type": "object",
-      "description": "Partage de point GPS entre utilisateurs",
       "properties": {
         "id": { "type": "string" },
-        "senderId": { "type": "string" },
-        "senderName": { "type": "string" },
-        "recipientEmail": { "type": "string" },
-        "spotData": { "type": "object" },
+        "businessId": { "type": "string" },
+        "targetCommune": { "type": "string" },
+        "targetCategory": { "type": "string" },
+        "reach": { "type": "integer" },
+        "cost": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "sent"] },
         "createdAt": { "type": "object" }
-      },
-      "required": ["senderId", "recipientEmail", "spotData"]
+      }
     }
   },
   "auth": {
-    "providers": ["password", "anonymous"]
+    "providers": ["password"]
   },
   "firestore": {
     "structure": [
-      {
-        "path": "/cms_support/faq/items/{id}",
-        "definition": {
-          "entityName": "FaqEntry",
-          "schema": { "$ref": "#/backend/entities/FaqEntry" },
-          "description": "Base de connaissances dynamique (FAQ)"
-        }
-      },
-      {
-        "path": "/cms_support/tickets/items/{id}",
-        "definition": {
-          "entityName": "SupportTicket",
-          "schema": { "$ref": "#/backend/entities/SupportTicket" },
-          "description": "Tickets de support utilisateur"
-        }
-      },
       {
         "path": "/users/{userId}",
         "definition": {
           "entityName": "User",
           "schema": { "$ref": "#/backend/entities/User" },
-          "description": "Profils utilisateurs"
+          "description": "Profils utilisateurs incluant les rôles"
         }
       },
       {
-        "path": "/users/{userId}/vessels_safety/{id}",
+        "path": "/businesses/{businessId}",
         "definition": {
-          "entityName": "UserVesselSafety",
-          "schema": { "$ref": "#/backend/entities/UserVesselSafety" },
-          "description": "Gestion de la sécurité des navires privés"
+          "entityName": "Business",
+          "schema": { "$ref": "#/backend/entities/Business" },
+          "description": "Commerces professionnels"
         }
       },
       {
-        "path": "/spot_shares/{id}",
+        "path": "/businesses/{businessId}/promotions/{promoId}",
         "definition": {
-          "entityName": "SpotShare",
-          "schema": { "$ref": "#/backend/entities/SpotShare" },
-          "description": "Transfert de spots entre utilisateurs"
+          "entityName": "Promotion",
+          "schema": { "$ref": "#/backend/entities/Promotion" },
+          "description": "Promotions par commerce"
+        }
+      },
+      {
+        "path": "/campaigns/{campaignId}",
+        "definition": {
+          "entityName": "Campaign",
+          "schema": { "$ref": "#/backend/entities/Campaign" },
+          "description": "Campagnes de notifications et facturation"
         }
       }
     ]

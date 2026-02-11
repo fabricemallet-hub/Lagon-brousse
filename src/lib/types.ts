@@ -1,6 +1,59 @@
 
 export type WindDirection = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
 
+export type UserRole = 'client' | 'professional' | 'admin';
+
+export interface UserAccount {
+  id: string;
+  email: string;
+  displayName: string;
+  role: UserRole;
+  businessId?: string;
+  vesselNickname?: string;
+  subscriptionStatus: 'active' | 'inactive' | 'trial' | 'admin';
+  subscriptionExpiryDate?: string;
+  lastSelectedLocation?: string;
+  favoriteCategory?: 'Pêche' | 'Chasse' | 'Jardinage';
+  notificationsEnabled?: boolean;
+}
+
+export interface Business {
+  id: string;
+  ownerId: string;
+  name: string;
+  commune: string;
+  category: 'Pêche' | 'Chasse' | 'Jardinage';
+  logoUrl?: string;
+  description?: string;
+  createdAt: any;
+}
+
+export interface Promotion {
+  id: string;
+  businessId: string;
+  title: string;
+  price: number;
+  promoType: 'Promo' | 'Nouvel Arrivage';
+  imageUrl?: string;
+  createdAt: any;
+}
+
+export interface Campaign {
+  id: string;
+  ownerId: string;
+  businessId: string;
+  businessName: string;
+  title: string;
+  message: string;
+  targetCommune: string;
+  targetCategory: string;
+  reach: number;
+  cost: number;
+  status: 'pending' | 'sent';
+  createdAt: any;
+}
+
+// ... rest of the existing interfaces (WindForecast, WeatherData, etc.)
 export interface WindForecast {
   time: string;
   speed: number;
@@ -118,30 +171,6 @@ export interface LocationData {
   };
   tideStation: string;
   tideThresholds: { high: number; low: number; };
-}
-
-export interface UserAccount {
-  id: string;
-  email: string;
-  displayName: string;
-  vesselNickname?: string;
-  mapIcon?: string;
-  mapColor?: string;
-  subscriptionStatus: 'active' | 'inactive' | 'trial' | 'admin';
-  subscriptionStartDate?: string;
-  subscriptionExpiryDate?: string;
-  lastSelectedLocation?: string;
-  emergencyContact?: string;
-  isEmergencyEnabled?: boolean;
-  isCustomMessageEnabled?: boolean;
-  vesselSmsMessage?: string;
-  savedVesselIds?: string[];
-  lastVesselId?: string;
-  vesselPrefs?: any;
-  notificationsEnabled?: boolean;
-  // CGV Tracking
-  cgvAcceptedAt?: string;
-  cgvVersionSeen?: number;
 }
 
 export interface SafetyItem {

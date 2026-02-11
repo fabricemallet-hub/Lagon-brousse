@@ -1,7 +1,9 @@
-import { Home, Waves, Leaf, Fish, Calendar, Scale, Crosshair, User, Shield, BookOpen, Sprout, Sun, Navigation, HelpCircle } from 'lucide-react';
+
+import { Home, Waves, Leaf, Fish, Calendar, Scale, Crosshair, User, Shield, BookOpen, Sprout, Sun, Navigation, HelpCircle, Briefcase } from 'lucide-react';
 
 export const navLinks = [
   { href: '/', label: 'Accueil', icon: Home, adminOnly: false },
+  { href: '/pro/dashboard', label: 'Dashboard Pro', icon: Briefcase, proOnly: true },
   { href: '/meteo', label: 'Météo Live', icon: Sun, adminOnly: false },
   { href: '/lagon', label: 'Lagon', icon: Waves, adminOnly: false },
   { href: '/calendrier', label: 'Calendrier', icon: Calendar, adminOnly: false },

@@ -11,18 +11,34 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2"] ||
-        (request.auth.token.email != null && 
-         request.auth.token.email.lower() in [
-           "fabrice.mallet@gmail.com",
-           "f.mallet81@gmail.com",
-           "f.mallet81@outlook.com"
-         ]
-        )
+        request.auth.token.role == "admin" ||
+        request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2"]
       );
     }
 
-    // --- 1. CMS SUPPORT & FAQ ---
+    function isPro() {
+      return isSignedIn() && request.auth.token.role == "professional";
+    }
+
+    // --- COMMERCES & BUSINESS ---
+    match /businesses/{businessId} {
+      allow get, list: if true;
+      allow create: if isPro();
+      allow update, delete: if isPro() && resource.data.ownerId == request.auth.uid;
+
+      match /promotions/{promoId} {
+        allow get, list: if true;
+        allow write: if isPro() && get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerId == request.auth.uid;
+      }
+    }
+
+    // --- CAMPAGNES ---
+    match /campaigns/{id} {
+      allow create: if isPro();
+      allow read: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
+    }
+
+    // --- CMS SUPPORT & FAQ ---
     match /cms_support/faq/items/{id} {
       allow get, list: if true;
       allow write: if isAdmin();
@@ -31,80 +47,23 @@ service cloud.firestore {
     match /cms_support/tickets/items/{id} {
       allow create: if isSignedIn();
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow list: if isAdmin() || (isSignedIn() && request.query.limit <= 100);
+      allow list: if isAdmin();
       allow update, delete: if isAdmin();
     }
 
-    // --- 2. ACCÈS PUBLICS / GÉNÉRAUX ---
-    match /app_settings/{id} {
-      allow get, list: if true;
-      allow write: if isAdmin();
-    }
-
-    match /meteo_caledonie/{id} {
-      allow get, list: if true;
-      match /previsions/{prevId} {
-        allow get, list: if true;
-      }
-      allow write: if isAdmin();
-    }
-
-    match /fish_species/{fishId} {
-      allow get, list: if true;
-      allow write: if isAdmin();
-      
-      // Statistiques de gratte par commune
-      match /commune_stats/{communeId} {
-        allow get, list: if true;
-        // Les utilisateurs peuvent voter (mise à jour) ou créer si inexistant
-        allow create, update: if isSignedIn();
-      }
-    }
-    
-    match /sound_library/{id} {
-      allow get, list: if true;
-      allow write: if isAdmin();
-    }
-
-    // --- 3. UTILISATEURS & DONNÉES PERSO ---
+    // --- UTILISATEURS ---
     match /users/{userId} {
-      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow read: if isSignedIn(); // Permet aux pros de compter le reach
+      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       match /{allPaths=**} {
         allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       }
     }
 
-    // --- 4. FONCTIONNALITÉS TEMPS RÉEL ---
-    match /hunting_sessions/{id} {
-      allow read, write: if isSignedIn();
-      match /{allPaths=**} {
-        allow read, write: if isSignedIn();
-      }
-    }
-
-    match /vessels/{id} {
-      allow read, write: if isSignedIn();
-      match /{allPaths=**} {
-        allow read, write: if isSignedIn();
-      }
-    }
-
-    match /access_tokens/{id} {
-      allow read, write: if isSignedIn() || isAdmin();
-    }
-
-    match /shared_access_tokens/{id} {
-      allow get, list: if true;
+    // --- DEFAUT ---
+    match /{allPaths=**} {
+      allow read: if isSignedIn();
       allow write: if isAdmin();
-    }
-
-    // --- 5. PARTAGE DE SPOTS ---
-    match /spot_shares/{id} {
-      allow create: if isSignedIn();
-      allow read, delete: if isSignedIn() && (
-        isAdmin() || 
-        (request.auth.token.email != null && resource.data.recipientEmail == request.auth.token.email.lower())
-      );
     }
   }
 }

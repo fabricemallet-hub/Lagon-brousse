@@ -27,32 +27,30 @@ export function SidebarNav() {
 
   const { data: userProfile } = useDoc<UserAccount>(userDocRef);
 
-  // Détection robuste du rôle admin (Email + UID) pour un affichage immédiat
-  const isAdmin = useMemo(() => {
-    if (!user) return false;
+  // Détection robuste du rôle admin et pro
+  const roles = useMemo(() => {
+    if (!user) return { isAdmin: false, isPro: false };
     const email = user.email?.toLowerCase();
     const uid = user.uid;
-    return email === 'f.mallet81@outlook.com' || 
-           email === 'f.mallet81@gmail.com' || 
-           email === 'fabrice.mallet@gmail.com' ||
-           uid === 'K9cVYLVUk1NV99YV3anebkugpPp1' ||
-           uid === 'Irglq69MasYdNwBmUu8yKvw6h4G2' ||
-           userProfile?.subscriptionStatus === 'admin';
+    const isAdmin = email === 'f.mallet81@outlook.com' || 
+                    email === 'f.mallet81@gmail.com' || 
+                    email === 'fabrice.mallet@gmail.com' ||
+                    uid === 'K9cVYLVUk1NV99YV3anebkugpPp1' ||
+                    userProfile?.subscriptionStatus === 'admin';
+    const isPro = userProfile?.role === 'professional' || isAdmin;
+    return { isAdmin, isPro };
   }, [user, userProfile]);
 
   return (
     <div className="flex flex-col h-full">
       <SidebarMenu className="flex-grow">
         {navLinks.map((link) => {
-          if (link.adminOnly && !isAdmin) {
-            return null;
-          }
-          if (link.href === '/contact' && isAdmin) {
-            return null;
-          }
-          if (link.href === '/contact' && !user) {
-            return null;
-          }
+          if (link.adminOnly && !roles.isAdmin) return null;
+          if (link.proOnly && !roles.isPro) return null;
+          
+          if (link.href === '/contact' && roles.isAdmin) return null;
+          if (link.href === '/contact' && !user) return null;
+          
           return (
             <SidebarMenuItem key={link.href}>
               <SidebarMenuButton
