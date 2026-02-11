@@ -1,4 +1,3 @@
-
 'use client';
 import {
   Sidebar,
@@ -27,7 +26,8 @@ import {
   Leaf,
   MailWarning,
   RefreshCw,
-  ShieldCheck
+  ShieldCheck,
+  Mail
 } from 'lucide-react';
 import {
   Select,
@@ -47,7 +47,7 @@ import { fr } from 'date-fns/locale';
 import Link from 'next/link';
 import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { Skeleton } from './ui/skeleton';
-import { signOut } from 'firebase/auth';
+import { signOut, sendEmailVerification } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
 import type { UserAccount } from '@/lib/types';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -128,6 +128,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const handleResendEmail = async () => {
+    if (!user) return;
+    setIsRefreshing(true);
+    try {
+      await sendEmailVerification(user);
+      toast({ title: "Email envoyé", description: "Un nouveau lien de validation a été envoyé." });
+    } catch (e) {
+      toast({ variant: 'destructive', title: "Erreur", description: "Trop de tentatives. Veuillez réessayer plus tard." });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const handlePrevDay = useCallback(() => setSelectedDate(subDays(selectedDate, 1)), [selectedDate, setSelectedDate]);
   const handleNextDay = useCallback(() => setSelectedDate(addDays(selectedDate, 1)), [selectedDate, setSelectedDate]);
 
@@ -156,6 +169,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Button onClick={handleCheckVerification} disabled={isRefreshing} className="w-full h-12 font-black uppercase text-xs tracking-widest gap-2">
                 {isRefreshing ? <RefreshCw className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
                 J'ai vérifié mon adresse
+              </Button>
+              <Button variant="outline" onClick={handleResendEmail} disabled={isRefreshing} className="w-full h-10 font-black uppercase text-[10px] tracking-widest gap-2">
+                <Mail className="size-3" /> Renvoyer le mail de confirmation
               </Button>
             </div>
           </CardContent>
