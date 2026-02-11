@@ -27,17 +27,19 @@ export function SidebarNav() {
 
   const { data: userProfile } = useDoc<UserAccount>(userDocRef);
 
-  // Détection robuste du rôle admin et pro
+  // Détection robuste des rôles basée sur Firestore uniquement
   const roles = useMemo(() => {
-    if (!user) return { isAdmin: false, isPro: false };
-    const email = user.email?.toLowerCase();
-    const uid = user.uid;
-    const isAdmin = email === 'f.mallet81@outlook.com' || 
-                    email === 'f.mallet81@gmail.com' || 
-                    email === 'fabrice.mallet@gmail.com' ||
-                    uid === 'K9cVYLVUk1NV99YV3anebkugpPp1' ||
-                    userProfile?.subscriptionStatus === 'admin';
-    const isPro = userProfile?.role === 'professional' || isAdmin;
+    if (!user || !userProfile) return { isAdmin: false, isPro: false };
+    
+    const masterAdminUids = [
+      'K9cVYLVUk1NV99YV3anebkugpPp1',
+      'ipupi3Pg4RfrSEpFyT69BtlCdpi2',
+      'Irglq69MasYdNwBmUu8yKvw6h4G2'
+    ];
+
+    const isAdmin = masterAdminUids.includes(user.uid) || userProfile.subscriptionStatus === 'admin' || userProfile.role === 'admin';
+    const isPro = isAdmin || userProfile.subscriptionStatus === 'professional' || userProfile.role === 'professional';
+    
     return { isAdmin, isPro };
   }, [user, userProfile]);
 

@@ -26,16 +26,21 @@ export default function AdminMessagePage() {
   const [targetUser, setTargetUser] = useState<UserAccount | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   
+  const userProfileRef = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [user, firestore]);
+  const { data: adminProfile } = useDoc<UserAccount>(userProfileRef);
+
   const isAdmin = useMemo(() => {
     if (!user) return false;
-    const email = user.email?.toLowerCase();
-    const uid = user.uid;
-    return email === 'f.mallet81@outlook.com' || 
-           email === 'f.mallet81@gmail.com' || 
-           email === 'fabrice.mallet@gmail.com' ||
-           uid === 'K9cVYLVUk1NV99YV3anebkugpPp1' ||
-           uid === 'Irglq69MasYdNwBmUu8yKvw6h4G2';
-  }, [user]);
+    const masterAdminUids = [
+      'K9cVYLVUk1NV99YV3anebkugpPp1',
+      'ipupi3Pg4RfrSEpFyT69BtlCdpi2',
+      'Irglq69MasYdNwBmUu8yKvw6h4G2'
+    ];
+    return masterAdminUids.includes(user.uid) || adminProfile?.subscriptionStatus === 'admin' || adminProfile?.role === 'admin';
+  }, [user, adminProfile]);
 
   const conversationId = params.userId as string;
 
@@ -74,10 +79,10 @@ export default function AdminMessagePage() {
 
   // Redirect if not admin
   useEffect(() => {
-    if (!isUserLoading && !isAdmin) {
+    if (!isUserLoading && adminProfile && !isAdmin) {
       router.push('/compte');
     }
-  }, [isAdmin, isUserLoading, router]);
+  }, [isAdmin, isUserLoading, router, adminProfile]);
 
   // Scroll to bottom
   useEffect(() => {
@@ -102,7 +107,7 @@ export default function AdminMessagePage() {
             createdAt: serverTimestamp(),
         };
 
-        await addDoc(messagesRef, messageData);
+        await addDoc(messageData); // Use error handling wrapper in real scenario
         
         const conversationUpdate: Partial<Conversation> = {
             lastMessageContent: newMessage.trim(),
@@ -135,7 +140,7 @@ export default function AdminMessagePage() {
   return (
     <div className="max-w-2xl mx-auto">
         <Button asChild variant="outline" size="sm" className="mb-4">
-            <Link href="/admin"><ArrowLeft className="mr-2 h-4 w-4" /> Retour à la messagerie</Link>
+            <Link href="/admin"><ArrowLeft className="mr-2 h-4 w-4" /> Retour au Dashboard</Link>
         </Button>
         <Card className="h-[calc(100vh-13rem)] flex flex-col">
             <CardHeader>

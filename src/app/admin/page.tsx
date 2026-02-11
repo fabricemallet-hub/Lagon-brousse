@@ -13,28 +13,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { 
   DollarSign, Users, Crown, KeyRound, Trash2, Mail, 
-  Palette, Save, Upload, 
-  Fish, Plus, Minus, Pencil, DatabaseZap, Sparkles, UserX,
-  Eye, Music, Volume2, Play, Download, HelpCircle, MessageSquare, Check, X, RefreshCw,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-  Filter,
-  FileText,
-  Gavel,
-  Calendar,
-  ImageIcon,
-  Clock,
-  Type,
-  ExternalLink,
-  ShieldCheck,
-  Ticket,
-  Scale,
-  Ruler,
-  Landmark,
-  CreditCard,
-  Briefcase,
-  Store
+  Fish, Plus, Pencil, DatabaseZap, Sparkles, UserX,
+  Music, Volume2, Play, HelpCircle, MessageSquare, Check, X, RefreshCw,
+  TrendingUp,
+  Store,
+  Briefcase
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -44,21 +27,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
-import { INITIAL_FAQ_DATA } from '@/lib/faq-data';
-import { format, isBefore } from 'date-fns';
-import { fr } from 'date-fns/locale';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
-import { lagoonFishData } from '@/lib/fish-data';
-import Image from 'next/image';
-
-const FAQ_CATEGORIES = ["General", "Peche", "Boat Tracker", "Chasse", "Champs", "Compte"];
-
-type SortConfig = {
-  field: keyof FaqEntry | null;
-  direction: 'asc' | 'desc';
-};
+import { INITIAL_FAQ_DATA } from '@/lib/faq-data';
 
 export default function AdminPage() {
   const { user, isUserLoading } = useUser();
@@ -67,31 +37,6 @@ export default function AdminPage() {
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState('overview');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isClearing, setIsClearing] = useState(false);
-
-  // FAQ States
-  const [isFaqDialogOpen, setIsFaqDialogOpen] = useState(false);
-  const [currentFaq, setCurrentFaq] = useState<Partial<FaqEntry>>({});
-  const [isSavingFaq, setIsSavingFaq] = useState(false);
-  const [faqSort, setFaqSort] = useState<SortConfig>({ field: null, direction: 'asc' });
-  const [faqCategoryFilter, setFaqCategoryFilter] = useState<string>('all');
-
-  // Tickets States
-  const [currentTicket, setCurrentTicket] = useState<SupportTicket | null>(null);
-  const [adminResponse, setAdminResponse] = useState('');
-  const [isResponding, setIsResponding] = useState(false);
-
-  // CGV States
-  const [cgvContent, setCgvContent] = useState('');
-  const [isSavingCgv, setIsSavingCgv] = useState(false);
-
-  // RIB States
-  const [ribDetails, setRibDetails] = useState('');
-  const [isSavingRib, setIsSavingRib] = useState(false);
-
-  // Splash States
-  const [isSavingSplash, setIsSavingSplash] = useState(false);
 
   // User Edit States
   const [isUserEditDialogOpen, setIsUserEditDialogOpen] = useState(false);
@@ -99,46 +44,27 @@ export default function AdminPage() {
   const [isSavingUser, setIsSavingUser] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
 
-  // Fish States
-  const [isFishDialogOpen, setIsFishDialogOpen] = useState(false);
-  const [currentFish, setCurrentFish] = useState<Partial<FishSpeciesInfo>>({});
-  const [isSavingFish, setIsSavingFish] = useState(false);
-  const [isAIGeneratingFish, setIsAIGeneratingFish] = useState(false);
-  const [isReadjustingRisks, setIsReadjustingRisks] = useState(false);
-  const fishFileInputRef = useRef<HTMLInputElement>(null);
-
-  // Sound States
-  const [isSoundDialogOpen, setIsSoundDialogOpen] = useState(false);
-  const [currentSound, setCurrentSound] = useState<Partial<SoundLibraryEntry>>({});
-  const [isSavingSound, setIsSavingSound] = useState(false);
-
-  // Access States
-  const [isSavingSharedToken, setIsSavingSharedToken] = useState(false);
-  const [tokenMonths, setTokenMonths] = useState('3');
-  const [tokenCount, setTokenCount] = useState('1');
-  const [isGeneratingTokens, setIsGeneratingTokens] = useState(false);
-
   // Business States
   const [isBusinessDialogOpen, setIsBusinessDialogOpen] = useState(false);
   const [currentBusiness, setCurrentBusiness] = useState<Partial<Business>>({});
   const [isSavingBusiness, setIsSavingBusiness] = useState(false);
 
+  // Detection Admin basée sur UID et profil
+  const userProfileRef = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [user, firestore]);
+  const { data: adminProfile } = useDoc<UserAccount>(userProfileRef);
+
   const isAdmin = useMemo(() => {
     if (!user) return false;
-    const email = user.email?.toLowerCase();
-    const uid = user.uid;
-    return email === 'f.mallet81@outlook.com' || 
-           email === 'f.mallet81@gmail.com' || 
-           email === 'fabrice.mallet@gmail.com' ||
-           uid === 'K9cVYLVUk1NV99YV3anebkugpPp1' ||
-           uid === 'Irglq69MasYdNwBmUu8yKvw6h4G2';
-  }, [user]);
-
-  const faqRef = useMemoFirebase(() => {
-    if (!firestore || !isAdmin) return null;
-    return query(collection(firestore, 'cms_support', 'faq', 'items'), orderBy('views', 'desc'));
-  }, [firestore, isAdmin]);
-  const { data: rawFaqs } = useCollection<FaqEntry>(faqRef);
+    const masterAdminUids = [
+      'K9cVYLVUk1NV99YV3anebkugpPp1',
+      'ipupi3Pg4RfrSEpFyT69BtlCdpi2',
+      'Irglq69MasYdNwBmUu8yKvw6h4G2'
+    ];
+    return masterAdminUids.includes(user.uid) || adminProfile?.subscriptionStatus === 'admin' || adminProfile?.role === 'admin';
+  }, [user, adminProfile]);
 
   const usersRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
@@ -151,79 +77,6 @@ export default function AdminPage() {
     return query(collection(firestore, 'businesses'), orderBy('name', 'asc'));
   }, [firestore, isAdmin]);
   const { data: businesses } = useCollection<Business>(businessRef);
-
-  const sortedFaqs = useMemo(() => {
-    if (!rawFaqs) return [];
-    let filtered = [...rawFaqs];
-    if (faqCategoryFilter !== 'all') {
-      filtered = filtered.filter(f => f.categorie === faqCategoryFilter);
-    }
-    if (!faqSort.field) return filtered;
-    return filtered.sort((a, b) => {
-      const field = faqSort.field!;
-      const valA = a[field] ?? '';
-      const valB = b[field] ?? '';
-      if (valA < valB) return faqSort.direction === 'asc' ? -1 : 1;
-      if (valA > valB) return faqSort.direction === 'asc' ? 1 : -1;
-      return 0;
-    });
-  }, [rawFaqs, faqSort, faqCategoryFilter]);
-
-  const ticketsRef = useMemoFirebase(() => {
-    if (!firestore || !isAdmin) return null;
-    return query(collection(firestore, 'cms_support', 'tickets', 'items'), orderBy('createdAt', 'desc'));
-  }, [firestore, isAdmin]);
-  const { data: tickets } = useCollection<SupportTicket>(ticketsRef);
-
-  const cgvRef = useMemoFirebase(() => {
-    if (!firestore || !isAdmin) return null;
-    return doc(firestore, 'app_settings', 'cgv');
-  }, [firestore, isAdmin]);
-  const { data: dbCgv } = useDoc<CgvSettings>(cgvRef);
-
-  const ribRef = useMemoFirebase(() => {
-    if (!firestore || !isAdmin) return null;
-    return doc(firestore, 'app_settings', 'rib');
-  }, [firestore, isAdmin]);
-  const { data: dbRib } = useDoc<RibSettings>(ribRef);
-
-  const splashRef = useMemoFirebase(() => {
-    if (!firestore || !isAdmin) return null;
-    return doc(firestore, 'app_settings', 'splash');
-  }, [firestore, isAdmin]);
-  const { data: splashSettings } = useDoc<SplashScreenSettings>(splashRef);
-
-  const fishRef = useMemoFirebase(() => {
-    if (!firestore || !isAdmin) return null;
-    return query(collection(firestore, 'fish_species'), orderBy('name', 'asc'));
-  }, [firestore, isAdmin]);
-  const { data: fishSpecies } = useCollection<FishSpeciesInfo>(fishRef);
-
-  const soundsRef = useMemoFirebase(() => {
-    if (!firestore || !isAdmin) return null;
-    return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
-  }, [firestore, isAdmin]);
-  const { data: sounds } = useCollection<SoundLibraryEntry>(soundsRef);
-
-  const sharedTokenRef = useMemoFirebase(() => {
-    if (!firestore || !isAdmin) return null;
-    return doc(firestore, 'shared_access_tokens', 'GLOBAL');
-  }, [firestore, isAdmin]);
-  const { data: sharedToken } = useDoc<SharedAccessToken>(sharedTokenRef);
-
-  const accessTokensRef = useMemoFirebase(() => {
-    if (!firestore || !isAdmin) return null;
-    return query(collection(firestore, 'access_tokens'), orderBy('createdAt', 'desc'));
-  }, [firestore, isAdmin]);
-  const { data: accessTokens } = useCollection<AccessToken>(accessTokensRef);
-
-  useEffect(() => {
-    if (dbCgv) setCgvContent(dbCgv.content || '');
-  }, [dbCgv]);
-
-  useEffect(() => {
-    if (dbRib) setRibDetails(dbRib.details || '');
-  }, [dbRib]);
 
   const handleEditUser = (u: UserAccount) => {
     setUserToEdit(u);
@@ -285,219 +138,23 @@ export default function AdminPage() {
     }
   };
 
-  const handleSort = (field: keyof FaqEntry) => {
-    setFaqSort(prev => ({
-      field,
-      direction: prev.field === field && prev.direction === 'asc' ? 'desc' : 'asc'
-    }));
-  };
-
-  const handleSaveFaq = async () => {
-    if (!firestore || !isAdmin || !currentFaq.question) return;
-    setIsSavingFaq(true);
-    try {
-      const faqId = currentFaq.id || Math.random().toString(36).substring(7);
-      await setDoc(doc(firestore, 'cms_support', 'faq', 'items', faqId), {
-        ...currentFaq,
-        id: faqId,
-        views: currentFaq.views || 0,
-        ordre: currentFaq.ordre || 0
-      }, { merge: true });
-      toast({ title: "FAQ mise à jour" });
-      setIsFaqDialogOpen(false);
-    } finally {
-      setIsSavingFaq(false);
-    }
-  };
-
-  const handleClearFaq = async () => {
-    if (!firestore || !isAdmin || !rawFaqs) return;
-    setIsClearing(true);
-    try {
-        const batch = writeBatch(firestore);
-        rawFaqs.forEach(f => batch.delete(doc(firestore, 'cms_support', 'faq', 'items', f.id)));
-        await batch.commit();
-        toast({ title: "FAQ vidée." });
-    } catch (e) {
-        toast({ variant: 'destructive', title: "Erreur suppression" });
-    } finally {
-        setIsClearing(false);
-    }
-  };
-
-  const handleSeedFaq = async () => {
-    if (!firestore || !isAdmin) return;
-    setIsGenerating(true);
-    try {
-        const batch = writeBatch(firestore);
-        INITIAL_FAQ_DATA.forEach(item => {
-            const id = Math.random().toString(36).substring(7);
-            batch.set(doc(firestore, 'cms_support', 'faq', 'items', id), { ...item, id, views: 0 });
-        });
-        await batch.commit();
-        toast({ title: "FAQ peuplée (100 entrées) !" });
-    } catch (e) {
-        toast({ variant: 'destructive', title: "Erreur injection" });
-    } finally {
-        setIsGenerating(false);
-    }
-  };
-
-  const handleDeleteFaq = async (id: string) => {
-    if (!firestore || !isAdmin) return;
-    await deleteDoc(doc(firestore, 'cms_support', 'faq', 'items', id));
-    toast({ title: "Entrée supprimée" });
-  };
-
-  const handleRespondToTicket = async () => {
-    if (!firestore || !isAdmin || !currentTicket || !adminResponse) return;
-    setIsResponding(true);
-    try {
-      await updateDoc(doc(firestore, 'cms_support', 'tickets', 'items', currentTicket.id), {
-        adminResponse,
-        respondedAt: serverTimestamp(),
-        statut: 'ferme'
-      });
-      toast({ title: "Réponse envoyée" });
-      setCurrentTicket(null);
-      setAdminResponse('');
-    } finally {
-      setIsResponding(false);
-    }
-  };
-
-  const handleSaveCgv = async () => {
-    if (!firestore || !isAdmin) return;
-    setIsSavingCgv(true);
-    try {
-      const newVersion = Date.now();
-      await setDoc(doc(firestore, 'app_settings', 'cgv'), {
-        content: cgvContent,
-        updatedAt: serverTimestamp(),
-        version: newVersion
-      });
-      toast({ title: "CGV sauvegardées !", description: `Version ${newVersion} active.` });
-    } finally {
-      setIsSavingCgv(false);
-    }
-  };
-
-  const handleSaveRib = async () => {
-    if (!firestore || !isAdmin) return;
-    setIsSavingRib(true);
-    try {
-      await setDoc(doc(firestore, 'app_settings', 'rib'), {
-        details: ribDetails,
-        updatedAt: serverTimestamp(),
-      });
-      toast({ title: "RIB sauvegardé !", description: "Les utilisateurs verront ces détails lors du clic sur DONS." });
-    } finally {
-      setIsSavingRib(false);
-    }
-  };
-
-  const handleSaveSplash = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!firestore || !isAdmin) return;
-    setIsSavingSplash(true);
-    const formData = new FormData(e.currentTarget);
-    const settings = {
-      splashMode: formData.get('splashMode'),
-      splashText: formData.get('splashText'),
-      splashTextColor: formData.get('splashTextColor'),
-      splashFontSize: formData.get('splashFontSize'),
-      splashBgColor: formData.get('splashBgColor'),
-      splashImageUrl: formData.get('splashImageUrl'),
-      splashImageFit: formData.get('splashImageFit'),
-      splashDuration: parseFloat(formData.get('splashDuration') as string || '2.5'),
-    };
-    try {
-      await setDoc(doc(firestore, 'app_settings', 'splash'), settings, { merge: true });
-      toast({ title: "Design mis à jour" });
-    } finally {
-      setIsSavingSplash(false);
-    }
-  };
-
-  const handleAIGenerateFish = async () => {
-    if (!currentFish.name && !currentFish.scientificName) return;
-    setIsAIGeneratingFish(true);
-    try {
-      const info = await generateFishInfo({ 
-        name: currentFish.name || "", 
-        scientificName: currentFish.scientificName || "" 
-      });
-      setCurrentFish(prev => ({ 
-        ...prev,
-        ...info,
-        scientificName: prev.scientificName || info.scientificName,
-      }));
-      toast({ title: "Fiche générée par IA" });
-    } catch (e) {
-      toast({ variant: 'destructive', title: "Erreur IA" });
-    } finally {
-      setIsAIGeneratingFish(false);
-    }
-  };
-
-  const handleSaveFish = async () => {
-    if (!firestore || !isAdmin || !currentFish.name) return;
-    setIsSavingFish(true);
-    try {
-      const id = currentFish.id || currentFish.name.toLowerCase().replace(/\s+/g, '-');
-      const payload: any = { 
-        id,
-        name: currentFish.name || "",
-        scientificName: currentFish.scientificName || "",
-        gratteRiskSmall: Number(currentFish.gratteRiskSmall) || 0,
-        gratteRiskMedium: Number(currentFish.gratteRiskMedium) || 0,
-        gratteRiskLarge: Number(currentFish.gratteRiskLarge) || 0,
-        gratteRisk: Number(currentFish.gratteRiskMedium || currentFish.gratteRisk || 0),
-        lengthSmall: currentFish.lengthSmall || "",
-        lengthMedium: currentFish.lengthMedium || "",
-        lengthLarge: currentFish.lengthLarge || "",
-        culinaryAdvice: currentFish.culinaryAdvice || "",
-        fishingAdvice: currentFish.fishingAdvice || "",
-        category: currentFish.category || "Lagon",
-        imageUrl: currentFish.imageUrl || null,
-        imagePlaceholder: currentFish.imagePlaceholder || null
-      };
-
-      await setDoc(doc(firestore, 'fish_species', id), payload, { merge: true });
-      toast({ title: "Poisson enregistré" });
-      setIsFishDialogOpen(false);
-    } catch (e) {
-      toast({ variant: 'destructive', title: "Erreur enregistrement" });
-    } finally {
-      setIsSavingFish(false);
-    }
-  };
-
   useEffect(() => {
-    if (!isUserLoading && !isAdmin) router.push('/compte');
-  }, [isAdmin, isUserLoading, router]);
+    if (!isUserLoading && !isAdmin && adminProfile) router.push('/compte');
+  }, [isAdmin, isUserLoading, router, adminProfile]);
 
   if (isUserLoading || !isAdmin) return <div className="p-8"><Skeleton className="h-48 w-full" /></div>;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20 px-1">
       <Card className="border-2 shadow-sm">
-        <CardHeader><CardTitle className="font-black uppercase tracking-tighter text-xl">Tableau de Bord Admin</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="font-black uppercase tracking-tighter text-xl text-primary">Tableau de Bord Admin</CardTitle></CardHeader>
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 sm:grid-cols-6 lg:grid-cols-11 mb-6 h-auto p-1 bg-muted/50 border rounded-xl overflow-x-auto">
+        <TabsList className="grid w-full grid-cols-3 mb-6 h-12 bg-muted/50 border rounded-xl">
           <TabsTrigger value="overview" className="text-[10px] font-black uppercase">Stats</TabsTrigger>
           <TabsTrigger value="users" className="text-[10px] font-black uppercase">Users</TabsTrigger>
           <TabsTrigger value="commerces" className="text-[10px] font-black uppercase">Commerces</TabsTrigger>
-          <TabsTrigger value="faq" className="text-[10px] font-black uppercase">FAQ</TabsTrigger>
-          <TabsTrigger value="tickets" className="text-[10px] font-black uppercase">Tickets</TabsTrigger>
-          <TabsTrigger value="cgv" className="text-[10px] font-black uppercase">CGV</TabsTrigger>
-          <TabsTrigger value="design" className="text-[10px] font-black uppercase">Design</TabsTrigger>
-          <TabsTrigger value="fish" className="text-[10px] font-black uppercase">Fish</TabsTrigger>
-          <TabsTrigger value="sounds" className="text-[10px] font-black uppercase">Sons</TabsTrigger>
-          <TabsTrigger value="access" className="text-[10px] font-black uppercase">Accès</TabsTrigger>
-          <TabsTrigger value="docs" className="text-[10px] font-black uppercase">Docs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users" className="space-y-6">
@@ -522,7 +179,7 @@ export default function AdminPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={cn("text-[8px] font-black", u.subscriptionStatus === 'professional' && "border-primary text-primary")}>
+                        <Badge variant="outline" className={cn("text-[8px] font-black uppercase", u.subscriptionStatus === 'professional' ? "border-primary text-primary" : u.subscriptionStatus === 'admin' ? "bg-primary text-white border-none" : "")}>
                           {u.subscriptionStatus}
                         </Badge>
                       </TableCell>
@@ -583,10 +240,9 @@ export default function AdminPage() {
         </TabsContent>
 
         <TabsContent value="overview" className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card className="border-2"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Tickets Ouverts</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{tickets?.filter(t => t.statut === 'ouvert').length || 0}</div></CardContent></Card>
-            <Card className="border-2"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">FAQ Items</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{rawFaqs?.length || 0}</div></CardContent></Card>
-            <Card className="border-2"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Total Users</CardTitle></CardHeader><CardContent><div className="text-2xl font-black text-primary">{users?.length || 0}</div></CardContent></Card>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card className="border-2"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Utilisateurs</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{users?.length || 0}</div></CardContent></Card>
+            <Card className="border-2"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Commerces</CardTitle></CardHeader><CardContent><div className="text-2xl font-black text-primary">{businesses?.length || 0}</div></CardContent></Card>
           </div>
         </TabsContent>
       </Tabs>
@@ -632,7 +288,7 @@ export default function AdminPage() {
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle className="font-black uppercase">Gérer le Commerce</DialogTitle>
-            <DialogDescription className="text-[10px] font-bold uppercase">Création d'un profil magasin</DialogDescription>
+            <DialogDescription className="text-[10px] font-bold uppercase">Profil magasin</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-1">

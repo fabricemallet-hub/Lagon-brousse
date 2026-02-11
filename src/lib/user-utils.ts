@@ -7,7 +7,7 @@ import { addMonths } from 'date-fns';
 
 /**
  * Gère la création et la mise à jour du document profil utilisateur dans Firestore.
- * Force le statut admin pour les adresses de Fabrice afin de garantir la cohérence des accès.
+ * Utilise désormais les UIDs pour la sécurité critique au lieu des emails en dur.
  */
 export async function ensureUserDocument(firestore: Firestore, user: User, displayName?: string): Promise<void> {
   if (!user || !firestore) return;
@@ -16,46 +16,45 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
   const email = user.email?.toLowerCase() || '';
   const uid = user.uid;
   
-  // Comptes Administrateur Système
-  const adminEmails = [
-    'f.mallet81@gmail.com', 
-    'f.mallet81@outlook.com', 
-    'fabrice.mallet@gmail.com'
-  ];
-  const adminUids = [
+  // UIDs des administrateurs maîtres (sécurité ultime)
+  const masterAdminUids = [
     'K9cVYLVUk1NV99YV3anebkugpPp1',
+    'ipupi3Pg4RfrSEpFyT69BtlCdpi2',
     'Irglq69MasYdNwBmUu8yKvw6h4G2'
   ];
   
-  const isAdminUser = adminEmails.includes(email) || adminUids.includes(uid);
+  const isMasterAdmin = masterAdminUids.includes(uid);
 
   try {
     const docSnap = await getDoc(userDocRef);
 
     if (docSnap.exists()) {
       const currentData = docSnap.data() as UserAccount;
-      // Mise à jour forcée si le statut admin n'est pas synchronisé
-      if (isAdminUser && currentData.subscriptionStatus !== 'admin') {
+      
+      // Si c'est un admin maître mais qu'il n'a pas le flag, on le met à jour une seule fois
+      if (isMasterAdmin && currentData.subscriptionStatus !== 'admin') {
           await setDoc(userDocRef, { 
             ...currentData, 
             subscriptionStatus: 'admin',
-            email: email
+            role: 'admin'
           }, { merge: true });
       }
       return;
     }
 
+    // Création du nouveau profil
     const effectiveDisplayName = displayName || user.displayName || email.split('@')[0] || 'Utilisateur';
     
     const newUserDocument: UserAccount = {
       id: user.uid,
       email: email,
       displayName: effectiveDisplayName,
-      subscriptionStatus: isAdminUser ? 'admin' : 'trial',
+      role: isMasterAdmin ? 'admin' : 'client',
+      subscriptionStatus: isMasterAdmin ? 'admin' : 'trial',
       lastSelectedLocation: 'Nouméa',
     };
 
-    if (!isAdminUser) {
+    if (!isMasterAdmin) {
       const trialStartDate = new Date();
       newUserDocument.subscriptionStartDate = trialStartDate.toISOString();
       newUserDocument.subscriptionExpiryDate = addMonths(trialStartDate, 3).toISOString();
