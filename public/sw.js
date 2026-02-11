@@ -1,24 +1,16 @@
-const CACHE_NAME = 'lb-nc-v2';
-const ASSETS = [
-  '/',
-  '/manifest.json',
-  '/icon-192x192.png',
-  '/icon-512x512.png'
-];
-
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
-    })
-  );
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(clients.claim());
 });
 
 self.addEventListener('fetch', (event) => {
-  // Stratégie Network-First pour les données, Cache-First pour les assets
+  // PWABuilder requires a fetch handler to validate offline capability
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
+    fetch(event.request).catch(() => {
+      return new Response('Mode hors-ligne actif. Reconnectez-vous pour les données live.');
     })
   );
 });

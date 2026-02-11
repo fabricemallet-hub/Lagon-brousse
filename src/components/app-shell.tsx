@@ -254,8 +254,12 @@ function InnerAppShell({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="w-full justify-start h-12 p-2 gap-3 bg-accent text-accent-foreground shadow-sm overflow-hidden text-white">
-                  <Avatar className="h-8 w-8 border-2 border-background shrink-0"><AvatarFallback className="font-black">{user.email?.[0].toUpperCase()}</AvatarFallback></Avatar>
-                  <div className="text-left group-data-[collapsible=icon]:hidden min-w-0 flex-1"><p className="font-bold text-xs truncate w-full">{user.email}</p></div>
+                  <Avatar className="h-8 w-8 border-2 border-background shrink-0">
+                    <AvatarFallback className="font-black">{user.email?.[0].toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <div className="text-left group-data-[collapsible=icon]:hidden min-w-0 flex-1">
+                    <p className="font-bold text-xs truncate w-full">{user.email}</p>
+                  </div>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" side="right" sideOffset={10} className="w-56">
