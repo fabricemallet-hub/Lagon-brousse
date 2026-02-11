@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -31,7 +32,8 @@ import {
   Scale,
   Ruler,
   Landmark,
-  CreditCard
+  CreditCard,
+  Briefcase
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -90,6 +92,11 @@ export default function AdminPage() {
   // Splash States
   const [isSavingSplash, setIsSavingSplash] = useState(false);
 
+  // User Edit States
+  const [isUserEditDialogOpen, setIsUserEditDialogOpen] = useState(false);
+  const [userToEdit, setUserToEdit] = useState<UserAccount | null>(null);
+  const [isSavingUser, setIsSavingUser] = useState(false);
+
   // Fish States
   const [isFishDialogOpen, setIsFishDialogOpen] = useState(false);
   const [currentFish, setCurrentFish] = useState<Partial<FishSpeciesInfo>>({});
@@ -109,7 +116,6 @@ export default function AdminPage() {
   const [tokenCount, setTokenCount] = useState('1');
   const [isGeneratingTokens, setIsGeneratingTokens] = useState(false);
 
-  // Détection robuste admin (Email + UID)
   const isAdmin = useMemo(() => {
     if (!user) return false;
     const email = user.email?.toLowerCase();
@@ -121,7 +127,6 @@ export default function AdminPage() {
            uid === 'Irglq69MasYdNwBmUu8yKvw6h4G2';
   }, [user]);
 
-  // --- QUERIES ---
   const faqRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
     return query(collection(firestore, 'cms_support', 'faq', 'items'), orderBy('views', 'desc'));
@@ -207,7 +212,25 @@ export default function AdminPage() {
     if (dbRib) setRibDetails(dbRib.details || '');
   }, [dbRib]);
 
-  // --- HANDLERS FAQ ---
+  const handleEditUser = (u: UserAccount) => {
+    setUserToEdit(u);
+    setIsUserEditDialogOpen(true);
+  };
+
+  const handleSaveUser = async () => {
+    if (!firestore || !isAdmin || !userToEdit) return;
+    setIsSavingUser(true);
+    try {
+      await setDoc(doc(firestore, 'users', userToEdit.id), userToEdit, { merge: true });
+      toast({ title: "Utilisateur mis à jour" });
+      setIsUserEditDialogOpen(false);
+    } catch (e) {
+      toast({ variant: 'destructive', title: "Erreur mise à jour" });
+    } finally {
+      setIsSavingUser(false);
+    }
+  };
+
   const handleSort = (field: keyof FaqEntry) => {
     setFaqSort(prev => ({
       field,
@@ -272,7 +295,6 @@ export default function AdminPage() {
     toast({ title: "Entrée supprimée" });
   };
 
-  // --- HANDLERS TICKETS ---
   const handleRespondToTicket = async () => {
     if (!firestore || !isAdmin || !currentTicket || !adminResponse) return;
     setIsResponding(true);
@@ -290,7 +312,6 @@ export default function AdminPage() {
     }
   };
 
-  // --- HANDLERS CGV ---
   const handleSaveCgv = async () => {
     if (!firestore || !isAdmin) return;
     setIsSavingCgv(true);
@@ -314,7 +335,6 @@ export default function AdminPage() {
     toast({ title: "Modèle chargé" });
   };
 
-  // --- HANDLERS RIB ---
   const handleSaveRib = async () => {
     if (!firestore || !isAdmin) return;
     setIsSavingRib(true);
@@ -329,7 +349,6 @@ export default function AdminPage() {
     }
   };
 
-  // --- HANDLERS DESIGN ---
   const handleSaveSplash = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!firestore || !isAdmin) return;
@@ -353,7 +372,6 @@ export default function AdminPage() {
     }
   };
 
-  // --- HANDLERS FISH ---
   const handleAIGenerateFish = async () => {
     if (!currentFish.name && !currentFish.scientificName) return;
     setIsAIGeneratingFish(true);
@@ -362,7 +380,6 @@ export default function AdminPage() {
         name: currentFish.name || "", 
         scientificName: currentFish.scientificName || "" 
       });
-      // Fusion intelligente : on préserve le nom scientifique s'il était déjà saisi par l'utilisateur
       setCurrentFish(prev => ({ 
         ...prev,
         ...info,
@@ -394,8 +411,6 @@ export default function AdminPage() {
     setIsSavingFish(true);
     try {
       const id = currentFish.id || currentFish.name.toLowerCase().replace(/\s+/g, '-');
-      
-      // Sanitisation du payload pour éviter les erreurs "undefined" de Firebase
       const payload: any = { 
         id,
         name: currentFish.name || "",
@@ -418,8 +433,7 @@ export default function AdminPage() {
       toast({ title: "Poisson enregistré" });
       setIsFishDialogOpen(false);
     } catch (e) {
-      console.error("Firestore Save Error:", e);
-      toast({ variant: 'destructive', title: "Erreur enregistrement", description: "Une valeur invalide a bloqué l'accès à Firestore." });
+      toast({ variant: 'destructive', title: "Erreur enregistrement" });
     } finally {
       setIsSavingFish(false);
     }
@@ -472,13 +486,10 @@ export default function AdminPage() {
 
       if (count > 0) {
         await batch.commit();
-        toast({ title: "Risques réajustés !", description: `${count} espèces mises à jour par taille.` });
+        toast({ title: "Risques réajustés !", description: `${count} espèces mises à jour.` });
       } else {
-        toast({ title: "Aucun réajustement", description: "Pas de notes spécifiques par taille trouvées." });
+        toast({ title: "Aucun réajustement nécessaire" });
       }
-    } catch (e) {
-      console.error(e);
-      toast({ variant: 'destructive', title: "Erreur de réajustement" });
     } finally {
       setIsReadjustingRisks(false);
     }
@@ -492,7 +503,6 @@ export default function AdminPage() {
       let count = 0;
       
       for (const fish of fishSpecies) {
-        // Robust matching: by ID or normalized Name
         const referenceFish = lagoonFishData.find(f => 
           f.id === fish.id || 
           f.name.toLowerCase().trim() === fish.name.toLowerCase().trim()
@@ -513,19 +523,13 @@ export default function AdminPage() {
       
       if (count > 0) {
         await batch.commit();
-        toast({ title: "Données réparées", description: `${count} fiches mises à jour avec les longueurs NC.` });
-      } else {
-        toast({ title: "Tout est à jour", description: "Aucune fiche ne nécessite de réparation." });
+        toast({ title: "Données réparées" });
       }
-    } catch (e) {
-      console.error(e);
-      toast({ variant: 'destructive', title: "Erreur réparation" });
     } finally {
       setIsClearing(false);
     }
   };
 
-  // --- HANDLERS SOUNDS ---
   const handleSaveSound = async () => {
     if (!firestore || !isAdmin || !currentSound.label || !currentSound.url) return;
     setIsSavingSound(true);
@@ -549,7 +553,6 @@ export default function AdminPage() {
     }
   };
 
-  // --- HANDLERS ACCESS ---
   const handleToggleGlobalAccess = async () => {
     if (!firestore || !isAdmin) return;
     setIsSavingSharedToken(true);
@@ -562,7 +565,7 @@ export default function AdminPage() {
         expiresAt: isActive ? Timestamp.fromDate(new Date(0)) : Timestamp.fromDate(expiryDate),
         updatedAt: serverTimestamp()
       });
-      toast({ title: isActive ? "Accès Offert Désactivé" : "Accès Offert Activé (1 an)" });
+      toast({ title: isActive ? "Accès Global Désactivé" : "Accès Global Activé" });
     } finally {
       setIsSavingSharedToken(false);
     }
@@ -616,7 +619,7 @@ export default function AdminPage() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 sm:grid-cols-10 mb-6 h-auto p-1 bg-muted/50 border rounded-xl">
+        <TabsList className="grid w-full grid-cols-4 sm:grid-cols-10 mb-6 h-auto p-1 bg-muted/50 border rounded-xl overflow-x-auto">
           <TabsTrigger value="overview" className="text-[10px] font-black uppercase">Stats</TabsTrigger>
           <TabsTrigger value="faq" className="text-[10px] font-black uppercase">FAQ</TabsTrigger>
           <TabsTrigger value="tickets" className="text-[10px] font-black uppercase">Tickets</TabsTrigger>
@@ -629,45 +632,79 @@ export default function AdminPage() {
           <TabsTrigger value="docs" className="text-[10px] font-black uppercase">Docs</TabsTrigger>
         </TabsList>
 
+        <TabsContent value="users" className="space-y-6">
+          <Card className="border-2">
+            <CardHeader><CardTitle className="text-sm font-black uppercase">Utilisateurs ({users?.length || 0})</CardTitle></CardHeader>
+            <CardContent className="p-0 border-t">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-[10px] font-black uppercase">User</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase">Statut</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase">Rôle</TableHead>
+                    <TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users?.map(u => (
+                    <TableRow key={u.id}>
+                      <TableCell className="font-bold text-xs">
+                        <div className="flex flex-col">
+                          <span>{u.displayName}</span>
+                          <span className="text-[9px] opacity-50">{u.email}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={cn("text-[8px] font-black", u.subscriptionStatus === 'professional' && "border-primary text-primary")}>
+                          {u.subscriptionStatus}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="text-[8px] font-black uppercase">
+                          {u.role || 'client'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" onClick={() => handleEditUser(u)}>
+                          <Pencil className="size-3" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="design" className="space-y-6">
           <Card className="border-2">
-            <CardHeader><CardTitle className="flex items-center gap-2 font-black uppercase text-sm"><Palette className="size-4" /> Personnalisation Splash Screen</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2 font-black uppercase text-sm"><Palette className="size-4" /> Design Splash Screen</CardTitle></CardHeader>
             <CardContent>
               <form onSubmit={handleSaveSplash} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase">Mode d'affichage</Label>
+                    <Label className="text-[10px] font-black uppercase">Mode</Label>
                     <Select name="splashMode" defaultValue={splashSettings?.splashMode || 'text'}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent><SelectItem value="text">Texte stylisé</SelectItem><SelectItem value="image">Logo / Image</SelectItem></SelectContent>
+                      <SelectContent><SelectItem value="text">Texte</SelectItem><SelectItem value="image">Image</SelectItem></SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase">Durée (secondes)</Label>
+                    <Label className="text-[10px] font-black uppercase">Durée</Label>
                     <Input name="splashDuration" type="number" step="0.5" defaultValue={splashSettings?.splashDuration || 2.5} />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase">Texte principal</Label>
+                    <Label className="text-[10px] font-black uppercase">Texte</Label>
                     <Input name="splashText" defaultValue={splashSettings?.splashText || 'Lagon & Brousse NC'} />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase">Couleur de fond (Hex)</Label>
+                    <Label className="text-[10px] font-black uppercase">Couleur Fond</Label>
                     <Input name="splashBgColor" defaultValue={splashSettings?.splashBgColor || '#3b82f6'} />
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase">URL de l'image</Label>
-                    <Input name="splashImageUrl" defaultValue={splashSettings?.splashImageUrl || ''} placeholder="https://..." />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase">Ajustement image</Label>
-                    <Select name="splashImageFit" defaultValue={splashSettings?.splashImageFit || 'contain'}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent><SelectItem value="contain">Contenir (Entier)</SelectItem><SelectItem value="cover">Couvrir (Remplir)</SelectItem></SelectContent>
-                    </Select>
-                  </div>
                 </div>
-                <Button type="submit" disabled={isSavingSplash} className="w-full h-12 font-black uppercase tracking-widest gap-2">
-                  {isSavingSplash ? <RefreshCw className="size-4 animate-spin" /> : <Save className="size-4" />} Sauvegarder le Design
+                <Button type="submit" disabled={isSavingSplash} className="w-full h-12 font-black uppercase gap-2">
+                  <Save className="size-4" /> Sauvegarder
                 </Button>
               </form>
             </CardContent>
@@ -675,379 +712,58 @@ export default function AdminPage() {
         </TabsContent>
 
         <TabsContent value="fish" className="space-y-6">
-          <div className="flex flex-col sm:flex-row justify-end mb-4 gap-2">
-            <Button 
-              variant="outline"
-              onClick={handleRepairLengths} 
-              disabled={isClearing || !fishSpecies || fishSpecies.length === 0}
-              className="font-black uppercase text-[10px] gap-2 border-orange-500/20 bg-orange-50/5 text-orange-700"
-            >
-              {isClearing ? <RefreshCw className="size-4 animate-spin" /> : <Ruler className="size-4" />}
-              Réparer Tailles (Auto NC)
-            </Button>
-            <Button 
-              variant="outline"
-              onClick={handleReadjustRisks} 
-              disabled={isReadjustingRisks || !fishSpecies || fishSpecies.length === 0}
-              className="font-black uppercase text-[10px] gap-2 border-primary/20 bg-primary/5"
-            >
-              {isReadjustingRisks ? <RefreshCw className="size-4 animate-spin" /> : <Scale className="size-4" />}
-              Réajuster via Moyennes NC
-            </Button>
-            <Button onClick={() => { setCurrentFish({}); setIsFishDialogOpen(true); }} className="font-black uppercase text-[10px] gap-2">
-              <Fish className="size-4" /> Ajouter un Poisson
-            </Button>
+          <div className="flex justify-end gap-2 mb-4">
+            <Button variant="outline" onClick={handleRepairLengths} disabled={isClearing} className="font-black uppercase text-[10px] gap-2"><Ruler className="size-4" /> Réparer Longueurs</Button>
+            <Button variant="outline" onClick={handleReadjustRisks} disabled={isReadjustingRisks} className="font-black uppercase text-[10px] gap-2"><Scale className="size-4" /> Réajuster Risques</Button>
+            <Button onClick={() => { setCurrentFish({}); setIsFishDialogOpen(true); }} className="font-black uppercase text-[10px] gap-2"><Plus className="size-4" /> Ajouter Poisson</Button>
           </div>
           <Card className="border-2">
-            <CardHeader><CardTitle className="text-sm font-black uppercase">Espèces Répertoriées ({fishSpecies?.length || 0})</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-sm font-black uppercase">Espèces ({fishSpecies?.length || 0})</CardTitle></CardHeader>
             <CardContent className="p-0 border-t">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-[10px] font-black uppercase">Photo</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase">Nom</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase">Risque (P/M/G)</TableHead>
-                    <TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
+                <TableHeader><TableRow><TableHead className="text-[10px] font-black uppercase">Photo</TableHead><TableHead className="text-[10px] font-black uppercase">Nom</TableHead><TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {fishSpecies?.map(f => {
-                    const finalImg = f.imageUrl || (f.imagePlaceholder ? `https://picsum.photos/seed/${f.imagePlaceholder}/100/100` : null);
-                    return (
-                      <TableRow key={f.id}>
-                        <TableCell>
-                          <div className="size-10 rounded border bg-muted flex items-center justify-center overflow-hidden">
-                            {finalImg ? (
-                              <Image src={finalImg} alt={f.name} width={40} height={40} className="object-cover" />
-                            ) : (
-                              <Fish className="size-4 opacity-20" />
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-bold text-xs">{f.name}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Badge variant="outline" className="text-[7px] font-black px-1">{f.gratteRiskSmall || 0}%</Badge>
-                            <Badge variant="outline" className="text-[7px] font-black px-1">{f.gratteRiskMedium || 0}%</Badge>
-                            <Badge variant="outline" className="text-[7px] font-black px-1">{f.gratteRiskLarge || 0}%</Badge>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => { setCurrentFish(f); setIsFishDialogOpen(true); }}><Pencil className="size-3" /></Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteFish(f.id)}><Trash2 className="size-3 text-destructive" /></Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="sounds" className="space-y-6">
-          <div className="flex justify-end mb-4">
-            <Button onClick={() => { setCurrentSound({}); setIsSoundDialogOpen(true); }} className="font-black uppercase text-[10px] gap-2"><Plus className="size-4" /> Nouveau Son</Button>
-          </div>
-          <Card className="border-2">
-            <CardHeader><CardTitle className="text-sm font-black uppercase">Bibliothèque Sonore ({sounds?.length || 0})</CardTitle></CardHeader>
-            <CardContent className="p-0 border-t">
-              <Table>
-                <TableHeader><TableRow><TableHead className="text-[10px] font-black uppercase">Libellé</TableHead><TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {sounds?.map(s => (
-                    <TableRow key={s.id}>
-                      <TableCell className="font-bold text-xs">{s.label}</TableCell>
+                  {fishSpecies?.map(f => (
+                    <TableRow key={f.id}>
+                      <TableCell>
+                        <div className="size-10 rounded border bg-muted flex items-center justify-center overflow-hidden">
+                          {f.imageUrl ? <img src={f.imageUrl} className="object-cover w-full h-full" /> : <Fish className="size-4 opacity-20" />}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-bold text-xs">{f.name}</TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => new Audio(s.url).play()}><Play className="size-3" /></Button>
-                          <Button variant="ghost" size="icon" onClick={() => { setCurrentSound(s); setIsSoundDialogOpen(true); }}><Pencil className="size-3" /></Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDeleteSound(s.id)}><Trash2 className="size-3 text-destructive" /></Button>
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => { setCurrentFish(f); setIsFishDialogOpen(true); }}><Pencil className="size-3" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDeleteFish(f.id)}><Trash2 className="size-3 text-destructive" /></Button>
                         </div>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="access" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className={cn("border-2 transition-colors", sharedToken && isBefore(new Date(), sharedToken.expiresAt.toDate()) ? "border-green-500 bg-green-50/10" : "border-primary/20")}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 font-black uppercase text-sm"><ShieldCheck className="size-4" /> Accès Offert (Global)</CardTitle>
-                <CardDescription className="text-[10px] font-bold uppercase">Si activé, tous les utilisateurs inscrits ont un accès Premium.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button onClick={handleToggleGlobalAccess} disabled={isSavingSharedToken} className="w-full h-12 font-black uppercase tracking-widest">
-                  {isSavingSharedToken ? <RefreshCw className="size-4 animate-spin" /> : (sharedToken && isBefore(new Date(), sharedToken.expiresAt.toDate()) ? 'Désactiver l\'accès global' : 'Activer pour tout le monde')}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="border-2">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 font-black uppercase text-sm"><Ticket className="size-4" /> Générateur de Jetons</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1"><Label className="text-[9px] font-black uppercase">Nombre</Label><Input type="number" value={tokenCount} onChange={e => setTokenCount(e.target.value)} /></div>
-                  <div className="space-y-1"><Label className="text-[9px] font-black uppercase">Mois</Label><Input type="number" value={tokenMonths} onChange={e => setTokenMonths(e.target.value)} /></div>
-                </div>
-                <Button onClick={handleGenerateTokens} disabled={isGeneratingTokens} className="w-full h-12 font-black uppercase tracking-widest bg-accent">Générer les codes</Button>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className="border-2">
-            <CardHeader>
-              <CardTitle className="text-sm font-black uppercase">Historique des Jetons ({accessTokens?.length || 0})</CardTitle>
-              <CardDescription className="text-[10px] font-bold uppercase">Suivi des codes d'accès générés.</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0 border-t">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-[10px] font-black uppercase">Code</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase">Durée</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase">Statut</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase">Créé le</TableHead>
-                    <TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {accessTokens?.map(token => (
-                    <TableRow key={token.id}>
-                      <TableCell className="font-mono font-black text-xs">{token.id}</TableCell>
-                      <TableCell className="text-xs font-bold">{token.durationMonths} mois</TableCell>
-                      <TableCell>
-                        <Badge variant={token.status === 'active' ? 'default' : 'secondary'} className="text-[8px] uppercase font-black">
-                          {token.status === 'active' ? 'Actif' : 'Utilisé'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-[10px] opacity-60">
-                        {token.createdAt ? format(token.createdAt.toDate(), 'dd/MM/yy', { locale: fr }) : '...'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteToken(token.id)} className="size-8 text-destructive/40">
-                          <Trash2 className="size-3" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {(!accessTokens || accessTokens.length === 0) && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-10 text-xs italic opacity-40">Aucun jeton généré.</TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="docs" className="space-y-6">
-          <Card className="border-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 font-black uppercase text-sm">
-                <FileText className="size-4" /> Documents Administratifs
-              </CardTitle>
-              <CardDescription className="text-[10px] font-bold uppercase">Gerez les fichiers et informations bancaires pour les dons.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4 border-b pb-6">
-                <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl border-2 border-dashed border-primary/20">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-background rounded-lg shadow-sm">
-                      <Landmark className="size-5 text-primary" />
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-black uppercase text-muted-foreground">Fichier PDF (RIB)</span>
-                      <span className="text-xs font-bold">RIB_Lagon_Brousse_NC.pdf</span>
-                    </div>
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="h-10 font-black uppercase text-[10px] gap-2 border-2" 
-                    onClick={() => window.open('/RIB_Lagon_Brousse_NC.pdf', '_blank')}
-                  >
-                    <Download className="size-3" /> tester le téléchargement
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <CreditCard className="size-4 text-accent" />
-                  <Label className="text-[10px] font-black uppercase">Coordonnées Bancaires (Texte)</Label>
-                </div>
-                <Textarea 
-                  placeholder="Saisissez ici le RIB au format texte (Banque, IBAN, BIC, Titulaire)..." 
-                  value={ribDetails}
-                  onChange={e => setRibDetails(e.target.value)}
-                  className="min-h-[150px] font-mono text-xs"
-                />
-                <Button 
-                  onClick={handleSaveRib} 
-                  disabled={isSavingRib} 
-                  className="w-full h-12 font-black uppercase tracking-widest gap-2 bg-accent hover:bg-accent/90"
-                >
-                  {isSavingRib ? <RefreshCw className="size-4 animate-spin" /> : <Save className="size-4" />}
-                  Mettre à jour le RIB texte
-                </Button>
-                <p className="text-[10px] text-muted-foreground italic font-medium">
-                  Note : Ce texte s'affichera aux utilisateurs lorsqu'ils cliqueront sur "DONS" &gt; "Virement Bancaire".
-                </p>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="faq" className="space-y-6">
-          <div className="flex flex-col sm:flex-row gap-2 mb-4">
-            <Button className="flex-1 h-12 font-black uppercase text-[10px] tracking-widest gap-2" onClick={() => { setCurrentFaq({ categorie: 'General', ordre: 0, views: 0 }); setIsFaqDialogOpen(true); }}>
-                <Plus className="size-4" /> Ajouter Manuellement
-            </Button>
-            <Button variant="outline" className="flex-1 h-12 font-black uppercase text-[10px] tracking-widest gap-2 border-primary/20 bg-primary/5" onClick={handleSeedFaq} disabled={isGenerating || (rawFaqs && rawFaqs.length > 0)}>
-                {isGenerating ? <RefreshCw className="size-4 animate-spin" /> : <DatabaseZap className="size-4 text-primary" />}
-                Peupler FAQ (100 Auto)
-            </Button>
-            
-            <AlertDialog>
-                <AlertDialogTrigger asChild>
-                    <Button variant="destructive" className="flex-1 h-12 font-black uppercase text-[10px] tracking-widest gap-2" disabled={isClearing || !rawFaqs || rawFaqs.length === 0}>
-                        <Trash2 className="size-4" /> vider la FAQ ({rawFaqs?.length || 0})
-                    </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Êtes-vous sûr ?</AlertDialogTitle>
-                        <AlertDialogDescription>Cette action supprimera TOUTES les questions de la base de connaissances. Cette action est irréversible.</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Annuler</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleClearFaq} className="bg-destructive text-white">Confirmer la suppression</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+          <div className="flex gap-2 mb-4">
+            <Button className="flex-1 font-black uppercase text-[10px]" onClick={() => { setCurrentFaq({ categorie: 'General', ordre: 0, views: 0 }); setIsFaqDialogOpen(true); }}>Ajouter FAQ</Button>
+            <Button variant="outline" className="flex-1 font-black uppercase text-[10px]" onClick={handleSeedFaq} disabled={isGenerating}>Peupler 100 Auto</Button>
+            <Button variant="destructive" className="flex-1 font-black uppercase text-[10px]" onClick={handleClearFaq} disabled={isClearing}>Tout Supprimer</Button>
           </div>
-
           <Card className="border-2">
-            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <CardTitle className="flex items-center gap-2 font-black uppercase text-sm">
-                <HelpCircle className="size-4" /> Base de connaissances ({sortedFaqs.length})
-              </CardTitle>
-              <div className="flex items-center gap-2 min-w-[200px]">
-                <Filter className="size-3 text-muted-foreground" />
-                <Select value={faqCategoryFilter} onValueChange={setFaqCategoryFilter}>
-                  <SelectTrigger className="h-9 text-[10px] font-black uppercase bg-muted/30 border-2">
-                    <SelectValue placeholder="Catégorie..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="text-[10px] font-black uppercase">Toutes les catégories</SelectItem>
-                    {FAQ_CATEGORIES.map(cat => (
-                      <SelectItem key={cat} value={cat} className="text-[10px] font-black uppercase">{cat}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-sm font-black uppercase">Base FAQ ({sortedFaqs.length})</CardTitle></CardHeader>
             <CardContent className="p-0 border-t">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead 
-                      className="text-[10px] font-black uppercase cursor-pointer hover:text-primary transition-colors"
-                      onClick={() => handleSort('question')}
-                    >
-                      <div className="flex items-center">Question <SortIcon field="question" /></div>
-                    </TableHead>
-                    <TableHead 
-                      className="text-[10px] font-black uppercase cursor-pointer hover:text-primary transition-colors"
-                      onClick={() => handleSort('views')}
-                    >
-                      <div className="flex items-center">Vues <SortIcon field="views" /></div>
-                    </TableHead>
-                    <TableHead 
-                      className="text-[10px] font-black uppercase cursor-pointer hover:text-primary transition-colors"
-                      onClick={() => handleSort('categorie')}
-                    >
-                      <div className="flex items-center">Catégorie <SortIcon field="categorie" /></div>
-                    </TableHead>
-                    <TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
+                <TableHeader><TableRow><TableHead className="text-[10px] font-black uppercase">Question</TableHead><TableHead className="text-[10px] font-black uppercase text-right">Action</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {sortedFaqs.map(f => (
                     <TableRow key={f.id}>
-                      <TableCell className="font-bold text-xs max-w-[200px] truncate">{f.question}</TableCell>
-                      <TableCell><Badge variant="secondary" className="text-[8px] font-black">{f.views || 0}</Badge></TableCell>
-                      <TableCell><Badge variant="outline" className="text-[8px] uppercase font-black">{f.categorie}</Badge></TableCell>
+                      <TableCell className="font-bold text-xs truncate max-w-[200px]">{f.question}</TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" className="size-8" onClick={() => { setCurrentFaq(f); setIsFaqDialogOpen(true); }}><Pencil className="size-3" /></Button>
-                          <Button variant="ghost" size="icon" className="size-8" onClick={() => handleDeleteFaq(f.id)}><Trash2 className="size-3 text-destructive" /></Button>
-                        </div>
+                        <Button variant="ghost" size="icon" onClick={() => { setCurrentFaq(f); setIsFaqDialogOpen(true); }}><Pencil className="size-3" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteFaq(f.id)}><Trash2 className="size-3 text-destructive" /></Button>
                       </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="tickets" className="space-y-6">
-          <Card className="border-2">
-            <CardHeader><CardTitle className="flex items-center gap-2 font-black uppercase text-sm"><MessageSquare className="size-4" /> Tickets Support</CardTitle></CardHeader>
-            <CardContent className="p-0 border-t">
-              <Table>
-                <TableHeader><TableRow><TableHead className="text-[10px] font-black uppercase">Utilisateur</TableHead><TableHead className="text-[10px] font-black uppercase">Sujet</TableHead><TableHead className="text-[10px] font-black uppercase">Statut</TableHead><TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {tickets?.map(t => (
-                    <TableRow key={t.id} className={cn(t.statut === 'ouvert' && "bg-primary/5")}>
-                      <TableCell className="text-[10px] font-bold">{t.userEmail}</TableCell>
-                      <TableCell className="text-[10px] font-black uppercase">{t.sujet}</TableCell>
-                      <TableCell><Badge variant={t.statut === 'ouvert' ? 'default' : 'secondary'} className="text-[8px] uppercase font-black">{t.statut}</Badge></TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="outline" size="sm" className="h-8 text-[9px] font-black uppercase" onClick={() => { setCurrentTicket(t); setAdminResponse(t.adminResponse || ''); }}>Répondre</Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="cgv" className="space-y-6">
-          <Card className="border-2">
-            <CardHeader><CardTitle className="text-sm font-black uppercase">Conditions Générales de Vente</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <Button variant="outline" onClick={loadCgvTemplate} className="w-full text-[10px] font-black uppercase border-dashed border-2">Charger le modèle conforme NC</Button>
-              <Textarea value={cgvContent} onChange={e => setCgvContent(e.target.value)} className="min-h-[400px] text-xs font-medium" />
-              <Button onClick={handleSaveCgv} disabled={isSavingCgv} className="w-full h-12 font-black uppercase">Enregistrer & Publier</Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="users" className="space-y-6">
-          <Card className="border-2">
-            <CardHeader><CardTitle className="text-sm font-black uppercase">Utilisateurs ({users?.length || 0})</CardTitle></CardHeader>
-            <CardContent className="p-0 border-t">
-              <Table>
-                <TableHeader><TableRow><TableHead className="text-[10px] font-black uppercase">User</TableHead><TableHead className="text-[10px] font-black uppercase">Statut</TableHead><TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {users?.map(u => (
-                    <TableRow key={u.id}>
-                      <TableCell className="font-bold text-xs"><div className="flex flex-col"><span>{u.displayName}</span><span className="text-[9px] opacity-50">{u.email}</span></div></TableCell>
-                      <TableCell><Badge variant="outline" className="text-[8px] font-black">{u.subscriptionStatus}</Badge></TableCell>
-                      <TableCell className="text-right"><Button variant="ghost" size="icon"><Pencil className="size-3" /></Button></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -1060,142 +776,76 @@ export default function AdminPage() {
           <div className="grid gap-4 md:grid-cols-3">
             <Card className="border-2"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Tickets Ouverts</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{tickets?.filter(t => t.statut === 'ouvert').length || 0}</div></CardContent></Card>
             <Card className="border-2"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">FAQ Items</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{rawFaqs?.length || 0}</div></CardContent></Card>
-            <Card className="border-2"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Total Utilisateurs</CardTitle></CardHeader><CardContent><div className="text-2xl font-black text-primary">{users?.length || 0}</div></CardContent></Card>
+            <Card className="border-2"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Total Users</CardTitle></CardHeader><CardContent><div className="text-2xl font-black text-primary">{users?.length || 0}</div></CardContent></Card>
           </div>
         </TabsContent>
       </Tabs>
 
-      {/* Dialogs FAQ, Fish, Sounds, etc. */}
-      <Dialog open={isFaqDialogOpen} onOpenChange={setIsFaqDialogOpen}>
-        <DialogContent className="max-w-xl rounded-2xl">
-          <DialogHeader><DialogTitle className="font-black uppercase">Éditer FAQ</DialogTitle></DialogHeader>
+      {/* DIALOGS */}
+      <Dialog open={isUserEditDialogOpen} onOpenChange={setIsUserEditDialogOpen}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-black uppercase">Éditer l'utilisateur</DialogTitle>
+            <DialogDescription className="text-xs font-bold uppercase">{userToEdit?.email}</DialogDescription>
+          </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-1"><Label className="text-xs uppercase font-bold opacity-60">Question</Label><Input value={currentFaq.question || ''} onChange={e => setCurrentFaq({...currentFaq, question: e.target.value})} /></div>
-            <div className="space-y-1"><Label className="text-xs uppercase font-bold opacity-60">Réponse</Label><Textarea value={currentFaq.reponse || ''} onChange={e => setCurrentFaq({...currentFaq, reponse: e.target.value})} className="min-h-[120px]" /></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label className="text-xs uppercase font-bold opacity-60">Catégorie</Label>
-                <Select value={currentFaq.categorie} onValueChange={(v:any) => setCurrentFaq({...currentFaq, categorie: v})}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{FAQ_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1"><Label className="text-xs uppercase font-bold opacity-60">Ordre</Label><Input type="number" value={currentFaq.ordre || 0} onChange={e => setCurrentFaq({...currentFaq, ordre: parseInt(e.target.value)})} /></div>
+            <div className="space-y-1">
+              <Label className="text-xs uppercase font-bold opacity-60">Nom d'affichage</Label>
+              <Input value={userToEdit?.displayName || ''} onChange={e => setUserToEdit(p => p ? {...p, displayName: e.target.value} : null)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs uppercase font-bold opacity-60">Rôle</Label>
+              <Select value={userToEdit?.role || 'client'} onValueChange={(v: any) => setUserToEdit(p => p ? {...p, role: v} : null)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="client">Client</SelectItem><SelectItem value="professional">Professionnel</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs uppercase font-bold opacity-60">Statut Abonnement</Label>
+              <Select value={userToEdit?.subscriptionStatus || 'trial'} onValueChange={(v: any) => setUserToEdit(p => p ? {...p, subscriptionStatus: v} : null)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="trial">Essai</SelectItem>
+                  <SelectItem value="active">Abonné Actif</SelectItem>
+                  <SelectItem value="professional">Professionnel</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="inactive">Inactif / Limité</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs uppercase font-bold opacity-60">ID Commerce (Pro)</Label>
+              <Input value={userToEdit?.businessId || ''} onChange={e => setUserToEdit(p => p ? {...p, businessId: e.target.value} : null)} placeholder="Lier à un business" />
             </div>
           </div>
-          <DialogFooter><Button onClick={handleSaveFaq} disabled={isSavingFaq} className="w-full h-12 font-black uppercase shadow-lg">Sauvegarder</Button></DialogFooter>
+          <DialogFooter><Button onClick={handleSaveUser} disabled={isSavingUser} className="w-full h-12 font-black uppercase">{isSavingUser ? <RefreshCw className="animate-spin" /> : 'Mettre à jour'}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isFaqDialogOpen} onOpenChange={setIsFaqDialogOpen}>
+        <DialogContent className="max-w-xl rounded-2xl">
+          <DialogHeader><DialogTitle className="font-black uppercase">FAQ</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-1"><Label className="text-xs font-bold opacity-60">Question</Label><Input value={currentFaq.question || ''} onChange={e => setCurrentFaq({...currentFaq, question: e.target.value})} /></div>
+            <div className="space-y-1"><Label className="text-xs font-bold opacity-60">Réponse</Label><Textarea value={currentFaq.reponse || ''} onChange={e => setCurrentFaq({...currentFaq, reponse: e.target.value})} className="min-h-[120px]" /></div>
+          </div>
+          <DialogFooter><Button onClick={handleSaveFaq} disabled={isSavingFaq} className="w-full h-12 font-black uppercase">Enregistrer</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={isFishDialogOpen} onOpenChange={setIsFishDialogOpen}>
         <DialogContent className="max-w-xl rounded-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="font-black uppercase">Fiche Poisson</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="font-black uppercase">Poisson</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="flex gap-2 items-end">
-              <div className="flex-1 space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Nom Commun</Label><Input value={currentFish.name || ''} onChange={e => setCurrentFish({...currentFish, name: e.target.value})} /></div>
-              <Button onClick={handleAIGenerateFish} disabled={isAIGeneratingFish || (!currentFish.name && !currentFish.scientificName)} className="h-10 px-3 bg-indigo-600 text-white gap-2"><Sparkles className="size-4" /> IA</Button>
+            <div className="flex gap-2 items-end"><div className="flex-1 space-y-1"><Label className="text-xs font-bold opacity-60">Nom</Label><Input value={currentFish.name || ''} onChange={e => setCurrentFish({...currentFish, name: e.target.value})} /></div><Button onClick={handleAIGenerateFish} disabled={isAIGeneratingFish} className="h-10 px-3 bg-indigo-600 gap-2"><Sparkles className="size-4" /> IA</Button></div>
+            <div className="space-y-1"><Label className="text-xs font-bold opacity-60">Scientifique</Label><Input value={currentFish.scientificName || ''} onChange={e => setCurrentFish({...currentFish, scientificName: e.target.value})} /></div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1"><Label className="text-[9px] font-bold">Risque P (%)</Label><Input type="number" value={currentFish.gratteRiskSmall || 0} onChange={e => setCurrentFish({...currentFish, gratteRiskSmall: parseInt(e.target.value)})} /></div>
+              <div className="space-y-1"><Label className="text-[9px] font-bold">Risque M (%)</Label><Input type="number" value={currentFish.gratteRiskMedium || 0} onChange={e => setCurrentFish({...currentFish, gratteRiskMedium: parseInt(e.target.value)})} /></div>
+              <div className="space-y-1"><Label className="text-[9px] font-bold">Risque G (%)</Label><Input type="number" value={currentFish.gratteRiskLarge || 0} onChange={e => setCurrentFish({...currentFish, gratteRiskLarge: parseInt(e.target.value)})} /></div>
             </div>
-            
-            <div className="space-y-1">
-              <Label className="text-xs font-bold uppercase opacity-60">Scientifique</Label>
-              <Input 
-                value={currentFish.scientificName || ''} 
-                onChange={e => setCurrentFish(prev => ({ ...prev, scientificName: e.target.value }))} 
-              />
-            </div>
-
-            <div className="bg-muted/30 p-4 rounded-xl border-2 space-y-4">
-              <Label className="text-[10px] font-black uppercase text-primary">Risques & Longueurs par Taille</Label>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-[9px] font-bold uppercase opacity-60">Petit (%)</Label>
-                  <Input type="number" value={currentFish.gratteRiskSmall || 0} onChange={e => setCurrentFish({...currentFish, gratteRiskSmall: parseInt(e.target.value)})} />
-                  <div className="flex items-center gap-1">
-                    <Ruler className="size-3 opacity-40" />
-                    <Input placeholder="Ex: < 30cm" value={currentFish.lengthSmall || ''} onChange={e => setCurrentFish({...currentFish, lengthSmall: e.target.value})} className="h-7 text-[10px]" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[9px] font-bold uppercase opacity-60">Moyen (%)</Label>
-                  <Input type="number" value={currentFish.gratteRiskMedium || 0} onChange={e => setCurrentFish({...currentFish, gratteRiskMedium: parseInt(e.target.value)})} />
-                  <div className="flex items-center gap-1">
-                    <Ruler className="size-3 opacity-40" />
-                    <Input placeholder="Ex: 30-60cm" value={currentFish.lengthMedium || ''} onChange={e => setCurrentFish({...currentFish, lengthMedium: e.target.value})} className="h-7 text-[10px]" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[9px] font-bold uppercase opacity-60">Grand (%)</Label>
-                  <Input type="number" value={currentFish.gratteRiskLarge || 0} onChange={e => setCurrentFish({...currentFish, gratteRiskLarge: parseInt(e.target.value)})} />
-                  <div className="flex items-center gap-1">
-                    <Ruler className="size-3 opacity-40" />
-                    <Input placeholder="Ex: > 60cm" value={currentFish.lengthLarge || ''} onChange={e => setCurrentFish({...currentFish, lengthLarge: e.target.value})} className="h-7 text-[10px]" />
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase opacity-60">Photo du poisson</Label>
-              <div className="grid grid-cols-1 gap-2">
-                <div className="flex gap-2">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    className="flex-1 h-12 border-2 border-dashed gap-2 text-[10px] font-black uppercase"
-                    onClick={() => fishFileInputRef.current?.click()}
-                  >
-                    <Upload className="size-4" />
-                    Télécharger Photo
-                  </Button>
-                  <input 
-                    type="file" 
-                    ref={fishFileInputRef} 
-                    className="hidden" 
-                    accept="image/*" 
-                    onChange={handleFishPhotoUpload} 
-                  />
-                </div>
-                
-                <div className="space-y-1">
-                  <Label className="text-[9px] font-black uppercase opacity-40">Ou URL directe</Label>
-                  <Input value={currentFish.imageUrl || ''} onChange={e => setCurrentFish({...currentFish, imageUrl: e.target.value})} placeholder="https://..." className="h-9 text-xs" />
-                </div>
-
-                {currentFish.imageUrl && (
-                  <div className="relative size-24 rounded-lg overflow-hidden border-2 mt-1">
-                    <img src={currentFish.imageUrl} alt="Fish Preview" className="object-cover w-full h-full" />
-                    <button 
-                      type="button"
-                      className="absolute top-0 right-0 p-1 bg-destructive text-white rounded-bl-lg"
-                      onClick={() => setCurrentFish(prev => ({ ...prev, imageUrl: '' }))}
-                    >
-                      <X className="size-3" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-1 pt-2 border-t">
-              <Label className="text-xs font-bold uppercase opacity-60">ID Placeholder (Picsum)</Label>
-              <Input value={currentFish.imagePlaceholder || ''} onChange={e => setCurrentFish({...currentFish, imagePlaceholder: e.target.value})} placeholder="fish-nom" />
-            </div>
-
-            <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Conseils Pêche</Label><Textarea value={currentFish.fishingAdvice || ''} onChange={e => setCurrentFish({...currentFish, fishingAdvice: e.target.value})} /></div>
-            <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Conseils Cuisine</Label><Textarea value={currentFish.culinaryAdvice || ''} onChange={e => setCurrentFish({...currentFish, culinaryAdvice: e.target.value})} /></div>
           </div>
-          <DialogFooter><Button onClick={handleSaveFish} disabled={isSavingFish} className="w-full h-12 font-black uppercase shadow-lg">Sauvegarder</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isSoundDialogOpen} onOpenChange={setIsSoundDialogOpen}>
-        <DialogContent className="max-md rounded-2xl">
-          <DialogHeader><DialogTitle className="font-black uppercase"> Nouveau Signal Sonore</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">Libellé</Label><Input value={currentSound.label || ''} onChange={e => setCurrentSound({...currentSound, label: e.target.value})} /></div>
-            <div className="space-y-1"><Label className="text-xs font-bold uppercase opacity-60">URL du fichier MP3</Label><Input value={currentSound.url || ''} onChange={e => setCurrentSound({...currentSound, url: e.target.value})} /></div>
-          </div>
-          <DialogFooter><Button onClick={handleSaveSound} disabled={isSavingSound} className="w-full h-12 font-black uppercase shadow-lg">Sauvegarder</Button></DialogFooter>
+          <DialogFooter><Button onClick={handleSaveFish} disabled={isSavingFish} className="w-full h-12 font-black uppercase">Sauvegarder</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

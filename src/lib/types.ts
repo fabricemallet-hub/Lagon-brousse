@@ -10,11 +10,17 @@ export interface UserAccount {
   role: UserRole;
   businessId?: string;
   vesselNickname?: string;
-  subscriptionStatus: 'active' | 'inactive' | 'trial' | 'admin';
+  subscriptionStatus: 'active' | 'inactive' | 'trial' | 'admin' | 'professional';
   subscriptionExpiryDate?: string;
   lastSelectedLocation?: string;
   favoriteCategory?: 'Pêche' | 'Chasse' | 'Jardinage';
   notificationsEnabled?: boolean;
+  mapIcon?: string;
+  mapColor?: string;
+  vesselPrefs?: any;
+  subscriptionStartDate?: string;
+  cgvAcceptedAt?: string;
+  cgvVersionSeen?: number;
 }
 
 export interface Business {
@@ -53,7 +59,6 @@ export interface Campaign {
   createdAt: any;
 }
 
-// ... rest of the existing interfaces (WindForecast, WeatherData, etc.)
 export interface WindForecast {
   time: string;
   speed: number;
@@ -192,13 +197,13 @@ export interface FishSpeciesInfo {
   id: string;
   name: string;
   scientificName: string;
-  gratteRisk: number; // Base Admin Risk (legacy/fallback)
-  gratteRiskSmall: number;  // Risque petit spécimen
-  gratteRiskMedium: number; // Risque moyen spécimen
-  gratteRiskLarge: number;  // Risque grand spécimen
-  lengthSmall?: string;     // Longueur estimée petit
-  lengthMedium?: string;    // Longueur estimée moyen
-  lengthLarge?: string;     // Longueur estimée grand
+  gratteRisk: number;
+  gratteRiskSmall: number;
+  gratteRiskMedium: number;
+  gratteRiskLarge: number;
+  lengthSmall?: string;
+  lengthMedium?: string;
+  lengthLarge?: string;
   culinaryAdvice: string;
   fishingAdvice: string;
   category: 'Lagon' | 'Large' | 'Recif';
@@ -207,12 +212,11 @@ export interface FishSpeciesInfo {
 }
 
 export interface FishCommuneStats {
-  id: string; // communeId
+  id: string;
   somme_des_notes: number;
   nombre_de_votants: number;
   moyenne_calculee: number;
   dernier_update: any;
-  // Stats par taille
   small_sum?: number;
   small_count?: number;
   medium_sum?: number;
@@ -327,7 +331,7 @@ export interface MeteoForecast {
 export interface CgvSettings {
   content: string;
   updatedAt: any;
-  version: number; // Unix timestamp used as version
+  version: number;
 }
 
 export interface RibSettings {
@@ -349,5 +353,29 @@ export interface SpotShare {
   senderName: string;
   recipientEmail: string;
   spotData: any;
+  createdAt: any;
+}
+
+export interface AccessToken {
+  id: string;
+  status: 'active' | 'redeemed';
+  durationMonths: number;
+  createdAt: any;
+  redeemedBy?: string;
+  redeemedAt?: any;
+}
+
+export interface SharedAccessToken {
+  id: string;
+  expiresAt: any;
+  updatedAt: any;
+}
+
+export interface SystemNotification {
+  id: string;
+  title: string;
+  content: string;
+  type: 'info' | 'warning' | 'error' | 'success';
+  isActive: boolean;
   createdAt: any;
 }

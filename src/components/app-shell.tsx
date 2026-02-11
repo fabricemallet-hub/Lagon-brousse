@@ -1,3 +1,4 @@
+
 'use client';
 import {
   Sidebar,
@@ -90,6 +91,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       case 'admin': return 'admin';
       case 'active':
         return isValid ? 'active' : 'limited';
+      case 'professional': return 'professional';
       case 'trial':
         return isValid ? 'trial' : 'limited';
       default: return 'limited';
@@ -229,6 +231,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <SidebarTrigger />
                   {status === 'trial' && <Badge variant="secondary" className="text-[10px] h-5 font-black uppercase">Essai</Badge>}
                   {status === 'limited' && <Badge variant="destructive" className="text-[10px] h-5 font-black uppercase">Limité</Badge>}
+                  {status === 'professional' && <Badge variant="outline" className="text-[10px] h-5 font-black uppercase border-primary text-primary">Pro</Badge>}
                 </div>
                 {isLocationLoading ? <Skeleton className="h-9 w-[120px]" /> : (
                   <Select value={selectedLocation} onValueChange={setSelectedLocation}>
