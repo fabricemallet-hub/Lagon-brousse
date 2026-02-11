@@ -1,3 +1,6 @@
+
+const CACHE_NAME = 'lb-nc-cache-v1';
+
 self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
@@ -7,6 +10,8 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Pass-through simple pour valider les critères PWA hors-ligne
-  event.respondWith(fetch(event.request));
+  // Service worker minimal pour conformité PWABuilder
+  event.respondWith(fetch(event.request).catch(() => {
+    return caches.match(event.request);
+  }));
 });

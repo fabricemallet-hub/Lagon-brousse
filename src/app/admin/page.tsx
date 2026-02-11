@@ -96,6 +96,7 @@ export default function AdminPage() {
   const [isUserEditDialogOpen, setIsUserEditDialogOpen] = useState(false);
   const [userToEdit, setUserToEdit] = useState<UserAccount | null>(null);
   const [isSavingUser, setIsSavingUser] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<string | null>(null);
 
   // Fish States
   const [isFishDialogOpen, setIsFishDialogOpen] = useState(false);
@@ -228,6 +229,18 @@ export default function AdminPage() {
       toast({ variant: 'destructive', title: "Erreur mise à jour" });
     } finally {
       setIsSavingUser(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!firestore || !isAdmin) return;
+    try {
+      await deleteDoc(doc(firestore, 'users', userId));
+      toast({ title: "Compte utilisateur supprimé de Firestore." });
+    } catch (e) {
+      toast({ variant: 'destructive', title: "Erreur suppression" });
+    } finally {
+      setUserToDelete(null);
     }
   };
 
@@ -665,9 +678,14 @@ export default function AdminPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => handleEditUser(u)}>
-                          <Pencil className="size-3" />
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => handleEditUser(u)}>
+                            <Pencil className="size-3" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => setUserToDelete(u.id)}>
+                            <Trash2 className="size-3 text-destructive" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -821,6 +839,21 @@ export default function AdminPage() {
           <DialogFooter><Button onClick={handleSaveUser} disabled={isSavingUser} className="w-full h-12 font-black uppercase">{isSavingUser ? <RefreshCw className="animate-spin" /> : 'Mettre à jour'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!userToDelete} onOpenChange={(o) => !o && setUserToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cet utilisateur ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action supprimera uniquement le document profil de Firestore. L'authentification Firebase ne sera pas affectée.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={() => userToDelete && handleDeleteUser(userToDelete)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Supprimer</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={isFaqDialogOpen} onOpenChange={setIsFaqDialogOpen}>
         <DialogContent className="max-w-xl rounded-2xl">

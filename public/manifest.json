@@ -1,3 +1,4 @@
+
 {
   "id": "nc.lagonbrousse.app",
   "name": "Lagon & Brousse NC",
@@ -32,13 +33,6 @@
       "type": "image/png",
       "form_factor": "narrow",
       "label": "Accueil de l'application"
-    },
-    {
-      "src": "https://picsum.photos/seed/lb-wide/1920/1080",
-      "sizes": "1920x1080",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Tableau de bord Pêche"
     }
   ]
 }

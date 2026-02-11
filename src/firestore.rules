@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -21,7 +22,7 @@ service cloud.firestore {
       );
     }
 
-    // --- 0. ACCÈS PUBLICS (Indispensable pour Splash Screen & PWABuilder) ---
+    // --- 0. ACCÈS PUBLICS ---
     match /app_settings/{id} {
       allow read: if true;
       allow write: if isAdmin();
@@ -70,6 +71,7 @@ service cloud.firestore {
     // --- 2. UTILISATEURS & DONNÉES PERSO ---
     match /users/{userId} {
       allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
       match /{allPaths=**} {
         allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       }
