@@ -1,3 +1,5 @@
+const CACHE_NAME = 'lb-cache-v3';
+
 self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
@@ -7,10 +9,10 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // PWABuilder requires a fetch handler to validate offline capability
+  // Nécessaire pour que PWABuilder valide le support hors-ligne
   event.respondWith(
     fetch(event.request).catch(() => {
-      return new Response('Mode hors-ligne actif. Reconnectez-vous pour les données live.');
+      return caches.match(event.request);
     })
   );
 });
