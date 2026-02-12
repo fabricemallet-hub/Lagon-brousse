@@ -31,7 +31,7 @@ export function SidebarNav() {
   const roles = useMemo(() => {
     if (!user) return { isAdmin: false, isPro: false };
     
-    // Liste blanche technique (Priorité Haute)
+    // Liste blanche technique (Priorité Haute pour Fabrice Mallet)
     const masterAdminUids = [
       'K9cVYLVUk1NV99YV3anebkugpPp1',
       'ipupi3Pg4RfrSEpFyT69BtlCdpi2',

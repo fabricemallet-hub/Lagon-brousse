@@ -51,13 +51,7 @@ export default function AdminPage() {
   // Splash/Design States
   const [isSavingDesign, setIsSavingDesign] = useState(false);
 
-  // Detection Admin (Priorité technique)
-  const userProfileRef = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return doc(firestore, 'users', user.uid);
-  }, [user, firestore]);
-  const { data: adminProfile } = useDoc<UserAccount>(userProfileRef);
-
+  // Detection Admin (Priorité technique absolue pour Fabrice Mallet)
   const isAdmin = useMemo(() => {
     if (!user) return false;
     const masterAdminUids = [
@@ -71,8 +65,8 @@ export default function AdminPage() {
     if (masterAdminUids.includes(user.uid)) return true;
     if (user.email && masterEmails.includes(user.email.toLowerCase())) return true;
     
-    return adminProfile?.subscriptionStatus === 'admin' || adminProfile?.role === 'admin';
-  }, [user, adminProfile]);
+    return false; // On se base sur l'identité technique pour résoudre les erreurs de règles
+  }, [user]);
 
   // Requêtes Firestore
   const usersRef = useMemoFirebase(() => isAdmin ? query(collection(firestore!, 'users'), orderBy('email', 'asc')) : null, [firestore, isAdmin]);
@@ -87,7 +81,7 @@ export default function AdminPage() {
   const fishRef = useMemoFirebase(() => isAdmin ? query(collection(firestore!, 'fish_species'), orderBy('name', 'asc')) : null, [firestore, isAdmin]);
   const { data: fishSpecies } = useCollection<FishSpeciesInfo>(fishRef);
 
-  // Correction de la requête messagerie
+  // Requête messagerie
   const convsRef = useMemoFirebase(() => isAdmin ? collection(firestore!, 'conversations') : null, [firestore, isAdmin]);
   const { data: conversations } = useCollection<Conversation>(convsRef);
 
@@ -163,8 +157,8 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
-    if (!isUserLoading && !isAdmin && adminProfile) router.push('/compte');
-  }, [isAdmin, isUserLoading, router, adminProfile]);
+    if (!isUserLoading && !isAdmin) router.push('/compte');
+  }, [isAdmin, isUserLoading, router]);
 
   if (isUserLoading || !isAdmin) return <div className="p-8"><Skeleton className="h-48 w-full" /></div>;
 
@@ -243,9 +237,9 @@ export default function AdminPage() {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {conversations?.length === 0 && (
+                  {!conversations || conversations.length === 0 ? (
                     <TableRow><TableCell colSpan={3} className="text-center py-10 text-xs italic opacity-40">Aucune conversation active</TableCell></TableRow>
-                  )}
+                  ) : null}
                 </TableBody>
               </Table>
             </CardContent>

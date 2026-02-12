@@ -1,7 +1,7 @@
 
 rules_version = '2';
 
-// Version 2.0.5 - Correction forcée des permissions de listage
+// Version 2.0.6 - Correction critique des permissions de listage pour la messagerie
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -10,12 +10,15 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Identifiants Maîtres (Fabrice Mallet & Admins techniques)
-    // t8nPnZLcTiaLJSKMuLzib3C5nPn1 est l'UID de Fabrice Mallet
+    // Identifiant Maître (Fabrice Mallet : t8nPnZLcTiaLJSKMuLzib3C5nPn1)
     function isMasterAdmin() {
       return isSignedIn() && (
         request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2", "t8nPnZLcTiaLJSKMuLzib3C5nPn1"] ||
-        (request.auth.token.email != null && request.auth.token.email.lower() in ["f.mallet81@outlook.com", "fabrice.mallet@gmail.com", "f.mallet81@gmail.com"])
+        (request.auth.token.email != null && request.auth.token.email.lower() in [
+          "f.mallet81@outlook.com", 
+          "fabrice.mallet@gmail.com", 
+          "f.mallet81@gmail.com"
+        ])
       );
     }
 
@@ -36,17 +39,17 @@ service cloud.firestore {
     }
 
     // --- 2. ACCÈS PRIORITAIRE ---
-    // Les administrateurs maîtres ont un accès total sur tout
+    // Cette règle garantit que Fabrice Mallet a un accès total sur TOUTE la base de données
     match /{allPaths=**} {
       allow read, write: if isMasterAdmin();
     }
 
     // --- 3. RÈGLES SPÉCIFIQUES ---
     
-    // Messagerie & Conversations
-    // La règle 'list' doit être au niveau de la collection
+    // Messagerie & Conversations (Correction explicite pour l'erreur de listage)
     match /conversations {
-      allow list: if isAdmin();
+      // Force l'autorisation de listage à la racine de la collection
+      allow list: if isMasterAdmin() || isAdmin();
       
       match /{userId} {
         allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
