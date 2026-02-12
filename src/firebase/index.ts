@@ -32,14 +32,14 @@ export function initializeFirebase() {
 }
 
 export function getSdks(firebaseApp: FirebaseApp) {
-  // Use initializeFirestore with experimentalForceLongPolling to prevent WebSocket issues 
-  // in port-forwarded workstation environments. This fixes "INTERNAL ASSERTION FAILED: Unexpected state".
+  // CRITICAL: experimentalForceLongPolling solves "Unexpected state ID: ca9" in workstations
   let firestore;
   try {
     firestore = initializeFirestore(firebaseApp, {
       experimentalForceLongPolling: true,
     });
   } catch (e) {
+    console.warn("Firestore secondary init:", e);
     firestore = getFirestore(firebaseApp);
   }
 

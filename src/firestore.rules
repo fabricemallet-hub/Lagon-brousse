@@ -9,7 +9,7 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // ACCÈS MAÎTRE (INFAILLIBLE) : Basé sur les identifiants techniques immuables
+    // ACCÈS MAÎTRE (INFAILLIBLE) : Autorisation totale sur toute la base
     function isMasterAdmin() {
       return isSignedIn() && (
         request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2", "t8nPnZLcTiaLJSKMuLzib3C5nPn1"] ||
@@ -17,7 +17,12 @@ service cloud.firestore {
       );
     }
 
-    // ACCÈS ADMIN : Maître OU statut 'admin' en base
+    // RÈGLE GLOBALE MASTER ADMIN : Priorité absolue
+    match /{allPaths=**} {
+      allow read, write: if isMasterAdmin();
+    }
+
+    // ACCÈS ADMIN : Basé sur le statut en base (pour les admins secondaires)
     function isAdmin() {
       return isMasterAdmin() || (isSignedIn() && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -33,10 +38,9 @@ service cloud.firestore {
       );
     }
 
-    // --- 0. ACCÈS PUBLICS ---
+    // --- RÈGLES UTILISATEURS STANDARDS ---
     match /app_settings/{id} {
       allow read: if true;
-      allow write: if isMasterAdmin();
     }
 
     match /system_notifications/{id} {
@@ -48,13 +52,10 @@ service cloud.firestore {
       match /previsions/{prevId} {
         allow get, list: if true;
       }
-      allow write: if isMasterAdmin();
     }
 
     match /fish_species/{id} {
       allow get, list: if true;
-      allow write: if isMasterAdmin();
-      
       match /commune_stats/{communeId} {
         allow get, list: if true;
         allow create, update: if isSignedIn();
@@ -63,45 +64,31 @@ service cloud.firestore {
     
     match /sound_library/{id} {
       allow get, list: if true;
-      allow write: if isMasterAdmin();
     }
 
-    // --- 1. CMS SUPPORT & FAQ ---
     match /cms_support/faq/items/{id} {
       allow get, list: if true;
-      allow write: if isMasterAdmin();
     }
 
     match /cms_support/tickets/items/{id} {
       allow create: if isSignedIn();
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isMasterAdmin());
-      allow list: if isMasterAdmin();
-      allow update, delete: if isMasterAdmin();
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid);
     }
 
-    // --- 2. UTILISATEURS & DONNÉES PERSO ---
     match /users/{userId} {
-      allow read, write: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
-      allow list: if isMasterAdmin();
-      allow delete: if isMasterAdmin();
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
       match /{allPaths=**} {
-        allow read, write: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
       }
     }
 
-    // --- 3. MESSAGERIE & CONVERSATIONS ---
     match /conversations/{userId} {
-      // Listage autorisé pour l'admin au niveau de la collection
-      allow list: if isMasterAdmin();
-      // Accès au document individuel
-      allow read, write: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
-      
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
       match /messages/{messageId} {
-        allow read, write: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
       }
     }
 
-    // --- 4. FONCTIONNALITÉS TEMPS RÉEL ---
     match /hunting_sessions/{id} {
       allow read, write: if isSignedIn();
       match /{allPaths=**} {
@@ -117,28 +104,24 @@ service cloud.firestore {
     }
 
     match /access_tokens/{id} {
-      allow read, write: if isSignedIn() || isMasterAdmin();
+      allow read, write: if isSignedIn();
     }
 
     match /shared_access_tokens/{id} {
       allow get, list: if true;
-      allow write: if isMasterAdmin();
     }
 
-    // --- 5. PARTAGE DE SPOTS ---
     match /spot_shares/{id} {
       allow create: if isSignedIn();
       allow read, delete: if isSignedIn() && (
-        isMasterAdmin() || 
-        (request.auth.token.email != null && resource.data.recipientEmail == request.auth.token.email.lower())
+        request.auth.token.email != null && resource.data.recipientEmail == request.auth.token.email.lower()
       );
     }
 
-    // --- 6. COMMERCES & BUSINESS ---
     match /businesses/{businessId} {
       allow get, list: if true;
       allow create: if isPro();
-      allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isMasterAdmin());
+      allow update, delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
 
       match /promotions/{promoId} {
         allow get, list: if true;
@@ -148,7 +131,7 @@ service cloud.firestore {
 
     match /campaigns/{campaignId} {
       allow create: if isPro();
-      allow read: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isMasterAdmin());
+      allow read: if isSignedIn() && resource.data.ownerId == request.auth.uid;
     }
   }
 }

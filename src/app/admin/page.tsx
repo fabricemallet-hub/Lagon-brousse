@@ -35,7 +35,6 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState('stats');
 
   // User Edit States
-  const [isUserEditDialogOpen] = useState(false);
   const [userToEdit, setUserToEdit] = useState<UserAccount | null>(null);
   const [isSavingUser, setIsSavingUser] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
@@ -69,11 +68,9 @@ export default function AdminPage() {
     ];
     const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
     
-    // Check master identifiers first
     if (masterAdminUids.includes(user.uid)) return true;
     if (user.email && masterEmails.includes(user.email.toLowerCase())) return true;
     
-    // Fallback to database profile
     return adminProfile?.subscriptionStatus === 'admin' || adminProfile?.role === 'admin';
   }, [user, adminProfile]);
 
@@ -174,7 +171,6 @@ export default function AdminPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-20 px-1">
-      {/* HEADER CARD */}
       <Card className="border-2 shadow-sm">
         <CardHeader className="py-6">
           <CardTitle className="font-black uppercase tracking-tighter text-2xl text-slate-800 text-center sm:text-left">
