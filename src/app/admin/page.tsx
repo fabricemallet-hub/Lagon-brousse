@@ -50,7 +50,7 @@ export default function AdminPage() {
   // Splash/Design States
   const [isSavingDesign, setIsSavingDesign] = useState(false);
 
-  // Detection Admin Maître (Priorité absolue pour Fabrice Mallet)
+  // Détection robuste et instantanée Admin Maître
   const isAdmin = useMemo(() => {
     if (!user) return false;
     const masterAdminUids = [
