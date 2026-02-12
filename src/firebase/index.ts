@@ -6,8 +6,8 @@ import { getAuth, Auth } from 'firebase/auth';
 import { initializeFirestore, Firestore, getFirestore, memoryLocalCache } from 'firebase/firestore';
 
 /**
- * @fileOverview Initialisation blindée de Firebase.
- * Utilise un singleton immuable pour éviter les erreurs d'assertion interne (ID: ca9).
+ * @fileOverview Initialisation ULTIME de Firebase.
+ * VERSION 3.2.0 - Singleton immuable pour éliminer l'erreur d'assertion ca9.
  */
 
 declare global {
@@ -33,17 +33,16 @@ export function initializeFirebase() {
     }
     const auth = globalThis.__FIREBASE_AUTH;
 
-    // 3. Firestore Singleton (Memory Cache + Long Polling)
+    // 3. Firestore Singleton (Memory Cache FORCÉ)
     if (!globalThis.__FIREBASE_FIRESTORE) {
       try {
-        // Initialisation forcée avec les paramètres de stabilité
+        // Initialisation SANS persistance IndexedDB pour éviter ID: ca9
         globalThis.__FIREBASE_FIRESTORE = initializeFirestore(app, {
           experimentalForceLongPolling: true,
           localCache: memoryLocalCache(),
         });
-        console.log("L&B NC: Firestore initialisé (Stable: Long Polling + Memory Cache)");
+        console.log("L&B NC: Firestore initialisé (Singleton Immuable : Long Polling + Memory Cache)");
       } catch (e) {
-        // En cas de tentative de ré-initialisation, on récupère l'existant
         globalThis.__FIREBASE_FIRESTORE = getFirestore(app);
       }
     }
@@ -56,7 +55,7 @@ export function initializeFirebase() {
     };
   }
 
-  // Fallback pour SSR (Server-Side Rendering)
+  // Fallback SSR
   const ssrApps = getApps();
   const ssrApp = ssrApps.length === 0 ? initializeApp(firebaseConfig) : getApp();
   return {
