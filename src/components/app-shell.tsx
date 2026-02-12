@@ -90,24 +90,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (isUserLoading) return 'loading';
     if (!user) return 'limited';
 
-    // MASTER ADMIN DETECTION (PRIORITÉ ABSOLUE PAR UID ET EMAIL)
-    const masterAdminUids = [
-      't8nPnZLcTiaLJSKMuLzib3C5nPn1',
-      'K9cVYLVUk1NV99YV3anebkugpPp1',
-      'ipupi3Pg4RfrSEpFyT69BtlCdpi2',
-      'Irglq69MasYdNwBmUu8yKvw6h4G2'
-    ];
-    
+    // MASTER ADMIN DETECTION (PRIORITÉ ABSOLUE)
     const masterAdminEmails = [
       'f.mallet81@outlook.com',
       'fabrice.mallet@gmail.com', 
       'f.mallet81@gmail.com'
     ];
 
-    const isMaster = user && (
-      masterAdminUids.includes(user.uid) || 
-      (user.email && masterAdminEmails.includes(user.email.toLowerCase()))
-    );
+    const isMaster = user.email && masterAdminEmails.includes(user.email.toLowerCase());
 
     if (isMaster) {
       return 'admin';
