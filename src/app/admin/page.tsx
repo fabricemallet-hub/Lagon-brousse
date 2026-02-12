@@ -65,10 +65,10 @@ export default function AdminPage() {
     if (masterAdminUids.includes(user.uid)) return true;
     if (user.email && masterEmails.includes(user.email.toLowerCase())) return true;
     
-    return false; // On se base sur l'identité technique pour résoudre les erreurs de règles
+    return false;
   }, [user]);
 
-  // Requêtes Firestore
+  // Requêtes Firestore avec mémoïsation sécurisée
   const usersRef = useMemoFirebase(() => isAdmin ? query(collection(firestore!, 'users'), orderBy('email', 'asc')) : null, [firestore, isAdmin]);
   const { data: users } = useCollection<UserAccount>(usersRef);
 

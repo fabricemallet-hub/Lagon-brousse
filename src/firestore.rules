@@ -1,25 +1,30 @@
 
 rules_version = '2';
 
-// Version 2.0.8 - Correction critique permissions listage conversations
+// Version 2.1.0 - Accès Maître Prioritaire Absolu
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. FONCTIONS DE DÉTECTION ---
+    // --- 1. ACCÈS TOTAL MAÎTRE (Priorité #1) ---
+    // Cette règle autorise TOUT pour Fabrice Mallet via son UID ou Email.
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null && (
+        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || 
+        request.auth.uid == "K9cVYLVUk1NV99YV3anebkugpPp1" ||
+        (request.auth.token.email != null && request.auth.token.email.lower() == "f.mallet81@outlook.com")
+      );
+    }
+
+    // --- 2. FONCTIONS DE DÉTECTION GÉNÉRALES ---
     
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Identifiant Maître (Fabrice Mallet)
     function isMasterAdmin() {
       return isSignedIn() && (
         request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2", "t8nPnZLcTiaLJSKMuLzib3C5nPn1"] ||
-        (request.auth.token.email != null && request.auth.token.email.lower() in [
-          "f.mallet81@outlook.com", 
-          "fabrice.mallet@gmail.com", 
-          "f.mallet81@gmail.com"
-        ])
+        (request.auth.token.email != null && request.auth.token.email.lower() in ["f.mallet81@outlook.com", "fabrice.mallet@gmail.com", "f.mallet81@gmail.com"])
       );
     }
 
@@ -38,16 +43,11 @@ service cloud.firestore {
       );
     }
 
-    // --- 2. ACCÈS PRIORITAIRE MAÎTRE ---
-    match /{allPaths=**} {
-      allow read, write: if isMasterAdmin();
-    }
-
     // --- 3. RÈGLES SPÉCIFIQUES ---
     
     // Messagerie (Conversations)
-    // Firestore nécessite souvent une règle list explicite sur la collection parente
     match /conversations {
+      // Autorisation explicite de listage pour les admins
       allow list: if isAdmin();
       
       match /{userId} {
