@@ -4,13 +4,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- FONCTIONS DE BASE ---
+    // --- 1. FONCTIONS DE DÉTECTION ---
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // ACCÈS MAÎTRE (INFAILLIBLE) : Autorisation totale sur toute la base
-    // Inclut l'UID de Fabrice Mallet: t8nPnZLcTiaLJSKMuLzib3C5nPn1
+    // Identifiants Maîtres (Fabrice Mallet & Admins techniques)
     function isMasterAdmin() {
       return isSignedIn() && (
         request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2", "t8nPnZLcTiaLJSKMuLzib3C5nPn1"] ||
@@ -18,12 +17,7 @@ service cloud.firestore {
       );
     }
 
-    // RÈGLE GLOBALE MASTER ADMIN : Priorité absolue
-    match /{allPaths=**} {
-      allow read, write: if isMasterAdmin();
-    }
-
-    // ACCÈS ADMIN : Basé sur le statut en base (pour les admins secondaires)
+    // Accès Admin standard via profil DB
     function isAdmin() {
       return isMasterAdmin() || (isSignedIn() && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -39,7 +33,24 @@ service cloud.firestore {
       );
     }
 
-    // --- RÈGLES UTILISATEURS STANDARDS ---
+    // --- 2. RÈGLES DE PRIORITÉ (MASTER ADMIN) ---
+    // Cette règle autorise TOUT aux admins maîtres sur TOUTE la base
+    match /{allPaths=**} {
+      allow read, write: if isMasterAdmin();
+    }
+
+    // --- 3. RÈGLES SPÉCIFIQUES ---
+    
+    // Messagerie & Conversations
+    match /conversations/{userId} {
+      allow list: if isAdmin();
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      match /{allPaths=**} {
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      }
+    }
+
+    // Public & Paramètres
     match /app_settings/{id} {
       allow read: if true;
     }
@@ -55,6 +66,7 @@ service cloud.firestore {
       }
     }
 
+    // Poissons & Commune Stats
     match /fish_species/{id} {
       allow get, list: if true;
       match /commune_stats/{communeId} {
@@ -67,6 +79,7 @@ service cloud.firestore {
       allow get, list: if true;
     }
 
+    // Support
     match /cms_support/faq/items/{id} {
       allow get, list: if true;
     }
@@ -76,6 +89,7 @@ service cloud.firestore {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
+    // Utilisateurs
     match /users/{userId} {
       allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       match /{allPaths=**} {
@@ -83,15 +97,7 @@ service cloud.firestore {
       }
     }
 
-    // CORRECTION : Autorisation explicite de listage pour la messagerie
-    match /conversations/{userId} {
-      allow list: if isAdmin();
-      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      match /messages/{messageId} {
-        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      }
-    }
-
+    // Sessions & Vessels
     match /hunting_sessions/{id} {
       allow read, write: if isSignedIn();
       match /{allPaths=**} {
@@ -106,6 +112,7 @@ service cloud.firestore {
       }
     }
 
+    // Jetons & Partage
     match /access_tokens/{id} {
       allow read, write: if isSignedIn() || isAdmin();
     }
@@ -121,6 +128,7 @@ service cloud.firestore {
       );
     }
 
+    // B2B Commerces
     match /businesses/{businessId} {
       allow get, list: if true;
       allow create: if isPro();

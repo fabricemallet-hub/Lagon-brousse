@@ -27,10 +27,11 @@ export function SidebarNav() {
 
   const { data: userProfile } = useDoc<UserAccount>(userDocRef);
 
-  // Détection robuste des rôles (Mise à jour master UID)
+  // Détection robuste et prioritaire des rôles Admin
   const roles = useMemo(() => {
     if (!user) return { isAdmin: false, isPro: false };
     
+    // Liste blanche technique (Priorité Haute)
     const masterAdminUids = [
       'K9cVYLVUk1NV99YV3anebkugpPp1',
       'ipupi3Pg4RfrSEpFyT69BtlCdpi2',
@@ -62,9 +63,11 @@ export function SidebarNav() {
     <div className="flex flex-col h-full">
       <SidebarMenu className="flex-grow">
         {navLinks.map((link) => {
+          // Filtrage dynamique selon les rôles
           if (link.adminOnly && !roles.isAdmin) return null;
           if (link.proOnly && !roles.isPro) return null;
           
+          // Masquer Contact pour l'admin (il utilise le dashboard)
           if (link.href === '/contact' && roles.isAdmin) return null;
           if (link.href === '/contact' && !user) return null;
           

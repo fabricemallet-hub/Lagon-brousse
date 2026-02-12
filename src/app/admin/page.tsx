@@ -51,7 +51,7 @@ export default function AdminPage() {
   // Splash/Design States
   const [isSavingDesign, setIsSavingDesign] = useState(false);
 
-  // Detection Admin
+  // Detection Admin (Priorité technique)
   const userProfileRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return doc(firestore, 'users', user.uid);
@@ -74,7 +74,7 @@ export default function AdminPage() {
     return adminProfile?.subscriptionStatus === 'admin' || adminProfile?.role === 'admin';
   }, [user, adminProfile]);
 
-  // Queries
+  // Requêtes Firestore
   const usersRef = useMemoFirebase(() => isAdmin ? query(collection(firestore!, 'users'), orderBy('email', 'asc')) : null, [firestore, isAdmin]);
   const { data: users } = useCollection<UserAccount>(usersRef);
 
@@ -87,7 +87,8 @@ export default function AdminPage() {
   const fishRef = useMemoFirebase(() => isAdmin ? query(collection(firestore!, 'fish_species'), orderBy('name', 'asc')) : null, [firestore, isAdmin]);
   const { data: fishSpecies } = useCollection<FishSpeciesInfo>(fishRef);
 
-  const convsRef = useMemoFirebase(() => isAdmin ? query(collection(firestore!, 'conversations'), orderBy('lastMessageAt', 'desc')) : null, [firestore, isAdmin]);
+  // Correction de la requête messagerie
+  const convsRef = useMemoFirebase(() => isAdmin ? collection(firestore!, 'conversations') : null, [firestore, isAdmin]);
   const { data: conversations } = useCollection<Conversation>(convsRef);
 
   const splashRef = useMemoFirebase(() => isAdmin ? doc(firestore!, 'app_settings', 'splash') : null, [firestore, isAdmin]);
