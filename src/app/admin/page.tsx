@@ -44,26 +44,26 @@ export default function AdminPage() {
     }
   }, [profile]);
 
-  // REQUÊTES FIRESTORE
+  // REQUÊTES FIRESTORE - Sécurisées par isAdmin
   const usersRef = useMemoFirebase(() => {
-    if (!firestore || !isAdmin) return null;
+    if (!firestore || !isAdmin || isUserLoading) return null;
     console.log("L&B DEBUG ADMIN: Lancement requête [users]");
     return query(collection(firestore, 'users'), orderBy('email', 'asc'));
-  }, [firestore, isAdmin]);
+  }, [firestore, isAdmin, isUserLoading]);
   const { data: users, isLoading: isUsersLoading, error: usersError } = useCollection<UserAccount>(usersRef);
 
   const businessRef = useMemoFirebase(() => {
-    if (!firestore || !isAdmin) return null;
+    if (!firestore || !isAdmin || isUserLoading) return null;
     console.log("L&B DEBUG ADMIN: Lancement requête [businesses]");
     return query(collection(firestore, 'businesses'), orderBy('name', 'asc'));
-  }, [firestore, isAdmin]);
+  }, [firestore, isAdmin, isUserLoading]);
   const { data: businesses } = useCollection<Business>(businessRef);
 
   const convsRef = useMemoFirebase(() => {
-    if (!firestore || !isAdmin) return null;
+    if (!firestore || !isAdmin || isUserLoading) return null;
     console.log("L&B DEBUG ADMIN: Lancement requête [conversations]");
     return query(collection(firestore, 'conversations'), orderBy('lastMessageAt', 'desc'));
-  }, [firestore, isAdmin]);
+  }, [firestore, isAdmin, isUserLoading]);
   const { data: conversations, isLoading: isConvsLoading, error: convsError } = useCollection<Conversation>(convsRef);
 
   useEffect(() => {

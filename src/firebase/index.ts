@@ -11,8 +11,8 @@ import {
 } from 'firebase/firestore';
 
 /**
- * @fileOverview Initialisation de Firebase Singleton Blindée.
- * Utilise le cache mémoire pour éviter les erreurs d'assertion (ID: ca9).
+ * @fileOverview Initialisation de Firebase Singleton.
+ * Utilise le cache mémoire pour éviter l'erreur d'assertion interne (ID: ca9).
  */
 
 declare global {
@@ -44,8 +44,7 @@ export function initializeFirebase() {
       try {
         console.log("L&B DEBUG: Configuration Firestore (Memory Cache Mode)...");
         globalThis.__LB_FIREBASE_FIRESTORE = initializeFirestore(app, {
-          localCache: memoryLocalCache(),
-          // Long Polling retiré pour éviter les 400 Bad Request
+          localCache: memoryLocalCache()
         });
       } catch (e) {
         console.warn("L&B DEBUG: Échec initialisation personnalisée, repli standard.");
