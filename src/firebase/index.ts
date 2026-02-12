@@ -36,12 +36,10 @@ export function getSdks(firebaseApp: FirebaseApp) {
   // in port-forwarded workstation environments. This fixes "INTERNAL ASSERTION FAILED: Unexpected state".
   let firestore;
   try {
-    // On essaie d'initialiser avec les paramètres optimisés pour la workstation
     firestore = initializeFirestore(firebaseApp, {
       experimentalForceLongPolling: true,
     });
   } catch (e) {
-    // Si déjà initialisé, on récupère l'instance existante
     firestore = getFirestore(firebaseApp);
   }
 

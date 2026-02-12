@@ -11,11 +11,9 @@ service cloud.firestore {
 
     // ACCÈS MAÎTRE (INFAILLIBLE) : Basé sur les identifiants techniques immuables
     function isMasterAdmin() {
-      let masterUids = ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2", "t8nPnZLcTiaLJSKMuLzib3C5nPn1"];
-      let masterEmails = ["f.mallet81@outlook.com", "fabrice.mallet@gmail.com", "f.mallet81@gmail.com"];
       return isSignedIn() && (
-        request.auth.uid in masterUids ||
-        (request.auth.token.email != null && request.auth.token.email.lower() in masterEmails)
+        request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2", "t8nPnZLcTiaLJSKMuLzib3C5nPn1"] ||
+        (request.auth.token.email != null && request.auth.token.email.lower() in ["f.mallet81@outlook.com", "fabrice.mallet@gmail.com", "f.mallet81@gmail.com"])
       );
     }
 
@@ -91,16 +89,12 @@ service cloud.firestore {
     }
 
     // --- 3. MESSAGERIE & CONVERSATIONS ---
-    match /conversations {
-      // Autorise le listage des conversations pour les admins maîtres
+    match /conversations/{userId} {
       allow list: if isMasterAdmin();
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
       
-      match /{userId} {
+      match /messages/{messageId} {
         allow read, write: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
-        
-        match /messages/{messageId} {
-          allow read, write: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
-        }
       }
     }
 
