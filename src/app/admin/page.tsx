@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -81,7 +80,7 @@ export default function AdminPage() {
   const fishRef = useMemoFirebase(() => isAdmin ? query(collection(firestore!, 'fish_species'), orderBy('name', 'asc')) : null, [firestore, isAdmin]);
   const { data: fishSpecies } = useCollection<FishSpeciesInfo>(fishRef);
 
-  // Requête messagerie - Utilisation d'une collection simple pour éviter l'erreur de permission list
+  // Requête messagerie
   const convsRef = useMemoFirebase(() => isAdmin ? collection(firestore!, 'conversations') : null, [firestore, isAdmin]);
   const { data: conversations } = useCollection<Conversation>(convsRef);
 
