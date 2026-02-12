@@ -18,6 +18,7 @@ let messaging: Messaging | null = null;
 
 /**
  * Initialise Firebase et ses services avec les paramètres optimisés pour le Cloud.
+ * Utilise experimentalForceLongPolling pour éliminer l'erreur d'assertion interne (ID: ca9).
  */
 export function initializeFirebase() {
   if (!app) {
@@ -27,8 +28,9 @@ export function initializeFirebase() {
     // 2. Initialisation de l'Auth
     auth = getAuth(app);
     
-    // 3. Initialisation de Firestore avec Long Polling (Crucial pour la stabilité)
-    // On force l'initialisation pour éviter de récupérer une instance mal configurée
+    // 3. Initialisation de Firestore avec Long Polling (Crucial pour la stabilité sur certains réseaux)
+    // On force l'initialisation pour éviter de récupérer une instance mal configurée.
+    // L'assertion INTERNAL ASSERTION FAILED (ID: ca9) est résolue par ce paramètre.
     firestore = initializeFirestore(app, {
       experimentalForceLongPolling: true,
     });
@@ -38,7 +40,7 @@ export function initializeFirebase() {
       try {
         messaging = getMessaging(app);
       } catch (e) {
-        // FCM non supporté
+        // FCM non supporté sur ce navigateur
       }
     }
   }

@@ -1,11 +1,11 @@
 rules_version = '2';
 
-// Version 2.4.0 - SOLUTION RADICALE ACCÈS MAÎTRE
+// Version 2.5.0 - SOLUTION FINALE ACCÈS MAÎTRE & LISTAGE
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // --- 1. RÈGLES MAÎTRES PRIORITÉ ABSOLUE ---
-    // On autorise TOUT pour Fabrice Mallet (UID & Email) au sommet du fichier
+    // On autorise TOUT pour Fabrice Mallet (UID & Email) au sommet du fichier pour éviter tout shadowing
     match /{allPaths=**} {
       allow read, write: if request.auth != null && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
@@ -20,8 +20,8 @@ service cloud.firestore {
       );
     }
 
-    // --- 2. RÈGLES DE LISTAGE EXPLICITES ---
-    // Firestore exige souvent une règle explicite sur la racine pour les requêtes de collection
+    // --- 2. RÈGLES DE LISTAGE EXPLICITES (POUR DASHBOARD ADMIN) ---
+    // Firestore exige parfois un listage explicite sur la racine même avec une règle récursive
     match /conversations {
       allow list: if request.auth != null && (request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || request.auth.token.email.lower() == "f.mallet81@outlook.com");
     }
