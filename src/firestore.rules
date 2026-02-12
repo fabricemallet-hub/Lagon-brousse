@@ -10,6 +10,7 @@ service cloud.firestore {
     }
 
     // ACCÈS MAÎTRE (INFAILLIBLE) : Autorisation totale sur toute la base
+    // Inclut l'UID de Fabrice Mallet: t8nPnZLcTiaLJSKMuLzib3C5nPn1
     function isMasterAdmin() {
       return isSignedIn() && (
         request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2", "t8nPnZLcTiaLJSKMuLzib3C5nPn1"] ||
@@ -72,20 +73,22 @@ service cloud.firestore {
 
     match /cms_support/tickets/items/{id} {
       allow create: if isSignedIn();
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid);
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
     match /users/{userId} {
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       match /{allPaths=**} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       }
     }
 
+    // CORRECTION : Autorisation explicite de listage pour la messagerie
     match /conversations/{userId} {
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
+      allow list: if isAdmin();
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       match /messages/{messageId} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       }
     }
 
@@ -104,7 +107,7 @@ service cloud.firestore {
     }
 
     match /access_tokens/{id} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isSignedIn() || isAdmin();
     }
 
     match /shared_access_tokens/{id} {
@@ -114,14 +117,14 @@ service cloud.firestore {
     match /spot_shares/{id} {
       allow create: if isSignedIn();
       allow read, delete: if isSignedIn() && (
-        request.auth.token.email != null && resource.data.recipientEmail == request.auth.token.email.lower()
+        isAdmin() || (request.auth.token.email != null && resource.data.recipientEmail == request.auth.token.email.lower())
       );
     }
 
     match /businesses/{businessId} {
       allow get, list: if true;
       allow create: if isPro();
-      allow update, delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
 
       match /promotions/{promoId} {
         allow get, list: if true;
@@ -131,7 +134,7 @@ service cloud.firestore {
 
     match /campaigns/{campaignId} {
       allow create: if isPro();
-      allow read: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow read: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
     }
   }
 }

@@ -16,7 +16,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
   const email = user.email?.toLowerCase() || '';
   const uid = user.uid;
   
-  // Identifiants de confiance pour l'administration
+  // Identifiants de confiance pour l'administration (Fabrice Mallet inclus)
   const masterAdminUids = [
     'K9cVYLVUk1NV99YV3anebkugpPp1',
     'ipupi3Pg4RfrSEpFyT69BtlCdpi2',
