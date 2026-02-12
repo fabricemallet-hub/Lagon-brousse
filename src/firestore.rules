@@ -9,14 +9,14 @@ service cloud.firestore {
     
     function isMaster() {
       return request.auth != null && (
+        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
         request.auth.token.email.lower() == "f.mallet81@outlook.com" || 
         request.auth.token.email.lower() == "fabrice.mallet@gmail.com" || 
-        request.auth.token.email.lower() == "f.mallet81@gmail.com" ||
-        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"
+        request.auth.token.email.lower() == "f.mallet81@gmail.com"
       );
     }
 
-    // ACCÈS UNIVERSEL POUR LE MASTER (Court-circuite tout le reste)
+    // ACCÈS UNIVERSEL ABSOLU (Prioritaire sur tout)
     match /{allPaths=**} {
       allow read, write: if isMaster();
     }
@@ -25,10 +25,10 @@ service cloud.firestore {
     // 2. AUTORISATIONS DE LISTAGE EXPLICITES (Pour le Dashboard)
     // ======================================================
     
-    match /conversations { allow list: if isMaster(); }
-    match /users { allow list: if isMaster(); }
-    match /businesses { allow list: if isMaster(); }
-    match /campaigns { allow list: if isMaster(); }
+    match /conversations { allow read, write: if isMaster(); }
+    match /users { allow read, write: if isMaster(); }
+    match /businesses { allow read, write: if isMaster(); }
+    match /campaigns { allow read, write: if isMaster(); }
 
     // ======================================================
     // 3. RÈGLES STANDARDS (Pour les autres utilisateurs)
@@ -39,16 +39,16 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read, write: if isSignedIn() && (request.auth.uid == uid || isMaster());
+      allow read, write: if isSignedIn() && (request.auth.uid == uid);
       match /{allPaths=**} {
-        allow read, write: if isSignedIn() && (request.auth.uid == uid || isMaster());
+        allow read, write: if isSignedIn() && (request.auth.uid == uid);
       }
     }
 
     match /conversations/{convId} {
-      allow read, write: if isSignedIn() && (request.auth.uid == convId || isMaster());
+      allow read, write: if isSignedIn() && (request.auth.uid == convId);
       match /{allPaths=**} {
-        allow read, write: if isSignedIn() && (request.auth.uid == convId || isMaster());
+        allow read, write: if isSignedIn() && (request.auth.uid == convId);
       }
     }
 
@@ -73,14 +73,14 @@ service cloud.firestore {
     // Support (Tickets)
     match /cms_support/tickets/items/{id} {
       allow create: if isSignedIn();
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isMaster());
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid);
     }
 
     // Business & Commerces
     match /businesses/{businessId} {
       allow get, list: if true;
       allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isMaster());
+      allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid);
       match /promotions/{promoId} { 
         allow get, list: if true; 
         allow write: if isSignedIn(); 
@@ -89,13 +89,12 @@ service cloud.firestore {
 
     match /campaigns/{campaignId} {
       allow create: if isSignedIn();
-      allow read: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isMaster());
+      allow read: if isSignedIn() && (resource.data.ownerId == request.auth.uid);
     }
     
     match /spot_shares/{id} {
       allow create: if isSignedIn();
       allow read, delete: if isSignedIn() && (
-        isMaster() || 
         (request.auth.token.email != null && resource.data.recipientEmail == request.auth.token.email.lower())
       );
     }

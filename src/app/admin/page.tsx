@@ -45,6 +45,7 @@ export default function AdminPage() {
   }, [profile]);
 
   // REQUÊTES FIRESTORE - Sécurisées par isAdmin
+  // Note: On retire le orderBy sur conversations pour tester si c'est un problème d'index
   const usersRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin || isUserLoading) return null;
     console.log("L&B DEBUG ADMIN: Lancement requête [users]");
@@ -62,7 +63,8 @@ export default function AdminPage() {
   const convsRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin || isUserLoading) return null;
     console.log("L&B DEBUG ADMIN: Lancement requête [conversations]");
-    return query(collection(firestore, 'conversations'), orderBy('lastMessageAt', 'desc'));
+    // TEST: Suppression du orderBy pour forcer le listage simple
+    return collection(firestore, 'conversations');
   }, [firestore, isAdmin, isUserLoading]);
   const { data: conversations, isLoading: isConvsLoading, error: convsError } = useCollection<Conversation>(convsRef);
 

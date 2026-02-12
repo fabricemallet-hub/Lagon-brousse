@@ -83,6 +83,8 @@ export function useCollection<T = any>(
       },
       (error: FirestoreError) => {
         console.error(`L&B DEBUG ERROR: Échec sur [${path}]`, error.code, error.message);
+        console.dir(error); // Log exhaustif de l'erreur brute
+        
         if (error.code === 'permission-denied') {
           const contextualError = new FirestorePermissionError({
             operation: 'list',
@@ -90,6 +92,7 @@ export function useCollection<T = any>(
           })
 
           setError(contextualError)
+          // trigger global error propagation
           errorEmitter.emit('permission-error', contextualError);
         } else {
           setError(error);
