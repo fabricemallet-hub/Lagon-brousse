@@ -1,10 +1,10 @@
 rules_version = '2';
 
-// Version 2.2.9 - Accès Maître Prioritaire & Fix Permission List
+// Version 2.3.0 - SOLUTION DÉFINITIVE PERMISSIONS MAÎTRE
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. FONCTION DE DÉTECTION MAÎTRE ---
+    // --- 1. FONCTIONS DE DÉTECTION ---
     
     function isMasterAdmin() {
       return request.auth != null && (
@@ -17,15 +17,13 @@ service cloud.firestore {
       );
     }
 
-    // --- 2. ACCÈS TOTAL MAÎTRE (Priorité Absolue) ---
-    // Cette règle globale en haut de fichier court-circuite toute restriction pour l'admin
+    // --- 2. RÈGLE PRIORITAIRE ABSOLUE ---
+    // Cette règle autorise tout pour les administrateurs maîtres et ignore les suivantes si vrai.
     match /{allPaths=**} {
       allow read, write: if isMasterAdmin();
     }
 
-    // --- 3. AUTORISATIONS DE LISTAGE EXPLICITES ---
-    // Nécessaire pour les requêtes globales du Dashboard
-    
+    // --- 3. AUTORISATIONS DE LISTAGE RACINE (Nécessaire pour le Dashboard) ---
     match /conversations {
       allow list: if isMasterAdmin();
     }
@@ -39,10 +37,6 @@ service cloud.firestore {
     }
 
     match /access_tokens {
-      allow list: if isMasterAdmin();
-    }
-
-    match /campaigns {
       allow list: if isMasterAdmin();
     }
 
@@ -110,10 +104,6 @@ service cloud.firestore {
       match /{allPaths=**} {
         allow read, write: if request.auth != null;
       }
-    }
-
-    match /shared_access_tokens/{id} {
-      allow get, list: if true;
     }
 
     match /spot_shares/{id} {

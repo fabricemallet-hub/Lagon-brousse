@@ -26,7 +26,7 @@ export function SidebarNav() {
 
   const { data: userProfile } = useDoc<UserAccount>(userDocRef);
 
-  // Détection robuste et instantanée des rôles Admin Maître
+  // Détection robuste et instantanée des rôles Admin Maître (Hardcoded pour sécurité maximale)
   const roles = useMemo(() => {
     if (!user) return { isAdmin: false, isPro: false };
     
@@ -44,13 +44,16 @@ export function SidebarNav() {
       'f.mallet81@gmail.com'
     ];
 
+    // Détection immédiate par UID/Email technique
     const isMaster = masterAdminUids.includes(user.uid) || 
                     (user.email && masterAdminEmails.includes(user.email.toLowerCase()));
 
+    // Détection Admin (Maître ou via profil base de données)
     const isAdmin = isMaster || 
                     userProfile?.subscriptionStatus === 'admin' || 
                     userProfile?.role === 'admin';
 
+    // Détection Pro (Admin ou via profil base de données)
     const isPro = isAdmin || 
                   userProfile?.subscriptionStatus === 'professional' || 
                   userProfile?.role === 'professional';
@@ -89,7 +92,7 @@ export function SidebarNav() {
       
       <div className="px-4 py-4 mt-auto border-t border-sidebar-border bg-sidebar group-data-[collapsible=icon]:hidden">
         <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40">
-          Version 2.2.9
+          Version 2.3.0
         </p>
       </div>
     </div>
