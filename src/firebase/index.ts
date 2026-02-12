@@ -7,7 +7,7 @@ import { initializeFirestore, Firestore, getFirestore, memoryLocalCache } from '
 
 /**
  * @fileOverview Initialisation SINGLETON de Firebase.
- * Empêche les erreurs d'assertion interne (ca9) en forçant Memory Cache et Long Polling.
+ * Version Ultra-Stable : Long Polling + Memory Cache + Verrou Global.
  */
 
 declare global {
@@ -18,7 +18,7 @@ declare global {
 
 export function initializeFirebase() {
   if (typeof window !== 'undefined') {
-    // 1. Initialisation App
+    // 1. Initialisation App (Singleton)
     if (!globalThis.__LB_FIREBASE_APP) {
       const apps = getApps();
       globalThis.__LB_FIREBASE_APP = apps.length === 0 
@@ -27,27 +27,27 @@ export function initializeFirebase() {
     }
     const app = globalThis.__LB_FIREBASE_APP;
 
-    // 2. Initialisation Auth
+    // 2. Initialisation Auth (Singleton)
     if (!globalThis.__LB_FIREBASE_AUTH) {
       globalThis.__LB_FIREBASE_AUTH = getAuth(app);
       
-      // Diagnostic pour l'utilisateur
       onAuthStateChanged(globalThis.__LB_FIREBASE_AUTH, (u) => {
-        if (u) console.log(`L&B NC: Utilisateur connecté - UID: ${u.uid}`);
-        else console.log("L&B NC: Aucun utilisateur connecté");
+        if (u) console.log(`L&B NC: Firestore prêt pour l'UID: ${u.uid}`);
       });
     }
     const auth = globalThis.__LB_FIREBASE_AUTH;
 
-    // 3. Initialisation Firestore (Mode Stable Forcé)
+    // 3. Initialisation Firestore (Singleton Forcé)
     if (!globalThis.__LB_FIREBASE_FIRESTORE) {
       try {
+        // Paramètres de stabilité maximum pour environnement Cloud/Mobile
         globalThis.__LB_FIREBASE_FIRESTORE = initializeFirestore(app, {
           experimentalForceLongPolling: true, 
           localCache: memoryLocalCache(),     
         });
-        console.log("L&B NC: Firestore initialisé (Mode Immuable : Long Polling + Memory)");
+        console.log("L&B NC: Firestore initialisé (Stable: Long Polling + Memory Cache)");
       } catch (e) {
+        // En cas de Fast Refresh, on récupère l'instance existante
         globalThis.__LB_FIREBASE_FIRESTORE = getFirestore(app);
       }
     }
@@ -56,7 +56,7 @@ export function initializeFirebase() {
     return { firebaseApp: app, auth, firestore };
   }
 
-  // Fallback SSR
+  // Fallback SSR (Serveur)
   const ssrApps = getApps();
   const ssrApp = ssrApps.length === 0 ? initializeApp(firebaseConfig) : getApp();
   return {
