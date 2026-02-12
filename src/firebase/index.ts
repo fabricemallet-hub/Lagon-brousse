@@ -18,7 +18,6 @@ let messaging: Messaging | null = null;
 
 /**
  * Initialise Firebase et ses services avec les paramètres optimisés pour le Cloud.
- * Le mode experimentalForceLongPolling est activé pour résoudre l'erreur "INTERNAL ASSERTION FAILED: Unexpected state (ID: ca9)".
  */
 export function initializeFirebase() {
   if (!app) {
@@ -28,22 +27,18 @@ export function initializeFirebase() {
     // 2. Initialisation de l'Auth
     auth = getAuth(app);
     
-    // 3. Initialisation de Firestore avec Long Polling (Crucial pour la stabilité en proxy/cloud)
-    try {
-      firestore = initializeFirestore(app, {
-        experimentalForceLongPolling: true,
-      });
-    } catch (e) {
-      // Si déjà initialisé, on récupère l'instance existante
-      firestore = getFirestore(app);
-    }
+    // 3. Initialisation de Firestore avec Long Polling (Crucial pour la stabilité)
+    // On force l'initialisation pour éviter de récupérer une instance mal configurée
+    firestore = initializeFirestore(app, {
+      experimentalForceLongPolling: true,
+    });
 
     // 4. Messagerie (Client side uniquement)
     if (typeof window !== 'undefined') {
       try {
         messaging = getMessaging(app);
       } catch (e) {
-        // FCM peut ne pas être supporté sur certains navigateurs
+        // FCM non supporté
       }
     }
   }

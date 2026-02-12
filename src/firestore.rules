@@ -1,10 +1,16 @@
 rules_version = '2';
 
-// Version 2.3.5 - PRIORITÉ ABSOLUE PERMISSIONS MAÎTRE
+// Version 2.3.8 - SOLUTION FINALE PERMISSIONS MAÎTRE
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- FONCTION DE VÉRIFICATION MAÎTRE ---
+    // --- 1. PRIORITÉ ABSOLUE MAÎTRE (Solution Infaillible) ---
+    // On autorise TOUT pour l'UID maître au sommet du fichier.
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1";
+    }
+
+    // --- FONCTION DE VÉRIFICATION GÉNÉRALE ---
     function isMasterAdmin() {
       return request.auth != null && (
         request.auth.uid in ["t8nPnZLcTiaLJSKMuLzib3C5nPn1", "K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2"] ||
@@ -16,13 +22,7 @@ service cloud.firestore {
       );
     }
 
-    // --- 1. ACCÈS TOTAL MAÎTRE (Priorité Absolue) ---
-    // Cette règle court-circuite toute autre restriction pour les administrateurs maîtres.
-    match /{allPaths=**} {
-      allow read, write: if isMasterAdmin();
-    }
-
-    // --- 2. RÈGLES DE LISTAGE EXPLICITES (Nécessaire pour Dashboard) ---
+    // --- 2. RÈGLES DE LISTAGE EXPLICITES POUR LES AUTRES ADMINS ---
     match /conversations { allow list: if isMasterAdmin(); }
     match /users { allow list: if isMasterAdmin(); }
     match /businesses { allow list: if isMasterAdmin(); }
