@@ -3,9 +3,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. ACCÈS ALPHA PRIORITAIRE (ADMIN OUTLOOK) ---
-    // On définit l'accès pour f.mallet81@outlook.com (UID: t8nPnZLcTiaLJSKMuLzib3C5nPn1)
-    // Nous utilisons des blocs explicites pour garantir le droit de listage (list).
+    // ======================================================
+    // 1. RÈGLE ALPHA - ACCÈS TOTAL ET PRIORITAIRE (MASTER)
+    // ======================================================
+    // Cette règle autorise f.mallet81@outlook.com à TOUT faire sur TOUTE la base.
+    // L'UID t8nPnZLcTiaLJSKMuLzib3C5nPn1 est également autorisé.
     
     function isMaster() {
       return request.auth != null && (
@@ -14,31 +16,14 @@ service cloud.firestore {
       );
     }
 
-    // Autorisations explicites sur les racines de collections pour le Dashboard Admin
-    match /conversations { allow read, write: if isMaster(); }
-    match /conversations/{allPaths=**} { allow read, write: if isMaster(); }
-    
-    match /users { allow read, write: if isMaster(); }
-    match /users/{allPaths=**} { allow read, write: if isMaster(); }
-    
-    match /businesses { allow read, write: if isMaster(); }
-    match /businesses/{allPaths=**} { allow read, write: if isMaster(); }
-    
-    match /campaigns { allow read, write: if isMaster(); }
-    match /campaigns/{allPaths=**} { allow read, write: if isMaster(); }
-
-    match /vessels { allow read, write: if isMaster(); }
-    match /vessels/{allPaths=**} { allow read, write: if isMaster(); }
-
-    match /hunting_sessions { allow read, write: if isMaster(); }
-    match /hunting_sessions/{allPaths=**} { allow read, write: if isMaster(); }
-
-    // Règle de secours globale pour le Master
     match /{allPaths=**} {
       allow read, write: if isMaster();
     }
 
-    // --- 2. RÈGLES UTILISATEURS STANDARDS (NON-ADMIN) ---
+    // ======================================================
+    // 2. RÈGLES UTILISATEURS (Appliquées si non-Master)
+    // ======================================================
+
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
       match /{allPaths=**} { allow read, write: if request.auth != null && request.auth.uid == userId; }
@@ -70,14 +55,14 @@ service cloud.firestore {
     // Support (Tickets)
     match /cms_support/tickets/items/{id} {
       allow create: if request.auth != null;
-      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || isMaster());
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
     }
 
     // Business & Commerces
     match /businesses/{businessId} {
       allow get, list: if true;
       allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && (resource.data.ownerId == request.auth.uid || isMaster());
+      allow update, delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
       match /promotions/{promoId} { 
         allow get, list: if true; 
         allow write: if request.auth != null; 
@@ -86,7 +71,7 @@ service cloud.firestore {
 
     match /campaigns/{campaignId} {
       allow create: if request.auth != null;
-      allow read: if request.auth != null && (resource.data.ownerId == request.auth.uid || isMaster());
+      allow read: if request.auth != null && resource.data.ownerId == request.auth.uid;
     }
     
     match /spot_shares/{id} {

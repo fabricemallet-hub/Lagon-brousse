@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, where, doc } from 'firebase/firestore';
+import { collection, query, orderBy, orderBy as firestoreOrderBy } from 'firebase/firestore';
 import type { UserAccount, Business, Conversation } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,54 +21,43 @@ export default function AdminPage() {
 
   const [activeTab, setActiveTab] = useState('stats');
 
-  // DÉTECTION ADMIN MAÎTRE AVEC LOGS RENFORCÉS
   const isAdmin = useMemo(() => {
-    if (!user) {
-        console.log("L&B DEBUG ADMIN: Attente utilisateur...");
-        return false;
-    }
-    
+    if (!user) return false;
     const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
-    const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1'];
-    
     const isMaster = (user.email && masterEmails.includes(user.email.toLowerCase())) || 
-                    masterUids.includes(user.uid);
-
-    console.log(`L&B DEBUG ADMIN IDENTITÉ: [${user.email}] (UID: ${user.uid}). Accès Master: ${isMaster}`);
+                    user.uid === 't8nPnZLcTiaLJSKMuLzib3C5nPn1';
+    
+    if (isMaster) console.log("L&B DEBUG ADMIN: Accès Master confirmé.");
     return isMaster;
   }, [user]);
 
-  // REQUÊTES FIRESTORE (Seulement si isAdmin est confirmé)
+  // REQUÊTES FIRESTORE
   const usersRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
-    console.log("L&B DEBUG ADMIN: Lancement requête [users]");
     return query(collection(firestore, 'users'), orderBy('email', 'asc'));
   }, [firestore, isAdmin]);
   const { data: users, isLoading: isUsersLoading, error: usersError } = useCollection<UserAccount>(usersRef);
 
   const businessRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
-    console.log("L&B DEBUG ADMIN: Lancement requête [businesses]");
     return query(collection(firestore, 'businesses'), orderBy('name', 'asc'));
   }, [firestore, isAdmin]);
   const { data: businesses } = useCollection<Business>(businessRef);
 
   const convsRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
-    console.log("L&B DEBUG ADMIN: Lancement requête [conversations]");
     return query(collection(firestore, 'conversations'), orderBy('lastMessageAt', 'desc'));
   }, [firestore, isAdmin]);
   const { data: conversations, isLoading: isConvsLoading, error: convsError } = useCollection<Conversation>(convsRef);
 
   useEffect(() => {
     if (!isUserLoading && !isAdmin && user) {
-      console.warn("L&B DEBUG ADMIN: Redirection immédiate - Non autorisé.");
       router.push('/compte');
     }
   }, [isAdmin, isUserLoading, router, user]);
 
   if (isUserLoading) return <div className="p-8"><Skeleton className="h-48 w-full rounded-2xl" /></div>;
-  if (!isAdmin) return <div className="p-12 text-center font-black uppercase text-muted-foreground animate-pulse">Validation de sécurité en cours...</div>;
+  if (!isAdmin) return <div className="p-12 text-center font-black uppercase text-muted-foreground animate-pulse">Accès Admin en cours de validation...</div>;
 
   const activeSubs = users?.filter(u => u.subscriptionStatus === 'active' || u.subscriptionStatus === 'admin').length || 0;
 
@@ -79,7 +68,7 @@ export default function AdminPage() {
             <ShieldCheck className="size-48" />
         </div>
         <CardHeader className="py-8 relative z-10">
-          <CardTitle className="font-black uppercase tracking-tighter text-3xl flex items-center gap-3">
+          <CardTitle className="font-black uppercase tracking-tighter text-3xl">
             Console Administrateur
           </CardTitle>
           <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Session Active : {user?.email}</p>
@@ -87,25 +76,27 @@ export default function AdminPage() {
       </Card>
 
       {(usersError || convsError) && (
-        <Card className="border-red-500 bg-red-50 text-red-900 shadow-lg animate-bounce">
+        <Card className="border-red-500 bg-red-50 text-red-900 shadow-lg">
             <CardHeader className="py-4">
-                <CardTitle className="text-sm font-black uppercase flex items-center gap-2">
-                    <AlertCircle className="size-4" /> Erreur de permission détectée
+                <CardTitle className="text-sm font-black uppercase flex items-center gap-2 text-red-600">
+                    <AlertCircle className="size-4" /> Erreur de synchronisation détectée
                 </CardTitle>
             </CardHeader>
-            <CardContent className="text-xs font-mono">
-                {usersError && <p>Erreur Users: {usersError.message}</p>}
-                {convsError && <p>Erreur Conversations: {convsError.message}</p>}
-                <p className="mt-2 text-[10px] font-bold">Action suggérée : Vérifiez la console et rafraîchissez (Cmd+Shift+R).</p>
+            <CardContent className="text-xs font-mono space-y-1">
+                {usersError && <p>• Erreur Utilisateurs: {usersError.message}</p>}
+                {convsError && <p>• Erreur Conversations: {convsError.message}</p>}
+                <Button variant="outline" className="mt-4 h-8 text-[10px] font-black uppercase border-red-200 bg-white" onClick={() => window.location.reload()}>
+                    <RefreshCw className="size-3 mr-2" /> Forcer le rafraîchissement
+                </Button>
             </CardContent>
         </Card>
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3 mb-6 h-auto bg-muted/50 border-2 rounded-2xl p-1.5 shadow-sm">
-          <TabsTrigger value="stats" className="text-[10px] font-black uppercase py-3 rounded-xl data-[state=active]:shadow-md">Statistiques</TabsTrigger>
-          <TabsTrigger value="users" className="text-[10px] font-black uppercase py-3 rounded-xl data-[state=active]:shadow-md">Utilisateurs</TabsTrigger>
-          <TabsTrigger value="commerces" className="text-[10px] font-black uppercase py-3 rounded-xl data-[state=active]:shadow-md">Commerces</TabsTrigger>
+          <TabsTrigger value="stats" className="text-[10px] font-black uppercase py-3 rounded-xl">Statistiques</TabsTrigger>
+          <TabsTrigger value="users" className="text-[10px] font-black uppercase py-3 rounded-xl">Utilisateurs</TabsTrigger>
+          <TabsTrigger value="commerces" className="text-[10px] font-black uppercase py-3 rounded-xl">Commerces</TabsTrigger>
         </TabsList>
 
         <TabsContent value="stats" className="space-y-6 animate-in fade-in slide-in-from-bottom-2">

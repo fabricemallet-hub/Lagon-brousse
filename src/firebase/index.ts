@@ -12,6 +12,7 @@ import {
 
 /**
  * @fileOverview Initialisation de Firebase Hardened.
+ * Le mode Memory Cache est activé pour éviter l'erreur ca9 et Bad Request.
  */
 
 declare global {
@@ -24,7 +25,6 @@ export function initializeFirebase() {
   if (typeof window !== 'undefined') {
     // 1. Singleton App
     if (!globalThis.__LB_FIREBASE_APP) {
-      console.log("L&B DEBUG: Initialisation Firebase App...");
       globalThis.__LB_FIREBASE_APP = getApps().length === 0 
         ? initializeApp(firebaseConfig) 
         : getApp();
@@ -33,20 +33,18 @@ export function initializeFirebase() {
 
     // 2. Singleton Auth
     if (!globalThis.__LB_FIREBASE_AUTH) {
-      console.log("L&B DEBUG: Initialisation Firebase Auth...");
       globalThis.__LB_FIREBASE_AUTH = getAuth(app);
     }
     const auth = globalThis.__LB_FIREBASE_AUTH;
 
-    // 3. Singleton Firestore (STRICT MEMORY POUR ÉVITER CA9)
+    // 3. Singleton Firestore (STRICT MEMORY CACHE POUR STABILITÉ)
     if (!globalThis.__LB_FIREBASE_FIRESTORE) {
       try {
-        console.log("L&B DEBUG: Configuration Firestore (Memory Cache Only)...");
+        console.log("L&B DEBUG: Configuration Firestore (Memory Cache Mode)...");
         globalThis.__LB_FIREBASE_FIRESTORE = initializeFirestore(app, {
           localCache: memoryLocalCache(),
         });
       } catch (e) {
-        console.warn("L&B DEBUG: Firestore déjà initialisé ou mode restreint, récupération de l'instance par défaut.");
         globalThis.__LB_FIREBASE_FIRESTORE = getFirestore(app);
       }
     }
