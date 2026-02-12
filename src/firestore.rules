@@ -4,24 +4,25 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ======================================================
-    // 1. RÈGLE ALPHA - ACCÈS TOTAL ET PRIORITAIRE (MASTER)
+    // 1. RÈGLE ALPHA - ACCÈS TOTAL MASTER (f.mallet81@outlook.com)
     // ======================================================
-    // Cette règle autorise f.mallet81@outlook.com à TOUT faire sur TOUTE la base.
-    // L'UID t8nPnZLcTiaLJSKMuLzib3C5nPn1 est également autorisé.
+    // Cette règle est prioritiaire et inconditionnelle.
     
-    function isMaster() {
-      return request.auth != null && (
-        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
-        (request.auth.token.email != null && request.auth.token.email.lower() == "f.mallet81@outlook.com")
+    match /{document=**} {
+      allow read, write: if request.auth != null && (
+        request.auth.token.email == "f.mallet81@outlook.com" || 
+        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"
       );
     }
 
-    match /{allPaths=**} {
-      allow read, write: if isMaster();
-    }
+    // Autorisations explicites pour le listage des collections Admin
+    match /conversations { allow list: if request.auth != null && (request.auth.token.email == "f.mallet81@outlook.com" || request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"); }
+    match /users { allow list: if request.auth != null && (request.auth.token.email == "f.mallet81@outlook.com" || request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"); }
+    match /businesses { allow list: if request.auth != null && (request.auth.token.email == "f.mallet81@outlook.com" || request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"); }
+    match /campaigns { allow list: if request.auth != null && (request.auth.token.email == "f.mallet81@outlook.com" || request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"); }
 
     // ======================================================
-    // 2. RÈGLES UTILISATEURS (Appliquées si non-Master)
+    // 2. RÈGLES STANDARDS (Pour les autres utilisateurs)
     // ======================================================
 
     match /users/{userId} {

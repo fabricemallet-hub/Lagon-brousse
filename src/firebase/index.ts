@@ -11,8 +11,8 @@ import {
 } from 'firebase/firestore';
 
 /**
- * @fileOverview Initialisation de Firebase Hardened.
- * Le mode Memory Cache est activé pour éviter l'erreur ca9 et Bad Request.
+ * @fileOverview Initialisation de Firebase Blindée.
+ * Utilisation du Long Polling pour éviter les erreurs de canal (400 Bad Request).
  */
 
 declare global {
@@ -37,14 +37,17 @@ export function initializeFirebase() {
     }
     const auth = globalThis.__LB_FIREBASE_AUTH;
 
-    // 3. Singleton Firestore (STRICT MEMORY CACHE POUR STABILITÉ)
+    // 3. Singleton Firestore (STRICT MEMORY CACHE + LONG POLLING)
     if (!globalThis.__LB_FIREBASE_FIRESTORE) {
       try {
-        console.log("L&B DEBUG: Configuration Firestore (Memory Cache Mode)...");
+        console.log("L&B DEBUG: Configuration Firestore (Hardened Mode)...");
         globalThis.__LB_FIREBASE_FIRESTORE = initializeFirestore(app, {
           localCache: memoryLocalCache(),
+          // Force le Long Polling pour éviter les déconnexions WebSockets en environnement Cloud
+          experimentalForceLongPolling: true,
         });
       } catch (e) {
+        console.warn("L&B DEBUG: Échec initialisation personnalisée, repli standard.");
         globalThis.__LB_FIREBASE_FIRESTORE = getFirestore(app);
       }
     }

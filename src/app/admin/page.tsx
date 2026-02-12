@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, orderBy as firestoreOrderBy } from 'firebase/firestore';
+import { collection, query, orderBy } from 'firebase/firestore';
 import type { UserAccount, Business, Conversation } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,31 +27,35 @@ export default function AdminPage() {
     const isMaster = (user.email && masterEmails.includes(user.email.toLowerCase())) || 
                     user.uid === 't8nPnZLcTiaLJSKMuLzib3C5nPn1';
     
-    if (isMaster) console.log("L&B DEBUG ADMIN: Accès Master confirmé.");
+    if (isMaster) console.log(`L&B DEBUG ADMIN IDENTITÉ: [${user.email}] (UID: ${user.uid}). Accès Master: true`);
     return isMaster;
   }, [user]);
 
-  // REQUÊTES FIRESTORE
+  // REQUÊTES FIRESTORE - N'exécuter que si isAdmin est confirmé et firestore prêt
   const usersRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
+    console.log("L&B DEBUG ADMIN: Lancement requête [users]");
     return query(collection(firestore, 'users'), orderBy('email', 'asc'));
   }, [firestore, isAdmin]);
   const { data: users, isLoading: isUsersLoading, error: usersError } = useCollection<UserAccount>(usersRef);
 
   const businessRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
+    console.log("L&B DEBUG ADMIN: Lancement requête [businesses]");
     return query(collection(firestore, 'businesses'), orderBy('name', 'asc'));
   }, [firestore, isAdmin]);
   const { data: businesses } = useCollection<Business>(businessRef);
 
   const convsRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
+    console.log("L&B DEBUG ADMIN: Lancement requête [conversations]");
     return query(collection(firestore, 'conversations'), orderBy('lastMessageAt', 'desc'));
   }, [firestore, isAdmin]);
   const { data: conversations, isLoading: isConvsLoading, error: convsError } = useCollection<Conversation>(convsRef);
 
   useEffect(() => {
     if (!isUserLoading && !isAdmin && user) {
+      console.warn("L&B DEBUG ADMIN: Redirection - Accès non autorisé.");
       router.push('/compte');
     }
   }, [isAdmin, isUserLoading, router, user]);
