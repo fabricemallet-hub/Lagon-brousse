@@ -59,23 +59,41 @@ export default function AdminPage() {
   }, [user]);
 
   // Requêtes Firestore
-  const usersRef = useMemoFirebase(() => isAdmin ? query(collection(firestore!, 'users'), orderBy('email', 'asc')) : null, [firestore, isAdmin]);
+  const usersRef = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    return query(collection(firestore, 'users'), orderBy('email', 'asc'));
+  }, [firestore, isAdmin]);
   const { data: users } = useCollection<UserAccount>(usersRef);
 
-  const businessRef = useMemoFirebase(() => isAdmin ? query(collection(firestore!, 'businesses'), orderBy('name', 'asc')) : null, [firestore, isAdmin]);
+  const businessRef = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    return query(collection(firestore, 'businesses'), orderBy('name', 'asc'));
+  }, [firestore, isAdmin]);
   const { data: businesses } = useCollection<Business>(businessRef);
 
-  const tokensRef = useMemoFirebase(() => isAdmin ? query(collection(firestore!, 'access_tokens'), orderBy('createdAt', 'desc')) : null, [firestore, isAdmin]);
+  const tokensRef = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    return query(collection(firestore, 'access_tokens'), orderBy('createdAt', 'desc'));
+  }, [firestore, isAdmin]);
   const { data: tokens } = useCollection<AccessToken>(tokensRef);
 
-  const fishRef = useMemoFirebase(() => isAdmin ? query(collection(firestore!, 'fish_species'), orderBy('name', 'asc')) : null, [firestore, isAdmin]);
+  const fishRef = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    return query(collection(firestore, 'fish_species'), orderBy('name', 'asc'));
+  }, [firestore, isAdmin]);
   const { data: fishSpecies } = useCollection<FishSpeciesInfo>(fishRef);
 
-  // Correction de la requête de conversations pour éviter les erreurs de permission
-  const convsRef = useMemoFirebase(() => isAdmin ? query(collection(firestore!, 'conversations'), orderBy('lastMessageAt', 'desc')) : null, [firestore, isAdmin]);
+  // Requête conversations - Chemin direct pour simplifier les règles
+  const convsRef = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    return query(collection(firestore, 'conversations'), orderBy('lastMessageAt', 'desc'));
+  }, [firestore, isAdmin]);
   const { data: conversations } = useCollection<Conversation>(convsRef);
 
-  const splashRef = useMemoFirebase(() => isAdmin ? doc(firestore!, 'app_settings', 'splash') : null, [firestore, isAdmin]);
+  const splashRef = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    return doc(firestore, 'app_settings', 'splash');
+  }, [firestore, isAdmin]);
   const { data: splashSettings } = useDoc<SplashScreenSettings>(splashRef);
 
   const handleEditUser = (u: UserAccount) => setUserToEdit(u);

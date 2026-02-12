@@ -1,38 +1,45 @@
 rules_version = '2';
 
-// Version 7.0.0 - ACCÈS MAÎTRE ABSOLU ET PRIORITAIRE
+// Version 8.0.0 - SÉCURITÉ MAÎTRE EXPLICITE
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. PRIORITÉ SUPRÊME : VOTRE UID MAÎTRE ---
-    // Cette règle autorise TOUTES les opérations sur TOUS les chemins.
-    // On utilise l'UID en dur pour une évaluation instantanée et sans faille.
-    match /{allPaths=**} {
-      allow read, write: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1";
+    // --- FONCTION MAÎTRE PRIORITAIRE ---
+    function isMaster() {
+      return request.auth != null && (
+        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
+        request.auth.uid == "ipupi3Pg4RfrSEpFyT69BtlCdpi2" ||
+        request.auth.uid == "Irglq69MasYdNwBmUu8yKvw6h4G2" ||
+        (request.auth.token.email != null && request.auth.token.email.lower() == "f.mallet81@outlook.com")
+      );
     }
 
-    // --- 2. LISTAGE EXPLICITE DES COLLECTIONS RACINE ---
-    // Indispensable pour le fonctionnement du Dashboard Admin.
-    match /conversations { allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"; }
-    match /users { allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"; }
-    match /businesses { allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"; }
-    match /access_tokens { allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"; }
-    match /campaigns { allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"; }
-    match /system_notifications { allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"; }
+    // --- 1. ACCÈS TOTAL POUR LE MAÎTRE ---
+    match /{allPaths=**} {
+      allow read, write: if isMaster();
+    }
 
-    // --- 3. FONCTION DE DÉTECTION POUR LES AUTRES ADMINS ---
+    // --- 2. LISTAGE EXPLICITE DES RACINES (Indispensable pour SDK JS) ---
+    match /conversations { allow list: if isMaster(); }
+    match /users { allow list: if isMaster(); }
+    match /businesses { allow list: if isMaster(); }
+    match /access_tokens { allow list: if isMaster(); }
+    match /campaigns { allow list: if isMaster(); }
+    match /system_notifications { allow list: if isMaster(); }
+    match /app_settings { allow list: if isMaster(); }
+
+    // --- 3. FONCTION POUR ADMINS SECONDAIRES & PROS ---
     function isSecondaryAdmin() {
       return request.auth != null && (
-        request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2"] ||
+        request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1"] ||
         (request.auth.token.email != null && request.auth.token.email.lower() in [
-          "f.mallet81@outlook.com", 
           "fabrice.mallet@gmail.com", 
           "f.mallet81@gmail.com"
         ])
       );
     }
 
-    // --- 4. RÈGLES STANDARDS POUR LES UTILISATEURS ---
+    // --- 4. RÈGLES POUR UTILISATEURS STANDARDS ---
     
     match /conversations/{userId} {
       allow read, write: if request.auth != null && (request.auth.uid == userId || isSecondaryAdmin());
