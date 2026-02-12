@@ -80,7 +80,7 @@ export default function AdminPage() {
   const fishRef = useMemoFirebase(() => isAdmin ? query(collection(firestore!, 'fish_species'), orderBy('name', 'asc')) : null, [firestore, isAdmin]);
   const { data: fishSpecies } = useCollection<FishSpeciesInfo>(fishRef);
 
-  // Requête messagerie
+  // Requête messagerie - Utilise isAdmin pour s'assurer que l'admin voit tout
   const convsRef = useMemoFirebase(() => isAdmin ? collection(firestore!, 'conversations') : null, [firestore, isAdmin]);
   const { data: conversations } = useCollection<Conversation>(convsRef);
 

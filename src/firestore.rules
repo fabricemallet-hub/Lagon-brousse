@@ -1,16 +1,18 @@
 rules_version = '2';
 
-// Version 2.2.4 - Priorité Maître Absolue
+// Version 2.2.5 - Priorité Maître Absolue & Listage Explicite
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. ACCÈS TOTAL MAÎTRE (Priorité Absolue) ---
-    // On autorise tout pour Fabrice Mallet et les administrateurs techniques au niveau racine.
-    // Cela inclut le listage de TOUTES les collections.
-    match /{document=**} {
-      allow read, write: if request.auth != null && (
-        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || 
-        request.auth.uid == "K9cVYLVUk1NV99YV3anebkugpPp1" ||
+    // --- 1. FONCTIONS DE DÉTECTION ---
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isMasterAdmin() {
+      return isSignedIn() && (
+        request.auth.uid in ["t8nPnZLcTiaLJSKMuLzib3C5nPn1", "K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2"] ||
         (request.auth.token.email != null && request.auth.token.email.lower() in [
           "f.mallet81@outlook.com", 
           "fabrice.mallet@gmail.com", 
@@ -19,35 +21,30 @@ service cloud.firestore {
       );
     }
 
-    // --- 2. FONCTIONS DE DÉTECTION GÉNÉRALES (Pour les autres utilisateurs) ---
+    // --- 2. ACCÈS TOTAL MAÎTRE (Priorité Absolue) ---
+    match /{document=**} {
+      allow read, write: if isMasterAdmin();
+    }
+
+    // --- 3. RÈGLES DE LISTAGE EXPLICITES (Pour corriger l'erreur Missing Permissions) ---
     
-    function isSignedIn() {
-      return request.auth != null;
+    match /conversations {
+      allow list: if isMasterAdmin();
     }
 
-    function isMasterAdmin() {
-      return isSignedIn() && (
-        request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2", "t8nPnZLcTiaLJSKMuLzib3C5nPn1"] ||
-        (request.auth.token.email != null && request.auth.token.email.lower() in ["f.mallet81@outlook.com", "fabrice.mallet@gmail.com", "f.mallet81@gmail.com"])
-      );
+    match /users {
+      allow list: if isMasterAdmin();
     }
 
-    function isAdmin() {
-      return isMasterAdmin() || (isSignedIn() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'admin');
+    match /businesses {
+      allow list: if isMasterAdmin();
     }
 
-    function isPro() {
-      return isAdmin() || (isSignedIn() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'professional' ||
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'professional'
-        )
-      );
+    match /access_tokens {
+      allow list: if isMasterAdmin();
     }
 
-    // --- 3. RÈGLES SPÉCIFIQUES ---
+    // --- 4. RÈGLES SPÉCIFIQUES POUR UTILISATEURS STANDARDS ---
     
     match /conversations/{userId} {
       allow read, write: if isSignedIn() && (request.auth.uid == userId);
@@ -113,10 +110,6 @@ service cloud.firestore {
       }
     }
 
-    match /access_tokens/{id} {
-      allow read, write: if isSignedIn();
-    }
-
     match /shared_access_tokens/{id} {
       allow get, list: if true;
     }
@@ -130,17 +123,17 @@ service cloud.firestore {
 
     match /businesses/{businessId} {
       allow get, list: if true;
-      allow create: if isPro();
+      allow create: if isSignedIn();
       allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid);
 
       match /promotions/{promoId} {
         allow get, list: if true;
-        allow write: if isPro();
+        allow write: if isSignedIn();
       }
     }
 
     match /campaigns/{campaignId} {
-      allow create: if isPro();
+      allow create: if isSignedIn();
       allow read: if isSignedIn() && (resource.data.ownerId == request.auth.uid);
     }
   }
