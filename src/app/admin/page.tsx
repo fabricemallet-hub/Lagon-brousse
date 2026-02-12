@@ -551,6 +551,7 @@ function FishManager({ species }: { species: FishSpeciesInfo[] | null }) {
     const [name, setName] = useState('');
     const [scieName, setScieName] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isRefilling, setIsRefilling] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     
     // Edit state
@@ -637,6 +638,35 @@ function FishManager({ species }: { species: FishSpeciesInfo[] | null }) {
         } finally { setIsGenerating(false); }
     };
 
+    const handleAiRefill = async () => {
+        if (!editingFish) return;
+        setIsRefilling(true);
+        try {
+            const info = await generateFishInfo({ 
+                name: editingFish.name, 
+                scientificName: editingFish.scientificName 
+            });
+            setEditingFish({
+                ...editingFish,
+                scientificName: info.scientificName,
+                category: info.category,
+                gratteRiskSmall: info.gratteRiskSmall,
+                gratteRiskMedium: info.gratteRiskMedium,
+                gratteRiskLarge: info.gratteRiskLarge,
+                lengthSmall: info.lengthSmall,
+                lengthMedium: info.lengthMedium,
+                lengthLarge: info.lengthLarge,
+                fishingAdvice: info.fishingAdvice,
+                culinaryAdvice: info.culinaryAdvice,
+            });
+            toast({ title: "Champs mis à jour par l'IA", description: "Vérifiez les données avant de sauvegarder." });
+        } catch (e) {
+            toast({ variant: 'destructive', title: "Erreur IA", description: "L'IA n'a pas pu générer les informations." });
+        } finally {
+            setIsRefilling(false);
+        }
+    };
+
     return (
         <Card className="border-2 shadow-lg">
             <CardHeader><CardTitle className="text-xl font-black uppercase flex items-center gap-2"><Fish className="size-6 text-primary" /> Guide Poissons & Gratte</CardTitle></CardHeader>
@@ -700,6 +730,19 @@ function FishManager({ species }: { species: FishSpeciesInfo[] | null }) {
                     </DialogHeader>
                     {editingFish && (
                         <div className="space-y-4 py-4">
+                            <div className="flex justify-end">
+                                <Button 
+                                    variant="secondary" 
+                                    size="sm" 
+                                    className="font-black uppercase h-9 gap-2 shadow-sm border-2 border-primary/20"
+                                    onClick={handleAiRefill}
+                                    disabled={isRefilling}
+                                >
+                                    {isRefilling ? <RefreshCw className="size-3 animate-spin" /> : <BrainCircuit className="size-3" />}
+                                    Remplir via IA (Gemini)
+                                </Button>
+                            </div>
+
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Nom Commun</Label><Input value={editingFish.name} onChange={e => setEditingFish({...editingFish, name: e.target.value})} /></div>
                                 <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Nom Scientifique</Label><Input value={editingFish.scientificName} onChange={e => setEditingFish({...editingFish, scientificName: e.target.value})} /></div>
