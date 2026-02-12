@@ -115,17 +115,20 @@ export function AuthForm({ mode }: AuthFormProps) {
       return;
     }
 
+    // Force email to lowercase to avoid verification issues
+    const emailLower = values.email.toLowerCase();
+
     try {
       if (mode === 'login') {
         const loginValues = values as z.infer<typeof loginSchema>;
 
         if (loginValues.rememberMe) {
-            localStorage.setItem('rememberedEmail', loginValues.email);
+            localStorage.setItem('rememberedEmail', emailLower);
         } else {
             localStorage.removeItem('rememberedEmail');
         }
 
-        const userCredential = await signInWithEmailAndPassword(auth, loginValues.email, loginValues.password);
+        const userCredential = await signInWithEmailAndPassword(auth, emailLower, loginValues.password);
 
         if (userCredential.user && loginValues.token) {
             const result = await redeemAccessToken(firestore, userCredential.user, loginValues.token);
@@ -151,7 +154,7 @@ export function AuthForm({ mode }: AuthFormProps) {
 
       } else { // mode === 'signup'
         const signupValues = values as z.infer<typeof signupSchema>;
-        const userCredential = await createUserWithEmailAndPassword(auth, signupValues.email, signupValues.password);
+        const userCredential = await createUserWithEmailAndPassword(auth, emailLower, signupValues.password);
         
         if (userCredential.user) {
           const user = userCredential.user;

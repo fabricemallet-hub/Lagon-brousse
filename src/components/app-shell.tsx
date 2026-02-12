@@ -1,3 +1,4 @@
+
 'use client';
 import {
   Sidebar,
@@ -157,10 +158,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="space-y-1">
               <CardTitle className="text-2xl font-black uppercase tracking-tighter">Vérifiez votre Email</CardTitle>
               <CardDescription className="font-bold text-xs uppercase text-muted-foreground">
-                Validation requise pour {user.email}
+                Validation requise pour <span className="lowercase font-black text-primary">{user.email}</span>
               </CardDescription>
             </div>
-          </CardHeader>
+          </Header>
           <CardContent className="space-y-6 text-center">
             <p className="text-sm font-medium leading-relaxed text-muted-foreground">
               Un lien de validation vous a été envoyé. Veuillez cliquer dessus pour activer votre compte.
