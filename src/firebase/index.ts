@@ -13,7 +13,7 @@ import {
 /**
  * @fileOverview Initialisation SINGLETON de Firebase.
  * Forçage Memory Cache + Long Polling pour éliminer les erreurs d'assertion interne (ID: ca9).
- * Utilisation de globalThis pour garantir l'immuabilité de l'instance.
+ * Utilisation de globalThis pour garantir l'immuabilité de l'instance lors du Fast Refresh.
  */
 
 declare global {
@@ -39,16 +39,17 @@ export function initializeFirebase() {
     }
     const auth = globalThis.__LB_FIREBASE_AUTH;
 
-    // 3. Singleton Firestore (FORÇAGE STABILITÉ ABSOLU)
+    // 3. Singleton Firestore (STABILISATION CRITIQUE)
     if (!globalThis.__LB_FIREBASE_FIRESTORE) {
       try {
+        // ON INITIALISE AVEC LES RÉGLAGES DE STABILITÉ AVANT TOUT AUTRE APPEL
         globalThis.__LB_FIREBASE_FIRESTORE = initializeFirestore(app, {
-          experimentalForceLongPolling: true, // Évite les crashs WebChannel dans Cloud Workstations
+          experimentalForceLongPolling: true, // Évite les crashs WebChannel
           localCache: memoryLocalCache(), // Désactive IndexedDB pour éviter le conflit ID: ca9
         });
-        console.log("L&B NC: Firestore initialisé (Mode Singleton Immuable)");
+        console.log("L&B NC: Firestore initialisé (Mode Singleton Stable : Long Polling + Memory Cache)");
       } catch (e) {
-        // En cas d'erreur (déjà initialisé par ailleurs), on récupère l'instance existante
+        // En cas d'erreur (déjà initialisé), on récupère l'instance existante
         globalThis.__LB_FIREBASE_FIRESTORE = getFirestore(app);
       }
     }

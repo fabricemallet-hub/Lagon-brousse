@@ -38,6 +38,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
             subscriptionStatus: 'admin',
             role: 'admin'
           }, { merge: true });
+          console.log("L&B NC: Rôle Administrateur Maître synchronisé.");
       }
       return;
     }
@@ -62,6 +63,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
     }
     
     await setDoc(userDocRef, newUserDocument);
+    console.log("L&B NC: Nouveau profil utilisateur créé.");
   } catch (error) {
     console.warn("L&B NC: Erreur synchronisation profil:", error);
   }
