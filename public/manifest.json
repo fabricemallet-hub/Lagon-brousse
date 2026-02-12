@@ -7,11 +7,9 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
   "theme_color": "#3498db",
+  "background_color": "#ffffff",
   "orientation": "portrait",
-  "lang": "fr-FR",
-  "categories": ["weather", "navigation", "lifestyle", "sports"],
   "icons": [
     {
       "src": "/icon-192x192.png",
@@ -33,6 +31,15 @@
       "type": "image/png",
       "form_factor": "narrow",
       "label": "Accueil de l'application"
+    },
+    {
+      "src": "https://picsum.photos/seed/lb-wide/1920/1080",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Tableau de bord Pêche"
     }
-  ]
+  ],
+  "categories": ["weather", "navigation", "lifestyle", "sports"],
+  "lang": "fr-FR"
 }

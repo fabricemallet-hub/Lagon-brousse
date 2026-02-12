@@ -161,7 +161,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 Validation requise pour <span className="lowercase font-black text-primary">{user.email}</span>
               </CardDescription>
             </div>
-          </Header>
+          </CardHeader>
           <CardContent className="space-y-6 text-center">
             <p className="text-sm font-medium leading-relaxed text-muted-foreground">
               Un lien de validation vous a été envoyé. Veuillez cliquer dessus pour activer votre compte.
