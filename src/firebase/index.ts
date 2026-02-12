@@ -11,8 +11,8 @@ import {
 } from 'firebase/firestore';
 
 /**
- * @fileOverview Initialisation ROBUSTE de Firebase pour L&B NC.
- * Cette version utilise un verrou global immuable pour éliminer l'erreur ca9.
+ * @fileOverview Initialisation HAUTEMENT STABLE de Firebase.
+ * Utilise un verrou global pour empêcher toute réinitialisation conflictuelle.
  */
 
 declare global {
@@ -38,15 +38,16 @@ export function initializeFirebase() {
     }
     const auth = globalThis.__LB_FIREBASE_AUTH;
 
-    // 3. Firestore Singleton (FORCE STABILITÉ)
+    // 3. Firestore Singleton (FORCE STABILITÉ & CACHE MÉMOIRE)
     if (!globalThis.__LB_FIREBASE_FIRESTORE) {
       try {
         globalThis.__LB_FIREBASE_FIRESTORE = initializeFirestore(app, {
-          experimentalForceLongPolling: true, // Transport stable pour environnement Cloud
-          localCache: memoryLocalCache(),     // Désactive IndexedDB pour éviter l'erreur ca9
+          experimentalForceLongPolling: true, // Transport stable pour éviter ERR_CONNECTION_CLOSED
+          localCache: memoryLocalCache(),     // Désactive IndexedDB pour éliminer l'erreur ca9
         });
-        console.log("L&B NC: Firestore prêt (Mode Stabilité Verrouillé).");
+        console.log("L&B NC: Firestore initialisé en mode Stabilité Verrouillée.");
       } catch (e) {
+        console.warn("L&B NC: Échec initialisation personnalisée, fallback standard.");
         globalThis.__LB_FIREBASE_FIRESTORE = getFirestore(app);
       }
     }
@@ -55,7 +56,7 @@ export function initializeFirebase() {
     return { firebaseApp: app, auth, firestore };
   }
 
-  // Fallback Serveur (Next.js)
+  // Fallback Serveur (SSR)
   const ssrApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
   return {
     firebaseApp: ssrApp,

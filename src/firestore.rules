@@ -3,9 +3,8 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. ACCÈS MAÎTRE (PRIORITÉ ABSOLUE) ---
-    // On autorise tout pour votre email Outlook, sans condition.
-    // Cela débloque immédiatement le listage des collections racine.
+    // --- 1. AUTORITÉ MAÎTRE ABSOLUE (Email-First) ---
+    // Cette règle est prioritaire et inconditionnelle pour votre compte.
     match /{allPaths=**} {
       allow read, write: if request.auth != null && (
         request.auth.token.email.lower() == "f.mallet81@outlook.com" ||
@@ -14,8 +13,8 @@ service cloud.firestore {
       );
     }
 
-    // --- 2. RÈGLES EXPLICITES POUR LES COLLECTIONS D'ADMINISTRATION ---
-    // Parfois le moteur de règles nécessite une déclaration explicite pour le listage.
+    // --- 2. ACCÈS EXPLICITES POUR LE DASHBOARD ADMIN ---
+    // Firestore nécessite parfois un match explicite sur la collection pour le listage.
     match /conversations/{id} { allow list: if request.auth != null && request.auth.token.email.lower() == "f.mallet81@outlook.com"; }
     match /users/{id} { allow list: if request.auth != null && request.auth.token.email.lower() == "f.mallet81@outlook.com"; }
     match /businesses/{id} { allow list: if request.auth != null && request.auth.token.email.lower() == "f.mallet81@outlook.com"; }
@@ -53,7 +52,7 @@ service cloud.firestore {
     // Support (Tickets)
     match /cms_support/tickets/items/{id} {
       allow create: if request.auth != null;
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || request.auth.token.email.lower() == "f.mallet81@outlook.com");
     }
 
     // Sessions temps réel (GPS)
@@ -71,7 +70,7 @@ service cloud.firestore {
     match /businesses/{businessId} {
       allow get, list: if true;
       allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
+      allow update, delete: if request.auth != null && (resource.data.ownerId == request.auth.uid || request.auth.token.email.lower() == "f.mallet81@outlook.com");
       match /promotions/{promoId} { 
         allow get, list: if true; 
         allow write: if request.auth != null; 
@@ -80,7 +79,7 @@ service cloud.firestore {
 
     match /campaigns/{campaignId} {
       allow create: if request.auth != null;
-      allow read: if request.auth != null && resource.data.ownerId == request.auth.uid;
+      allow read: if request.auth != null && (resource.data.ownerId == request.auth.uid || request.auth.token.email.lower() == "f.mallet81@outlook.com");
     }
     
     match /spot_shares/{id} {

@@ -62,7 +62,6 @@ import { ensureUserDocument } from '@/lib/user-utils';
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { locations, selectedLocation, setSelectedLocation, isLocationLoading } = useLocation();
   const { selectedDate, setSelectedDate } = useDate();
-  const { calendarView, setCalendarView } = useCalendarView();
   const pathname = usePathname();
   const router = useRouter();
   const { user, isUserLoading } = useUser();
@@ -79,7 +78,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
-  // AUTO-SYNC ADMIN STATUS
+  // AUTO-SYNC PROFILE & ADMIN STATUS
   useEffect(() => {
     if (user && !isUserLoading && firestore) {
       ensureUserDocument(firestore, user).catch(console.error);
@@ -90,7 +89,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (isUserLoading) return 'loading';
     if (!user) return 'limited';
 
-    // MASTER ADMIN DETECTION (PRIORITÉ ABSOLUE)
+    // MASTER ADMIN DETECTION (PRIORITÉ ABSOLUE PAR EMAIL)
     const masterAdminEmails = [
       'f.mallet81@outlook.com',
       'fabrice.mallet@gmail.com', 
