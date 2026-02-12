@@ -6,7 +6,7 @@ import { getAuth, Auth } from 'firebase/auth';
 import { initializeFirestore, Firestore, getFirestore, memoryLocalCache } from 'firebase/firestore';
 
 /**
- * @fileOverview Initialisation centralisée et ultra-robuste de Firebase.
+ * @fileOverview Initialisation blindée de Firebase.
  * Utilise un singleton immuable pour éviter les erreurs d'assertion interne (ID: ca9).
  */
 
@@ -20,7 +20,8 @@ export function initializeFirebase() {
   if (typeof window !== 'undefined') {
     // 1. App Singleton
     if (!globalThis.__FIREBASE_APP) {
-      globalThis.__FIREBASE_APP = getApps().length === 0 
+      const apps = getApps();
+      globalThis.__FIREBASE_APP = apps.length === 0 
         ? initializeApp(firebaseConfig) 
         : getApp();
     }
@@ -32,17 +33,17 @@ export function initializeFirebase() {
     }
     const auth = globalThis.__FIREBASE_AUTH;
 
-    // 3. Firestore Singleton Blindé (Memory Cache + Long Polling)
-    // On force l'initialisation une seule fois pour toute la durée de vie de la session
+    // 3. Firestore Singleton (Memory Cache + Long Polling)
     if (!globalThis.__FIREBASE_FIRESTORE) {
       try {
+        // Initialisation forcée avec les paramètres de stabilité
         globalThis.__FIREBASE_FIRESTORE = initializeFirestore(app, {
           experimentalForceLongPolling: true,
           localCache: memoryLocalCache(),
         });
-        console.log("L&B NC: Firestore initialisé (Mode Immuable : Long Polling + Memory)");
+        console.log("L&B NC: Firestore initialisé (Stable: Long Polling + Memory Cache)");
       } catch (e) {
-        // En cas d'erreur (déjà initialisé par une autre voie), on récupère l'instance existante
+        // En cas de tentative de ré-initialisation, on récupère l'existant
         globalThis.__FIREBASE_FIRESTORE = getFirestore(app);
       }
     }
@@ -55,8 +56,9 @@ export function initializeFirebase() {
     };
   }
 
-  // Fallback pour SSR (Next.js server-side)
-  const ssrApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+  // Fallback pour SSR (Server-Side Rendering)
+  const ssrApps = getApps();
+  const ssrApp = ssrApps.length === 0 ? initializeApp(firebaseConfig) : getApp();
   return {
     firebaseApp: ssrApp,
     auth: getAuth(ssrApp),
