@@ -17,10 +17,10 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
   
   // Identifiants de confiance pour l'administration (Fabrice Mallet inclus)
   const masterAdminUids = [
+    't8nPnZLcTiaLJSKMuLzib3C5nPn1',
     'K9cVYLVUk1NV99YV3anebkugpPp1',
     'ipupi3Pg4RfrSEpFyT69BtlCdpi2',
-    'Irglq69MasYdNwBmUu8yKvw6h4G2',
-    't8nPnZLcTiaLJSKMuLzib3C5nPn1'
+    'Irglq69MasYdNwBmUu8yKvw6h4G2'
   ];
   const masterAdminEmails = [
     'f.mallet81@outlook.com',

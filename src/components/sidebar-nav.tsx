@@ -32,10 +32,10 @@ export function SidebarNav() {
     
     // Liste blanche technique (Priorité Haute pour Fabrice Mallet)
     const masterAdminUids = [
+      't8nPnZLcTiaLJSKMuLzib3C5nPn1',
       'K9cVYLVUk1NV99YV3anebkugpPp1',
       'ipupi3Pg4RfrSEpFyT69BtlCdpi2',
-      'Irglq69MasYdNwBmUu8yKvw6h4G2',
-      't8nPnZLcTiaLJSKMuLzib3C5nPn1'
+      'Irglq69MasYdNwBmUu8yKvw6h4G2'
     ];
 
     const masterAdminEmails = [
@@ -89,7 +89,7 @@ export function SidebarNav() {
       
       <div className="px-4 py-4 mt-auto border-t border-sidebar-border bg-sidebar group-data-[collapsible=icon]:hidden">
         <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40">
-          Version 2.2.5
+          Version 2.2.6
         </p>
       </div>
     </div>
