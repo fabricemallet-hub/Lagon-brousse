@@ -93,9 +93,10 @@ export function useCollection<T = any>(
 
           setError(contextualError)
           
-          // On désactive l'émission globale pour 'conversations' pour éviter le crash visuel NextJS
-          // et permettre au dashboard Admin de gérer l'erreur localement.
-          if (path !== 'conversations') {
+          // On évite l'émission globale pour les collections d'administration
+          // afin de permettre un affichage local de l'erreur dans le Dashboard
+          const adminPaths = ['conversations', 'users', 'businesses', 'campaigns'];
+          if (!adminPaths.includes(path)) {
             errorEmitter.emit('permission-error', contextualError);
           }
         } else {

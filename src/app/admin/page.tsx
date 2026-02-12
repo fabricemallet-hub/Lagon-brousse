@@ -31,7 +31,6 @@ export default function AdminPage() {
     return isMaster;
   }, [user]);
 
-  // Récupération du profil pour vérifier le rôle en base
   const userProfileRef = useMemoFirebase(() => {
     if (!user || !firestore || !isAdmin) return null;
     return doc(firestore, 'users', user.uid);
@@ -44,26 +43,24 @@ export default function AdminPage() {
     }
   }, [profile]);
 
-  // REQUÊTES FIRESTORE - Sécurisées par isAdmin
-  // Note: On retire le orderBy sur conversations pour tester si c'est un problème d'index
+  // REQUÊTES FIRESTORE
   const usersRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin || isUserLoading) return null;
     console.log("L&B DEBUG ADMIN: Lancement requête [users]");
-    return query(collection(firestore, 'users'), orderBy('email', 'asc'));
+    return collection(firestore, 'users');
   }, [firestore, isAdmin, isUserLoading]);
   const { data: users, isLoading: isUsersLoading, error: usersError } = useCollection<UserAccount>(usersRef);
 
   const businessRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin || isUserLoading) return null;
     console.log("L&B DEBUG ADMIN: Lancement requête [businesses]");
-    return query(collection(firestore, 'businesses'), orderBy('name', 'asc'));
+    return collection(firestore, 'businesses');
   }, [firestore, isAdmin, isUserLoading]);
   const { data: businesses } = useCollection<Business>(businessRef);
 
   const convsRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin || isUserLoading) return null;
     console.log("L&B DEBUG ADMIN: Lancement requête [conversations]");
-    // TEST: Suppression du orderBy pour forcer le listage simple
     return collection(firestore, 'conversations');
   }, [firestore, isAdmin, isUserLoading]);
   const { data: conversations, isLoading: isConvsLoading, error: convsError } = useCollection<Conversation>(convsRef);
@@ -96,24 +93,6 @@ export default function AdminPage() {
         </CardHeader>
       </Card>
 
-      {(usersError || convsError) && (
-        <Card className="border-red-500 bg-red-50 text-red-900 shadow-lg">
-            <CardHeader className="py-4">
-                <CardTitle className="text-sm font-black uppercase flex items-center gap-2 text-red-600">
-                    <AlertCircle className="size-4" /> Erreur de permissions détectée
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="text-xs font-mono space-y-1">
-                <p>Le moteur de règles Firestore a rejeté la requête.</p>
-                {usersError && <p className="text-red-600">• Users: {usersError.message}</p>}
-                {convsError && <p className="text-red-600">• Conversations: {convsError.message}</p>}
-                <Button variant="outline" className="mt-4 h-8 text-[10px] font-black uppercase border-red-200 bg-white" onClick={() => window.location.reload()}>
-                    <RefreshCw className="size-3 mr-2" /> Forcer le rafraîchissement
-                </Button>
-            </CardContent>
-        </Card>
-      )}
-
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3 mb-6 h-auto bg-muted/50 border-2 rounded-2xl p-1.5 shadow-sm">
           <TabsTrigger value="stats" className="text-[10px] font-black uppercase py-3 rounded-xl">Statistiques</TabsTrigger>
@@ -144,7 +123,18 @@ export default function AdminPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              {isConvsLoading ? (
+              {convsError ? (
+                <div className="p-8 flex flex-col items-center gap-4 text-center">
+                  <div className="p-4 bg-red-50 text-red-600 rounded-full"><AlertCircle className="size-8" /></div>
+                  <div className="space-y-1">
+                    <p className="font-black uppercase text-sm text-red-600">Erreur de permissions</p>
+                    <p className="text-xs text-muted-foreground max-w-xs leading-relaxed italic">Firestore rejette le listage des conversations pour votre profil.</p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="font-black uppercase text-[10px] h-8">
+                    <RefreshCw className="size-3 mr-2" /> Réessayer
+                  </Button>
+                </div>
+              ) : isConvsLoading ? (
                 <div className="p-8 space-y-4">
                   <Skeleton className="h-12 w-full" />
                   <Skeleton className="h-12 w-full" />
