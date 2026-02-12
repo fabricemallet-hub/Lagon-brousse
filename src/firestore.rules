@@ -4,7 +4,8 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // --- 1. AUTORITÉ MAÎTRE ABSOLUE (PRIORITÉ MAXIMALE) ---
-    // On accorde un accès total et immédiat aux UIDs administrateurs maîtres au sommet.
+    // On accorde un accès total et immédiat aux UIDs et Emails de confiance au sommet du fichier.
+    // Cela court-circuite tout refus potentiel ultérieur.
     match /{allPaths=**} {
       allow read, write: if request.auth != null && (
         request.auth.uid in [
@@ -22,20 +23,17 @@ service cloud.firestore {
     }
 
     // --- 2. ACCÈS EXPLICITES POUR LE DASHBOARD ADMIN ---
-    // Indispensable car allPaths=** peut parfois être masqué pour l'opération 'list'
+    // Firestore exige souvent une règle 'list' nommée sur la collection racine.
     match /conversations {
       allow list: if request.auth != null && (request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || request.auth.token.email.lower() == "f.mallet81@outlook.com");
-      match /{allPaths=**} {
-        allow read, write: if request.auth != null && (request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || request.auth.token.email.lower() == "f.mallet81@outlook.com");
-      }
     }
-
+    
     match /users {
       allow list: if request.auth != null && (request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || request.auth.token.email.lower() == "f.mallet81@outlook.com");
     }
 
     match /businesses {
-      allow list: if true; // Public pour la recherche
+      allow list: if true; 
     }
 
     match /campaigns {
