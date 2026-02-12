@@ -1,29 +1,25 @@
 rules_version = '2';
 
-// Version 10.0.0 - SÉCURITÉ MAÎTRE ABSOLUE
+// VERSION 11.0.0 - SOLUTION RADICALE POUR ACCÈS MAÎTRE
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. ACCÈS MAÎTRE TOTAL (PRIORITÉ #1) ---
-    // On autorise TOUT pour les UIDs administrateurs à la racine de manière directe
+    // --- 1. ACCÈS MAÎTRE ABSOLU (PRIORITÉ CRITIQUE) ---
+    // Cette règle autorise TOUT pour Fabrice Mallet (UID t8nPnZLcTiaLJSKMuLzib3C5nPn1)
+    // Placé ici, il court-circuite toute autre restriction.
     match /{allPaths=**} {
-      allow read, write: if request.auth != null && (
-        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
-        request.auth.uid == "ipupi3Pg4RfrSEpFyT69BtlCdpi2" ||
-        request.auth.uid == "Irglq69MasYdNwBmUu8yKvw6h4G2" ||
-        request.auth.uid == "K9cVYLVUk1NV99YV3anebkugpPp1"
-      );
+      allow read, write: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1";
     }
 
-    // --- 2. RÈGLES DE LISTAGE EXPLICITES (ROOT COLLECTIONS) ---
-    // Indispensable pour le Dashboard Admin
+    // --- 2. AUTORISATIONS DE LISTAGE RACINE EXPLICITES ---
+    // Firestore exige parfois un listage explicite au niveau de la collection racine
     match /conversations { allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"; }
     match /users { allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"; }
     match /access_tokens { allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"; }
     match /businesses { allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"; }
     match /campaigns { allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"; }
 
-    // --- 3. FONCTIONS DE BASE ---
+    // --- 3. FONCTIONS POUR UTILISATEURS STANDARDS ---
     function isSignedIn() {
       return request.auth != null;
     }
@@ -32,11 +28,7 @@ service cloud.firestore {
       return isSignedIn() && (
         request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2", "t8nPnZLcTiaLJSKMuLzib3C5nPn1"] ||
         (request.auth.token.email != null && 
-         request.auth.token.email.lower() in [
-           "fabrice.mallet@gmail.com",
-           "f.mallet81@gmail.com",
-           "f.mallet81@outlook.com"
-         ]
+         request.auth.token.email.lower() in ["fabrice.mallet@gmail.com", "f.mallet81@gmail.com", "f.mallet81@outlook.com"]
         )
       );
     }
@@ -53,20 +45,14 @@ service cloud.firestore {
 
     match /meteo_caledonie/{id} {
       allow get, list: if true;
-      match /previsions/{prevId} {
-        allow get, list: if true;
-      }
+      match /previsions/{prevId} { allow get, list: if true; }
       allow write: if isAdmin();
     }
 
     match /fish_species/{id} {
       allow get, list: if true;
       allow write: if isAdmin();
-      
-      match /commune_stats/{communeId} {
-        allow get, list: if true;
-        allow create, update: if isSignedIn();
-      }
+      match /commune_stats/{communeId} { allow get, list: if true; allow create, update: if isSignedIn(); }
     }
     
     match /sound_library/{id} {
@@ -88,30 +74,22 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      match /{allPaths=**} {
-        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      }
+      match /{allPaths=**} { allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin()); }
     }
 
     match /conversations/{userId} {
       allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      match /{allPaths=**} {
-        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      }
+      match /{allPaths=**} { allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin()); }
     }
 
     match /hunting_sessions/{id} {
       allow read, write: if isSignedIn();
-      match /{allPaths=**} {
-        allow read, write: if isSignedIn();
-      }
+      match /{allPaths=**} { allow read, write: if isSignedIn(); }
     }
 
     match /vessels/{id} {
       allow read, write: if isSignedIn();
-      match /{allPaths=**} {
-        allow read, write: if isSignedIn();
-      }
+      match /{allPaths=**} { allow read, write: if isSignedIn(); }
     }
 
     match /access_tokens/{id} {
@@ -135,11 +113,7 @@ service cloud.firestore {
       allow get, list: if true;
       allow create: if isSignedIn();
       allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
-
-      match /promotions/{promoId} {
-        allow get, list: if true;
-        allow write: if isSignedIn();
-      }
+      match /promotions/{promoId} { allow get, list: if true; allow write: if isSignedIn(); }
     }
 
     match /campaigns/{campaignId} {

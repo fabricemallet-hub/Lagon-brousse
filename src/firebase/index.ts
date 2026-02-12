@@ -6,8 +6,8 @@ import { getAuth, Auth } from 'firebase/auth';
 import { initializeFirestore, Firestore, getFirestore, memoryLocalCache } from 'firebase/firestore';
 
 /**
- * @fileOverview Initialisation centralisée et robuste de Firebase.
- * Utilise un singleton global et désactive la persistance sur disque pour éviter les erreurs d'assertion ID: ca9.
+ * @fileOverview Initialisation centralisée et ultra-robuste de Firebase.
+ * Utilise un singleton immuable pour éviter les erreurs d'assertion interne (ID: ca9).
  */
 
 declare global {
@@ -32,13 +32,19 @@ export function initializeFirebase() {
     }
     const auth = globalThis.__FIREBASE_AUTH;
 
-    // 3. Firestore Singleton avec Memory Cache (évite l'erreur d'assertion ID: ca9 liée à IndexedDB)
+    // 3. Firestore Singleton Blindé (Memory Cache + Long Polling)
+    // On force l'initialisation une seule fois pour toute la durée de vie de la session
     if (!globalThis.__FIREBASE_FIRESTORE) {
-      globalThis.__FIREBASE_FIRESTORE = initializeFirestore(app, {
-        experimentalForceLongPolling: true,
-        localCache: memoryLocalCache(),
-      });
-      console.log("L&B NC: Firestore initialisé (Stable: Long Polling + Memory Cache)");
+      try {
+        globalThis.__FIREBASE_FIRESTORE = initializeFirestore(app, {
+          experimentalForceLongPolling: true,
+          localCache: memoryLocalCache(),
+        });
+        console.log("L&B NC: Firestore initialisé (Mode Immuable : Long Polling + Memory)");
+      } catch (e) {
+        // En cas d'erreur (déjà initialisé par une autre voie), on récupère l'instance existante
+        globalThis.__FIREBASE_FIRESTORE = getFirestore(app);
+      }
     }
     const firestore = globalThis.__FIREBASE_FIRESTORE;
 
