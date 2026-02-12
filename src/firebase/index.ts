@@ -32,7 +32,8 @@ export function initializeFirebase() {
 }
 
 export function getSdks(firebaseApp: FirebaseApp) {
-  // CRITICAL: experimentalForceLongPolling solves "Unexpected state ID: ca9" in workstations
+  // CRITICAL: experimentalForceLongPolling: true solves "Unexpected state ID: ca9" in workstations
+  // by using HTTP polling instead of WebSockets which often fail behind proxies.
   let firestore;
   try {
     firestore = initializeFirestore(firebaseApp, {
