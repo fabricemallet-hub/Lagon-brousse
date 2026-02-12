@@ -1,14 +1,17 @@
 rules_version = '2';
 
-// Version 2.3.9 - CORRECTIF PRIORITAIRE LISTAGE CONVERSATIONS
+// Version 2.4.0 - SOLUTION RADICALE ACCÈS MAÎTRE
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. FONCTIONS DE SÉCURITÉ MAÎTRE ---
-    function isMasterAdmin() {
-      return request.auth != null && (
+    // --- 1. RÈGLES MAÎTRES PRIORITÉ ABSOLUE ---
+    // On autorise TOUT pour Fabrice Mallet (UID & Email) au sommet du fichier
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
-        request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2"] ||
+        request.auth.uid == "K9cVYLVUk1NV99YV3anebkugpPp1" ||
+        request.auth.uid == "ipupi3Pg4RfrSEpFyT69BtlCdpi2" ||
+        request.auth.uid == "Irglq69MasYdNwBmUu8yKvw6h4G2" ||
         (request.auth.token.email != null && request.auth.token.email.lower() in [
           "f.mallet81@outlook.com", 
           "fabrice.mallet@gmail.com", 
@@ -17,27 +20,22 @@ service cloud.firestore {
       );
     }
 
-    // --- 2. PRIORITÉ ABSOLUE (Court-circuit pour le Maître) ---
-    // Cette règle autorise TOUT pour l'administrateur principal.
-    match /{allPaths=**} {
-      allow read, write: if isMasterAdmin();
-    }
-
-    // --- 3. RÈGLES DE LISTAGE EXPLICITES (Pour corriger l'erreur 13:07) ---
+    // --- 2. RÈGLES DE LISTAGE EXPLICITES ---
+    // Firestore exige souvent une règle explicite sur la racine pour les requêtes de collection
     match /conversations {
-      allow list: if isMasterAdmin();
+      allow list: if request.auth != null && (request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || request.auth.token.email.lower() == "f.mallet81@outlook.com");
     }
     match /users {
-      allow list: if isMasterAdmin();
-    }
-    match /businesses {
-      allow list: if isMasterAdmin();
+      allow list: if request.auth != null && (request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || request.auth.token.email.lower() == "f.mallet81@outlook.com");
     }
     match /access_tokens {
-      allow list: if isMasterAdmin();
+      allow list: if request.auth != null && (request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || request.auth.token.email.lower() == "f.mallet81@outlook.com");
+    }
+    match /businesses {
+      allow list: if request.auth != null && (request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || request.auth.token.email.lower() == "f.mallet81@outlook.com");
     }
 
-    // --- 4. RÈGLES STANDARDS POUR UTILISATEURS ---
+    // --- 3. RÈGLES STANDARDS UTILISATEURS ---
     
     match /conversations/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
