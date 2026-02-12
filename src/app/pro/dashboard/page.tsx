@@ -27,7 +27,7 @@ export default function ProDashboard() {
     if (!user || !firestore) return null;
     return doc(firestore, 'users', user.uid);
   }, [user, firestore]);
-  const { data: profile } = useDoc<UserAccount>(userProfileRef);
+  const { data: profile, isLoading: isProfileLoading } = useDoc<UserAccount>(userProfileRef);
 
   const businessRef = useMemoFirebase(() => {
     if (!firestore || !profile?.businessId) return null;
@@ -112,7 +112,7 @@ export default function ProDashboard() {
     }
   };
 
-  if (isUserLoading || isBusinessLoading) return <div className="p-8"><Skeleton className="h-64 w-full" /></div>;
+  if (isUserLoading || isProfileLoading || isBusinessLoading) return <div className="p-8"><Skeleton className="h-64 w-full" /></div>;
 
   if (!business) {
     return (

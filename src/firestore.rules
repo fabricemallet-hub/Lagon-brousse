@@ -9,29 +9,30 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isAdmin() {
+    // ACCÈS MAÎTRE (INFAILLIBLE) : Basé sur les identifiants techniques
+    function isMasterAdmin() {
       return isSignedIn() && (
-        // Accès par UID maître (Consolidé)
         request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2", "t8nPnZLcTiaLJSKMuLzib3C5nPn1"] ||
-        // Accès par email maître
-        (request.auth.token.email != null && request.auth.token.email.lower() in ["f.mallet81@outlook.com", "fabrice.mallet@gmail.com", "f.mallet81@gmail.com"]) ||
-        // Accès par statut dans le document utilisateur (dynamique)
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'admin'
+        (request.auth.token.email != null && request.auth.token.email.lower() in ["f.mallet81@outlook.com", "fabrice.mallet@gmail.com", "f.mallet81@gmail.com"])
       );
     }
 
+    // ACCÈS ADMIN : Maître OU statut 'admin' en base
+    function isAdmin() {
+      return isMasterAdmin() || (isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'admin');
+    }
+
     function isPro() {
-      return isSignedIn() && (
-        isAdmin() || 
+      return isAdmin() || (isSignedIn() && (
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'professional' ||
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'professional'
-      );
+      ));
     }
 
     // --- 0. ACCÈS PUBLICS ---
     match /app_settings/{id} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isMasterAdmin();
     }
 
     match /system_notifications/{id} {
@@ -43,12 +44,12 @@ service cloud.firestore {
       match /previsions/{prevId} {
         allow get, list: if true;
       }
-      allow write: if isAdmin();
+      allow write: if isMasterAdmin();
     }
 
     match /fish_species/{id} {
       allow get, list: if true;
-      allow write: if isAdmin();
+      allow write: if isMasterAdmin();
       
       match /commune_stats/{communeId} {
         allow get, list: if true;
@@ -58,42 +59,39 @@ service cloud.firestore {
     
     match /sound_library/{id} {
       allow get, list: if true;
-      allow write: if isAdmin();
+      allow write: if isMasterAdmin();
     }
 
     // --- 1. CMS SUPPORT & FAQ ---
     match /cms_support/faq/items/{id} {
       allow get, list: if true;
-      allow write: if isAdmin();
+      allow write: if isMasterAdmin();
     }
 
     match /cms_support/tickets/items/{id} {
       allow create: if isSignedIn();
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow list: if isAdmin();
-      allow update, delete: if isAdmin();
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isMasterAdmin());
+      allow list: if isMasterAdmin();
+      allow update, delete: if isMasterAdmin();
     }
 
     // --- 2. UTILISATEURS & DONNÉES PERSO ---
     match /users/{userId} {
-      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow delete: if isAdmin();
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
+      allow delete: if isMasterAdmin();
       match /{allPaths=**} {
-        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
       }
     }
 
     // --- 3. MESSAGERIE & CONVERSATIONS ---
     match /conversations/{userId} {
-      // Un utilisateur lit sa propre convo, un admin lit tout
-      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      // L'admin peut lister la collection conversations
-      allow list: if isAdmin();
-      // Création/Maj par le proprio ou l'admin
-      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
+      // Règle de listage globale pour l'admin
+      allow list: if isMasterAdmin();
       
       match /messages/{messageId} {
-        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
       }
     }
 
@@ -113,19 +111,19 @@ service cloud.firestore {
     }
 
     match /access_tokens/{id} {
-      allow read, write: if isSignedIn() || isAdmin();
+      allow read, write: if isSignedIn() || isMasterAdmin();
     }
 
     match /shared_access_tokens/{id} {
       allow get, list: if true;
-      allow write: if isAdmin();
+      allow write: if isMasterAdmin();
     }
 
     // --- 5. PARTAGE DE SPOTS ---
     match /spot_shares/{id} {
       allow create: if isSignedIn();
       allow read, delete: if isSignedIn() && (
-        isAdmin() || 
+        isMasterAdmin() || 
         (request.auth.token.email != null && resource.data.recipientEmail == request.auth.token.email.lower())
       );
     }
@@ -134,7 +132,7 @@ service cloud.firestore {
     match /businesses/{businessId} {
       allow get, list: if true;
       allow create: if isPro();
-      allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isMasterAdmin());
 
       match /promotions/{promoId} {
         allow get, list: if true;
@@ -144,7 +142,7 @@ service cloud.firestore {
 
     match /campaigns/{campaignId} {
       allow create: if isPro();
-      allow read: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow read: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isMasterAdmin());
     }
   }
 }
