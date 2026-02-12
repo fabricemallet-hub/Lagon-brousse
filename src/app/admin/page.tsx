@@ -1,182 +1,613 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, doc } from 'firebase/firestore';
-import type { UserAccount, Business, Conversation } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { collection, query, orderBy, doc, setDoc, addDoc, deleteDoc, serverTimestamp, Timestamp, increment, getDocs, where, writeBatch } from 'firebase/firestore';
+import type { UserAccount, Business, Conversation, AccessToken, SharedAccessToken, FishSpeciesInfo, SplashScreenSettings, CgvSettings, RibSettings, SystemNotification } from '@/lib/types';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { 
+  MessageSquare, 
+  ShieldCheck, 
+  Users, 
+  Settings, 
+  KeyRound, 
+  Fish, 
+  Plus, 
+  Trash2, 
+  RefreshCw, 
+  Save, 
+  Zap, 
+  Gift, 
+  Ticket, 
+  BrainCircuit, 
+  Smartphone,
+  Info,
+  AlertTriangle,
+  CheckCircle2,
+  Megaphone,
+  Sparkles,
+  Search,
+  Eye,
+  CreditCard,
+  FileText
+} from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { MessageSquare, ShieldCheck, RefreshCw, AlertCircle, User } from 'lucide-react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { format, addMonths, addDays, isBefore } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
 
 export default function AdminPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const router = useRouter();
+  const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState('stats');
+  const [isGenerating, setIsGenerating] = useState(false);
 
+  // --- IDENTITY & MASTER CHECK ---
   const isAdmin = useMemo(() => {
     if (!user) return false;
     const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
-    const isMaster = (user.email && masterEmails.includes(user.email.toLowerCase())) || 
-                    user.uid === 't8nPnZLcTiaLJSKMuLzib3C5nPn1';
-    
-    if (isMaster) console.log(`L&B DEBUG ADMIN: Accès Master [${user.email}] confirmé.`);
-    return isMaster;
+    return masterEmails.includes(user.email?.toLowerCase() || '') || user.uid === 't8nPnZLcTiaLJSKMuLzib3C5nPn1';
   }, [user]);
 
-  const userProfileRef = useMemoFirebase(() => {
-    if (!user || !firestore || !isAdmin) return null;
-    return doc(firestore, 'users', user.uid);
-  }, [user, firestore, isAdmin]);
-  const { data: profile } = useDoc<UserAccount>(userProfileRef);
-
-  useEffect(() => {
-    if (profile) {
-      console.log(`L&B DEBUG ADMIN: Rôle document Firestore: ${profile.role}`);
-    }
-  }, [profile]);
-
   // REQUÊTES FIRESTORE
-  const usersRef = useMemoFirebase(() => {
-    if (!firestore || !isAdmin || isUserLoading) return null;
-    console.log("L&B DEBUG ADMIN: Lancement requête [users]");
-    return collection(firestore, 'users');
-  }, [firestore, isAdmin, isUserLoading]);
-  const { data: users, isLoading: isUsersLoading, error: usersError } = useCollection<UserAccount>(usersRef);
+  const usersRef = useMemoFirebase(() => (firestore && isAdmin) ? collection(firestore, 'users') : null, [firestore, isAdmin]);
+  const { data: users, isLoading: isUsersLoading } = useCollection<UserAccount>(usersRef);
 
-  const businessRef = useMemoFirebase(() => {
-    if (!firestore || !isAdmin || isUserLoading) return null;
-    console.log("L&B DEBUG ADMIN: Lancement requête [businesses]");
-    return collection(firestore, 'businesses');
-  }, [firestore, isAdmin, isUserLoading]);
+  const businessRef = useMemoFirebase(() => (firestore && isAdmin) ? collection(firestore, 'businesses') : null, [firestore, isAdmin]);
   const { data: businesses } = useCollection<Business>(businessRef);
 
-  const convsRef = useMemoFirebase(() => {
-    if (!firestore || !isAdmin || isUserLoading) return null;
-    console.log("L&B DEBUG ADMIN: Lancement requête [conversations]");
-    return collection(firestore, 'conversations');
-  }, [firestore, isAdmin, isUserLoading]);
-  const { data: conversations, isLoading: isConvsLoading, error: convsError } = useCollection<Conversation>(convsRef);
+  const convsRef = useMemoFirebase(() => (firestore && isAdmin) ? collection(firestore, 'conversations') : null, [firestore, isAdmin]);
+  const { data: conversations } = useCollection<Conversation>(convsRef);
+
+  const tokensRef = useMemoFirebase(() => (firestore && isAdmin) ? query(collection(firestore, 'access_tokens'), orderBy('createdAt', 'desc')) : null, [firestore, isAdmin]);
+  const { data: tokens } = useCollection<AccessToken>(tokensRef);
+
+  const fishRef = useMemoFirebase(() => (firestore && isAdmin) ? query(collection(firestore, 'fish_species'), orderBy('name', 'asc')) : null, [firestore, isAdmin]);
+  const { data: fishSpecies } = useCollection<FishSpeciesInfo>(fishRef);
+
+  const sysNotifsRef = useMemoFirebase(() => (firestore && isAdmin) ? query(collection(firestore, 'system_notifications'), orderBy('createdAt', 'desc')) : null, [firestore, isAdmin]);
+  const { data: sysNotifs } = useCollection<SystemNotification>(sysNotifsRef);
+
+  // SETTINGS REFS
+  const splashRef = useMemoFirebase(() => (firestore && isAdmin) ? doc(firestore, 'app_settings', 'splash') : null, [firestore, isAdmin]);
+  const { data: splashSettings } = useDoc<SplashScreenSettings>(splashRef);
+
+  const cgvRef = useMemoFirebase(() => (firestore && isAdmin) ? doc(firestore, 'app_settings', 'cgv') : null, [firestore, isAdmin]);
+  const { data: cgvData } = useDoc<CgvSettings>(cgvRef);
+
+  const ribRef = useMemoFirebase(() => (firestore && isAdmin) ? doc(firestore, 'app_settings', 'rib') : null, [firestore, isAdmin]);
+  const { data: ribData } = useDoc<RibSettings>(ribRef);
+
+  const sharedTokenRef = useMemoFirebase(() => (firestore && isAdmin) ? doc(firestore, 'shared_access_tokens', 'GLOBAL') : null, [firestore, isAdmin]);
+  const { data: globalGift } = useDoc<SharedAccessToken>(sharedTokenRef);
 
   useEffect(() => {
-    if (!isUserLoading && !isAdmin && user) {
-      router.push('/compte');
-    }
+    if (!isUserLoading && !isAdmin && user) router.push('/compte');
   }, [isAdmin, isUserLoading, router, user]);
 
-  if (isUserLoading) return <div className="p-8"><Skeleton className="h-48 w-full rounded-2xl" /></div>;
-  if (!isAdmin) return <div className="p-12 text-center font-black uppercase text-muted-foreground animate-pulse">Validation Master Admin...</div>;
-
-  const activeSubs = users?.filter(u => u.subscriptionStatus === 'active' || u.subscriptionStatus === 'admin').length || 0;
+  if (isUserLoading) return <div className="p-8"><Skeleton className="h-64 w-full rounded-2xl" /></div>;
+  if (!isAdmin) return <div className="p-12 text-center font-black uppercase text-muted-foreground animate-pulse">Vérification Accès Master...</div>;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-20 px-1">
+    <div className="max-w-6xl mx-auto space-y-6 pb-20 px-1">
       <Card className="border-2 shadow-xl bg-slate-900 text-white overflow-hidden relative">
         <div className="absolute right-0 top-0 opacity-10 -translate-y-4 translate-x-4">
             <ShieldCheck className="size-48" />
         </div>
         <CardHeader className="py-8 relative z-10">
-          <CardTitle className="font-black uppercase tracking-tighter text-3xl">
-            Console Administrateur
-          </CardTitle>
-          <div className="flex flex-col gap-1 mt-1">
-            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Session : {user?.email}</p>
-            {profile && <p className="text-primary text-[10px] font-black uppercase tracking-widest flex items-center gap-1"><User className="size-3" /> Statut Base: {profile.role}</p>}
-          </div>
+          <CardTitle className="font-black uppercase tracking-tighter text-3xl">Tableau de Bord Administrateur</CardTitle>
+          <CardDescription className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Contrôle Master • {user?.email}</CardDescription>
         </CardHeader>
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-6 h-auto bg-muted/50 border-2 rounded-2xl p-1.5 shadow-sm">
-          <TabsTrigger value="stats" className="text-[10px] font-black uppercase py-3 rounded-xl">Statistiques</TabsTrigger>
-          <TabsTrigger value="users" className="text-[10px] font-black uppercase py-3 rounded-xl">Utilisateurs</TabsTrigger>
-          <TabsTrigger value="commerces" className="text-[10px] font-black uppercase py-3 rounded-xl">Commerces</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-6 mb-6 h-auto bg-muted/50 border-2 rounded-2xl p-1.5 shadow-sm gap-1">
+          <TabsTrigger value="stats" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Vue d'ensemble</TabsTrigger>
+          <TabsTrigger value="users" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Utilisateurs</TabsTrigger>
+          <TabsTrigger value="design" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Design & Splash</TabsTrigger>
+          <TabsTrigger value="fish" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Guide Poissons</TabsTrigger>
+          <TabsTrigger value="acces" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Accès</TabsTrigger>
+          <TabsTrigger value="support" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Support</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="stats" className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
-            <Card className="border-2 shadow-sm">
-              <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Utilisateurs</CardTitle></CardHeader>
-              <CardContent><div className="text-3xl font-black">{isUsersLoading ? <RefreshCw className="size-6 animate-spin" /> : users?.length || 0}</div></CardContent>
-            </Card>
-            <Card className="border-2 shadow-sm">
-              <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Abonnés</CardTitle></CardHeader>
-              <CardContent><div className="text-3xl font-black text-primary">{activeSubs}</div></CardContent>
-            </Card>
-            <Card className="border-2 shadow-sm">
-              <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Commerces Pro</CardTitle></CardHeader>
-              <CardContent><div className="text-3xl font-black text-accent">{businesses?.length || 0}</div></CardContent>
-            </Card>
+        <TabsContent value="stats" className="space-y-6">
+          <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
+            <Card className="border-2 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase opacity-40">Utilisateurs</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{users?.length || 0}</div></CardContent></Card>
+            <Card className="border-2 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-primary">Abonnés</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{users?.filter(u => u.subscriptionStatus === 'active' || u.subscriptionStatus === 'admin').length || 0}</div></CardContent></Card>
+            <Card className="border-2 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-accent">Commerces</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{businesses?.length || 0}</div></CardContent></Card>
+            <Card className="border-2 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-green-600">En Ligne (Sharing)</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">?</div></CardContent></Card>
           </div>
+          
+          <SystemNotificationsManager notifications={sysNotifs} />
+        </TabsContent>
 
-          <Card className="border-2 shadow-lg overflow-hidden rounded-2xl">
-            <CardHeader className="pb-3 border-b bg-muted/10">
-              <CardTitle className="text-lg font-black uppercase flex items-center gap-2">
-                <MessageSquare className="size-5 text-primary" /> Support & Messages Clients
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {convsError ? (
-                <div className="p-8 flex flex-col items-center gap-4 text-center">
-                  <div className="p-4 bg-red-50 text-red-600 rounded-full"><AlertCircle className="size-8" /></div>
-                  <div className="space-y-1">
-                    <p className="font-black uppercase text-sm text-red-600">Erreur de permissions</p>
-                    <p className="text-xs text-muted-foreground max-w-xs leading-relaxed italic">Firestore rejette le listage des conversations pour votre profil.</p>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="font-black uppercase text-[10px] h-8">
-                    <RefreshCw className="size-3 mr-2" /> Réessayer
-                  </Button>
-                </div>
-              ) : isConvsLoading ? (
-                <div className="p-8 space-y-4">
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/30">
-                      <TableHead className="text-[10px] font-black uppercase h-10 px-4">Utilisateur</TableHead>
-                      <TableHead className="text-[10px] font-black uppercase h-10">Dernier Message</TableHead>
-                      <TableHead className="text-right text-[10px] font-black uppercase h-10 px-4">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {conversations?.map(conv => (
-                      <TableRow key={conv.id} className={cn(!conv.isReadByAdmin && "bg-primary/5")}>
-                        <TableCell className="py-4 px-4">
-                          <div className="flex flex-col">
-                            <span className="font-black text-xs text-slate-800">{conv.userDisplayName || 'Inconnu'}</span>
-                            <span className="text-[9px] font-bold opacity-50 lowercase">{conv.userEmail}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-xs italic truncate max-w-[150px] opacity-70">
-                          "{conv.lastMessageContent}"
-                        </TableCell>
-                        <TableCell className="text-right px-4">
-                          <Button asChild variant="outline" size="sm" className="h-8 text-[10px] font-black uppercase border-2 shadow-sm hover:bg-primary hover:text-white transition-colors">
-                            <Link href={`/admin/messages/${conv.id}`}>Répondre</Link>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {(!conversations || conversations.length === 0) && (
-                      <TableRow><TableCell colSpan={3} className="text-center py-16 text-xs italic opacity-40 font-bold uppercase tracking-widest">Aucun message pour le moment</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+        <TabsContent value="users" className="space-y-6">
+          <UsersManager users={users} isUsersLoading={isUsersLoading} />
+        </TabsContent>
+
+        <TabsContent value="design" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <SplashManager initialSettings={splashSettings} />
+            <CgvRibManager cgvData={cgvData} ribData={ribData} />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="fish" className="space-y-6">
+          <FishManager species={fishSpecies} />
+        </TabsContent>
+
+        <TabsContent value="acces" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <GlobalAccessManager globalGift={globalGift} />
+            <TokenManager tokens={tokens} />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="support" className="space-y-6">
+          <SupportConversationsManager conversations={conversations} />
         </TabsContent>
       </Tabs>
     </div>
   );
+}
+
+// --- SUB-COMPONENTS ---
+
+function SystemNotificationsManager({ notifications }: { notifications: SystemNotification[] | null }) {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [title, setTitle] = useState('');
+    const [content, setContent] = useState('');
+    const [type, setType] = useState<SystemNotification['type']>('info');
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleAdd = async () => {
+        if (!firestore || !title || !content) return;
+        setIsSaving(true);
+        try {
+            await addDoc(collection(firestore, 'system_notifications'), {
+                title, content, type, isActive: true, createdAt: serverTimestamp()
+            });
+            setTitle(''); setContent('');
+            toast({ title: "Notification publiée" });
+        } finally { setIsSaving(false); }
+    };
+
+    const toggleStatus = async (id: string, current: boolean) => {
+        if (!firestore) return;
+        await setDoc(doc(firestore, 'system_notifications', id), { isActive: !current }, { merge: true });
+    };
+
+    return (
+        <Card className="border-2 shadow-lg">
+            <CardHeader><CardTitle className="text-lg font-black uppercase flex items-center gap-2"><Megaphone className="size-5 text-primary" /> Bandeaux d'information Accueil</CardTitle></CardHeader>
+            <CardContent className="space-y-6">
+                <div className="p-4 bg-muted/30 rounded-2xl border-2 border-dashed space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Titre du bandeau</Label><Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Alerte Météo, Maintenance..." /></div>
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Type</Label>
+                            <Select value={type} onValueChange={(v: any) => setType(v)}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent><SelectItem value="info">Information (Bleu)</SelectItem><SelectItem value="warning">Vigilance (Orange)</SelectItem><SelectItem value="error">Alerte (Rouge)</SelectItem><SelectItem value="success">Succès (Vert)</SelectItem></SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Message détaillé</Label><Textarea value={content} onChange={e => setContent(e.target.value)} placeholder="Contenu du message..." /></div>
+                    <Button onClick={handleAdd} disabled={isSaving || !title} className="w-full font-black uppercase h-12 shadow-lg">Publier sur l'accueil</Button>
+                </div>
+                <div className="space-y-2">
+                    {notifications?.map(n => (
+                        <div key={n.id} className="flex items-center justify-between p-3 border-2 rounded-xl bg-white shadow-sm">
+                            <div className="flex items-center gap-3">
+                                <div className={cn("size-3 rounded-full", n.type === 'error' ? 'bg-red-500' : n.type === 'warning' ? 'bg-orange-500' : 'bg-blue-500')} />
+                                <div className="flex flex-col"><span className="font-black text-xs uppercase">{n.title}</span><span className="text-[9px] font-bold opacity-40">{n.isActive ? 'ACTIF' : 'ARCHIVÉ'}</span></div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button variant="outline" size="sm" onClick={() => toggleStatus(n.id, n.isActive)} className="h-8 text-[9px] font-black uppercase">{n.isActive ? 'Masquer' : 'Afficher'}</Button>
+                                <Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(firestore!, 'system_notifications', n.id))} className="size-8 text-destructive"><Trash2 className="size-3" /></Button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function UsersManager({ users, isUsersLoading }: { users: UserAccount[] | null, isUsersLoading: boolean }) {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [search, setSearch] = useState('');
+
+    const filtered = users?.filter(u => u.email.toLowerCase().includes(search.toLowerCase()) || u.displayName.toLowerCase().includes(search.toLowerCase())) || [];
+
+    const updateStatus = async (uid: string, status: string) => {
+        if (!firestore) return;
+        const expiryDate = status === 'active' ? addMonths(new Date(), 1).toISOString() : null;
+        await setDoc(doc(firestore, 'users', uid), { 
+            subscriptionStatus: status,
+            subscriptionExpiryDate: expiryDate
+        }, { merge: true });
+        toast({ title: "Statut mis à jour" });
+    };
+
+    const updateRole = async (uid: string, role: string) => {
+        if (!firestore) return;
+        await setDoc(doc(firestore, 'users', uid), { role }, { merge: true });
+        toast({ title: "Rôle mis à jour" });
+    };
+
+    return (
+        <Card className="border-2 shadow-lg overflow-hidden">
+            <CardHeader className="bg-muted/10 border-b flex-row justify-between items-center">
+                <div><CardTitle className="text-lg font-black uppercase flex items-center gap-2"><Users className="size-5 text-primary" /> Gestion des Comptes</CardTitle></div>
+                <div className="relative w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3 text-muted-foreground" />
+                    <Input placeholder="Chercher utilisateur..." value={search} onChange={e => setSearch(e.target.value)} className="pl-8 h-9 text-xs border-2" />
+                </div>
+            </CardHeader>
+            <CardContent className="p-0">
+                <Table>
+                    <TableHeader><TableRow className="bg-muted/30">
+                        <TableHead className="text-[10px] font-black uppercase h-10 px-4">Utilisateur</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase h-10">Rôle</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase h-10">Abonnement</TableHead>
+                        <TableHead className="text-right text-[10px] font-black uppercase h-10 px-4">Actions</TableHead>
+                    </TableRow></TableHeader>
+                    <TableBody>
+                        {filtered.map(u => (
+                            <TableRow key={u.id}>
+                                <TableCell className="px-4 py-3">
+                                    <div className="flex flex-col"><span className="font-black text-xs">{u.displayName}</span><span className="text-[9px] font-bold opacity-40 lowercase">{u.email}</span></div>
+                                </TableCell>
+                                <TableCell>
+                                    <Select value={u.role || 'client'} onValueChange={v => updateRole(u.id, v)}>
+                                        <SelectTrigger className="h-8 text-[9px] font-black uppercase w-28"><SelectValue /></SelectTrigger>
+                                        <SelectContent><SelectItem value="client">Client</SelectItem><SelectItem value="professional">Pro</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent>
+                                    </Select>
+                                </TableCell>
+                                <TableCell>
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant={u.subscriptionStatus === 'active' ? 'default' : u.subscriptionStatus === 'trial' ? 'secondary' : 'destructive'} className="text-[8px] font-black uppercase h-5">
+                                            {u.subscriptionStatus}
+                                        </Badge>
+                                        {u.subscriptionExpiryDate && <span className="text-[8px] font-bold opacity-40">Expire: {format(new Date(u.subscriptionExpiryDate), 'dd/MM/yy')}</span>}
+                                    </div>
+                                </TableCell>
+                                <TableCell className="text-right px-4">
+                                    <div className="flex justify-end gap-1">
+                                        <Button variant="outline" size="sm" onClick={() => updateStatus(u.id, 'active')} className="h-7 text-[8px] font-black uppercase">Activer</Button>
+                                        <Button variant="outline" size="sm" onClick={() => updateStatus(u.id, 'limited')} className="h-7 text-[8px] font-black uppercase border-red-200 text-red-600">Couper</Button>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+    );
+}
+
+function SplashManager({ initialSettings }: { initialSettings: SplashScreenSettings | null }) {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [settings, setSettings] = useState<SplashScreenSettings>(initialSettings || { splashMode: 'text', splashText: 'Lagon & Brousse NC', splashTextColor: '#ffffff', splashFontSize: '32', splashBgColor: '#3b82f6', splashImageUrl: '', splashImageFit: 'contain', splashDuration: 2.5 });
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => { if (initialSettings) setSettings(initialSettings); }, [initialSettings]);
+
+    const handleSave = async () => {
+        if (!firestore) return;
+        setIsSaving(true);
+        try {
+            await setDoc(doc(firestore, 'app_settings', 'splash'), settings, { merge: true });
+            toast({ title: "Splash mis à jour" });
+        } finally { setIsSaving(false); }
+    };
+
+    return (
+        <Card className="border-2 shadow-lg">
+            <CardHeader><CardTitle className="text-lg font-black uppercase flex items-center gap-2"><Smartphone className="size-5 text-primary" /> Configuration Splash Screen</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Mode</Label>
+                        <Select value={settings.splashMode} onValueChange={(v: any) => setSettings({ ...settings, splashMode: v })}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent><SelectItem value="text">Texte pur</SelectItem><SelectItem value="image">Image / Logo</SelectItem></SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Durée (sec)</Label><Input type="number" step="0.5" value={settings.splashDuration} onChange={e => setSettings({ ...settings, splashDuration: parseFloat(e.target.value) })} /></div>
+                </div>
+                {settings.splashMode === 'text' ? (
+                    <div className="space-y-3">
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Texte affiché</Label><Input value={settings.splashText} onChange={e => setSettings({ ...settings, splashText: e.target.value })} /></div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Couleur Texte</Label><Input type="color" value={settings.splashTextColor} onChange={e => setSettings({ ...settings, splashTextColor: e.target.value })} className="h-10 p-1" /></div>
+                            <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Taille Police</Label><Input type="number" value={settings.splashFontSize} onChange={e => setSettings({ ...settings, splashFontSize: e.target.value })} /></div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase">URL Image</Label><Input value={settings.splashImageUrl} onChange={e => setSettings({ ...settings, splashImageUrl: e.target.value })} placeholder="https://..." /></div>
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Ajustement</Label>
+                            <Select value={settings.splashImageFit} onValueChange={(v: any) => setSettings({ ...settings, splashImageFit: v })}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent><SelectItem value="contain">Contenir (Entier)</SelectItem><SelectItem value="cover">Couvrir (Plein écran)</SelectItem></SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                )}
+                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Couleur Fond</Label><Input type="color" value={settings.splashBgColor} onChange={e => setSettings({ ...settings, splashBgColor: e.target.value })} className="h-10 p-1" /></div>
+                <Button onClick={handleSave} disabled={isSaving} className="w-full font-black uppercase h-12 gap-2 shadow-lg"><Save className="size-4" /> Sauvegarder l'identité visuelle</Button>
+            </CardContent>
+        </Card>
+    );
+}
+
+function CgvRibManager({ cgvData, ribData }: { cgvData: CgvSettings | null, ribData: RibSettings | null }) {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [cgvContent, setCgvContent] = useState('');
+    const [ribContent, setRibContent] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => { if (cgvData) setCgvContent(cgvData.content); if (ribData) setRibContent(ribData.details); }, [cgvData, ribData]);
+
+    const handleSave = async (type: 'cgv' | 'rib') => {
+        if (!firestore) return;
+        setIsSaving(true);
+        try {
+            if (type === 'cgv') {
+                const newVersion = (cgvData?.version || 0) + 1;
+                await setDoc(doc(firestore, 'app_settings', 'cgv'), { content: cgvContent, version: newVersion, updatedAt: serverTimestamp() });
+                toast({ title: "CGV mises à jour", description: `Nouvelle version : ${newVersion}` });
+            } else {
+                await setDoc(doc(firestore, 'app_settings', 'rib'), { details: ribContent, updatedAt: serverTimestamp() });
+                toast({ title: "RIB mis à jour" });
+            }
+        } finally { setIsSaving(false); }
+    };
+
+    return (
+        <Card className="border-2 shadow-lg">
+            <CardHeader><CardTitle className="text-lg font-black uppercase flex items-center gap-2"><FileText className="size-5 text-primary" /> Textes Légaux & Dons</CardTitle></CardHeader>
+            <CardContent className="space-y-6">
+                <div className="space-y-2">
+                    <Label className="text-[10px] font-black uppercase flex items-center justify-between">Conditions Générales (CGV) <Badge variant="outline" className="h-4 text-[8px] font-black">V{cgvData?.version || 0}</Badge></Label>
+                    <Textarea value={cgvContent} onChange={e => setCgvContent(e.target.value)} className="min-h-[150px] text-xs font-medium" />
+                    <Button variant="outline" onClick={() => handleSave('cgv')} disabled={isSaving} className="w-full h-10 font-black uppercase text-[10px] border-2">Publier nouvelle version CGV</Button>
+                </div>
+                <div className="space-y-2 border-t pt-4">
+                    <Label className="text-[10px] font-black uppercase flex items-center gap-2"><CreditCard className="size-3" /> Coordonnées Bancaires (Virement)</Label>
+                    <Textarea value={ribContent} onChange={e => setRibContent(e.target.value)} className="min-h-[80px] font-mono text-[10px]" />
+                    <Button variant="outline" onClick={() => handleSave('rib')} disabled={isSaving} className="w-full h-10 font-black uppercase text-[10px] border-2">Mettre à jour le RIB</Button>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | null }) {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [duration, setDuration] = useState('7');
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleActivate = async () => {
+        if (!firestore) return;
+        setIsSaving(true);
+        try {
+            const expiry = Timestamp.fromDate(addDays(new Date(), parseInt(duration)));
+            await setDoc(doc(firestore, 'shared_access_tokens', 'GLOBAL'), { expiresAt: expiry, updatedAt: serverTimestamp() });
+            toast({ title: "Accès Global activé !" });
+        } finally { setIsSaving(false); }
+    };
+
+    const handleStop = async () => {
+        if (!firestore) return;
+        await setDoc(doc(firestore, 'shared_access_tokens', 'GLOBAL'), { expiresAt: Timestamp.fromDate(new Date(0)), updatedAt: serverTimestamp() });
+        toast({ title: "Accès Global coupé" });
+    };
+
+    const isGlobalActive = globalGift && globalGift.expiresAt && isBefore(new Date(), globalGift.expiresAt.toDate());
+
+    return (
+        <Card className="border-2 shadow-lg">
+            <CardHeader><CardTitle className="text-xl font-black uppercase flex items-center gap-2 text-primary"><Sparkles className="size-6" /> Accès Global (Cadeau)</CardTitle>
+            <CardDescription className="text-xs font-bold uppercase">Ouvrez l'accès premium à TOUS les utilisateurs inscrits pour une durée déterminée.</CardDescription></CardHeader>
+            <CardContent className="space-y-6">
+                <div className={cn("p-4 rounded-2xl border-2 flex items-center justify-between", isGlobalActive ? "bg-green-50 border-green-200" : "bg-muted/30 border-dashed")}>
+                    <div className="flex flex-col"><span className="text-[10px] font-black uppercase opacity-60">Statut actuel</span>
+                        <p className={cn("text-sm font-black", isGlobalActive ? "text-green-600" : "text-muted-foreground")}>{isGlobalActive ? `ACTIF JUSQU'AU ${format(globalGift!.expiresAt.toDate(), 'dd/MM HH:mm')}` : 'AUCUN ACCÈS ACTIF'}</p>
+                    </div>
+                    {isGlobalActive && <Button variant="destructive" size="sm" onClick={handleStop} className="h-8 font-black uppercase text-[10px]">Couper</Button>}
+                </div>
+                <div className="space-y-4">
+                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Durée de l'offre (jours)</Label>
+                        <Select value={duration} onValueChange={setDuration}>
+                            <SelectTrigger className="h-12 border-2 font-black"><SelectValue /></SelectTrigger>
+                            <SelectContent><SelectItem value="1">1 jour</SelectItem><SelectItem value="7">1 semaine</SelectItem><SelectItem value="30">1 mois</SelectItem><SelectItem value="90">3 mois</SelectItem></SelectContent>
+                        </Select>
+                    </div>
+                    <Button onClick={handleActivate} disabled={isSaving} className="w-full h-14 font-black uppercase tracking-widest bg-primary shadow-lg text-sm">Activer l'offre cadeau</Button>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function TokenManager({ tokens }: { tokens: AccessToken[] | null }) {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [duration, setDuration] = useState('1');
+    const [isGenerating, setIsGenerating] = useState(false);
+
+    const generateToken = async () => {
+        if (!firestore) return;
+        setIsGenerating(true);
+        try {
+            const id = `LBN-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+            await setDoc(doc(firestore, 'access_tokens', id), {
+                id, status: 'active', durationMonths: parseInt(duration), createdAt: serverTimestamp()
+            });
+            toast({ title: "Jeton généré !" });
+        } finally { setIsGenerating(false); }
+    };
+
+    return (
+        <Card className="border-2 shadow-lg">
+            <CardHeader><CardTitle className="text-xl font-black uppercase flex items-center gap-2"><Ticket className="size-6 text-accent" /> Jetons d'Accès Individuels</CardTitle></CardHeader>
+            <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1">Durée (mois)</Label>
+                        <Select value={duration} onValueChange={setDuration}>
+                            <SelectTrigger className="h-12 border-2"><SelectValue /></SelectTrigger>
+                            <SelectContent><SelectItem value="1">1 mois</SelectItem><SelectItem value="3">3 mois</SelectItem><SelectItem value="6">6 mois</SelectItem><SelectItem value="12">12 mois</SelectItem></SelectContent>
+                        </Select>
+                    </div>
+                    <div className="flex items-end"><Button onClick={generateToken} disabled={isGenerating} className="w-full h-12 font-black uppercase tracking-widest gap-2 bg-accent hover:bg-accent/90 shadow-lg"><Zap className="size-4" /> Générer</Button></div>
+                </div>
+                <div className="max-h-64 overflow-y-auto border-2 rounded-2xl">
+                    <Table>
+                        <TableHeader><TableRow className="bg-muted/30"><TableHead className="text-[9px] font-black uppercase h-8 px-3">Code</TableHead><TableHead className="text-[9px] font-black uppercase h-8">Durée</TableHead><TableHead className="text-[9px] font-black uppercase h-8">État</TableHead><TableHead className="text-right text-[9px] font-black uppercase h-8 px-3">Action</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                            {tokens?.map(t => (
+                                <TableRow key={t.id}>
+                                    <TableCell className="px-3 py-2 font-mono text-[10px] font-black">{t.id}</TableCell>
+                                    <TableCell className="text-[10px] font-bold">{t.durationMonths} m</TableCell>
+                                    <TableCell><Badge variant={t.status === 'active' ? 'outline' : 'secondary'} className="text-[7px] font-black uppercase h-4 px-1">{t.status}</Badge></TableCell>
+                                    <TableCell className="text-right px-3"><Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(firestore!, 'access_tokens', t.id))} className="size-7 text-destructive"><Trash2 className="size-3" /></Button></TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function FishManager({ species }: { species: FishSpeciesInfo[] | null }) {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [name, setName] = useState('');
+    const [scieName, setScieName] = useState('');
+    const [isGenerating, setIsGenerating] = useState(false);
+
+    const handleAdd = async (aiData?: any) => {
+        if (!firestore || !name) return;
+        try {
+            const id = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '-');
+            const data = aiData || { name, scientificName: scieName, category: 'Lagon', gratteRisk: 0, gratteRiskSmall: 0, gratteRiskMedium: 0, gratteRiskLarge: 0, fishingAdvice: '', culinaryAdvice: '' };
+            await setDoc(doc(firestore, 'fish_species', id), { ...data, id }, { merge: true });
+            setName(''); setScieName('');
+            toast({ title: "Espèce répertoriée" });
+        } catch (e) { toast({ variant: 'destructive', title: "Erreur" }); }
+    };
+
+    const handleAiFill = async () => {
+        if (!name) return;
+        setIsGenerating(true);
+        try {
+            const info = await generateFishInfo({ name, scientificName: scieName });
+            handleAdd({
+                name,
+                scientificName: info.scientificName,
+                category: info.category,
+                gratteRisk: info.gratteRiskMedium,
+                gratteRiskSmall: info.gratteRiskSmall,
+                gratteRiskMedium: info.gratteRiskMedium,
+                gratteRiskLarge: info.gratteRiskLarge,
+                lengthSmall: info.lengthSmall,
+                lengthMedium: info.lengthMedium,
+                lengthLarge: info.lengthLarge,
+                fishingAdvice: info.fishingAdvice,
+                culinaryAdvice: info.culinaryAdvice
+            });
+        } finally { setIsGenerating(false); }
+    };
+
+    return (
+        <Card className="border-2 shadow-lg">
+            <CardHeader><CardTitle className="text-xl font-black uppercase flex items-center gap-2"><Fish className="size-6 text-primary" /> Guide Poissons & Gratte</CardTitle></CardHeader>
+            <CardContent className="space-y-6">
+                <div className="p-4 bg-muted/30 rounded-2xl border-2 border-dashed grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Nom Commun NC</Label><Input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Bec de cane..." /></div>
+                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Nom Scientifique</Label><Input value={scieName} onChange={e => setScieName(e.target.value)} placeholder="Optionnel..." /></div>
+                    <div className="sm:col-span-2 flex gap-2">
+                        <Button onClick={() => handleAdd()} className="flex-1 font-black uppercase h-12 border-2" variant="outline">Saisie Manuelle</Button>
+                        <Button onClick={handleAiFill} disabled={isGenerating || !name} className="flex-1 font-black uppercase h-12 gap-2 shadow-lg bg-primary">
+                            {isGenerating ? <RefreshCw className="size-4 animate-spin" /> : <BrainCircuit className="size-4" />} Générer via IA (Gemini)
+                        </Button>
+                    </div>
+                </div>
+                <div className="max-h-96 overflow-y-auto border-2 rounded-2xl">
+                    <Table>
+                        <TableHeader><TableRow className="bg-muted/30"><TableHead className="text-[9px] font-black uppercase h-8 px-3">Espèce</TableHead><TableHead className="text-[9px] font-black uppercase h-8">Catégorie</TableHead><TableHead className="text-[9px] font-black uppercase h-8">Risque (M)</TableHead><TableHead className="text-right text-[9px] font-black uppercase h-8 px-3">Action</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                            {species?.map(s => (
+                                <TableRow key={s.id}>
+                                    <TableCell className="px-3 py-2">
+                                        <div className="flex flex-col"><span className="font-black text-xs uppercase leading-none">{s.name}</span><span className="text-[8px] italic opacity-40">{s.scientificName}</span></div>
+                                    </TableCell>
+                                    <TableCell><Badge variant="outline" className="text-[7px] font-black uppercase h-4">{s.category}</Badge></TableCell>
+                                    <TableCell className="font-black text-xs">{s.gratteRiskMedium || s.gratteRisk}%</TableCell>
+                                    <TableCell className="text-right px-3"><Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(firestore!, 'fish_species', s.id))} className="size-7 text-destructive"><Trash2 className="size-3" /></Button></TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function SupportConversationsManager({ conversations }: { conversations: Conversation[] | null }) {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+
+    return (
+        <Card className="border-2 shadow-lg">
+            <CardHeader className="bg-muted/10 border-b"><CardTitle className="text-lg font-black uppercase flex items-center gap-2"><MessageSquare className="size-5 text-primary" /> Support & Messages Clients</CardTitle></CardHeader>
+            <CardContent className="p-0">
+                <Table>
+                    <TableHeader><TableRow className="bg-muted/30">
+                        <TableHead className="text-[10px] font-black uppercase h-10 px-4">Utilisateur</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase h-10">Dernier Message</TableHead>
+                        <TableHead className="text-right text-[10px] font-black uppercase h-10 px-4">Action</TableHead>
+                    </TableRow></TableHeader>
+                    <TableBody>
+                        {conversations?.map(conv => (
+                            <TableRow key={conv.id} className={cn(!conv.isReadByAdmin && "bg-primary/5")}>
+                                <TableCell className="px-4 py-3"><div className="flex flex-col"><span className="font-black text-xs">{conv.userDisplayName}</span><span className="text-[9px] font-bold opacity-40 lowercase">{conv.userEmail}</span></div></TableCell>
+                                <TableCell className="text-xs italic opacity-70 truncate max-w-[200px]">"{conv.lastMessageContent}"</TableCell>
+                                <TableCell className="text-right px-4"><Button asChild variant="outline" size="sm" className="h-8 text-[9px] font-black uppercase border-2"><Link href={`/admin/messages/${conv.id}`}>Répondre</Link></Button></TableCell>
+                            </TableRow>
+                        ))}
+                        {(!conversations || conversations.length === 0) && (
+                            <TableRow><TableCell colSpan={3} className="text-center py-12 text-xs italic opacity-40 uppercase font-black tracking-widest">Aucun message</TableCell></TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+    );
 }
