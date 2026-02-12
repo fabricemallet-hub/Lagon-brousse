@@ -7,12 +7,11 @@ import {
   initializeFirestore, 
   Firestore, 
   getFirestore, 
-  memoryLocalCache,
-  terminate
+  memoryLocalCache
 } from 'firebase/firestore';
 
 /**
- * @fileOverview Initialisation de Firebase Hardened (Bypass ID: ca9).
+ * @fileOverview Initialisation de Firebase Hardened.
  */
 
 declare global {
@@ -39,18 +38,15 @@ export function initializeFirebase() {
     }
     const auth = globalThis.__LB_FIREBASE_AUTH;
 
-    // 3. Singleton Firestore (STRICT MEMORY POUR ÉVITER CA9 & BAD REQUEST)
+    // 3. Singleton Firestore (STRICT MEMORY POUR ÉVITER CA9)
     if (!globalThis.__LB_FIREBASE_FIRESTORE) {
       try {
-        console.log("L&B DEBUG: Tentative d'initialisation Firestore (Memory Cache Only)...");
+        console.log("L&B DEBUG: Configuration Firestore (Memory Cache Only)...");
         globalThis.__LB_FIREBASE_FIRESTORE = initializeFirestore(app, {
           localCache: memoryLocalCache(),
-          // Utilisation du Long Polling pour une meilleure stabilité dans l'environnement Cloud
-          experimentalForceLongPolling: true, 
         });
-        console.log("L&B DEBUG: Firestore initialisé avec succès (Instance Unique).");
       } catch (e) {
-        console.warn("L&B DEBUG: Firestore déjà initialisé ou erreur, récupération de l'instance existante.");
+        console.warn("L&B DEBUG: Firestore déjà initialisé ou mode restreint, récupération de l'instance par défaut.");
         globalThis.__LB_FIREBASE_FIRESTORE = getFirestore(app);
       }
     }

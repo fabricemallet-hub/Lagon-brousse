@@ -34,41 +34,41 @@ export default function AdminPage() {
     const isMaster = (user.email && masterEmails.includes(user.email.toLowerCase())) || 
                     masterUids.includes(user.uid);
 
-    console.log(`L&B DEBUG ADMIN: [${user.email}] (UID: ${user.uid}). Accès Master: ${isMaster}`);
+    console.log(`L&B DEBUG ADMIN IDENTITÉ: [${user.email}] (UID: ${user.uid}). Accès Master: ${isMaster}`);
     return isMaster;
   }, [user]);
 
   // REQUÊTES FIRESTORE (Seulement si isAdmin est confirmé)
   const usersRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
-    console.log("L&B DEBUG ADMIN: Préparation requête [users]");
+    console.log("L&B DEBUG ADMIN: Lancement requête [users]");
     return query(collection(firestore, 'users'), orderBy('email', 'asc'));
   }, [firestore, isAdmin]);
   const { data: users, isLoading: isUsersLoading, error: usersError } = useCollection<UserAccount>(usersRef);
 
   const businessRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
-    console.log("L&B DEBUG ADMIN: Préparation requête [businesses]");
+    console.log("L&B DEBUG ADMIN: Lancement requête [businesses]");
     return query(collection(firestore, 'businesses'), orderBy('name', 'asc'));
   }, [firestore, isAdmin]);
   const { data: businesses } = useCollection<Business>(businessRef);
 
   const convsRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
-    console.log("L&B DEBUG ADMIN: Préparation requête [conversations]");
+    console.log("L&B DEBUG ADMIN: Lancement requête [conversations]");
     return query(collection(firestore, 'conversations'), orderBy('lastMessageAt', 'desc'));
   }, [firestore, isAdmin]);
   const { data: conversations, isLoading: isConvsLoading, error: convsError } = useCollection<Conversation>(convsRef);
 
   useEffect(() => {
     if (!isUserLoading && !isAdmin && user) {
-      console.warn("L&B DEBUG ADMIN: Redirection - Non autorisé.");
+      console.warn("L&B DEBUG ADMIN: Redirection immédiate - Non autorisé.");
       router.push('/compte');
     }
   }, [isAdmin, isUserLoading, router, user]);
 
   if (isUserLoading) return <div className="p-8"><Skeleton className="h-48 w-full rounded-2xl" /></div>;
-  if (!isAdmin) return <div className="p-12 text-center font-black uppercase text-muted-foreground">Vérification de sécurité...</div>;
+  if (!isAdmin) return <div className="p-12 text-center font-black uppercase text-muted-foreground animate-pulse">Validation de sécurité en cours...</div>;
 
   const activeSubs = users?.filter(u => u.subscriptionStatus === 'active' || u.subscriptionStatus === 'admin').length || 0;
 
@@ -87,16 +87,16 @@ export default function AdminPage() {
       </Card>
 
       {(usersError || convsError) && (
-        <Card className="border-red-500 bg-red-50 text-red-900">
+        <Card className="border-red-500 bg-red-50 text-red-900 shadow-lg animate-bounce">
             <CardHeader className="py-4">
                 <CardTitle className="text-sm font-black uppercase flex items-center gap-2">
                     <AlertCircle className="size-4" /> Erreur de permission détectée
                 </CardTitle>
             </CardHeader>
             <CardContent className="text-xs font-mono">
-                {usersError && <p>Collection Users: {usersError.message}</p>}
-                {convsError && <p>Collection Conversations: {convsError.message}</p>}
-                <p className="mt-2 text-[10px] font-bold">Veuillez vérifier vos logs console pour plus de détails.</p>
+                {usersError && <p>Erreur Users: {usersError.message}</p>}
+                {convsError && <p>Erreur Conversations: {convsError.message}</p>}
+                <p className="mt-2 text-[10px] font-bold">Action suggérée : Vérifiez la console et rafraîchissez (Cmd+Shift+R).</p>
             </CardContent>
         </Card>
       )}
