@@ -19,14 +19,18 @@ service cloud.firestore {
 
     // ACCÈS ADMIN : Maître OU statut 'admin' en base
     function isAdmin() {
-      return isMasterAdmin() || (isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'admin');
+      return isMasterAdmin() || (isSignedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'admin');
     }
 
     function isPro() {
-      return isAdmin() || (isSignedIn() && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'professional' ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'professional'
-      ));
+      return isAdmin() || (isSignedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'professional' ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'professional'
+        )
+      );
     }
 
     // --- 0. ACCÈS PUBLICS ---
@@ -86,9 +90,8 @@ service cloud.firestore {
 
     // --- 3. MESSAGERIE & CONVERSATIONS ---
     match /conversations/{userId} {
-      allow read, write: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
-      // Règle de listage globale pour l'admin
-      allow list: if isMasterAdmin();
+      allow get, list: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
+      allow write: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
       
       match /messages/{messageId} {
         allow read, write: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
