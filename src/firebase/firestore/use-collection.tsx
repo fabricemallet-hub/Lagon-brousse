@@ -63,45 +63,40 @@ export function useCollection<T = any>(
     setError(null);
 
     // Initialisation du listener avec gestion d'erreur robuste
-    try {
-      const unsubscribe = onSnapshot(
-        memoizedTargetRefOrQuery,
-        (snapshot: QuerySnapshot<DocumentData>) => {
-          const results: ResultItemType[] = [];
-          for (const doc of snapshot.docs) {
-            results.push({ ...(doc.data() as T), id: doc.id });
-          }
-          setData(results);
-          setError(null);
-          setIsLoading(false);
-        },
-        (error: FirestoreError) => {
-          if (error.code === 'permission-denied') {
-            const path: string =
-              memoizedTargetRefOrQuery.type === 'collection'
-                ? (memoizedTargetRefOrQuery as CollectionReference).path
-                : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString()
-
-            const contextualError = new FirestorePermissionError({
-              operation: 'list',
-              path,
-            })
-
-            setError(contextualError)
-            errorEmitter.emit('permission-error', contextualError);
-          } else {
-            setError(error);
-          }
-          setData(null)
-          setIsLoading(false)
+    const unsubscribe = onSnapshot(
+      memoizedTargetRefOrQuery,
+      (snapshot: QuerySnapshot<DocumentData>) => {
+        const results: ResultItemType[] = [];
+        for (const doc of snapshot.docs) {
+          results.push({ ...(doc.data() as T), id: doc.id });
         }
-      );
+        setData(results);
+        setError(null);
+        setIsLoading(false);
+      },
+      (error: FirestoreError) => {
+        if (error.code === 'permission-denied') {
+          const path: string =
+            memoizedTargetRefOrQuery.type === 'collection'
+              ? (memoizedTargetRefOrQuery as CollectionReference).path
+              : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString()
 
-      return () => unsubscribe();
-    } catch (e: any) {
-      console.warn("L&B NC: Erreur lors de l'abonnement à la collection", e);
-      setIsLoading(false);
-    }
+          const contextualError = new FirestorePermissionError({
+            operation: 'list',
+            path,
+          })
+
+          setError(contextualError)
+          errorEmitter.emit('permission-error', contextualError);
+        } else {
+          setError(error);
+        }
+        setData(null)
+        setIsLoading(false)
+      }
+    );
+
+    return () => unsubscribe();
   }, [memoizedTargetRefOrQuery]);
 
   if(memoizedTargetRefOrQuery && !memoizedTargetRefOrQuery.__memo) {
