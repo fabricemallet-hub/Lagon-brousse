@@ -78,8 +78,19 @@ export function useCollection<T = any>(
           setError(contextualError);
           
           // Ne pas afficher l'écran d'erreur Next.js pour les collections Admin
-          const silentPaths = ['conversations', 'users', 'businesses', 'campaigns', 'system_notifications', 'sound_library'];
-          if (!silentPaths.includes(path)) {
+          const silentPaths = [
+            'conversations', 
+            'users', 
+            'businesses', 
+            'campaigns', 
+            'system_notifications', 
+            'sound_library',
+            'vessels_safety'
+          ];
+          
+          const isSilent = silentPaths.some(p => path.includes(p));
+          
+          if (!isSilent) {
             errorEmitter.emit('permission-error', contextualError);
           }
         } else {

@@ -39,15 +39,17 @@ export function initializeFirebase() {
     }
     const auth = globalThis.__LB_FIREBASE_AUTH;
 
-    // 3. Singleton Firestore (FORCED LONG POLLING)
+    // 3. Singleton Firestore (STABLE TRANSPORT)
     if (!globalThis.__LB_FIREBASE_FIRESTORE) {
       console.log("L&B DEBUG: Configuration Firestore (Stable Transport)...");
       try {
+        // On tente d'abord une initialisation propre
         globalThis.__LB_FIREBASE_FIRESTORE = initializeFirestore(app, {
           localCache: memoryLocalCache(),
-          experimentalForceLongPolling: true // Crucial pour éviter les erreurs WebSocket dans Studio
+          experimentalForceLongPolling: true 
         });
       } catch (e) {
+        // Si déjà initialisé, on récupère l'instance existante
         globalThis.__LB_FIREBASE_FIRESTORE = getFirestore(app);
       }
     }
