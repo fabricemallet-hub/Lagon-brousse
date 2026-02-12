@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// Version 2.2.7 - Accès Maître Prioritaire & Listage Explicite
+// Version 2.2.8 - Stabilisation Interne & Accès Maître Prioritaire
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -18,13 +18,13 @@ service cloud.firestore {
     }
 
     // --- 2. ACCÈS TOTAL MAÎTRE (Priorité Absolue) ---
-    // Cette règle autorise TOUT aux administrateurs sur TOUTE la base (Documents + Collections)
+    // Cette règle globale en haut de fichier court-circuite toute restriction pour l'admin
     match /{allPaths=**} {
       allow read, write: if isMasterAdmin();
     }
 
     // --- 3. AUTORISATIONS DE LISTAGE EXPLICITES ---
-    // Requis pour les requêtes de collection globales dans le Dashboard Admin
+    // Nécessaire pour les requêtes globales du Dashboard même avec l'accès total
     
     match /conversations {
       allow list: if isMasterAdmin();

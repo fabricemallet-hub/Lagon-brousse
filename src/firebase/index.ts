@@ -2,62 +2,58 @@
 
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore, initializeFirestore } from 'firebase/firestore';
-import { getMessaging } from 'firebase/messaging';
+import { getAuth, Auth } from 'firebase/auth';
+import { getFirestore, initializeFirestore, Firestore } from 'firebase/firestore';
+import { getMessaging, Messaging } from 'firebase/messaging';
 
-// Singleton pour les services
-let initializedServices: any = null;
+/**
+ * @fileOverview Point d'entrée central pour Firebase.
+ * Gère l'initialisation unique des services et la stabilisation de Firestore.
+ */
+
+let app: FirebaseApp;
+let auth: Auth;
+let firestore: Firestore;
+let messaging: Messaging | null = null;
 
 /**
  * Initialise Firebase et ses services avec les paramètres optimisés pour le Cloud.
- * Utilise experimentalForceLongPolling pour stabiliser la connexion Firestore.
+ * Le mode experimentalForceLongPolling est activé pour résoudre l'erreur "Unexpected state (ID: ca9)".
  */
 export function initializeFirebase() {
-  if (initializedServices) return initializedServices;
-
-  let firebaseApp: FirebaseApp;
-  
-  if (!getApps().length) {
+  if (!app) {
+    // 1. Initialisation de l'App (Singleton)
+    app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+    
+    // 2. Initialisation de l'Auth
+    auth = getAuth(app);
+    
+    // 3. Initialisation de Firestore avec Long Polling (Crucial pour la stabilité en proxy/cloud)
     try {
-      firebaseApp = initializeApp(firebaseConfig);
+      firestore = initializeFirestore(app, {
+        experimentalForceLongPolling: true,
+      });
     } catch (e) {
-      console.warn('Firebase init fallback:', e);
-      firebaseApp = initializeApp(firebaseConfig);
+      // Si déjà initialisé, on récupère l'instance existante
+      firestore = getFirestore(app);
     }
-  } else {
-    firebaseApp = getApp();
-  }
 
-  // Initialisation optimisée de Firestore pour les environnements Workstation
-  // experimentalForceLongPolling résout les erreurs "Unexpected state ID: ca9"
-  let firestore;
-  try {
-    firestore = initializeFirestore(firebaseApp, {
-      experimentalForceLongPolling: true,
-    });
-  } catch (e) {
-    console.warn("Firestore initialize error, falling back to getFirestore:", e);
-    firestore = getFirestore(firebaseApp);
-  }
-
-  let messaging = null;
-  if (typeof window !== 'undefined') {
-    try {
-      messaging = getMessaging(firebaseApp);
-    } catch (e) {
-      console.warn("Messaging not supported in this browser environment");
+    // 4. Messagerie (Client side uniquement)
+    if (typeof window !== 'undefined') {
+      try {
+        messaging = getMessaging(app);
+      } catch (e) {
+        // FCM peut ne pas être supporté sur certains navigateurs ou modes privés
+      }
     }
   }
 
-  initializedServices = {
-    firebaseApp,
-    auth: getAuth(firebaseApp),
+  return {
+    firebaseApp: app,
+    auth,
     firestore,
     messaging
   };
-
-  return initializedServices;
 }
 
 export * from './provider';
