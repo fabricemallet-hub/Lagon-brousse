@@ -35,6 +35,7 @@ export function initializeFirebase() {
       });
     } catch (e) {
       // Si déjà initialisé avec des paramètres différents, on récupère l'instance existante
+      // @ts-ignore - Accès sécurisé à l'instance déjà initialisée
       firestore = getFirestore(app);
     }
 

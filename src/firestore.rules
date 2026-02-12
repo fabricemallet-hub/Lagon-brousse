@@ -1,14 +1,13 @@
 rules_version = '2';
 
-// Version 2.3.1 - PRIORITÉ ABSOLUE PERMISSIONS MAÎTRE
+// Version 2.3.2 - PRIORITÉ ABSOLUE PERMISSIONS MAÎTRE
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. RÈGLE MAÎTRE (ACCÈS TOTAL) ---
-    // Cette règle autorise TOUT pour Fabrice Mallet et les comptes de maintenance.
-    // Elle est placée en premier pour garantir son exécution prioritaire.
-    match /{allPaths=**} {
-      allow read, write: if request.auth != null && (
+    // --- FONCTION DE VÉRIFICATION MAÎTRE ---
+    // Autorise l'accès complet basé sur l'UID ou l'Email de confiance.
+    function isMasterAdmin() {
+      return request.auth != null && (
         request.auth.uid in ["t8nPnZLcTiaLJSKMuLzib3C5nPn1", "K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2"] ||
         (request.auth.token.email != null && request.auth.token.email.lower() in [
           "f.mallet81@outlook.com", 
@@ -18,18 +17,27 @@ service cloud.firestore {
       );
     }
 
-    // --- 2. RÈGLES DE LISTAGE EXPLICITES (Nécessaire pour le Dashboard) ---
+    // --- 1. RÈGLE MAÎTRE GLOBALE ---
+    // Cette règle doit rester au sommet pour écraser toute autre restriction.
+    match /{allPaths=**} {
+      allow read, write: if isMasterAdmin();
+    }
+
+    // --- 2. RÈGLES DE LISTAGE RACINE (Nécessaire pour les requêtes collection()) ---
     match /conversations {
-      allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1";
+      allow list: if isMasterAdmin();
     }
     match /users {
-      allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1";
+      allow list: if isMasterAdmin();
     }
     match /businesses {
-      allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1";
+      allow list: if isMasterAdmin();
     }
     match /access_tokens {
-      allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1";
+      allow list: if isMasterAdmin();
+    }
+    match /campaigns {
+      allow list: if isMasterAdmin();
     }
 
     // --- 3. RÈGLES STANDARDS POUR UTILISATEURS ---
