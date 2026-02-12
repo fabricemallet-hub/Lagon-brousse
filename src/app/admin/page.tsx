@@ -35,7 +35,7 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState('stats');
 
   // User Edit States
-  const [isUserEditDialogOpen, setIsUserEditDialogOpen] = useState(false);
+  const [isUserEditDialogOpen] = useState(false);
   const [userToEdit, setUserToEdit] = useState<UserAccount | null>(null);
   const [isSavingUser, setIsSavingUser] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
@@ -99,7 +99,6 @@ export default function AdminPage() {
   // Logic Handlers
   const handleEditUser = (u: UserAccount) => {
     setUserToEdit(u);
-    setIsUserEditDialogOpen(true);
   };
 
   const handleSaveUser = async () => {
@@ -108,7 +107,7 @@ export default function AdminPage() {
     try {
       await setDoc(doc(firestore, 'users', userToEdit.id), userToEdit, { merge: true });
       toast({ title: "Utilisateur mis à jour" });
-      setIsUserEditDialogOpen(false);
+      setUserToEdit(null);
     } finally {
       setIsSavingUser(false);
     }
@@ -367,7 +366,7 @@ export default function AdminPage() {
       </Tabs>
 
       {/* DIALOGS MODALS */}
-      <Dialog open={isUserEditDialogOpen} onOpenChange={setIsUserEditDialogOpen}>
+      <Dialog open={!!userToEdit} onOpenChange={(o) => !o && setUserToEdit(null)}>
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader><DialogTitle className="font-black uppercase">Édition Utilisateur</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">

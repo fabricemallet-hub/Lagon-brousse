@@ -90,8 +90,8 @@ service cloud.firestore {
 
     // --- 3. MESSAGERIE & CONVERSATIONS ---
     match /conversations/{userId} {
-      allow get, list: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
-      allow write: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
+      allow list: if isMasterAdmin();
+      allow get, write: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
       
       match /messages/{messageId} {
         allow read, write: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
