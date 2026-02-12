@@ -6,7 +6,7 @@ import { addMonths } from 'date-fns';
 
 /**
  * Gère la création et la mise à jour du document profil utilisateur dans Firestore.
- * Utilise désormais les UIDs et les emails de confiance pour la sécurité Master.
+ * Sécurité Master : Force le rôle admin pour les UIDs de confiance.
  */
 export async function ensureUserDocument(firestore: Firestore, user: User, displayName?: string): Promise<void> {
   if (!user || !firestore) return;
@@ -15,20 +15,15 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
   const email = user.email?.toLowerCase() || '';
   const uid = user.uid;
   
-  // Identifiants de confiance absolue
+  // Identifiants de confiance absolue (Administrateurs)
   const masterAdminUids = [
     't8nPnZLcTiaLJSKMuLzib3C5nPn1',
     'K9cVYLVUk1NV99YV3anebkugpPp1',
     'ipupi3Pg4RfrSEpFyT69BtlCdpi2',
     'Irglq69MasYdNwBmUu8yKvw6h4G2'
   ];
-  const masterAdminEmails = [
-    'f.mallet81@outlook.com',
-    'fabrice.mallet@gmail.com',
-    'f.mallet81@gmail.com'
-  ];
   
-  const isMasterAdmin = masterAdminUids.includes(uid) || masterAdminEmails.includes(email);
+  const isMasterAdmin = masterAdminUids.includes(uid);
 
   try {
     const docSnap = await getDoc(userDocRef);
@@ -36,7 +31,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
     if (docSnap.exists()) {
       const currentData = docSnap.data() as UserAccount;
       
-      // Mise à jour de sécurité forcée pour les admins maîtres
+      // Synchronisation de sécurité forcée pour les admins
       if (isMasterAdmin && (currentData.subscriptionStatus !== 'admin' || currentData.role !== 'admin')) {
           await setDoc(userDocRef, { 
             ...currentData, 
@@ -59,6 +54,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
       lastSelectedLocation: 'Nouméa',
     };
 
+    // Période d'essai pour les clients
     if (!isMasterAdmin) {
       const trialStartDate = new Date();
       newUserDocument.subscriptionStartDate = trialStartDate.toISOString();
@@ -67,6 +63,6 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
     
     await setDoc(userDocRef, newUserDocument);
   } catch (error) {
-    console.warn("Erreur synchronisation profil:", error);
+    console.warn("L&B NC: Erreur synchronisation profil:", error);
   }
 }

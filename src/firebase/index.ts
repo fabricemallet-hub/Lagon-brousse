@@ -7,7 +7,7 @@ import { initializeFirestore, Firestore, getFirestore, memoryLocalCache } from '
 
 /**
  * @fileOverview Initialisation SINGLETON de Firebase.
- * Version Ultra-Stable : Long Polling + Memory Cache + Verrou Global Immuable.
+ * Version Ultra-Stable : Long Polling + Memory Cache + Singleton Verrouillé.
  */
 
 declare global {
@@ -30,24 +30,19 @@ export function initializeFirebase() {
     // 2. Singleton Auth
     if (!globalThis.__LB_FIREBASE_AUTH) {
       globalThis.__LB_FIREBASE_AUTH = getAuth(app);
-      onAuthStateChanged(globalThis.__LB_FIREBASE_AUTH, (u) => {
-        if (u) {
-          console.log(`L&B NC: Session active pour: ${u.uid}`);
-        }
-      });
     }
     const auth = globalThis.__LB_FIREBASE_AUTH;
 
-    // 3. Singleton Firestore (Paramètres de transport figés pour éviter ID: ca9)
+    // 3. Singleton Firestore (Forçage Long Polling + Memory Cache pour éviter ID: ca9)
     if (!globalThis.__LB_FIREBASE_FIRESTORE) {
       try {
         globalThis.__LB_FIREBASE_FIRESTORE = initializeFirestore(app, {
           experimentalForceLongPolling: true,
           localCache: memoryLocalCache(),
         });
-        console.log("L&B NC: Firestore initialisé (Mode Stable : Long Polling + Memory Cache)");
+        console.log("L&B NC: Firestore initialisé en mode stable (Memory Cache)");
       } catch (e) {
-        // Fallback si déjà initialisé
+        // Fallback si déjà initialisé (HMR)
         globalThis.__LB_FIREBASE_FIRESTORE = getFirestore(app);
       }
     }
