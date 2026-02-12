@@ -59,6 +59,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
       lastSelectedLocation: 'Nouméa',
     };
 
+    // Pour les admins maîtres, on ne met pas de date d'expiration
     if (!isMasterAdmin) {
       const trialStartDate = new Date();
       newUserDocument.subscriptionStartDate = trialStartDate.toISOString();

@@ -40,8 +40,7 @@ export function initializeFirebase() {
         experimentalForceLongPolling: true,
       });
     } catch (e) {
-      // En cas de hot-reload ou d'initialisation concurrente
-      console.warn("Firestore déjà initialisé, récupération de l'instance.");
+      // En cas de hot-reload ou d'initialisation concurrente, on tente de récupérer l'instance existante
       firestore = getFirestore(app);
     }
   }
@@ -51,7 +50,7 @@ export function initializeFirebase() {
     try {
       messaging = getMessaging(app);
     } catch (e) {
-      // FCM non supporté sur ce navigateur
+      // FCM non supporté sur ce navigateur ou cet environnement
     }
   }
 

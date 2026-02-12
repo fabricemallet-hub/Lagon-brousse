@@ -1,12 +1,14 @@
 rules_version = '2';
 
-// Version 2.6.0 - SOLUTION FINALE ACCÈS MAÎTRE & LISTAGE
+// Version 3.2.0 - SOLUTION RADICALE PERMISSIONS MAÎTRES
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. FONCTIONS DE SÉCURITÉ ---
-    function isMasterAdmin() {
-      return request.auth != null && (
+    // --- 1. DROITS ABSOLUS POUR ADMINISTRATEURS MAÎTRES (Priorité Maximale) ---
+    // On autorise TOUT pour Fabrice Mallet et l'équipe technique.
+    // Cette règle récursive au sommet court-circuite toute restriction pour ces comptes.
+    match /{document=**} {
+      allow read, write: if request.auth != null && (
         request.auth.uid in ["t8nPnZLcTiaLJSKMuLzib3C5nPn1", "K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2"] ||
         (request.auth.token.email != null && request.auth.token.email.lower() in [
           "f.mallet81@outlook.com", 
@@ -16,24 +18,17 @@ service cloud.firestore {
       );
     }
 
-    // --- 2. RÈGLES MAÎTRES PRIORITÉ ABSOLUE ---
-    // On autorise TOUT pour Fabrice Mallet au sommet du fichier
-    match /{allPaths=**} {
-      allow read, write: if isMasterAdmin();
-    }
+    // --- 2. RÈGLES DE LISTAGE EXPLICITES (Dashboard) ---
+    // Requis par le SDK pour les requêtes sur les collections racines.
+    match /conversations { allow list: if request.auth != null; }
+    match /users { allow list: if request.auth != null; }
+    match /businesses { allow list: if request.auth != null; }
+    match /access_tokens { allow list: if request.auth != null; }
+    match /campaigns { allow list: if request.auth != null; }
+    match /vessels { allow list: if request.auth != null; }
+    match /hunting_sessions { allow list: if request.auth != null; }
 
-    // --- 3. AUTORISATIONS DE LISTAGE EXPLICITES (DASHBOARD ADMIN) ---
-    // Requis par le SDK pour les requêtes sur la racine des collections
-    match /conversations { allow list: if isMasterAdmin(); }
-    match /users { allow list: if isMasterAdmin(); }
-    match /businesses { allow list: if isMasterAdmin(); }
-    match /access_tokens { allow list: if isMasterAdmin(); }
-    match /campaigns { allow list: if isMasterAdmin(); }
-    match /spot_shares { allow list: if isMasterAdmin(); }
-    match /vessels { allow list: if isMasterAdmin(); }
-    match /hunting_sessions { allow list: if isMasterAdmin(); }
-
-    // --- 4. RÈGLES STANDARDS UTILISATEURS ---
+    // --- 3. RÈGLES UTILISATEURS STANDARDS ---
     
     match /conversations/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
