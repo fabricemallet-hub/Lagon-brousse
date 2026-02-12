@@ -4,24 +4,31 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // --- 1. SÉCURITÉ MAÎTRE ABSOLUE (UID PRIORITAIRE) ---
-    // Cette règle court-circuite tout le reste pour les administrateurs identifiés.
+    // Cette règle est évaluée en premier et court-circuite tout le reste.
     function isMasterAdmin() {
       return request.auth != null && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || 
         request.auth.uid == "K9cVYLVUk1NV99YV3anebkugpPp1" ||
         request.auth.uid == "ipupi3Pg4RfrSEpFyT69BtlCdpi2" ||
-        request.auth.uid == "Irglq69MasYdNwBmUu8yKvw6h4G2"
+        request.auth.uid == "Irglq69MasYdNwBmUu8yKvw6h4G2" ||
+        (request.auth.token.email != null && request.auth.token.email.lower() in [
+          "f.mallet81@outlook.com",
+          "fabrice.mallet@gmail.com",
+          "f.mallet81@gmail.com"
+        ])
       );
     }
 
-    // Autorisation explicite de listage pour le Dashboard Admin
-    match /conversations { allow list, read: if isMasterAdmin(); }
-    match /users { allow list, read: if isMasterAdmin(); }
-    match /businesses { allow list, read: if isMasterAdmin(); }
-    match /campaigns { allow list, read: if isMasterAdmin(); }
-    match /system_notifications { allow list, read: if isMasterAdmin(); }
+    // Autorisation explicite de LISTAGE pour les collections racine d'administration
+    // Indispensable pour éviter les erreurs "Missing or insufficient permissions" sur les requêtes de collection
+    match /conversations { allow list, get: if isMasterAdmin(); }
+    match /users { allow list, get: if isMasterAdmin(); }
+    match /businesses { allow list, get: if isMasterAdmin(); }
+    match /campaigns { allow list, get: if isMasterAdmin(); }
+    match /system_notifications { allow list, get: if isMasterAdmin(); }
+    match /access_tokens { allow list, get: if isMasterAdmin(); }
 
-    // Accès total récursif pour les admins maîtres
+    // Accès total récursif pour les admins maîtres sur l'ensemble de la base
     match /{allPaths=**} {
       allow read, write: if isMasterAdmin();
     }
@@ -77,7 +84,7 @@ service cloud.firestore {
     match /businesses/{businessId} {
       allow get, list: if true;
       allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
+      allow update, delete: if request.auth != null && (resource.data.ownerId == request.auth.uid);
       
       match /promotions/{promoId} { 
         allow get, list: if true; 
@@ -87,7 +94,7 @@ service cloud.firestore {
 
     match /campaigns/{campaignId} {
       allow create: if request.auth != null;
-      allow read: if request.auth != null && resource.data.ownerId == request.auth.uid;
+      allow read: if request.auth != null && (resource.data.ownerId == request.auth.uid);
     }
     
     match /spot_shares/{id} {

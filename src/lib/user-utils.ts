@@ -37,14 +37,15 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
     if (docSnap.exists()) {
       const currentData = docSnap.data() as UserAccount;
       
-      // Synchronisation de sécurité forcée pour les admins
+      // SYNCHRONISATION DE SÉCURITÉ FORCÉE POUR LES ADMINS
+      // Si l'UID ou l'Email est dans la liste blanche, on écrase les champs de statut
       if (isMasterAdmin && (currentData.subscriptionStatus !== 'admin' || currentData.role !== 'admin')) {
           await setDoc(userDocRef, { 
             ...currentData, 
             subscriptionStatus: 'admin',
             role: 'admin'
           }, { merge: true });
-          console.log("L&B NC: Rôle Administrateur Maître synchronisé.");
+          console.log("L&B NC: Statut Administrateur Maître restauré et synchronisé.");
       }
       return;
     }

@@ -12,6 +12,7 @@ import {
 
 /**
  * @fileOverview Initialisation SINGLETON de Firebase pour L&B NC.
+ * Utilisation de globalThis pour garantir l'unicité de l'instance.
  */
 
 declare global {
@@ -22,6 +23,7 @@ declare global {
 
 export function initializeFirebase() {
   if (typeof window !== 'undefined') {
+    // 1. Initialisation App
     if (!globalThis.__LB_FIREBASE_APP) {
       const apps = getApps();
       globalThis.__LB_FIREBASE_APP = apps.length === 0 
@@ -30,20 +32,23 @@ export function initializeFirebase() {
     }
     const app = globalThis.__LB_FIREBASE_APP;
 
+    // 2. Initialisation Auth
     if (!globalThis.__LB_FIREBASE_AUTH) {
       globalThis.__LB_FIREBASE_AUTH = getAuth(app);
     }
     const auth = globalThis.__LB_FIREBASE_AUTH;
 
+    // 3. Initialisation Firestore (MODE STABILITÉ MAXIMALE)
     if (!globalThis.__LB_FIREBASE_FIRESTORE) {
       try {
-        // Mode Long Polling + Memory Cache pour la stabilité sur Workstation
+        // Mode Long Polling + Memory Cache pour éviter les erreurs d'assertion interne (ID: ca9)
         globalThis.__LB_FIREBASE_FIRESTORE = initializeFirestore(app, {
           experimentalForceLongPolling: true,
           localCache: memoryLocalCache(),
         });
-        console.log("L&B NC: Firestore initialisé (Singleton Stable)");
+        console.log("L&B NC: Firestore initialisé (Singleton Immuable : Long Polling + Memory Cache)");
       } catch (e) {
+        console.warn("L&B NC: Firestore déjà initialisé ou erreur, récupération de l'instance par défaut.");
         globalThis.__LB_FIREBASE_FIRESTORE = getFirestore(app);
       }
     }
@@ -52,6 +57,7 @@ export function initializeFirebase() {
     return { firebaseApp: app, auth, firestore };
   }
 
+  // Fallback pour SSR
   const ssrApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
   return {
     firebaseApp: ssrApp,
