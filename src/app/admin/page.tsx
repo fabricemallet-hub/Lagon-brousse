@@ -45,7 +45,7 @@ export default function AdminPage() {
     return masterAdminUids.includes(user.uid);
   }, [user]);
 
-  // Requêtes Firestore simplifiées pour correspondre aux nouvelles règles
+  // Requêtes Firestore stabilisées
   const usersRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
     return query(collection(firestore, 'users'), orderBy('email', 'asc'));
@@ -72,7 +72,6 @@ export default function AdminPage() {
 
   const convsRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
-    // Requête directe sans filtre complexe pour valider la règle list racine
     return query(collection(firestore, 'conversations'), orderBy('lastMessageAt', 'desc'));
   }, [firestore, isAdmin]);
   const { data: conversations } = useCollection<Conversation>(convsRef);
