@@ -12,7 +12,7 @@ import {
 
 /**
  * @fileOverview Initialisation SINGLETON de Firebase pour L&B NC.
- * Utilisation de globalThis pour garantir l'unicité de l'instance et la stabilité.
+ * Verrouillage absolu sur globalThis pour garantir la stabilité du Dashboard Admin.
  */
 
 declare global {
@@ -39,16 +39,15 @@ export function initializeFirebase() {
     const auth = globalThis.__LB_FIREBASE_AUTH;
 
     // 3. Initialisation Firestore (MODE STABILITÉ ABSOLUE)
-    // On verrouille le mode Long Polling et le Memory Cache pour éviter les erreurs d'assertion SDK
+    // On verrouille le mode Long Polling et le Memory Cache pour éliminer l'erreur ca9
     if (!globalThis.__LB_FIREBASE_FIRESTORE) {
       try {
         globalThis.__LB_FIREBASE_FIRESTORE = initializeFirestore(app, {
           experimentalForceLongPolling: true,
           localCache: memoryLocalCache(),
         });
-        console.log("L&B NC: Firestore Master Instance initialisée.");
+        console.log("L&B NC: Firestore Singleton Master prêt.");
       } catch (e) {
-        console.warn("L&B NC: Firestore déjà actif, récupération de l'instance existante.");
         globalThis.__LB_FIREBASE_FIRESTORE = getFirestore(app);
       }
     }

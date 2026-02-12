@@ -37,6 +37,7 @@ export default function AdminPage() {
   }, [user]);
 
   // REQUÊTES FIRESTORE (Seulement si isAdmin est confirmé)
+  // On utilise useMemoFirebase pour stabiliser les références de requêtes
   const usersRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
     return query(collection(firestore, 'users'), orderBy('email', 'asc'));
@@ -51,7 +52,6 @@ export default function AdminPage() {
 
   const convsRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
-    // On trie par date pour avoir les conversations les plus récentes en haut
     return query(collection(firestore, 'conversations'), orderBy('lastMessageAt', 'desc'));
   }, [firestore, isAdmin]);
   const { data: conversations } = useCollection<Conversation>(convsRef);
