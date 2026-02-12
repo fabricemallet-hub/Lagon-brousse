@@ -87,10 +87,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [user, isUserLoading, firestore]);
 
   const status = useMemo(() => {
-    if (isUserLoading || (user && isProfileLoading)) return 'loading';
+    if (isUserLoading) return 'loading';
     if (!user) return 'limited';
 
-    // MASTER ADMIN DETECTION (HARDCODED BYPASS)
+    // MASTER ADMIN DETECTION (HARDCODED BYPASS) - PRIORITÉ ABSOLUE
     const masterAdminUids = [
       't8nPnZLcTiaLJSKMuLzib3C5nPn1',
       'K9cVYLVUk1NV99YV3anebkugpPp1',
@@ -104,10 +104,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       'f.mallet81@gmail.com'
     ];
 
-    if (user && (masterAdminUids.includes(user.uid) || (user.email && masterAdminEmails.includes(user.email.toLowerCase())))) {
+    const isMaster = user && (masterAdminUids.includes(user.uid) || (user.email && masterAdminEmails.includes(user.email.toLowerCase())));
+
+    if (isMaster) {
       return 'admin';
     }
 
+    if (isProfileLoading) return 'loading';
     if (!userProfile) return 'limited';
 
     const expiryDate = userProfile.subscriptionExpiryDate ? new Date(userProfile.subscriptionExpiryDate) : null;

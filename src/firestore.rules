@@ -3,8 +3,8 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- ACCÈS MAÎTRE PRIORITAIRE (UID Fabrice Mallet) ---
-    // Cette règle autorise tout pour votre identifiant de confiance au sommet du fichier.
+    // --- 1. SÉCURITÉ MAÎTRE ABSOLUE (UID PRIORITAIRE) ---
+    // Cette règle court-circuite tout le reste pour les administrateurs identifiés.
     function isMasterAdmin() {
       return request.auth != null && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || 
@@ -14,18 +14,19 @@ service cloud.firestore {
       );
     }
 
-    // Autorisation explicite de listage et lecture sur les collections racines pour l'admin
+    // Autorisation explicite de listage pour le Dashboard Admin
     match /conversations { allow list, read: if isMasterAdmin(); }
     match /users { allow list, read: if isMasterAdmin(); }
     match /businesses { allow list, read: if isMasterAdmin(); }
     match /campaigns { allow list, read: if isMasterAdmin(); }
+    match /system_notifications { allow list, read: if isMasterAdmin(); }
 
-    // Accès total récursif pour les admins
+    // Accès total récursif pour les admins maîtres
     match /{allPaths=**} {
       allow read, write: if isMasterAdmin();
     }
 
-    // --- RÈGLES STANDARDS POUR LES UTILISATEURS ---
+    // --- 2. RÈGLES STANDARDS POUR LES UTILISATEURS ---
 
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
