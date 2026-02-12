@@ -12,7 +12,7 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         // Accès par UID maître
-        request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2"] ||
+        request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2", "t8nPnZLcTiaLJSKMuLzib3C5nPn1"] ||
         // Accès par email maître
         request.auth.token.email.lower() in ["f.mallet81@outlook.com", "fabrice.mallet@gmail.com", "f.mallet81@gmail.com"] ||
         // Accès par statut dans le document utilisateur (dynamique)
@@ -83,7 +83,18 @@ service cloud.firestore {
       }
     }
 
-    // --- 3. FONCTIONNALITÉS TEMPS RÉEL ---
+    // --- 3. MESSAGERIE & CONVERSATIONS ---
+    match /conversations/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      
+      match /messages/{messageId} {
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      }
+    }
+
+    // --- 4. FONCTIONNALITÉS TEMPS RÉEL ---
     match /hunting_sessions/{id} {
       allow read, write: if isSignedIn();
       match /{allPaths=**} {
@@ -107,7 +118,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // --- 4. PARTAGE DE SPOTS ---
+    // --- 5. PARTAGE DE SPOTS ---
     match /spot_shares/{id} {
       allow create: if isSignedIn();
       allow read, delete: if isSignedIn() && (
@@ -116,7 +127,7 @@ service cloud.firestore {
       );
     }
 
-    // --- 5. COMMERCES & BUSINESS ---
+    // --- 6. COMMERCES & BUSINESS ---
     match /businesses/{businessId} {
       allow get, list: if true;
       allow create: if isPro();

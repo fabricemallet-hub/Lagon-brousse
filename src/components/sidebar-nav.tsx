@@ -27,18 +27,33 @@ export function SidebarNav() {
 
   const { data: userProfile } = useDoc<UserAccount>(userDocRef);
 
-  // Détection robuste des rôles basée sur Firestore uniquement
+  // Détection robuste des rôles basée sur Firestore et fallbacks emails/UIDs
   const roles = useMemo(() => {
-    if (!user || !userProfile) return { isAdmin: false, isPro: false };
+    if (!user) return { isAdmin: false, isPro: false };
     
     const masterAdminUids = [
       'K9cVYLVUk1NV99YV3anebkugpPp1',
       'ipupi3Pg4RfrSEpFyT69BtlCdpi2',
-      'Irglq69MasYdNwBmUu8yKvw6h4G2'
+      'Irglq69MasYdNwBmUu8yKvw6h4G2',
+      't8nPnZLcTiaLJSKMuLzib3C5nPn1'
     ];
 
-    const isAdmin = masterAdminUids.includes(user.uid) || userProfile.subscriptionStatus === 'admin' || userProfile.role === 'admin';
-    const isPro = isAdmin || userProfile.subscriptionStatus === 'professional' || userProfile.role === 'professional';
+    const masterAdminEmails = [
+      'f.mallet81@outlook.com',
+      'fabrice.mallet@gmail.com',
+      'f.mallet81@gmail.com'
+    ];
+
+    const isExplicitAdmin = masterAdminUids.includes(user.uid) || 
+                           (user.email && masterAdminEmails.includes(user.email.toLowerCase()));
+
+    const isAdmin = isExplicitAdmin || 
+                    userProfile?.subscriptionStatus === 'admin' || 
+                    userProfile?.role === 'admin';
+
+    const isPro = isAdmin || 
+                  userProfile?.subscriptionStatus === 'professional' || 
+                  userProfile?.role === 'professional';
     
     return { isAdmin, isPro };
   }, [user, userProfile]);
