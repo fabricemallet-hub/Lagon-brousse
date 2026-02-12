@@ -11,8 +11,7 @@ import {
 } from 'firebase/firestore';
 
 /**
- * @fileOverview Initialisation SINGLETON STRICT de Firebase.
- * Élimine définitivement l'erreur INTERNAL ASSERTION FAILED: ID: ca9.
+ * @fileOverview Initialisation SINGLETON de Firebase pour L&B NC.
  */
 
 declare global {
@@ -23,7 +22,6 @@ declare global {
 
 export function initializeFirebase() {
   if (typeof window !== 'undefined') {
-    // 1. Singleton App
     if (!globalThis.__LB_FIREBASE_APP) {
       const apps = getApps();
       globalThis.__LB_FIREBASE_APP = apps.length === 0 
@@ -32,21 +30,19 @@ export function initializeFirebase() {
     }
     const app = globalThis.__LB_FIREBASE_APP;
 
-    // 2. Singleton Auth
     if (!globalThis.__LB_FIREBASE_AUTH) {
       globalThis.__LB_FIREBASE_AUTH = getAuth(app);
     }
     const auth = globalThis.__LB_FIREBASE_AUTH;
 
-    // 3. Singleton Firestore (Verrouillage Stabilité)
     if (!globalThis.__LB_FIREBASE_FIRESTORE) {
       try {
-        // Mode Long Polling + Memory Cache pour éviter la corruption d'état SDK
+        // Mode Long Polling + Memory Cache pour la stabilité sur Workstation
         globalThis.__LB_FIREBASE_FIRESTORE = initializeFirestore(app, {
           experimentalForceLongPolling: true,
           localCache: memoryLocalCache(),
         });
-        console.log("L&B NC: Firestore prêt (UID Maître autorisé)");
+        console.log("L&B NC: Firestore initialisé (Singleton Stable)");
       } catch (e) {
         globalThis.__LB_FIREBASE_FIRESTORE = getFirestore(app);
       }
@@ -56,7 +52,6 @@ export function initializeFirebase() {
     return { firebaseApp: app, auth, firestore };
   }
 
-  // SSR Fallback
   const ssrApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
   return {
     firebaseApp: ssrApp,

@@ -1,10 +1,6 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  experimental: {
-    // Allows hot module replacement and dev server features to work across workstation origins
-    allowedDevOrigins: ['*'],
-  },
   typescript: {
     ignoreBuildErrors: true,
   },

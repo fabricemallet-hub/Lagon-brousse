@@ -3,18 +3,29 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- ACCÈS MAÎTRE ABSOLU (VOTRE UID) ---
-    // Cette règle est évaluée en premier et donne un accès TOTAL à tout.
-    // Cela résout les erreurs de listage sur /conversations.
-    match /{allPaths=**} {
-      allow read, write: if request.auth != null && 
-        (request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || 
-         request.auth.uid == "K9cVYLVUk1NV99YV3anebkugpPp1" ||
-         request.auth.uid == "ipupi3Pg4RfrSEpFyT69BtlCdpi2" ||
-         request.auth.uid == "Irglq69MasYdNwBmUu8yKvw6h4G2");
+    // --- ACCÈS MAÎTRE PRIORITAIRE (UID Fabrice Mallet) ---
+    // Cette règle autorise tout pour votre identifiant de confiance au sommet du fichier.
+    function isMasterAdmin() {
+      return request.auth != null && (
+        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || 
+        request.auth.uid == "K9cVYLVUk1NV99YV3anebkugpPp1" ||
+        request.auth.uid == "ipupi3Pg4RfrSEpFyT69BtlCdpi2" ||
+        request.auth.uid == "Irglq69MasYdNwBmUu8yKvw6h4G2"
+      );
     }
 
-    // --- RÈGLES STANDARDS POUR LES AUTRES UTILISATEURS ---
+    // Autorisation explicite de listage et lecture sur les collections racines pour l'admin
+    match /conversations { allow list, read: if isMasterAdmin(); }
+    match /users { allow list, read: if isMasterAdmin(); }
+    match /businesses { allow list, read: if isMasterAdmin(); }
+    match /campaigns { allow list, read: if isMasterAdmin(); }
+
+    // Accès total récursif pour les admins
+    match /{allPaths=**} {
+      allow read, write: if isMasterAdmin();
+    }
+
+    // --- RÈGLES STANDARDS POUR LES UTILISATEURS ---
 
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
