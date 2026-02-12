@@ -27,41 +27,37 @@ export default function AdminPage() {
     const isMaster = (user.email && masterEmails.includes(user.email.toLowerCase())) || 
                     user.uid === 't8nPnZLcTiaLJSKMuLzib3C5nPn1';
     
-    if (isMaster) console.log(`L&B DEBUG ADMIN IDENTITÉ: [${user.email}] (UID: ${user.uid}). Accès Master: true`);
+    if (isMaster) console.log("L&B DEBUG ADMIN: Accès Master confirmé.");
     return isMaster;
   }, [user]);
 
-  // REQUÊTES FIRESTORE - N'exécuter que si isAdmin est confirmé et firestore prêt
+  // REQUÊTES FIRESTORE - N'exécuter que si isAdmin est confirmé
   const usersRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
-    console.log("L&B DEBUG ADMIN: Lancement requête [users]");
     return query(collection(firestore, 'users'), orderBy('email', 'asc'));
   }, [firestore, isAdmin]);
   const { data: users, isLoading: isUsersLoading, error: usersError } = useCollection<UserAccount>(usersRef);
 
   const businessRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
-    console.log("L&B DEBUG ADMIN: Lancement requête [businesses]");
     return query(collection(firestore, 'businesses'), orderBy('name', 'asc'));
   }, [firestore, isAdmin]);
   const { data: businesses } = useCollection<Business>(businessRef);
 
   const convsRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
-    console.log("L&B DEBUG ADMIN: Lancement requête [conversations]");
     return query(collection(firestore, 'conversations'), orderBy('lastMessageAt', 'desc'));
   }, [firestore, isAdmin]);
   const { data: conversations, isLoading: isConvsLoading, error: convsError } = useCollection<Conversation>(convsRef);
 
   useEffect(() => {
     if (!isUserLoading && !isAdmin && user) {
-      console.warn("L&B DEBUG ADMIN: Redirection - Accès non autorisé.");
       router.push('/compte');
     }
   }, [isAdmin, isUserLoading, router, user]);
 
   if (isUserLoading) return <div className="p-8"><Skeleton className="h-48 w-full rounded-2xl" /></div>;
-  if (!isAdmin) return <div className="p-12 text-center font-black uppercase text-muted-foreground animate-pulse">Accès Admin en cours de validation...</div>;
+  if (!isAdmin) return <div className="p-12 text-center font-black uppercase text-muted-foreground animate-pulse">Accès Administrateur en cours de validation...</div>;
 
   const activeSubs = users?.filter(u => u.subscriptionStatus === 'active' || u.subscriptionStatus === 'admin').length || 0;
 
@@ -75,7 +71,7 @@ export default function AdminPage() {
           <CardTitle className="font-black uppercase tracking-tighter text-3xl">
             Console Administrateur
           </CardTitle>
-          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Session Active : {user?.email}</p>
+          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Session Master : {user?.email}</p>
         </CardHeader>
       </Card>
 

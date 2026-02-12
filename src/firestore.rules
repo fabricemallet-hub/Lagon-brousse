@@ -4,35 +4,61 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ======================================================
-    // 1. RÈGLE ALPHA - ACCÈS TOTAL MASTER (f.mallet81@outlook.com)
+    // 1. FONCTIONS DE SÉCURITÉ
     // ======================================================
-    // Cette règle est prioritiaire et inconditionnelle.
-    
-    match /{document=**} {
-      allow read, write: if request.auth != null && (
-        request.auth.token.email == "f.mallet81@outlook.com" || 
-        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Détection Admin Maître (Prioritaire)
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email.lower() == "f.mallet81@outlook.com" || 
+        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
+        (request.auth.token.email != null && 
+         request.auth.token.email.lower() in [
+           "fabrice.mallet@gmail.com",
+           "f.mallet81@gmail.com",
+           "f.mallet81@outlook.com"
+         ]
+        )
       );
     }
 
-    // Autorisations explicites pour le listage des collections Admin
-    match /conversations { allow list: if request.auth != null && (request.auth.token.email == "f.mallet81@outlook.com" || request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"); }
-    match /users { allow list: if request.auth != null && (request.auth.token.email == "f.mallet81@outlook.com" || request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"); }
-    match /businesses { allow list: if request.auth != null && (request.auth.token.email == "f.mallet81@outlook.com" || request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"); }
-    match /campaigns { allow list: if request.auth != null && (request.auth.token.email == "f.mallet81@outlook.com" || request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"); }
+    // ======================================================
+    // 2. RÈGLE ALPHA - ACCÈS TOTAL ADMIN
+    // ======================================================
+    
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
 
     // ======================================================
-    // 2. RÈGLES STANDARDS (Pour les autres utilisateurs)
+    // 3. RÈGLES DE LISTAGE (Pour le Dashboard Admin)
+    // ======================================================
+    
+    match /users { allow list: if isAdmin(); }
+    match /conversations { allow list: if isAdmin(); }
+    match /businesses { allow list: if isAdmin(); }
+    match /campaigns { allow list: if isAdmin(); }
+
+    // ======================================================
+    // 4. RÈGLES STANDARDS (Pour les utilisateurs)
     // ======================================================
 
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      match /{allPaths=**} { allow read, write: if request.auth != null && request.auth.uid == userId; }
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      match /{allPaths=**} {
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      }
     }
 
     match /conversations/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      match /{allPaths=**} { allow read, write: if request.auth != null && request.auth.uid == userId; }
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      match /{allPaths=**} {
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      }
     }
 
     // Accès Publics
@@ -46,7 +72,7 @@ service cloud.firestore {
       allow get, list: if true;
       match /commune_stats/{communeId} { 
         allow get, list: if true; 
-        allow create, update: if request.auth != null; 
+        allow create, update: if isSignedIn(); 
       }
     }
     match /sound_library/{id} { allow get, list: if true; }
@@ -55,29 +81,42 @@ service cloud.firestore {
 
     // Support (Tickets)
     match /cms_support/tickets/items/{id} {
-      allow create: if request.auth != null;
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
     // Business & Commerces
     match /businesses/{businessId} {
       allow get, list: if true;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
       match /promotions/{promoId} { 
         allow get, list: if true; 
-        allow write: if request.auth != null; 
+        allow write: if isSignedIn(); 
       }
     }
 
     match /campaigns/{campaignId} {
-      allow create: if request.auth != null;
-      allow read: if request.auth != null && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
     }
     
     match /spot_shares/{id} {
-      allow create: if request.auth != null;
-      allow read, delete: if request.auth != null && (request.auth.token.email != null && resource.data.recipientEmail == request.auth.token.email.lower());
+      allow create: if isSignedIn();
+      allow read, delete: if isSignedIn() && (
+        isAdmin() || 
+        (request.auth.token.email != null && resource.data.recipientEmail == request.auth.token.email.lower())
+      );
+    }
+
+    // Boat Tracker & Sessions
+    match /vessels/{id} {
+      allow read, write: if isSignedIn();
+      match /{allPaths=**} { allow read, write: if isSignedIn(); }
+    }
+    match /hunting_sessions/{id} {
+      allow read, write: if isSignedIn();
+      match /{allPaths=**} { allow read, write: if isSignedIn(); }
     }
   }
 }

@@ -11,8 +11,8 @@ import {
 } from 'firebase/firestore';
 
 /**
- * @fileOverview Initialisation de Firebase Blindée.
- * Utilisation du Long Polling pour éviter les erreurs de canal (400 Bad Request).
+ * @fileOverview Initialisation de Firebase Blindée (Master Mode).
+ * Singleton immuable pour éviter les erreurs d'assertion interne (ID: ca9).
  */
 
 declare global {
@@ -25,6 +25,7 @@ export function initializeFirebase() {
   if (typeof window !== 'undefined') {
     // 1. Singleton App
     if (!globalThis.__LB_FIREBASE_APP) {
+      console.log("L&B DEBUG: Initialisation Firebase App...");
       globalThis.__LB_FIREBASE_APP = getApps().length === 0 
         ? initializeApp(firebaseConfig) 
         : getApp();
@@ -33,17 +34,18 @@ export function initializeFirebase() {
 
     // 2. Singleton Auth
     if (!globalThis.__LB_FIREBASE_AUTH) {
+      console.log("L&B DEBUG: Initialisation Firebase Auth...");
       globalThis.__LB_FIREBASE_AUTH = getAuth(app);
     }
     const auth = globalThis.__LB_FIREBASE_AUTH;
 
-    // 3. Singleton Firestore (STRICT MEMORY CACHE + LONG POLLING)
+    // 3. Singleton Firestore (STRICT MEMORY CACHE)
     if (!globalThis.__LB_FIREBASE_FIRESTORE) {
       try {
-        console.log("L&B DEBUG: Configuration Firestore (Hardened Mode)...");
+        console.log("L&B DEBUG: Configuration Firestore (Memory Cache Mode)...");
         globalThis.__LB_FIREBASE_FIRESTORE = initializeFirestore(app, {
           localCache: memoryLocalCache(),
-          // Force le Long Polling pour éviter les déconnexions WebSockets en environnement Cloud
+          // Long Polling requis pour la stabilité dans cet environnement cloud
           experimentalForceLongPolling: true,
         });
       } catch (e) {
