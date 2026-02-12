@@ -11,9 +11,7 @@ import {
 } from 'firebase/firestore';
 
 /**
- * @fileOverview Initialisation CRITIQUE de Firebase.
- * Utilisation de Memory Cache pour éliminer l'erreur d'assertion ca9.
- * Forçage du mode singleton strict via globalThis.
+ * @fileOverview Initialisation de Firebase avec Logs de Debug.
  */
 
 declare global {
@@ -26,6 +24,7 @@ export function initializeFirebase() {
   if (typeof window !== 'undefined') {
     // 1. Singleton App
     if (!globalThis.__LB_FIREBASE_APP) {
+      console.log("L&B DEBUG: Initialisation Firebase App...");
       globalThis.__LB_FIREBASE_APP = getApps().length === 0 
         ? initializeApp(firebaseConfig) 
         : getApp();
@@ -34,21 +33,21 @@ export function initializeFirebase() {
 
     // 2. Singleton Auth
     if (!globalThis.__LB_FIREBASE_AUTH) {
+      console.log("L&B DEBUG: Initialisation Firebase Auth...");
       globalThis.__LB_FIREBASE_AUTH = getAuth(app);
     }
     const auth = globalThis.__LB_FIREBASE_AUTH;
 
-    // 3. Singleton Firestore (FORCÉ MEMOIRE POUR CA9)
+    // 3. Singleton Firestore (FORCÉ MEMOIRE POUR ÉVITER CA9)
     if (!globalThis.__LB_FIREBASE_FIRESTORE) {
       try {
-        // On initialise Firestore UNE SEULE FOIS avec le cache en mémoire
-        // Cela évite les conflits de verrouillage de base de données (erreur ca9)
+        console.log("L&B DEBUG: Tentative d'initialisation Firestore (Memory Cache)...");
         globalThis.__LB_FIREBASE_FIRESTORE = initializeFirestore(app, {
           localCache: memoryLocalCache(),
         });
-        console.log("L&B NC: Firestore verrouillé en mode Singleton Mémoire.");
+        console.log("L&B DEBUG: Firestore initialisé en mode Singleton Mémoire (ID: ca9 Prevented).");
       } catch (e) {
-        // Fallback si déjà initialisé par ailleurs
+        console.warn("L&B DEBUG: Firestore déjà initialisé, récupération de l'instance existante.");
         globalThis.__LB_FIREBASE_FIRESTORE = getFirestore(app);
       }
     }

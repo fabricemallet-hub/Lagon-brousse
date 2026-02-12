@@ -4,8 +4,6 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // --- 1. SÉCURITÉ MAÎTRE PRIORITAIRE (BYPASS TOTAL) ---
-    // Cette fonction identifie Fabrice Mallet de manière absolue.
-    // L'accès est accordé AVANT toute autre règle pour éviter les conflits.
     function isMaster() {
       return request.auth != null && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
@@ -15,13 +13,13 @@ service cloud.firestore {
       );
     }
 
-    // Autorité absolue pour le compte Master
+    // Autorité absolue pour les comptes Master (EMAIL & UID)
     match /{allPaths=**} {
       allow read, write: if isMaster();
     }
 
     // --- 2. AUTORISATIONS DE LISTAGE EXPLICITES (DASHBOARD ADMIN) ---
-    // Firestore exige parfois un listage explicite au niveau collection pour les admins.
+    // On force le listage explicite pour éviter le rejet du moteur de règles sur les collections racine
     match /conversations { allow list: if isMaster(); }
     match /users { allow list: if isMaster(); }
     match /businesses { allow list: if isMaster(); }

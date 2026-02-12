@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { MessageSquare, TrendingUp, ShieldCheck, RefreshCw } from 'lucide-react';
+import { MessageSquare, TrendingUp, ShieldCheck, RefreshCw, AlertCircle } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
@@ -21,22 +21,29 @@ export default function AdminPage() {
 
   const [activeTab, setActiveTab] = useState('stats');
 
-  // DÉTECTION ADMIN MAÎTRE (UID ET EMAIL) - PRIORITÉ ABSOLUE
+  // DÉTECTION ADMIN MAÎTRE AVEC LOGS
   const isAdmin = useMemo(() => {
-    if (!user) return false;
-    const masterAdminEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
-    const masterAdminUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'K9cVYLVUk1NV99YV3anebkugpPp1', 'ipupi3Pg4RfrSEpFyT69BtlCdpi2'];
+    if (!user) {
+        console.log("L&B DEBUG ADMIN: Aucun utilisateur connecté.");
+        return false;
+    }
     
-    return (user.email && masterAdminEmails.includes(user.email.toLowerCase())) || 
-           masterAdminUids.includes(user.uid);
+    const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
+    const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1'];
+    
+    const isMaster = (user.email && masterEmails.includes(user.email.toLowerCase())) || 
+                    masterUids.includes(user.uid);
+
+    console.log(`L&B DEBUG ADMIN: Test Admin pour [${user.email}] (UID: ${user.uid}). Résultat: ${isMaster}`);
+    return isMaster;
   }, [user]);
 
-  // REQUÊTES FIRESTORE (Seulement si isAdmin est confirmé)
+  // REQUÊTES FIRESTORE
   const usersRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
     return query(collection(firestore, 'users'), orderBy('email', 'asc'));
   }, [firestore, isAdmin]);
-  const { data: users, isLoading: isUsersLoading } = useCollection<UserAccount>(usersRef);
+  const { data: users, isLoading: isUsersLoading, error: usersError } = useCollection<UserAccount>(usersRef);
 
   const businessRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
@@ -48,10 +55,11 @@ export default function AdminPage() {
     if (!firestore || !isAdmin) return null;
     return query(collection(firestore, 'conversations'), orderBy('lastMessageAt', 'desc'));
   }, [firestore, isAdmin]);
-  const { data: conversations, isLoading: isConvsLoading } = useCollection<Conversation>(convsRef);
+  const { data: conversations, isLoading: isConvsLoading, error: convsError } = useCollection<Conversation>(convsRef);
 
   useEffect(() => {
     if (!isUserLoading && !isAdmin) {
+      console.warn("L&B DEBUG ADMIN: Redirection vers /compte car non autorisé.");
       router.push('/compte');
     }
   }, [isAdmin, isUserLoading, router]);
@@ -74,6 +82,20 @@ export default function AdminPage() {
           <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Accès Maître : {user?.email}</p>
         </CardHeader>
       </Card>
+
+      {(usersError || convsError) && (
+        <Card className="border-red-500 bg-red-50 text-red-900">
+            <CardHeader className="py-4">
+                <CardTitle className="text-sm font-black uppercase flex items-center gap-2">
+                    <AlertCircle className="size-4" /> Erreur de synchronisation Firestore
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="text-xs font-mono">
+                {usersError && <p>Users: {usersError.message}</p>}
+                {convsError && <p>Convs: {convsError.message}</p>}
+            </CardContent>
+        </Card>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3 mb-6 h-auto bg-muted/50 border-2 rounded-2xl p-1.5 shadow-sm">

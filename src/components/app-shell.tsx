@@ -89,24 +89,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (isUserLoading) return 'loading';
     if (!user) return 'limited';
 
-    // MASTER ADMIN DETECTION (PRIORITÉ ABSOLUE PAR EMAIL ET UID)
-    const masterAdminEmails = [
-      'f.mallet81@outlook.com',
-      'fabrice.mallet@gmail.com', 
-      'f.mallet81@gmail.com'
-    ];
-    
-    const masterAdminUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1'];
+    const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
+    const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1'];
 
-    const isMaster = (user.email && masterAdminEmails.includes(user.email.toLowerCase())) || 
-                    masterAdminUids.includes(user.uid);
+    const isMaster = (user.email && masterEmails.includes(user.email.toLowerCase())) || 
+                    masterUids.includes(user.uid);
 
     if (isMaster) {
+      console.log("L&B DEBUG SHELL: Détection MASTER ADMIN.");
       return 'admin';
     }
 
     if (isProfileLoading) return 'loading';
     if (!userProfile) return 'limited';
+
+    console.log(`L&B DEBUG SHELL: Statut profil base: ${userProfile.subscriptionStatus}`);
 
     const expiryDate = userProfile.subscriptionExpiryDate ? new Date(userProfile.subscriptionExpiryDate) : null;
     const isValid = expiryDate && !isNaN(expiryDate.getTime()) && isBefore(new Date(), expiryDate);

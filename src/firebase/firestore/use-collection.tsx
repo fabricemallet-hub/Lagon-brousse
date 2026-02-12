@@ -59,10 +59,16 @@ export function useCollection<T = any>(
       return;
     }
 
+    const path: string =
+      memoizedTargetRefOrQuery.type === 'collection'
+        ? (memoizedTargetRefOrQuery as CollectionReference).path
+        : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString();
+
+    console.log(`L&B DEBUG: Début écoute Collection [${path}]`);
+
     setIsLoading(true);
     setError(null);
 
-    // Initialisation du listener avec gestion d'erreur robuste
     const unsubscribe = onSnapshot(
       memoizedTargetRefOrQuery,
       (snapshot: QuerySnapshot<DocumentData>) => {
@@ -70,17 +76,14 @@ export function useCollection<T = any>(
         for (const doc of snapshot.docs) {
           results.push({ ...(doc.data() as T), id: doc.id });
         }
+        console.log(`L&B DEBUG: Données reçues pour [${path}] (${results.length} docs)`);
         setData(results);
         setError(null);
         setIsLoading(false);
       },
       (error: FirestoreError) => {
+        console.error(`L&B DEBUG ERROR: Échec sur [${path}]`, error.code, error.message);
         if (error.code === 'permission-denied') {
-          const path: string =
-            memoizedTargetRefOrQuery.type === 'collection'
-              ? (memoizedTargetRefOrQuery as CollectionReference).path
-              : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString()
-
           const contextualError = new FirestorePermissionError({
             operation: 'list',
             path,
@@ -96,7 +99,10 @@ export function useCollection<T = any>(
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      console.log(`L&B DEBUG: Arrêt écoute Collection [${path}]`);
+      unsubscribe();
+    };
   }, [memoizedTargetRefOrQuery]);
 
   if(memoizedTargetRefOrQuery && !memoizedTargetRefOrQuery.__memo) {

@@ -15,16 +15,11 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
   const email = user.email?.toLowerCase() || '';
   
   // Identifiants de confiance absolue (Administrateurs)
-  const masterAdminEmails = [
-    'f.mallet81@outlook.com',
-    'fabrice.mallet@gmail.com',
-    'f.mallet81@gmail.com'
-  ];
+  const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
+  const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1'];
   
-  const masterAdminUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1'];
-  
-  const isMasterAdmin = (email && masterAdminEmails.includes(email)) || 
-                        masterAdminUids.includes(user.uid);
+  const isMasterAdmin = (email && masterEmails.includes(email)) || 
+                        masterUids.includes(user.uid);
 
   try {
     const docSnap = await getDoc(userDocRef);
@@ -34,6 +29,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
       
       // SYNCHRONISATION DE SÉCURITÉ FORCÉE POUR LES ADMINS PAR EMAIL
       if (isMasterAdmin && (currentData.subscriptionStatus !== 'admin' || currentData.role !== 'admin')) {
+          console.log(`L&B DEBUG SYNC: Restauration Admin pour [${email}]...`);
           await setDoc(userDocRef, { 
             ...currentData, 
             subscriptionStatus: 'admin',
@@ -41,12 +37,13 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
             id: user.uid,
             email: email
           }, { merge: true });
-          console.log("L&B NC: Statut Administrateur restauré pour le compte master.");
+          console.log("L&B DEBUG SYNC: Statut Administrateur restauré.");
       }
       return;
     }
 
     // Création d'un nouveau profil
+    console.log(`L&B DEBUG SYNC: Création nouveau profil pour [${email}]...`);
     const effectiveDisplayName = displayName || user.displayName || email.split('@')[0] || 'Utilisateur';
     
     const newUserDocument: UserAccount = {
@@ -66,8 +63,8 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
     }
     
     await setDoc(userDocRef, newUserDocument);
-    console.log("L&B NC: Nouveau profil utilisateur créé.");
+    console.log("L&B DEBUG SYNC: Nouveau profil utilisateur créé avec succès.");
   } catch (error) {
-    console.warn("L&B NC: Erreur synchronisation profil:", error);
+    console.error("L&B DEBUG SYNC ERROR:", error);
   }
 }
