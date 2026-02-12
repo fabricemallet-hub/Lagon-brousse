@@ -1,26 +1,9 @@
 'use client';
 
-import { firebaseConfig } from '@/firebase/config';
-import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-
 /**
- * Initializes Firebase core services.
- * This is separated from the main barrel file to avoid circular dependencies.
+ * Ce fichier est obsolète. Toute l'initialisation se fait désormais 
+ * dans src/firebase/index.ts pour éviter les conflits d'instances.
  */
-export function initializeFirebase() {
-  if (!getApps().length) {
-    const firebaseApp = initializeApp(firebaseConfig);
-    return getSdks(firebaseApp);
-  }
-  return getSdks(getApp());
-}
+import { initializeFirebase, getSdks } from './index';
 
-export function getSdks(firebaseApp: FirebaseApp) {
-  return {
-    firebaseApp,
-    auth: getAuth(firebaseApp),
-    firestore: getFirestore(firebaseApp)
-  };
-}
+export { initializeFirebase, getSdks };
