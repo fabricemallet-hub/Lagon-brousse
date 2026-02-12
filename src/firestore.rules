@@ -1,16 +1,17 @@
 
 rules_version = '2';
 
-// Version 2.0.6 - Correction critique des permissions de listage pour la messagerie
+// Version 2.0.8 - Correction critique permissions listage conversations
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // --- 1. FONCTIONS DE DÉTECTION ---
+    
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Identifiant Maître (Fabrice Mallet : t8nPnZLcTiaLJSKMuLzib3C5nPn1)
+    // Identifiant Maître (Fabrice Mallet)
     function isMasterAdmin() {
       return isSignedIn() && (
         request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2", "t8nPnZLcTiaLJSKMuLzib3C5nPn1"] ||
@@ -22,7 +23,6 @@ service cloud.firestore {
       );
     }
 
-    // Accès Admin standard via profil DB
     function isAdmin() {
       return isMasterAdmin() || (isSignedIn() && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -38,19 +38,29 @@ service cloud.firestore {
       );
     }
 
-    // --- 2. ACCÈS PRIORITAIRE ---
-    // Cette règle garantit que Fabrice Mallet a un accès total sur TOUTE la base de données
+    // --- 2. ACCÈS PRIORITAIRE MAÎTRE ---
     match /{allPaths=**} {
       allow read, write: if isMasterAdmin();
     }
 
     // --- 3. RÈGLES SPÉCIFIQUES ---
     
-    // Messagerie & Conversations (Correction explicite pour l'erreur de listage)
+    // Messagerie (Conversations)
+    // Firestore nécessite souvent une règle list explicite sur la collection parente
     match /conversations {
-      // Force l'autorisation de listage à la racine de la collection
-      allow list: if isMasterAdmin() || isAdmin();
+      allow list: if isAdmin();
       
+      match /{userId} {
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+        match /{allPaths=**} {
+          allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+        }
+      }
+    }
+
+    // Utilisateurs
+    match /users {
+      allow list: if isAdmin();
       match /{userId} {
         allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
         match /{allPaths=**} {
@@ -96,14 +106,6 @@ service cloud.firestore {
     match /cms_support/tickets/items/{id} {
       allow create: if isSignedIn();
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-    }
-
-    // Utilisateurs
-    match /users/{userId} {
-      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      match /{allPaths=**} {
-        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      }
     }
 
     // Sessions & Vessels

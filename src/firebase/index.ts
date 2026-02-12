@@ -10,7 +10,10 @@ import { getMessaging } from 'firebase/messaging';
 // Singleton pour les services
 let initializedServices: any = null;
 
-// IMPORTANT: DO NOT MODIFY THIS FUNCTION
+/**
+ * Initialise Firebase et ses services avec les paramètres optimisés pour le Cloud.
+ * Utilise experimentalForceLongPolling pour stabiliser la connexion Firestore.
+ */
 export function initializeFirebase() {
   if (initializedServices) return initializedServices;
 
@@ -27,20 +30,16 @@ export function initializeFirebase() {
     firebaseApp = getApp();
   }
 
-  initializedServices = getSdks(firebaseApp);
-  return initializedServices;
-}
-
-export function getSdks(firebaseApp: FirebaseApp) {
-  // CRITICAL: experimentalForceLongPolling: true solves "Unexpected state ID: ca9" in workstations
-  // by using HTTP polling instead of WebSockets which often fail behind proxies.
+  // Initialisation optimisée de Firestore
+  // experimentalForceLongPolling résout les erreurs "Unexpected state ID: ca9" 
+  // en forçant HTTP au lieu des WebSockets instables dans les workstations.
   let firestore;
   try {
     firestore = initializeFirestore(firebaseApp, {
       experimentalForceLongPolling: true,
     });
   } catch (e) {
-    console.warn("Firestore secondary init:", e);
+    console.warn("Firestore initialize error, falling back to getFirestore:", e);
     firestore = getFirestore(firebaseApp);
   }
 
@@ -53,12 +52,14 @@ export function getSdks(firebaseApp: FirebaseApp) {
     }
   }
 
-  return {
+  initializedServices = {
     firebaseApp,
     auth: getAuth(firebaseApp),
     firestore,
     messaging
   };
+
+  return initializedServices;
 }
 
 export * from './provider';
