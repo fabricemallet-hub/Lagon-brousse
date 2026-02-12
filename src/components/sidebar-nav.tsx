@@ -26,11 +26,11 @@ export function SidebarNav() {
 
   const { data: userProfile } = useDoc<UserAccount>(userDocRef);
 
-  // Détection robuste et prioritaire des rôles Admin
+  // Détection robuste et instantanée des rôles Admin Maître
   const roles = useMemo(() => {
     if (!user) return { isAdmin: false, isPro: false };
     
-    // Liste blanche technique (Priorité Haute pour Fabrice Mallet)
+    // Identifiants de confiance absolus (Fabrice Mallet inclus)
     const masterAdminUids = [
       't8nPnZLcTiaLJSKMuLzib3C5nPn1',
       'K9cVYLVUk1NV99YV3anebkugpPp1',
@@ -40,14 +40,14 @@ export function SidebarNav() {
 
     const masterAdminEmails = [
       'f.mallet81@outlook.com',
-      'fabrice.mallet@gmail.com',
+      'fabrice.mallet@gmail.com', 
       'f.mallet81@gmail.com'
     ];
 
-    const isExplicitAdmin = masterAdminUids.includes(user.uid) || 
-                           (user.email && masterAdminEmails.includes(user.email.toLowerCase()));
+    const isMaster = masterAdminUids.includes(user.uid) || 
+                    (user.email && masterAdminEmails.includes(user.email.toLowerCase()));
 
-    const isAdmin = isExplicitAdmin || 
+    const isAdmin = isMaster || 
                     userProfile?.subscriptionStatus === 'admin' || 
                     userProfile?.role === 'admin';
 
@@ -89,7 +89,7 @@ export function SidebarNav() {
       
       <div className="px-4 py-4 mt-auto border-t border-sidebar-border bg-sidebar group-data-[collapsible=icon]:hidden">
         <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40">
-          Version 2.2.6
+          Version 2.2.7
         </p>
       </div>
     </div>

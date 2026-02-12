@@ -29,9 +29,8 @@ export function initializeFirebase() {
     firebaseApp = getApp();
   }
 
-  // Initialisation optimisée de Firestore
-  // experimentalForceLongPolling résout les erreurs "Unexpected state ID: ca9" 
-  // en forçant HTTP au lieu des WebSockets instables dans les workstations.
+  // Initialisation optimisée de Firestore pour les environnements Workstation
+  // experimentalForceLongPolling résout les erreurs "Unexpected state ID: ca9"
   let firestore;
   try {
     firestore = initializeFirestore(firebaseApp, {
