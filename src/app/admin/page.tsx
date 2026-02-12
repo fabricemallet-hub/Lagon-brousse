@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { MessageSquare, TrendingUp, ShieldCheck } from 'lucide-react';
+import { MessageSquare, TrendingUp, ShieldCheck, RefreshCw } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
@@ -21,7 +21,7 @@ export default function AdminPage() {
 
   const [activeTab, setActiveTab] = useState('stats');
 
-  // DÉTECTION ADMIN MAÎTRE (UID ET EMAIL)
+  // DÉTECTION ADMIN MAÎTRE (UID ET EMAIL) - PRIORITÉ ABSOLUE
   const isAdmin = useMemo(() => {
     if (!user) return false;
     const masterAdminEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
@@ -32,12 +32,11 @@ export default function AdminPage() {
   }, [user]);
 
   // REQUÊTES FIRESTORE (Seulement si isAdmin est confirmé)
-  // On utilise useMemoFirebase pour stabiliser les références de requêtes
   const usersRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
     return query(collection(firestore, 'users'), orderBy('email', 'asc'));
   }, [firestore, isAdmin]);
-  const { data: users } = useCollection<UserAccount>(usersRef);
+  const { data: users, isLoading: isUsersLoading } = useCollection<UserAccount>(usersRef);
 
   const businessRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
@@ -47,10 +46,9 @@ export default function AdminPage() {
 
   const convsRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
-    // On s'assure que la requête ne part pas trop tôt
     return query(collection(firestore, 'conversations'), orderBy('lastMessageAt', 'desc'));
   }, [firestore, isAdmin]);
-  const { data: conversations } = useCollection<Conversation>(convsRef);
+  const { data: conversations, isLoading: isConvsLoading } = useCollection<Conversation>(convsRef);
 
   useEffect(() => {
     if (!isUserLoading && !isAdmin) {
@@ -88,7 +86,7 @@ export default function AdminPage() {
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
             <Card className="border-2 shadow-sm">
               <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Utilisateurs</CardTitle></CardHeader>
-              <CardContent><div className="text-3xl font-black">{users?.length || 0}</div></CardContent>
+              <CardContent><div className="text-3xl font-black">{isUsersLoading ? <RefreshCw className="size-6 animate-spin" /> : users?.length || 0}</div></CardContent>
             </Card>
             <Card className="border-2 shadow-sm">
               <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Abonnés</CardTitle></CardHeader>
@@ -107,38 +105,45 @@ export default function AdminPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/30">
-                    <TableHead className="text-[10px] font-black uppercase h-10 px-4">Utilisateur</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase h-10">Dernier Message</TableHead>
-                    <TableHead className="text-right text-[10px] font-black uppercase h-10 px-4">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {conversations?.map(conv => (
-                    <TableRow key={conv.id} className={cn(!conv.isReadByAdmin && "bg-primary/5")}>
-                      <TableCell className="py-4 px-4">
-                        <div className="flex flex-col">
-                          <span className="font-black text-xs text-slate-800">{conv.userDisplayName || 'Inconnu'}</span>
-                          <span className="text-[9px] font-bold opacity-50 lowercase">{conv.userEmail}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-xs italic truncate max-w-[150px] opacity-70">
-                        "{conv.lastMessageContent}"
-                      </TableCell>
-                      <TableCell className="text-right px-4">
-                        <Button asChild variant="outline" size="sm" className="h-8 text-[10px] font-black uppercase border-2 shadow-sm hover:bg-primary hover:text-white transition-colors">
-                          <Link href={`/admin/messages/${conv.id}`}>Répondre</Link>
-                        </Button>
-                      </TableCell>
+              {isConvsLoading ? (
+                <div className="p-8 space-y-4">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/30">
+                      <TableHead className="text-[10px] font-black uppercase h-10 px-4">Utilisateur</TableHead>
+                      <TableHead className="text-[10px] font-black uppercase h-10">Dernier Message</TableHead>
+                      <TableHead className="text-right text-[10px] font-black uppercase h-10 px-4">Action</TableHead>
                     </TableRow>
-                  ))}
-                  {(!conversations || conversations.length === 0) && (
-                    <TableRow><TableCell colSpan={3} className="text-center py-16 text-xs italic opacity-40 font-bold uppercase tracking-widest">Aucun message pour le moment</TableCell></TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {conversations?.map(conv => (
+                      <TableRow key={conv.id} className={cn(!conv.isReadByAdmin && "bg-primary/5")}>
+                        <TableCell className="py-4 px-4">
+                          <div className="flex flex-col">
+                            <span className="font-black text-xs text-slate-800">{conv.userDisplayName || 'Inconnu'}</span>
+                            <span className="text-[9px] font-bold opacity-50 lowercase">{conv.userEmail}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs italic truncate max-w-[150px] opacity-70">
+                          "{conv.lastMessageContent}"
+                        </TableCell>
+                        <TableCell className="text-right px-4">
+                          <Button asChild variant="outline" size="sm" className="h-8 text-[10px] font-black uppercase border-2 shadow-sm hover:bg-primary hover:text-white transition-colors">
+                            <Link href={`/admin/messages/${conv.id}`}>Répondre</Link>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {(!conversations || conversations.length === 0) && (
+                      <TableRow><TableCell colSpan={3} className="text-center py-16 text-xs italic opacity-40 font-bold uppercase tracking-widest">Aucun message pour le moment</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

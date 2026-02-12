@@ -12,8 +12,8 @@ import {
 
 /**
  * @fileOverview Initialisation CRITIQUE de Firebase.
- * Forçage du mode Long Polling et Memory Cache pour garantir la stabilité 
- * des permissions dans l'environnement Cloud et éliminer l'erreur ca9.
+ * Utilisation de Memory Cache pour éliminer l'erreur d'assertion ca9.
+ * Forçage du mode singleton strict via globalThis.
  */
 
 declare global {
@@ -26,8 +26,7 @@ export function initializeFirebase() {
   if (typeof window !== 'undefined') {
     // 1. Singleton App
     if (!globalThis.__LB_FIREBASE_APP) {
-      const apps = getApps();
-      globalThis.__LB_FIREBASE_APP = apps.length === 0 
+      globalThis.__LB_FIREBASE_APP = getApps().length === 0 
         ? initializeApp(firebaseConfig) 
         : getApp();
     }
@@ -39,16 +38,17 @@ export function initializeFirebase() {
     }
     const auth = globalThis.__LB_FIREBASE_AUTH;
 
-    // 3. Singleton Firestore (FORCÉ LONG POLLING + MEMOIRE)
-    // C'est la seule configuration qui garantit la stabilité des règles de sécurité.
+    // 3. Singleton Firestore (FORCÉ MEMOIRE POUR CA9)
     if (!globalThis.__LB_FIREBASE_FIRESTORE) {
       try {
+        // On initialise Firestore UNE SEULE FOIS avec le cache en mémoire
+        // Cela évite les conflits de verrouillage de base de données (erreur ca9)
         globalThis.__LB_FIREBASE_FIRESTORE = initializeFirestore(app, {
-          experimentalForceLongPolling: true, // Évite les déconnexions WebSocket
-          localCache: memoryLocalCache(),     // Évite les conflits de persistance (erreur ca9)
+          localCache: memoryLocalCache(),
         });
-        console.log("L&B NC: Firestore verrouillé en mode Stabilité Totale.");
+        console.log("L&B NC: Firestore verrouillé en mode Singleton Mémoire.");
       } catch (e) {
+        // Fallback si déjà initialisé par ailleurs
         globalThis.__LB_FIREBASE_FIRESTORE = getFirestore(app);
       }
     }
