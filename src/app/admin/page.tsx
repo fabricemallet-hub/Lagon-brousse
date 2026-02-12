@@ -3,8 +3,8 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, setDoc, addDoc, deleteDoc, serverTimestamp, Timestamp, increment, getDocs, where, writeBatch } from 'firebase/firestore';
-import type { UserAccount, Business, Conversation, AccessToken, SharedAccessToken, FishSpeciesInfo, SplashScreenSettings, CgvSettings, RibSettings, SystemNotification } from '@/lib/types';
+import { collection, query, orderBy, doc, setDoc, addDoc, deleteDoc, serverTimestamp, Timestamp, increment, getDocs, where, writeBatch, updateDoc } from 'firebase/firestore';
+import type { UserAccount, Business, Conversation, AccessToken, SharedAccessToken, FishSpeciesInfo, SplashScreenSettings, CgvSettings, RibSettings, SystemNotification, Campaign, SoundLibraryEntry } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,7 +42,9 @@ import {
   FileText,
   Camera,
   Pencil,
-  X
+  X,
+  Volume2,
+  Play
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -87,6 +89,12 @@ export default function AdminPage() {
   const sysNotifsRef = useMemoFirebase(() => (firestore && isAdmin) ? query(collection(firestore, 'system_notifications'), orderBy('createdAt', 'desc')) : null, [firestore, isAdmin]);
   const { data: sysNotifs } = useCollection<SystemNotification>(sysNotifsRef);
 
+  const campaignsRef = useMemoFirebase(() => (firestore && isAdmin) ? query(collection(firestore, 'campaigns'), orderBy('createdAt', 'desc')) : null, [firestore, isAdmin]);
+  const { data: campaigns } = useCollection<Campaign>(campaignsRef);
+
+  const soundsRef = useMemoFirebase(() => (firestore && isAdmin) ? query(collection(firestore, 'sound_library'), orderBy('label', 'asc')) : null, [firestore, isAdmin]);
+  const { data: sounds } = useCollection<SoundLibraryEntry>(soundsRef);
+
   // SETTINGS REFS
   const splashRef = useMemoFirebase(() => (firestore && isAdmin) ? doc(firestore, 'app_settings', 'splash') : null, [firestore, isAdmin]);
   const { data: splashSettings } = useDoc<SplashScreenSettings>(splashRef);
@@ -120,10 +128,11 @@ export default function AdminPage() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-6 mb-6 h-auto bg-muted/50 border-2 rounded-2xl p-1.5 shadow-sm gap-1">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 md:grid-cols-7 mb-6 h-auto bg-muted/50 border-2 rounded-2xl p-1.5 shadow-sm gap-1">
           <TabsTrigger value="stats" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Vue d'ensemble</TabsTrigger>
           <TabsTrigger value="users" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Utilisateurs</TabsTrigger>
           <TabsTrigger value="design" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Design & Splash</TabsTrigger>
+          <TabsTrigger value="notifications" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Notifications</TabsTrigger>
           <TabsTrigger value="fish" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Guide Poissons</TabsTrigger>
           <TabsTrigger value="acces" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Accès</TabsTrigger>
           <TabsTrigger value="support" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Support</TabsTrigger>
@@ -134,10 +143,8 @@ export default function AdminPage() {
             <Card className="border-2 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase opacity-40">Utilisateurs</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{users?.length || 0}</div></CardContent></Card>
             <Card className="border-2 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-primary">Abonnés</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{users?.filter(u => u.subscriptionStatus === 'active' || u.subscriptionStatus === 'admin').length || 0}</div></CardContent></Card>
             <Card className="border-2 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-accent">Commerces</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{businesses?.length || 0}</div></CardContent></Card>
-            <Card className="border-2 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-green-600">En Ligne (Sharing)</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">?</div></CardContent></Card>
+            <Card className="border-2 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-green-600">Messages Support</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{conversations?.filter(c => !c.isReadByAdmin).length || 0}</div></CardContent></Card>
           </div>
-          
-          <SystemNotificationsManager notifications={sysNotifs} />
         </TabsContent>
 
         <TabsContent value="users" className="space-y-6">
@@ -149,6 +156,14 @@ export default function AdminPage() {
             <SplashManager initialSettings={splashSettings} />
             <CgvRibManager cgvData={cgvData} ribData={ribData} />
           </div>
+        </TabsContent>
+
+        <TabsContent value="notifications" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <SystemNotificationsManager notifications={sysNotifs} />
+            <SoundLibraryManager sounds={sounds} />
+          </div>
+          <CampaignsManager campaigns={campaigns} />
         </TabsContent>
 
         <TabsContent value="fish" className="space-y-6">
@@ -228,6 +243,91 @@ function SystemNotificationsManager({ notifications }: { notifications: SystemNo
                         </div>
                     ))}
                 </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function SoundLibraryManager({ sounds }: { sounds: SoundLibraryEntry[] | null }) {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [label, setLabel] = useState('');
+    const [url, setUrl] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleAdd = async () => {
+        if (!firestore || !label || !url) return;
+        setIsSaving(true);
+        try {
+            await addDoc(collection(firestore, 'sound_library'), {
+                label, url, categories: ['General'], createdAt: serverTimestamp()
+            });
+            setLabel(''); setUrl('');
+            toast({ title: "Son ajouté" });
+        } finally { setIsSaving(false); }
+    };
+
+    return (
+        <Card className="border-2 shadow-lg">
+            <CardHeader><CardTitle className="text-lg font-black uppercase flex items-center gap-2"><Volume2 className="size-5 text-primary" /> Bibliothèque de Sons</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Libellé</Label><Input value={label} onChange={e => setLabel(e.target.value)} placeholder="Ex: Alerte sonar..." /></div>
+                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase">URL (.mp3)</Label><Input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://..." /></div>
+                </div>
+                <Button onClick={handleAdd} disabled={isSaving || !label || !url} className="w-full font-black uppercase h-12 shadow-lg">Enregistrer le son</Button>
+                <div className="max-h-64 overflow-y-auto space-y-2 border-t pt-4">
+                    {sounds?.map(s => (
+                        <div key={s.id} className="flex items-center justify-between p-2 border-2 rounded-xl bg-white shadow-sm">
+                            <span className="font-black text-[10px] uppercase pl-2">{s.label}</span>
+                            <div className="flex items-center gap-1">
+                                <Button variant="ghost" size="icon" className="size-8" onClick={() => new Audio(s.url).play()}><Play className="size-3" /></Button>
+                                <Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(firestore!, 'sound_library', s.id))} className="size-8 text-destructive"><Trash2 className="size-3" /></Button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function CampaignsManager({ campaigns }: { campaigns: Campaign[] | null }) {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+
+    const updateStatus = async (id: string, status: 'sent' | 'pending') => {
+        if (!firestore) return;
+        await updateDoc(doc(firestore, 'campaigns', id), { status });
+        toast({ title: "Campagne mise à jour" });
+    };
+
+    return (
+        <Card className="border-2 shadow-lg">
+            <CardHeader><CardTitle className="text-lg font-black uppercase flex items-center gap-2"><Megaphone className="size-5 text-accent" /> Campagnes Pro (Push)</CardTitle></CardHeader>
+            <CardContent className="p-0">
+                <Table>
+                    <TableHeader><TableRow className="bg-muted/30">
+                        <TableHead className="text-[10px] font-black uppercase h-10 px-4">Commerce</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase h-10">Message</TableHead>
+                        <TableHead className="text-[10px] font-black uppercase h-10">Reach / Coût</TableHead>
+                        <TableHead className="text-right text-[10px] font-black uppercase h-10 px-4">Action</TableHead>
+                    </TableRow></TableHeader>
+                    <TableBody>
+                        {campaigns?.map(c => (
+                            <TableRow key={c.id}>
+                                <TableCell className="px-4 py-3"><div className="flex flex-col"><span className="font-black text-xs">{c.businessName}</span><span className="text-[9px] font-bold opacity-40">{c.targetCommune} / {c.targetCategory}</span></div></TableCell>
+                                <TableCell className="text-[10px] font-medium max-w-[150px] truncate">{c.title}</TableCell>
+                                <TableCell><div className="flex flex-col"><span className="font-black text-xs">{c.reach} pers.</span><span className="text-[9px] font-bold text-accent">{c.cost} F</span></div></TableCell>
+                                <TableCell className="text-right px-4">
+                                    <Badge variant={c.status === 'sent' ? 'default' : 'secondary'} className="text-[8px] font-black uppercase cursor-pointer" onClick={() => updateStatus(c.id, c.status === 'sent' ? 'pending' : 'sent')}>
+                                        {c.status}
+                                    </Badge>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
             </CardContent>
         </Card>
     );
