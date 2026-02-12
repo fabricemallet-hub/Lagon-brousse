@@ -7,26 +7,22 @@ service cloud.firestore {
     // 1. MASTER ADMIN BYPASS (PRIORITÉ ABSOLUE)
     // ======================================================
     
-    // Fonction de vérification Master ultra-robuste
     function isMaster() {
       return request.auth != null && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
-        (request.auth.token.email != null && 
-         request.auth.token.email.lower() in [
-           "f.mallet81@outlook.com", 
-           "fabrice.mallet@gmail.com", 
-           "f.mallet81@gmail.com"
-         ]
-        )
+        request.auth.token.get('email', '').lower() == "f.mallet81@outlook.com" ||
+        request.auth.token.get('email', '').lower() == "fabrice.mallet@gmail.com" ||
+        request.auth.token.get('email', '').lower() == "f.mallet81@gmail.com"
       );
     }
 
-    // Bypass universel pour tous les documents
-    match /{document=**} {
+    // Bypass universel pour TOUS les documents (Alpha)
+    match /{allPaths=**} {
       allow read, write: if isMaster();
     }
 
-    // Autorisation de listage explicite pour les collections Admin
+    // Autorisation de listage EXPLICITE pour les collections Admin
+    // Indispensable pour que collection(db, 'name') ne soit pas rejeté par sécurité
     match /conversations { allow list: if isMaster(); }
     match /users { allow list: if isMaster(); }
     match /businesses { allow list: if isMaster(); }
@@ -46,7 +42,6 @@ service cloud.firestore {
 
     // Conversations privées (Support)
     match /conversations/{convId} {
-      // CRITIQUE : Autoriser l'admin explicitement au niveau du document pour permettre le listage global
       allow read, write: if isMaster() || (request.auth != null && request.auth.uid == convId);
       match /{allPaths=**} {
         allow read, write: if isMaster() || (request.auth != null && request.auth.uid == convId);

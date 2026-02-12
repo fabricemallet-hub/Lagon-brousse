@@ -12,22 +12,14 @@ import {
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
-/** Utility type to add an 'id' field to a given type T. */
 export type WithId<T> = T & { id: string };
 
-/**
- * Interface for the return value of the useCollection hook.
- * @template T Type of the document data.
- */
 export interface UseCollectionResult<T> {
-  data: WithId<T>[] | null; // Document data with ID, or null.
-  isLoading: boolean;       // True if loading.
-  error: FirestoreError | Error | null; // Error object, or null.
+  data: WithId<T>[] | null;
+  isLoading: boolean;
+  error: FirestoreError | Error | null;
 }
 
-/* Internal implementation of Query:
-  https://github.com/firebase/firebase-js-sdk/blob/c5f08a9bc5da0d2b0207802c972d53724ccef055/packages/firestore/src/lite-api/reference.ts#L143
-*/
 export interface InternalQuery extends Query<DocumentData> {
   _query: {
     path: {
@@ -37,10 +29,6 @@ export interface InternalQuery extends Query<DocumentData> {
   }
 }
 
-/**
- * React hook to subscribe to a Firestore collection or query in real-time.
- * Handles nullable references/queries.
- */
 export function useCollection<T = any>(
     memoizedTargetRefOrQuery: ((CollectionReference<DocumentData> | Query<DocumentData>) & {__memo?: boolean})  | null | undefined,
 ): UseCollectionResult<T> {
@@ -82,18 +70,20 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (err: FirestoreError) => {
+        // Log non-bloquant pour le diagnostic
         console.error(`L&B DEBUG ERROR: Échec sur [${path}]`, err.code, err.message);
         
         if (err.code === 'permission-denied') {
           const contextualError = new FirestorePermissionError({
             operation: 'list',
             path,
-          })
+          });
 
           setError(contextualError);
           
-          // On évite l'émission globale pour les collections d'administration dans le Dashboard
-          // pour éviter de bloquer toute l'interface avec une erreur Next.js
+          // CRITIQUE : On n'émet PAS l'erreur globale pour les collections Admin
+          // pour éviter que Next.js n'affiche l'écran d'erreur HTML bloquant.
+          // Le Dashboard Admin gérera l'affichage local de l'erreur.
           const adminPaths = ['conversations', 'users', 'businesses', 'campaigns'];
           if (!adminPaths.includes(path)) {
             errorEmitter.emit('permission-error', contextualError);

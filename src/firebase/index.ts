@@ -12,7 +12,7 @@ import {
 
 /**
  * @fileOverview Initialisation de Firebase Singleton.
- * Verrouillage strict pour éviter les erreurs d'assertion ID: ca9.
+ * Memory Cache forcé pour éviter l'erreur ca9 dans cet environnement.
  */
 
 declare global {
@@ -25,6 +25,7 @@ export function initializeFirebase() {
   if (typeof window !== 'undefined') {
     // 1. Singleton App
     if (!globalThis.__LB_FIREBASE_APP) {
+      console.log("L&B DEBUG: Initialisation Firebase App...");
       globalThis.__LB_FIREBASE_APP = getApps().length === 0 
         ? initializeApp(firebaseConfig) 
         : getApp();
@@ -33,18 +34,20 @@ export function initializeFirebase() {
 
     // 2. Singleton Auth
     if (!globalThis.__LB_FIREBASE_AUTH) {
+      console.log("L&B DEBUG: Initialisation Firebase Auth...");
       globalThis.__LB_FIREBASE_AUTH = getAuth(app);
     }
     const auth = globalThis.__LB_FIREBASE_AUTH;
 
-    // 3. Singleton Firestore (MEMORY CACHE OBLIGATOIRE)
+    // 3. Singleton Firestore (MEMORY CACHE ONLY)
     if (!globalThis.__LB_FIREBASE_FIRESTORE) {
+      console.log("L&B DEBUG: Configuration Firestore (Memory Cache Mode)...");
       try {
         globalThis.__LB_FIREBASE_FIRESTORE = initializeFirestore(app, {
           localCache: memoryLocalCache()
         });
       } catch (e) {
-        // En cas d'erreur ca9, on essaie de récupérer l'instance déjà initialisée
+        // En cas d'erreur ID: ca9, on récupère l'instance par défaut
         globalThis.__LB_FIREBASE_FIRESTORE = getFirestore(app);
       }
     }
