@@ -1,12 +1,13 @@
 
 rules_version = '2';
 
-// Version 2.1.0 - Accès Maître Prioritaire Absolu
+// Version 2.2.0 - Accès Maître Prioritaire Absolu
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // --- 1. ACCÈS TOTAL MAÎTRE (Priorité #1) ---
     // Cette règle autorise TOUT pour Fabrice Mallet via son UID ou Email.
+    // Elle est placée ici pour court-circuiter toute autre restriction.
     match /{allPaths=**} {
       allow read, write: if request.auth != null && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || 
@@ -43,29 +44,30 @@ service cloud.firestore {
       );
     }
 
-    // --- 3. RÈGLES SPÉCIFIQUES ---
+    // --- 3. RÈGLES SPÉCIFIQUES (Sécurité par défaut pour les autres) ---
     
     // Messagerie (Conversations)
     match /conversations {
       // Autorisation explicite de listage pour les admins
       allow list: if isAdmin();
-      
-      match /{userId} {
+    }
+
+    match /conversations/{userId} {
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      match /{allPaths=**} {
         allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-        match /{allPaths=**} {
-          allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-        }
       }
     }
 
     // Utilisateurs
     match /users {
       allow list: if isAdmin();
-      match /{userId} {
+    }
+
+    match /users/{userId} {
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      match /{allPaths=**} {
         allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-        match /{allPaths=**} {
-          allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-        }
       }
     }
 
