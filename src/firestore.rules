@@ -3,24 +3,31 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. AUTORITÉ MAÎTRE ABSOLUE (Email-First) ---
-    // Cette règle est prioritaire et inconditionnelle pour votre compte.
-    match /{allPaths=**} {
-      allow read, write: if request.auth != null && (
+    // --- FONCTION DE SÉCURITÉ MAÎTRE ---
+    // Cette fonction identifie Fabrice Mallet de manière absolue par UID et Email.
+    function isMaster() {
+      return request.auth != null && (
+        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
         request.auth.token.email.lower() == "f.mallet81@outlook.com" ||
         request.auth.token.email.lower() == "fabrice.mallet@gmail.com" ||
         request.auth.token.email.lower() == "f.mallet81@gmail.com"
       );
     }
 
-    // --- 2. ACCÈS EXPLICITES POUR LE DASHBOARD ADMIN ---
-    // Firestore nécessite parfois un match explicite sur la collection pour le listage.
-    match /conversations/{id} { allow list: if request.auth != null && request.auth.token.email.lower() == "f.mallet81@outlook.com"; }
-    match /users/{id} { allow list: if request.auth != null && request.auth.token.email.lower() == "f.mallet81@outlook.com"; }
-    match /businesses/{id} { allow list: if request.auth != null && request.auth.token.email.lower() == "f.mallet81@outlook.com"; }
-    match /campaigns/{id} { allow list: if request.auth != null && request.auth.token.email.lower() == "f.mallet81@outlook.com"; }
+    // --- 1. ACCÈS TOTAL ET PRIORITAIRE POUR L'ADMINISTRATEUR ---
+    // On place cette règle au sommet pour court-circuiter tout refus ultérieur.
+    match /{allPaths=**} {
+      allow read, write: if isMaster();
+    }
 
-    // --- 3. RÈGLES STANDARDS POUR LES UTILISATEURS ---
+    // --- 2. RÈGLES SPÉCIFIQUES POUR LE DASHBOARD ADMIN ---
+    // Firestore exige parfois un match explicite sur la collection pour le listage (getDocs/onSnapshot).
+    match /conversations/{id} { allow list: if isMaster(); }
+    match /users/{id} { allow list: if isMaster(); }
+    match /businesses/{id} { allow list: if isMaster(); }
+    match /campaigns/{id} { allow list: if isMaster(); }
+
+    // --- 3. ACCÈS UTILISATEURS STANDARDS ---
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
       match /{allPaths=**} { allow read, write: if request.auth != null && request.auth.uid == userId; }
@@ -31,7 +38,7 @@ service cloud.firestore {
       match /{allPaths=**} { allow read, write: if request.auth != null && request.auth.uid == userId; }
     }
 
-    // Accès Publics (Lecture seule)
+    // Accès Publics
     match /app_settings/{id} { allow read: if true; }
     match /system_notifications/{id} { allow read: if true; }
     match /meteo_caledonie/{id} { 
@@ -52,7 +59,7 @@ service cloud.firestore {
     // Support (Tickets)
     match /cms_support/tickets/items/{id} {
       allow create: if request.auth != null;
-      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || request.auth.token.email.lower() == "f.mallet81@outlook.com");
+      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || isMaster());
     }
 
     // Sessions temps réel (GPS)
@@ -70,7 +77,7 @@ service cloud.firestore {
     match /businesses/{businessId} {
       allow get, list: if true;
       allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && (resource.data.ownerId == request.auth.uid || request.auth.token.email.lower() == "f.mallet81@outlook.com");
+      allow update, delete: if request.auth != null && (resource.data.ownerId == request.auth.uid || isMaster());
       match /promotions/{promoId} { 
         allow get, list: if true; 
         allow write: if request.auth != null; 
@@ -79,7 +86,7 @@ service cloud.firestore {
 
     match /campaigns/{campaignId} {
       allow create: if request.auth != null;
-      allow read: if request.auth != null && (resource.data.ownerId == request.auth.uid || request.auth.token.email.lower() == "f.mallet81@outlook.com");
+      allow read: if request.auth != null && (resource.data.ownerId == request.auth.uid || isMaster());
     }
     
     match /spot_shares/{id} {

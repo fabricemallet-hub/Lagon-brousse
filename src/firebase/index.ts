@@ -11,8 +11,9 @@ import {
 } from 'firebase/firestore';
 
 /**
- * @fileOverview Initialisation HAUTEMENT STABLE de Firebase.
- * Utilise un verrou global pour empêcher toute réinitialisation conflictuelle.
+ * @fileOverview Initialisation CRITIQUE de Firebase.
+ * Forçage du mode Long Polling et Memory Cache pour garantir la stabilité 
+ * des permissions dans l'environnement Cloud et éliminer l'erreur ca9.
  */
 
 declare global {
@@ -23,7 +24,7 @@ declare global {
 
 export function initializeFirebase() {
   if (typeof window !== 'undefined') {
-    // 1. App Singleton
+    // 1. Singleton App
     if (!globalThis.__LB_FIREBASE_APP) {
       const apps = getApps();
       globalThis.__LB_FIREBASE_APP = apps.length === 0 
@@ -32,22 +33,22 @@ export function initializeFirebase() {
     }
     const app = globalThis.__LB_FIREBASE_APP;
 
-    // 2. Auth Singleton
+    // 2. Singleton Auth
     if (!globalThis.__LB_FIREBASE_AUTH) {
       globalThis.__LB_FIREBASE_AUTH = getAuth(app);
     }
     const auth = globalThis.__LB_FIREBASE_AUTH;
 
-    // 3. Firestore Singleton (FORCE STABILITÉ & CACHE MÉMOIRE)
+    // 3. Singleton Firestore (FORCÉ LONG POLLING + MEMOIRE)
+    // C'est la seule configuration qui garantit la stabilité des règles de sécurité.
     if (!globalThis.__LB_FIREBASE_FIRESTORE) {
       try {
         globalThis.__LB_FIREBASE_FIRESTORE = initializeFirestore(app, {
-          experimentalForceLongPolling: true, // Transport stable pour éviter ERR_CONNECTION_CLOSED
-          localCache: memoryLocalCache(),     // Désactive IndexedDB pour éliminer l'erreur ca9
+          experimentalForceLongPolling: true, // Évite les déconnexions WebSocket
+          localCache: memoryLocalCache(),     // Évite les conflits de persistance (erreur ca9)
         });
-        console.log("L&B NC: Firestore initialisé en mode Stabilité Verrouillée.");
+        console.log("L&B NC: Firestore verrouillé en mode Stabilité Totale.");
       } catch (e) {
-        console.warn("L&B NC: Échec initialisation personnalisée, fallback standard.");
         globalThis.__LB_FIREBASE_FIRESTORE = getFirestore(app);
       }
     }

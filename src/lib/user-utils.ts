@@ -21,7 +21,10 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
     'f.mallet81@gmail.com'
   ];
   
-  const isMasterAdmin = email && masterAdminEmails.includes(email);
+  const masterAdminUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1'];
+  
+  const isMasterAdmin = (email && masterAdminEmails.includes(email)) || 
+                        masterAdminUids.includes(user.uid);
 
   try {
     const docSnap = await getDoc(userDocRef);
