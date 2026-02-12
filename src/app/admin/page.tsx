@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, where } from 'firebase/firestore';
-import type { UserAccount, Business, FishSpeciesInfo, AccessToken, Conversation } from '@/lib/types';
+import { collection, query, orderBy, where, doc } from 'firebase/firestore';
+import type { UserAccount, Business, Conversation } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { MessageSquare, TrendingUp, ShieldCheck, RefreshCw, AlertCircle } from 'lucide-react';
+import { MessageSquare, ShieldCheck, RefreshCw, AlertCircle } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
@@ -21,10 +21,10 @@ export default function AdminPage() {
 
   const [activeTab, setActiveTab] = useState('stats');
 
-  // DÉTECTION ADMIN MAÎTRE AVEC LOGS
+  // DÉTECTION ADMIN MAÎTRE AVEC LOGS RENFORCÉS
   const isAdmin = useMemo(() => {
     if (!user) {
-        console.log("L&B DEBUG ADMIN: Aucun utilisateur connecté.");
+        console.log("L&B DEBUG ADMIN: Attente utilisateur...");
         return false;
     }
     
@@ -34,38 +34,41 @@ export default function AdminPage() {
     const isMaster = (user.email && masterEmails.includes(user.email.toLowerCase())) || 
                     masterUids.includes(user.uid);
 
-    console.log(`L&B DEBUG ADMIN: Test Admin pour [${user.email}] (UID: ${user.uid}). Résultat: ${isMaster}`);
+    console.log(`L&B DEBUG ADMIN: [${user.email}] (UID: ${user.uid}). Accès Master: ${isMaster}`);
     return isMaster;
   }, [user]);
 
-  // REQUÊTES FIRESTORE
+  // REQUÊTES FIRESTORE (Seulement si isAdmin est confirmé)
   const usersRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
+    console.log("L&B DEBUG ADMIN: Préparation requête [users]");
     return query(collection(firestore, 'users'), orderBy('email', 'asc'));
   }, [firestore, isAdmin]);
   const { data: users, isLoading: isUsersLoading, error: usersError } = useCollection<UserAccount>(usersRef);
 
   const businessRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
+    console.log("L&B DEBUG ADMIN: Préparation requête [businesses]");
     return query(collection(firestore, 'businesses'), orderBy('name', 'asc'));
   }, [firestore, isAdmin]);
   const { data: businesses } = useCollection<Business>(businessRef);
 
   const convsRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
+    console.log("L&B DEBUG ADMIN: Préparation requête [conversations]");
     return query(collection(firestore, 'conversations'), orderBy('lastMessageAt', 'desc'));
   }, [firestore, isAdmin]);
   const { data: conversations, isLoading: isConvsLoading, error: convsError } = useCollection<Conversation>(convsRef);
 
   useEffect(() => {
-    if (!isUserLoading && !isAdmin) {
-      console.warn("L&B DEBUG ADMIN: Redirection vers /compte car non autorisé.");
+    if (!isUserLoading && !isAdmin && user) {
+      console.warn("L&B DEBUG ADMIN: Redirection - Non autorisé.");
       router.push('/compte');
     }
-  }, [isAdmin, isUserLoading, router]);
+  }, [isAdmin, isUserLoading, router, user]);
 
   if (isUserLoading) return <div className="p-8"><Skeleton className="h-48 w-full rounded-2xl" /></div>;
-  if (!isAdmin) return null;
+  if (!isAdmin) return <div className="p-12 text-center font-black uppercase text-muted-foreground">Vérification de sécurité...</div>;
 
   const activeSubs = users?.filter(u => u.subscriptionStatus === 'active' || u.subscriptionStatus === 'admin').length || 0;
 
@@ -79,7 +82,7 @@ export default function AdminPage() {
           <CardTitle className="font-black uppercase tracking-tighter text-3xl flex items-center gap-3">
             Console Administrateur
           </CardTitle>
-          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Accès Maître : {user?.email}</p>
+          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Session Active : {user?.email}</p>
         </CardHeader>
       </Card>
 
@@ -87,12 +90,13 @@ export default function AdminPage() {
         <Card className="border-red-500 bg-red-50 text-red-900">
             <CardHeader className="py-4">
                 <CardTitle className="text-sm font-black uppercase flex items-center gap-2">
-                    <AlertCircle className="size-4" /> Erreur de synchronisation Firestore
+                    <AlertCircle className="size-4" /> Erreur de permission détectée
                 </CardTitle>
             </CardHeader>
             <CardContent className="text-xs font-mono">
-                {usersError && <p>Users: {usersError.message}</p>}
-                {convsError && <p>Convs: {convsError.message}</p>}
+                {usersError && <p>Collection Users: {usersError.message}</p>}
+                {convsError && <p>Collection Conversations: {convsError.message}</p>}
+                <p className="mt-2 text-[10px] font-bold">Veuillez vérifier vos logs console pour plus de détails.</p>
             </CardContent>
         </Card>
       )}
