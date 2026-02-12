@@ -81,21 +81,25 @@ export function useCollection<T = any>(
         setError(null);
         setIsLoading(false);
       },
-      (error: FirestoreError) => {
-        console.error(`L&B DEBUG ERROR: Échec sur [${path}]`, error.code, error.message);
-        console.dir(error); // Log exhaustif de l'erreur brute
+      (err: FirestoreError) => {
+        console.error(`L&B DEBUG ERROR: Échec sur [${path}]`, err.code, err.message);
+        console.dir(err);
         
-        if (error.code === 'permission-denied') {
+        if (err.code === 'permission-denied') {
           const contextualError = new FirestorePermissionError({
             operation: 'list',
             path,
           })
 
           setError(contextualError)
-          // trigger global error propagation
-          errorEmitter.emit('permission-error', contextualError);
+          
+          // On désactive l'émission globale pour 'conversations' pour éviter le crash visuel NextJS
+          // et permettre au dashboard Admin de gérer l'erreur localement.
+          if (path !== 'conversations') {
+            errorEmitter.emit('permission-error', contextualError);
+          }
         } else {
-          setError(error);
+          setError(err);
         }
         setData(null)
         setIsLoading(false)
