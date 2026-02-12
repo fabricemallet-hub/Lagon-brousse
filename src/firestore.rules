@@ -1,11 +1,11 @@
 rules_version = '2';
 
-// Version 9.0.0 - SÉCURITÉ MAÎTRE DIRECTE (UID)
+// Version 10.0.0 - SÉCURITÉ MAÎTRE ABSOLUE
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- ACCÈS MAÎTRE ABSOLU ---
-    // On utilise les UIDs directs pour éviter toute erreur de fonction ou de token
+    // --- 1. ACCÈS MAÎTRE TOTAL (PRIORITÉ #1) ---
+    // On autorise TOUT pour les UIDs administrateurs à la racine de manière directe
     match /{allPaths=**} {
       allow read, write: if request.auth != null && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
@@ -15,31 +15,36 @@ service cloud.firestore {
       );
     }
 
-    // --- AUTORISATIONS DE LISTAGE RACINE (INDISPENSABLE POUR ADMIN) ---
+    // --- 2. RÈGLES DE LISTAGE EXPLICITES (ROOT COLLECTIONS) ---
+    // Indispensable pour le Dashboard Admin
     match /conversations { allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"; }
     match /users { allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"; }
     match /access_tokens { allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"; }
     match /businesses { allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"; }
     match /campaigns { allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"; }
 
-    // --- RÈGLES STANDARDS ---
-    
-    match /conversations/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      match /{allPaths=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
+    // --- 3. FONCTIONS DE BASE ---
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      match /{allPaths=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2", "t8nPnZLcTiaLJSKMuLzib3C5nPn1"] ||
+        (request.auth.token.email != null && 
+         request.auth.token.email.lower() in [
+           "fabrice.mallet@gmail.com",
+           "f.mallet81@gmail.com",
+           "f.mallet81@outlook.com"
+         ]
+        )
+      );
     }
 
+    // --- 4. ACCÈS STANDARDS ---
     match /app_settings/{id} {
       allow read: if true;
+      allow write: if isAdmin();
     }
 
     match /system_notifications/{id} {
@@ -51,64 +56,95 @@ service cloud.firestore {
       match /previsions/{prevId} {
         allow get, list: if true;
       }
+      allow write: if isAdmin();
     }
 
     match /fish_species/{id} {
       allow get, list: if true;
+      allow write: if isAdmin();
+      
       match /commune_stats/{communeId} {
         allow get, list: if true;
-        allow create, update: if request.auth != null;
+        allow create, update: if isSignedIn();
       }
     }
     
     match /sound_library/{id} {
       allow get, list: if true;
+      allow write: if isAdmin();
     }
 
     match /cms_support/faq/items/{id} {
       allow get, list: if true;
+      allow write: if isAdmin();
     }
 
     match /cms_support/tickets/items/{id} {
-      allow create: if request.auth != null;
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      match /{allPaths=**} {
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      }
+    }
+
+    match /conversations/{userId} {
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      match /{allPaths=**} {
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      }
     }
 
     match /hunting_sessions/{id} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isSignedIn();
       match /{allPaths=**} {
-        allow read, write: if request.auth != null;
+        allow read, write: if isSignedIn();
       }
     }
 
     match /vessels/{id} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isSignedIn();
       match /{allPaths=**} {
-        allow read, write: if request.auth != null;
+        allow read, write: if isSignedIn();
       }
     }
 
+    match /access_tokens/{id} {
+      allow read, write: if isSignedIn() || isAdmin();
+    }
+
+    match /shared_access_tokens/{id} {
+      allow get, list: if true;
+      allow write: if isAdmin();
+    }
+
     match /spot_shares/{id} {
-      allow create: if request.auth != null;
-      allow read, delete: if request.auth != null && (
-        request.auth.token.email != null && resource.data.recipientEmail == request.auth.token.email.lower()
+      allow create: if isSignedIn();
+      allow read, delete: if isSignedIn() && (
+        isAdmin() || 
+        (request.auth.token.email != null && resource.data.recipientEmail == request.auth.token.email.lower())
       );
     }
 
     match /businesses/{businessId} {
       allow get, list: if true;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
 
       match /promotions/{promoId} {
         allow get, list: if true;
-        allow write: if request.auth != null;
+        allow write: if isSignedIn();
       }
     }
 
     match /campaigns/{campaignId} {
-      allow create: if request.auth != null;
-      allow read: if request.auth != null && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
     }
   }
 }

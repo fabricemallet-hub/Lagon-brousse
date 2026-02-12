@@ -3,11 +3,11 @@
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
-import { initializeFirestore, Firestore, getFirestore } from 'firebase/firestore';
+import { initializeFirestore, Firestore, getFirestore, memoryLocalCache } from 'firebase/firestore';
 
 /**
  * @fileOverview Initialisation centralisée et robuste de Firebase.
- * Utilise un singleton global pour éviter les conflits d'instances pendant le HMR.
+ * Utilise un singleton global et désactive la persistance sur disque pour éviter les erreurs d'assertion ID: ca9.
  */
 
 declare global {
@@ -32,12 +32,13 @@ export function initializeFirebase() {
     }
     const auth = globalThis.__FIREBASE_AUTH;
 
-    // 3. Firestore Singleton avec paramètres de stabilité immuables
+    // 3. Firestore Singleton avec Memory Cache (évite l'erreur d'assertion ID: ca9 liée à IndexedDB)
     if (!globalThis.__FIREBASE_FIRESTORE) {
       globalThis.__FIREBASE_FIRESTORE = initializeFirestore(app, {
         experimentalForceLongPolling: true,
+        localCache: memoryLocalCache(),
       });
-      console.log("L&B NC: Firestore initialisé (Long Polling Stable)");
+      console.log("L&B NC: Firestore initialisé (Stable: Long Polling + Memory Cache)");
     }
     const firestore = globalThis.__FIREBASE_FIRESTORE;
 
