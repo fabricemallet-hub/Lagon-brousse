@@ -3,9 +3,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- IDENTIFIANTS MAÎTRES ---
-    function isMaster() {
-      return request.auth != null && (
+    // --- ACCÈS ADMINISTRATEUR MAÎTRE (PRIORITÉ ABSOLUE) ---
+    // Cette règle autorise TOUT pour les UIDs listés ci-dessous.
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
         request.auth.uid == "K9cVYLVUk1NV99YV3anebkugpPp1" ||
         request.auth.uid == "ipupi3Pg4RfrSEpFyT69BtlCdpi2" ||
@@ -13,34 +14,19 @@ service cloud.firestore {
       );
     }
 
-    // Accès global Master
-    match /{allPaths=**} {
-      allow read, write: if isMaster();
-    }
-
     // --- 1. MESSAGERIE & CONVERSATIONS ---
-    match /conversations {
-      allow list: if isMaster();
-      
-      match /{userId} {
-        allow read, write: if isMaster() || (request.auth != null && request.auth.uid == userId);
-        
-        match /{allPaths=**} {
-          allow read, write: if isMaster() || (request.auth != null && request.auth.uid == userId);
-        }
+    match /conversations/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      match /{allPaths=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
       }
     }
 
     // --- 2. UTILISATEURS ---
-    match /users {
-      allow list: if isMaster();
-      
-      match /{userId} {
-        allow read, write: if isMaster() || (request.auth != null && request.auth.uid == userId);
-        
-        match /{allPaths=**} {
-          allow read, write: if isMaster() || (request.auth != null && request.auth.uid == userId);
-        }
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      match /{allPaths=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
       }
     }
 
@@ -65,8 +51,7 @@ service cloud.firestore {
     // --- 4. TICKETS SUPPORT ---
     match /cms_support/tickets/items/{id} {
       allow create: if request.auth != null;
-      allow read: if isMaster() || (request.auth != null && resource.data.userId == request.auth.uid);
-      allow list: if isMaster();
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
     }
 
     // --- 5. SESSIONS TEMPS RÉEL ---
@@ -81,34 +66,20 @@ service cloud.firestore {
     }
 
     // --- 6. COMMERCES & BUSINESS ---
-    match /businesses {
-      allow list: if isMaster();
-      match /{businessId} {
-        allow get, list: if true;
-        allow create: if request.auth != null;
-        allow update, delete: if isMaster() || (request.auth != null && resource.data.ownerId == request.auth.uid);
-        
-        match /promotions/{promoId} { 
-          allow get, list: if true; 
-          allow write: if request.auth != null; 
-        }
+    match /businesses/{businessId} {
+      allow get, list: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
+      
+      match /promotions/{promoId} { 
+        allow get, list: if true; 
+        allow write: if request.auth != null; 
       }
     }
 
-    match /campaigns {
-      allow list: if isMaster();
-      match /{campaignId} {
-        allow create: if request.auth != null;
-        allow read: if isMaster() || (request.auth != null && resource.data.ownerId == request.auth.uid);
-      }
-    }
-
-    // --- 7. ACCÈS TOKENS ---
-    match /access_tokens {
-      allow list: if isMaster();
-      match /{id} {
-        allow read, write: if isMaster();
-      }
+    match /campaigns/{campaignId} {
+      allow create: if request.auth != null;
+      allow read: if request.auth != null && resource.data.ownerId == request.auth.uid;
     }
   }
 }

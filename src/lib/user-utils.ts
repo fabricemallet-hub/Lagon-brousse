@@ -54,7 +54,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
       lastSelectedLocation: 'Nouméa',
     };
 
-    // Période d'essai pour les clients
+    // Période d'essai pour les clients (3 mois)
     if (!isMasterAdmin) {
       const trialStartDate = new Date();
       newUserDocument.subscriptionStartDate = trialStartDate.toISOString();
