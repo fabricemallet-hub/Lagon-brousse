@@ -52,8 +52,6 @@ export function useCollection<T = any>(
         ? (memoizedTargetRefOrQuery as CollectionReference).path
         : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString();
 
-    console.log(`L&B DEBUG: Début écoute Collection [${path}]`);
-
     setIsLoading(true);
     setError(null);
 
@@ -64,13 +62,11 @@ export function useCollection<T = any>(
         for (const doc of snapshot.docs) {
           results.push({ ...(doc.data() as T), id: doc.id });
         }
-        console.log(`L&B DEBUG: Données reçues pour [${path}] (${results.length} docs)`);
         setData(results);
         setError(null);
         setIsLoading(false);
       },
       (err: FirestoreError) => {
-        // Log non-bloquant pour le diagnostic
         console.error(`L&B DEBUG ERROR: Échec sur [${path}]`, err.code, err.message);
         
         if (err.code === 'permission-denied') {
@@ -81,11 +77,9 @@ export function useCollection<T = any>(
 
           setError(contextualError);
           
-          // CRITIQUE : On n'émet PAS l'erreur globale pour les collections Admin
-          // pour éviter que Next.js n'affiche l'écran d'erreur HTML bloquant.
-          // Le Dashboard Admin gérera l'affichage local de l'erreur.
-          const adminPaths = ['conversations', 'users', 'businesses', 'campaigns'];
-          if (!adminPaths.includes(path)) {
+          // Ne pas afficher l'écran d'erreur Next.js pour les collections Admin
+          const silentPaths = ['conversations', 'users', 'businesses', 'campaigns', 'system_notifications', 'sound_library'];
+          if (!silentPaths.includes(path)) {
             errorEmitter.emit('permission-error', contextualError);
           }
         } else {
@@ -96,10 +90,7 @@ export function useCollection<T = any>(
       }
     );
 
-    return () => {
-      console.log(`L&B DEBUG: Arrêt écoute Collection [${path}]`);
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, [memoizedTargetRefOrQuery]);
 
   if(memoizedTargetRefOrQuery && !memoizedTargetRefOrQuery.__memo) {

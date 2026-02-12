@@ -12,7 +12,7 @@ import {
 
 /**
  * @fileOverview Initialisation de Firebase Singleton.
- * Memory Cache forcé pour éviter l'erreur ca9 dans cet environnement.
+ * Mode Long Polling forcé pour la stabilité dans l'environnement Cloud.
  */
 
 declare global {
@@ -39,15 +39,15 @@ export function initializeFirebase() {
     }
     const auth = globalThis.__LB_FIREBASE_AUTH;
 
-    // 3. Singleton Firestore (MEMORY CACHE ONLY)
+    // 3. Singleton Firestore (FORCED LONG POLLING)
     if (!globalThis.__LB_FIREBASE_FIRESTORE) {
-      console.log("L&B DEBUG: Configuration Firestore (Memory Cache Mode)...");
+      console.log("L&B DEBUG: Configuration Firestore (Stable Transport)...");
       try {
         globalThis.__LB_FIREBASE_FIRESTORE = initializeFirestore(app, {
-          localCache: memoryLocalCache()
+          localCache: memoryLocalCache(),
+          experimentalForceLongPolling: true // Crucial pour éviter les erreurs WebSocket dans Studio
         });
       } catch (e) {
-        // En cas d'erreur ID: ca9, on récupère l'instance par défaut
         globalThis.__LB_FIREBASE_FIRESTORE = getFirestore(app);
       }
     }
