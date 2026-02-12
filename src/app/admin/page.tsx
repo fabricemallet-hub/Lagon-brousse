@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, doc, setDoc, addDoc, deleteDoc, serverTimestamp, Timestamp, increment, getDocs, where, writeBatch } from 'firebase/firestore';
 import type { UserAccount, Business, Conversation, AccessToken, SharedAccessToken, FishSpeciesInfo, SplashScreenSettings, CgvSettings, RibSettings, SystemNotification } from '@/lib/types';
@@ -39,7 +39,8 @@ import {
   Search,
   Eye,
   CreditCard,
-  FileText
+  FileText,
+  Camera
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -310,8 +311,21 @@ function SplashManager({ initialSettings }: { initialSettings: SplashScreenSetti
     const { toast } = useToast();
     const [settings, setSettings] = useState<SplashScreenSettings>(initialSettings || { splashMode: 'text', splashText: 'Lagon & Brousse NC', splashTextColor: '#ffffff', splashFontSize: '32', splashBgColor: '#3b82f6', splashImageUrl: '', splashImageFit: 'contain', splashDuration: 2.5 });
     const [isSaving, setIsSaving] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => { if (initialSettings) setSettings(initialSettings); }, [initialSettings]);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const base64 = event.target?.result as string;
+            setSettings({ ...settings, splashImageUrl: base64 });
+            toast({ title: "Image chargée localement", description: "N'oubliez pas de sauvegarder." });
+        };
+        reader.readAsDataURL(file);
+    };
 
     const handleSave = async () => {
         if (!firestore) return;
@@ -345,7 +359,32 @@ function SplashManager({ initialSettings }: { initialSettings: SplashScreenSetti
                     </div>
                 ) : (
                     <div className="space-y-3">
-                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase">URL Image</Label><Input value={settings.splashImageUrl} onChange={e => setSettings({ ...settings, splashImageUrl: e.target.value })} placeholder="https://..." /></div>
+                        <div className="space-y-1">
+                            <Label className="text-[10px] font-black uppercase">Pouvoir telecharger l'image sur le smartphone</Label>
+                            <div className="flex gap-2">
+                                <Input 
+                                    value={settings.splashImageUrl} 
+                                    onChange={e => setSettings({ ...settings, splashImageUrl: e.target.value })} 
+                                    placeholder="Lien de l'image..." 
+                                    className="flex-grow"
+                                />
+                                <Button 
+                                    variant="outline" 
+                                    size="icon" 
+                                    className="shrink-0 h-10 w-10 border-2" 
+                                    onClick={() => fileInputRef.current?.click()}
+                                >
+                                    <Camera className="size-4" />
+                                </Button>
+                                <input 
+                                    type="file" 
+                                    accept="image/*" 
+                                    ref={fileInputRef} 
+                                    className="hidden" 
+                                    onChange={handleFileChange} 
+                                />
+                            </div>
+                        </div>
                         <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Ajustement</Label>
                             <Select value={settings.splashImageFit} onValueChange={(v: any) => setSettings({ ...settings, splashImageFit: v })}>
                                 <SelectTrigger><SelectValue /></SelectTrigger>
