@@ -40,7 +40,9 @@ import {
   Eye,
   CreditCard,
   FileText,
-  Camera
+  Camera,
+  Pencil,
+  X
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -49,6 +51,7 @@ import Link from 'next/link';
 import { format, addMonths, addDays, isBefore } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 export default function AdminPage() {
   const { user, isUserLoading } = useUser();
@@ -57,7 +60,6 @@ export default function AdminPage() {
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState('stats');
-  const [isGenerating, setIsGenerating] = useState(false);
 
   // --- IDENTITY & MASTER CHECK ---
   const isAdmin = useMemo(() => {
@@ -549,16 +551,67 @@ function FishManager({ species }: { species: FishSpeciesInfo[] | null }) {
     const [name, setName] = useState('');
     const [scieName, setScieName] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    
+    // Edit state
+    const [editingFish, setEditingFish] = useState<FishSpeciesInfo | null>(null);
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    
+    // Image state
+    const [currentImageUrl, setCurrentImageUrl] = useState('');
+    const addFileInputRef = useRef<HTMLInputElement>(null);
+    const editFileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, isEdit: boolean) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const base64 = event.target?.result as string;
+            if (isEdit && editingFish) {
+                setEditingFish({ ...editingFish, imageUrl: base64 });
+            } else {
+                setCurrentImageUrl(base64);
+            }
+            toast({ title: "Photo chargée" });
+        };
+        reader.readAsDataURL(file);
+    };
 
     const handleAdd = async (aiData?: any) => {
         if (!firestore || !name) return;
+        setIsSaving(true);
         try {
             const id = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '-');
-            const data = aiData || { name, scientificName: scieName, category: 'Lagon', gratteRisk: 0, gratteRiskSmall: 0, gratteRiskMedium: 0, gratteRiskLarge: 0, fishingAdvice: '', culinaryAdvice: '' };
+            const data = aiData || { 
+                name, 
+                scientificName: scieName, 
+                category: 'Lagon', 
+                gratteRisk: 0, 
+                gratteRiskSmall: 0, 
+                gratteRiskMedium: 0, 
+                gratteRiskLarge: 0, 
+                fishingAdvice: '', 
+                culinaryAdvice: '',
+                imageUrl: currentImageUrl
+            };
             await setDoc(doc(firestore, 'fish_species', id), { ...data, id }, { merge: true });
-            setName(''); setScieName('');
+            setName(''); setScieName(''); setCurrentImageUrl('');
             toast({ title: "Espèce répertoriée" });
         } catch (e) { toast({ variant: 'destructive', title: "Erreur" }); }
+        finally { setIsSaving(false); }
+    };
+
+    const handleUpdate = async () => {
+        if (!firestore || !editingFish) return;
+        setIsSaving(true);
+        try {
+            await setDoc(doc(firestore, 'fish_species', editingFish.id), editingFish, { merge: true });
+            setIsEditDialogOpen(false);
+            setEditingFish(null);
+            toast({ title: "Fiche mise à jour" });
+        } catch (e) { toast({ variant: 'destructive', title: "Erreur sauvegarde" }); }
+        finally { setIsSaving(false); }
     };
 
     const handleAiFill = async () => {
@@ -578,7 +631,8 @@ function FishManager({ species }: { species: FishSpeciesInfo[] | null }) {
                 lengthMedium: info.lengthMedium,
                 lengthLarge: info.lengthLarge,
                 fishingAdvice: info.fishingAdvice,
-                culinaryAdvice: info.culinaryAdvice
+                culinaryAdvice: info.culinaryAdvice,
+                imageUrl: currentImageUrl
             });
         } finally { setIsGenerating(false); }
     };
@@ -587,34 +641,103 @@ function FishManager({ species }: { species: FishSpeciesInfo[] | null }) {
         <Card className="border-2 shadow-lg">
             <CardHeader><CardTitle className="text-xl font-black uppercase flex items-center gap-2"><Fish className="size-6 text-primary" /> Guide Poissons & Gratte</CardTitle></CardHeader>
             <CardContent className="space-y-6">
-                <div className="p-4 bg-muted/30 rounded-2xl border-2 border-dashed grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Nom Commun NC</Label><Input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Bec de cane..." /></div>
-                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Nom Scientifique</Label><Input value={scieName} onChange={e => setScieName(e.target.value)} placeholder="Optionnel..." /></div>
-                    <div className="sm:col-span-2 flex gap-2">
-                        <Button onClick={() => handleAdd()} className="flex-1 font-black uppercase h-12 border-2" variant="outline">Saisie Manuelle</Button>
-                        <Button onClick={handleAiFill} disabled={isGenerating || !name} className="flex-1 font-black uppercase h-12 gap-2 shadow-lg bg-primary">
-                            {isGenerating ? <RefreshCw className="size-4 animate-spin" /> : <BrainCircuit className="size-4" />} Générer via IA (Gemini)
+                <div className="p-4 bg-muted/30 rounded-2xl border-2 border-dashed space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Nom Commun NC</Label><Input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Bec de cane..." /></div>
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Nom Scientifique</Label><Input value={scieName} onChange={e => setScieName(e.target.value)} placeholder="Optionnel..." /></div>
+                    </div>
+                    
+                    <div className="space-y-1">
+                        <Label className="text-[10px] font-black uppercase">Photo du spécimen (Smartphone)</Label>
+                        <div className="flex gap-2">
+                            <Input value={currentImageUrl} onChange={e => setCurrentImageUrl(e.target.value)} placeholder="URL ou base64..." className="flex-grow" />
+                            <Button variant="outline" size="icon" className="shrink-0 h-10 w-10 border-2" onClick={() => addFileInputRef.current?.click()}><Camera className="size-4" /></Button>
+                            <input type="file" accept="image/*" ref={addFileInputRef} className="hidden" onChange={e => handleFileChange(e, false)} />
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                        <Button onClick={() => handleAdd()} disabled={isSaving || !name} className="flex-1 font-black uppercase h-12 border-2" variant="outline">Saisie Manuelle</Button>
+                        <Button onClick={handleAiFill} disabled={isGenerating || isSaving || !name} className="flex-1 font-black uppercase h-12 gap-2 shadow-lg bg-primary">
+                            {isGenerating ? <RefreshCw className="size-4 animate-spin" /> : <BrainCircuit className="size-4" />} IA (Gemini)
                         </Button>
                     </div>
                 </div>
+
                 <div className="max-h-96 overflow-y-auto border-2 rounded-2xl">
                     <Table>
-                        <TableHeader><TableRow className="bg-muted/30"><TableHead className="text-[9px] font-black uppercase h-8 px-3">Espèce</TableHead><TableHead className="text-[9px] font-black uppercase h-8">Catégorie</TableHead><TableHead className="text-[9px] font-black uppercase h-8">Risque (M)</TableHead><TableHead className="text-right text-[9px] font-black uppercase h-8 px-3">Action</TableHead></TableRow></TableHeader>
+                        <TableHeader><TableRow className="bg-muted/30"><TableHead className="text-[9px] font-black uppercase h-8 px-3">Espèce</TableHead><TableHead className="text-[9px] font-black uppercase h-8">Catégorie</TableHead><TableHead className="text-[9px] font-black uppercase h-8">Risque (M)</TableHead><TableHead className="text-right text-[9px] font-black uppercase h-8 px-3">Actions</TableHead></TableRow></TableHeader>
                         <TableBody>
                             {species?.map(s => (
                                 <TableRow key={s.id}>
                                     <TableCell className="px-3 py-2">
-                                        <div className="flex flex-col"><span className="font-black text-xs uppercase leading-none">{s.name}</span><span className="text-[8px] italic opacity-40">{s.scientificName}</span></div>
+                                        <div className="flex items-center gap-2">
+                                            {s.imageUrl && <div className="size-6 rounded border bg-muted shrink-0 overflow-hidden"><img src={s.imageUrl} className="w-full h-full object-cover" /></div>}
+                                            <div className="flex flex-col"><span className="font-black text-xs uppercase leading-none">{s.name}</span><span className="text-[8px] italic opacity-40">{s.scientificName}</span></div>
+                                        </div>
                                     </TableCell>
                                     <TableCell><Badge variant="outline" className="text-[7px] font-black uppercase h-4">{s.category}</Badge></TableCell>
                                     <TableCell className="font-black text-xs">{s.gratteRiskMedium || s.gratteRisk}%</TableCell>
-                                    <TableCell className="text-right px-3"><Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(firestore!, 'fish_species', s.id))} className="size-7 text-destructive"><Trash2 className="size-3" /></Button></TableCell>
+                                    <TableCell className="text-right px-3">
+                                        <div className="flex justify-end gap-1">
+                                            <Button variant="ghost" size="icon" onClick={() => { setEditingFish(s); setIsEditDialogOpen(true); }} className="size-7 text-primary/60"><Pencil className="size-3" /></Button>
+                                            <Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(firestore!, 'fish_species', s.id))} className="size-7 text-destructive/60"><Trash2 className="size-3" /></Button>
+                                        </div>
+                                    </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
                     </Table>
                 </div>
             </CardContent>
+
+            {/* EDIT DIALOG */}
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="font-black uppercase flex items-center gap-2"><Pencil className="size-5" /> Modifier : {editingFish?.name}</DialogTitle>
+                        <DialogDescription className="text-xs uppercase font-bold">Mise à jour de la fiche technique</DialogDescription>
+                    </DialogHeader>
+                    {editingFish && (
+                        <div className="space-y-4 py-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Nom Commun</Label><Input value={editingFish.name} onChange={e => setEditingFish({...editingFish, name: e.target.value})} /></div>
+                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Nom Scientifique</Label><Input value={editingFish.scientificName} onChange={e => setEditingFish({...editingFish, scientificName: e.target.value})} /></div>
+                            </div>
+                            
+                            <div className="space-y-1">
+                                <Label className="text-[10px] font-black uppercase">Photo (Smartphone)</Label>
+                                <div className="flex gap-2">
+                                    <Input value={editingFish.imageUrl || ''} onChange={e => setEditingFish({...editingFish, imageUrl: e.target.value})} className="flex-grow" />
+                                    <Button variant="outline" size="icon" className="shrink-0 h-10 w-10 border-2" onClick={() => editFileInputRef.current?.click()}><Camera className="size-4" /></Button>
+                                    <input type="file" accept="image/*" ref={editFileInputRef} className="hidden" onChange={e => handleFileChange(e, true)} />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-3">
+                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Risque Petit (%)</Label><Input type="number" value={editingFish.gratteRiskSmall} onChange={e => setEditingFish({...editingFish, gratteRiskSmall: parseInt(e.target.value)})} /></div>
+                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Risque Moyen (%)</Label><Input type="number" value={editingFish.gratteRiskMedium} onChange={e => setEditingFish({...editingFish, gratteRiskMedium: parseInt(e.target.value)})} /></div>
+                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Risque Grand (%)</Label><Input type="number" value={editingFish.gratteRiskLarge} onChange={e => setEditingFish({...editingFish, gratteRiskLarge: parseInt(e.target.value)})} /></div>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-3">
+                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Taille P (cm)</Label><Input value={editingFish.lengthSmall || ''} onChange={e => setEditingFish({...editingFish, lengthSmall: e.target.value})} /></div>
+                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Taille M (cm)</Label><Input value={editingFish.lengthMedium || ''} onChange={e => setEditingFish({...editingFish, lengthMedium: e.target.value})} /></div>
+                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Taille G (cm)</Label><Input value={editingFish.lengthLarge || ''} onChange={e => setEditingFish({...editingFish, lengthLarge: e.target.value})} /></div>
+                            </div>
+
+                            <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Conseils Pêche</Label><Textarea value={editingFish.fishingAdvice} onChange={e => setEditingFish({...editingFish, fishingAdvice: e.target.value})} /></div>
+                            <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Conseils Cuisine</Label><Textarea value={editingFish.culinaryAdvice} onChange={e => setEditingFish({...editingFish, culinaryAdvice: e.target.value})} /></div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setIsEditDialogOpen(false)} className="font-black uppercase h-12">Annuler</Button>
+                        <Button onClick={handleUpdate} disabled={isSaving} className="font-black uppercase h-12 gap-2 shadow-lg bg-primary">
+                            <Save className="size-4" /> Sauvegarder les modifications
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </Card>
     );
 }
