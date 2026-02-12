@@ -15,7 +15,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
   const email = user.email?.toLowerCase() || '';
   const uid = user.uid;
   
-  // Identifiants de confiance absolue (Fabrice Mallet inclus)
+  // Identifiants de confiance absolue
   const masterAdminUids = [
     't8nPnZLcTiaLJSKMuLzib3C5nPn1',
     'K9cVYLVUk1NV99YV3anebkugpPp1',
@@ -36,7 +36,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
     if (docSnap.exists()) {
       const currentData = docSnap.data() as UserAccount;
       
-      // Mise à jour de sécurité si l'utilisateur maître n'a pas encore les rôles admin dans le profil
+      // Mise à jour de sécurité forcée pour les admins maîtres
       if (isMasterAdmin && (currentData.subscriptionStatus !== 'admin' || currentData.role !== 'admin')) {
           await setDoc(userDocRef, { 
             ...currentData, 
@@ -47,7 +47,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
       return;
     }
 
-    // Création d'un nouveau profil pour un nouvel utilisateur
+    // Création d'un nouveau profil
     const effectiveDisplayName = displayName || user.displayName || email.split('@')[0] || 'Utilisateur';
     
     const newUserDocument: UserAccount = {
@@ -59,7 +59,6 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
       lastSelectedLocation: 'Nouméa',
     };
 
-    // Promotion automatique et durée illimitée pour les comptes maîtres
     if (!isMasterAdmin) {
       const trialStartDate = new Date();
       newUserDocument.subscriptionStartDate = trialStartDate.toISOString();

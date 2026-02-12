@@ -3,12 +3,13 @@
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
-import { getFirestore, initializeFirestore, Firestore, terminate } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, Firestore } from 'firebase/firestore';
 import { getMessaging, Messaging } from 'firebase/messaging';
 
 /**
  * @fileOverview Point d'entrée central pour Firebase.
  * Gère l'initialisation unique et forcée pour la stabilité Firestore (Long Polling).
+ * Utilise un pattern Singleton robuste pour éviter les erreurs d'assertion interne (ca9).
  */
 
 let app: FirebaseApp;
@@ -16,40 +17,39 @@ let auth: Auth;
 let firestore: Firestore;
 let messaging: Messaging | null = null;
 
-/**
- * Initialise Firebase et ses services avec les paramètres de stabilité maximaux.
- * Forcer experimentalForceLongPolling résout l'erreur d'assertion interne (ID: ca9).
- */
 export function initializeFirebase() {
-  if (!app) {
-    app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+  // 1. Initialisation de l'App (Singleton)
+  if (getApps().length === 0) {
+    app = initializeApp(firebaseConfig);
+  } else {
+    app = getApp();
   }
 
+  // 2. Initialisation de l'Auth
   if (!auth) {
     auth = getAuth(app);
   }
 
+  // 3. Initialisation de Firestore avec paramètres de stabilité forcés
+  // CRITIQUE : initializeFirestore doit être le PREMIER appel pour configurer le transport.
   if (!firestore) {
     try {
-      // Tenter une initialisation propre avec les paramètres de transport stables
       firestore = initializeFirestore(app, {
         experimentalForceLongPolling: true,
       });
     } catch (e) {
-      // En cas d'erreur (déjà initialisé par un autre module), on tente de récupérer l'instance
-      console.warn("Firestore déjà initialisé, récupération de l'instance existante.");
-      // Note: getFirestore ne permet pas de changer les paramètres après initialisation.
-      // Mais dans cet environnement, initializeFirestore devrait être le premier appel.
+      // Si déjà initialisé (ex: Fast Refresh), on récupère l'instance existante
       const { getFirestore } = require('firebase/firestore');
       firestore = getFirestore(app);
     }
   }
 
+  // 4. Initialisation de Messaging (Client-side uniquement)
   if (typeof window !== 'undefined' && !messaging) {
     try {
       messaging = getMessaging(app);
     } catch (e) {
-      // FCM non supporté
+      // FCM peut ne pas être supporté sur certains navigateurs
     }
   }
 
