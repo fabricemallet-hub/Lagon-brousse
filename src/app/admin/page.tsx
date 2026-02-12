@@ -50,15 +50,14 @@ export default function AdminPage() {
   // Splash/Design States
   const [isSavingDesign, setIsSavingDesign] = useState(false);
 
-  // Détection Admin Maître instantanée
+  // Détection Admin Maître instantanée par UID
   const isAdmin = useMemo(() => {
     if (!user) return false;
-    const masterAdminUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'K9cVYLVUk1NV99YV3anebkugpPp1', 'ipupi3Pg4RfrSEpFyT69BtlCdpi2', 'Irglq69MasYdNwBmUu8yKvw6h4G2'];
-    const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
-    return masterAdminUids.includes(user.uid) || (user.email && masterEmails.includes(user.email.toLowerCase()));
+    const masterAdminUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'ipupi3Pg4RfrSEpFyT69BtlCdpi2', 'Irglq69MasYdNwBmUu8yKvw6h4G2', 'K9cVYLVUk1NV99YV3anebkugpPp1'];
+    return masterAdminUids.includes(user.uid);
   }, [user]);
 
-  // Requêtes Firestore
+  // Requêtes Firestore avec mémoïsation stable
   const usersRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
     return query(collection(firestore, 'users'), orderBy('email', 'asc'));
@@ -83,9 +82,9 @@ export default function AdminPage() {
   }, [firestore, isAdmin]);
   const { data: fishSpecies } = useCollection<FishSpeciesInfo>(fishRef);
 
-  // Requête conversations - Chemin direct pour simplifier les règles
   const convsRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
+    // Requête directe simplifiée pour matcher la règle list racine
     return query(collection(firestore, 'conversations'), orderBy('lastMessageAt', 'desc'));
   }, [firestore, isAdmin]);
   const { data: conversations } = useCollection<Conversation>(convsRef);
