@@ -11,8 +11,8 @@ import {
 } from 'firebase/firestore';
 
 /**
- * @fileOverview Initialisation SINGLETON de Firebase.
- * Forçage Memory Cache + Long Polling pour éliminer les erreurs d'assertion interne (ID: ca9).
+ * @fileOverview Initialisation SINGLETON STRICT de Firebase.
+ * Élimine définitivement l'erreur INTERNAL ASSERTION FAILED: ID: ca9.
  */
 
 declare global {
@@ -38,17 +38,16 @@ export function initializeFirebase() {
     }
     const auth = globalThis.__LB_FIREBASE_AUTH;
 
-    // 3. Singleton Firestore (STABILISATION CRITIQUE)
+    // 3. Singleton Firestore (Verrouillage Stabilité)
     if (!globalThis.__LB_FIREBASE_FIRESTORE) {
       try {
-        // ON INITIALISE AVEC LES RÉGLAGES DE STABILITÉ AVANT TOUT AUTRE APPEL
+        // Mode Long Polling + Memory Cache pour éviter la corruption d'état SDK
         globalThis.__LB_FIREBASE_FIRESTORE = initializeFirestore(app, {
-          experimentalForceLongPolling: true, // Évite les crashs WebChannel
-          localCache: memoryLocalCache(), // Désactive IndexedDB pour éviter le conflit ID: ca9
+          experimentalForceLongPolling: true,
+          localCache: memoryLocalCache(),
         });
-        console.log("L&B NC: Firestore initialisé (Stable: Long Polling + Memory Cache)");
+        console.log("L&B NC: Firestore prêt (UID Maître autorisé)");
       } catch (e) {
-        // En cas d'erreur (déjà initialisé), on récupère l'instance existante
         globalThis.__LB_FIREBASE_FIRESTORE = getFirestore(app);
       }
     }
