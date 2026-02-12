@@ -6,7 +6,7 @@ import { addMonths } from 'date-fns';
 
 /**
  * Gère la création et la mise à jour du document profil utilisateur dans Firestore.
- * Sécurité Master : Force le rôle admin pour les UIDs de confiance.
+ * Sécurité Master : Force le rôle admin pour les UIDs et Emails de confiance.
  */
 export async function ensureUserDocument(firestore: Firestore, user: User, displayName?: string): Promise<void> {
   if (!user || !firestore) return;
@@ -22,8 +22,14 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
     'ipupi3Pg4RfrSEpFyT69BtlCdpi2',
     'Irglq69MasYdNwBmUu8yKvw6h4G2'
   ];
+
+  const masterAdminEmails = [
+    'f.mallet81@outlook.com',
+    'fabrice.mallet@gmail.com',
+    'f.mallet81@gmail.com'
+  ];
   
-  const isMasterAdmin = masterAdminUids.includes(uid);
+  const isMasterAdmin = masterAdminUids.includes(uid) || (email && masterAdminEmails.includes(email));
 
   try {
     const docSnap = await getDoc(userDocRef);

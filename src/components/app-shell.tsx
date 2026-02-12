@@ -1,4 +1,3 @@
-
 'use client';
 import {
   Sidebar,
@@ -58,6 +57,7 @@ import { BottomNav } from './bottom-nav';
 import { UsageTimer } from './usage-timer';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
+import { ensureUserDocument } from '@/lib/user-utils';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { locations, selectedLocation, setSelectedLocation, isLocationLoading } = useLocation();
@@ -79,9 +79,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
+  // AUTO-SYNC ADMIN STATUS
+  useEffect(() => {
+    if (user && !isUserLoading && firestore) {
+      ensureUserDocument(firestore, user).catch(console.error);
+    }
+  }, [user, isUserLoading, firestore]);
+
   const status = useMemo(() => {
     if (isUserLoading || (user && isProfileLoading)) return 'loading';
     if (!user) return 'limited';
+
+    // MASTER ADMIN DETECTION (HARDCODED BYPASS)
+    const masterAdminUids = [
+      't8nPnZLcTiaLJSKMuLzib3C5nPn1',
+      'K9cVYLVUk1NV99YV3anebkugpPp1',
+      'ipupi3Pg4RfrSEpFyT69BtlCdpi2',
+      'Irglq69MasYdNwBmUu8yKvw6h4G2'
+    ];
+    
+    const masterAdminEmails = [
+      'f.mallet81@outlook.com',
+      'fabrice.mallet@gmail.com', 
+      'f.mallet81@gmail.com'
+    ];
+
+    if (user && (masterAdminUids.includes(user.uid) || (user.email && masterAdminEmails.includes(user.email.toLowerCase())))) {
+      return 'admin';
+    }
+
     if (!userProfile) return 'limited';
 
     const expiryDate = userProfile.subscriptionExpiryDate ? new Date(userProfile.subscriptionExpiryDate) : null;
@@ -235,6 +261,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   {status === 'trial' && <Badge variant="secondary" className="text-[10px] h-5 font-black uppercase">Essai</Badge>}
                   {status === 'limited' && <Badge variant="destructive" className="text-[10px] h-5 font-black uppercase">Limité</Badge>}
                   {status === 'professional' && <Badge variant="outline" className="text-[10px] h-5 font-black uppercase border-primary text-primary">Pro</Badge>}
+                  {status === 'admin' && <Badge variant="default" className="text-[10px] h-5 font-black uppercase bg-slate-800">Admin</Badge>}
                 </div>
                 {isLocationLoading ? <Skeleton className="h-9 w-[120px]" /> : (
                   <Select value={selectedLocation} onValueChange={setSelectedLocation}>
