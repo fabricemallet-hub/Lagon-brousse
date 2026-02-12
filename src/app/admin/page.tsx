@@ -50,14 +50,14 @@ export default function AdminPage() {
   // Splash/Design States
   const [isSavingDesign, setIsSavingDesign] = useState(false);
 
-  // Detection Admin (Priorité technique absolue pour Fabrice Mallet)
+  // Detection Admin Maître (Priorité absolue pour Fabrice Mallet)
   const isAdmin = useMemo(() => {
     if (!user) return false;
     const masterAdminUids = [
+      't8nPnZLcTiaLJSKMuLzib3C5nPn1',
       'K9cVYLVUk1NV99YV3anebkugpPp1', 
       'ipupi3Pg4RfrSEpFyT69BtlCdpi2', 
-      'Irglq69MasYdNwBmUu8yKvw6h4G2', 
-      't8nPnZLcTiaLJSKMuLzib3C5nPn1'
+      'Irglq69MasYdNwBmUu8yKvw6h4G2'
     ];
     const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
     
@@ -80,7 +80,6 @@ export default function AdminPage() {
   const fishRef = useMemoFirebase(() => isAdmin ? query(collection(firestore!, 'fish_species'), orderBy('name', 'asc')) : null, [firestore, isAdmin]);
   const { data: fishSpecies } = useCollection<FishSpeciesInfo>(fishRef);
 
-  // Requête messagerie - Utilise isAdmin pour s'assurer que l'admin voit tout
   const convsRef = useMemoFirebase(() => isAdmin ? collection(firestore!, 'conversations') : null, [firestore, isAdmin]);
   const { data: conversations } = useCollection<Conversation>(convsRef);
 

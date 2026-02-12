@@ -34,7 +34,7 @@ export function initializeFirebase() {
         experimentalForceLongPolling: true,
       });
     } catch (e) {
-      // Si déjà initialisé, on récupère l'instance existante
+      // Si déjà initialisé avec des paramètres différents, on récupère l'instance existante
       firestore = getFirestore(app);
     }
 
