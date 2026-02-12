@@ -11,53 +11,49 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Détection Admin Maître (Prioritaire)
-    function isAdmin() {
+    // Détection Master Admin par Email et UID (Priorité absolue)
+    function isMaster() {
       return isSignedIn() && (
         request.auth.token.email.lower() == "f.mallet81@outlook.com" || 
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
-        (request.auth.token.email != null && 
-         request.auth.token.email.lower() in [
-           "fabrice.mallet@gmail.com",
-           "f.mallet81@gmail.com",
-           "f.mallet81@outlook.com"
-         ]
-        )
+        request.auth.token.email.lower() == "fabrice.mallet@gmail.com" ||
+        request.auth.token.email.lower() == "f.mallet81@gmail.com"
       );
     }
 
     // ======================================================
-    // 2. RÈGLE ALPHA - ACCÈS TOTAL ADMIN
+    // 2. RÈGLE ALPHA - ACCÈS TOTAL ET PRIORITAIRE MASTER
     // ======================================================
     
-    match /{document=**} {
-      allow read, write: if isAdmin();
+    // Cette règle écrase toutes les restrictions suivantes si l'utilisateur est le Master
+    match /{allPaths=**} {
+      allow read, write: if isMaster();
     }
 
     // ======================================================
-    // 3. RÈGLES DE LISTAGE (Pour le Dashboard Admin)
+    // 3. AUTORISATIONS DE LISTAGE (Nécessaires pour le Dashboard)
     // ======================================================
     
-    match /users { allow list: if isAdmin(); }
-    match /conversations { allow list: if isAdmin(); }
-    match /businesses { allow list: if isAdmin(); }
-    match /campaigns { allow list: if isAdmin(); }
+    match /users { allow list: if isMaster(); }
+    match /conversations { allow list: if isMaster(); }
+    match /businesses { allow list: if isMaster(); }
+    match /campaigns { allow list: if isMaster(); }
 
     // ======================================================
-    // 4. RÈGLES STANDARDS (Pour les utilisateurs)
+    // 4. RÈGLES STANDARDS (Pour les autres utilisateurs)
     // ======================================================
 
     match /users/{userId} {
-      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isMaster());
       match /{allPaths=**} {
-        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isMaster());
       }
     }
 
     match /conversations/{userId} {
-      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isMaster());
       match /{allPaths=**} {
-        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isMaster());
       }
     }
 
@@ -82,14 +78,14 @@ service cloud.firestore {
     // Support (Tickets)
     match /cms_support/tickets/items/{id} {
       allow create: if isSignedIn();
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isMaster());
     }
 
     // Business & Commerces
     match /businesses/{businessId} {
       allow get, list: if true;
       allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isMaster());
       match /promotions/{promoId} { 
         allow get, list: if true; 
         allow write: if isSignedIn(); 
@@ -98,13 +94,13 @@ service cloud.firestore {
 
     match /campaigns/{campaignId} {
       allow create: if isSignedIn();
-      allow read: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow read: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isMaster());
     }
     
     match /spot_shares/{id} {
       allow create: if isSignedIn();
       allow read, delete: if isSignedIn() && (
-        isAdmin() || 
+        isMaster() || 
         (request.auth.token.email != null && resource.data.recipientEmail == request.auth.token.email.lower())
       );
     }

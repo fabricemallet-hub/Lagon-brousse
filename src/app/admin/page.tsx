@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy, doc } from 'firebase/firestore';
 import type { UserAccount, Business, Conversation } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { MessageSquare, ShieldCheck, RefreshCw, AlertCircle } from 'lucide-react';
+import { MessageSquare, ShieldCheck, RefreshCw, AlertCircle, User } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
@@ -27,25 +27,41 @@ export default function AdminPage() {
     const isMaster = (user.email && masterEmails.includes(user.email.toLowerCase())) || 
                     user.uid === 't8nPnZLcTiaLJSKMuLzib3C5nPn1';
     
-    if (isMaster) console.log("L&B DEBUG ADMIN: Accès Master confirmé.");
+    if (isMaster) console.log(`L&B DEBUG ADMIN: Accès Master [${user.email}] confirmé.`);
     return isMaster;
   }, [user]);
 
-  // REQUÊTES FIRESTORE - N'exécuter que si isAdmin est confirmé
+  // Récupération du profil pour vérifier le rôle en base
+  const userProfileRef = useMemoFirebase(() => {
+    if (!user || !firestore || !isAdmin) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [user, firestore, isAdmin]);
+  const { data: profile } = useDoc<UserAccount>(userProfileRef);
+
+  useEffect(() => {
+    if (profile) {
+      console.log(`L&B DEBUG ADMIN: Rôle document Firestore: ${profile.role}`);
+    }
+  }, [profile]);
+
+  // REQUÊTES FIRESTORE
   const usersRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
+    console.log("L&B DEBUG ADMIN: Lancement requête [users]");
     return query(collection(firestore, 'users'), orderBy('email', 'asc'));
   }, [firestore, isAdmin]);
   const { data: users, isLoading: isUsersLoading, error: usersError } = useCollection<UserAccount>(usersRef);
 
   const businessRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
+    console.log("L&B DEBUG ADMIN: Lancement requête [businesses]");
     return query(collection(firestore, 'businesses'), orderBy('name', 'asc'));
   }, [firestore, isAdmin]);
   const { data: businesses } = useCollection<Business>(businessRef);
 
   const convsRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
+    console.log("L&B DEBUG ADMIN: Lancement requête [conversations]");
     return query(collection(firestore, 'conversations'), orderBy('lastMessageAt', 'desc'));
   }, [firestore, isAdmin]);
   const { data: conversations, isLoading: isConvsLoading, error: convsError } = useCollection<Conversation>(convsRef);
@@ -57,7 +73,7 @@ export default function AdminPage() {
   }, [isAdmin, isUserLoading, router, user]);
 
   if (isUserLoading) return <div className="p-8"><Skeleton className="h-48 w-full rounded-2xl" /></div>;
-  if (!isAdmin) return <div className="p-12 text-center font-black uppercase text-muted-foreground animate-pulse">Accès Administrateur en cours de validation...</div>;
+  if (!isAdmin) return <div className="p-12 text-center font-black uppercase text-muted-foreground animate-pulse">Validation Master Admin...</div>;
 
   const activeSubs = users?.filter(u => u.subscriptionStatus === 'active' || u.subscriptionStatus === 'admin').length || 0;
 
@@ -71,7 +87,10 @@ export default function AdminPage() {
           <CardTitle className="font-black uppercase tracking-tighter text-3xl">
             Console Administrateur
           </CardTitle>
-          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Session Master : {user?.email}</p>
+          <div className="flex flex-col gap-1 mt-1">
+            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Session : {user?.email}</p>
+            {profile && <p className="text-primary text-[10px] font-black uppercase tracking-widest flex items-center gap-1"><User className="size-3" /> Statut Base: {profile.role}</p>}
+          </div>
         </CardHeader>
       </Card>
 
@@ -79,12 +98,13 @@ export default function AdminPage() {
         <Card className="border-red-500 bg-red-50 text-red-900 shadow-lg">
             <CardHeader className="py-4">
                 <CardTitle className="text-sm font-black uppercase flex items-center gap-2 text-red-600">
-                    <AlertCircle className="size-4" /> Erreur de synchronisation détectée
+                    <AlertCircle className="size-4" /> Erreur de permissions détectée
                 </CardTitle>
             </CardHeader>
             <CardContent className="text-xs font-mono space-y-1">
-                {usersError && <p>• Erreur Utilisateurs: {usersError.message}</p>}
-                {convsError && <p>• Erreur Conversations: {convsError.message}</p>}
+                <p>Le moteur de règles Firestore a rejeté la requête.</p>
+                {usersError && <p className="text-red-600">• Users: {usersError.message}</p>}
+                {convsError && <p className="text-red-600">• Conversations: {convsError.message}</p>}
                 <Button variant="outline" className="mt-4 h-8 text-[10px] font-black uppercase border-red-200 bg-white" onClick={() => window.location.reload()}>
                     <RefreshCw className="size-3 mr-2" /> Forcer le rafraîchissement
                 </Button>
