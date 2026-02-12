@@ -7,15 +7,17 @@ service cloud.firestore {
     // 1. MASTER ADMIN BYPASS (PRIORITÉ ABSOLUE)
     // ======================================================
     
-    // Fonction de vérification Master
+    // Fonction de vérification Master ultra-robuste
     function isMaster() {
       return request.auth != null && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
-        request.auth.token.get('email', '').lower() in [
-          "f.mallet81@outlook.com", 
-          "fabrice.mallet@gmail.com", 
-          "f.mallet81@gmail.com"
-        ]
+        (request.auth.token.email != null && 
+         request.auth.token.email.lower() in [
+           "f.mallet81@outlook.com", 
+           "fabrice.mallet@gmail.com", 
+           "f.mallet81@gmail.com"
+         ]
+        )
       );
     }
 
@@ -24,20 +26,11 @@ service cloud.firestore {
       allow read, write: if isMaster();
     }
 
-    // Autorisation explicite de listage pour les collections Admin
-    // (Parfois requis par le SDK pour les requêtes globales sans filtre)
-    match /conversations {
-      allow list: if isMaster();
-    }
-    match /users {
-      allow list: if isMaster();
-    }
-    match /businesses {
-      allow list: if isMaster();
-    }
-    match /campaigns {
-      allow list: if isMaster();
-    }
+    // Autorisation de listage explicite pour les collections Admin
+    match /conversations { allow list: if isMaster(); }
+    match /users { allow list: if isMaster(); }
+    match /businesses { allow list: if isMaster(); }
+    match /campaigns { allow list: if isMaster(); }
 
     // ======================================================
     // 2. RÈGLES UTILISATEURS STANDARDS
@@ -45,17 +38,18 @@ service cloud.firestore {
 
     // Profils et données personnelles
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null && (request.auth.uid == userId || isMaster());
       match /{allPaths=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if request.auth != null && (request.auth.uid == userId || isMaster());
       }
     }
 
     // Conversations privées (Support)
     match /conversations/{convId} {
-      allow read, write: if request.auth != null && request.auth.uid == convId;
+      // CRITIQUE : Autoriser l'admin explicitement au niveau du document pour permettre le listage global
+      allow read, write: if isMaster() || (request.auth != null && request.auth.uid == convId);
       match /{allPaths=**} {
-        allow read, write: if request.auth != null && request.auth.uid == convId;
+        allow read, write: if isMaster() || (request.auth != null && request.auth.uid == convId);
       }
     }
 

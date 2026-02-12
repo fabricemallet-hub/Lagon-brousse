@@ -83,7 +83,6 @@ export function useCollection<T = any>(
       },
       (err: FirestoreError) => {
         console.error(`L&B DEBUG ERROR: Échec sur [${path}]`, err.code, err.message);
-        console.dir(err);
         
         if (err.code === 'permission-denied') {
           const contextualError = new FirestorePermissionError({
@@ -91,10 +90,10 @@ export function useCollection<T = any>(
             path,
           })
 
-          setError(contextualError)
+          setError(contextualError);
           
-          // On évite l'émission globale pour les collections d'administration
-          // afin de permettre un affichage local de l'erreur dans le Dashboard
+          // On évite l'émission globale pour les collections d'administration dans le Dashboard
+          // pour éviter de bloquer toute l'interface avec une erreur Next.js
           const adminPaths = ['conversations', 'users', 'businesses', 'campaigns'];
           if (!adminPaths.includes(path)) {
             errorEmitter.emit('permission-error', contextualError);
@@ -102,8 +101,8 @@ export function useCollection<T = any>(
         } else {
           setError(err);
         }
-        setData(null)
-        setIsLoading(false)
+        setData(null);
+        setIsLoading(false);
       }
     );
 
