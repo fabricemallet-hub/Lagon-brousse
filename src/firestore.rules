@@ -1,17 +1,32 @@
 rules_version = '2';
 
-// Version 5.0.0 - ACCÈS MAÎTRE PRIORITAIRE ET LISTAGE RACINE EXPLICITE
+// Version 6.0.0 - ACCÈS MAÎTRE PRIORITAIRE ET LISTAGE RACINE EXPLICITE
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // --- 1. PRIORITÉ ABSOLUE : ACCÈS TOTAL POUR L'UID MAÎTRE ---
-    // Cette règle court-circuite tout le reste pour votre compte.
-    match /{allPaths=**} {
-      allow read, write: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1";
+    // Cette règle court-circuite tout le reste pour votre compte technique.
+    function isMaster() {
+      return request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1";
     }
 
-    // --- 2. FONCTION DE DÉTECTION POUR LES AUTRES ADMINS ---
-    function isMasterAdmin() {
+    match /{allPaths=**} {
+      allow read, write: if isMaster();
+    }
+
+    // --- 2. PERMISSIONS DE LISTAGE RACINE (CRITIQUE POUR LE DASHBOARD) ---
+    // Firestore exige souvent une règle explicite sur la collection pour le listage.
+    match /conversations { allow list: if isMaster(); }
+    match /users { allow list: if isMaster(); }
+    match /businesses { allow list: if isMaster(); }
+    match /access_tokens { allow list: if isMaster(); }
+    match /campaigns { allow list: if isMaster(); }
+    match /vessels { allow list: if isMaster(); }
+    match /hunting_sessions { allow list: if isMaster(); }
+    match /cms_support { allow list: if isMaster(); }
+
+    // --- 3. FONCTION DE DÉTECTION POUR LES AUTRES ADMINS ---
+    function isSecondaryAdmin() {
       return request.auth != null && (
         request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2"] ||
         (request.auth.token.email != null && request.auth.token.email.lower() in [
@@ -22,39 +37,30 @@ service cloud.firestore {
       );
     }
 
-    // --- 3. PERMISSIONS DE LISTAGE RACINE (CRITIQUE POUR DASHBOARD) ---
-    // Requis explicitement par le SDK pour les requêtes sur les collections racine.
-    match /conversations { allow list: if isMasterAdmin(); }
-    match /users { allow list: if isMasterAdmin(); }
-    match /businesses { allow list: if isMasterAdmin(); }
-    match /access_tokens { allow list: if isMasterAdmin(); }
-    match /campaigns { allow list: if isMasterAdmin(); }
-    match /vessels { allow list: if isMasterAdmin(); }
-    match /hunting_sessions { allow list: if isMasterAdmin(); }
-    match /cms_support { allow list: if isMasterAdmin(); }
-
     // --- 4. RÈGLES UTILISATEURS ET SERVICES STANDARDS ---
     
     match /conversations/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null && (request.auth.uid == userId || isSecondaryAdmin());
       match /{allPaths=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if request.auth != null && (request.auth.uid == userId || isSecondaryAdmin());
       }
     }
 
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null && (request.auth.uid == userId || isSecondaryAdmin());
       match /{allPaths=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if request.auth != null && (request.auth.uid == userId || isSecondaryAdmin());
       }
     }
 
     match /app_settings/{id} {
       allow read: if true;
+      allow write: if isSecondaryAdmin();
     }
 
     match /system_notifications/{id} {
       allow read: if true;
+      allow write: if isSecondaryAdmin();
     }
 
     match /meteo_caledonie/{id} {
@@ -62,10 +68,12 @@ service cloud.firestore {
       match /previsions/{prevId} {
         allow get, list: if true;
       }
+      allow write: if isSecondaryAdmin();
     }
 
     match /fish_species/{id} {
       allow get, list: if true;
+      allow write: if isSecondaryAdmin();
       match /commune_stats/{communeId} {
         allow get, list: if true;
         allow create, update: if request.auth != null;
@@ -74,15 +82,18 @@ service cloud.firestore {
     
     match /sound_library/{id} {
       allow get, list: if true;
+      allow write: if isSecondaryAdmin();
     }
 
     match /cms_support/faq/items/{id} {
       allow get, list: if true;
+      allow write: if isSecondaryAdmin();
     }
 
     match /cms_support/tickets/items/{id} {
       allow create: if request.auth != null;
-      allow read: if request.auth != null && (resource.data.userId == request.auth.uid);
+      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || isSecondaryAdmin());
+      allow list, update, delete: if isSecondaryAdmin();
     }
 
     match /hunting_sessions/{id} {
@@ -102,6 +113,7 @@ service cloud.firestore {
     match /spot_shares/{id} {
       allow create: if request.auth != null;
       allow read, delete: if request.auth != null && (
+        isSecondaryAdmin() || 
         (request.auth.token.email != null && resource.data.recipientEmail == request.auth.token.email.lower())
       );
     }
@@ -109,7 +121,7 @@ service cloud.firestore {
     match /businesses/{businessId} {
       allow get, list: if true;
       allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && (resource.data.ownerId == request.auth.uid);
+      allow update, delete: if request.auth != null && (resource.data.ownerId == request.auth.uid || isSecondaryAdmin());
 
       match /promotions/{promoId} {
         allow get, list: if true;
@@ -119,7 +131,7 @@ service cloud.firestore {
 
     match /campaigns/{campaignId} {
       allow create: if request.auth != null;
-      allow read: if request.auth != null && (resource.data.ownerId == request.auth.uid);
+      allow read: if request.auth != null && (resource.data.ownerId == request.auth.uid || isSecondaryAdmin());
     }
   }
 }

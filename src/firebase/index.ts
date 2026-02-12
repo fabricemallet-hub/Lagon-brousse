@@ -3,7 +3,7 @@
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
-import { getFirestore, initializeFirestore, Firestore } from 'firebase/firestore';
+import { initializeFirestore, Firestore, getFirestore } from 'firebase/firestore';
 import { getMessaging, Messaging } from 'firebase/messaging';
 
 /**
@@ -32,14 +32,15 @@ export function initializeFirebase() {
 
   // 3. Initialisation de Firestore avec paramètres de stabilité forcés
   // CRITIQUE : initializeFirestore doit être le PREMIER appel pour configurer le transport.
+  // On utilise un verrou sur l'objet singleton global.
   if (!firestore) {
     try {
+      // Tenter une initialisation propre
       firestore = initializeFirestore(app, {
         experimentalForceLongPolling: true,
       });
     } catch (e) {
-      // Si déjà initialisé (ex: Fast Refresh), on récupère l'instance existante
-      const { getFirestore } = require('firebase/firestore');
+      // Si déjà initialisé par ailleurs, récupérer l'instance existante
       firestore = getFirestore(app);
     }
   }
@@ -49,7 +50,7 @@ export function initializeFirebase() {
     try {
       messaging = getMessaging(app);
     } catch (e) {
-      // FCM peut ne pas être supporté sur certains navigateurs
+      // FCM non supporté sur ce navigateur
     }
   }
 
