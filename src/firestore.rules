@@ -11,10 +11,10 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        // Accès par UID maître
+        // Accès par UID maître (Consolidé)
         request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2", "t8nPnZLcTiaLJSKMuLzib3C5nPn1"] ||
         // Accès par email maître
-        request.auth.token.email.lower() in ["f.mallet81@outlook.com", "fabrice.mallet@gmail.com", "f.mallet81@gmail.com"] ||
+        (request.auth.token.email != null && request.auth.token.email.lower() in ["f.mallet81@outlook.com", "fabrice.mallet@gmail.com", "f.mallet81@gmail.com"]) ||
         // Accès par statut dans le document utilisateur (dynamique)
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'admin'
       );
@@ -85,8 +85,11 @@ service cloud.firestore {
 
     // --- 3. MESSAGERIE & CONVERSATIONS ---
     match /conversations/{userId} {
+      // Un utilisateur lit sa propre convo, un admin lit tout
       allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      // L'admin peut lister la collection conversations
       allow list: if isAdmin();
+      // Création/Maj par le proprio ou l'admin
       allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       
       match /messages/{messageId} {

@@ -61,9 +61,9 @@ export default function AdminPage() {
 
   const isAdmin = useMemo(() => {
     if (!user) return false;
-    const masterAdminUids = ['K9cVYLVUk1NV99YV3anebkugpPp1', 'ipupi3Pg4RfrSEpFyT69BtlCdpi2', 'Irglq69MasYdNwBmUu8yKvw6h4G2'];
+    const masterAdminUids = ['K9cVYLVUk1NV99YV3anebkugpPp1', 'ipupi3Pg4RfrSEpFyT69BtlCdpi2', 'Irglq69MasYdNwBmUu8yKvw6h4G2', 't8nPnZLcTiaLJSKMuLzib3C5nPn1'];
     const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
-    return masterAdminUids.includes(user.uid) || (user.email && masterEmails.includes(user.email.toLowerCase())) || adminProfile?.subscriptionStatus === 'admin';
+    return masterAdminUids.includes(user.uid) || (user.email && masterEmails.includes(user.email.toLowerCase())) || adminProfile?.subscriptionStatus === 'admin' || adminProfile?.role === 'admin';
   }, [user, adminProfile]);
 
   // Queries

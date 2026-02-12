@@ -27,7 +27,7 @@ export function SidebarNav() {
 
   const { data: userProfile } = useDoc<UserAccount>(userDocRef);
 
-  // Détection robuste des rôles basée sur Firestore et fallbacks emails/UIDs
+  // Détection robuste des rôles (Mise à jour master UID)
   const roles = useMemo(() => {
     if (!user) return { isAdmin: false, isPro: false };
     

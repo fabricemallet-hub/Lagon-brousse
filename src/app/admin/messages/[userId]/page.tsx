@@ -37,9 +37,11 @@ export default function AdminMessagePage() {
     const masterAdminUids = [
       'K9cVYLVUk1NV99YV3anebkugpPp1',
       'ipupi3Pg4RfrSEpFyT69BtlCdpi2',
-      'Irglq69MasYdNwBmUu8yKvw6h4G2'
+      'Irglq69MasYdNwBmUu8yKvw6h4G2',
+      't8nPnZLcTiaLJSKMuLzib3C5nPn1'
     ];
-    return masterAdminUids.includes(user.uid) || adminProfile?.subscriptionStatus === 'admin' || adminProfile?.role === 'admin';
+    const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
+    return masterAdminUids.includes(user.uid) || (user.email && masterEmails.includes(user.email.toLowerCase())) || adminProfile?.subscriptionStatus === 'admin' || adminProfile?.role === 'admin';
   }, [user, adminProfile]);
 
   const conversationId = params.userId as string;
@@ -107,7 +109,7 @@ export default function AdminMessagePage() {
             createdAt: serverTimestamp(),
         };
 
-        await addDoc(messageData); // Use error handling wrapper in real scenario
+        await addDoc(messagesRef, messageData);
         
         const conversationUpdate: Partial<Conversation> = {
             lastMessageContent: newMessage.trim(),
