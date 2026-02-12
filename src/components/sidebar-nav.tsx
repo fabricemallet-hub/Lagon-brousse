@@ -92,7 +92,7 @@ export function SidebarNav() {
       
       <div className="px-4 py-4 mt-auto border-t border-sidebar-border bg-sidebar group-data-[collapsible=icon]:hidden">
         <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40">
-          Version 2.3.2
+          Version 2.3.9
         </p>
       </div>
     </div>

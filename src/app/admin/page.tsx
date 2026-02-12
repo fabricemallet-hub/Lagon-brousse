@@ -80,7 +80,7 @@ export default function AdminPage() {
   const fishRef = useMemoFirebase(() => isAdmin ? query(collection(firestore!, 'fish_species'), orderBy('name', 'asc')) : null, [firestore, isAdmin]);
   const { data: fishSpecies } = useCollection<FishSpeciesInfo>(fishRef);
 
-  const convsRef = useMemoFirebase(() => isAdmin ? collection(firestore!, 'conversations') : null, [firestore, isAdmin]);
+  const convsRef = useMemoFirebase(() => isAdmin ? query(collection(firestore!, 'conversations'), orderBy('lastMessageAt', 'desc')) : null, [firestore, isAdmin]);
   const { data: conversations } = useCollection<Conversation>(convsRef);
 
   const splashRef = useMemoFirebase(() => isAdmin ? doc(firestore!, 'app_settings', 'splash') : null, [firestore, isAdmin]);
