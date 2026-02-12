@@ -6,8 +6,8 @@ import { getAuth, Auth } from 'firebase/auth';
 import { initializeFirestore, Firestore, getFirestore, memoryLocalCache } from 'firebase/firestore';
 
 /**
- * @fileOverview Initialisation ULTIME de Firebase.
- * VERSION 3.2.0 - Singleton immuable pour éliminer l'erreur d'assertion ca9.
+ * @fileOverview Initialisation ROBUSTE de Firebase.
+ * VERSION 4.0.0 - Singleton immuable forçant Long Polling et Memory Cache.
  */
 
 declare global {
@@ -18,7 +18,7 @@ declare global {
 
 export function initializeFirebase() {
   if (typeof window !== 'undefined') {
-    // 1. App Singleton
+    // 1. Initialisation App (Unique)
     if (!globalThis.__FIREBASE_APP) {
       const apps = getApps();
       globalThis.__FIREBASE_APP = apps.length === 0 
@@ -27,22 +27,23 @@ export function initializeFirebase() {
     }
     const app = globalThis.__FIREBASE_APP;
 
-    // 2. Auth Singleton
+    // 2. Initialisation Auth (Unique)
     if (!globalThis.__FIREBASE_AUTH) {
       globalThis.__FIREBASE_AUTH = getAuth(app);
     }
     const auth = globalThis.__FIREBASE_AUTH;
 
-    // 3. Firestore Singleton (Memory Cache FORCÉ)
+    // 3. Initialisation Firestore (Forçage Immuable)
+    // On utilise initializeFirestore UNE SEULE FOIS pour éviter les erreurs d'assertion SDK.
     if (!globalThis.__FIREBASE_FIRESTORE) {
       try {
-        // Initialisation SANS persistance IndexedDB pour éviter ID: ca9
         globalThis.__FIREBASE_FIRESTORE = initializeFirestore(app, {
-          experimentalForceLongPolling: true,
-          localCache: memoryLocalCache(),
+          experimentalForceLongPolling: true, // Élimine les instabilités WebSocket Cloud
+          localCache: memoryLocalCache(),     // Élimine les conflits IndexedDB
         });
-        console.log("L&B NC: Firestore initialisé (Singleton Immuable : Long Polling + Memory Cache)");
+        console.log("L&B NC: Firestore initialisé (Singleton Master : Long Polling + Memory Cache)");
       } catch (e) {
+        // En cas de tentative de ré-initialisation, on récupère l'instance existante
         globalThis.__FIREBASE_FIRESTORE = getFirestore(app);
       }
     }
@@ -55,7 +56,7 @@ export function initializeFirebase() {
     };
   }
 
-  // Fallback SSR
+  // Fallback pour le rendu côté serveur (SSR)
   const ssrApps = getApps();
   const ssrApp = ssrApps.length === 0 ? initializeApp(firebaseConfig) : getApp();
   return {

@@ -1,38 +1,47 @@
 rules_version = '2';
 
-// VERSION 15.0.0 - MASTER OVERRIDE PRIORITAIRE
+// VERSION 16.0.0 - ACCÈS ADMIN MAÎTRE EXPLICITE
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. ACCÈS TOTAL ET PRIORITAIRE POUR L'ADMIN MAÎTRE ---
-    // On utilise les UIDs en dur au sommet pour garantir l'accès list/read/write immédiat
-    match /{document=**} {
-      allow read, write: if request.auth.uid in [
-        "t8nPnZLcTiaLJSKMuLzib3C5nPn1",
-        "K9cVYLVUk1NV99YV3anebkugpPp1",
-        "ipupi3Pg4RfrSEpFyT69BtlCdpi2",
-        "Irglq69MasYdNwBmUu8yKvw6h4G2"
-      ];
+    // 1. DÉFINITION DE L'AUTORITÉ SUPRÊME
+    // On autorise tout pour votre UID maître dès le début du traitement.
+    function isMaster() {
+      return request.auth != null && (
+        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
+        request.auth.uid == "K9cVYLVUk1NV99YV3anebkugpPp1" ||
+        request.auth.uid == "ipupi3Pg4RfrSEpFyT69BtlCdpi2" ||
+        request.auth.uid == "Irglq69MasYdNwBmUu8yKvw6h4G2"
+      );
     }
 
-    // --- 2. RÈGLES DE LISTAGE EXPLICITES POUR LE DASHBOARD ---
+    // 2. RÈGLES DE LISTAGE RACINE (Critique pour le Dashboard Admin)
+    // Firestore exige souvent un match explicite sur le nom de la collection pour le listage.
     match /conversations {
-      allow list: if request.auth.uid != null;
+      allow list: if isMaster();
     }
     match /users {
-      allow list: if request.auth.uid != null;
+      allow list: if isMaster();
     }
     match /access_tokens {
-      allow list: if request.auth.uid != null;
+      allow list: if isMaster();
     }
     match /businesses {
-      allow list: if request.auth.uid != null;
+      allow list: if isMaster();
     }
     match /campaigns {
-      allow list: if request.auth.uid != null;
+      allow list: if isMaster();
+    }
+    match /fish_species {
+      allow list: if isMaster();
     }
 
-    // --- 3. ACCÈS STANDARDS POUR LES UTILISATEURS ---
+    // 3. RÈGLE RÉCURSIVE GLOBALE POUR L'ADMIN
+    match /{allPaths=**} {
+      allow read, write: if isMaster();
+    }
+
+    // 4. RÈGLES STANDARDS POUR LES UTILISATEURS
     match /app_settings/{id} {
       allow read: if true;
     }
@@ -48,7 +57,10 @@ service cloud.firestore {
 
     match /fish_species/{id} {
       allow get, list: if true;
-      match /commune_stats/{communeId} { allow get, list: if true; allow create, update: if request.auth != null; }
+      match /commune_stats/{communeId} { 
+        allow get, list: if true; 
+        allow create, update: if request.auth != null; 
+      }
     }
     
     match /sound_library/{id} {
