@@ -11,8 +11,8 @@ import {
 } from 'firebase/firestore';
 
 /**
- * @fileOverview Initialisation SINGLETON de Firebase pour L&B NC.
- * Cette version force le Memory Cache et le Long Polling pour éliminer l'erreur ca9.
+ * @fileOverview Initialisation ROBUSTE de Firebase pour L&B NC.
+ * Cette version utilise un verrou global immuable pour éliminer l'erreur ca9.
  */
 
 declare global {
@@ -38,17 +38,15 @@ export function initializeFirebase() {
     }
     const auth = globalThis.__LB_FIREBASE_AUTH;
 
-    // 3. Firestore Singleton (ANTI-CORRUPTION)
-    // On utilise initializeFirestore UNE SEULE FOIS avec des réglages de stabilité forcés.
+    // 3. Firestore Singleton (FORCE STABILITÉ)
     if (!globalThis.__LB_FIREBASE_FIRESTORE) {
       try {
         globalThis.__LB_FIREBASE_FIRESTORE = initializeFirestore(app, {
-          experimentalForceLongPolling: true, // Évite les conflits de WebSockets instables
-          localCache: memoryLocalCache(),     // Évite les erreurs ca9 liées à IndexedDB
+          experimentalForceLongPolling: true, // Transport stable pour environnement Cloud
+          localCache: memoryLocalCache(),     // Désactive IndexedDB pour éviter l'erreur ca9
         });
-        console.log("L&B NC: Firestore Singleton prêt (Mode Stabilité).");
+        console.log("L&B NC: Firestore prêt (Mode Stabilité Verrouillé).");
       } catch (e) {
-        // En cas d'erreur (déjà initialisé), on récupère l'instance existante
         globalThis.__LB_FIREBASE_FIRESTORE = getFirestore(app);
       }
     }
@@ -57,7 +55,7 @@ export function initializeFirebase() {
     return { firebaseApp: app, auth, firestore };
   }
 
-  // Fallback SSR (Serveur Next.js)
+  // Fallback Serveur (Next.js)
   const ssrApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
   return {
     firebaseApp: ssrApp,

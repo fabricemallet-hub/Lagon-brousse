@@ -34,7 +34,9 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
           await setDoc(userDocRef, { 
             ...currentData, 
             subscriptionStatus: 'admin',
-            role: 'admin'
+            role: 'admin',
+            id: user.uid,
+            email: email
           }, { merge: true });
           console.log("L&B NC: Statut Administrateur restauré pour le compte master.");
       }

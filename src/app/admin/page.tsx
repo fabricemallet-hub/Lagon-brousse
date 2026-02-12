@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { MessageSquare, TrendingUp } from 'lucide-react';
+import { MessageSquare, TrendingUp, ShieldCheck } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
@@ -24,16 +24,11 @@ export default function AdminPage() {
   // DÉTECTION ADMIN MAÎTRE (UID ET EMAIL)
   const isAdmin = useMemo(() => {
     if (!user) return false;
-    const masterAdminUids = [
-      't8nPnZLcTiaLJSKMuLzib3C5nPn1', 
-      'ipupi3Pg4RfrSEpFyT69BtlCdpi2', 
-      'Irglq69MasYdNwBmUu8yKvw6h4G2', 
-      'K9cVYLVUk1NV99YV3anebkugpPp1'
-    ];
-    const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
+    const masterAdminEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
+    const masterAdminUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'K9cVYLVUk1NV99YV3anebkugpPp1', 'ipupi3Pg4RfrSEpFyT69BtlCdpi2'];
     
-    return masterAdminUids.includes(user.uid) || 
-           (user.email && masterEmails.includes(user.email.toLowerCase()));
+    return (user.email && masterAdminEmails.includes(user.email.toLowerCase())) || 
+           masterAdminUids.includes(user.uid);
   }, [user]);
 
   // REQUÊTES FIRESTORE (Seulement si isAdmin est confirmé)
@@ -52,6 +47,7 @@ export default function AdminPage() {
 
   const convsRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
+    // On s'assure que la requête ne part pas trop tôt
     return query(collection(firestore, 'conversations'), orderBy('lastMessageAt', 'desc'));
   }, [firestore, isAdmin]);
   const { data: conversations } = useCollection<Conversation>(convsRef);
@@ -62,80 +58,84 @@ export default function AdminPage() {
     }
   }, [isAdmin, isUserLoading, router]);
 
-  if (isUserLoading) return <div className="p-8"><Skeleton className="h-48 w-full" /></div>;
+  if (isUserLoading) return <div className="p-8"><Skeleton className="h-48 w-full rounded-2xl" /></div>;
   if (!isAdmin) return null;
 
   const activeSubs = users?.filter(u => u.subscriptionStatus === 'active' || u.subscriptionStatus === 'admin').length || 0;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-20 px-1">
-      <Card className="border-2 shadow-sm">
-        <CardHeader className="py-6">
-          <CardTitle className="font-black uppercase tracking-tighter text-2xl text-slate-800">
+      <Card className="border-2 shadow-xl bg-slate-900 text-white overflow-hidden relative">
+        <div className="absolute right-0 top-0 opacity-10 -translate-y-4 translate-x-4">
+            <ShieldCheck className="size-48" />
+        </div>
+        <CardHeader className="py-8 relative z-10">
+          <CardTitle className="font-black uppercase tracking-tighter text-3xl flex items-center gap-3">
             Console Administrateur
           </CardTitle>
+          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Accès Maître : {user?.email}</p>
         </CardHeader>
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-6 h-auto bg-muted/50 border rounded-xl p-1">
-          <TabsTrigger value="stats" className="text-[10px] font-black uppercase py-3">Statistiques</TabsTrigger>
-          <TabsTrigger value="users" className="text-[10px] font-black uppercase py-3">Utilisateurs</TabsTrigger>
-          <TabsTrigger value="commerces" className="text-[10px] font-black uppercase py-3">Commerces</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 mb-6 h-auto bg-muted/50 border-2 rounded-2xl p-1.5 shadow-sm">
+          <TabsTrigger value="stats" className="text-[10px] font-black uppercase py-3 rounded-xl data-[state=active]:shadow-md">Statistiques</TabsTrigger>
+          <TabsTrigger value="users" className="text-[10px] font-black uppercase py-3 rounded-xl data-[state=active]:shadow-md">Utilisateurs</TabsTrigger>
+          <TabsTrigger value="commerces" className="text-[10px] font-black uppercase py-3 rounded-xl data-[state=active]:shadow-md">Commerces</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="stats" className="space-y-6">
+        <TabsContent value="stats" className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
-            <Card className="border-2">
-              <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Inscrits</CardTitle></CardHeader>
+            <Card className="border-2 shadow-sm">
+              <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Utilisateurs</CardTitle></CardHeader>
               <CardContent><div className="text-3xl font-black">{users?.length || 0}</div></CardContent>
             </Card>
-            <Card className="border-2">
-              <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Abonnés</CardTitle></CardHeader>
+            <Card className="border-2 shadow-sm">
+              <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Abonnés</CardTitle></CardHeader>
               <CardContent><div className="text-3xl font-black text-primary">{activeSubs}</div></CardContent>
             </Card>
-            <Card className="border-2">
-              <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Commerces</CardTitle></CardHeader>
-              <CardContent><div className="text-3xl font-black">{businesses?.length || 0}</div></CardContent>
+            <Card className="border-2 shadow-sm">
+              <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Commerces Pro</CardTitle></CardHeader>
+              <CardContent><div className="text-3xl font-black text-accent">{businesses?.length || 0}</div></CardContent>
             </Card>
           </div>
 
-          <Card className="border-2">
-            <CardHeader className="pb-3 border-b">
+          <Card className="border-2 shadow-lg overflow-hidden rounded-2xl">
+            <CardHeader className="pb-3 border-b bg-muted/10">
               <CardTitle className="text-lg font-black uppercase flex items-center gap-2">
-                <MessageSquare className="size-5 text-primary" /> Support & Messages
+                <MessageSquare className="size-5 text-primary" /> Support & Messages Clients
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/30">
-                    <TableHead className="text-[10px] font-black uppercase">Utilisateur</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase">Message</TableHead>
-                    <TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase h-10 px-4">Utilisateur</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase h-10">Dernier Message</TableHead>
+                    <TableHead className="text-right text-[10px] font-black uppercase h-10 px-4">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {conversations?.map(conv => (
                     <TableRow key={conv.id} className={cn(!conv.isReadByAdmin && "bg-primary/5")}>
-                      <TableCell className="py-4">
+                      <TableCell className="py-4 px-4">
                         <div className="flex flex-col">
-                          <span className="font-black text-xs">{conv.userDisplayName || 'Inconnu'}</span>
-                          <span className="text-[9px] opacity-50 lowercase">{conv.userEmail}</span>
+                          <span className="font-black text-xs text-slate-800">{conv.userDisplayName || 'Inconnu'}</span>
+                          <span className="text-[9px] font-bold opacity-50 lowercase">{conv.userEmail}</span>
                         </div>
                       </TableCell>
                       <TableCell className="text-xs italic truncate max-w-[150px] opacity-70">
-                        {conv.lastMessageContent}
+                        "{conv.lastMessageContent}"
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button asChild variant="outline" size="sm" className="h-8 text-[10px] font-black uppercase">
+                      <TableCell className="text-right px-4">
+                        <Button asChild variant="outline" size="sm" className="h-8 text-[10px] font-black uppercase border-2 shadow-sm hover:bg-primary hover:text-white transition-colors">
                           <Link href={`/admin/messages/${conv.id}`}>Répondre</Link>
                         </Button>
                       </TableCell>
                     </TableRow>
                   ))}
                   {(!conversations || conversations.length === 0) && (
-                    <TableRow><TableCell colSpan={3} className="text-center py-10 text-xs italic opacity-40">Aucun message</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={3} className="text-center py-16 text-xs italic opacity-40 font-bold uppercase tracking-widest">Aucun message pour le moment</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>

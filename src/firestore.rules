@@ -3,33 +3,33 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. AUTORITÉ SUPRÊME (ACCÈS TOTAL POUR L'ADMIN MAÎTRE) ---
-    // Cette règle bypass toutes les autres pour votre email.
+    // --- 1. ACCÈS MAÎTRE (PRIORITÉ ABSOLUE) ---
+    // On autorise tout pour votre email Outlook, sans condition.
+    // Cela débloque immédiatement le listage des collections racine.
     match /{allPaths=**} {
       allow read, write: if request.auth != null && (
         request.auth.token.email.lower() == "f.mallet81@outlook.com" ||
         request.auth.token.email.lower() == "fabrice.mallet@gmail.com" ||
-        request.auth.token.email.lower() == "f.mallet81@gmail.com" ||
-        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"
+        request.auth.token.email.lower() == "f.mallet81@gmail.com"
       );
     }
 
-    // --- 2. RÈGLES STANDARDS POUR LES AUTRES UTILISATEURS ---
-    
-    // Profils utilisateurs
+    // --- 2. RÈGLES EXPLICITES POUR LES COLLECTIONS D'ADMINISTRATION ---
+    // Parfois le moteur de règles nécessite une déclaration explicite pour le listage.
+    match /conversations/{id} { allow list: if request.auth != null && request.auth.token.email.lower() == "f.mallet81@outlook.com"; }
+    match /users/{id} { allow list: if request.auth != null && request.auth.token.email.lower() == "f.mallet81@outlook.com"; }
+    match /businesses/{id} { allow list: if request.auth != null && request.auth.token.email.lower() == "f.mallet81@outlook.com"; }
+    match /campaigns/{id} { allow list: if request.auth != null && request.auth.token.email.lower() == "f.mallet81@outlook.com"; }
+
+    // --- 3. RÈGLES STANDARDS POUR LES UTILISATEURS ---
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
-      match /{allPaths=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
+      match /{allPaths=**} { allow read, write: if request.auth != null && request.auth.uid == userId; }
     }
 
-    // Conversations et messages
     match /conversations/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
-      match /{allPaths=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
+      match /{allPaths=**} { allow read, write: if request.auth != null && request.auth.uid == userId; }
     }
 
     // Accès Publics (Lecture seule)
