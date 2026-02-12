@@ -2,38 +2,26 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, serverTimestamp, deleteDoc, doc, orderBy, query, setDoc, getDocs, where, addDoc, increment } from 'firebase/firestore';
-import type { UserAccount, Business, FishSpeciesInfo, AccessToken, SplashScreenSettings, SupportTicket, Conversation } from '@/lib/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { collection, query, orderBy, where } from 'firebase/firestore';
+import type { UserAccount, Business, FishSpeciesInfo, AccessToken, Conversation } from '@/lib/types';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { 
-  Trash2, Plus, Pencil, RefreshCw, MessageSquare, LayoutDashboard, Settings, 
-  Fish, KeyRound, Store, Users, TrendingUp, Palette, Trash, Send, Check
-} from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { MessageSquare, TrendingUp } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
 import Link from 'next/link';
 
 export default function AdminPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const router = useRouter();
-  const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState('stats');
 
-  // Détection Admin Maître instantanée par UID
+  // DÉTECTION ADMIN MAÎTRE (UID ET EMAIL)
   const isAdmin = useMemo(() => {
     if (!user) return false;
     const masterAdminUids = [
@@ -42,10 +30,13 @@ export default function AdminPage() {
       'Irglq69MasYdNwBmUu8yKvw6h4G2', 
       'K9cVYLVUk1NV99YV3anebkugpPp1'
     ];
-    return masterAdminUids.includes(user.uid);
+    const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
+    
+    return masterAdminUids.includes(user.uid) || 
+           (user.email && masterEmails.includes(user.email.toLowerCase()));
   }, [user]);
 
-  // Requêtes Firestore stabilisées
+  // REQUÊTES FIRESTORE (Seulement si isAdmin est confirmé)
   const usersRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
     return query(collection(firestore, 'users'), orderBy('email', 'asc'));
@@ -58,29 +49,21 @@ export default function AdminPage() {
   }, [firestore, isAdmin]);
   const { data: businesses } = useCollection<Business>(businessRef);
 
-  const tokensRef = useMemoFirebase(() => {
-    if (!firestore || !isAdmin) return null;
-    return query(collection(firestore, 'access_tokens'), orderBy('createdAt', 'desc'));
-  }, [firestore, isAdmin]);
-  const { data: tokens } = useCollection<AccessToken>(tokensRef);
-
-  const fishRef = useMemoFirebase(() => {
-    if (!firestore || !isAdmin) return null;
-    return query(collection(firestore, 'fish_species'), orderBy('name', 'asc'));
-  }, [firestore, isAdmin]);
-  const { data: fishSpecies } = useCollection<FishSpeciesInfo>(fishRef);
-
   const convsRef = useMemoFirebase(() => {
     if (!firestore || !isAdmin) return null;
+    // On trie par date pour avoir les conversations les plus récentes en haut
     return query(collection(firestore, 'conversations'), orderBy('lastMessageAt', 'desc'));
   }, [firestore, isAdmin]);
   const { data: conversations } = useCollection<Conversation>(convsRef);
 
   useEffect(() => {
-    if (!isUserLoading && !isAdmin) router.push('/compte');
+    if (!isUserLoading && !isAdmin) {
+      router.push('/compte');
+    }
   }, [isAdmin, isUserLoading, router]);
 
-  if (isUserLoading || !isAdmin) return <div className="p-8"><Skeleton className="h-48 w-full" /></div>;
+  if (isUserLoading) return <div className="p-8"><Skeleton className="h-48 w-full" /></div>;
+  if (!isAdmin) return null;
 
   const activeSubs = users?.filter(u => u.subscriptionStatus === 'active' || u.subscriptionStatus === 'admin').length || 0;
 
@@ -88,42 +71,39 @@ export default function AdminPage() {
     <div className="max-w-5xl mx-auto space-y-6 pb-20 px-1">
       <Card className="border-2 shadow-sm">
         <CardHeader className="py-6">
-          <CardTitle className="font-black uppercase tracking-tighter text-2xl text-slate-800 text-center sm:text-left">
-            Tableau de Bord Administrateur
+          <CardTitle className="font-black uppercase tracking-tighter text-2xl text-slate-800">
+            Console Administrateur
           </CardTitle>
         </CardHeader>
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 mb-6 h-auto bg-muted/50 border rounded-xl p-1">
-          <TabsTrigger value="stats" className="text-[10px] font-black uppercase py-3">Stats</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 mb-6 h-auto bg-muted/50 border rounded-xl p-1">
+          <TabsTrigger value="stats" className="text-[10px] font-black uppercase py-3">Statistiques</TabsTrigger>
           <TabsTrigger value="users" className="text-[10px] font-black uppercase py-3">Utilisateurs</TabsTrigger>
-          <TabsTrigger value="design" className="text-[10px] font-black uppercase py-3">Design</TabsTrigger>
-          <TabsTrigger value="fish" className="text-[10px] font-black uppercase py-3">Fish</TabsTrigger>
-          <TabsTrigger value="acces" className="text-[10px] font-black uppercase py-3">Accès</TabsTrigger>
           <TabsTrigger value="commerces" className="text-[10px] font-black uppercase py-3">Commerces</TabsTrigger>
         </TabsList>
 
         <TabsContent value="stats" className="space-y-6">
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
             <Card className="border-2">
-              <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Utilisateurs</CardTitle></CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Inscrits</CardTitle></CardHeader>
               <CardContent><div className="text-3xl font-black">{users?.length || 0}</div></CardContent>
             </Card>
             <Card className="border-2">
-              <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Abonnés Actifs</CardTitle></CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Abonnés</CardTitle></CardHeader>
               <CardContent><div className="text-3xl font-black text-primary">{activeSubs}</div></CardContent>
             </Card>
             <Card className="border-2">
-              <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Revenu Mensuel</CardTitle></CardHeader>
-              <CardContent><div className="text-3xl font-black text-green-600">{activeSubs * 500} FCFP</div></CardContent>
+              <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Commerces</CardTitle></CardHeader>
+              <CardContent><div className="text-3xl font-black">{businesses?.length || 0}</div></CardContent>
             </Card>
           </div>
 
           <Card className="border-2">
             <CardHeader className="pb-3 border-b">
               <CardTitle className="text-lg font-black uppercase flex items-center gap-2">
-                <MessageSquare className="size-5 text-primary" /> Messagerie Admin
+                <MessageSquare className="size-5 text-primary" /> Support & Messages
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -131,8 +111,8 @@ export default function AdminPage() {
                 <TableHeader>
                   <TableRow className="bg-muted/30">
                     <TableHead className="text-[10px] font-black uppercase">Utilisateur</TableHead>
-                    <TableHead className="text-[10px] font-black uppercase">Dernier Message</TableHead>
-                    <TableHead className="text-right text-[10px] font-black uppercase">Actions</TableHead>
+                    <TableHead className="text-[10px] font-black uppercase">Message</TableHead>
+                    <TableHead className="text-right text-[10px] font-black uppercase">Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -144,7 +124,7 @@ export default function AdminPage() {
                           <span className="text-[9px] opacity-50 lowercase">{conv.userEmail}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-xs italic truncate max-w-[150px] sm:max-w-xs opacity-70">
+                      <TableCell className="text-xs italic truncate max-w-[150px] opacity-70">
                         {conv.lastMessageContent}
                       </TableCell>
                       <TableCell className="text-right">
@@ -154,9 +134,9 @@ export default function AdminPage() {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {!conversations || conversations.length === 0 ? (
-                    <TableRow><TableCell colSpan={3} className="text-center py-10 text-xs italic opacity-40">Aucune conversation active</TableCell></TableRow>
-                  ) : null}
+                  {(!conversations || conversations.length === 0) && (
+                    <TableRow><TableCell colSpan={3} className="text-center py-10 text-xs italic opacity-40">Aucun message</TableCell></TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>

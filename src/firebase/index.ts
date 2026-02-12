@@ -12,7 +12,7 @@ import {
 
 /**
  * @fileOverview Initialisation SINGLETON de Firebase pour L&B NC.
- * Utilisation de globalThis pour garantir l'unicité de l'instance.
+ * Utilisation de globalThis pour garantir l'unicité de l'instance et la stabilité.
  */
 
 declare global {
@@ -23,7 +23,7 @@ declare global {
 
 export function initializeFirebase() {
   if (typeof window !== 'undefined') {
-    // 1. Initialisation App
+    // 1. Initialisation App (Unique)
     if (!globalThis.__LB_FIREBASE_APP) {
       const apps = getApps();
       globalThis.__LB_FIREBASE_APP = apps.length === 0 
@@ -32,23 +32,23 @@ export function initializeFirebase() {
     }
     const app = globalThis.__LB_FIREBASE_APP;
 
-    // 2. Initialisation Auth
+    // 2. Initialisation Auth (Unique)
     if (!globalThis.__LB_FIREBASE_AUTH) {
       globalThis.__LB_FIREBASE_AUTH = getAuth(app);
     }
     const auth = globalThis.__LB_FIREBASE_AUTH;
 
-    // 3. Initialisation Firestore (MODE STABILITÉ MAXIMALE)
+    // 3. Initialisation Firestore (MODE STABILITÉ ABSOLUE)
+    // On verrouille le mode Long Polling et le Memory Cache pour éviter les erreurs d'assertion SDK
     if (!globalThis.__LB_FIREBASE_FIRESTORE) {
       try {
-        // Mode Long Polling + Memory Cache pour éviter les erreurs d'assertion interne (ID: ca9)
         globalThis.__LB_FIREBASE_FIRESTORE = initializeFirestore(app, {
           experimentalForceLongPolling: true,
           localCache: memoryLocalCache(),
         });
-        console.log("L&B NC: Firestore initialisé (Singleton Immuable : Long Polling + Memory Cache)");
+        console.log("L&B NC: Firestore Master Instance initialisée.");
       } catch (e) {
-        console.warn("L&B NC: Firestore déjà initialisé ou erreur, récupération de l'instance par défaut.");
+        console.warn("L&B NC: Firestore déjà actif, récupération de l'instance existante.");
         globalThis.__LB_FIREBASE_FIRESTORE = getFirestore(app);
       }
     }
@@ -57,7 +57,7 @@ export function initializeFirebase() {
     return { firebaseApp: app, auth, firestore };
   }
 
-  // Fallback pour SSR
+  // Fallback SSR
   const ssrApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
   return {
     firebaseApp: ssrApp,
