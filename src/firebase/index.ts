@@ -8,57 +8,60 @@ import { getMessaging, Messaging } from 'firebase/messaging';
 
 /**
  * @fileOverview Point d'entrée central pour Firebase.
- * Gère l'initialisation unique et forcée pour la stabilité Firestore (Long Polling).
- * Utilise un pattern Singleton robuste pour éviter les erreurs d'assertion interne (ca9).
+ * Utilise un singleton global pour garantir une initialisation unique et stable.
  */
 
-let app: FirebaseApp;
-let auth: Auth;
-let firestore: Firestore;
-let messaging: Messaging | null = null;
+// Utilisation de globalThis pour persister l'instance à travers les rafraîchissements HMR
+declare global {
+  var __FIREBASE_APP: FirebaseApp | undefined;
+  var __FIREBASE_AUTH: Auth | undefined;
+  var __FIREBASE_FIRESTORE: Firestore | undefined;
+}
 
 export function initializeFirebase() {
-  // 1. Initialisation de l'App (Singleton)
-  if (getApps().length === 0) {
-    app = initializeApp(firebaseConfig);
-  } else {
-    app = getApp();
-  }
-
-  // 2. Initialisation de l'Auth
-  if (!auth) {
-    auth = getAuth(app);
-  }
-
-  // 3. Initialisation de Firestore avec paramètres de stabilité forcés
-  // CRITIQUE : initializeFirestore doit être le PREMIER appel pour configurer le transport.
-  // On utilise un verrou sur l'objet singleton global.
-  if (!firestore) {
-    try {
-      // Tenter une initialisation propre
-      firestore = initializeFirestore(app, {
-        experimentalForceLongPolling: true,
-      });
-    } catch (e) {
-      // Si déjà initialisé par ailleurs, récupérer l'instance existante
-      firestore = getFirestore(app);
+  if (typeof window !== 'undefined') {
+    // 1. Initialisation de l'App
+    if (!globalThis.__FIREBASE_APP) {
+      globalThis.__FIREBASE_APP = getApps().length === 0 
+        ? initializeApp(firebaseConfig) 
+        : getApp();
     }
-  }
+    const app = globalThis.__FIREBASE_APP;
 
-  // 4. Initialisation de Messaging (Client-side uniquement)
-  if (typeof window !== 'undefined' && !messaging) {
-    try {
-      messaging = getMessaging(app);
-    } catch (e) {
-      // FCM non supporté sur ce navigateur
+    // 2. Initialisation de l'Auth
+    if (!globalThis.__FIREBASE_AUTH) {
+      globalThis.__FIREBASE_AUTH = getAuth(app);
     }
+    const auth = globalThis.__FIREBASE_AUTH;
+
+    // 3. Initialisation de Firestore (CRITIQUE : Appelé une seule fois avec Long Polling)
+    if (!globalThis.__FIREBASE_FIRESTORE) {
+      try {
+        globalThis.__FIREBASE_FIRESTORE = initializeFirestore(app, {
+          experimentalForceLongPolling: true,
+        });
+      } catch (e) {
+        // En cas d'erreur (déjà initialisé), on récupère l'instance
+        globalThis.__FIREBASE_FIRESTORE = getFirestore(app);
+      }
+    }
+    const firestore = globalThis.__FIREBASE_FIRESTORE;
+
+    return {
+      firebaseApp: app,
+      auth,
+      firestore,
+      messaging: null // Messaging initialisé séparément si besoin
+    };
   }
 
+  // Fallback pour SSR (Server Side Rendering)
+  const ssrApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
   return {
-    firebaseApp: app,
-    auth,
-    firestore,
-    messaging
+    firebaseApp: ssrApp,
+    auth: getAuth(ssrApp),
+    firestore: getFirestore(ssrApp),
+    messaging: null
   };
 }
 

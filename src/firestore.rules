@@ -1,29 +1,24 @@
 rules_version = '2';
 
-// Version 6.0.0 - ACCÈS MAÎTRE PRIORITAIRE ET LISTAGE RACINE EXPLICITE
+// Version 7.0.0 - ACCÈS MAÎTRE ABSOLU ET PRIORITAIRE
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. PRIORITÉ ABSOLUE : ACCÈS TOTAL POUR L'UID MAÎTRE ---
-    // Cette règle court-circuite tout le reste pour votre compte technique.
-    function isMaster() {
-      return request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1";
-    }
-
+    // --- 1. PRIORITÉ SUPRÊME : VOTRE UID MAÎTRE ---
+    // Cette règle autorise TOUTES les opérations sur TOUS les chemins.
+    // On utilise l'UID en dur pour une évaluation instantanée et sans faille.
     match /{allPaths=**} {
-      allow read, write: if isMaster();
+      allow read, write: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1";
     }
 
-    // --- 2. PERMISSIONS DE LISTAGE RACINE (CRITIQUE POUR LE DASHBOARD) ---
-    // Firestore exige souvent une règle explicite sur la collection pour le listage.
-    match /conversations { allow list: if isMaster(); }
-    match /users { allow list: if isMaster(); }
-    match /businesses { allow list: if isMaster(); }
-    match /access_tokens { allow list: if isMaster(); }
-    match /campaigns { allow list: if isMaster(); }
-    match /vessels { allow list: if isMaster(); }
-    match /hunting_sessions { allow list: if isMaster(); }
-    match /cms_support { allow list: if isMaster(); }
+    // --- 2. LISTAGE EXPLICITE DES COLLECTIONS RACINE ---
+    // Indispensable pour le fonctionnement du Dashboard Admin.
+    match /conversations { allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"; }
+    match /users { allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"; }
+    match /businesses { allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"; }
+    match /access_tokens { allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"; }
+    match /campaigns { allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"; }
+    match /system_notifications { allow list: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1"; }
 
     // --- 3. FONCTION DE DÉTECTION POUR LES AUTRES ADMINS ---
     function isSecondaryAdmin() {
@@ -37,7 +32,7 @@ service cloud.firestore {
       );
     }
 
-    // --- 4. RÈGLES UTILISATEURS ET SERVICES STANDARDS ---
+    // --- 4. RÈGLES STANDARDS POUR LES UTILISATEURS ---
     
     match /conversations/{userId} {
       allow read, write: if request.auth != null && (request.auth.uid == userId || isSecondaryAdmin());

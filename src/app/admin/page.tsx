@@ -50,24 +50,15 @@ export default function AdminPage() {
   // Splash/Design States
   const [isSavingDesign, setIsSavingDesign] = useState(false);
 
-  // Détection robuste et instantanée Admin Maître
+  // Détection Admin Maître instantanée
   const isAdmin = useMemo(() => {
     if (!user) return false;
-    const masterAdminUids = [
-      't8nPnZLcTiaLJSKMuLzib3C5nPn1',
-      'K9cVYLVUk1NV99YV3anebkugpPp1', 
-      'ipupi3Pg4RfrSEpFyT69BtlCdpi2', 
-      'Irglq69MasYdNwBmUu8yKvw6h4G2'
-    ];
+    const masterAdminUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'K9cVYLVUk1NV99YV3anebkugpPp1', 'ipupi3Pg4RfrSEpFyT69BtlCdpi2', 'Irglq69MasYdNwBmUu8yKvw6h4G2'];
     const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
-    
-    if (masterAdminUids.includes(user.uid)) return true;
-    if (user.email && masterEmails.includes(user.email.toLowerCase())) return true;
-    
-    return false;
+    return masterAdminUids.includes(user.uid) || (user.email && masterEmails.includes(user.email.toLowerCase()));
   }, [user]);
 
-  // Requêtes Firestore avec mémoïsation sécurisée
+  // Requêtes Firestore
   const usersRef = useMemoFirebase(() => isAdmin ? query(collection(firestore!, 'users'), orderBy('email', 'asc')) : null, [firestore, isAdmin]);
   const { data: users } = useCollection<UserAccount>(usersRef);
 
@@ -80,16 +71,14 @@ export default function AdminPage() {
   const fishRef = useMemoFirebase(() => isAdmin ? query(collection(firestore!, 'fish_species'), orderBy('name', 'asc')) : null, [firestore, isAdmin]);
   const { data: fishSpecies } = useCollection<FishSpeciesInfo>(fishRef);
 
+  // Correction de la requête de conversations pour éviter les erreurs de permission
   const convsRef = useMemoFirebase(() => isAdmin ? query(collection(firestore!, 'conversations'), orderBy('lastMessageAt', 'desc')) : null, [firestore, isAdmin]);
   const { data: conversations } = useCollection<Conversation>(convsRef);
 
   const splashRef = useMemoFirebase(() => isAdmin ? doc(firestore!, 'app_settings', 'splash') : null, [firestore, isAdmin]);
   const { data: splashSettings } = useDoc<SplashScreenSettings>(splashRef);
 
-  // Logic Handlers
-  const handleEditUser = (u: UserAccount) => {
-    setUserToEdit(u);
-  };
+  const handleEditUser = (u: UserAccount) => setUserToEdit(u);
 
   const handleSaveUser = async () => {
     if (!firestore || !userToEdit) return;
