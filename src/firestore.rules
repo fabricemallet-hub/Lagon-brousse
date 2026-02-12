@@ -16,21 +16,26 @@ service cloud.firestore {
       );
     }
 
-    // Bypass universel pour TOUS les documents (Alpha)
+    // Bypass universel pour TOUS les documents
     match /{allPaths=**} {
       allow read, write: if isMaster();
     }
 
-    // Autorisation de listage EXPLICITE pour les collections Admin
-    // Indispensable pour que collection(db, 'name') ne soit pas rejeté par sécurité
-    match /conversations { allow list: if isMaster(); }
-    match /users { allow list: if isMaster(); }
-    match /businesses { allow list: if isMaster(); }
-    match /campaigns { allow list: if isMaster(); }
+    // ======================================================
+    // 2. RÈGLES SPÉCIFIQUES (ACCÈS PUBLICS & USAGERS)
+    // ======================================================
 
-    // ======================================================
-    // 2. RÈGLES UTILISATEURS STANDARDS
-    // ======================================================
+    // Notifications Système (Lecture publique, Écriture Admin)
+    match /system_notifications/{id} {
+      allow read: if true;
+      allow write: if isMaster();
+    }
+
+    // Bibliothèque de Sons (Lecture publique, Écriture Admin)
+    match /sound_library/{id} {
+      allow read: if true;
+      allow write: if isMaster();
+    }
 
     // Profils et données personnelles
     match /users/{userId} {
@@ -50,7 +55,6 @@ service cloud.firestore {
 
     // Accès publics et utilitaires
     match /app_settings/{id} { allow read: if true; }
-    match /system_notifications/{id} { allow read: if true; }
     match /meteo_caledonie/{id} { 
       allow get, list: if true;
       match /previsions/{prevId} { allow get, list: if true; }
@@ -62,7 +66,6 @@ service cloud.firestore {
         allow create, update: if request.auth != null; 
       }
     }
-    match /sound_library/{id} { allow get, list: if true; }
     match /cms_support/faq/items/{id} { allow get, list: if true; }
     match /shared_access_tokens/{id} { allow get, list: if true; }
 
