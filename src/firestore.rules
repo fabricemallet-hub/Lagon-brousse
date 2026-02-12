@@ -10,6 +10,7 @@ service cloud.firestore {
     }
 
     // ACCÈS MAÎTRE (INFAILLIBLE) : Basé sur les identifiants techniques immuables
+    // Version 2.1 - Mise à jour UID f.mallet81@outlook.com
     function isMasterAdmin() {
       return isSignedIn() && (
         request.auth.uid in ["K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2", "t8nPnZLcTiaLJSKMuLzib3C5nPn1"] ||
@@ -82,6 +83,7 @@ service cloud.firestore {
     // --- 2. UTILISATEURS & DONNÉES PERSO ---
     match /users/{userId} {
       allow read, write: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
+      allow list: if isMasterAdmin();
       allow delete: if isMasterAdmin();
       match /{allPaths=**} {
         allow read, write: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
@@ -89,8 +91,11 @@ service cloud.firestore {
     }
 
     // --- 3. MESSAGERIE & CONVERSATIONS ---
-    match /conversations/{userId} {
+    match /conversations {
       allow list: if isMasterAdmin();
+    }
+    
+    match /conversations/{userId} {
       allow read, write: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
       
       match /messages/{messageId} {
