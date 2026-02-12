@@ -31,22 +31,23 @@ export function initializeFirebase() {
     if (!globalThis.__LB_FIREBASE_AUTH) {
       globalThis.__LB_FIREBASE_AUTH = getAuth(app);
       onAuthStateChanged(globalThis.__LB_FIREBASE_AUTH, (u) => {
-        if (u) console.log(`L&B NC: Firestore prêt pour l'UID: ${u.uid}`);
+        if (u) {
+          console.log(`L&B NC: Session active pour: ${u.uid}`);
+        }
       });
     }
     const auth = globalThis.__LB_FIREBASE_AUTH;
 
-    // 3. Singleton Firestore (Verrouillage des paramètres de transport)
+    // 3. Singleton Firestore (Paramètres de transport figés pour éviter ID: ca9)
     if (!globalThis.__LB_FIREBASE_FIRESTORE) {
       try {
-        // Paramètres de stabilité maximum pour éviter INTERNAL ASSERTION FAILED ID: ca9
         globalThis.__LB_FIREBASE_FIRESTORE = initializeFirestore(app, {
           experimentalForceLongPolling: true,
           localCache: memoryLocalCache(),
         });
-        console.log("L&B NC: Firestore initialisé (Singleton Immuable : Long Polling + Memory Cache)");
+        console.log("L&B NC: Firestore initialisé (Mode Stable : Long Polling + Memory Cache)");
       } catch (e) {
-        // Fallback si déjà initialisé par un outil tiers
+        // Fallback si déjà initialisé
         globalThis.__LB_FIREBASE_FIRESTORE = getFirestore(app);
       }
     }
