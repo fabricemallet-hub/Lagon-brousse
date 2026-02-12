@@ -18,7 +18,7 @@ let messaging: Messaging | null = null;
 
 /**
  * Initialise Firebase et ses services avec les paramètres optimisés pour le Cloud.
- * Le mode experimentalForceLongPolling est activé pour résoudre l'erreur "Unexpected state (ID: ca9)".
+ * Le mode experimentalForceLongPolling est activé pour résoudre l'erreur "INTERNAL ASSERTION FAILED: Unexpected state (ID: ca9)".
  */
 export function initializeFirebase() {
   if (!app) {
@@ -34,8 +34,7 @@ export function initializeFirebase() {
         experimentalForceLongPolling: true,
       });
     } catch (e) {
-      // Si déjà initialisé avec des paramètres différents, on récupère l'instance existante
-      // @ts-ignore - Accès sécurisé à l'instance déjà initialisée
+      // Si déjà initialisé, on récupère l'instance existante
       firestore = getFirestore(app);
     }
 
@@ -44,7 +43,7 @@ export function initializeFirebase() {
       try {
         messaging = getMessaging(app);
       } catch (e) {
-        // FCM peut ne pas être supporté sur certains navigateurs ou modes privés
+        // FCM peut ne pas être supporté sur certains navigateurs
       }
     }
   }
