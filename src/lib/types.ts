@@ -38,6 +38,7 @@ export interface Promotion {
   id: string;
   businessId: string;
   title: string;
+  category?: string; // Ajouté pour le classement par produit
   description?: string;
   price: number;
   originalPrice?: number | null;

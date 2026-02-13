@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, Image as ImageIcon, X, Info, Pencil } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, Image as ImageIcon, X, Info, Pencil, Save } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -50,12 +50,28 @@ export default function ProDashboard() {
   const [targetCount, setTargetCount] = useState<number | null>(null);
   const [isCalculatingReach, setIsCalculatingReach] = useState(false);
 
+  // --- FORM STATES ---
+  const [editingPromoId, setEditingPromoId] = useState<string | null>(null);
+  const [promoTitle, setPromoTitle] = useState('');
+  const [promoCategory, setPromoCategory] = useState('');
+  const [promoDescription, setPromoDescription] = useState('');
+  const [promoImage, setPromoImage] = useState('');
+  const [promoType, setPromoType] = useState<'Promo' | 'Nouvel Arrivage'>('Promo');
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Smart Promo States
+  const [originalPrice, setOriginalPrice] = useState('');
+  const [discountedPrice, setDiscountedPrice] = useState('');
+  const [discountPercentage, setDiscountPercentage] = useState('');
+  const [standardPrice, setStandardPrice] = useState('');
+
   // Initialize target category from business categories
   useEffect(() => {
-    if (business && business.categories && business.categories.length > 0 && !targetCategory) {
-      setTargetCategory(business.categories[0]);
+    if (business && business.categories && business.categories.length > 0) {
+      if (!targetCategory) setTargetCategory(business.categories[0]);
+      if (!promoCategory) setPromoCategory(business.categories[0]);
     }
-  }, [business, targetCategory]);
+  }, [business, targetCategory, promoCategory]);
 
   useEffect(() => {
     if (!firestore || !business || !targetCategory) return;
@@ -79,20 +95,6 @@ export default function ProDashboard() {
     };
     calculateReach();
   }, [firestore, business, targetCategory]);
-
-  // --- FORM STATES ---
-  const [editingPromoId, setEditingPromoId] = useState<string | null>(null);
-  const [promoTitle, setPromoTitle] = useState('');
-  const [promoDescription, setPromoDescription] = useState('');
-  const [promoImage, setPromoImage] = useState('');
-  const [promoType, setPromoType] = useState<'Promo' | 'Nouvel Arrivage'>('Promo');
-  const [isSaving, setIsSaving] = useState(false);
-
-  // Smart Promo States
-  const [originalPrice, setOriginalPrice] = useState('');
-  const [discountedPrice, setDiscountedPrice] = useState('');
-  const [discountPercentage, setDiscountPercentage] = useState('');
-  const [standardPrice, setStandardPrice] = useState('');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -139,7 +141,7 @@ export default function ProDashboard() {
   };
 
   const handleSavePromotion = async () => {
-    if (!firestore || !business || !promoTitle) return;
+    if (!firestore || !business || !promoTitle || !promoCategory) return;
     setIsSaving(true);
     try {
       const finalPrice = promoType === 'Promo' ? parseFloat(discountedPrice) : parseFloat(standardPrice);
@@ -147,6 +149,7 @@ export default function ProDashboard() {
       const promoData: any = {
         businessId: business.id,
         title: promoTitle,
+        category: promoCategory,
         description: promoDescription,
         price: finalPrice || 0,
         originalPrice: promoType === 'Promo' ? (parseFloat(originalPrice) || 0) : null,
@@ -180,11 +183,15 @@ export default function ProDashboard() {
     setDiscountedPrice('');
     setDiscountPercentage('');
     setStandardPrice('');
+    if (business && business.categories && business.categories.length > 0) {
+        setPromoCategory(business.categories[0]);
+    }
   };
 
   const handleEditPromotion = (promo: Promotion) => {
     setEditingPromoId(promo.id);
     setPromoTitle(promo.title);
+    setPromoCategory(promo.category || (business?.categories?.[0] || ''));
     setPromoDescription(promo.description || '');
     setPromoImage(promo.imageUrl || '');
     setPromoType(promo.promoType);
@@ -288,6 +295,20 @@ export default function ProDashboard() {
                 <div className="space-y-1.5">
                   <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Nom du produit</Label>
                   <Input value={promoTitle} onChange={e => setPromoTitle(e.target.value)} placeholder="Ex: Moulinet Shimano..." className="font-bold border-2 h-11" />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Catégorie du produit</Label>
+                  <Select value={promoCategory} onValueChange={setPromoCategory}>
+                    <SelectTrigger className="h-11 border-2 font-black uppercase text-xs">
+                        <SelectValue placeholder="Choisir..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {(business.categories || [business.category]).map(cat => (
+                            <SelectItem key={cat} value={cat} className="font-black text-xs uppercase">{cat}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-1.5">
@@ -493,7 +514,10 @@ export default function ProDashboard() {
                         <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
                             <div className="space-y-1">
                                 <h4 className="font-black uppercase text-xs truncate leading-none">{promo.title}</h4>
-                                <p className="text-[10px] text-muted-foreground line-clamp-2 leading-tight">{promo.description || "Aucune description."}</p>
+                                <div className="flex gap-1">
+                                    <Badge variant="outline" className="text-[7px] h-3.5 px-1 font-black uppercase border-muted-foreground/30">{promo.category}</Badge>
+                                </div>
+                                <p className="text-[10px] text-muted-foreground line-clamp-1 leading-tight">{promo.description || "Aucune description."}</p>
                             </div>
                             <div className="flex items-center justify-between">
                                 <div className="flex flex-col">
