@@ -27,16 +27,15 @@ service cloud.firestore {
       );
     }
 
-    // --- 1. BYPASS UNIVERSEL MASTER ---
-    // Cette règle permet à l'admin de tout lister et tout modifier sur n'importe quel chemin
-    match /{allPaths=**} {
-      allow read, write: if isMaster();
+    // --- 1. ACCÈS CATALOGUE (SHOPPING) ---
+    // Cette règle est CRITIQUE pour permettre les requêtes collectionGroup('promotions')
+    match /{path=**}/promotions/{promoId} {
+      allow read: if true;
     }
 
-    // --- 2. REQUÊTES DE GROUPE (SHOPPING) ---
-    // Indispensable pour collectionGroup('promotions') utilisé dans le Dashboard Shopping
-    match /{path=**}/promotions/{promoId} {
-      allow read: if isSignedIn();
+    // --- 2. BYPASS UNIVERSEL MASTER ---
+    match /{allPaths=**} {
+      allow read, write: if isMaster();
     }
 
     // --- 3. ACCÈS PUBLICS & USAGERS ---
@@ -107,7 +106,6 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isMaster());
       
-      // Sécurité interne pour les promos du magasin
       match /promotions/{promoId} { 
         allow read: if true;
         allow write: if isSignedIn() && (get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerId == request.auth.uid || isMaster());

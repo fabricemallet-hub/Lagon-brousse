@@ -1,9 +1,8 @@
-
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, collectionGroup, query, orderBy, doc, getDocs, limit } from 'firebase/firestore';
+import { collection, collectionGroup, query, orderBy, doc } from 'firebase/firestore';
 import type { Promotion, Business, UserAccount } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Search, ShoppingBag, Store, MapPin, Tag, Percent, Sparkles, Filter, X, ChevronRight, Info, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Search, ShoppingBag, Store, MapPin, Tag, Percent, Filter, RefreshCw, AlertTriangle, ChevronRight } from 'lucide-react';
 import { locations } from '@/lib/locations';
 import { cn } from '@/lib/utils';
 
@@ -68,10 +67,11 @@ export default function ShoppingPage() {
                              (item.description?.toLowerCase() || '').includes(search.toLowerCase());
         if (!matchesSearch) return false;
 
-        // 2. Filtre Commune (Seulement si le magasin est connu)
+        // 2. Filtre Commune
         if (filterCommune !== 'USER_DEFAULT' && filterCommune !== 'ALL') {
             if (item.business && item.business.commune !== filterCommune) return false;
-            if (!item.business) return false; // On masque si on ne sait pas où c'est et qu'un filtre est actif
+            // On ne masque pas si le magasin est en cours de chargement, sauf si une commune spécifique est demandée
+            if (!item.business) return false; 
         }
 
         // 3. Filtre Catégorie
@@ -94,9 +94,9 @@ export default function ShoppingPage() {
             if (!aInCommune && bInCommune) return 1;
         }
         
-        // Tri chronologique (JS Side)
-        const timeA = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0;
-        const timeB = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0;
+        // Tri chronologique JS
+        const timeA = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
+        const timeB = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
         return timeB - timeA;
       });
   }, [allPromotions, businesses, search, filterCommune, filterCategory, filterBusiness, filterType, userCommune]);
@@ -124,7 +124,6 @@ export default function ShoppingPage() {
         </CardHeader>
       </Card>
 
-      {/* --- BARRE DE RECHERCHE --- */}
       <div className="relative group">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-muted-foreground transition-colors group-focus-within:text-primary" />
         <Input 
@@ -135,7 +134,6 @@ export default function ShoppingPage() {
         />
       </div>
 
-      {/* --- FILTRES --- */}
       <Card className="border-2 shadow-md bg-muted/10">
         <CardContent className="p-4 space-y-4">
           <div className="flex items-center justify-between mb-2">
@@ -209,10 +207,9 @@ export default function ShoppingPage() {
         </CardContent>
       </Card>
 
-      {/* --- LISTE DES PRODUITS --- */}
       <div className="space-y-4">
-        {promosError && (
-            <Alert variant="destructive" className="border-2">
+        {promosError && !allPromotions && (
+            <Alert variant="destructive" className="border-2 animate-in fade-in">
                 <AlertTriangle className="size-4" />
                 <AlertTitle className="text-xs font-black uppercase">Erreur de chargement</AlertTitle>
                 <AlertDescription className="text-[10px]">
@@ -265,7 +262,6 @@ function ProductCard({ product }: { product: Promotion & { business?: Business }
             "overflow-hidden border-2 shadow-sm flex flex-col group transition-all hover:border-primary/40",
             isPromo && "border-red-100 bg-red-50/10"
         )}>
-            {/* Store Header */}
             <div className="px-3 py-2 bg-muted/20 border-b flex items-center justify-between">
                 <div className="flex items-center gap-2 min-w-0">
                     <div className="size-6 rounded-lg bg-white flex items-center justify-center border shadow-sm shrink-0">
@@ -282,7 +278,6 @@ function ProductCard({ product }: { product: Promotion & { business?: Business }
             </div>
 
             <div className="flex min-h-[140px] h-auto">
-                {/* Product Image */}
                 <div className="w-32 bg-muted/20 shrink-0 relative flex items-center justify-center border-r">
                     {product.imageUrl ? (
                         <img src={product.imageUrl} className="w-full h-full object-cover transition-transform group-hover:scale-105" alt={product.title} />
@@ -297,7 +292,6 @@ function ProductCard({ product }: { product: Promotion & { business?: Business }
                     </Badge>
                 </div>
 
-                {/* Product Info */}
                 <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
                     <div className="space-y-1">
                         <div className="flex justify-between items-start gap-2">
@@ -334,7 +328,6 @@ function ProductCard({ product }: { product: Promotion & { business?: Business }
                 </div>
             </div>
             
-            {/* Footer Action */}
             <div className="p-2 border-t bg-muted/10">
                 <Button variant="ghost" className="w-full h-8 text-[9px] font-black uppercase text-primary gap-2 hover:bg-primary/5">
                     Contacter le magasin <ChevronRight className="size-3" />
