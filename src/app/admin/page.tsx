@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -68,7 +67,8 @@ export default function AdminPage() {
   const isAdmin = useMemo(() => {
     if (!user) return false;
     const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
-    return masterEmails.includes(user.email?.toLowerCase() || '') || user.uid === 't8nPnZLcTiaLJSKMuLzib3C5nPn1';
+    const masterAdminUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'K9cVYLVUk1NV99YV3anebkugpPp1', 'ipupi3Pg4RfrSEpFyT69BtlCdpi2', 'Irglq69MasYdNwBmUu8yKvw6h4G2'];
+    return masterEmails.includes(user.email?.toLowerCase() || '') || masterAdminUids.includes(user.uid);
   }, [user]);
 
   // REQUÊTES FIRESTORE
@@ -205,6 +205,9 @@ function SystemNotificationsManager({ notifications }: { notifications: SystemNo
             });
             setTitle(''); setContent('');
             toast({ title: "Notification publiée" });
+        } catch (e: any) {
+            console.error("Add Notification Error:", e);
+            toast({ variant: 'destructive', title: "Erreur de publication", description: e.message || "Vérifiez vos permissions." });
         } finally { setIsSaving(false); }
     };
 

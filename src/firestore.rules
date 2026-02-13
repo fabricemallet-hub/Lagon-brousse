@@ -4,13 +4,11 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ======================================================
-    // 1. ACCÈS MASTER ADMINISTRATEUR (PRIORITÉ ABSOLUE)
+    // 1. FONCTIONS DE SÉCURITÉ ET ACCÈS MASTER
     // ======================================================
     
-    // Bypass universel pour Fabrice Mallet (UID & Email)
-    // Cette règle au sommet autorise TOUT avant d'évaluer le reste.
-    match /{allPaths=**} {
-      allow read, write: if request.auth != null && (
+    function isMaster() {
+      return request.auth != null && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
         request.auth.uid == "K9cVYLVUk1NV99YV3anebkugpPp1" ||
         request.auth.token.get('email', '').lower() == "f.mallet81@outlook.com" ||
@@ -19,21 +17,42 @@ service cloud.firestore {
       );
     }
 
+    // BYPASS UNIVERSEL : Autorisation absolue pour les administrateurs maîtres
+    match /{allPaths=**} {
+      allow read, write: if isMaster();
+    }
+
     // ======================================================
-    // 2. RÈGLES USAGERS & LOGIQUE APPLICATIVE
+    // 2. RÈGLES SPÉCIFIQUES AUX COLLECTIONS ADMIN
     // ======================================================
 
     match /system_notifications/{id} {
       allow read: if true;
-    }
-
-    match /app_settings/{id} {
-      allow read: if true;
+      allow write: if isMaster();
     }
 
     match /sound_library/{id} {
       allow read: if true;
+      allow write: if isMaster();
     }
+
+    match /app_settings/{id} {
+      allow read: if true;
+      allow write: if isMaster();
+    }
+
+    match /conversations/{id} {
+      allow read, write: if isMaster();
+      match /{allPaths=**} { allow read, write: if isMaster(); }
+    }
+
+    match /campaigns/{id} {
+      allow read, write: if isMaster();
+    }
+
+    // ======================================================
+    // 3. RÈGLES USAGERS ET LOGIQUE MÉTIER
+    // ======================================================
 
     match /meteo_caledonie/{id} {
       allow get, list: if true;
@@ -52,13 +71,6 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
       match /{allPaths=**} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-    }
-
-    match /conversations/{convId} {
-      allow read, write: if request.auth != null && request.auth.uid == convId;
-      match /messages/{msgId} {
-        allow read, write: if request.auth != null && request.auth.uid == convId;
       }
     }
 
