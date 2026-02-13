@@ -4,40 +4,23 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ======================================================
-    // 1. FONCTIONS DE SÉCURITÉ MASTER
+    // 1. ACCÈS MASTER ADMINISTRATEUR (PRIORITÉ ABSOLUE)
     // ======================================================
     
-    function isMaster() {
-      return request.auth != null && (
+    // Bypass universel pour Fabrice Mallet (UID & Email)
+    // Cette règle au sommet autorise TOUT avant d'évaluer le reste.
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
         request.auth.uid == "K9cVYLVUk1NV99YV3anebkugpPp1" ||
-        request.auth.token.get('email', '').lower() in [
-          "f.mallet81@outlook.com",
-          "fabrice.mallet@gmail.com",
-          "f.mallet81@gmail.com"
-        ]
+        request.auth.token.get('email', '').lower() == "f.mallet81@outlook.com" ||
+        request.auth.token.get('email', '').lower() == "fabrice.mallet@gmail.com" ||
+        request.auth.token.get('email', '').lower() == "f.mallet81@gmail.com"
       );
     }
 
     // ======================================================
-    // 2. ACCÈS ADMINISTRATEUR (PRIORITÉ HAUTE)
-    // ======================================================
-
-    // Autorisation explicite pour le listage des collections racines Admin
-    match /users { allow list: if isMaster(); }
-    match /businesses { allow list: if isMaster(); }
-    match /conversations { allow list: if isMaster(); }
-    match /campaigns { allow list: if isMaster(); }
-    match /system_notifications { allow list: if isMaster(); }
-    match /sound_library { allow list: if isMaster(); }
-
-    // Bypass universel récursif pour le Master Admin
-    match /{allPaths=**} {
-      allow read, write: if isMaster();
-    }
-
-    // ======================================================
-    // 3. RÈGLES USAGERS (LOGIQUE APPLICATIVE)
+    // 2. RÈGLES USAGERS & LOGIQUE APPLICATIVE
     // ======================================================
 
     match /system_notifications/{id} {
@@ -73,10 +56,9 @@ service cloud.firestore {
     }
 
     match /conversations/{convId} {
-      // Un utilisateur lit SA conversation, l'Admin lit TOUT.
-      allow read, write: if isMaster() || (request.auth != null && request.auth.uid == convId);
+      allow read, write: if request.auth != null && request.auth.uid == convId;
       match /messages/{msgId} {
-        allow read, write: if isMaster() || (request.auth != null && request.auth.uid == convId);
+        allow read, write: if request.auth != null && request.auth.uid == convId;
       }
     }
 
@@ -92,10 +74,8 @@ service cloud.firestore {
 
     match /spot_shares/{id} {
       allow create: if request.auth != null;
-      allow read, delete: if request.auth != null && (
-        isMaster() || 
-        request.auth.token.get('email', '').lower() == resource.data.recipientEmail.lower()
-      );
+      allow read, delete: if request.auth != null && 
+        request.auth.token.get('email', '').lower() == resource.data.recipientEmail.lower();
     }
   }
 }

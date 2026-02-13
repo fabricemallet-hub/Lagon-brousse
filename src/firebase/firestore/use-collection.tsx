@@ -67,8 +67,6 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (err: FirestoreError) => {
-        console.error(`L&B DEBUG ERROR: Échec sur [${path}]`, err.code, err.message);
-        
         if (err.code === 'permission-denied') {
           const contextualError = new FirestorePermissionError({
             operation: 'list',
@@ -77,7 +75,7 @@ export function useCollection<T = any>(
 
           setError(contextualError);
           
-          // Ne pas afficher l'écran d'erreur Next.js pour les collections Admin
+          // CRITIQUE : Silence absolu sur les erreurs de permission Admin pour éviter le crash UI
           const silentPaths = [
             'conversations', 
             'users', 
@@ -85,15 +83,19 @@ export function useCollection<T = any>(
             'campaigns', 
             'system_notifications', 
             'sound_library',
-            'vessels_safety'
+            'vessels_safety',
+            'app_settings'
           ];
           
           const isSilent = silentPaths.some(p => path.includes(p));
           
           if (!isSilent) {
             errorEmitter.emit('permission-error', contextualError);
+          } else {
+            console.warn(`L&B SILENT ERROR: Permission denied on [${path}]. L'interface Admin reste active.`);
           }
         } else {
+          console.error(`L&B FIRESTORE ERROR: [${path}]`, err);
           setError(err);
         }
         setData(null);
