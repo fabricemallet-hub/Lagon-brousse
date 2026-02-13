@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -35,11 +36,19 @@ export default function ProDashboard() {
   const { data: business, isLoading: isBusinessLoading } = useDoc<Business>(businessRef);
 
   // --- REACH CALCULATION ---
+  const [targetCategory, setTargetCategory] = useState<string>('');
   const [targetCount, setTargetCount] = useState<number | null>(null);
   const [isCalculatingReach, setIsCalculatingReach] = useState(false);
 
+  // Initialize target category from business categories
   useEffect(() => {
-    if (!firestore || !business) return;
+    if (business && business.categories && business.categories.length > 0 && !targetCategory) {
+      setTargetCategory(business.categories[0]);
+    }
+  }, [business, targetCategory]);
+
+  useEffect(() => {
+    if (!firestore || !business || !targetCategory) return;
     
     const calculateReach = async () => {
       setIsCalculatingReach(true);
@@ -48,7 +57,7 @@ export default function ProDashboard() {
         const q = query(
           usersRef, 
           where('lastSelectedLocation', '==', business.commune),
-          where('favoriteCategory', '==', business.category)
+          where('favoriteCategory', '==', targetCategory)
         );
         const snap = await getDocs(q);
         setTargetCount(snap.size);
@@ -59,7 +68,7 @@ export default function ProDashboard() {
       }
     };
     calculateReach();
-  }, [firestore, business]);
+  }, [firestore, business, targetCategory]);
 
   // --- FORM STATES ---
   const [promoTitle, setPromoTitle] = useState('');
@@ -88,7 +97,7 @@ export default function ProDashboard() {
   };
 
   const handleDiffuse = async () => {
-    if (!firestore || !business || targetCount === null) return;
+    if (!firestore || !business || targetCount === null || !targetCategory) return;
     setIsSaving(true);
     try {
       const campaignData: Omit<Campaign, 'id'> = {
@@ -96,9 +105,9 @@ export default function ProDashboard() {
         businessId: business.id,
         businessName: business.name,
         title: `${business.name} : ${promoTitle || 'Nouvelle offre !'}`,
-        message: `Découvrez nos offres à ${business.commune} en ${business.category}.`,
+        message: `Découvrez nos offres à ${business.commune} en ${targetCategory}.`,
         targetCommune: business.commune,
-        targetCategory: business.category,
+        targetCategory: targetCategory,
         reach: targetCount,
         cost: targetCount * 10,
         status: 'pending',
@@ -143,7 +152,11 @@ export default function ProDashboard() {
               <CardTitle className="text-2xl font-black uppercase tracking-tighter">{business.name}</CardTitle>
               <CardDescription className="text-white/80 font-bold uppercase text-[10px]">Espace Professionnel • {business.commune}</CardDescription>
             </div>
-            <Badge variant="outline" className="bg-white/10 text-white border-white/20 uppercase font-black">{business.category}</Badge>
+            <div className="flex flex-wrap gap-1 justify-end max-w-[150px]">
+                {(business.categories || [business.category]).map(cat => (
+                    <Badge key={cat} variant="outline" className="bg-white/10 text-white border-white/20 uppercase font-black text-[8px]">{cat}</Badge>
+                ))}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-6">
@@ -185,15 +198,31 @@ export default function ProDashboard() {
               </div>
 
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-background rounded-xl shadow-sm border">
-                  <div className="flex items-center gap-3">
-                    <Users className="size-5 text-primary" />
-                    <div>
-                      <p className="text-[10px] font-black uppercase text-muted-foreground">Audience Cible</p>
-                      <p className="text-lg font-black">{isCalculatingReach ? <RefreshCw className="size-4 animate-spin" /> : `${targetCount || 0} abonnés`}</p>
+                <div className="space-y-3">
+                    <div className="space-y-1">
+                        <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Catégorie visée</Label>
+                        <Select value={targetCategory} onValueChange={setTargetCategory}>
+                            <SelectTrigger className="h-10 border-2 bg-background font-black uppercase text-[10px]">
+                                <SelectValue placeholder="Choisir cible..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {(business.categories || [business.category]).map(cat => (
+                                    <SelectItem key={cat} value={cat} className="font-black uppercase text-[10px]">{cat}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
-                  </div>
-                  <Badge variant="secondary" className="text-[8px] font-black uppercase">{business.commune}</Badge>
+
+                    <div className="flex items-center justify-between p-4 bg-background rounded-xl shadow-sm border">
+                    <div className="flex items-center gap-3">
+                        <Users className="size-5 text-primary" />
+                        <div>
+                        <p className="text-[10px] font-black uppercase text-muted-foreground">Audience Cible</p>
+                        <p className="text-lg font-black">{isCalculatingReach ? <RefreshCw className="size-4 animate-spin" /> : `${targetCount || 0} abonnés`}</p>
+                        </div>
+                    </div>
+                    <Badge variant="secondary" className="text-[8px] font-black uppercase">{business.commune}</Badge>
+                    </div>
                 </div>
 
                 <div className="flex items-center justify-between p-4 bg-accent/10 rounded-xl border border-accent/20">
@@ -209,7 +238,7 @@ export default function ProDashboard() {
 
                 <Button 
                   onClick={handleDiffuse} 
-                  disabled={isSaving || !targetCount} 
+                  disabled={isSaving || !targetCount || !targetCategory} 
                   className="w-full h-14 bg-accent hover:bg-accent/90 text-white font-black uppercase tracking-widest shadow-lg gap-2"
                 >
                   <Megaphone className="size-5" /> Diffuser Maintenant

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -15,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { locations } from '@/lib/locations';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   MessageSquare, 
   ShieldCheck, 
@@ -65,23 +67,25 @@ export default function AdminPage() {
 
   const [activeTab, setActiveTab] = useState('stats');
 
-  // --- IDENTITY & MASTER CHECK ---
   const isAdmin = useMemo(() => {
     if (!user) return false;
+    const masterAdminUids = [
+      't8nPnZLcTiaLJSKMuLzib3C5nPn1',
+      'K9cVYLVUk1NV99YV3anebkugpPp1',
+      'ipupi3Pg4RfrSEpFyT69BtlCdpi2',
+      'Irglq69MasYdNwBmUu8yKvw6h4G2'
+    ];
     const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
-    const masterAdminUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'K9cVYLVUk1NV99YV3anebkugpPp1', 'ipupi3Pg4RfrSEpFyT69BtlCdpi2', 'Irglq69MasYdNwBmUu8yKvw6h4G2'];
-    const isMaster = masterEmails.includes(user.email?.toLowerCase() || '') || masterAdminUids.includes(user.uid);
-    return isMaster;
+    return masterAdminUids.includes(user.uid) || (user.email && masterEmails.includes(user.email.toLowerCase()));
   }, [user]);
 
-  // REQUÊTES FIRESTORE
   const usersRef = useMemoFirebase(() => (firestore && isAdmin) ? collection(firestore, 'users') : null, [firestore, isAdmin]);
   const { data: users, isLoading: isUsersLoading } = useCollection<UserAccount>(usersRef);
 
   const businessRef = useMemoFirebase(() => (firestore && isAdmin) ? collection(firestore, 'businesses') : null, [firestore, isAdmin]);
   const { data: businesses } = useCollection<Business>(businessRef);
 
-  const convsRef = useMemoFirebase(() => (firestore && isAdmin) ? collection(firestore, 'conversations') : null, [firestore, isAdmin]);
+  const convsRef = useMemoFirebase(() => (firestore && isAdmin) ? query(collection(firestore, 'conversations'), orderBy('lastMessageAt', 'desc')) : null, [firestore, isAdmin]);
   const { data: conversations, error: convError } = useCollection<Conversation>(convsRef);
 
   const tokensRef = useMemoFirebase(() => (firestore && isAdmin) ? query(collection(firestore, 'access_tokens'), orderBy('createdAt', 'desc')) : null, [firestore, isAdmin]);
@@ -99,7 +103,6 @@ export default function AdminPage() {
   const soundsRef = useMemoFirebase(() => (firestore && isAdmin) ? query(collection(firestore, 'sound_library'), orderBy('label', 'asc')) : null, [firestore, isAdmin]);
   const { data: sounds } = useCollection<SoundLibraryEntry>(soundsRef);
 
-  // SETTINGS REFS
   const splashRef = useMemoFirebase(() => (firestore && isAdmin) ? doc(firestore, 'app_settings', 'splash') : null, [firestore, isAdmin]);
   const { data: splashSettings } = useDoc<SplashScreenSettings>(splashRef);
 
@@ -194,19 +197,23 @@ export default function AdminPage() {
   );
 }
 
-// --- SUB-COMPONENTS ---
-
 function BusinessesManager({ businesses, users }: { businesses: Business[] | null, users: UserAccount[] | null }) {
     const firestore = useFirestore();
     const { toast } = useToast();
     const [name, setName] = useState('');
     const [commune, setCommune] = useState('');
-    const [category, setCategory] = useState<'Pêche' | 'Chasse' | 'Jardinage'>('Pêche');
+    const [selectedCategories, setSelectedCategories] = useState<string[]>(['Pêche']);
     const [ownerId, setOwnerId] = useState('');
     const [isSaving, setIsSaving] = useState(false);
 
+    const toggleCategory = (cat: string) => {
+        setSelectedCategories(prev => 
+            prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
+        );
+    };
+
     const handleAdd = async () => {
-        if (!firestore || !name || !commune || !ownerId) return;
+        if (!firestore || !name || !commune || !ownerId || selectedCategories.length === 0) return;
         setIsSaving(true);
         try {
             const businessRef = doc(collection(firestore, 'businesses'));
@@ -215,7 +222,7 @@ function BusinessesManager({ businesses, users }: { businesses: Business[] | nul
                 ownerId,
                 name,
                 commune,
-                category,
+                categories: selectedCategories,
                 createdAt: serverTimestamp()
             };
             
@@ -228,7 +235,7 @@ function BusinessesManager({ businesses, users }: { businesses: Business[] | nul
             });
             
             await batch.commit();
-            setName(''); setCommune(''); setOwnerId('');
+            setName(''); setCommune(''); setOwnerId(''); setSelectedCategories(['Pêche']);
             toast({ title: "Commerce créé et lié à l'utilisateur" });
         } catch (e) {
             toast({ variant: 'destructive', title: "Erreur" });
@@ -254,13 +261,23 @@ function BusinessesManager({ businesses, users }: { businesses: Business[] | nul
                         </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Catégorie principale</Label>
-                            <Select value={category} onValueChange={(v: any) => setCategory(v)}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent><SelectItem value="Pêche">Pêche</SelectItem><SelectItem value="Chasse">Chasse</SelectItem><SelectItem value="Jardinage">Jardinage</SelectItem></SelectContent>
-                            </Select>
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-black uppercase">Catégories (Plusieurs possibles)</Label>
+                            <div className="flex flex-wrap gap-4 p-3 bg-background rounded-lg border">
+                                {['Pêche', 'Chasse', 'Jardinage'].map(cat => (
+                                    <div key={cat} className="flex items-center space-x-2">
+                                        <Checkbox 
+                                            id={`cat-${cat}`} 
+                                            checked={selectedCategories.includes(cat)} 
+                                            onCheckedChange={() => toggleCategory(cat)}
+                                        />
+                                        <label htmlFor={`cat-${cat}`} className="text-xs font-bold uppercase cursor-pointer">{cat}</label>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Propriétaire à lier (Utilisateur)</Label>
+                        <div className="space-y-1">
+                            <Label className="text-[10px] font-black uppercase">Propriétaire à lier (Utilisateur)</Label>
                             <Select value={ownerId} onValueChange={setOwnerId}>
                                 <SelectTrigger><SelectValue placeholder="Choisir un utilisateur..." /></SelectTrigger>
                                 <SelectContent>
@@ -269,7 +286,7 @@ function BusinessesManager({ businesses, users }: { businesses: Business[] | nul
                             </Select>
                         </div>
                     </div>
-                    <Button onClick={handleAdd} disabled={isSaving || !name || !commune || !ownerId} className="w-full font-black uppercase h-12 shadow-lg bg-primary">Lier et créer le commerce</Button>
+                    <Button onClick={handleAdd} disabled={isSaving || !name || !commune || !ownerId || selectedCategories.length === 0} className="w-full font-black uppercase h-12 shadow-lg bg-primary">Lier et créer le commerce</Button>
                 </div>
                 <div className="max-h-96 overflow-y-auto border-2 rounded-2xl">
                     <Table>
@@ -279,7 +296,17 @@ function BusinessesManager({ businesses, users }: { businesses: Business[] | nul
                                 const owner = users?.find(u => u.id === b.ownerId);
                                 return (
                                     <TableRow key={b.id}>
-                                        <TableCell className="px-4 py-3"><div className="flex flex-col"><span className="font-black text-xs">{b.name}</span><span className="text-[9px] font-bold opacity-40 uppercase">{b.commune} / {b.category}</span></div></TableCell>
+                                        <TableCell className="px-4 py-3">
+                                            <div className="flex flex-col">
+                                                <span className="font-black text-xs">{b.name}</span>
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    <Badge variant="secondary" className="text-[7px] h-3 px-1">{b.commune}</Badge>
+                                                    {(b.categories || [b.category]).map(cat => (
+                                                        <Badge key={cat} variant="outline" className="text-[7px] h-3 px-1 border-primary/30 text-primary">{cat}</Badge>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </TableCell>
                                         <TableCell className="text-[10px] font-bold">{owner?.displayName || 'Inconnu'} <span className="opacity-40 italic">({owner?.email || 'N/A'})</span></TableCell>
                                         <TableCell className="text-right px-4"><Button variant="ghost" size="icon" className="text-destructive/40 hover:text-destructive" onClick={() => deleteDoc(doc(firestore!, 'businesses', b.id))}><Trash2 className="size-3" /></Button></TableCell>
                                     </TableRow>
@@ -527,7 +554,6 @@ function UsersManager({ users, isUsersLoading }: { users: UserAccount[] | null, 
                 </Table>
             </CardContent>
 
-            {/* USER EDIT DIALOG */}
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                 <DialogContent className="max-w-md rounded-2xl">
                     <DialogHeader>
@@ -840,11 +866,9 @@ function FishManager({ species }: { species: FishSpeciesInfo[] | null }) {
     const [isRefilling, setIsRefilling] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     
-    // Edit state
     const [editingFish, setEditingFish] = useState<FishSpeciesInfo | null>(null);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     
-    // Image state
     const [currentImageUrl, setCurrentImageUrl] = useState('');
     const addFileInputRef = useRef<HTMLInputElement>(null);
     const editFileInputRef = useRef<HTMLInputElement>(null);
@@ -1007,7 +1031,6 @@ function FishManager({ species }: { species: FishSpeciesInfo[] | null }) {
                 </div>
             </CardContent>
 
-            {/* EDIT DIALOG */}
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                 <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl">
                     <DialogHeader>
@@ -1044,9 +1067,9 @@ function FishManager({ species }: { species: FishSpeciesInfo[] | null }) {
                             </div>
 
                             <div className="grid grid-cols-3 gap-3">
-                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Risque Petit (%)</Label><Input type="number" value={editingFish.gratteRiskSmall} onChange={e => setEditingFish({...editingFish, gratteRiskSmall: parseInt(e.target.value)})} /></div>
-                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Risque Moyen (%)</Label><Input type="number" value={editingFish.gratteRiskMedium} onChange={e => setEditingFish({...editingFish, gratteRiskMedium: parseInt(e.target.value)})} /></div>
-                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Risque Grand (%)</Label><Input type="number" value={editingFish.gratteRiskLarge} onChange={e => setEditingFish({...editingFish, gratteRiskLarge: parseInt(e.target.value)})} /></div>
+                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Risque Petit (%)</Label><Input type="number" value={editingFish.gratteRiskSmall} onChange={e => setEditingFish({...editingFish, @ts-ignore gratteRiskSmall: parseInt(e.target.value)})} /></div>
+                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Risque Moyen (%)</Label><Input type="number" value={editingFish.gratteRiskMedium} onChange={e => setEditingFish({...editingFish, @ts-ignore gratteRiskMedium: parseInt(e.target.value)})} /></div>
+                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Risque Grand (%)</Label><Input type="number" value={editingFish.gratteRiskLarge} onChange={e => setEditingFish({...editingFish, @ts-ignore gratteRiskLarge: parseInt(e.target.value)})} /></div>
                             </div>
 
                             <div className="grid grid-cols-3 gap-3">

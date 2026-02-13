@@ -28,7 +28,7 @@ export interface Business {
   ownerId: string;
   name: string;
   commune: string;
-  category: 'Pêche' | 'Chasse' | 'Jardinage';
+  categories: string[]; // Changé de category: string à categories: string[]
   logoUrl?: string;
   description?: string;
   createdAt: any;
