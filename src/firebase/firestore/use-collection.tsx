@@ -52,7 +52,6 @@ export function useCollection<T = any>(
         ? (memoizedTargetRefOrQuery as CollectionReference).path
         : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString();
 
-    console.log(`L&B DEBUG: Début écoute Collection [${path}]`);
     setIsLoading(true);
     setError(null);
 
@@ -63,14 +62,11 @@ export function useCollection<T = any>(
         for (const doc of snapshot.docs) {
           results.push({ ...(doc.data() as T), id: doc.id });
         }
-        console.log(`L&B DEBUG: Données reçues pour [${path}] (${results.length} docs)`);
         setData(results);
         setError(null);
         setIsLoading(false);
       },
       (err: FirestoreError) => {
-        console.error(`L&B DEBUG ERROR: Échec sur [${path}]`, err.code, err.message);
-        
         if (err.code === 'permission-denied') {
           const contextualError = new FirestorePermissionError({
             operation: 'list',
@@ -79,6 +75,7 @@ export function useCollection<T = any>(
 
           setError(contextualError);
           
+          // Silencing error for admin-only paths to avoid disruptive dev overlays
           const silentPaths = [
             'conversations', 
             'users', 
@@ -94,8 +91,6 @@ export function useCollection<T = any>(
           
           if (!isSilent) {
             errorEmitter.emit('permission-error', contextualError);
-          } else {
-            console.warn(`L&B SILENT ERROR: Permission denied on [${path}]. L'interface Admin reste active.`);
           }
         } else {
           setError(err);
@@ -106,7 +101,6 @@ export function useCollection<T = any>(
     );
 
     return () => {
-      console.log(`L&B DEBUG: Arrêt écoute Collection [${path}]`);
       unsubscribe();
     };
   }, [memoizedTargetRefOrQuery]);
