@@ -250,7 +250,7 @@ export function LunarCalendar() {
       </div>
 
       <div 
-        className="w-full overflow-x-auto pb-20 scrollbar-hide touch-pan-y" 
+        className="w-full overflow-x-auto pb-20 scrollbar-hide touch-pan-x touch-pan-y" 
         ref={scrollContainerRef}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -258,13 +258,14 @@ export function LunarCalendar() {
       >
         <div 
           className={cn(
-            "w-fit border-2 rounded-2xl bg-card shadow-lg overflow-hidden flex flex-col origin-top-left",
+            "border-2 rounded-2xl bg-card shadow-lg overflow-hidden flex flex-col origin-top-left",
             !isPinching && "transition-transform duration-300"
           )}
           style={{ 
             width: `${1000 * zoom}px`, 
-            transform: `scale(${zoom})`, 
-            marginBottom: `${(1 - zoom) * -100}%` 
+            transform: `scale(${zoom})`,
+            // On laisse le conteneur parent overflow-x gérer le scroll horizontal
+            marginBottom: `${(1 - zoom) * -100}%`
           }}
         >
           <div className="grid grid-cols-7 bg-muted/30 border-b">
