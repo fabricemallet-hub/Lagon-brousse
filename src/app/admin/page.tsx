@@ -68,18 +68,32 @@ export default function AdminPage() {
     if (!user) return false;
     const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
     const masterAdminUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'K9cVYLVUk1NV99YV3anebkugpPp1', 'ipupi3Pg4RfrSEpFyT69BtlCdpi2', 'Irglq69MasYdNwBmUu8yKvw6h4G2'];
-    return masterEmails.includes(user.email?.toLowerCase() || '') || masterAdminUids.includes(user.uid);
+    const isMaster = masterEmails.includes(user.email?.toLowerCase() || '') || masterAdminUids.includes(user.uid);
+    if (isMaster) console.log(`L&B DEBUG ADMIN: Accès Master [${user.email}] confirmé.`);
+    return isMaster;
   }, [user]);
 
   // REQUÊTES FIRESTORE
-  const usersRef = useMemoFirebase(() => (firestore && isAdmin) ? collection(firestore, 'users') : null, [firestore, isAdmin]);
+  const usersRef = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    console.log("L&B DEBUG ADMIN: Lancement requête [users]");
+    return collection(firestore, 'users');
+  }, [firestore, isAdmin]);
   const { data: users, isLoading: isUsersLoading } = useCollection<UserAccount>(usersRef);
 
-  const businessRef = useMemoFirebase(() => (firestore && isAdmin) ? collection(firestore, 'businesses') : null, [firestore, isAdmin]);
+  const businessRef = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    console.log("L&B DEBUG ADMIN: Lancement requête [businesses]");
+    return collection(firestore, 'businesses');
+  }, [firestore, isAdmin]);
   const { data: businesses } = useCollection<Business>(businessRef);
 
-  const convsRef = useMemoFirebase(() => (firestore && isAdmin) ? collection(firestore, 'conversations') : null, [firestore, isAdmin]);
-  const { data: conversations } = useCollection<Conversation>(convsRef);
+  const convsRef = useMemoFirebase(() => {
+    if (!firestore || !isAdmin) return null;
+    console.log("L&B DEBUG ADMIN: Lancement requête [conversations]");
+    return collection(firestore, 'conversations');
+  }, [firestore, isAdmin]);
+  const { data: conversations, error: convError } = useCollection<Conversation>(convsRef);
 
   const tokensRef = useMemoFirebase(() => (firestore && isAdmin) ? query(collection(firestore, 'access_tokens'), orderBy('createdAt', 'desc')) : null, [firestore, isAdmin]);
   const { data: tokens } = useCollection<AccessToken>(tokensRef);
@@ -108,6 +122,16 @@ export default function AdminPage() {
 
   const sharedTokenRef = useMemoFirebase(() => (firestore && isAdmin) ? doc(firestore, 'shared_access_tokens', 'GLOBAL') : null, [firestore, isAdmin]);
   const { data: globalGift } = useDoc<SharedAccessToken>(sharedTokenRef);
+
+  // Auto-sync profile to ensure admin role is visible in users list
+  useEffect(() => {
+    if (users && user && isAdmin) {
+        const myProfile = users.find(u => u.id === user.uid);
+        if (myProfile && myProfile.role !== 'admin') {
+            console.log("L&B DEBUG ADMIN: Rôle document Firestore: " + myProfile.role);
+        }
+    }
+  }, [users, user, isAdmin]);
 
   useEffect(() => {
     if (!isUserLoading && !isAdmin && user) router.push('/compte');
@@ -179,7 +203,7 @@ export default function AdminPage() {
         </TabsContent>
 
         <TabsContent value="support" className="space-y-6">
-          <SupportConversationsManager conversations={conversations} />
+          <SupportConversationsManager conversations={conversations} error={convError} />
         </TabsContent>
       </Tabs>
     </div>
@@ -957,7 +981,7 @@ function FishManager({ species }: { species: FishSpeciesInfo[] | null }) {
                     <DialogFooter>
                         <Button variant="ghost" onClick={() => setIsEditDialogOpen(false)} className="font-black uppercase h-12">Annuler</Button>
                         <Button onClick={handleUpdate} disabled={isSaving} className="font-black uppercase h-12 gap-2 shadow-lg bg-primary">
-                            <Save className="size-4" /> Sauvegarder les modifications
+                            <Save className="size-4" /> Enregistrer les modifications
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -966,33 +990,40 @@ function FishManager({ species }: { species: FishSpeciesInfo[] | null }) {
     );
 }
 
-function SupportConversationsManager({ conversations }: { conversations: Conversation[] | null }) {
+function SupportConversationsManager({ conversations, error }: { conversations: Conversation[] | null, error?: any }) {
     const firestore = useFirestore();
-    const { toast } = useToast();
 
     return (
         <Card className="border-2 shadow-lg">
             <CardHeader className="bg-muted/10 border-b"><CardTitle className="text-lg font-black uppercase flex items-center gap-2"><MessageSquare className="size-5 text-primary" /> Support & Messages Clients</CardTitle></CardHeader>
             <CardContent className="p-0">
-                <Table>
-                    <TableHeader><TableRow className="bg-muted/30">
-                        <TableHead className="text-[10px] font-black uppercase h-10 px-4">Utilisateur</TableHead>
-                        <TableHead className="text-[10px] font-black uppercase h-10">Dernier Message</TableHead>
-                        <TableHead className="text-right text-[10px] font-black uppercase h-10 px-4">Action</TableHead>
-                    </TableRow></TableHeader>
-                    <TableBody>
-                        {conversations?.map(conv => (
-                            <TableRow key={conv.id} className={cn(!conv.isReadByAdmin && "bg-primary/5")}>
-                                <TableCell className="px-4 py-3"><div className="flex flex-col"><span className="font-black text-xs">{conv.userDisplayName}</span><span className="text-[9px] font-bold opacity-40 lowercase">{conv.userEmail}</span></div></TableCell>
-                                <TableCell className="text-xs italic opacity-70 truncate max-w-[200px]">"{conv.lastMessageContent}"</TableCell>
-                                <TableCell className="text-right px-4"><Button asChild variant="outline" size="sm" className="h-8 text-[9px] font-black uppercase border-2"><Link href={`/admin/messages/${conv.id}`}>Répondre</Link></Button></TableCell>
-                            </TableRow>
-                        ))}
-                        {(!conversations || conversations.length === 0) && (
-                            <TableRow><TableCell colSpan={3} className="text-center py-12 text-xs italic opacity-40 uppercase font-black tracking-widest">Aucun message</TableCell></TableRow>
-                        )}
-                    </TableBody>
-                </Table>
+                {error ? (
+                    <div className="p-8 text-center text-xs font-black uppercase text-red-600 bg-red-50 flex flex-col items-center gap-2">
+                        <AlertTriangle className="size-6" />
+                        Erreur de permissions sur les conversations
+                        <p className="text-[8px] opacity-60">Veuillez rafraîchir la page (Cmd+Shift+R)</p>
+                    </div>
+                ) : (
+                    <Table>
+                        <TableHeader><TableRow className="bg-muted/30">
+                            <TableHead className="text-[10px] font-black uppercase h-10 px-4">Utilisateur</TableHead>
+                            <TableHead className="text-[10px] font-black uppercase h-10">Dernier Message</TableHead>
+                            <TableHead className="text-right text-[10px] font-black uppercase h-10 px-4">Action</TableHead>
+                        </TableRow></TableHeader>
+                        <TableBody>
+                            {conversations?.map(conv => (
+                                <TableRow key={conv.id} className={cn(!conv.isReadByAdmin && "bg-primary/5")}>
+                                    <TableCell className="px-4 py-3"><div className="flex flex-col"><span className="font-black text-xs">{conv.userDisplayName}</span><span className="text-[9px] font-bold opacity-40 lowercase">{conv.userEmail}</span></div></TableCell>
+                                    <TableCell className="text-xs italic opacity-70 truncate max-w-[200px]">"{conv.lastMessageContent}"</TableCell>
+                                    <TableCell className="text-right px-4"><Button asChild variant="outline" size="sm" className="h-8 text-[9px] font-black uppercase border-2"><Link href={`/admin/messages/${conv.id}`}>Répondre</Link></Button></TableCell>
+                                </TableRow>
+                            ))}
+                            {(!conversations || conversations.length === 0) && (
+                                <TableRow><TableCell colSpan={3} className="text-center py-12 text-xs italic opacity-40 uppercase font-black tracking-widest">Aucun message</TableCell></TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                )}
             </CardContent>
         </Card>
     );
