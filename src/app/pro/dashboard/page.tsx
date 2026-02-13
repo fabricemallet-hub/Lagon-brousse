@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, doc, query, where, serverTimestamp, addDoc, setDoc, getDocs, orderBy, deleteDoc } from 'firebase/firestore';
+import { collection, doc, query, where, serverTimestamp, addDoc, setDoc, getDocs, orderBy, deleteDoc, updateDoc } from 'firebase/firestore';
 import type { UserAccount, Business, Promotion, Campaign } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, Image as ImageIcon, X, Info } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, Image as ImageIcon, X, Info, Pencil } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -81,6 +81,7 @@ export default function ProDashboard() {
   }, [firestore, business, targetCategory]);
 
   // --- FORM STATES ---
+  const [editingPromoId, setEditingPromoId] = useState<string | null>(null);
   const [promoTitle, setPromoTitle] = useState('');
   const [promoDescription, setPromoDescription] = useState('');
   const [promoImage, setPromoImage] = useState('');
@@ -137,13 +138,13 @@ export default function ProDashboard() {
     }
   };
 
-  const handleAddPromotion = async () => {
+  const handleSavePromotion = async () => {
     if (!firestore || !business || !promoTitle) return;
     setIsSaving(true);
     try {
       const finalPrice = promoType === 'Promo' ? parseFloat(discountedPrice) : parseFloat(standardPrice);
       
-      const promoData: Omit<Promotion, 'id'> = {
+      const promoData: any = {
         businessId: business.id,
         title: promoTitle,
         description: promoDescription,
@@ -152,22 +153,49 @@ export default function ProDashboard() {
         discountPercentage: promoType === 'Promo' ? (parseFloat(discountPercentage) || 0) : null,
         promoType,
         imageUrl: promoImage,
-        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       };
-      await addDoc(collection(firestore, 'businesses', business.id, 'promotions'), promoData);
-      toast({ title: "Produit ajouté au catalogue !" });
+
+      if (editingPromoId) {
+        await updateDoc(doc(firestore, 'businesses', business.id, 'promotions', editingPromoId), promoData);
+        toast({ title: "Fiche produit mise à jour !" });
+      } else {
+        promoData.createdAt = serverTimestamp();
+        await addDoc(collection(firestore, 'businesses', business.id, 'promotions'), promoData);
+        toast({ title: "Produit ajouté au catalogue !" });
+      }
       
-      // Reset form
-      setPromoTitle('');
-      setPromoDescription('');
-      setPromoImage('');
-      setOriginalPrice('');
-      setDiscountedPrice('');
-      setDiscountPercentage('');
-      setStandardPrice('');
+      resetForm();
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const resetForm = () => {
+    setEditingPromoId(null);
+    setPromoTitle('');
+    setPromoDescription('');
+    setPromoImage('');
+    setOriginalPrice('');
+    setDiscountedPrice('');
+    setDiscountPercentage('');
+    setStandardPrice('');
+  };
+
+  const handleEditPromotion = (promo: Promotion) => {
+    setEditingPromoId(promo.id);
+    setPromoTitle(promo.title);
+    setPromoDescription(promo.description || '');
+    setPromoImage(promo.imageUrl || '');
+    setPromoType(promo.promoType);
+    if (promo.promoType === 'Promo') {
+        setOriginalPrice(promo.originalPrice?.toString() || '');
+        setDiscountedPrice(promo.price.toString());
+        setDiscountPercentage(promo.discountPercentage?.toString() || '');
+    } else {
+        setStandardPrice(promo.price.toString());
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDeletePromotion = async (id: string) => {
@@ -175,6 +203,7 @@ export default function ProDashboard() {
     try {
         await deleteDoc(doc(firestore, 'businesses', business.id, 'promotions', id));
         toast({ title: "Produit supprimé" });
+        if (editingPromoId === id) resetForm();
     } catch (e) {
         toast({ variant: 'destructive', title: "Erreur" });
     }
@@ -229,12 +258,16 @@ export default function ProDashboard() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-32">
-      <Card className="border-2 border-primary shadow-xl overflow-hidden">
-        <CardHeader className="bg-primary text-white">
+      <Card className={cn("border-2 shadow-xl overflow-hidden transition-all", editingPromoId ? "border-accent ring-2 ring-accent/20" : "border-primary")}>
+        <CardHeader className={cn(editingPromoId ? "bg-accent" : "bg-primary", "text-white")}>
           <div className="flex justify-between items-start">
             <div className="space-y-1">
-              <CardTitle className="text-2xl font-black uppercase tracking-tighter">{business.name}</CardTitle>
-              <CardDescription className="text-white/80 font-bold uppercase text-[10px]">Espace Professionnel • {business.commune}</CardDescription>
+              <CardTitle className="text-2xl font-black uppercase tracking-tighter">
+                {editingPromoId ? "Modifier la fiche" : business.name}
+              </CardTitle>
+              <CardDescription className="text-white/80 font-bold uppercase text-[10px]">
+                {editingPromoId ? `Modification du produit ID : ${editingPromoId}` : `Espace Professionnel • ${business.commune}`}
+              </CardDescription>
             </div>
             <div className="flex flex-wrap gap-1 justify-end max-w-[150px]">
                 {(business.categories || [business.category]).map(cat => (
@@ -246,7 +279,10 @@ export default function ProDashboard() {
         <CardContent className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-6">
-              <h3 className="text-sm font-black uppercase flex items-center gap-2 text-primary border-b pb-2"><ShoppingBag className="size-4" /> Ajouter une Offre</h3>
+              <h3 className={cn("text-sm font-black uppercase flex items-center gap-2 border-b pb-2", editingPromoId ? "text-accent border-accent/20" : "text-primary border-primary/20")}>
+                {editingPromoId ? <Pencil className="size-4" /> : <ShoppingBag className="size-4" />} 
+                {editingPromoId ? "Mise à jour du produit" : "Ajouter une Offre"}
+              </h3>
               
               <div className="space-y-4">
                 <div className="space-y-1.5">
@@ -287,7 +323,7 @@ export default function ProDashboard() {
 
                 {promoImage && (
                     <div className="relative aspect-video rounded-xl overflow-hidden border-2 border-dashed border-primary/30 bg-muted/30">
-                        <img src={promoImage} className="w-full h-full object-contain" />
+                        <img src={promoImage} className="w-full h-full object-contain" alt="Preview" />
                     </div>
                 )}
 
@@ -353,9 +389,15 @@ export default function ProDashboard() {
                     </div>
                 )}
 
-                <Button onClick={handleAddPromotion} disabled={isSaving || !promoTitle} className="w-full h-14 font-black uppercase gap-2 shadow-lg text-sm tracking-widest">
-                  <Plus className="size-5" /> Enregistrer au catalogue
-                </Button>
+                <div className="flex gap-2">
+                    {editingPromoId && (
+                        <Button variant="ghost" onClick={resetForm} className="flex-1 font-bold uppercase text-xs h-14 border-2">Annuler</Button>
+                    )}
+                    <Button onClick={handleSavePromotion} disabled={isSaving || !promoTitle} className={cn("flex-[2] h-14 font-black uppercase gap-2 shadow-lg text-sm tracking-widest", editingPromoId ? "bg-accent hover:bg-accent/90" : "bg-primary hover:bg-primary/90")}>
+                        {isSaving ? <RefreshCw className="size-5 animate-spin" /> : editingPromoId ? <Save className="size-5" /> : <Plus className="size-5" />}
+                        {editingPromoId ? "Mettre à jour la fiche" : "Enregistrer au catalogue"}
+                    </Button>
+                </div>
               </div>
             </div>
 
@@ -437,14 +479,16 @@ export default function ProDashboard() {
                 [1,2].map(i => <Skeleton key={i} className="h-32 w-full rounded-2xl" />)
             ) : promotions && promotions.length > 0 ? (
                 promotions.map(promo => (
-                    <Card key={promo.id} className="overflow-hidden border-2 shadow-sm flex h-32 group">
+                    <Card key={promo.id} className={cn("overflow-hidden border-2 shadow-sm flex h-32 group transition-all", editingPromoId === promo.id ? "border-accent bg-accent/5 ring-1 ring-accent" : "hover:border-primary/30")}>
                         <div className="w-32 bg-muted/20 shrink-0 border-r relative flex items-center justify-center">
                             {promo.imageUrl ? (
-                                <img src={promo.imageUrl} className="w-full h-full object-cover" />
+                                <img src={promo.imageUrl} className="w-full h-full object-cover" alt={promo.title} />
                             ) : (
                                 <ImageIcon className="size-8 text-muted-foreground/30" />
                             )}
-                            <Badge className="absolute top-1 left-1 font-black text-[8px] uppercase">{promo.promoType}</Badge>
+                            <Badge className={cn("absolute top-1 left-1 font-black text-[8px] uppercase border-none shadow-sm", promo.promoType === 'Promo' ? "bg-red-600" : "bg-primary")}>
+                                {promo.promoType}
+                            </Badge>
                         </div>
                         <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
                             <div className="space-y-1">
@@ -458,9 +502,14 @@ export default function ProDashboard() {
                                     )}
                                     <span className="text-sm font-black text-primary leading-none">{promo.price} F</span>
                                 </div>
-                                <Button variant="ghost" size="icon" className="size-8 text-destructive/40 hover:text-destructive border-2" onClick={() => handleDeletePromotion(promo.id)}>
-                                    <Trash2 className="size-4" />
-                                </Button>
+                                <div className="flex items-center gap-1">
+                                    <Button variant="ghost" size="icon" className="size-8 text-primary/60 hover:text-primary border-2" onClick={() => handleEditPromotion(promo)}>
+                                        <Pencil className="size-4" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="size-8 text-destructive/40 hover:text-destructive border-2" onClick={() => handleDeletePromotion(promo.id)}>
+                                        <Trash2 className="size-4" />
+                                    </Button>
+                                </div>
                             </div>
                         </div>
                     </Card>
