@@ -44,13 +44,14 @@ import {
   Pencil,
   X,
   Volume2,
-  Play
+  Play,
+  Calendar
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
-import { format, addMonths, addDays, isBefore } from 'date-fns';
+import { format, addMonths, addDays, isBefore, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -337,8 +338,27 @@ function UsersManager({ users, isUsersLoading }: { users: UserAccount[] | null, 
     const firestore = useFirestore();
     const { toast } = useToast();
     const [search, setSearch] = useState('');
+    
+    const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     const filtered = users?.filter(u => u.email.toLowerCase().includes(search.toLowerCase()) || u.displayName.toLowerCase().includes(search.toLowerCase())) || [];
+
+    const handleUpdateUser = async () => {
+        if (!firestore || !editingUser) return;
+        setIsSaving(true);
+        try {
+            await setDoc(doc(firestore, 'users', editingUser.id), editingUser, { merge: true });
+            toast({ title: "Utilisateur mis à jour" });
+            setIsEditDialogOpen(false);
+            setEditingUser(null);
+        } catch (e) {
+            toast({ variant: 'destructive', title: "Erreur sauvegarde" });
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     const updateStatus = async (uid: string, status: string) => {
         if (!firestore) return;
@@ -348,12 +368,6 @@ function UsersManager({ users, isUsersLoading }: { users: UserAccount[] | null, 
             subscriptionExpiryDate: expiryDate
         }, { merge: true });
         toast({ title: "Statut mis à jour" });
-    };
-
-    const updateRole = async (uid: string, role: string) => {
-        if (!firestore) return;
-        await setDoc(doc(firestore, 'users', uid), { role }, { merge: true });
-        toast({ title: "Rôle mis à jour" });
     };
 
     return (
@@ -380,10 +394,9 @@ function UsersManager({ users, isUsersLoading }: { users: UserAccount[] | null, 
                                     <div className="flex flex-col"><span className="font-black text-xs">{u.displayName}</span><span className="text-[9px] font-bold opacity-40 lowercase">{u.email}</span></div>
                                 </TableCell>
                                 <TableCell>
-                                    <Select value={u.role || 'client'} onValueChange={v => updateRole(u.id, v)}>
-                                        <SelectTrigger className="h-8 text-[9px] font-black uppercase w-28"><SelectValue /></SelectTrigger>
-                                        <SelectContent><SelectItem value="client">Client</SelectItem><SelectItem value="professional">Pro</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent>
-                                    </Select>
+                                    <Badge variant="outline" className="text-[8px] font-black uppercase h-5">
+                                        {u.role || 'client'}
+                                    </Badge>
                                 </TableCell>
                                 <TableCell>
                                     <div className="flex items-center gap-2">
@@ -395,6 +408,7 @@ function UsersManager({ users, isUsersLoading }: { users: UserAccount[] | null, 
                                 </TableCell>
                                 <TableCell className="text-right px-4">
                                     <div className="flex justify-end gap-1">
+                                        <Button variant="ghost" size="icon" onClick={() => { setEditingUser(u); setIsEditDialogOpen(true); }} className="size-7 text-primary/60"><Pencil className="size-3" /></Button>
                                         <Button variant="outline" size="sm" onClick={() => updateStatus(u.id, 'active')} className="h-7 text-[8px] font-black uppercase">Activer</Button>
                                         <Button variant="outline" size="sm" onClick={() => updateStatus(u.id, 'limited')} className="h-7 text-[8px] font-black uppercase border-red-200 text-red-600">Couper</Button>
                                     </div>
@@ -404,6 +418,70 @@ function UsersManager({ users, isUsersLoading }: { users: UserAccount[] | null, 
                     </TableBody>
                 </Table>
             </CardContent>
+
+            {/* USER EDIT DIALOG */}
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                <DialogContent className="max-w-md rounded-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="font-black uppercase flex items-center gap-2"><Pencil className="size-5" /> Modifier l'utilisateur</DialogTitle>
+                        <DialogDescription className="text-[10px] font-bold uppercase">{editingUser?.email}</DialogDescription>
+                    </DialogHeader>
+                    {editingUser && (
+                        <div className="space-y-4 py-4">
+                            <div className="space-y-1">
+                                <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Nom d'affichage</Label>
+                                <Input value={editingUser.displayName} onChange={e => setEditingUser({ ...editingUser, displayName: e.target.value })} className="font-bold" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Rôle</Label>
+                                    <Select value={editingUser.role} onValueChange={(v: any) => setEditingUser({ ...editingUser, role: v })}>
+                                        <SelectTrigger className="font-black uppercase text-[10px]"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="client">Client</SelectItem>
+                                            <SelectItem value="professional">Professionnel</SelectItem>
+                                            <SelectItem value="admin">Administrateur</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Statut Abonnement</Label>
+                                    <Select value={editingUser.subscriptionStatus} onValueChange={(v: any) => setEditingUser({ ...editingUser, subscriptionStatus: v })}>
+                                        <SelectTrigger className="font-black uppercase text-[10px]"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="trial">Essai Gratuit</SelectItem>
+                                            <SelectItem value="active">Abonné Actif</SelectItem>
+                                            <SelectItem value="limited">Mode Limité</SelectItem>
+                                            <SelectItem value="admin">Admin (Illimité)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Date d'expiration (ISO)</Label>
+                                <div className="flex gap-2">
+                                    <Input 
+                                        type="date" 
+                                        value={editingUser.subscriptionExpiryDate ? editingUser.subscriptionExpiryDate.split('T')[0] : ''} 
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            setEditingUser({ ...editingUser, subscriptionExpiryDate: val ? new Date(val).toISOString() : undefined });
+                                        }} 
+                                        className="font-bold" 
+                                    />
+                                    <Button variant="outline" size="icon" onClick={() => setEditingUser({ ...editingUser, subscriptionExpiryDate: undefined })} className="shrink-0"><X className="size-4" /></Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setIsEditDialogOpen(false)} className="font-black uppercase h-12">Annuler</Button>
+                        <Button onClick={handleUpdateUser} disabled={isSaving} className="font-black uppercase h-12 gap-2 shadow-lg bg-primary">
+                            <Save className="size-4" /> Enregistrer les modifications
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </Card>
     );
 }
