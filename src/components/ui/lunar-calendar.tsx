@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -55,11 +54,8 @@ import {
 import { Button } from './button';
 import { cn } from '@/lib/utils';
 import { useCalendarView } from '@/context/calendar-view-context';
-import type { FishRating, Tide } from '@/lib/types';
-import { CrabIcon, LobsterIcon, OctopusIcon } from '../icons';
-import { Skeleton } from './skeleton';
-import { Badge } from './badge';
-import { Slider } from './slider';
+import type { Tide } from '@/lib/types';
+import { CrabIcon, LobsterIcon } from '../icons';
 
 export const MoonPhaseIcon = ({
   phase,
@@ -78,19 +74,6 @@ export const MoonPhaseIcon = ({
     case 'Dernier croissant': return <Moon className={baseClassName} />;
     default: return <Circle className={baseClassName} strokeWidth={1} />;
   }
-};
-
-const RatingStars = ({ rating }: { rating: number }) => {
-  const fullStars = Math.floor(rating / 2);
-  const halfStar = rating % 2 === 1;
-  const emptyStars = 5 - fullStars - (halfStar ? 1 : 0);
-  return (
-    <div className="flex items-center">
-      {[...Array(fullStars)].map((_, i) => <Star key={`full-${i}`} className="size-3 fill-yellow-400 text-yellow-400" />)}
-      {halfStar && <Star key="half" className="size-3 fill-yellow-400 text-yellow-400" style={{ clipPath: 'polygon(0 0, 50% 0, 50% 100%, 0 100%)' }} />}
-      {[...Array(emptyStars)].map((_, i) => <Star key={`empty-${i}`} className="size-3 text-gray-300" />)}
-    </div>
-  );
 };
 
 const DayCell = React.memo(({
@@ -210,6 +193,19 @@ export function LunarCalendar() {
   const days = eachDayOfInterval({ start: startDate, end: endDate });
   const weekdays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
+  // Auto-scroll to today
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (scrollContainerRef.current) {
+        const todayCell = scrollContainerRef.current.querySelector('.calendar-today-cell');
+        if (todayCell) {
+          todayCell.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        }
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [displayDate]);
+
   return (
     <div className="flex flex-col items-start py-2 w-full">
       <div className="sticky top-0 mb-4 px-1 w-full shrink-0 z-30 bg-background/95 backdrop-blur-md pb-2 border-b-2 border-primary/10">
@@ -220,8 +216,11 @@ export function LunarCalendar() {
         </div>
       </div>
 
-      <div className="w-full overflow-x-auto pb-4 scrollbar-hide">
-        <div className="w-fit border-2 rounded-2xl bg-card shadow-lg overflow-hidden flex flex-col" style={{ width: '1000px' }}>
+      <div className="w-full overflow-x-auto pb-20 scrollbar-hide" ref={scrollContainerRef}>
+        <div 
+          className="w-fit border-2 rounded-2xl bg-card shadow-lg overflow-hidden flex flex-col transition-transform duration-300 origin-top-left" 
+          style={{ width: `${1000 * zoom}px`, transform: `scale(${zoom})`, marginBottom: `${(1 - zoom) * -100}%` }}
+        >
           <div className="grid grid-cols-7 bg-muted/30 border-b">
             {weekdays.map((day) => (
               <div key={day} className="text-center text-[10px] font-black uppercase text-muted-foreground p-3">{day}</div>
@@ -229,10 +228,44 @@ export function LunarCalendar() {
           </div>
           <div className="grid grid-cols-7 w-full">
             {days.map((day) => (
-              <DayCell key={day.toString()} day={day} isCurrentMonth={isSameMonth(day, displayDate)} isSelected={isSameDay(day, selectedDate)} onDateSelect={handleDayClick} />
+              <DayCell 
+                key={day.toString()} 
+                day={day} 
+                isCurrentMonth={isSameMonth(day, displayDate)} 
+                isSelected={isSameDay(day, selectedDate)} 
+                onDateSelect={handleDayClick} 
+              />
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Barre de Zoom flottante */}
+      <div className="fixed bottom-24 right-4 z-40 flex flex-col gap-2">
+        <Button 
+          size="icon" 
+          variant="secondary" 
+          className="size-12 rounded-full shadow-xl border-2 border-primary/20 bg-white/90 backdrop-blur-md" 
+          onClick={() => setZoom(prev => Math.min(prev + 0.1, 1.5))}
+        >
+          <ZoomIn className="size-6 text-primary" />
+        </Button>
+        <Button 
+          size="icon" 
+          variant="secondary" 
+          className="size-12 rounded-full shadow-xl border-2 border-primary/20 bg-white/90 backdrop-blur-md" 
+          onClick={() => setZoom(prev => Math.max(prev - 0.1, 0.5))}
+        >
+          <ZoomOut className="size-6 text-primary" />
+        </Button>
+        <Button 
+          size="icon" 
+          variant="secondary" 
+          className="size-12 rounded-full shadow-xl border-2 border-primary/20 bg-white/90 backdrop-blur-md" 
+          onClick={() => setZoom(1)}
+        >
+          <Maximize2 className="size-6 text-primary" />
+        </Button>
       </div>
 
       <Dialog open={!!detailedDay} onOpenChange={(isOpen) => !isOpen && setDetailedDay(null)}>
@@ -245,11 +278,31 @@ export function LunarCalendar() {
           </DialogHeader>
           <div className="py-4">
             {detailedDay && (
-              <p className="text-sm">Consultez les prévisions détaillées pour cette date.</p>
+              <div className="space-y-4">
+                <div className="p-4 bg-primary/5 rounded-xl border border-primary/10">
+                  <p className="text-sm font-medium leading-relaxed">
+                    {getDataForDate(selectedLocation, detailedDay).farming.recommendation}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Prochaines Marées</p>
+                  {getDataForDate(selectedLocation, detailedDay).tides.map((tide, i) => (
+                    <div key={i} className="flex justify-between items-center p-3 border rounded-lg bg-card">
+                      <span className="text-xs font-bold uppercase">{tide.type}</span>
+                      <div className="flex items-center gap-4">
+                        <span className="text-sm font-black">{tide.time}</span>
+                        <span className="text-sm font-black text-primary">{tide.height.toFixed(2)}m</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDetailedDay(null)}>Fermer</Button>
+            <DialogClose asChild>
+              <Button variant="outline" className="w-full h-12 font-black uppercase">Fermer</Button>
+            </DialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>
