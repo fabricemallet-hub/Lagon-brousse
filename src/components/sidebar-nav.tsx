@@ -26,11 +26,11 @@ export function SidebarNav() {
 
   const { data: userProfile } = useDoc<UserAccount>(userDocRef);
 
-  // Détection robuste et instantanée des rôles Admin Maître (Hardcoded pour sécurité maximale)
+  // Détection robuste et instantanée des rôles
   const roles = useMemo(() => {
     if (!user) return { isAdmin: false, isPro: false };
     
-    // Identifiants de confiance absolus (Fabrice Mallet inclus)
+    // Identifiants de confiance absolus (Administrateurs)
     const masterAdminUids = [
       't8nPnZLcTiaLJSKMuLzib3C5nPn1',
       'K9cVYLVUk1NV99YV3anebkugpPp1',
@@ -48,12 +48,12 @@ export function SidebarNav() {
     const isMaster = masterAdminUids.includes(user.uid) || 
                     (user.email && masterAdminEmails.includes(user.email.toLowerCase()));
 
-    // Détection Admin (Maître ou via profil base de données)
+    // Détection Admin
     const isAdmin = isMaster || 
                     userProfile?.subscriptionStatus === 'admin' || 
                     userProfile?.role === 'admin';
 
-    // Détection Pro (Admin ou via profil base de données)
+    // Détection Pro (Strictement pour les pros ou les admins)
     const isPro = isAdmin || 
                   userProfile?.subscriptionStatus === 'professional' || 
                   userProfile?.role === 'professional';
@@ -65,11 +65,13 @@ export function SidebarNav() {
     <div className="flex flex-col h-full">
       <SidebarMenu className="flex-grow">
         {navLinks.map((link) => {
-          // Filtrage dynamique selon les rôles
-          if (link.adminOnly && !roles.isAdmin) return null;
+          // Filtrage Pro Only
           if (link.proOnly && !roles.isPro) return null;
           
-          // Masquer Contact pour l'admin (il utilise le dashboard)
+          // Filtrage Admin Only
+          if (link.adminOnly && !roles.isAdmin) return null;
+          
+          // Masquer Contact pour l'admin
           if (link.href === '/contact' && roles.isAdmin) return null;
           if (link.href === '/contact' && !user) return null;
           
