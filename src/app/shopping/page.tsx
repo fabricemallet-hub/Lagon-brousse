@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -32,10 +33,12 @@ export default function ShoppingPage() {
   }, [firestore]);
   const { data: businesses, isLoading: isBusinessesLoading } = useCollection<Business>(businessesRef);
 
-  // Utilisation de collectionGroup pour récupérer TOUS les produits de TOUS les magasins
+  // CRITICAL: We remove orderBy('createdAt') from collectionGroup to avoid 
+  // the hard requirement of a composite index which might not be created yet.
+  // The sorting will be handled in JS below.
   const promosRef = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collectionGroup(firestore, 'promotions'), orderBy('createdAt', 'desc'));
+    return collectionGroup(firestore, 'promotions');
   }, [firestore]);
   const { data: allPromotions, isLoading: isPromosLoading } = useCollection<Promotion>(promosRef);
 
@@ -60,41 +63,43 @@ export default function ShoppingPage() {
         business: businessMap.get(promo.businessId)
       }))
       .filter(item => {
+        // 1. Validation: Item must belong to a known business
         if (!item.business) return false;
 
-        // 1. Search filter
+        // 2. Search filter
         const matchesSearch = item.title.toLowerCase().includes(search.toLowerCase()) || 
-                             item.description?.toLowerCase().includes(search.toLowerCase());
+                             (item.description?.toLowerCase() || '').includes(search.toLowerCase());
         if (!matchesSearch) return false;
 
-        // 2. Commune filter
-        if (filterCommune === 'USER_DEFAULT') {
-            // No strict filter, but we'll sort them later. 
-            // In shopping dashboard, "USER_DEFAULT" acts like "priority to my commune"
-        } else if (filterCommune !== 'ALL' && item.business.commune !== filterCommune) {
-            return false;
+        // 3. Commune filter
+        if (filterCommune !== 'USER_DEFAULT' && filterCommune !== 'ALL') {
+            if (item.business.commune !== filterCommune) return false;
         }
 
-        // 3. Category filter
+        // 4. Category filter
         if (filterCategory !== 'ALL' && item.category !== filterCategory) return false;
 
-        // 4. Business filter
+        // 5. Business filter
         if (filterBusiness !== 'ALL' && item.businessId !== filterBusiness) return false;
 
-        // 5. Type filter
+        // 6. Type filter
         if (filterType !== 'ALL' && item.promoType !== filterType) return false;
 
         return true;
       })
       .sort((a, b) => {
-        // Priority logic: User's commune products first
-        if (filterCommune === 'USER_DEFAULT' || filterCommune === 'ALL') {
+        // A. Priority sorting: User's commune products first
+        if (filterCommune === 'USER_DEFAULT') {
             const aInCommune = a.business?.commune === userCommune;
             const bInCommune = b.business?.commune === userCommune;
             if (aInCommune && !bInCommune) return -1;
             if (!aInCommune && bInCommune) return 1;
         }
-        return 0; // Maintain original creation order if in same priority group
+        
+        // B. Temporal sorting: Newest first (using createdAt if available)
+        const timeA = a.createdAt?.toMillis?.() || 0;
+        const timeB = b.createdAt?.toMillis?.() || 0;
+        return timeB - timeA;
       });
   }, [allPromotions, businesses, search, filterCommune, filterCategory, filterBusiness, filterType, userCommune]);
 
