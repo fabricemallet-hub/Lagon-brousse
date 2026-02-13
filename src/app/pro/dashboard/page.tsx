@@ -520,11 +520,18 @@ export default function ProDashboard() {
                                 <p className="text-[10px] text-muted-foreground line-clamp-1 leading-tight">{promo.description || "Aucune description."}</p>
                             </div>
                             <div className="flex items-center justify-between">
-                                <div className="flex flex-col">
-                                    {promo.promoType === 'Promo' && promo.originalPrice && (
-                                        <span className="text-[8px] text-muted-foreground line-through font-bold">{promo.originalPrice} F</span>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex flex-col">
+                                        {promo.promoType === 'Promo' && promo.originalPrice && (
+                                            <span className="text-[8px] text-muted-foreground line-through font-bold">{promo.originalPrice} F</span>
+                                        )}
+                                        <span className="text-sm font-black text-primary leading-none">{promo.price} F</span>
+                                    </div>
+                                    {promo.promoType === 'Promo' && promo.discountPercentage && (
+                                        <Badge className="bg-red-600 text-white font-black text-[10px] h-6 border-none shadow-md animate-bounce">
+                                            -{Math.round(promo.discountPercentage)}%
+                                        </Badge>
                                     )}
-                                    <span className="text-sm font-black text-primary leading-none">{promo.price} F</span>
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <Button variant="ghost" size="icon" className="size-8 text-primary/60 hover:text-primary border-2" onClick={() => handleEditPromotion(promo)}>
