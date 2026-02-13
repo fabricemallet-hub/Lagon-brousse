@@ -18,7 +18,7 @@ import {
 import { fr } from 'date-fns/locale';
 import { useDate } from '@/context/date-context';
 import { useLocation } from '@/context/location-context';
-import { generateProceduralData, getDataForDate, LocationData } from '@/lib/data';
+import { generateProceduralData, getDataForDate } from '@/lib/data';
 import {
   Dialog,
   DialogContent,
@@ -29,8 +29,6 @@ import {
   DialogClose
 } from '@/components/ui/dialog';
 import {
-  Fish,
-  Moon,
   Circle,
   ChevronLeft,
   ChevronRight,
@@ -40,16 +38,13 @@ import {
   Leaf,
   Scissors,
   RefreshCw,
-  Info,
   TrendingUp,
   TrendingDown,
-  Star,
-  Waves,
-  Clock,
-  X,
   ZoomIn,
   ZoomOut,
-  Maximize2
+  Maximize2,
+  Moon,
+  X
 } from 'lucide-react';
 import { Button } from './button';
 import { cn } from '@/lib/utils';
@@ -180,9 +175,17 @@ export function LunarCalendar() {
   const [detailedDay, setDetailedDay] = useState<Date | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // Zoom States
   const [zoom, setZoom] = useState(1);
+  const [isPinching, setIsPinching] = useState(false);
+  const initialDistRef = useRef<number | null>(null);
+  const initialZoomRef = useRef<number>(1);
 
-  const handleDayClick = (day: Date) => { setSelectedDate(day); setDetailedDay(day); };
+  const handleDayClick = (day: Date) => { 
+    setSelectedDate(day); 
+    setDetailedDay(day); 
+  };
+  
   const handlePrevMonth = () => setDisplayDate((d) => subMonths(d, 1));
   const handleNextMonth = () => setDisplayDate((d) => addMonths(d, 1));
 
@@ -192,6 +195,36 @@ export function LunarCalendar() {
   const endDate = endOfWeek(monthEnd, { weekStartsOn: 1 });
   const days = eachDayOfInterval({ start: startDate, end: endDate });
   const weekdays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+
+  // Pinch-to-zoom logic
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      setIsPinching(true);
+      const dist = Math.hypot(
+        e.touches[0].pageX - e.touches[1].pageX,
+        e.touches[0].pageY - e.touches[1].pageY
+      );
+      initialDistRef.current = dist;
+      initialZoomRef.current = zoom;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && initialDistRef.current !== null) {
+      const dist = Math.hypot(
+        e.touches[0].pageX - e.touches[1].pageX,
+        e.touches[0].pageY - e.touches[1].pageY
+      );
+      const factor = dist / initialDistRef.current;
+      const nextZoom = Math.min(Math.max(initialZoomRef.current * factor, 0.5), 1.5);
+      setZoom(nextZoom);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    initialDistRef.current = null;
+    setIsPinching(false);
+  };
 
   // Auto-scroll to today
   useEffect(() => {
@@ -216,10 +249,23 @@ export function LunarCalendar() {
         </div>
       </div>
 
-      <div className="w-full overflow-x-auto pb-20 scrollbar-hide" ref={scrollContainerRef}>
+      <div 
+        className="w-full overflow-x-auto pb-20 scrollbar-hide touch-pan-y" 
+        ref={scrollContainerRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         <div 
-          className="w-fit border-2 rounded-2xl bg-card shadow-lg overflow-hidden flex flex-col transition-transform duration-300 origin-top-left" 
-          style={{ width: `${1000 * zoom}px`, transform: `scale(${zoom})`, marginBottom: `${(1 - zoom) * -100}%` }}
+          className={cn(
+            "w-fit border-2 rounded-2xl bg-card shadow-lg overflow-hidden flex flex-col origin-top-left",
+            !isPinching && "transition-transform duration-300"
+          )}
+          style={{ 
+            width: `${1000 * zoom}px`, 
+            transform: `scale(${zoom})`, 
+            marginBottom: `${(1 - zoom) * -100}%` 
+          }}
         >
           <div className="grid grid-cols-7 bg-muted/30 border-b">
             {weekdays.map((day) => (
@@ -240,12 +286,12 @@ export function LunarCalendar() {
         </div>
       </div>
 
-      {/* Barre de Zoom flottante */}
+      {/* Zoom Floating Toolbar */}
       <div className="fixed bottom-24 right-4 z-40 flex flex-col gap-2">
         <Button 
           size="icon" 
           variant="secondary" 
-          className="size-12 rounded-full shadow-xl border-2 border-primary/20 bg-white/90 backdrop-blur-md" 
+          className="size-12 rounded-full shadow-xl border-2 border-primary/20 bg-white/90 backdrop-blur-md active:scale-90 transition-transform" 
           onClick={() => setZoom(prev => Math.min(prev + 0.1, 1.5))}
         >
           <ZoomIn className="size-6 text-primary" />
@@ -253,7 +299,7 @@ export function LunarCalendar() {
         <Button 
           size="icon" 
           variant="secondary" 
-          className="size-12 rounded-full shadow-xl border-2 border-primary/20 bg-white/90 backdrop-blur-md" 
+          className="size-12 rounded-full shadow-xl border-2 border-primary/20 bg-white/90 backdrop-blur-md active:scale-90 transition-transform" 
           onClick={() => setZoom(prev => Math.max(prev - 0.1, 0.5))}
         >
           <ZoomOut className="size-6 text-primary" />
@@ -261,7 +307,7 @@ export function LunarCalendar() {
         <Button 
           size="icon" 
           variant="secondary" 
-          className="size-12 rounded-full shadow-xl border-2 border-primary/20 bg-white/90 backdrop-blur-md" 
+          className="size-12 rounded-full shadow-xl border-2 border-primary/20 bg-white/90 backdrop-blur-md active:scale-90 transition-transform" 
           onClick={() => setZoom(1)}
         >
           <Maximize2 className="size-6 text-primary" />
@@ -274,7 +320,7 @@ export function LunarCalendar() {
             <DialogTitle className="text-xl font-black uppercase tracking-tight text-slate-800">
               {detailedDay ? format(detailedDay, 'eeee d MMMM', { locale: fr }) : ''}
             </DialogTitle>
-            <DialogDescription>Détails tactiques de la journée</DialogDescription>
+            <DialogDescription className="text-xs font-bold uppercase opacity-60">Détails tactiques de la journée</DialogDescription>
           </DialogHeader>
           <div className="py-4">
             {detailedDay && (
@@ -287,11 +333,16 @@ export function LunarCalendar() {
                 <div className="space-y-2">
                   <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Prochaines Marées</p>
                   {getDataForDate(selectedLocation, detailedDay).tides.map((tide, i) => (
-                    <div key={i} className="flex justify-between items-center p-3 border rounded-lg bg-card">
-                      <span className="text-xs font-bold uppercase">{tide.type}</span>
+                    <div key={i} className={cn(
+                      "flex justify-between items-center p-3 border rounded-lg",
+                      tide.type === 'haute' ? "bg-primary/5 border-primary/10" : "bg-destructive/5 border-destructive/10"
+                    )}>
+                      <span className={cn("text-[10px] font-black uppercase", tide.type === 'haute' ? "text-primary" : "text-destructive")}>
+                        {tide.type === 'haute' ? 'Pleine Mer' : 'Basse Mer'}
+                      </span>
                       <div className="flex items-center gap-4">
                         <span className="text-sm font-black">{tide.time}</span>
-                        <span className="text-sm font-black text-primary">{tide.height.toFixed(2)}m</span>
+                        <span className={cn("text-sm font-black", tide.type === 'haute' ? "text-primary" : "text-destructive")}>{tide.height.toFixed(2)}m</span>
                       </div>
                     </div>
                   ))}
@@ -301,7 +352,7 @@ export function LunarCalendar() {
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="outline" className="w-full h-12 font-black uppercase">Fermer</Button>
+              <Button variant="outline" className="w-full h-12 font-black uppercase">Compris</Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
