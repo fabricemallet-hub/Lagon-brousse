@@ -117,6 +117,7 @@ export default function VesselTrackerPage() {
   const lastUpdatesRef = useRef<Record<string, number>>({});
   const lastSentStatusRef = useRef<string | null>(null);
   const lastBatteryLevelsRef = useRef<Record<string, number>>({});
+  const lastChargingStatesRef = useRef<Record<string, boolean>>({});
   const lastClearTimesRef = useRef<Record<string, number>>({});
 
   const [activeWatchAlarm, setActiveWatchAlarm] = useState<HTMLAudioElement | null>(null);
