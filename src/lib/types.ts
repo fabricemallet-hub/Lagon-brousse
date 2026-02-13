@@ -38,7 +38,10 @@ export interface Promotion {
   id: string;
   businessId: string;
   title: string;
+  description?: string;
   price: number;
+  originalPrice?: number | null;
+  discountPercentage?: number | null;
   promoType: 'Promo' | 'Nouvel Arrivage';
   imageUrl?: string;
   createdAt: any;
