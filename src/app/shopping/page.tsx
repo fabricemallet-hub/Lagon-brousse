@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Search, ShoppingBag, Store, MapPin, Tag, Percent, Sparkles, Filter, X, ChevronRight, Info, RefreshCw, AlertTriangle } from 'lucide-react';
 import { locations } from '@/lib/locations';
 import { cn } from '@/lib/utils';
@@ -271,12 +272,12 @@ function ProductCard({ product }: { product: Promotion & { business?: Business }
                         <Store className="size-3 text-primary" />
                     </div>
                     <span className="text-[9px] font-black uppercase truncate text-slate-700">
-                        {product.business?.name || "Chargement magasin..."}
+                        {product.business?.name || "Magasin NC"}
                     </span>
                 </div>
                 <div className="flex items-center gap-1 text-[8px] font-bold text-muted-foreground shrink-0 bg-white/50 px-1.5 py-0.5 rounded border">
                     <MapPin className="size-2 text-primary" />
-                    {product.business?.commune || "..."}
+                    {product.business?.commune || "NC"}
                 </div>
             </div>
 
