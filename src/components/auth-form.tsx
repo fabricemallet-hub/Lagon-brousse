@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -14,6 +13,13 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
@@ -27,17 +33,20 @@ import {
 } from 'firebase/auth';
 import { doc, collection, addDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { ForgotPasswordDialog } from './forgot-password-dialog';
-import { Eye, EyeOff, Ticket, FileText, ScrollText } from 'lucide-react';
+import { Eye, EyeOff, Ticket, MapPin, ScrollText } from 'lucide-react';
 import { ensureUserDocument } from '@/lib/user-utils';
 import { redeemAccessToken } from '@/lib/token-utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { CgvSettings } from '@/lib/types';
+import { locations } from '@/lib/locations';
 
 type AuthFormProps = {
   mode: 'login' | 'signup';
 };
+
+const locationOptions = Object.keys(locations).sort();
 
 // Schéma pour la connexion
 const loginSchema = z.object({
@@ -52,6 +61,7 @@ const signupSchema = z.object({
   displayName: z.string().min(3, { message: 'Le nom doit contenir au moins 3 caractères.' }),
   email: z.string().email({ message: 'Veuillez entrer une adresse email valide.' }),
   password: z.string().min(6, { message: 'Le mot de passe doit contenir au moins 6 caractères.' }),
+  commune: z.string().min(1, { message: 'Veuillez choisir votre commune.' }),
   token: z.string().optional(),
   acceptCgv: z.boolean().refine(val => val === true, {
     message: "Vous devez accepter les conditions générales de vente."
@@ -75,6 +85,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       displayName: '',
       email: '',
       password: '',
+      commune: 'Nouméa',
       token: '',
       rememberMe: false,
       acceptCgv: false,
@@ -97,11 +108,6 @@ export function AuthForm({ mode }: AuthFormProps) {
     }
   }, [form, mode]);
 
-
-  const onValidationErrors = (errors: any) => {
-    // This function can be used for debugging validation errors
-  };
-
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
 
@@ -115,7 +121,6 @@ export function AuthForm({ mode }: AuthFormProps) {
       return;
     }
 
-    // Force email to lowercase to avoid verification issues
     const emailLower = values.email.toLowerCase();
 
     try {
@@ -133,23 +138,11 @@ export function AuthForm({ mode }: AuthFormProps) {
         if (userCredential.user && loginValues.token) {
             const result = await redeemAccessToken(firestore, userCredential.user, loginValues.token);
             if (result.success) {
-              toast({
-                title: 'Jeton validé !',
-                description: result.message,
-              });
-            } else {
-              toast({
-                variant: 'destructive',
-                title: 'Erreur de jeton',
-                description: result.message,
-              });
+              toast({ title: 'Jeton validé !', description: result.message });
             }
         }
         
-        toast({
-            title: 'Connexion réussie!',
-            description: "Vous allez être redirigé vers la page d'accueil.",
-        });
+        toast({ title: 'Connexion réussie!', description: "Vous allez être redirigé." });
         router.push('/');
 
       } else { // mode === 'signup'
@@ -159,17 +152,15 @@ export function AuthForm({ mode }: AuthFormProps) {
         if (userCredential.user) {
           const user = userCredential.user;
           
-          // SEND VERIFICATION EMAIL
           await sendEmailVerification(user);
 
           await updateProfile(user, {
               displayName: signupValues.displayName
           });
 
-          // Ensure user document is created BEFORE attempting to redeem a token.
-          await ensureUserDocument(firestore, user, signupValues.displayName);
+          // Enregistrement de la commune choisie
+          await ensureUserDocument(firestore, user, signupValues.displayName, signupValues.commune);
 
-          // RECORD CGV ACCEPTANCE
           if (cgvData) {
             const acceptanceRef = collection(firestore, 'users', user.uid, 'cgv_acceptances');
             await addDoc(acceptanceRef, {
@@ -179,7 +170,6 @@ export function AuthForm({ mode }: AuthFormProps) {
               content: cgvData.content || ""
             });
             
-            // Update user profile with latest version seen
             await updateDoc(doc(firestore, 'users', user.uid), {
               cgvAcceptedAt: new Date().toISOString(),
               cgvVersionSeen: cgvData.version || 0
@@ -187,65 +177,23 @@ export function AuthForm({ mode }: AuthFormProps) {
           }
 
           if (signupValues.token) {
-            const result = await redeemAccessToken(firestore, user, signupValues.token);
-            if (result.success) {
-              toast({
-                title: 'Jeton validé !',
-                description: result.message,
-              });
-            } else {
-              toast({
-                variant: 'destructive',
-                title: 'Erreur de jeton',
-                description: result.message,
-              });
-            }
+            await redeemAccessToken(firestore, user, signupValues.token);
           }
         }
         
         toast({
           title: 'Inscription réussie!',
-          description: "Un lien de validation a été envoyé par e-mail. Veuillez vérifier votre boîte de réception pour activer votre compte.",
+          description: "Veuillez vérifier votre boîte de réception pour activer votre compte.",
         });
         router.push('/');
       }
     } catch (error) {
       const authError = error as AuthError;
-
-      let errorMessage = "Une erreur inattendue est survenue. Veuillez réessayer.";
-
-      if (authError && authError.code) {
-        switch (authError.code) {
-          case 'auth/invalid-credential':
-          case 'auth/user-not-found':
-          case 'auth/wrong-password':
-            errorMessage = "L'email ou le mot de passe est incorrect. Veuillez vérifier vos informations ou cliquer sur 'Mot de passe oublié ?' pour le réinitialiser.";
-            break;
-          case 'auth/email-already-in-use':
-            errorMessage = 'Cette adresse email est déjà utilisée par un autre compte.';
-            break;
-          case 'auth/weak-password':
-            errorMessage = 'Le mot de passe est trop faible. Il doit contenir au moins 6 caractères.';
-            break;
-          case 'auth/too-many-requests':
-            errorMessage = "L'accès à ce compte a été temporairement désactivé en raison de nombreuses tentatives de connexion infructueuses. Veuillez réessayer plus tard.";
-            break;
-          case 'auth/network-request-failed':
-            errorMessage = "Un problème de réseau est survenu. Veuillez vérifier votre connexion Internet et réessayer.";
-            break;
-          default:
-            errorMessage = `Une erreur est survenue (code: ${authError.code}). Veuillez contacter le support si le problème persiste.`;
-            break;
-        }
-      } else {
-        errorMessage = (error as Error).message || "Une erreur inconnue est survenue lors de la tentative de connexion.";
-      }
+      let errorMessage = "Une erreur est survenue.";
+      if (authError.code === 'auth/invalid-credential') errorMessage = "Email ou mot de passe incorrect.";
+      else if (authError.code === 'auth/email-already-in-use') errorMessage = "Email déjà utilisé.";
       
-      toast({
-        variant: "destructive",
-        title: "Erreur d'authentification",
-        description: errorMessage,
-      });
+      toast({ variant: "destructive", title: "Erreur", description: errorMessage });
     } finally {
       setIsLoading(false);
     }
@@ -253,21 +201,45 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit, onValidationErrors)} className="flex flex-col space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col space-y-4">
         {mode === 'signup' && (
-          <FormField
-            control={form.control}
-            name="displayName"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Nom d'utilisateur</FormLabel>
-                <FormControl>
-                  <Input placeholder="Votre nom" {...field} autoComplete="name" />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <>
+            <FormField
+              control={form.control}
+              name="displayName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nom d'utilisateur</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Votre nom" {...field} autoComplete="name" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="commune"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Votre Commune (NC)</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="h-12 border-2">
+                        <SelectValue placeholder="Choisir une commune..." />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="max-h-64">
+                      {locationOptions.map(loc => (
+                        <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </>
         )}
         <FormField
           control={form.control}
@@ -308,7 +280,6 @@ export function AuthForm({ mode }: AuthFormProps) {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground"
-                    aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
                   >
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
@@ -325,17 +296,8 @@ export function AuthForm({ mode }: AuthFormProps) {
             name="rememberMe"
             render={({ field }) => (
               <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                <FormControl>
-                  <Checkbox
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                </FormControl>
-                <div className="space-y-1 leading-none">
-                  <FormLabel>
-                    Se souvenir de moi
-                  </FormLabel>
-                </div>
+                <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                <div className="space-y-1 leading-none"><FormLabel>Se souvenir de moi</FormLabel></div>
               </FormItem>
             )}
           />
@@ -350,9 +312,7 @@ export function AuthForm({ mode }: AuthFormProps) {
               <FormControl>
                 <div className="relative">
                   <Input placeholder="LBN-XXXX-XXXX" {...field} autoComplete="off" className="pl-10 font-mono tracking-wider" />
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground">
-                    <Ticket className="h-5 w-5" />
-                  </div>
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground"><Ticket className="h-5 w-5" /></div>
                 </div>
               </FormControl>
               <FormMessage />
@@ -366,20 +326,13 @@ export function AuthForm({ mode }: AuthFormProps) {
             name="acceptCgv"
             render={({ field }) => (
               <FormItem className="flex flex-row items-start space-x-3 space-y-0 pt-2">
-                <FormControl>
-                  <Checkbox
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                </FormControl>
+                <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
                 <div className="space-y-1 leading-none">
                   <FormLabel className="text-xs">
                     J'ai lu et j'accepte les{' '}
                     <Dialog>
                       <DialogTrigger asChild>
-                        <button type="button" className="text-primary font-bold hover:underline underline-offset-4">
-                          Conditions Générales de Vente
-                        </button>
+                        <button type="button" className="text-primary font-bold hover:underline">Conditions Générales de Vente</button>
                       </DialogTrigger>
                       <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-0 overflow-hidden">
                         <DialogHeader className="p-6 bg-muted/30 border-b">
@@ -389,13 +342,11 @@ export function AuthForm({ mode }: AuthFormProps) {
                         </DialogHeader>
                         <ScrollArea className="flex-1 p-6">
                           <div className="prose prose-sm font-medium leading-relaxed text-muted-foreground whitespace-pre-wrap">
-                            {cgvData?.content || "Les conditions générales sont en cours de mise à jour. Veuillez réessayer plus tard."}
+                            {cgvData?.content || "Chargement..."}
                           </div>
                         </ScrollArea>
                         <DialogFooter className="p-4 border-t bg-muted/10">
-                          <DialogClose asChild>
-                            <Button variant="default" className="w-full font-black uppercase">Compris</Button>
-                          </DialogClose>
+                          <DialogClose asChild><Button className="w-full font-black uppercase">Compris</Button></DialogClose>
                         </DialogFooter>
                       </DialogContent>
                     </Dialog>

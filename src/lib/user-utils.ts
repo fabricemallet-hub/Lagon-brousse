@@ -8,7 +8,12 @@ import { addMonths } from 'date-fns';
  * Gère la création et la mise à jour du document profil utilisateur dans Firestore.
  * Sécurité Master : Force le rôle admin pour les Emails de confiance absolue.
  */
-export async function ensureUserDocument(firestore: Firestore, user: User, displayName?: string): Promise<void> {
+export async function ensureUserDocument(
+  firestore: Firestore, 
+  user: User, 
+  displayName?: string,
+  commune?: string
+): Promise<void> {
   if (!user || !firestore) return;
 
   const userDocRef = doc(firestore, 'users', user.uid);
@@ -52,7 +57,7 @@ export async function ensureUserDocument(firestore: Firestore, user: User, displ
       displayName: effectiveDisplayName,
       role: isMasterAdmin ? 'admin' : 'client',
       subscriptionStatus: isMasterAdmin ? 'admin' : 'trial',
-      lastSelectedLocation: 'Nouméa',
+      lastSelectedLocation: commune || 'Nouméa',
     };
 
     // Période d'essai pour les clients (3 mois)

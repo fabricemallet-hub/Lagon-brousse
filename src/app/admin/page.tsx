@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -1067,9 +1066,9 @@ function FishManager({ species }: { species: FishSpeciesInfo[] | null }) {
                             </div>
 
                             <div className="grid grid-cols-3 gap-3">
-                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Risque Petit (%)</Label><Input type="number" value={editingFish.gratteRiskSmall} onChange={e => setEditingFish({...editingFish, @ts-ignore gratteRiskSmall: parseInt(e.target.value)})} /></div>
-                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Risque Moyen (%)</Label><Input type="number" value={editingFish.gratteRiskMedium} onChange={e => setEditingFish({...editingFish, @ts-ignore gratteRiskMedium: parseInt(e.target.value)})} /></div>
-                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Risque Grand (%)</Label><Input type="number" value={editingFish.gratteRiskLarge} onChange={e => setEditingFish({...editingFish, @ts-ignore gratteRiskLarge: parseInt(e.target.value)})} /></div>
+                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Risque Petit (%)</Label><Input type="number" value={editingFish.gratteRiskSmall} onChange={e => setEditingFish({...editingFish, gratteRiskSmall: parseInt(e.target.value)})} /></div>
+                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Risque Moyen (%)</Label><Input type="number" value={editingFish.gratteRiskMedium} onChange={e => setEditingFish({...editingFish, gratteRiskMedium: parseInt(e.target.value)})} /></div>
+                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Risque Grand (%)</Label><Input type="number" value={editingFish.gratteRiskLarge} onChange={e => setEditingFish({...editingFish, gratteRiskLarge: parseInt(e.target.value)})} /></div>
                             </div>
 
                             <div className="grid grid-cols-3 gap-3">

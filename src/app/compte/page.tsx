@@ -1,6 +1,6 @@
 'use client';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, getDoc, writeBatch, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, writeBatch, serverTimestamp, updateDoc } from 'firebase/firestore';
 import type { UserAccount, AccessToken, SharedAccessToken, RibSettings } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,10 +8,18 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, isBefore, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Crown, Star, XCircle, KeyRound, Ticket, Gift, LogOut, Mail, Calendar, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink, Copy, Check } from 'lucide-react';
+import { 
+  Crown, Star, XCircle, Ticket, Gift, LogOut, Mail, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink, Copy, Check, MapPin
+} from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/firebase';
@@ -26,6 +34,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { locations } from '@/lib/locations';
 
 export default function ComptePage() {
   const { user, isUserLoading } = useUser();
@@ -64,6 +73,18 @@ export default function ComptePage() {
     router.push('/login');
   };
 
+  const handleUpdateLocation = async (newLoc: string) => {
+    if (!user || !firestore) return;
+    try {
+      await updateDoc(doc(firestore, 'users', user.uid), {
+        lastSelectedLocation: newLoc
+      });
+      toast({ title: "Localité mise à jour", description: `Votre commune favorite est désormais ${newLoc}.` });
+    } catch (e) {
+      toast({ variant: 'destructive', title: "Erreur", description: "Impossible de mettre à jour la commune." });
+    }
+  };
+
   const handleSubscribe = () => {
     const paypalLink = process.env.NEXT_PUBLIC_PAYPAL_LINK;
     if (paypalLink) window.open(paypalLink, '_blank');
@@ -73,14 +94,6 @@ export default function ComptePage() {
   const handlePaypalDonate = () => {
     const donationLink = "https://www.paypal.com/ncp/payment/G5GSMQHE3P6NA";
     window.open(donationLink, '_blank');
-  };
-
-  const handleDownloadRib = () => {
-    window.open('/RIB_Lagon_Brousse_NC.pdf', '_blank');
-    toast({
-      title: "RIB ouvert",
-      description: "Vous pouvez désormais effectuer votre virement."
-    });
   };
 
   const handleCopyRib = () => {
@@ -137,7 +150,7 @@ export default function ComptePage() {
   if (isUserLoading || isProfileLoading || isSharedTokenLoading) return <div className="space-y-6 px-1"><Skeleton className="h-48 w-full" /><Skeleton className="h-48 w-full" /></div>;
 
   return (
-    <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1">
+    <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-20">
        <Card className="w-full shadow-none border-2">
         <CardHeader className="p-6 border-b bg-muted/10">
           <div className="flex flex-col items-center text-center gap-4">
@@ -161,6 +174,28 @@ export default function ComptePage() {
                   <span className="text-sm font-bold">{status.desc || "Limité"}</span>
                 </div>
               </div>
+
+              {/* SECTION MA COMMUNE */}
+              <div className="flex items-center gap-4 p-4 bg-primary/5 rounded-xl border border-primary/10">
+                <div className="p-2 bg-background rounded-lg shadow-sm"><MapPin className="size-5 text-primary" /></div>
+                <div className="flex flex-col flex-1">
+                  <span className="text-[10px] font-black uppercase text-muted-foreground mb-1">Ma Localité (NC)</span>
+                  <Select 
+                    defaultValue={userProfile?.lastSelectedLocation || 'Nouméa'} 
+                    onValueChange={handleUpdateLocation}
+                  >
+                    <SelectTrigger className="h-9 border-2 font-bold text-xs bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-64">
+                      {Object.keys(locations).sort().map(loc => (
+                        <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-xl border">
                 <div className="p-2 bg-background rounded-lg shadow-sm"><Mail className="size-5 text-muted-foreground" /></div>
                 <div className="flex flex-col">
@@ -189,63 +224,27 @@ export default function ComptePage() {
               
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button 
-                    className="w-full h-14 text-base font-black uppercase tracking-widest shadow-lg bg-accent hover:bg-accent/90"
-                  >
-                    DONS
-                  </Button>
+                  <Button className="w-full h-14 text-base font-black uppercase tracking-widest shadow-lg bg-accent hover:bg-accent/90">DONS</Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-xs rounded-2xl overflow-hidden p-0">
                   <DialogHeader className="p-6 bg-slate-50 border-b">
                     <DialogTitle className="font-black uppercase tracking-tighter text-center">Soutenir le projet</DialogTitle>
-                    <DialogDescription className="text-center text-[10px] uppercase font-bold">Votre aide est précieuse</DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 p-6">
-                    {ribData?.details ? (
+                    {ribData?.details && (
                       <div className="space-y-3">
                         <div className="p-4 bg-muted/30 rounded-xl border-2 border-dashed border-primary/20 relative">
-                          <p className="text-[10px] font-black uppercase text-primary mb-2 flex items-center gap-2">
-                            <Landmark className="size-3" /> Virement Bancaire
-                          </p>
-                          <pre className="text-[10px] font-mono whitespace-pre-wrap leading-tight break-all">
-                            {ribData.details}
-                          </pre>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="absolute top-2 right-2 h-8 w-8 hover:bg-primary/10"
-                            onClick={handleCopyRib}
-                          >
+                          <p className="text-[10px] font-black uppercase text-primary mb-2 flex items-center gap-2"><Landmark className="size-3" /> Virement Bancaire</p>
+                          <pre className="text-[10px] font-mono whitespace-pre-wrap leading-tight break-all">{ribData.details}</pre>
+                          <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-8 w-8" onClick={handleCopyRib}>
                             {hasCopied ? <Check className="size-4 text-green-600" /> : <Copy className="size-4" />}
                           </Button>
                         </div>
                       </div>
-                    ) : (
-                      <Button 
-                        variant="outline" 
-                        className="h-16 flex flex-col items-center justify-center gap-1 border-2 hover:bg-primary/5"
-                        onClick={handleDownloadRib}
-                      >
-                        <div className="flex items-center gap-2 text-xs font-black uppercase">
-                          <Landmark className="size-4 text-primary" /> Virement Bancaire
-                        </div>
-                        <span className="text-[8px] font-bold text-muted-foreground uppercase flex items-center gap-1">
-                          <Download className="size-2" /> Télécharger mon RIB (PDF)
-                        </span>
-                      </Button>
                     )}
-
-                    <Button 
-                      variant="outline" 
-                      className="h-16 flex flex-col items-center justify-center gap-1 border-2 hover:bg-accent/5"
-                      onClick={handlePaypalDonate}
-                    >
-                      <div className="flex items-center gap-2 text-xs font-black uppercase">
-                        <CreditCard className="size-4 text-accent" /> PayPal
-                      </div>
-                      <span className="text-[8px] font-bold text-muted-foreground uppercase flex items-center gap-1">
-                        <ExternalLink className="size-2" /> Montant libre
-                      </span>
+                    <Button variant="outline" className="h-16 flex flex-col items-center justify-center gap-1 border-2" onClick={handlePaypalDonate}>
+                      <div className="flex items-center gap-2 text-xs font-black uppercase"><CreditCard className="size-4 text-accent" /> PayPal</div>
+                      <span className="text-[8px] font-bold text-muted-foreground uppercase flex items-center gap-1"><ExternalLink className="size-2" /> Montant libre</span>
                     </Button>
                   </div>
                 </DialogContent>
