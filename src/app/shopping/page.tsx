@@ -1,9 +1,9 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, collectionGroup, query, orderBy, doc } from 'firebase/firestore';
+import { collection, collectionGroup, query, orderBy, doc, getDocs, limit } from 'firebase/firestore';
 import type { Promotion, Business, UserAccount } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, ShoppingBag, Store, MapPin, Tag, Percent, Sparkles, Filter, X, ChevronRight, Info } from 'lucide-react';
+import { Search, ShoppingBag, Store, MapPin, Tag, Percent, Sparkles, Filter, X, ChevronRight, Info, RefreshCw, AlertTriangle } from 'lucide-react';
 import { locations } from '@/lib/locations';
 import { cn } from '@/lib/utils';
 
@@ -33,29 +33,27 @@ export default function ShoppingPage() {
   }, [firestore]);
   const { data: businesses, isLoading: isBusinessesLoading } = useCollection<Business>(businessesRef);
 
-  // CRITICAL: We remove orderBy('createdAt') from collectionGroup to avoid 
-  // the hard requirement of a composite index which might not be created yet.
-  // The sorting will be handled in JS below.
+  // Utilisation d'un Query brut pour collectionGroup sans tri pour éviter les erreurs d'index
   const promosRef = useMemoFirebase(() => {
     if (!firestore) return null;
     return collectionGroup(firestore, 'promotions');
   }, [firestore]);
-  const { data: allPromotions, isLoading: isPromosLoading } = useCollection<Promotion>(promosRef);
+  const { data: allPromotions, isLoading: isPromosLoading, error: promosError } = useCollection<Promotion>(promosRef);
 
   // --- FILTERS STATE ---
   const [search, setSearch] = useState('');
-  const [filterCommune, setFilterCommune] = useState<string>('USER_DEFAULT'); // 'USER_DEFAULT' | 'ALL' | 'CommuneName'
+  const [filterCommune, setFilterCommune] = useState<string>('USER_DEFAULT');
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
   const [filterBusiness, setFilterBusiness] = useState<string>('ALL');
-  const [filterType, setFilterType] = useState<string>('ALL'); // 'ALL' | 'Promo' | 'Nouvel Arrivage'
+  const [filterType, setFilterType] = useState<string>('ALL');
 
   const userCommune = profile?.lastSelectedLocation || 'Nouméa';
 
-  // --- FILTERING & SORTING LOGIC ---
+  // --- LOGIQUE DE FILTRAGE AMÉLIORÉE ---
   const filteredProducts = useMemo(() => {
-    if (!allPromotions || !businesses) return [];
+    if (!allPromotions) return [];
 
-    const businessMap = new Map(businesses.map(b => [b.id, b]));
+    const businessMap = new Map(businesses?.map(b => [b.id, b]) || []);
 
     return allPromotions
       .map(promo => ({
@@ -63,32 +61,31 @@ export default function ShoppingPage() {
         business: businessMap.get(promo.businessId)
       }))
       .filter(item => {
-        // 1. Validation: Item must belong to a known business
-        if (!item.business) return false;
-
-        // 2. Search filter
-        const matchesSearch = item.title.toLowerCase().includes(search.toLowerCase()) || 
+        // 1. Recherche textuelle
+        const matchesSearch = !search || 
+                             item.title.toLowerCase().includes(search.toLowerCase()) || 
                              (item.description?.toLowerCase() || '').includes(search.toLowerCase());
         if (!matchesSearch) return false;
 
-        // 3. Commune filter
+        // 2. Filtre Commune (Seulement si le magasin est connu)
         if (filterCommune !== 'USER_DEFAULT' && filterCommune !== 'ALL') {
-            if (item.business.commune !== filterCommune) return false;
+            if (item.business && item.business.commune !== filterCommune) return false;
+            if (!item.business) return false; // On masque si on ne sait pas où c'est et qu'un filtre est actif
         }
 
-        // 4. Category filter
+        // 3. Filtre Catégorie
         if (filterCategory !== 'ALL' && item.category !== filterCategory) return false;
 
-        // 5. Business filter
+        // 4. Filtre Magasin
         if (filterBusiness !== 'ALL' && item.businessId !== filterBusiness) return false;
 
-        // 6. Type filter
+        // 5. Filtre Type
         if (filterType !== 'ALL' && item.promoType !== filterType) return false;
 
         return true;
       })
       .sort((a, b) => {
-        // A. Priority sorting: User's commune products first
+        // Tri prioritaire par commune de l'utilisateur
         if (filterCommune === 'USER_DEFAULT') {
             const aInCommune = a.business?.commune === userCommune;
             const bInCommune = b.business?.commune === userCommune;
@@ -96,9 +93,9 @@ export default function ShoppingPage() {
             if (!aInCommune && bInCommune) return 1;
         }
         
-        // B. Temporal sorting: Newest first (using createdAt if available)
-        const timeA = a.createdAt?.toMillis?.() || 0;
-        const timeB = b.createdAt?.toMillis?.() || 0;
+        // Tri chronologique (JS Side)
+        const timeA = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0;
+        const timeB = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0;
         return timeB - timeA;
       });
   }, [allPromotions, businesses, search, filterCommune, filterCategory, filterBusiness, filterType, userCommune]);
@@ -213,12 +210,22 @@ export default function ShoppingPage() {
 
       {/* --- LISTE DES PRODUITS --- */}
       <div className="space-y-4">
+        {promosError && (
+            <Alert variant="destructive" className="border-2">
+                <AlertTriangle className="size-4" />
+                <AlertTitle className="text-xs font-black uppercase">Erreur de chargement</AlertTitle>
+                <AlertDescription className="text-[10px]">
+                    Un problème de permissions ou d'index empêche l'affichage. Veuillez patienter ou rafraîchir.
+                </AlertDescription>
+            </Alert>
+        )}
+
         <div className="flex items-center justify-between px-1">
             <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                <Tag className="size-3" /> {filteredProducts.length} Produit{filteredProducts.length > 1 ? 's' : ''} disponible{filteredProducts.length > 1 ? 's' : ''}
+                <Tag className="size-3" /> {filteredProducts.length} Produit{filteredProducts.length > 1 ? 's' : ''} trouvé{filteredProducts.length > 1 ? 's' : ''}
             </h3>
             {filterCommune === 'USER_DEFAULT' && (
-                <Badge variant="outline" className="text-[8px] h-4 font-black border-primary/30 text-primary uppercase">Priorité localité</Badge>
+                <Badge variant="outline" className="text-[8px] h-4 font-black border-primary/30 text-primary uppercase">Priorité {userCommune}</Badge>
             )}
         </div>
 
@@ -236,10 +243,12 @@ export default function ShoppingPage() {
             <div className="text-center py-20 border-4 border-dashed rounded-[2.5rem] flex flex-col items-center gap-4 opacity-30">
                 <div className="p-6 bg-muted rounded-full"><ShoppingBag className="size-12" /></div>
                 <div className="space-y-1">
-                    <p className="font-black uppercase tracking-widest text-sm">Aucun produit trouvé</p>
-                    <p className="text-xs font-bold">Essayez d'élargir vos filtres de recherche.</p>
+                    <p className="font-black uppercase tracking-widest text-sm">Aucun produit visible</p>
+                    <p className="text-xs font-bold max-w-[200px] mx-auto">Si vous avez créé un article, il peut mettre 1 à 2 minutes à apparaître partout.</p>
                 </div>
-                <Button variant="outline" onClick={resetFilters} className="mt-2 font-black uppercase text-[10px] border-2">Voir tout le catalogue NC</Button>
+                <Button variant="outline" onClick={() => window.location.reload()} className="mt-2 font-black uppercase text-[10px] border-2 gap-2">
+                    <RefreshCw className="size-3" /> Forcer le rafraîchissement
+                </Button>
             </div>
         )}
       </div>
@@ -261,11 +270,13 @@ function ProductCard({ product }: { product: Promotion & { business?: Business }
                     <div className="size-6 rounded-lg bg-white flex items-center justify-center border shadow-sm shrink-0">
                         <Store className="size-3 text-primary" />
                     </div>
-                    <span className="text-[9px] font-black uppercase truncate text-slate-700">{product.business?.name}</span>
+                    <span className="text-[9px] font-black uppercase truncate text-slate-700">
+                        {product.business?.name || "Chargement magasin..."}
+                    </span>
                 </div>
                 <div className="flex items-center gap-1 text-[8px] font-bold text-muted-foreground shrink-0 bg-white/50 px-1.5 py-0.5 rounded border">
                     <MapPin className="size-2 text-primary" />
-                    {product.business?.commune}
+                    {product.business?.commune || "..."}
                 </div>
             </div>
 
