@@ -12,9 +12,10 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 export default function ProDashboard() {
   const { user, isUserLoading } = useUser();
@@ -72,25 +73,70 @@ export default function ProDashboard() {
 
   // --- FORM STATES ---
   const [promoTitle, setPromoTitle] = useState('');
-  const [promoPrice, setPromoPrice] = useState('');
   const [promoType, setPromoType] = useState<'Promo' | 'Nouvel Arrivage'>('Promo');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Smart Promo States
+  const [originalPrice, setOriginalPrice] = useState('');
+  const [discountedPrice, setDiscountedPrice] = useState('');
+  const [discountPercentage, setDiscountPercentage] = useState('');
+  const [standardPrice, setStandardPrice] = useState(''); // Used for Non-Promo type
+
+  const handleOriginalPriceChange = (val: string) => {
+    setOriginalPrice(val);
+    const p1 = parseFloat(val);
+    const d = parseFloat(discountPercentage);
+    const p2 = parseFloat(discountedPrice);
+
+    if (!isNaN(p1)) {
+        if (!isNaN(d)) {
+            setDiscountedPrice((p1 * (1 - d / 100)).toFixed(0));
+        } else if (!isNaN(p2) && p1 !== 0) {
+            setDiscountPercentage(((1 - p2 / p1) * 100).toFixed(1));
+        }
+    }
+  };
+
+  const handleDiscountedPriceChange = (val: string) => {
+    setDiscountedPrice(val);
+    const p2 = parseFloat(val);
+    const p1 = parseFloat(originalPrice);
+    if (!isNaN(p2) && !isNaN(p1) && p1 !== 0) {
+      setDiscountPercentage(((1 - p2 / p1) * 100).toFixed(1));
+    }
+  };
+
+  const handlePercentageChange = (val: string) => {
+    setDiscountPercentage(val);
+    const d = parseFloat(val);
+    const p1 = parseFloat(originalPrice);
+    if (!isNaN(d) && !isNaN(p1)) {
+      setDiscountedPrice((p1 * (1 - d / 100)).toFixed(0));
+    }
+  };
 
   const handleAddPromotion = async () => {
     if (!firestore || !business || !promoTitle) return;
     setIsSaving(true);
     try {
+      const finalPrice = promoType === 'Promo' ? parseFloat(discountedPrice) : parseFloat(standardPrice);
+      
       const promoData = {
         businessId: business.id,
         title: promoTitle,
-        price: parseFloat(promoPrice) || 0,
+        price: finalPrice || 0,
+        originalPrice: promoType === 'Promo' ? (parseFloat(originalPrice) || 0) : null,
+        discountPercentage: promoType === 'Promo' ? (parseFloat(discountPercentage) || 0) : null,
         promoType,
         createdAt: serverTimestamp(),
       };
       await addDoc(collection(firestore, 'businesses', business.id, 'promotions'), promoData);
       toast({ title: "Produit ajouté !" });
       setPromoTitle('');
-      setPromoPrice('');
+      setOriginalPrice('');
+      setDiscountedPrice('');
+      setDiscountPercentage('');
+      setStandardPrice('');
     } finally {
       setIsSaving(false);
     }
@@ -163,29 +209,87 @@ export default function ProDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <h3 className="text-sm font-black uppercase flex items-center gap-2 text-primary"><ShoppingBag className="size-4" /> Ajouter une Offre</h3>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div className="space-y-1">
                   <Label className="text-[10px] font-black uppercase opacity-60">Nom du produit</Label>
-                  <Input value={promoTitle} onChange={e => setPromoTitle(e.target.value)} placeholder="Ex: Moulinet Shimano..." />
+                  <Input value={promoTitle} onChange={e => setPromoTitle(e.target.value)} placeholder="Ex: Moulinet Shimano..." className="font-bold border-2" />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-black uppercase opacity-60">Prix (FCFP)</Label>
-                    <Input type="number" value={promoPrice} onChange={e => setPromoPrice(e.target.value)} placeholder="0" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-black uppercase opacity-60">Type</Label>
+                
+                <div className="space-y-1">
+                    <Label className="text-[10px] font-black uppercase opacity-60">Type d'offre</Label>
                     <Select value={promoType} onValueChange={(v: any) => setPromoType(v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-11 border-2 font-black uppercase text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Promo">Promo</SelectItem>
-                        <SelectItem value="Nouvel Arrivage">Nouvel Arrivage</SelectItem>
+                        <SelectItem value="Promo" className="font-black text-xs uppercase">Promotion</SelectItem>
+                        <SelectItem value="Nouvel Arrivage" className="font-black text-xs uppercase">Nouvel Arrivage</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
                 </div>
-                <Button onClick={handleAddPromotion} disabled={isSaving || !promoTitle} className="w-full h-12 font-black uppercase gap-2">
-                  <Plus className="size-4" /> Enregistrer le produit
+
+                {promoType === 'Promo' ? (
+                    <div className="grid gap-4 p-4 bg-muted/30 rounded-2xl border-2 border-dashed animate-in fade-in zoom-in-95">
+                        <div className="space-y-1">
+                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Prix avant promotion (F)</Label>
+                            <div className="relative">
+                                <Tag className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                                <Input 
+                                    type="number" 
+                                    value={originalPrice} 
+                                    onChange={e => handleOriginalPriceChange(e.target.value)} 
+                                    placeholder="Prix d'origine" 
+                                    className="pl-10 h-11 border-2 font-black"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                                <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Remise (%)</Label>
+                                <div className="relative">
+                                    <Percent className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-primary" />
+                                    <Input 
+                                        type="number" 
+                                        value={discountPercentage} 
+                                        onChange={e => handlePercentageChange(e.target.value)} 
+                                        placeholder="%" 
+                                        className="pl-10 h-11 border-2 border-primary/20 font-black text-primary"
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Prix final (Promo)</Label>
+                                <div className="relative">
+                                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-green-600" />
+                                    <Input 
+                                        type="number" 
+                                        value={discountedPrice} 
+                                        onChange={e => handleDiscountedPriceChange(e.target.value)} 
+                                        placeholder="Prix final" 
+                                        className="pl-10 h-11 border-2 border-green-200 font-black text-green-600 bg-green-50"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <p className="text-[8px] font-bold text-muted-foreground text-center italic">Saisissez deux champs, le troisième se calculera automatiquement.</p>
+                    </div>
+                ) : (
+                    <div className="space-y-1 animate-in fade-in zoom-in-95">
+                        <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Prix de vente (F)</Label>
+                        <div className="relative">
+                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                            <Input 
+                                type="number" 
+                                value={standardPrice} 
+                                onChange={e => setStandardPrice(e.target.value)} 
+                                placeholder="0" 
+                                className="pl-10 h-11 border-2 font-black"
+                            />
+                        </div>
+                    </div>
+                )}
+
+                <Button onClick={handleAddPromotion} disabled={isSaving || !promoTitle} className="w-full h-14 font-black uppercase gap-2 shadow-lg text-sm tracking-widest">
+                  <Plus className="size-5" /> Enregistrer au catalogue
                 </Button>
               </div>
             </div>
