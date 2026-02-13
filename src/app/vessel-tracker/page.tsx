@@ -59,6 +59,7 @@ import { Textarea } from '@/components/ui/textarea';
 
 const INITIAL_CENTER = { lat: -22.27, lng: 166.45 };
 const IMMOBILITY_THRESHOLD_METERS = 20; 
+const EMPTY_IDS: string[] = [];
 
 const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
   if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
@@ -130,12 +131,12 @@ export default function VesselTrackerPage() {
   }, [user, firestore]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
-  const savedVesselIds = userProfile?.savedVesselIds || [];
+  const savedVesselIds = useMemo(() => userProfile?.savedVesselIds || EMPTY_IDS, [userProfile?.savedVesselIds]);
   
   const vesselsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     const queryIds = [...savedVesselIds];
-    if (isSharing && !queryIds.includes(sharingId)) queryIds.push(sharingId);
+    if (isSharing && !queryIds.includes(sharingId) && sharingId) queryIds.push(sharingId);
     
     if (queryIds.length === 0) return null;
     
@@ -261,7 +262,7 @@ export default function VesselTrackerPage() {
       
       if (userProfile.lastVesselId && !customSharingId) setCustomSharingId(userProfile.lastVesselId);
     }
-  }, [userProfile, user]);
+  }, [userProfile, user, customSharingId, vesselNickname]);
 
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
@@ -389,12 +390,6 @@ export default function VesselTrackerPage() {
     } catch (e) {}
   };
 
-  const saveVesselPrefs = async (newPrefs: typeof vesselPrefs) => {
-    if (!user || !firestore) return;
-    setVesselPrefs(newPrefs);
-    await updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: newPrefs }).catch(() => {});
-  };
-
   const handleSaveSmsSettings = async () => {
     if (!user || !firestore) return;
     try {
@@ -405,8 +400,18 @@ export default function VesselTrackerPage() {
     } catch (e) {}
   };
 
+  const saveVesselPrefs = async (newPrefs: typeof vesselPrefs) => {
+    if (!user || !firestore) return;
+    setVesselPrefs(newPrefs);
+    await updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: newPrefs }).catch(() => {});
+  };
+
+  // --- REFACTORED HISTORY & NOTIFICATION EFFECT (BATCHED) ---
   useEffect(() => {
     if (!followedVessels) return;
+
+    const newEntries: any[] = [];
+    let hasAlert = false;
 
     followedVessels.forEach(vessel => {
         const isSharingActive = vessel.isSharing === true;
@@ -428,7 +433,6 @@ export default function VesselTrackerPage() {
         const clearTimeKey = getTimeMillis(vessel.historyClearedAt);
 
         if (clearTimeKey > (lastClearTimesRef.current[vessel.id] || 0)) {
-            setHistory(prev => prev.filter(h => h.vesselName !== (vessel.displayName || vessel.id)));
             lastClearTimesRef.current[vessel.id] = clearTimeKey;
         }
 
@@ -449,18 +453,25 @@ export default function VesselTrackerPage() {
 
         const label = currentEvent || statusLabels[currentStatus] || currentStatus;
         
-        setHistory(prev => [{ vesselName: vessel.displayName || vessel.id, statusLabel: label, time: new Date(), pos, batteryLevel: currentBattery, isCharging: currentCharging }, ...prev].slice(0, 50));
+        // Collect entry instead of calling setHistory immediately
+        newEntries.push({ 
+            vesselName: vessel.displayName || vessel.id, 
+            statusLabel: label, 
+            time: new Date(), 
+            pos, 
+            batteryLevel: currentBattery, 
+            isCharging: currentCharging 
+        });
         
         if (mode === 'receiver' && lastStatus && vesselPrefs.isNotifyEnabled) {
             if (currentStatus === 'emergency' && statusChanged) {
                 if (vesselPrefs.notifySettings.emergency) {
                   playVesselSound(vesselPrefs.notifySounds.emergency || 'alerte');
-                  toast({ variant: 'destructive', title: vessel.displayName || vessel.id, description: "DEMANDE ASSISTANCE !" });
+                  hasAlert = true;
                 }
             } else if (currentEvent.includes('CHASSE') && eventChanged) {
                 if (vesselPrefs.notifySettings.birds) {
                   playVesselSound(vesselPrefs.notifySounds.birds || 'sonar');
-                  toast({ title: vessel.displayName || vessel.id, description: "Signal de chasse détecté !" });
                 }
             } else if (statusChanged) {
                 const soundKey = (currentStatus === 'returning' || currentStatus === 'landed') ? 'moving' : currentStatus;
@@ -478,12 +489,19 @@ export default function VesselTrackerPage() {
         if (lastBattery >= (vesselPrefs.batteryThreshold || 20) && currentBattery < (vesselPrefs.batteryThreshold || 20)) {
             if (mode === 'receiver' && vesselPrefs.isNotifyEnabled) {
                 playVesselSound(vesselPrefs.batterySound || 'alerte');
-                toast({ variant: 'destructive', title: "Batterie Critique", description: `${vessel.displayName || vessel.id} : ${currentBattery}%` });
             }
         }
         lastBatteryLevelsRef.current[vessel.id] = currentBattery;
         lastChargingStatesRef.current[vessel.id] = currentCharging;
     });
+
+    if (newEntries.length > 0) {
+        setHistory(prev => [...newEntries, ...prev].slice(0, 50));
+    }
+    if (hasAlert) {
+        const lastVessel = followedVessels.find(v => v.status === 'emergency');
+        if (lastVessel) toast({ variant: 'destructive', title: lastVessel.displayName || lastVessel.id, description: "DEMANDE ASSISTANCE !" });
+    }
   }, [followedVessels, mode, vesselPrefs, playVesselSound, toast]);
 
   useEffect(() => {
