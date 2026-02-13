@@ -57,7 +57,13 @@ service cloud.firestore {
       allow write: if isMaster();
     }
 
-    // --- 3. DONNÉES PRIVÉES (PROPRIÉTAIRE OU MASTER) ---
+    // --- 3. REQUÊTES DE GROUPE (SHOPPING) ---
+    // Indispensable pour collectionGroup('promotions')
+    match /{path=**}/promotions/{promoId} {
+      allow read: if isSignedIn();
+    }
+
+    // --- 4. DONNÉES PRIVÉES (PROPRIÉTAIRE OU MASTER) ---
     match /users/{userId} {
       allow read, write: if isSignedIn() && (request.auth.uid == userId || isMaster());
       match /{allPaths=**} {
@@ -66,7 +72,6 @@ service cloud.firestore {
     }
 
     match /conversations/{id} {
-      // Obligatoire pour le listage global de l'admin
       allow read, write: if isSignedIn() && (request.auth.uid == id || isMaster());
       match /{allPaths=**} {
         allow read, write: if isSignedIn() && (request.auth.uid == id || isMaster());
