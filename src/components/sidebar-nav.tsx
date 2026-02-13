@@ -1,3 +1,4 @@
+
 'use client';
 
 import { usePathname } from 'next/navigation';
@@ -65,13 +66,14 @@ export function SidebarNav() {
     <div className="flex flex-col h-full">
       <SidebarMenu className="flex-grow">
         {navLinks.map((link) => {
-          // Filtrage Pro Only
+          // 1. Filtrage Admin Only (Strict)
+          // Le lien ne s'affiche que si l'utilisateur est reconnu comme admin
+          if (link.adminOnly && !roles.isAdmin) return null;
+
+          // 2. Filtrage Pro Only
           if (link.proOnly && !roles.isPro) return null;
           
-          // Filtrage Admin Only
-          if (link.adminOnly && !roles.isAdmin) return null;
-          
-          // Masquer Contact pour l'admin
+          // 3. Masquage du contact pour l'admin (qui utilise le dashboard messages)
           if (link.href === '/contact' && roles.isAdmin) return null;
           if (link.href === '/contact' && !user) return null;
           
