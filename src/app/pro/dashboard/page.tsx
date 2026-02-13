@@ -500,7 +500,7 @@ export default function ProDashboard() {
                 [1,2].map(i => <Skeleton key={i} className="h-32 w-full rounded-2xl" />)
             ) : promotions && promotions.length > 0 ? (
                 promotions.map(promo => (
-                    <Card key={promo.id} className={cn("overflow-hidden border-2 shadow-sm flex h-32 group transition-all", editingPromoId === promo.id ? "border-accent bg-accent/5 ring-1 ring-accent" : "hover:border-primary/30")}>
+                    <Card key={promo.id} className={cn("overflow-hidden border-2 shadow-sm flex min-h-32 h-auto group transition-all", editingPromoId === promo.id ? "border-accent bg-accent/5 ring-1 ring-accent" : "hover:border-primary/30")}>
                         <div className="w-32 bg-muted/20 shrink-0 border-r relative flex items-center justify-center">
                             {promo.imageUrl ? (
                                 <img src={promo.imageUrl} className="w-full h-full object-cover" alt={promo.title} />
@@ -517,9 +517,9 @@ export default function ProDashboard() {
                                 <div className="flex gap-1">
                                     <Badge variant="outline" className="text-[7px] h-3.5 px-1 font-black uppercase border-muted-foreground/30">{promo.category}</Badge>
                                 </div>
-                                <p className="text-[10px] text-muted-foreground line-clamp-1 leading-tight">{promo.description || "Aucune description."}</p>
+                                <p className="text-[10px] text-muted-foreground leading-tight break-words">{promo.description || "Aucune description."}</p>
                             </div>
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between mt-3">
                                 <div className="flex items-center gap-2">
                                     <div className="flex flex-col">
                                         {promo.promoType === 'Promo' && promo.originalPrice && (
