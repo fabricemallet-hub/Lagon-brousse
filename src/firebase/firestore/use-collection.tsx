@@ -75,7 +75,7 @@ export function useCollection<T = any>(
 
           setError(contextualError);
           
-          // Silencing error for admin-only paths to avoid disruptive dev overlays
+          // Silencing error for sensitive paths to avoid disruptive dev overlays during rule propagation
           const silentPaths = [
             'conversations', 
             'users', 
@@ -84,10 +84,11 @@ export function useCollection<T = any>(
             'system_notifications', 
             'sound_library',
             'vessels_safety',
-            'app_settings'
+            'app_settings',
+            'promotions'
           ];
           
-          const isSilent = silentPaths.some(p => path.includes(p));
+          const isSilent = silentPaths.some(p => path.includes(p)) || path === "";
           
           if (!isSilent) {
             errorEmitter.emit('permission-error', contextualError);

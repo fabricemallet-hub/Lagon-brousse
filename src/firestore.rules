@@ -10,7 +10,13 @@ service cloud.firestore {
 
     function isMaster() {
       return isSignedIn() && (
-        request.auth.uid in ["t8nPnZLcTiaLJSKMuLzib3C5nPn1", "K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2"] ||
+        request.auth.uid in [
+          "D1q2GPM95rZi38cvCzvsjcWQDaV2",
+          "t8nPnZLcTiaLJSKMuLzib3C5nPn1", 
+          "K9cVYLVUk1NV99YV3anebkugpPp1", 
+          "ipupi3Pg4RfrSEpFyT69BtlCdpi2", 
+          "Irglq69MasYdNwBmUu8yKvw6h4G2"
+        ] ||
         (request.auth.token.email != null && 
          request.auth.token.email.lower() in [
            "f.mallet81@outlook.com",
@@ -22,12 +28,18 @@ service cloud.firestore {
     }
 
     // --- 1. BYPASS UNIVERSEL MASTER ---
-    // Cette règle permet à l'admin de tout lister et tout modifier
+    // Cette règle permet à l'admin de tout lister et tout modifier sur n'importe quel chemin
     match /{allPaths=**} {
       allow read, write: if isMaster();
     }
 
-    // --- 2. ACCÈS PUBLICS & USAGERS ---
+    // --- 2. REQUÊTES DE GROUPE (SHOPPING) ---
+    // Indispensable pour collectionGroup('promotions') utilisé dans le Dashboard Shopping
+    match /{path=**}/promotions/{promoId} {
+      allow read: if isSignedIn();
+    }
+
+    // --- 3. ACCÈS PUBLICS & USAGERS ---
     match /app_settings/{id} {
       allow read: if true;
     }
@@ -55,12 +67,6 @@ service cloud.firestore {
     match /sound_library/{id} {
       allow read: if true;
       allow write: if isMaster();
-    }
-
-    // --- 3. REQUÊTES DE GROUPE (SHOPPING) ---
-    // Indispensable pour collectionGroup('promotions')
-    match /{path=**}/promotions/{promoId} {
-      allow read: if isSignedIn();
     }
 
     // --- 4. DONNÉES PRIVÉES (PROPRIÉTAIRE OU MASTER) ---
@@ -100,7 +106,12 @@ service cloud.firestore {
       allow get, list: if true;
       allow create: if isSignedIn();
       allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isMaster());
-      match /promotions/{promoId} { allow read, write: if isSignedIn(); }
+      
+      // Sécurité interne pour les promos du magasin
+      match /promotions/{promoId} { 
+        allow read: if true;
+        allow write: if isSignedIn() && (get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerId == request.auth.uid || isMaster());
+      }
     }
 
     match /campaigns/{campaignId} {
