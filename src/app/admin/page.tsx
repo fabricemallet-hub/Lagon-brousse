@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { locations } from '@/lib/locations';
 import { 
   MessageSquare, 
   ShieldCheck, 
@@ -44,7 +45,8 @@ import {
   X,
   Volume2,
   Play,
-  Calendar
+  Calendar,
+  Store
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -69,30 +71,17 @@ export default function AdminPage() {
     const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
     const masterAdminUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'K9cVYLVUk1NV99YV3anebkugpPp1', 'ipupi3Pg4RfrSEpFyT69BtlCdpi2', 'Irglq69MasYdNwBmUu8yKvw6h4G2'];
     const isMaster = masterEmails.includes(user.email?.toLowerCase() || '') || masterAdminUids.includes(user.uid);
-    if (isMaster) console.log(`L&B DEBUG ADMIN: Accès Master [${user.email}] confirmé.`);
     return isMaster;
   }, [user]);
 
   // REQUÊTES FIRESTORE
-  const usersRef = useMemoFirebase(() => {
-    if (!firestore || !isAdmin) return null;
-    console.log("L&B DEBUG ADMIN: Lancement requête [users]");
-    return collection(firestore, 'users');
-  }, [firestore, isAdmin]);
+  const usersRef = useMemoFirebase(() => (firestore && isAdmin) ? collection(firestore, 'users') : null, [firestore, isAdmin]);
   const { data: users, isLoading: isUsersLoading } = useCollection<UserAccount>(usersRef);
 
-  const businessRef = useMemoFirebase(() => {
-    if (!firestore || !isAdmin) return null;
-    console.log("L&B DEBUG ADMIN: Lancement requête [businesses]");
-    return collection(firestore, 'businesses');
-  }, [firestore, isAdmin]);
+  const businessRef = useMemoFirebase(() => (firestore && isAdmin) ? collection(firestore, 'businesses') : null, [firestore, isAdmin]);
   const { data: businesses } = useCollection<Business>(businessRef);
 
-  const convsRef = useMemoFirebase(() => {
-    if (!firestore || !isAdmin) return null;
-    console.log("L&B DEBUG ADMIN: Lancement requête [conversations]");
-    return collection(firestore, 'conversations');
-  }, [firestore, isAdmin]);
+  const convsRef = useMemoFirebase(() => (firestore && isAdmin) ? collection(firestore, 'conversations') : null, [firestore, isAdmin]);
   const { data: conversations, error: convError } = useCollection<Conversation>(convsRef);
 
   const tokensRef = useMemoFirebase(() => (firestore && isAdmin) ? query(collection(firestore, 'access_tokens'), orderBy('createdAt', 'desc')) : null, [firestore, isAdmin]);
@@ -123,16 +112,6 @@ export default function AdminPage() {
   const sharedTokenRef = useMemoFirebase(() => (firestore && isAdmin) ? doc(firestore, 'shared_access_tokens', 'GLOBAL') : null, [firestore, isAdmin]);
   const { data: globalGift } = useDoc<SharedAccessToken>(sharedTokenRef);
 
-  // Auto-sync profile to ensure admin role is visible in users list
-  useEffect(() => {
-    if (users && user && isAdmin) {
-        const myProfile = users.find(u => u.id === user.uid);
-        if (myProfile && myProfile.role !== 'admin') {
-            console.log("L&B DEBUG ADMIN: Rôle document Firestore: " + myProfile.role);
-        }
-    }
-  }, [users, user, isAdmin]);
-
   useEffect(() => {
     if (!isUserLoading && !isAdmin && user) router.push('/compte');
   }, [isAdmin, isUserLoading, router, user]);
@@ -153,9 +132,10 @@ export default function AdminPage() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 md:grid-cols-7 mb-6 h-auto bg-muted/50 border-2 rounded-2xl p-1.5 shadow-sm gap-1">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 md:grid-cols-8 mb-6 h-auto bg-muted/50 border-2 rounded-2xl p-1.5 shadow-sm gap-1">
           <TabsTrigger value="stats" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Vue d'ensemble</TabsTrigger>
           <TabsTrigger value="users" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Utilisateurs</TabsTrigger>
+          <TabsTrigger value="businesses" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Commerces</TabsTrigger>
           <TabsTrigger value="design" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Design & Splash</TabsTrigger>
           <TabsTrigger value="notifications" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Notifications</TabsTrigger>
           <TabsTrigger value="fish" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Guide Poissons</TabsTrigger>
@@ -174,6 +154,10 @@ export default function AdminPage() {
 
         <TabsContent value="users" className="space-y-6">
           <UsersManager users={users} isUsersLoading={isUsersLoading} />
+        </TabsContent>
+
+        <TabsContent value="businesses" className="space-y-6">
+          <BusinessesManager businesses={businesses} users={users} />
         </TabsContent>
 
         <TabsContent value="design" className="space-y-6">
@@ -211,6 +195,103 @@ export default function AdminPage() {
 }
 
 // --- SUB-COMPONENTS ---
+
+function BusinessesManager({ businesses, users }: { businesses: Business[] | null, users: UserAccount[] | null }) {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [name, setName] = useState('');
+    const [commune, setCommune] = useState('');
+    const [category, setCategory] = useState<'Pêche' | 'Chasse' | 'Jardinage'>('Pêche');
+    const [ownerId, setOwnerId] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleAdd = async () => {
+        if (!firestore || !name || !commune || !ownerId) return;
+        setIsSaving(true);
+        try {
+            const businessRef = doc(collection(firestore, 'businesses'));
+            const businessData: Business = {
+                id: businessRef.id,
+                ownerId,
+                name,
+                commune,
+                category,
+                createdAt: serverTimestamp()
+            };
+            
+            const batch = writeBatch(firestore);
+            batch.set(businessRef, businessData);
+            batch.update(doc(firestore, 'users', ownerId), { 
+                businessId: businessRef.id,
+                role: 'professional',
+                subscriptionStatus: 'professional'
+            });
+            
+            await batch.commit();
+            setName(''); setCommune(''); setOwnerId('');
+            toast({ title: "Commerce créé et lié à l'utilisateur" });
+        } catch (e) {
+            toast({ variant: 'destructive', title: "Erreur" });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <Card className="border-2 shadow-lg">
+            <CardHeader><CardTitle className="text-lg font-black uppercase flex items-center gap-2"><Store className="size-5 text-primary" /> Gestion des Commerces Pro</CardTitle></CardHeader>
+            <CardContent className="space-y-6">
+                <div className="p-4 bg-muted/30 rounded-2xl border-2 border-dashed space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Nom du commerce</Label><Input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Pacific Pêche..." /></div>
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Commune</Label>
+                            <Select value={commune} onValueChange={setCommune}>
+                                <SelectTrigger><SelectValue placeholder="Choisir..." /></SelectTrigger>
+                                <SelectContent className="max-h-64">
+                                    {Object.keys(locations).map(loc => <SelectItem key={loc} value={loc}>{loc}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Catégorie principale</Label>
+                            <Select value={category} onValueChange={(v: any) => setCategory(v)}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent><SelectItem value="Pêche">Pêche</SelectItem><SelectItem value="Chasse">Chasse</SelectItem><SelectItem value="Jardinage">Jardinage</SelectItem></SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Propriétaire à lier (Utilisateur)</Label>
+                            <Select value={ownerId} onValueChange={setOwnerId}>
+                                <SelectTrigger><SelectValue placeholder="Choisir un utilisateur..." /></SelectTrigger>
+                                <SelectContent>
+                                    {users?.map(u => <SelectItem key={u.id} value={u.id}>{u.displayName} ({u.email})</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <Button onClick={handleAdd} disabled={isSaving || !name || !commune || !ownerId} className="w-full font-black uppercase h-12 shadow-lg bg-primary">Lier et créer le commerce</Button>
+                </div>
+                <div className="max-h-96 overflow-y-auto border-2 rounded-2xl">
+                    <Table>
+                        <TableHeader><TableRow className="bg-muted/30"><TableHead className="text-[10px] font-black uppercase h-10 px-4">Commerce</TableHead><TableHead className="text-[10px] font-black uppercase h-10">Propriétaire</TableHead><TableHead className="text-right text-[10px] font-black uppercase h-10 px-4">Action</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                            {businesses?.map(b => {
+                                const owner = users?.find(u => u.id === b.ownerId);
+                                return (
+                                    <TableRow key={b.id}>
+                                        <TableCell className="px-4 py-3"><div className="flex flex-col"><span className="font-black text-xs">{b.name}</span><span className="text-[9px] font-bold opacity-40 uppercase">{b.commune} / {b.category}</span></div></TableCell>
+                                        <TableCell className="text-[10px] font-bold">{owner?.displayName || 'Inconnu'} <span className="opacity-40 italic">({owner?.email || 'N/A'})</span></TableCell>
+                                        <TableCell className="text-right px-4"><Button variant="ghost" size="icon" className="text-destructive/40 hover:text-destructive" onClick={() => deleteDoc(doc(firestore!, 'businesses', b.id))}><Trash2 className="size-3" /></Button></TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
 
 function SystemNotificationsManager({ notifications }: { notifications: SystemNotification[] | null }) {
     const firestore = useFirestore();

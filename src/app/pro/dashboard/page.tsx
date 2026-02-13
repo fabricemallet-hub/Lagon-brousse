@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -116,11 +115,21 @@ export default function ProDashboard() {
 
   if (!business) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <Store className="size-16 text-muted-foreground opacity-20" />
-        <h2 className="text-xl font-black uppercase">Espace Professionnel</h2>
-        <p className="text-sm text-muted-foreground text-center max-w-xs">Vous n'avez pas encore de compte pro activé. Contactez l'admin pour lier votre boutique.</p>
-        <Button onClick={() => router.push('/compte')} variant="outline">Retour au compte</Button>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 px-4 text-center">
+        <div className="p-6 bg-primary/10 rounded-full text-primary shadow-inner">
+            <Store className="size-16" />
+        </div>
+        <h2 className="text-2xl font-black uppercase tracking-tighter">Espace Professionnel</h2>
+        <div className="space-y-4 max-w-sm">
+            <p className="text-sm font-medium text-muted-foreground leading-relaxed">
+                Votre compte n'est pas encore relié à un commerce. Pour lier votre boutique, veuillez contacter l'administrateur.
+            </p>
+            <div className="p-4 bg-muted/30 rounded-xl border-2 border-dashed space-y-1">
+                <p className="text-[10px] font-black uppercase opacity-40">Votre identifiant unique à fournir :</p>
+                <p className="font-mono font-black text-primary text-xs select-all">{user?.uid}</p>
+            </div>
+        </div>
+        <Button onClick={() => router.push('/compte')} variant="outline" className="mt-4 font-black uppercase text-xs h-12 border-2">Retour au compte</Button>
       </div>
     );
   }
