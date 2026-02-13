@@ -549,8 +549,17 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                             className="flex flex-col items-center gap-1 cursor-pointer"
                                             onClick={(e) => { e.stopPropagation(); handleSpotClick(spot.id); }}
                                         >
-                                            <div className="flex flex-col items-center gap-1 px-2 py-1 bg-card/90 backdrop-blur-sm border border-border rounded-md shadow" onClick={(e) => e.stopPropagation()}>
+                                            <div className="flex flex-col items-center gap-1 px-2 py-1 bg-card/90 backdrop-blur-sm border border-border rounded-md shadow min-w-[80px]" onClick={(e) => e.stopPropagation()}>
                                                 <span className="text-xs font-bold text-foreground whitespace-nowrap">{spot.name}</span>
+                                                {spot.fishingTypes && spot.fishingTypes.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1 justify-center mt-0.5">
+                                                        {spot.fishingTypes.map(type => (
+                                                            <span key={type} className="text-[8px] font-black uppercase text-primary leading-none bg-primary/10 px-1 py-0.5 rounded">
+                                                                {type.split(' ').pop()}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                              <div
                                                 className="p-1.5 rounded-full flex items-center justify-center shadow-lg"
