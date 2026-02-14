@@ -11,14 +11,17 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, Image as ImageIcon, X, Info, Pencil, Save, AlertCircle } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, ImageIcon, X, Info, Pencil, Save, AlertCircle, LogOut } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
+import { signOut } from 'firebase/auth';
+import { useAuth } from '@/firebase';
 
 export default function ProDashboard() {
   const { user, isUserLoading } = useUser();
+  const auth = useAuth();
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
@@ -86,7 +89,6 @@ export default function ProDashboard() {
           where('lastSelectedLocation', '==', business.commune),
           where('favoriteCategory', '==', targetCategory)
         );
-        // Utilisation de getCountFromServer pour la performance et la sécurité
         const snap = await getCountFromServer(q);
         setTargetCount(snap.data().count);
       } catch (e) {
@@ -99,6 +101,12 @@ export default function ProDashboard() {
     };
     calculateReach();
   }, [firestore, business, targetCategory]);
+
+  const handleLogout = async () => {
+    if (!auth) return;
+    await signOut(auth);
+    router.replace('/login');
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -465,9 +473,14 @@ export default function ProDashboard() {
                         </div>
                         
                         {reachError && (
-                            <p className="text-[9px] text-red-600 font-bold bg-red-50 p-2 rounded-lg border border-red-100 flex items-center gap-2">
-                                <AlertCircle className="size-3" /> Accès en cours de validation...
-                            </p>
+                            <div className="p-3 bg-red-50 border border-red-100 rounded-xl space-y-2">
+                                <p className="text-[9px] text-red-600 font-bold flex items-center gap-2">
+                                    <AlertCircle className="size-3" /> Accès en cours de validation...
+                                </p>
+                                <Button variant="outline" size="sm" onClick={handleLogout} className="w-full h-8 text-[8px] font-black uppercase border-red-200 text-red-600">
+                                    <LogOut className="size-2 mr-1" /> Reconnexion requise
+                                </Button>
+                            </div>
                         )}
                     </div>
 
@@ -497,11 +510,6 @@ export default function ProDashboard() {
                     <p className="text-[9px] font-medium leading-relaxed text-muted-foreground italic">
                         La diffusion flash envoie une notification immédiate aux utilisateurs ayant sélectionné <strong>{business.commune}</strong> comme localité et <strong>{targetCategory}</strong> comme catégorie favorite.
                     </p>
-                    {reachError && (
-                        <p className="text-[9px] font-bold text-orange-700 mt-2 bg-orange-50 p-2 rounded border border-orange-100">
-                            Info : Si vous venez de passer en compte PRO, déconnectez-vous et reconnectez-vous une fois pour rafraîchir vos permissions.
-                        </p>
-                    )}
                 </div>
             </div>
           </div>
@@ -523,7 +531,7 @@ export default function ProDashboard() {
                             {promo.imageUrl ? (
                                 <img src={promo.imageUrl} className="w-full h-full object-cover" alt={promo.title} />
                             ) : (
-                                <ImageIcon className="size-8 text-muted-foreground/30" />
+                                <Store className="size-8 text-muted-foreground/30" />
                             )}
                             <Badge className={cn("absolute top-1 left-1 font-black text-[8px] uppercase border-none shadow-sm", promo.promoType === 'Promo' ? "bg-red-600" : "bg-primary")}>
                                 {promo.promoType}

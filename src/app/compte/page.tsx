@@ -144,18 +144,21 @@ export default function ComptePage() {
   const getStatusInfo = () => {
     if (!userProfile) return { label: 'Chargement', variant: 'secondary', icon: Star, desc: '' };
     
+    const roleLower = userProfile.role?.toLowerCase() || '';
+    const subLower = userProfile.subscriptionStatus?.toLowerCase() || '';
+
     // PRIORITÉ 1 : ADMIN
-    if (userProfile.subscriptionStatus === 'admin' || userProfile.role === 'admin') {
+    if (roleLower === 'admin' || subLower === 'admin') {
         return { label: 'Administrateur', variant: 'default', icon: Crown, desc: "Accès illimité Master." };
     }
 
     // PRIORITÉ 2 : PRO
-    if (userProfile.subscriptionStatus === 'professional' || userProfile.role === 'professional') {
+    if (roleLower === 'professional' || subLower === 'professional' || roleLower === 'pro' || subLower === 'pro') {
         return { label: 'Professionnel', variant: 'outline', icon: Store, desc: "Compte Partenaire Professionnel." };
     }
 
     // PRIORITÉ 3 : ABONNÉS ACTIFS (Statut Utilisateur Payant)
-    if (userProfile.subscriptionStatus === 'active') {
+    if (subLower === 'active') {
         const exp = userProfile.subscriptionExpiryDate ? new Date(userProfile.subscriptionExpiryDate) : null;
         if (exp && isBefore(new Date(), exp)) {
             return { label: 'Abonné', variant: 'default', icon: Star, desc: `Actif jusqu'au ${format(exp, 'dd MMMM yyyy', { locale: fr })}.` };
@@ -163,7 +166,7 @@ export default function ComptePage() {
     }
 
     // PRIORITÉ 4 : ESSAI GRATUIT ACTIF
-    if (userProfile.subscriptionStatus === 'trial') {
+    if (subLower === 'trial') {
         const tExp = userProfile.subscriptionExpiryDate ? new Date(userProfile.subscriptionExpiryDate) : null;
         if (tExp && isBefore(new Date(), tExp)) {
             return { label: 'Essai Gratuit', variant: 'secondary', icon: Zap, desc: `Période d'essai jusqu'au ${format(tExp, 'dd/MM/yy', { locale: fr })}.` };
@@ -176,7 +179,7 @@ export default function ComptePage() {
     }
     
     // CAS D'EXPIRATION
-    if (userProfile.subscriptionStatus === 'active' || userProfile.subscriptionStatus === 'trial') {
+    if (subLower === 'active' || subLower === 'trial') {
         return { label: 'Expiré', variant: 'destructive', icon: XCircle, desc: "Abonnement ou essai terminé." };
     }
 
