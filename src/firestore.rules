@@ -36,10 +36,8 @@ service cloud.firestore {
       );
     }
 
-    // --- RÈGLES DE COLLECTION ---
-
-    // 1. COLLECTION UTILISATEURS (CRITIQUE : Autoriser le comptage pour le Reach)
-    // On autorise explicitement le "list" au niveau de la collection pour le calcul d'audience.
+    // --- RÈGLES DE COLLECTION UTILISATEURS ---
+    // CRITIQUE : Autoriser le comptage global pour le calcul d'audience (Reach)
     match /users {
       allow list: if isSignedIn();
     }
@@ -51,12 +49,12 @@ service cloud.firestore {
       }
     }
 
-    // 2. PARAMÈTRES PUBLICS
+    // --- AUTRES COLLECTIONS ---
+
     match /app_settings/{id} { allow read: if true; }
     match /system_notifications/{id} { allow read: if true; }
     match /sound_library/{id} { allow read: if true; }
     
-    // 3. MÉTÉO ET POISSONS
     match /meteo_caledonie/{id} { 
       allow get, list: if true;
       match /previsions/{prevId} { allow get, list: if true; }
@@ -66,16 +64,13 @@ service cloud.firestore {
       match /commune_stats/{communeId} { allow read, write: if isSignedIn(); }
     }
 
-    // 4. COMMERCES ET PROMOTIONS
     match /businesses/{businessId} {
       allow get, list: if true;
       allow write: if isSignedIn();
       match /promotions/{promoId} { allow read, write: if isSignedIn(); }
     }
-    // Règle pour collectionGroup (Shopping Global)
     match /{path=**}/promotions/{promoId} { allow read: if true; }
 
-    // 5. FONCTIONNALITÉS TEMPS RÉEL
     match /conversations/{id} {
       allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin());
       match /{allPaths=**} { allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin()); }
@@ -85,7 +80,6 @@ service cloud.firestore {
     match /hunting_sessions/{id} { allow read, write: if isSignedIn(); match /{allPaths=**} { allow read, write: if isSignedIn(); } }
     match /campaigns/{campaignId} { allow read, write: if isSignedIn(); }
 
-    // RÈGLE PAR DÉFAUT : SEUL L'ADMIN PEUT TOUT FAIRE
     match /{allPaths=**} {
       allow read, write: if isAdmin();
     }
