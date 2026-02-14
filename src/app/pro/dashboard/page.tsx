@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, ImageIcon, X, Info, Pencil, Save, AlertCircle, LogOut, HelpCircle, Copy, Check } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, ImageIcon, X, Info, Pencil, Save, AlertCircle, LogOut, HelpCircle, Copy, Check, UserCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -269,7 +269,7 @@ export default function ProDashboard() {
       <Card className="border-2 border-dashed border-primary/40 bg-primary/5 shadow-inner">
         <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg text-primary"><UserIcon className="size-5" /></div>
+                <div className="p-2 bg-primary/10 rounded-lg text-primary"><UserCircle className="size-5" /></div>
                 <div>
                     <p className="text-[10px] font-black uppercase text-primary opacity-60">Votre Identifiant Unique (UID)</p>
                     <p className="font-mono font-black text-sm tracking-tight select-all break-all">{user?.uid}</p>
@@ -443,10 +443,11 @@ export default function ProDashboard() {
                             </div>
                             
                             {reachError && (
-                                <div className="p-3 bg-red-50 border border-red-100 rounded-xl">
+                                <div className="p-3 bg-red-50 border border-red-100 rounded-xl space-y-2">
                                     <p className="text-[9px] text-red-600 font-bold flex items-center gap-2 uppercase">
-                                        <AlertCircle className="size-3" /> Comment relié le compte pro a un commerce?
+                                        <AlertCircle className="size-3" /> Accès en cours... Reconnexion requise
                                     </p>
+                                    <Button size="sm" variant="outline" className="w-full h-8 text-[8px] font-black uppercase border-red-200 text-red-600" onClick={handleLogout}>Se déconnecter & Reconnecter</Button>
                                 </div>
                             )}
 
@@ -505,7 +506,7 @@ export default function ProDashboard() {
                                 <div className="flex items-center justify-between mt-3">
                                     <div className="flex flex-col">
                                         {promo.promoType === 'Promo' && promo.originalPrice && (
-                                            <span className="text-[8px] text-muted-foreground line-through font-bold">{promo.originalPrice} F</span>
+                                            <span className="text-[9px] text-muted-foreground line-through font-bold">{promo.originalPrice} F</span>
                                         )}
                                         <span className="text-sm font-black text-primary leading-none">{promo.price} F</span>
                                     </div>
@@ -533,24 +534,4 @@ export default function ProDashboard() {
       )}
     </div>
   );
-}
-
-function UserIcon(props: any) {
-    return (
-        <svg
-            {...props}
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-            <circle cx="12" cy="7" r="4" />
-        </svg>
-    )
 }
