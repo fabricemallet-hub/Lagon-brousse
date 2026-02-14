@@ -76,7 +76,7 @@ export default function ProDashboard() {
     if (!firestore || !business || !targetCategory || isUserLoading || !user) return;
     
     const calculateReach = async () => {
-      console.log("L&B Reach: Début du calcul pour", { commune: business.commune, cat: targetCategory });
+      console.log("L&B Reach: Tentative de calcul...", { commune: business.commune, cat: targetCategory });
       setIsCalculatingReach(true);
       setReachError(false);
       try {
@@ -87,10 +87,10 @@ export default function ProDashboard() {
           where('favoriteCategory', '==', targetCategory)
         );
         const snap = await getCountFromServer(q);
-        console.log("L&B Reach: Résultat obtenu =", snap.data().count);
+        console.log("L&B Reach: Succès, Audience =", snap.data().count);
         setTargetCount(snap.data().count);
       } catch (e: any) {
-        console.error("L&B Reach: Échec de la requête d'agrégation", e);
+        console.error("L&B Reach: ERREUR CRITIQUE", e);
         setReachError(true);
         setTargetCount(0);
       } finally {
@@ -104,7 +104,7 @@ export default function ProDashboard() {
     if (!user?.uid) return;
     navigator.clipboard.writeText(user.uid);
     setHasCopiedUid(true);
-    toast({ title: "UID Copié !", description: "Transmettez-le à l'administrateur." });
+    toast({ title: "UID Copié !" });
     setTimeout(() => setHasCopiedUid(false), 2000);
   };
 
@@ -204,7 +204,7 @@ export default function ProDashboard() {
         createdAt: serverTimestamp()
       };
       await addDoc(collection(firestore, 'campaigns'), campaignData);
-      toast({ title: "Demande de diffusion envoyée", description: `Coût : ${campaignData.cost} FCFP` });
+      toast({ title: "Demande de diffusion envoyée" });
     } finally {
       setIsSaving(false);
     }
@@ -214,28 +214,30 @@ export default function ProDashboard() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-32 px-1">
-      {/* IDENTITÉ PRO & NOM UTILISATEUR */}
+      {/* IDENTITÉ PRO CONSOLIDÉE */}
       <Card className="border-2 border-primary bg-primary/5 shadow-lg overflow-hidden">
         <CardContent className="p-4 flex flex-col gap-4">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary text-white rounded-lg"><UserCircle className="size-5" /></div>
+                    <div className="p-2 bg-primary text-white rounded-lg shadow-sm"><UserCircle className="size-6" /></div>
                     <div>
-                        <p className="font-black text-lg uppercase leading-none mb-1 text-slate-800">
+                        <p className="font-black text-xl uppercase leading-none mb-1 text-slate-800">
                           {profile?.displayName || user?.displayName || 'Utilisateur Pro'}
                         </p>
-                        <p className="text-[9px] font-black uppercase text-primary/60">Identifiant de partage (UID)</p>
-                        <p className="font-mono font-black text-xs tracking-tight select-all opacity-70">{user?.uid}</p>
+                        <div className="flex flex-col">
+                            <p className="text-[9px] font-black uppercase text-primary/60">Identifiant de partage (UID)</p>
+                            <p className="font-mono font-black text-xs tracking-tight select-all opacity-70 leading-none">{user?.uid}</p>
+                        </div>
                     </div>
                 </div>
-                <Button variant="outline" size="sm" className="font-black uppercase text-[10px] h-10 gap-2 border-2 bg-white" onClick={handleCopyUid}>
+                <Button variant="outline" size="sm" className="font-black uppercase text-[10px] h-10 gap-2 border-2 bg-white shadow-sm" onClick={handleCopyUid}>
                     {hasCopiedUid ? <Check className="size-3 text-green-600" /> : <Copy className="size-3" />}
                     Copier
                 </Button>
             </div>
-            <div className="flex flex-wrap gap-2 pt-2 border-t border-primary/10">
-                <Badge className="font-black uppercase text-[10px] bg-primary">Rôle: {profile?.role}</Badge>
-                <Badge variant="outline" className="font-black uppercase text-[10px] border-primary text-primary bg-white">Statut: {profile?.subscriptionStatus}</Badge>
+            <div className="flex flex-wrap gap-2 pt-3 border-t border-primary/10">
+                <Badge className="font-black uppercase text-[9px] bg-primary tracking-wider">Rôle: {profile?.role}</Badge>
+                <Badge variant="outline" className="font-black uppercase text-[9px] border-primary text-primary bg-white tracking-wider">Statut: {profile?.subscriptionStatus}</Badge>
             </div>
         </CardContent>
       </Card>
@@ -245,9 +247,9 @@ export default function ProDashboard() {
             <div className="p-6 bg-muted rounded-full text-muted-foreground shadow-inner">
                 <Store className="size-16" />
             </div>
-            <h2 className="text-2xl font-black uppercase tracking-tighter">Comment relier le compte pro à un commerce ?</h2>
+            <h2 className="text-2xl font-black uppercase tracking-tighter text-slate-800">Compte non relié</h2>
             <p className="text-sm font-medium text-muted-foreground leading-relaxed max-w-sm mt-2">
-                Transmettez votre UID ci-dessus à l'administrateur pour qu'il puisse rattacher votre profil à votre boutique.
+                Transmettez votre UID ci-dessus à l'administrateur pour qu'il puisse rattacher votre boutique à ce compte.
             </p>
             <Button onClick={() => router.push('/compte')} variant="ghost" className="mt-4 font-black uppercase text-[10px] tracking-widest border-2">Retour au profil</Button>
         </div>
@@ -281,12 +283,12 @@ export default function ProDashboard() {
                   
                   <div className="space-y-4">
                     <div className="space-y-1.5">
-                      <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Titre</Label>
+                      <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Titre de l'article</Label>
                       <Input value={promoTitle} onChange={e => setPromoTitle(e.target.value)} placeholder="Ex: Moulinet..." className="font-bold border-2 h-11" />
                     </div>
 
                     <div className="space-y-1.5">
-                      <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Catégorie</Label>
+                      <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Rayon / Catégorie</Label>
                       <Select value={promoCategory} onValueChange={setPromoCategory}>
                         <SelectTrigger className="h-11 border-2 font-black uppercase text-xs">
                             <SelectValue placeholder="Choisir..." />
@@ -300,13 +302,13 @@ export default function ProDashboard() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Description</Label>
-                      <Textarea value={promoDescription} onChange={e => setPromoDescription(e.target.value)} placeholder="Détails..." className="font-medium border-2 min-h-[80px]" />
+                      <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Description courte</Label>
+                      <Textarea value={promoDescription} onChange={e => setPromoDescription(e.target.value)} placeholder="Détails de l'offre..." className="font-medium border-2 min-h-[80px]" />
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
-                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Type</Label>
+                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Type d'offre</Label>
                             <Select value={promoType} onValueChange={(v: any) => setPromoType(v)}>
                             <SelectTrigger className="h-11 border-2 font-black text-xs"><SelectValue /></SelectTrigger>
                             <SelectContent>
@@ -316,21 +318,21 @@ export default function ProDashboard() {
                             </Select>
                         </div>
                         <div className="space-y-1.5">
-                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Photo</Label>
+                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Photo smartphone</Label>
                             <Button variant="outline" className="w-full h-11 border-2 gap-2 font-black uppercase text-[10px]" onClick={() => fileInputRef.current?.click()}>
-                                <Camera className="size-3" /> Image
+                                <Camera className="size-3" /> Charger
                             </Button>
                             <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
                         </div>
                     </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 pt-2">
                         {editingPromoId && (
                             <Button variant="ghost" onClick={resetForm} className="flex-1 font-bold uppercase text-xs h-14 border-2">Annuler</Button>
                         )}
                         <Button onClick={handleSavePromotion} disabled={isSaving || !promoTitle} className={cn("flex-[2] h-14 font-black uppercase gap-2 shadow-lg text-sm tracking-widest", editingPromoId ? "bg-accent" : "bg-primary")}>
                             {isSaving ? <RefreshCw className="size-5 animate-spin" /> : <Plus className="size-5" />}
-                            {editingPromoId ? "Sauver" : "Enregistrer"}
+                            {editingPromoId ? "Sauvegarder" : "Mettre en ligne"}
                         </Button>
                     </div>
                   </div>
@@ -342,7 +344,7 @@ export default function ProDashboard() {
 
                         <div className="space-y-4">
                             <div className="space-y-1">
-                                <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Catégorie cible</Label>
+                                <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Ciblage Catégorie</Label>
                                 <Select value={targetCategory} onValueChange={setTargetCategory}>
                                     <SelectTrigger className="h-10 border-2 bg-background font-black uppercase text-[10px]">
                                         <SelectValue />
@@ -355,13 +357,13 @@ export default function ProDashboard() {
                                 </Select>
                             </div>
 
-                            <div className="flex items-center justify-between p-4 bg-background rounded-xl shadow-sm border">
+                            <div className="flex items-center justify-between p-4 bg-background rounded-xl shadow-sm border-2">
                                 <div className="flex items-center gap-3">
                                     <Users className="size-5 text-primary" />
                                     <div>
-                                        <p className="text-[10px] font-black uppercase text-muted-foreground">Audience</p>
-                                        <p className="text-lg font-black">
-                                            {isCalculatingReach ? <RefreshCw className="size-4 animate-spin" /> : `${targetCount ?? '0'}`}
+                                        <p className="text-[9px] font-black uppercase text-muted-foreground leading-none mb-1">Audience Potentielle</p>
+                                        <p className="text-xl font-black leading-none">
+                                            {isCalculatingReach ? <RefreshCw className="size-4 animate-spin text-primary" /> : `${targetCount ?? '0'}`}
                                         </p>
                                     </div>
                                 </div>
@@ -396,7 +398,7 @@ export default function ProDashboard() {
 
           <div className="space-y-4">
             <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
-                <Store className="size-4" /> Catalogue ({promotions?.length || 0})
+                <Store className="size-4" /> Vos articles en ligne ({promotions?.length || 0})
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -408,13 +410,13 @@ export default function ProDashboard() {
                         <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
                             <div className="space-y-1">
                                 <h4 className="font-black uppercase text-xs truncate">{promo.title}</h4>
-                                <p className="text-[10px] text-muted-foreground line-clamp-2">{promo.description || "Pas de description."}</p>
+                                <p className="text-[9px] text-muted-foreground line-clamp-2 italic">{promo.description || "Pas de description."}</p>
                             </div>
                             <div className="flex items-center justify-between">
-                                <span className="text-xs font-black text-primary">{promo.price} F</span>
+                                <Badge variant="outline" className="text-[7px] h-4 font-black uppercase border-primary/20 text-primary">{promo.promoType}</Badge>
                                 <div className="flex gap-1">
-                                    <Button variant="ghost" size="icon" className="size-7 border" onClick={() => handleEditPromotion(promo)}><Pencil className="size-3" /></Button>
-                                    <Button variant="ghost" size="icon" className="size-7 text-destructive border" onClick={() => handleDeletePromotion(promo.id)}><Trash2 className="size-3" /></Button>
+                                    <Button variant="ghost" size="icon" className="size-7 border rounded-full" onClick={() => handleEditPromotion(promo)}><Pencil className="size-3" /></Button>
+                                    <Button variant="ghost" size="icon" className="size-7 text-destructive border rounded-full" onClick={() => handleDeletePromotion(promo.id)}><Trash2 className="size-3" /></Button>
                                 </div>
                             </div>
                         </div>
