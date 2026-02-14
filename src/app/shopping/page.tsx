@@ -36,6 +36,7 @@ export default function ShoppingPage() {
   // Requête groupée pour récupérer toutes les promotions de tous les magasins
   const promosRef = useMemoFirebase(() => {
     if (!firestore) return null;
+    // On utilise collectionGroup pour chercher dans tous les sous-dossiers 'promotions'
     return collectionGroup(firestore, 'promotions');
   }, [firestore]);
   
@@ -110,7 +111,6 @@ export default function ShoppingPage() {
 
   const isLoading = isBusinessesLoading || isPromosLoading;
   const isAdmin = profile?.role === 'admin' || profile?.subscriptionStatus === 'admin';
-  const hasData = allPromotions && allPromotions.length > 0;
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-20">
@@ -209,13 +209,12 @@ export default function ShoppingPage() {
       </Card>
 
       <div className="space-y-4">
-        {/* AFFICHAGE DES ERREURS SEULEMENT SI AUCUNE DONNÉE N'EST DISPONIBLE */}
-        {promosError && !hasData && (
+        {promosError && (
             <Alert variant="destructive" className="border-2 animate-in fade-in bg-red-50 text-red-900 border-red-200">
                 <AlertTriangle className="size-4 text-red-600" />
-                <AlertTitle className="text-xs font-black uppercase">Erreur de chargement</AlertTitle>
-                <AlertDescription className="text-[10px] font-bold leading-tight mt-1">
-                    {promosError.message || "Un problème empêche l'affichage du catalogue. Veuillez rafraîchir la page."}
+                <AlertTitle className="text-xs font-black uppercase">ERREUR DE CHARGEMENT</AlertTitle>
+                <AlertDescription className="text-[10px] font-bold leading-tight mt-1 whitespace-pre-wrap font-mono">
+                    {promosError.message}
                 </AlertDescription>
             </Alert>
         )}
@@ -229,7 +228,7 @@ export default function ShoppingPage() {
             )}
         </div>
 
-        {isLoading && !hasData ? (
+        {isLoading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-48 w-full rounded-2xl" />)}
             </div>
@@ -247,13 +246,12 @@ export default function ShoppingPage() {
                     <p className="text-xs font-bold max-w-[200px] mx-auto">Vérifiez vos filtres ou tentez de rafraîchir la page.</p>
                 </div>
                 <Button variant="outline" onClick={() => window.location.reload()} className="mt-2 font-black uppercase text-[10px] border-2 gap-2">
-                    <RefreshCw className="size-3" /> Forcer le rafraîchissement
+                    <RefreshCw className="size-3" /> Rafraîchir
                 </Button>
             </div>
         )}
       </div>
 
-      {/* DEBUG POUR ADMIN SI VIDE */}
       {isAdmin && (
           <div className="p-4 bg-slate-900 text-white rounded-2xl border-2 border-slate-700 space-y-3 shadow-xl">
               <p className="text-[10px] font-black uppercase flex items-center gap-2 text-primary">
@@ -261,12 +259,12 @@ export default function ShoppingPage() {
               </p>
               <div className="grid grid-cols-2 gap-2 text-[9px] font-bold uppercase opacity-80">
                   <div className="bg-slate-800 p-2 rounded">Magasins : {businesses?.length || 0}</div>
-                  <div className="bg-slate-800 p-2 rounded">Promos Totales : {allPromotions?.length || 0}</div>
+                  <div className="bg-slate-800 p-2 rounded">Articles Bruts : {allPromotions?.length || 0}</div>
+                  <div className="bg-slate-800 p-2 rounded">Filtre : {filteredProducts.length}</div>
                   <div className="bg-slate-800 p-2 rounded">Erreur : {promosError ? 'OUI' : 'NON'}</div>
-                  <div className="bg-slate-800 p-2 rounded">Ma Localité : {userCommune}</div>
               </div>
               <p className="text-[8px] italic opacity-50 leading-tight">
-                  Note : Si "Promos Totales" est à 0 et qu'une erreur s'affiche, vérifiez que l'index Collection Group est bien créé dans la console Firebase.
+                  Note : Si "Articles Bruts" est à 0 malgré vos créations, c'est que l'index "Collection Group" n'est pas encore actif dans la console Firebase (Paramètres &gt; Indices &gt; Composite).
               </p>
           </div>
       )}

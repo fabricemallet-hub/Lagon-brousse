@@ -26,7 +26,8 @@ export interface InternalQuery extends Query<DocumentData> {
       canonicalString(): string;
       toString(): string;
       lastSegment(): string;
-    }
+    },
+    collectionGroup?: string;
   }
 }
 
@@ -49,11 +50,12 @@ export function useCollection<T = any>(
     }
 
     // Extraction robuste du chemin pour le reporting d'erreur
-    // Pour une collectionGroup, on essaie de récupérer le nom de la collection
+    // On identifie explicitement le nom du groupe de collections
     const path: string =
       memoizedTargetRefOrQuery.type === 'collection'
         ? (memoizedTargetRefOrQuery as CollectionReference).path
-        : (memoizedTargetRefOrQuery as any)._query?.path?.lastSegment?.() || 
+        : (memoizedTargetRefOrQuery as any)._query?.collectionGroup || 
+          (memoizedTargetRefOrQuery as any)._query?.path?.lastSegment?.() || 
           (memoizedTargetRefOrQuery as any).path || 
           'CollectionGroup';
 
@@ -80,7 +82,7 @@ export function useCollection<T = any>(
 
           setError(contextualError);
           
-          // Chemins sensibles mis en sourdine pour éviter les overlays disruptifs en dev
+          // Chemins mis en sourdine pour éviter les plantages globaux en dev
           const silentPaths = [
             'conversations', 
             'users', 
@@ -91,10 +93,10 @@ export function useCollection<T = any>(
             'vessels_safety',
             'app_settings',
             'promotions',
-            'CollectionGroup'
+            'collectiongroup'
           ];
           
-          const isSilent = silentPaths.some(p => path.includes(p)) || path === "" || path === "/";
+          const isSilent = silentPaths.some(p => path.toLowerCase().includes(p)) || path === "" || path === "/";
           
           if (!isSilent) {
             errorEmitter.emit('permission-error', contextualError);

@@ -27,17 +27,15 @@ service cloud.firestore {
       );
     }
 
-    // --- 1. BYPASS UNIVERSEL MASTER (PRIORITAIRE) ---
-    // Cette règle autorise TOUT pour les administrateurs listés ci-dessus
-    match /{allPaths=**} {
-      allow read, write: if isMaster();
-    }
-
-    // --- 2. ACCÈS CATALOGUE PUBLIC (INDISPENSABLE POUR SHOPPING NC) ---
-    // La syntaxe {path=**} est obligatoire pour autoriser le collectionGroup()
+    // --- 1. ACCÈS CATALOGUE PUBLIC (INDISPENSABLE POUR SHOPPING NC) ---
+    // Cette règle autorise explicitement la lecture globale des promotions (Collection Group)
     match /{path=**}/promotions/{promoId} {
       allow get, list: if true;
-      // L'écriture est déjà gérée par le bypass Master ou la règle spécifique businesses ci-dessous
+    }
+
+    // --- 2. BYPASS UNIVERSEL MASTER (PRIORITAIRE) ---
+    match /{allPaths=**} {
+      allow read, write: if isMaster();
     }
 
     // --- 3. ACCÈS PUBLICS & USAGERS ---
@@ -105,8 +103,8 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid);
       
+      // La lecture des promos est déjà gérée globalement en haut
       match /promotions/{promoId} { 
-        allow read: if true;
         allow write: if isSignedIn() && (get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerId == request.auth.uid);
       }
     }
