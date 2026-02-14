@@ -63,12 +63,6 @@ export default function ProDashboard() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasCopiedUid, setHasCopiedUid] = useState(false);
 
-  // Smart Promo States
-  const [originalPrice, setOriginalPrice] = useState('');
-  const [discountedPrice, setDiscountedPrice] = useState('');
-  const [discountPercentage, setDiscountPercentage] = useState('');
-  const [standardPrice, setStandardPrice] = useState('');
-
   // Initialize target category from business categories
   useEffect(() => {
     if (business && business.categories && business.categories.length > 0) {
@@ -132,16 +126,12 @@ export default function ProDashboard() {
     if (!firestore || !business || !promoTitle || !promoCategory) return;
     setIsSaving(true);
     try {
-      const finalPrice = promoType === 'Promo' ? parseFloat(discountedPrice) : parseFloat(standardPrice);
-      
       const promoData: any = {
         businessId: business.id,
         title: promoTitle,
         category: promoCategory,
         description: promoDescription,
-        price: finalPrice || 0,
-        originalPrice: promoType === 'Promo' ? (parseFloat(originalPrice) || 0) : null,
-        discountPercentage: promoType === 'Promo' ? (parseFloat(discountPercentage) || 0) : null,
+        price: 0,
         promoType,
         imageUrl: promoImage,
         updatedAt: serverTimestamp(),
@@ -149,11 +139,11 @@ export default function ProDashboard() {
 
       if (editingPromoId) {
         await updateDoc(doc(firestore, 'businesses', business.id, 'promotions', editingPromoId), promoData);
-        toast({ title: "Fiche produit mise à jour !" });
+        toast({ title: "Produit mis à jour" });
       } else {
         promoData.createdAt = serverTimestamp();
         await addDoc(collection(firestore, 'businesses', business.id, 'promotions'), promoData);
-        toast({ title: "Produit ajouté au catalogue !" });
+        toast({ title: "Produit ajouté" });
       }
       
       resetForm();
@@ -167,10 +157,6 @@ export default function ProDashboard() {
     setPromoTitle('');
     setPromoDescription('');
     setPromoImage('');
-    setOriginalPrice('');
-    setDiscountedPrice('');
-    setDiscountPercentage('');
-    setStandardPrice('');
     if (business && business.categories && business.categories.length > 0) {
         setPromoCategory(business.categories[0]);
     }
@@ -183,13 +169,6 @@ export default function ProDashboard() {
     setPromoDescription(promo.description || '');
     setPromoImage(promo.imageUrl || '');
     setPromoType(promo.promoType);
-    if (promo.promoType === 'Promo') {
-        setOriginalPrice(promo.originalPrice?.toString() || '');
-        setDiscountedPrice(promo.price.toString());
-        setDiscountPercentage(promo.discountPercentage?.toString() || '');
-    } else {
-        setStandardPrice(promo.price.toString());
-    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -250,7 +229,7 @@ export default function ProDashboard() {
             </div>
             <div className="flex flex-wrap gap-2 pt-2 border-t border-primary/10">
                 <Badge className="font-black uppercase text-[10px] bg-primary">Rôle: {profile?.role}</Badge>
-                <Badge variant="outline" className="font-black uppercase text-[10px] border-primary text-primary">Abonnement: {profile?.subscriptionStatus}</Badge>
+                <Badge variant="outline" className="font-black uppercase text-[10px] border-primary text-primary">Statut: {profile?.subscriptionStatus}</Badge>
             </div>
         </CardContent>
       </Card>
@@ -285,7 +264,7 @@ export default function ProDashboard() {
                     ))}
                 </div>
               </div>
-            </CardHeader>
+            </Header>
             <CardContent className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-6">
@@ -374,7 +353,7 @@ export default function ProDashboard() {
                                 <div className="flex items-center gap-3">
                                     <Users className="size-5 text-primary" />
                                     <div>
-                                        <p className="text-[10px] font-black uppercase text-muted-foreground">Cible</p>
+                                        <p className="text-[10px] font-black uppercase text-muted-foreground">Audience</p>
                                         <p className="text-lg font-black">
                                             {isCalculatingReach ? <RefreshCw className="size-4 animate-spin" /> : `${targetCount ?? 'Calcul...'}`}
                                         </p>
@@ -386,10 +365,10 @@ export default function ProDashboard() {
                             {reachError && (
                                 <div className="p-3 bg-red-50 border-2 border-red-200 rounded-xl space-y-2">
                                     <p className="text-[9px] text-red-600 font-bold uppercase flex items-center gap-2">
-                                        <AlertCircle className="size-3" /> Comment relier le compte pro à un commerce ?
+                                        <AlertCircle className="size-3" /> Comment relié le compte pro a un commerce ?
                                     </p>
                                     <div className="p-2 bg-white/50 rounded-lg text-[8px] font-bold text-red-800 leading-tight uppercase italic">
-                                        Note : Seul l'administrateur peut lier votre compte via l'UID affiché en haut. Une reconnexion peut aider si vous venez d'être lié.
+                                        L'accès est actuellement restreint par Firestore. Veuillez vous déconnecter et vous reconnecter pour rafraîchir vos droits.
                                     </div>
                                     <Button size="sm" variant="outline" className="w-full h-8 text-[8px] font-black uppercase border-red-200 text-red-600" onClick={handleLogout}>Déconnexion & Reconnexion</Button>
                                 </div>

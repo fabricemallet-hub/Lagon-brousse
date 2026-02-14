@@ -29,13 +29,6 @@ service cloud.firestore {
       );
     }
 
-    function isProfessional() {
-      return isSignedIn() && (
-        request.auth.token.role == 'professional' ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'professional'
-      );
-    }
-
     // --- PRIORITÉ 1: ACCÈS TOTAL MASTER (BYPASS) ---
     match /{allPaths=**} {
       allow read, write: if isAdmin();
@@ -58,11 +51,13 @@ service cloud.firestore {
       match /commune_stats/{communeId} { allow read, write: if isSignedIn(); }
     }
 
-    // Utilisateurs : Autoriser le comptage (list) pour le Reach, mais lecture privée restreinte
+    // --- COLLECTION UTILISATEURS (CRITIQUE POUR LE REACH) ---
     match /users {
+      // Autoriser explicitement le comptage (agrégation) pour tout utilisateur connecté
       allow list: if isSignedIn();
     }
     match /users/{userId} {
+      // Lecture et écriture de sa propre fiche ou par l'Admin
       allow get, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       match /{allPaths=**} {
         allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
