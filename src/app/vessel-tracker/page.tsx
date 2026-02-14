@@ -298,6 +298,8 @@ export default function VesselTrackerPage() {
             updatePayload.location = { latitude: currentPosRef.current.lat, longitude: currentPosRef.current.lng };
         }
 
+        // CRITICAL: Only update statusChangedAt if a real change occurs.
+        // Heartbeats (GPS updates without status change) should NOT update this timestamp.
         if (data.status || lastSentStatusRef.current === null || data.eventLabel) {
             updatePayload.statusChangedAt = serverTimestamp();
             if (data.status) lastSentStatusRef.current = data.status;
@@ -438,7 +440,8 @@ export default function VesselTrackerPage() {
     followedVessels.forEach(vessel => {
         const isSharingActive = vessel.isSharing === true;
         const currentStatus = isSharingActive ? (vessel.status || 'moving') : 'offline';
-        const statusTime = vessel.statusChangedAt || vessel.lastActive;
+        // ONLY use statusChangedAt for history to avoid heartbeats spamming the log
+        const statusTime = vessel.statusChangedAt;
         const currentEvent = vessel.eventLabel || '';
         const currentBattery = vessel.batteryLevel ?? 100;
         const currentCharging = vessel.isCharging ?? false;
@@ -458,6 +461,7 @@ export default function VesselTrackerPage() {
             lastClearTimesRef.current[vessel.id] = clearTimeKey;
         }
 
+        // CRITICAL: Skip history update if no real status change timestamp is present
         if (timeKey === 0) return;
         
         const eventUniqueKey = `${vessel.id}-${timeKey}-${currentStatus}-${currentEvent}-${vessel.isPositionHidden}`;
@@ -627,11 +631,22 @@ export default function VesselTrackerPage() {
   const sendEmergencySms = (type: 'SOS' | 'MAYDAY' | 'PAN PAN') => {
     if (!isEmergencyEnabled || !emergencyContact) return;
     const pos = mode === 'sender' ? currentPosRef.current : (followedVessels?.find(v => v.isSharing && !v.isPositionHidden)?.location ? { lat: followedVessels.find(v => v.isSharing)!.location!.latitude, lng: followedVessels.find(v => v.isSharing)!.location!.longitude } : null);
-    const posUrl = pos ? `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}` : "[RECHERCHE GPS...]";
+    
+    if (!pos) {
+        toast({ variant: "destructive", title: "GPS non verrouillé", description: "Attendez que votre position s'affiche sur la carte." });
+        return;
+    }
+
+    const posUrl = `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
     const nicknamePrefix = vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : "";
     const customText = (isCustomMessageEnabled && vesselSmsMessage) ? vesselSmsMessage : "Requiert assistance immédiate.";
     const body = `${nicknamePrefix}${customText} [${type}] Position : ${posUrl}`;
-    window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
+    
+    try {
+        window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
+    } catch (e) {
+        toast({ variant: "destructive", title: "Erreur SMS", description: "Impossible d'ouvrir votre application de messagerie." });
+    }
   };
 
   if (loadError) return <div className="p-4 text-destructive">Erreur Google Maps.</div>;
