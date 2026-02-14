@@ -221,7 +221,7 @@ export default function ProDashboard() {
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-primary text-white rounded-lg"><UserCircle className="size-5" /></div>
                     <div>
-                        <p className="font-black text-sm uppercase leading-none mb-1 text-slate-800">{profile?.displayName || user?.displayName || 'Utilisateur'}</p>
+                        <p className="font-black text-base uppercase leading-none mb-1 text-slate-800">{profile?.displayName || user?.displayName || 'Utilisateur'}</p>
                         <p className="text-[9px] font-black uppercase text-primary/60">Identifiant de partage (UID)</p>
                         <p className="font-mono font-black text-xs tracking-tight select-all opacity-70">{user?.uid}</p>
                     </div>

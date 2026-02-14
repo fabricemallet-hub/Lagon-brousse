@@ -20,6 +20,7 @@ service cloud.firestore {
         ] ||
         (request.auth.token.email != null && 
          request.auth.token.email.lower() in [
+           "kledostyle@outlook.com",
            "f.mallet81@outlook.com",
            "fabrice.mallet@gmail.com",
            "f.mallet81@gmail.com"
@@ -30,20 +31,17 @@ service cloud.firestore {
     }
 
     // --- 1. PROMOTIONS & SHOPPING (Accès Prioritaire pour CollectionGroup) ---
-    // Cette règle doit être globale pour permettre le query(collectionGroup(db, 'promotions'))
+    // Cette règle doit être globale et en haut pour permettre le query(collectionGroup(db, 'promotions'))
     match /{path=**}/promotions/{promoId} {
       allow read: if true;
       allow write: if isSignedIn();
     }
 
     // --- 2. UTILISATEURS & COMPTAGE (REACH) ---
-    // 'list' est indispensable sur la racine pour getCountFromServer
-    match /users {
-      allow list: if isSignedIn();
-    }
-
     match /users/{userId} {
-      allow get, list: if isSignedIn();
+      // 'list' est indispensable pour getCountFromServer (Aggregation Query)
+      allow list: if isSignedIn();
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       
       match /{allPaths=**} {
