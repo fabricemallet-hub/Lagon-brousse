@@ -67,8 +67,9 @@ export function useDoc<T = any>(
 
           setError(contextualError);
           
-          // Chemins système pour lesquels on ne doit pas faire planter l'app en cas de 403 passager
-          // On ajoute explicitement shared_access_tokens pour éviter les crashes UI Admin
+          // --- SILENCE CRITICAL SYSTEM PATHS ---
+          // On ignore les erreurs de permission sur ces chemins pour éviter de planter l'app
+          // si les règles de sécurité mettent du temps à se propager.
           const silentPaths = [
             'shared_access_tokens',
             'access_tokens',

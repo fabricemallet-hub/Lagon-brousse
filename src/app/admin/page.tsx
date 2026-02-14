@@ -57,8 +57,6 @@ import { format, addMonths, addDays, isBefore, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 
 export default function AdminPage() {
   const { user, isUserLoading } = useUser();
@@ -809,18 +807,13 @@ function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | n
         const docRef = doc(firestore, 'shared_access_tokens', 'GLOBAL');
         const data = { expiresAt: expiry, updatedAt: serverTimestamp() };
         
-        // Non-blocking conforme au standard Firebase Client
         setDoc(docRef, data, { merge: true })
             .then(() => {
                 toast({ title: "Accès Global activé !" });
             })
-            .catch(async (error) => {
-                const permissionError = new FirestorePermissionError({
-                    path: docRef.path,
-                    operation: 'write',
-                    requestResourceData: data,
-                });
-                errorEmitter.emit('permission-error', permissionError);
+            .catch((error) => {
+                console.error("Global Access Error:", error);
+                toast({ variant: "destructive", title: "Erreur Permission", description: "Impossible d'activer l'offre. Vérifiez vos droits Master." });
             })
             .finally(() => {
                 setIsSaving(false);
@@ -837,13 +830,9 @@ function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | n
             .then(() => {
                 toast({ title: "Accès Global coupé" });
             })
-            .catch(async (error) => {
-                const permissionError = new FirestorePermissionError({
-                    path: docRef.path,
-                    operation: 'write',
-                    requestResourceData: data,
-                });
-                errorEmitter.emit('permission-error', permissionError);
+            .catch((error) => {
+                console.error("Global Stop Error:", error);
+                toast({ variant: "destructive", title: "Erreur", description: "Impossible de couper l'offre." });
             })
             .finally(() => {
                 setIsSaving(false);
@@ -899,18 +888,13 @@ function TokenManager({ tokens }: { tokens: AccessToken[] | null }) {
             id, status: 'active', durationMonths: parseInt(duration), createdAt: serverTimestamp()
         };
 
-        // Opération non-bloquante avec gestion d'erreurs contextuelle
         setDoc(docRef, data)
             .then(() => {
                 toast({ title: "Jeton généré !" });
             })
-            .catch(async (error) => {
-                const permissionError = new FirestorePermissionError({
-                    path: docRef.path,
-                    operation: 'write',
-                    requestResourceData: data,
-                });
-                errorEmitter.emit('permission-error', permissionError);
+            .catch((error) => {
+                console.error("Token Generation Error:", error);
+                toast({ variant: "destructive", title: "Erreur", description: "Impossible de créer le jeton. Vérifiez vos permissions." });
             })
             .finally(() => {
                 setIsGenerating(false);
