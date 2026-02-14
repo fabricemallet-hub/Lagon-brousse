@@ -16,7 +16,6 @@ service cloud.firestore {
           "K9cVYLVUk1NV99YV3anebkugpPp1", 
           "ipupi3Pg4RfrSEpFyT69BtlCdpi2", 
           "Irglq69MasYdNwBmUu8yKvw6h4G2",
-          "koKj50bSGXYeO1PLKU5bgo8Yaky1",
           "koKj50bSGXYeO1PLKU5bgo8Yaky1"
         ] ||
         (request.auth.token.email != null && 
@@ -31,30 +30,25 @@ service cloud.firestore {
     }
 
     function isProfessional() {
-      // Vérification dynamique du rôle dans le document profil
       return isSignedIn() && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'professional' ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'professional' ||
-        request.auth.token.role == 'professional'
+        request.auth.token.role == 'professional' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'professional'
       );
     }
 
-    // --- PRIORITÉ 1: COMPTAGE DES UTILISATEURS (REACH) ---
-    // Cette règle doit être au plus haut niveau pour RunAggregationQuery
-    match /users {
-      // Autorise le comptage technique pour le calcul du Reach (Professionnels et Admins)
-      allow list: if isSignedIn();
-    }
-
-    // --- PRIORITÉ 2: ACCÈS TOTAL MASTER (BYPASS) ---
+    // --- PRIORITÉ 1: ACCÈS TOTAL MASTER (BYPASS) ---
     match /{allPaths=**} {
       allow read, write: if isAdmin();
     }
 
-    // --- PRIORITÉ 3: RÈGLES SPÉCIFIQUES ---
+    // --- PRIORITÉ 2: RÈGLES DE COLLECTION ---
+    
+    // Accès public aux paramètres de l'application
     match /app_settings/{id} { allow read: if true; }
     match /system_notifications/{id} { allow read: if true; }
     match /sound_library/{id} { allow read: if true; }
+    
+    // Météo et Poissons
     match /meteo_caledonie/{id} { 
       allow get, list: if true;
       match /previsions/{prevId} { allow get, list: if true; }
@@ -63,25 +57,28 @@ service cloud.firestore {
       allow get, list: if true;
       match /commune_stats/{communeId} { allow read, write: if isSignedIn(); }
     }
-    match /businesses/{businessId} {
-      allow get, list: if true;
-      allow write: if isSignedIn();
-      match /promotions/{promoId} { allow read, write: if isSignedIn(); }
-    }
-    // Collection group pour le shopping
-    match /{path=**}/promotions/{promoId} { allow read: if true; }
 
-    // DÉTAILS UTILISATEURS (SÉCURITÉ STRICTE)
+    // Utilisateurs : Autoriser le comptage (list) pour le Reach, mais lecture privée restreinte
+    match /users {
+      allow list: if isSignedIn();
+    }
     match /users/{userId} {
-      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      
+      allow get, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       match /{allPaths=**} {
         allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       }
     }
 
-    // FONCTIONNALITÉS PRIVÉES
+    // Commerces et Promotions
+    match /businesses/{businessId} {
+      allow get, list: if true;
+      allow write: if isSignedIn();
+      match /promotions/{promoId} { allow read, write: if isSignedIn(); }
+    }
+    // Règle pour collectionGroup (Shopping)
+    match /{path=**}/promotions/{promoId} { allow read: if true; }
+
+    // Fonctionnalités temps réel
     match /conversations/{id} {
       allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin());
       match /{allPaths=**} { allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin()); }

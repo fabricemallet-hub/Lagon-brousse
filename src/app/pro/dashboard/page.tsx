@@ -128,39 +128,6 @@ export default function ProDashboard() {
     reader.readAsDataURL(file);
   };
 
-  const handleOriginalPriceChange = (val: string) => {
-    setOriginalPrice(val);
-    const p1 = parseFloat(val);
-    const d = parseFloat(discountPercentage);
-    const p2 = parseFloat(discountedPrice);
-
-    if (!isNaN(p1)) {
-        if (!isNaN(d)) {
-            setDiscountedPrice((p1 * (1 - d / 100)).toFixed(0));
-        } else if (!isNaN(p2) && p1 !== 0) {
-            setDiscountPercentage(((1 - p2 / p1) * 100).toFixed(1));
-        }
-    }
-  };
-
-  const handleDiscountedPriceChange = (val: string) => {
-    setDiscountedPrice(val);
-    const p2 = parseFloat(val);
-    const p1 = parseFloat(originalPrice);
-    if (!isNaN(p2) && !isNaN(p1) && p1 !== 0) {
-      setDiscountPercentage(((1 - p2 / p1) * 100).toFixed(1));
-    }
-  };
-
-  const handlePercentageChange = (val: string) => {
-    setDiscountPercentage(val);
-    const d = parseFloat(val);
-    const p1 = parseFloat(originalPrice);
-    if (!isNaN(d) && !isNaN(p1)) {
-      setDiscountedPrice((p1 * (1 - d / 100)).toFixed(0));
-    }
-  };
-
   const handleSavePromotion = async () => {
     if (!firestore || !business || !promoTitle || !promoCategory) return;
     setIsSaving(true);
