@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, doc, query, where, serverTimestamp, addDoc, setDoc, getDocs, orderBy, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, query, where, serverTimestamp, addDoc, setDoc, getDocs, orderBy, deleteDoc, updateDoc, getCountFromServer } from 'firebase/firestore';
 import type { UserAccount, Business, Promotion, Campaign } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, Image as ImageIcon, X, Info, Pencil, Save } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, Image as ImageIcon, X, Info, Pencil, Save, AlertCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -49,6 +48,7 @@ export default function ProDashboard() {
   const [targetCategory, setTargetCategory] = useState<string>('');
   const [targetCount, setTargetCount] = useState<number | null>(null);
   const [isCalculatingReach, setIsCalculatingReach] = useState(false);
+  const [reachError, setReachError] = useState(false);
 
   // --- FORM STATES ---
   const [editingPromoId, setEditingPromoId] = useState<string | null>(null);
@@ -78,6 +78,7 @@ export default function ProDashboard() {
     
     const calculateReach = async () => {
       setIsCalculatingReach(true);
+      setReachError(false);
       try {
         const usersRef = collection(firestore, 'users');
         const q = query(
@@ -85,10 +86,13 @@ export default function ProDashboard() {
           where('lastSelectedLocation', '==', business.commune),
           where('favoriteCategory', '==', targetCategory)
         );
-        const snap = await getDocs(q);
-        setTargetCount(snap.size);
+        // Utilisation de getCountFromServer pour la performance et la sécurité
+        const snap = await getCountFromServer(q);
+        setTargetCount(snap.data().count);
       } catch (e) {
-        console.error(e);
+        console.error("Reach calculation error:", e);
+        setReachError(true);
+        setTargetCount(0);
       } finally {
         setIsCalculatingReach(false);
       }
@@ -451,11 +455,20 @@ export default function ProDashboard() {
                             <Users className="size-5 text-primary" />
                             <div>
                             <p className="text-[10px] font-black uppercase text-muted-foreground">Audience Cible</p>
-                            <p className="text-lg font-black">{isCalculatingReach ? <RefreshCw className="size-4 animate-spin" /> : `${targetCount || 0} abonnés`}</p>
+                            <p className="text-lg font-black">
+                                {isCalculatingReach ? <RefreshCw className="size-4 animate-spin" /> : `${targetCount ?? '...'}`} 
+                                <span className="text-[10px] ml-1 uppercase opacity-60">abonnés</span>
+                            </p>
                             </div>
                         </div>
                         <Badge variant="secondary" className="text-[8px] font-black uppercase">{business.commune}</Badge>
                         </div>
+                        
+                        {reachError && (
+                            <p className="text-[9px] text-red-600 font-bold bg-red-50 p-2 rounded-lg border border-red-100 flex items-center gap-2">
+                                <AlertCircle className="size-3" /> Accès en cours de validation...
+                            </p>
+                        )}
                     </div>
 
                     <div className="flex items-center justify-between p-4 bg-accent/10 rounded-xl border border-accent/20">
@@ -471,7 +484,7 @@ export default function ProDashboard() {
 
                     <Button 
                     onClick={handleDiffuse} 
-                    disabled={isSaving || !targetCount || !targetCategory} 
+                    disabled={isSaving || !targetCount || !targetCategory || reachError} 
                     className="w-full h-14 bg-accent hover:bg-accent/90 text-white font-black uppercase tracking-widest shadow-lg gap-2"
                     >
                     <Megaphone className="size-5" /> Diffuser Maintenant
@@ -484,6 +497,11 @@ export default function ProDashboard() {
                     <p className="text-[9px] font-medium leading-relaxed text-muted-foreground italic">
                         La diffusion flash envoie une notification immédiate aux utilisateurs ayant sélectionné <strong>{business.commune}</strong> comme localité et <strong>{targetCategory}</strong> comme catégorie favorite.
                     </p>
+                    {reachError && (
+                        <p className="text-[9px] font-bold text-orange-700 mt-2 bg-orange-50 p-2 rounded border border-orange-100">
+                            Info : Si vous venez de passer en compte PRO, déconnectez-vous et reconnectez-vous une fois pour rafraîchir vos permissions.
+                        </p>
+                    )}
                 </div>
             </div>
           </div>
