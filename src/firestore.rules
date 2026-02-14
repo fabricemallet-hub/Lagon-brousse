@@ -31,9 +31,9 @@ service cloud.firestore {
 
     // --- RÈGLES DE COLLECTION UTILISATEURS ---
     
-    // Règle de collection globale (Nécessaire pour le comptage du Reach)
+    // Règle spécifique pour autoriser le comptage (list) sur la collection users
+    // Firestore exige que list soit accordé au niveau du document wildcard pour RunAggregationQuery
     match /users/{userId} {
-      // allow list est évalué au niveau du match de document pour les agrégations filtrées
       allow list: if isSignedIn();
       
       allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());

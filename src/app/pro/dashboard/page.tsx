@@ -241,10 +241,13 @@ export default function ProDashboard() {
                 <Store className="size-16" />
             </div>
             <h2 className="text-2xl font-black uppercase tracking-tighter">Commerce non relié</h2>
-            <p className="text-sm font-medium text-muted-foreground leading-relaxed max-w-sm">
-                Transmettez votre UID ci-dessus à l'administrateur pour activer votre accès boutique.
+            <p className="text-sm font-medium text-muted-foreground leading-relaxed max-w-sm italic">
+                "Comment relier le compte pro à un commerce ?"
             </p>
-            <Button onClick={() => router.push('/compte')} variant="ghost" className="mt-2 font-black uppercase text-[10px] tracking-widest border-2">Retour au profil</Button>
+            <p className="text-xs text-muted-foreground leading-relaxed max-w-sm mt-2">
+                Transmettez votre UID ci-dessus à l'administrateur pour qu'il puisse rattacher votre profil à votre boutique.
+            </p>
+            <Button onClick={() => router.push('/compte')} variant="ghost" className="mt-4 font-black uppercase text-[10px] tracking-widest border-2">Retour au profil</Button>
         </div>
       ) : (
         <>
@@ -356,7 +359,7 @@ export default function ProDashboard() {
                                     <div>
                                         <p className="text-[10px] font-black uppercase text-muted-foreground">Audience</p>
                                         <p className="text-lg font-black">
-                                            {isCalculatingReach ? <RefreshCw className="size-4 animate-spin" /> : `${targetCount ?? 'Calcul...'}`}
+                                            {isCalculatingReach ? <RefreshCw className="size-4 animate-spin" /> : `${targetCount ?? '0'}`}
                                         </p>
                                     </div>
                                 </div>
@@ -368,7 +371,7 @@ export default function ProDashboard() {
                                     <p className="text-[9px] text-red-600 font-bold uppercase flex items-center gap-2">
                                         <AlertCircle className="size-3" /> Aide technique
                                     </p>
-                                    <div className="p-2 bg-white/50 rounded-lg text-[8px] font-bold text-red-800 leading-tight uppercase italic">
+                                    <div className="p-2 bg-white/50 rounded-lg text-[8px] font-bold text-red-800 leading-tight uppercase italic text-center">
                                         je n'ai pas d'audience qui s'affiche ce qui donne le message d'erreur sur le compte "pro". Veuillez utiliser le bouton ci-dessous pour rafraîchir vos droits.
                                     </div>
                                     <Button size="sm" variant="outline" className="w-full h-8 text-[8px] font-black uppercase border-red-200 text-red-600" onClick={handleLogout}>Déconnexion & Reconnexion</Button>
