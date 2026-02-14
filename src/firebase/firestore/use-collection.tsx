@@ -25,6 +25,7 @@ export interface InternalQuery extends Query<DocumentData> {
     path: {
       canonicalString(): string;
       toString(): string;
+      lastSegment(): string;
     }
   }
 }
@@ -48,12 +49,13 @@ export function useCollection<T = any>(
     }
 
     // Extraction robuste du chemin pour le reporting d'erreur
+    // Pour une collectionGroup, on essaie de récupérer le nom de la collection
     const path: string =
       memoizedTargetRefOrQuery.type === 'collection'
         ? (memoizedTargetRefOrQuery as CollectionReference).path
-        : (memoizedTargetRefOrQuery as any)._query?.path?.canonicalString?.() || 
+        : (memoizedTargetRefOrQuery as any)._query?.path?.lastSegment?.() || 
           (memoizedTargetRefOrQuery as any).path || 
-          'CollectionGroup query';
+          'CollectionGroup';
 
     setIsLoading(true);
     setError(null);
@@ -88,8 +90,7 @@ export function useCollection<T = any>(
             'sound_library',
             'vessels_safety',
             'app_settings',
-            'promotions',
-            'CollectionGroup'
+            'promotions'
           ];
           
           const isSilent = silentPaths.some(p => path.includes(p)) || path === "" || path === "/";

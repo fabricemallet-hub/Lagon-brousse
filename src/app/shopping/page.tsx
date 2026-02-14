@@ -110,6 +110,7 @@ export default function ShoppingPage() {
 
   const isLoading = isBusinessesLoading || isPromosLoading;
   const isAdmin = profile?.role === 'admin' || profile?.subscriptionStatus === 'admin';
+  const hasData = allPromotions && allPromotions.length > 0;
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-20">
@@ -208,13 +209,13 @@ export default function ShoppingPage() {
       </Card>
 
       <div className="space-y-4">
-        {/* AFFICHAGE EXPLICITE DES ERREURS POUR DÉBOGAGE */}
-        {promosError && (
+        {/* AFFICHAGE DES ERREURS SEULEMENT SI AUCUNE DONNÉE N'EST DISPONIBLE */}
+        {promosError && !hasData && (
             <Alert variant="destructive" className="border-2 animate-in fade-in bg-red-50 text-red-900 border-red-200">
                 <AlertTriangle className="size-4 text-red-600" />
-                <AlertTitle className="text-xs font-black uppercase">Erreur Technique détectée</AlertTitle>
+                <AlertTitle className="text-xs font-black uppercase">Erreur de chargement</AlertTitle>
                 <AlertDescription className="text-[10px] font-bold leading-tight mt-1">
-                    {promosError.message || "Un problème empêche l'affichage du catalogue. Veuillez vérifier votre connexion ou l'index Firestore."}
+                    {promosError.message || "Un problème empêche l'affichage du catalogue. Veuillez rafraîchir la page."}
                 </AlertDescription>
             </Alert>
         )}
@@ -228,7 +229,7 @@ export default function ShoppingPage() {
             )}
         </div>
 
-        {isLoading ? (
+        {isLoading && !hasData ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-48 w-full rounded-2xl" />)}
             </div>
@@ -243,7 +244,7 @@ export default function ShoppingPage() {
                 <div className="p-6 bg-muted rounded-full"><ShoppingBag className="size-12" /></div>
                 <div className="space-y-1">
                     <p className="font-black uppercase tracking-widest text-sm">Aucun produit visible</p>
-                    <p className="text-xs font-bold max-w-[200px] mx-auto">Si vous avez créé un article, il peut mettre 1 à 2 minutes à apparaître partout.</p>
+                    <p className="text-xs font-bold max-w-[200px] mx-auto">Vérifiez vos filtres ou tentez de rafraîchir la page.</p>
                 </div>
                 <Button variant="outline" onClick={() => window.location.reload()} className="mt-2 font-black uppercase text-[10px] border-2 gap-2">
                     <RefreshCw className="size-3" /> Forcer le rafraîchissement
@@ -253,19 +254,19 @@ export default function ShoppingPage() {
       </div>
 
       {/* DEBUG POUR ADMIN SI VIDE */}
-      {isAdmin && !isLoading && filteredProducts.length === 0 && (
+      {isAdmin && (
           <div className="p-4 bg-slate-900 text-white rounded-2xl border-2 border-slate-700 space-y-3 shadow-xl">
               <p className="text-[10px] font-black uppercase flex items-center gap-2 text-primary">
                   <ShieldCheck className="size-3" /> Diagnostics Administrateur
               </p>
               <div className="grid grid-cols-2 gap-2 text-[9px] font-bold uppercase opacity-80">
                   <div className="bg-slate-800 p-2 rounded">Magasins : {businesses?.length || 0}</div>
-                  <div className="bg-slate-800 p-2 rounded">Promos (Brut) : {allPromotions?.length || 0}</div>
+                  <div className="bg-slate-800 p-2 rounded">Promos Totales : {allPromotions?.length || 0}</div>
                   <div className="bg-slate-800 p-2 rounded">Erreur : {promosError ? 'OUI' : 'NON'}</div>
-                  <div className="bg-slate-800 p-2 rounded">Localité : {userCommune}</div>
+                  <div className="bg-slate-800 p-2 rounded">Ma Localité : {userCommune}</div>
               </div>
               <p className="text-[8px] italic opacity-50 leading-tight">
-                  Si "Promos (Brut)" est à 0 alors que vous en avez créé, vérifiez l'index "Collection Group" dans la console Firebase.
+                  Note : Si "Promos Totales" est à 0 et qu'une erreur s'affiche, vérifiez que l'index Collection Group est bien créé dans la console Firebase.
               </p>
           </div>
       )}
