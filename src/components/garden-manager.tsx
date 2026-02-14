@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'export { GardenManager };';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
 import { format } from 'date-fns';
@@ -279,7 +279,7 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
 
         <Button 
           onClick={() => fileInputRef.current?.click()} 
-          className="h-14 text-base font-black uppercase tracking-widest shadow-lg gap-3 bg-primary hover:bg-primary/90"
+          className="h-14 text-base font-black uppercase tracking-tight shadow-lg gap-3 bg-primary hover:bg-primary/90"
           disabled={isIdentifying}
         >
           {isIdentifying ? <BrainCircuit className="size-6 animate-pulse" /> : <Camera className="size-6" />}
@@ -372,7 +372,7 @@ export function GardenManager({ locationData }: { locationData: LocationData }) 
           <CardContent className="p-4 pt-0 space-y-4 animate-in fade-in slide-in-from-top-2">
             <div className="grid gap-3">
               <div className="space-y-1">
-                <Label className="text-[10px] font-black uppercase opacity-60">Saisir le nom de la plante</Label>
+                <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Saisir le nom de la plante</Label>
                 <div className="flex gap-2">
                   <Input 
                     placeholder="Ex: Citronnier, Manguier..." 

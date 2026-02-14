@@ -307,7 +307,7 @@ export default function SemisPage() {
 
         <Button 
           onClick={() => fileInputRef.current?.click()} 
-          className="h-14 text-base font-black uppercase tracking-widest shadow-lg gap-3 bg-primary hover:bg-primary/90"
+          className="h-14 text-base font-black uppercase tracking-tight shadow-lg gap-3 bg-primary hover:bg-primary/90"
           disabled={isIdentifying}
         >
           {isIdentifying ? <BrainCircuit className="size-6 animate-pulse" /> : <Camera className="size-6" />}
