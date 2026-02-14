@@ -67,9 +67,9 @@ export function useDoc<T = any>(
 
           setError(contextualError);
           
-          // --- SILENCE CRITICAL SYSTEM PATHS ---
+          // --- SILENCE SYSTEM & CONFIG PATHS ---
           // On ignore les erreurs de permission sur ces chemins pour éviter de planter l'app
-          // si les règles de sécurité mettent du temps à se propager.
+          // si les règles de sécurité mettent du temps à se propager ou sont restrictives.
           const silentPaths = [
             'shared_access_tokens',
             'access_tokens',

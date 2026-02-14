@@ -43,7 +43,7 @@ export async function ensureUserDocument(
       // SYNCHRONISATION DE SÉCURITÉ FORCÉE POUR LES ADMINS
       if (isMasterAdmin && (currentData.subscriptionStatus !== 'admin' || currentData.role !== 'admin')) {
           console.log(`L&B DEBUG SYNC: Restauration Admin pour [${email || user.uid}]...`);
-          await setDoc(userDocRef, { 
+          setDoc(userDocRef, { 
             ...currentData, 
             subscriptionStatus: 'admin',
             role: 'admin',
@@ -74,7 +74,7 @@ export async function ensureUserDocument(
       newUserDocument.subscriptionExpiryDate = addMonths(trialStartDate, 3).toISOString();
     }
     
-    await setDoc(userDocRef, newUserDocument);
+    setDoc(userDocRef, newUserDocument);
   } catch (error) {
     console.error("L&B DEBUG SYNC ERROR:", error);
   }

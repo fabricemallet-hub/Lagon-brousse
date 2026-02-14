@@ -57,13 +57,12 @@ import { format, addMonths, addDays, isBefore, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 export default function AdminPage() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const router = useRouter();
-  const { toast } = useToast();
-
   const [activeTab, setActiveTab] = useState('stats');
 
   const isAdmin = useMemo(() => {
@@ -223,36 +222,34 @@ function BusinessesManager({ businesses, users }: { businesses: Business[] | nul
         );
     };
 
-    const handleAdd = async () => {
+    const handleAdd = () => {
         if (!firestore || !name || !commune || !ownerId || selectedCategories.length === 0) return;
         setIsSaving(true);
-        try {
-            const businessRef = doc(collection(firestore, 'businesses'));
-            const businessData: Business = {
-                id: businessRef.id,
-                ownerId,
-                name,
-                commune,
-                categories: selectedCategories,
-                createdAt: serverTimestamp()
-            };
-            
-            const batch = writeBatch(firestore);
-            batch.set(businessRef, businessData);
-            batch.update(doc(firestore, 'users', ownerId), { 
-                businessId: businessRef.id,
-                role: 'professional',
-                subscriptionStatus: 'professional'
-            });
-            
-            await batch.commit();
-            setName(''); setCommune(''); setOwnerId(''); setSelectedCategories(['Pêche']); setOwnerSearch('');
-            toast({ title: "Commerce créé et lié à l'utilisateur" });
-        } catch (e) {
-            toast({ variant: 'destructive', title: "Erreur" });
-        } finally {
-            setIsSaving(false);
-        }
+        const businessRef = doc(collection(firestore, 'businesses'));
+        const businessData: Business = {
+            id: businessRef.id,
+            ownerId,
+            name,
+            commune,
+            categories: selectedCategories,
+            createdAt: serverTimestamp()
+        };
+        
+        const batch = writeBatch(firestore);
+        batch.set(businessRef, businessData);
+        batch.update(doc(firestore, 'users', ownerId), { 
+            businessId: businessRef.id,
+            role: 'professional',
+            subscriptionStatus: 'professional'
+        });
+        
+        batch.commit()
+            .then(() => {
+                setName(''); setCommune(''); setOwnerId(''); setSelectedCategories(['Pêche']); setOwnerSearch('');
+                toast({ title: "Commerce créé et lié à l'utilisateur" });
+            })
+            .catch(() => toast({ variant: 'destructive', title: "Erreur" }))
+            .finally(() => setIsSaving(false));
     };
 
     return (
@@ -364,24 +361,20 @@ function SystemNotificationsManager({ notifications }: { notifications: SystemNo
     const [type, setType] = useState<SystemNotification['type']>('info');
     const [isSaving, setIsSaving] = useState(false);
 
-    const handleAdd = async () => {
+    const handleAdd = () => {
         if (!firestore || !title || !content) return;
         setIsSaving(true);
-        try {
-            await addDoc(collection(firestore, 'system_notifications'), {
-                title, content, type, isActive: true, createdAt: serverTimestamp()
-            });
+        addDoc(collection(firestore, 'system_notifications'), {
+            title, content, type, isActive: true, createdAt: serverTimestamp()
+        }).then(() => {
             setTitle(''); setContent('');
             toast({ title: "Notification publiée" });
-        } catch (e: any) {
-            console.error("Add Notification Error:", e);
-            toast({ variant: 'destructive', title: "Erreur de publication", description: e.message || "Vérifiez vos permissions." });
-        } finally { setIsSaving(false); }
+        }).finally(() => setIsSaving(false));
     };
 
-    const toggleStatus = async (id: string, current: boolean) => {
+    const toggleStatus = (id: string, current: boolean) => {
         if (!firestore) return;
-        await setDoc(doc(firestore, 'system_notifications', id), { isActive: !current }, { merge: true });
+        setDoc(doc(firestore, 'system_notifications', id), { isActive: !current }, { merge: true });
     };
 
     return (
@@ -427,16 +420,15 @@ function SoundLibraryManager({ sounds }: { sounds: SoundLibraryEntry[] | null })
     const [url, setUrl] = useState('');
     const [isSaving, setIsSaving] = useState(false);
 
-    const handleAdd = async () => {
+    const handleAdd = () => {
         if (!firestore || !label || !url) return;
         setIsSaving(true);
-        try {
-            await addDoc(collection(firestore, 'sound_library'), {
-                label, url, categories: ['General'], createdAt: serverTimestamp()
-            });
+        addDoc(collection(firestore, 'sound_library'), {
+            label, url, categories: ['General'], createdAt: serverTimestamp()
+        }).then(() => {
             setLabel(''); setUrl('');
             toast({ title: "Son ajouté" });
-        } finally { setIsSaving(false); }
+        }).finally(() => setIsSaving(false));
     };
 
     return (
@@ -468,10 +460,10 @@ function CampaignsManager({ campaigns }: { campaigns: Campaign[] | null }) {
     const firestore = useFirestore();
     const { toast } = useToast();
 
-    const updateStatus = async (id: string, status: 'sent' | 'pending') => {
+    const updateStatus = (id: string, status: 'sent' | 'pending') => {
         if (!firestore) return;
-        await updateDoc(doc(firestore, 'campaigns', id), { status });
-        toast({ title: "Campagne mise à jour" });
+        updateDoc(doc(firestore, 'campaigns', id), { status })
+            .then(() => toast({ title: "Campagne mise à jour" }));
     };
 
     return (
@@ -516,29 +508,25 @@ function UsersManager({ users, isUsersLoading }: { users: UserAccount[] | null, 
 
     const filtered = users?.filter(u => u.email.toLowerCase().includes(search.toLowerCase()) || u.displayName.toLowerCase().includes(search.toLowerCase())) || [];
 
-    const handleUpdateUser = async () => {
+    const handleUpdateUser = () => {
         if (!firestore || !editingUser) return;
         setIsSaving(true);
-        try {
-            await setDoc(doc(firestore, 'users', editingUser.id), editingUser, { merge: true });
-            toast({ title: "Utilisateur mis à jour" });
-            setIsEditDialogOpen(false);
-            setEditingUser(null);
-        } catch (e) {
-            toast({ variant: 'destructive', title: "Erreur sauvegarde" });
-        } finally {
-            setIsSaving(false);
-        }
+        setDoc(doc(firestore, 'users', editingUser.id), editingUser, { merge: true })
+            .then(() => {
+                toast({ title: "Utilisateur mis à jour" });
+                setIsEditDialogOpen(false);
+                setEditingUser(null);
+            })
+            .finally(() => setIsSaving(false));
     };
 
-    const updateStatus = async (uid: string, status: string) => {
+    const updateStatus = (uid: string, status: string) => {
         if (!firestore) return;
         const expiryDate = status === 'active' ? addMonths(new Date(), 1).toISOString() : null;
-        await setDoc(doc(firestore, 'users', uid), { 
+        setDoc(doc(firestore, 'users', uid), { 
             subscriptionStatus: status,
             subscriptionExpiryDate: expiryDate
-        }, { merge: true });
-        toast({ title: "Statut mis à jour" });
+        }, { merge: true }).then(() => toast({ title: "Statut mis à jour" }));
     };
 
     return (
@@ -647,7 +635,7 @@ function UsersManager({ users, isUsersLoading }: { users: UserAccount[] | null, 
                     <DialogFooter>
                         <Button variant="ghost" onClick={() => setIsEditDialogOpen(false)} className="font-black uppercase h-12">Annuler</Button>
                         <Button onClick={handleUpdateUser} disabled={isSaving} className="font-black uppercase h-12 gap-2 shadow-lg bg-primary">
-                            <Save className="size-4" /> Enregistrer les modifications
+                            <Save className="size-4" /> Enregistrer
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -672,18 +660,17 @@ function SplashManager({ initialSettings }: { initialSettings: SplashScreenSetti
         reader.onload = (event) => {
             const base64 = event.target?.result as string;
             setSettings({ ...settings, splashImageUrl: base64 });
-            toast({ title: "Image chargée localement", description: "N'oubliez pas de sauvegarder." });
+            toast({ title: "Image chargée localement" });
         };
         reader.readAsDataURL(file);
     };
 
-    const handleSave = async () => {
+    const handleSave = () => {
         if (!firestore) return;
         setIsSaving(true);
-        try {
-            await setDoc(doc(firestore, 'app_settings', 'splash'), settings, { merge: true });
-            toast({ title: "Splash mis à jour" });
-        } finally { setIsSaving(false); }
+        setDoc(doc(firestore, 'app_settings', 'splash'), settings, { merge: true })
+            .then(() => toast({ title: "Splash mis à jour" }))
+            .finally(() => setIsSaving(false));
     };
 
     return (
@@ -710,41 +697,23 @@ function SplashManager({ initialSettings }: { initialSettings: SplashScreenSetti
                 ) : (
                     <div className="space-y-3">
                         <div className="space-y-1">
-                            <Label className="text-[10px] font-black uppercase">Pouvoir telecharger l'image sur le smartphone</Label>
+                            <Label className="text-[10px] font-black uppercase">Lien image</Label>
                             <div className="flex gap-2">
-                                <Input 
-                                    value={settings.splashImageUrl} 
-                                    onChange={e => setSettings({ ...settings, splashImageUrl: e.target.value })} 
-                                    placeholder="Lien de l'image..." 
-                                    className="flex-grow"
-                                />
-                                <Button 
-                                    variant="outline" 
-                                    size="icon" 
-                                    className="shrink-0 h-10 w-10 border-2" 
-                                    onClick={() => fileInputRef.current?.click()}
-                                >
-                                    <Camera className="size-4" />
-                                </Button>
-                                <input 
-                                    type="file" 
-                                    accept="image/*" 
-                                    ref={fileInputRef} 
-                                    className="hidden" 
-                                    onChange={handleFileChange} 
-                                />
+                                <Input value={settings.splashImageUrl} onChange={e => setSettings({ ...settings, splashImageUrl: e.target.value })} placeholder="Lien..." className="flex-grow" />
+                                <Button variant="outline" size="icon" className="shrink-0 h-10 w-10 border-2" onClick={() => fileInputRef.current?.click()}><Camera className="size-4" /></Button>
+                                <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
                             </div>
                         </div>
                         <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Ajustement</Label>
                             <Select value={settings.splashImageFit} onValueChange={(v: any) => setSettings({ ...settings, splashImageFit: v })}>
                                 <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent><SelectItem value="contain">Contenir (Entier)</SelectItem><SelectItem value="cover">Couvrir (Plein écran)</SelectItem></SelectContent>
+                                <SelectContent><SelectItem value="contain">Contenir</SelectItem><SelectItem value="cover">Couvrir</SelectItem></SelectContent>
                             </Select>
                         </div>
                     </div>
                 )}
                 <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Couleur Fond</Label><Input type="color" value={settings.splashBgColor} onChange={e => setSettings({ ...settings, splashBgColor: e.target.value })} className="h-10 p-1" /></div>
-                <Button onClick={handleSave} disabled={isSaving} className="w-full font-black uppercase h-12 gap-2 shadow-lg"><Save className="size-4" /> Sauvegarder l'identité visuelle</Button>
+                <Button onClick={handleSave} disabled={isSaving} className="w-full font-black uppercase h-12 gap-2 shadow-lg"><Save className="size-4" /> Sauvegarder</Button>
             </CardContent>
         </Card>
     );
@@ -759,19 +728,19 @@ function CgvRibManager({ cgvData, ribData }: { cgvData: CgvSettings | null, ribD
 
     useEffect(() => { if (cgvData) setCgvContent(cgvData.content); if (ribData) setRibContent(ribData.details); }, [cgvData, ribData]);
 
-    const handleSave = async (type: 'cgv' | 'rib') => {
+    const handleSave = (type: 'cgv' | 'rib') => {
         if (!firestore) return;
         setIsSaving(true);
-        try {
-            if (type === 'cgv') {
-                const newVersion = (cgvData?.version || 0) + 1;
-                await setDoc(doc(firestore, 'app_settings', 'cgv'), { content: cgvContent, version: newVersion, updatedAt: serverTimestamp() });
-                toast({ title: "CGV mises à jour", description: `Nouvelle version : ${newVersion}` });
-            } else {
-                await setDoc(doc(firestore, 'app_settings', 'rib'), { details: ribContent, updatedAt: serverTimestamp() });
-                toast({ title: "RIB mis à jour" });
-            }
-        } finally { setIsSaving(false); }
+        if (type === 'cgv') {
+            const newVersion = (cgvData?.version || 0) + 1;
+            setDoc(doc(firestore, 'app_settings', 'cgv'), { content: cgvContent, version: newVersion, updatedAt: serverTimestamp() })
+                .then(() => toast({ title: "CGV mises à jour" }))
+                .finally(() => setIsSaving(false));
+        } else {
+            setDoc(doc(firestore, 'app_settings', 'rib'), { details: ribContent, updatedAt: serverTimestamp() })
+                .then(() => toast({ title: "RIB mis à jour" }))
+                .finally(() => setIsSaving(false));
+        }
     };
 
     return (
@@ -779,12 +748,12 @@ function CgvRibManager({ cgvData, ribData }: { cgvData: CgvSettings | null, ribD
             <CardHeader><CardTitle className="text-lg font-black uppercase flex items-center gap-2"><FileText className="size-5 text-primary" /> Textes Légaux & Dons</CardTitle></CardHeader>
             <CardContent className="space-y-6">
                 <div className="space-y-2">
-                    <Label className="text-[10px] font-black uppercase flex items-center justify-between">Conditions Générales (CGV) <Badge variant="outline" className="h-4 text-[8px] font-black">V{cgvData?.version || 0}</Badge></Label>
-                    <Textarea value={cgvContent} onChange={e => setCgvContent(e.target.value)} className="min-h-[150px] text-xs font-medium" />
-                    <Button variant="outline" onClick={() => handleSave('cgv')} disabled={isSaving} className="w-full h-10 font-black uppercase text-[10px] border-2">Publier nouvelle version CGV</Button>
+                    <Label className="text-[10px] font-black uppercase">CGV (V{cgvData?.version || 0})</Label>
+                    <Textarea value={cgvContent} onChange={e => setCgvContent(e.target.value)} className="min-h-[150px] text-xs" />
+                    <Button variant="outline" onClick={() => handleSave('cgv')} disabled={isSaving} className="w-full h-10 font-black uppercase text-[10px] border-2">Publier CGV</Button>
                 </div>
                 <div className="space-y-2 border-t pt-4">
-                    <Label className="text-[10px] font-black uppercase flex items-center gap-2"><CreditCard className="size-3" /> Coordonnées Bancaires (Virement)</Label>
+                    <Label className="text-[10px] font-black uppercase">RIB (Virement)</Label>
                     <Textarea value={ribContent} onChange={e => setRibContent(e.target.value)} className="min-h-[80px] font-mono text-[10px]" />
                     <Button variant="outline" onClick={() => handleSave('rib')} disabled={isSaving} className="w-full h-10 font-black uppercase text-[10px] border-2">Mettre à jour le RIB</Button>
                 </div>
@@ -813,7 +782,7 @@ function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | n
             })
             .catch((error) => {
                 console.error("Global Access Error:", error);
-                toast({ variant: "destructive", title: "Erreur Permission", description: "Impossible d'activer l'offre. Vérifiez vos droits Master." });
+                toast({ variant: "destructive", title: "Erreur Permission", description: "Vérifiez vos droits Master dans les règles." });
             })
             .finally(() => {
                 setIsSaving(false);
@@ -832,7 +801,7 @@ function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | n
             })
             .catch((error) => {
                 console.error("Global Stop Error:", error);
-                toast({ variant: "destructive", title: "Erreur", description: "Impossible de couper l'offre." });
+                toast({ variant: "destructive", title: "Erreur" });
             })
             .finally(() => {
                 setIsSaving(false);
@@ -843,21 +812,19 @@ function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | n
 
     return (
         <Card className="border-2 shadow-lg">
-            <CardHeader><CardTitle className="text-xl font-black uppercase flex items-center gap-2 text-primary"><Sparkles className="size-6" /> Accès Global (Cadeau)</CardTitle>
-            <CardDescription className="text-xs font-bold uppercase">Ouvrez l'accès premium à TOUS les utilisateurs inscrits pour une durée déterminée.</CardDescription></CardHeader>
+            <CardHeader><CardTitle className="text-xl font-black uppercase flex items-center gap-2 text-primary"><Sparkles className="size-6" /> Accès Global (Cadeau)</CardTitle></CardHeader>
             <CardContent className="space-y-6">
                 <div className={cn("p-4 rounded-2xl border-2 flex items-center justify-between", isGlobalActive ? "bg-green-50 border-green-200" : "bg-muted/30 border-dashed")}>
-                    <div className="flex flex-col"><span className="text-[10px] font-black uppercase opacity-60">Statut actuel</span>
+                    <div className="flex flex-col">
+                        <span className="text-[10px] font-black uppercase opacity-60">Statut actuel</span>
                         <p className={cn("text-sm font-black", isGlobalActive ? "text-green-600" : "text-muted-foreground")}>{isGlobalActive ? `ACTIF JUSQU'AU ${format(globalGift!.expiresAt.toDate(), 'dd/MM HH:mm')}` : 'AUCUN ACCÈS ACTIF'}</p>
                     </div>
                     {isGlobalActive && (
-                        <Button variant="destructive" size="sm" onClick={handleStop} disabled={isSaving} className="h-8 font-black uppercase text-[10px]">
-                            {isSaving ? <RefreshCw className="size-3 animate-spin" /> : 'Couper'}
-                        </Button>
+                        <Button variant="destructive" size="sm" onClick={handleStop} disabled={isSaving} className="h-8 font-black uppercase text-[10px]">Couper</Button>
                     )}
                 </div>
                 <div className="space-y-4">
-                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Durée de l'offre (jours)</Label>
+                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Durée (jours)</Label>
                         <Select value={duration} onValueChange={setDuration}>
                             <SelectTrigger className="h-12 border-2 font-black"><SelectValue /></SelectTrigger>
                             <SelectContent><SelectItem value="1">1 jour</SelectItem><SelectItem value="7">1 semaine</SelectItem><SelectItem value="30">1 mois</SelectItem><SelectItem value="90">3 mois</SelectItem></SelectContent>
@@ -894,7 +861,7 @@ function TokenManager({ tokens }: { tokens: AccessToken[] | null }) {
             })
             .catch((error) => {
                 console.error("Token Generation Error:", error);
-                toast({ variant: "destructive", title: "Erreur", description: "Impossible de créer le jeton. Vérifiez vos permissions." });
+                toast({ variant: "destructive", title: "Erreur", description: "Vérifiez vos permissions Master." });
             })
             .finally(() => {
                 setIsGenerating(false);
@@ -903,7 +870,7 @@ function TokenManager({ tokens }: { tokens: AccessToken[] | null }) {
 
     return (
         <Card className="border-2 shadow-lg">
-            <CardHeader><CardTitle className="text-xl font-black uppercase flex items-center gap-2"><Ticket className="size-6 text-accent" /> Jetons d'Accès Individuels</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-xl font-black uppercase flex items-center gap-2"><Ticket className="size-6 text-accent" /> Jetons d'Accès</CardTitle></CardHeader>
             <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1">Durée (mois)</Label>
@@ -912,7 +879,7 @@ function TokenManager({ tokens }: { tokens: AccessToken[] | null }) {
                             <SelectContent><SelectItem value="1">1 mois</SelectItem><SelectItem value="3">3 mois</SelectItem><SelectItem value="6">6 mois</SelectItem><SelectItem value="12">12 mois</SelectItem></SelectContent>
                         </Select>
                     </div>
-                    <div className="flex items-end"><Button onClick={generateToken} disabled={isGenerating} className="w-full h-12 font-black uppercase tracking-widest gap-2 bg-accent hover:bg-accent/90 shadow-lg"><Zap className="size-4" /> Générer</Button></div>
+                    <div className="flex items-end"><Button onClick={generateToken} disabled={isGenerating} className="w-full h-12 font-black uppercase tracking-widest gap-2 bg-accent shadow-lg"><Zap className="size-4" /> Générer</Button></div>
                 </div>
                 <div className="max-h-64 overflow-y-auto border-2 rounded-2xl">
                     <Table>
@@ -940,66 +907,34 @@ function FishManager({ species }: { species: FishSpeciesInfo[] | null }) {
     const [name, setName] = useState('');
     const [scieName, setScieName] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
-    const [isRefilling, setIsRefilling] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
-    
     const [editingFish, setEditingFish] = useState<FishSpeciesInfo | null>(null);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-    
     const [currentImageUrl, setCurrentImageUrl] = useState('');
     const addFileInputRef = useRef<HTMLInputElement>(null);
-    const editFileInputRef = useRef<HTMLInputElement>(null);
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, isEdit: boolean) => {
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (event) => {
             const base64 = event.target?.result as string;
-            if (isEdit && editingFish) {
-                setEditingFish({ ...editingFish, imageUrl: base64 });
-            } else {
-                setCurrentImageUrl(base64);
-            }
+            setCurrentImageUrl(base64);
             toast({ title: "Photo chargée" });
         };
         reader.readAsDataURL(file);
     };
 
-    const handleAdd = async (aiData?: any) => {
+    const handleAdd = (aiData?: any) => {
         if (!firestore || !name) return;
         setIsSaving(true);
-        try {
-            const id = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '-');
-            const data = aiData || { 
-                name, 
-                scientificName: scieName, 
-                category: 'Lagon', 
-                gratteRisk: 0, 
-                gratteRiskSmall: 0, 
-                gratteRiskMedium: 0, 
-                gratteRiskLarge: 0, 
-                fishingAdvice: '', 
-                culinaryAdvice: '',
-                imageUrl: currentImageUrl
-            };
-            await setDoc(doc(firestore, 'fish_species', id), { ...data, id }, { merge: true });
-            setName(''); setScieName(''); setCurrentImageUrl('');
-            toast({ title: "Espèce répertoriée" });
-        } catch (e) { toast({ variant: 'destructive', title: "Erreur" }); }
-        finally { setIsSaving(false); }
-    };
-
-    const handleUpdate = async () => {
-        if (!firestore || !editingFish) return;
-        setIsSaving(true);
-        try {
-            await setDoc(doc(firestore, 'fish_species', editingFish.id), editingFish, { merge: true });
-            setIsEditDialogOpen(false);
-            setEditingFish(null);
-            toast({ title: "Fiche mise à jour" });
-        } catch (e) { toast({ variant: 'destructive', title: "Erreur sauvegarde" }); }
-        finally { setIsSaving(false); }
+        const id = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '-');
+        const data = aiData || { 
+            name, scientificName: scieName, category: 'Lagon', gratteRisk: 0, fishingAdvice: '', culinaryAdvice: '', imageUrl: currentImageUrl
+        };
+        setDoc(doc(firestore, 'fish_species', id), { ...data, id }, { merge: true })
+            .then(() => { setName(''); setScieName(''); setCurrentImageUrl(''); toast({ title: "Espèce ajoutée" }); })
+            .finally(() => setIsSaving(false));
     };
 
     const handleAiFill = async () => {
@@ -1025,186 +960,64 @@ function FishManager({ species }: { species: FishSpeciesInfo[] | null }) {
         } finally { setIsGenerating(false); }
     };
 
-    const handleAiRefill = async () => {
-        if (!editingFish) return;
-        setIsRefilling(true);
-        try {
-            const info = await generateFishInfo({ 
-                name: editingFish.name, 
-                scientificName: editingFish.scientificName 
-            });
-            setEditingFish({
-                ...editingFish,
-                scientificName: info.scientificName,
-                category: info.category,
-                gratteRiskSmall: info.gratteRiskSmall,
-                gratteRiskMedium: info.gratteRiskMedium,
-                gratteRiskLarge: info.gratteRiskLarge,
-                lengthSmall: info.lengthSmall,
-                lengthMedium: info.lengthMedium,
-                lengthLarge: info.lengthLarge,
-                fishingAdvice: info.fishingAdvice,
-                culinaryAdvice: info.culinaryAdvice,
-            });
-            toast({ title: "Champs mis à jour par l'IA", description: "Vérifiez les données avant de sauvegarder." });
-        } catch (e) {
-            toast({ variant: 'destructive', title: "Erreur IA", description: "L'IA n'a pas pu générer les informations." });
-        } finally {
-            setIsRefilling(false);
-        }
-    };
-
     return (
         <Card className="border-2 shadow-lg">
-            <CardHeader><CardTitle className="text-xl font-black uppercase flex items-center gap-2"><Fish className="size-6 text-primary" /> Guide Poissons & Gratte</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-xl font-black uppercase flex items-center gap-2"><Fish className="size-6 text-primary" /> Guide Poissons</CardTitle></CardHeader>
             <CardContent className="space-y-6">
                 <div className="p-4 bg-muted/30 rounded-2xl border-2 border-dashed space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Nom Commun NC</Label><Input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Bec de cane..." /></div>
-                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Nom Scientifique</Label><Input value={scieName} onChange={e => setScieName(e.target.value)} placeholder="Optionnel..." /></div>
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Nom NC</Label><Input value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Bec de cane..." /></div>
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Nom Scien.</Label><Input value={scieName} onChange={e => setScieName(e.target.value)} placeholder="Optionnel..." /></div>
                     </div>
-                    
                     <div className="space-y-1">
-                        <Label className="text-[10px] font-black uppercase">Photo du spécimen (Smartphone)</Label>
+                        <Label className="text-[10px] font-black uppercase">Photo</Label>
                         <div className="flex gap-2">
                             <Input value={currentImageUrl} onChange={e => setCurrentImageUrl(e.target.value)} placeholder="URL ou base64..." className="flex-grow" />
-                            <Button variant="outline" size="icon" className="shrink-0 h-10 w-10 border-2" onClick={() => addFileInputRef.current?.click()}><Camera className="size-4" /></Button>
-                            <input type="file" accept="image/*" ref={addFileInputRef} className="hidden" onChange={e => handleFileChange(e, false)} />
+                            <Button variant="outline" size="icon" onClick={() => addFileInputRef.current?.click()}><Camera className="size-4" /></Button>
+                            <input type="file" accept="image/*" ref={addFileInputRef} className="hidden" onChange={handleFileChange} />
                         </div>
                     </div>
-
                     <div className="flex gap-2">
-                        <Button onClick={() => handleAdd()} disabled={isSaving || !name} className="flex-1 font-black uppercase h-12 border-2" variant="outline">Saisie Manuelle</Button>
-                        <Button onClick={handleAiFill} disabled={isGenerating || isSaving || !name} className="flex-1 font-black uppercase h-12 gap-2 shadow-lg bg-primary">
-                            {isGenerating ? <RefreshCw className="size-4 animate-spin" /> : <BrainCircuit className="size-4" />} IA (Gemini)
+                        <Button onClick={() => handleAdd()} disabled={isSaving || !name} className="flex-1 font-black uppercase h-12" variant="outline">Manuelle</Button>
+                        <Button onClick={handleAiFill} disabled={isGenerating || isSaving || !name} className="flex-1 font-black uppercase h-12 gap-2 bg-primary">
+                            {isGenerating ? <RefreshCw className="size-4 animate-spin" /> : <BrainCircuit className="size-4" />} Gemini
                         </Button>
                     </div>
                 </div>
-
                 <div className="max-h-96 overflow-y-auto border-2 rounded-2xl">
                     <Table>
-                        <TableHeader><TableRow className="bg-muted/30"><TableHead className="text-[9px] font-black uppercase h-8 px-3">Espèce</TableHead><TableHead className="text-[9px] font-black uppercase h-8">Catégorie</TableHead><TableHead className="text-[9px] font-black uppercase h-8">Risque (M)</TableHead><TableHead className="text-right text-[9px] font-black uppercase h-8 px-3">Actions</TableHead></TableRow></TableHeader>
+                        <TableHeader><TableRow className="bg-muted/30"><TableHead className="text-[9px] font-black uppercase h-8 px-3">Espèce</TableHead><TableHead className="text-[9px] font-black uppercase h-8">Actions</TableHead></TableRow></TableHeader>
                         <TableBody>
                             {species?.map(s => (
                                 <TableRow key={s.id}>
-                                    <TableCell className="px-3 py-2">
-                                        <div className="flex items-center gap-2">
-                                            {s.imageUrl && <div className="size-6 rounded border bg-muted shrink-0 overflow-hidden"><img src={s.imageUrl} className="w-full h-full object-cover" /></div>}
-                                            <div className="flex flex-col"><span className="font-black text-xs uppercase leading-none">{s.name}</span><span className="text-[8px] italic opacity-40">{s.scientificName}</span></div>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell><Badge variant="outline" className="text-[7px] font-black uppercase h-4">{s.category}</Badge></TableCell>
-                                    <TableCell className="font-black text-xs">{s.gratteRiskMedium || s.gratteRisk}%</TableCell>
-                                    <TableCell className="text-right px-3">
-                                        <div className="flex justify-end gap-1">
-                                            <Button variant="ghost" size="icon" onClick={() => { setEditingFish(s); setIsEditDialogOpen(true); }} className="size-7 text-primary/60"><Pencil className="size-3" /></Button>
-                                            <Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(firestore!, 'fish_species', s.id))} className="size-7 text-destructive/60"><Trash2 className="size-3" /></Button>
-                                        </div>
-                                    </TableCell>
+                                    <TableCell className="px-3 py-2 font-black text-xs uppercase">{s.name}</TableCell>
+                                    <TableCell className="text-right px-3"><Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(firestore!, 'fish_species', s.id))} className="size-7 text-destructive"><Trash2 className="size-3" /></Button></TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
                     </Table>
                 </div>
             </CardContent>
-
-            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-                <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl">
-                    <DialogHeader>
-                        <DialogTitle className="font-black uppercase flex items-center gap-2"><Pencil className="size-5" /> Modifier : {editingFish?.name}</DialogTitle>
-                        <DialogDescription className="text-xs uppercase font-bold">Mise à jour de la fiche technique</DialogDescription>
-                    </DialogHeader>
-                    {editingFish && (
-                        <div className="space-y-4 py-4">
-                            <div className="flex justify-end">
-                                <Button 
-                                    variant="secondary" 
-                                    size="sm" 
-                                    className="font-black uppercase h-9 gap-2 shadow-sm border-2 border-primary/20"
-                                    onClick={handleAiRefill}
-                                    disabled={isRefilling}
-                                >
-                                    {isRefilling ? <RefreshCw className="size-3 animate-spin" /> : <BrainCircuit className="size-3" />}
-                                    Remplir via IA (Gemini)
-                                </Button>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Nom Commun</Label><Input value={editingFish.name} onChange={e => setEditingFish({...editingFish, name: e.target.value})} /></div>
-                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Nom Scientifique</Label><Input value={editingFish.scientificName} onChange={e => setEditingFish({...editingFish, scientificName: e.target.value})} /></div>
-                            </div>
-                            
-                            <div className="space-y-1">
-                                <Label className="text-[10px] font-black uppercase">Photo (Smartphone)</Label>
-                                <div className="flex gap-2">
-                                    <Input value={editingFish.imageUrl || ''} onChange={e => setEditingFish({...editingFish, imageUrl: e.target.value})} className="flex-grow" />
-                                    <Button variant="outline" size="icon" className="shrink-0 h-10 w-10 border-2" onClick={() => editFileInputRef.current?.click()}><Camera className="size-4" /></Button>
-                                    <input type="file" accept="image/*" ref={editFileInputRef} className="hidden" onChange={handleFileChange} />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-3">
-                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Risque Petit (%)</Label><Input type="number" value={editingFish.gratteRiskSmall} onChange={e => setEditingFish({...editingFish, gratteRiskSmall: parseInt(e.target.value)})} /></div>
-                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Risque Moyen (%)</Label><Input type="number" value={editingFish.gratteRiskMedium} onChange={e => setEditingFish({...editingFish, gratteRiskMedium: parseInt(e.target.value)})} /></div>
-                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Risque Grand (%)</Label><Input type="number" value={editingFish.gratteRiskLarge} onChange={e => setEditingFish({...editingFish, gratteRiskLarge: parseInt(e.target.value)})} /></div>
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-3">
-                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Taille P (cm)</Label><Input value={editingFish.lengthSmall || ''} onChange={e => setEditingFish({...editingFish, lengthSmall: e.target.value})} /></div>
-                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Taille M (cm)</Label><Input value={editingFish.lengthMedium || ''} onChange={e => setEditingFish({...editingFish, lengthMedium: e.target.value})} /></div>
-                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Taille G (cm)</Label><Input value={editingFish.lengthLarge || ''} onChange={e => setEditingFish({...editingFish, lengthLarge: e.target.value})} /></div>
-                            </div>
-
-                            <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Conseils Pêche</Label><Textarea value={editingFish.fishingAdvice} onChange={e => setEditingFish({...editingFish, fishingAdvice: e.target.value})} /></div>
-                            <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Conseils Cuisine</Label><Textarea value={editingFish.culinaryAdvice} onChange={e => setEditingFish({...editingFish, culinaryAdvice: e.target.value})} /></div>
-                        </div>
-                    )}
-                    <DialogFooter>
-                        <Button variant="ghost" onClick={() => setIsEditDialogOpen(false)} className="font-black uppercase h-12">Annuler</Button>
-                        <Button onClick={handleUpdate} disabled={isSaving} className="font-black uppercase h-12 gap-2 shadow-lg bg-primary">
-                            <Save className="size-4" /> Enregistrer les modifications
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </Card>
     );
 }
 
 function SupportConversationsManager({ conversations, error }: { conversations: Conversation[] | null, error?: any }) {
-    const firestore = useFirestore();
-
     return (
         <Card className="border-2 shadow-lg">
-            <CardHeader className="bg-muted/10 border-b"><CardTitle className="text-lg font-black uppercase flex items-center gap-2"><MessageSquare className="size-5 text-primary" /> Support & Messages Clients</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-lg font-black uppercase flex items-center gap-2"><MessageSquare className="size-5 text-primary" /> Support</CardTitle></CardHeader>
             <CardContent className="p-0">
-                {error ? (
-                    <div className="p-8 text-center text-xs font-black uppercase text-red-600 bg-red-50 flex flex-col items-center gap-2">
-                        <AlertTriangle className="size-6" />
-                        Erreur de permissions sur les conversations
-                        <p className="text-[8px] opacity-60">Veuillez rafraîchir la page (Cmd+Shift+R)</p>
-                    </div>
-                ) : (
-                    <Table>
-                        <TableHeader><TableRow className="bg-muted/30">
-                            <TableHead className="text-[10px] font-black uppercase h-10 px-4">Utilisateur</TableHead>
-                            <TableHead className="text-[10px] font-black uppercase h-10">Dernier Message</TableHead>
-                            <TableHead className="right text-[10px] font-black uppercase h-10 px-4">Action</TableHead>
-                        </TableRow></TableHeader>
-                        <TableBody>
-                            {conversations?.map(conv => (
-                                <TableRow key={conv.id} className={cn(!conv.isReadByAdmin && "bg-primary/5")}>
-                                    <TableCell className="px-4 py-3"><div className="flex flex-col"><span className="font-black text-xs">{conv.userDisplayName}</span><span className="text-[9px] font-bold opacity-40 lowercase">{conv.userEmail}</span></div></TableCell>
-                                    <TableCell className="text-xs italic opacity-70 truncate max-w-[200px]">"{conv.lastMessageContent}"</TableCell>
-                                    <TableCell className="text-right px-4"><Button asChild variant="outline" size="sm" className="h-8 text-[9px] font-black uppercase border-2"><Link href={`/admin/messages/${conv.id}`}>Répondre</Link></Button></TableCell>
-                                </TableRow>
-                            ))}
-                            {(!conversations || conversations.length === 0) && (
-                                <TableRow><TableCell colSpan={3} className="text-center py-12 text-xs italic opacity-40 uppercase font-black tracking-widest">Aucun message</TableCell></TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                )}
+                <Table>
+                    <TableHeader><TableRow className="bg-muted/30"><TableHead className="text-[10px] font-black uppercase h-10 px-4">Utilisateur</TableHead><TableHead className="text-right text-[10px] font-black uppercase h-10 px-4">Action</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                        {conversations?.map(conv => (
+                            <TableRow key={conv.id} className={cn(!conv.isReadByAdmin && "bg-primary/5")}>
+                                <TableCell className="px-4 py-3"><div className="flex flex-col"><span className="font-black text-xs">{conv.userDisplayName}</span><span className="text-[9px] font-bold opacity-40 lowercase">{conv.userEmail}</span></div></TableCell>
+                                <TableCell className="text-right px-4"><Button asChild variant="outline" size="sm" className="h-8 text-[9px] font-black uppercase"><Link href={`/admin/messages/${conv.id}`}>Répondre</Link></Button></TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
             </CardContent>
         </Card>
     );
