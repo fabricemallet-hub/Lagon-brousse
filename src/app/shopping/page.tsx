@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Search, ShoppingBag, Store, MapPin, Tag, Percent, Filter, RefreshCw, AlertTriangle, ChevronRight } from 'lucide-react';
+import { Search, ShoppingBag, Store, MapPin, Tag, Percent, Filter, RefreshCw, AlertTriangle, ChevronRight, ShieldCheck } from 'lucide-react';
 import { locations } from '@/lib/locations';
 import { cn } from '@/lib/utils';
 
@@ -33,11 +33,12 @@ export default function ShoppingPage() {
   }, [firestore]);
   const { data: businesses, isLoading: isBusinessesLoading } = useCollection<Business>(businessesRef);
 
-  // Utilisation d'un Query brut pour collectionGroup sans tri pour éviter les erreurs d'index
+  // Requête groupée pour récupérer toutes les promotions de tous les magasins
   const promosRef = useMemoFirebase(() => {
     if (!firestore) return null;
     return collectionGroup(firestore, 'promotions');
   }, [firestore]);
+  
   const { data: allPromotions, isLoading: isPromosLoading, error: promosError } = useCollection<Promotion>(promosRef);
 
   // --- FILTERS STATE ---
@@ -49,7 +50,7 @@ export default function ShoppingPage() {
 
   const userCommune = profile?.lastSelectedLocation || 'Nouméa';
 
-  // --- LOGIQUE DE FILTRAGE AMÉLIORÉE ---
+  // --- LOGIQUE DE FILTRAGE ---
   const filteredProducts = useMemo(() => {
     if (!allPromotions) return [];
 
@@ -70,7 +71,6 @@ export default function ShoppingPage() {
         // 2. Filtre Commune
         if (filterCommune !== 'USER_DEFAULT' && filterCommune !== 'ALL') {
             if (item.business && item.business.commune !== filterCommune) return false;
-            // On ne masque pas si le magasin est en cours de chargement, sauf si une commune spécifique est demandée
             if (!item.business) return false; 
         }
 
@@ -94,7 +94,6 @@ export default function ShoppingPage() {
             if (!aInCommune && bInCommune) return 1;
         }
         
-        // Tri chronologique JS
         const timeA = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
         const timeB = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
         return timeB - timeA;
@@ -110,6 +109,7 @@ export default function ShoppingPage() {
   };
 
   const isLoading = isBusinessesLoading || isPromosLoading;
+  const isAdmin = profile?.role === 'admin' || profile?.subscriptionStatus === 'admin';
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-20">
@@ -208,12 +208,13 @@ export default function ShoppingPage() {
       </Card>
 
       <div className="space-y-4">
-        {promosError && !allPromotions && (
-            <Alert variant="destructive" className="border-2 animate-in fade-in">
-                <AlertTriangle className="size-4" />
-                <AlertTitle className="text-xs font-black uppercase">Erreur de chargement</AlertTitle>
-                <AlertDescription className="text-[10px]">
-                    Un problème de permissions ou d'index empêche l'affichage. Veuillez patienter ou rafraîchir.
+        {/* AFFICHAGE EXPLICITE DES ERREURS POUR DÉBOGAGE */}
+        {promosError && (
+            <Alert variant="destructive" className="border-2 animate-in fade-in bg-red-50 text-red-900 border-red-200">
+                <AlertTriangle className="size-4 text-red-600" />
+                <AlertTitle className="text-xs font-black uppercase">Erreur Technique détectée</AlertTitle>
+                <AlertDescription className="text-[10px] font-bold leading-tight mt-1">
+                    {promosError.message || "Un problème empêche l'affichage du catalogue. Veuillez vérifier votre connexion ou l'index Firestore."}
                 </AlertDescription>
             </Alert>
         )}
@@ -250,6 +251,24 @@ export default function ShoppingPage() {
             </div>
         )}
       </div>
+
+      {/* DEBUG POUR ADMIN SI VIDE */}
+      {isAdmin && !isLoading && filteredProducts.length === 0 && (
+          <div className="p-4 bg-slate-900 text-white rounded-2xl border-2 border-slate-700 space-y-3 shadow-xl">
+              <p className="text-[10px] font-black uppercase flex items-center gap-2 text-primary">
+                  <ShieldCheck className="size-3" /> Diagnostics Administrateur
+              </p>
+              <div className="grid grid-cols-2 gap-2 text-[9px] font-bold uppercase opacity-80">
+                  <div className="bg-slate-800 p-2 rounded">Magasins : {businesses?.length || 0}</div>
+                  <div className="bg-slate-800 p-2 rounded">Promos (Brut) : {allPromotions?.length || 0}</div>
+                  <div className="bg-slate-800 p-2 rounded">Erreur : {promosError ? 'OUI' : 'NON'}</div>
+                  <div className="bg-slate-800 p-2 rounded">Localité : {userCommune}</div>
+              </div>
+              <p className="text-[8px] italic opacity-50 leading-tight">
+                  Si "Promos (Brut)" est à 0 alors que vous en avez créé, vérifiez l'index "Collection Group" dans la console Firebase.
+              </p>
+          </div>
+      )}
     </div>
   );
 }
