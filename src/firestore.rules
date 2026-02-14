@@ -6,29 +6,24 @@ service cloud.firestore {
     // ======================================================
     // 1. PRIORITÉ ABSOLUE : MASTER ADMIN BYPASS (GOD MODE)
     // ======================================================
-    // Cette règle autorise TOUT (lecture et écriture) sur TOUS les documents
-    // pour l'administrateur principal (UID t8nPnZLcTiaLJSKMuLzib3C5nPn1).
+    // Cette règle à la racine autorise TOUT (lecture et écriture) sur TOUS les documents
+    // pour l'administrateur principal et ses alias de confiance.
+    // Elle est placée ici pour être évaluée en premier et garantir un accès total.
     
-    function isMaster() {
-      return request.auth != null && (
-        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
-        request.auth.uid == "koKj5ObSGXYeO1PLKU5bgo8Yaky1" ||
-        request.auth.uid == "D1q2GPM95rZi38cvCzvsjcWQDaV2" ||
-        request.auth.uid == "K9cVYLVUk1NV99YV3anebkugpPp1" ||
-        request.auth.uid == "ipupi3Pg4RfrSEpFyT69BtlCdpi2" ||
-        request.auth.uid == "Irglq69MasYdNwBmUu8yKvw6h4G2" ||
-        (request.auth.token.email != null && request.auth.token.email.lower() in [
-          "f.mallet81@outlook.com",
-          "fabrice.mallet@gmail.com",
-          "f.mallet81@gmail.com",
-          "kledostyle@outlook.com"
-        ])
-      );
-    }
-
-    match /{allPaths=**} {
-      allow read, write: if isMaster();
-    }
+    allow read, write: if request.auth != null && (
+      request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
+      request.auth.uid == "koKj5ObSGXYeO1PLKU5bgo8Yaky1" ||
+      request.auth.uid == "D1q2GPM95rZi38cvCzvsjcWQDaV2" ||
+      request.auth.uid == "K9cVYLVUk1NV99YV3anebkugpPp1" ||
+      request.auth.uid == "ipupi3Pg4RfrSEpFyT69BtlCdpi2" ||
+      request.auth.uid == "Irglq69MasYdNwBmUu8yKvw6h4G2" ||
+      (request.auth.token.email != null && request.auth.token.email.lower() in [
+        "f.mallet81@outlook.com",
+        "fabrice.mallet@gmail.com",
+        "f.mallet81@gmail.com",
+        "kledostyle@outlook.com"
+      ])
+    );
 
     // --- FONCTIONS DE BASE ---
     function isSignedIn() {
@@ -36,18 +31,16 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && (
-        isMaster() ||
-        request.auth.token.get('role', '') == 'admin'
-      );
+      // Pour les autres admins (via custom claims)
+      return isSignedIn() && request.auth.token.get('role', '') == 'admin';
     }
 
     // --- 2. ACCÈS PUBLICS & SYSTÈME ---
-    match /shared_access_tokens/{id} { allow read: if true; allow write: if isAdmin(); }
-    match /access_tokens/{id} { allow read, write: if isAdmin(); }
-    match /app_settings/{id} { allow read: if true; allow write: if isAdmin(); }
-    match /system_notifications/{id} { allow read: if true; allow write: if isAdmin(); }
-    match /sound_library/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /shared_access_tokens/{id} { allow read: if true; }
+    match /access_tokens/{id} { allow read: if true; }
+    match /app_settings/{id} { allow read: if true; }
+    match /system_notifications/{id} { allow read: if true; }
+    match /sound_library/{id} { allow read: if true; }
     match /meteo_caledonie/{id} { 
       allow get, list: if true;
       match /previsions/{prevId} { allow get, list: if true; }
@@ -60,15 +53,14 @@ service cloud.firestore {
     // --- 3. CATALOGUE SHOPPING (Collection Group) ---
     match /{path=**}/promotions/{promoId} {
       allow read: if true;
-      allow write: if isAdmin();
     }
 
     // --- 4. UTILISATEURS & REACH ---
     match /users { allow list: if isSignedIn(); }
     match /users/{userId} {
-      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow read, write: if isSignedIn() && (request.auth.uid == userId);
       match /{allPaths=**} {
-        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+        allow read, write: if isSignedIn() && (request.auth.uid == userId);
       }
     }
 
@@ -77,12 +69,12 @@ service cloud.firestore {
     match /hunting_sessions/{id} { allow read, write: if isSignedIn(); match /{allPaths=**} { allow read, write: if isSignedIn(); } }
     match /vessels/{id} { allow read, write: if isSignedIn(); match /{allPaths=**} { allow read, write: if isSignedIn(); } }
     match /spot_shares/{id} { allow read, write: if isSignedIn(); }
-    match /businesses/{businessId} { allow get, list: if true; allow write: if isAdmin(); }
+    match /businesses/{businessId} { allow get, list: if true; }
     match /campaigns/{campaignId} { allow read, write: if isAdmin(); }
     match /conversations/{id} {
-      allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin());
+      allow read, write: if isSignedIn() && (request.auth.uid == id);
       match /{allPaths=**} {
-        allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin());
+        allow read, write: if isSignedIn() && (request.auth.uid == id);
       }
     }
   }

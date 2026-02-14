@@ -190,6 +190,157 @@ export default function AdminPage() {
   );
 }
 
+function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | null }) {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [duration, setDuration] = useState('7');
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleActivate = () => {
+        if (!firestore) return;
+        setIsSaving(true);
+        const durationNum = parseInt(duration);
+        const expiry = Timestamp.fromDate(addDays(new Date(), durationNum));
+        const docRef = doc(firestore, 'shared_access_tokens', 'GLOBAL');
+        const data = { expiresAt: expiry, updatedAt: serverTimestamp() };
+        
+        setDoc(docRef, data, { merge: true })
+            .then(() => {
+                toast({ title: "Accès Global activé !" });
+            })
+            .catch((error) => {
+                const permissionError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'write',
+                    requestResourceData: data,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            })
+            .finally(() => {
+                setIsSaving(false);
+            });
+    };
+
+    const handleStop = () => {
+        if (!firestore) return;
+        setIsSaving(true);
+        const docRef = doc(firestore, 'shared_access_tokens', 'GLOBAL');
+        const data = { expiresAt: Timestamp.fromDate(new Date(0)), updatedAt: serverTimestamp() };
+        
+        setDoc(docRef, data, { merge: true })
+            .then(() => {
+                toast({ title: "Accès Global coupé" });
+            })
+            .catch((error) => {
+                const permissionError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'write',
+                    requestResourceData: data,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            })
+            .finally(() => {
+                setIsSaving(false);
+            });
+    };
+
+    const isGlobalActive = globalGift && globalGift.expiresAt && isBefore(new Date(), globalGift.expiresAt.toDate());
+
+    return (
+        <Card className="border-2 shadow-lg">
+            <CardHeader><CardTitle className="text-xl font-black uppercase flex items-center gap-2 text-primary"><Sparkles className="size-6" /> Accès Global (Cadeau)</CardTitle></CardHeader>
+            <CardContent className="space-y-6">
+                <div className={cn("p-4 rounded-2xl border-2 flex items-center justify-between", isGlobalActive ? "bg-green-50 border-green-200" : "bg-muted/30 border-dashed")}>
+                    <div className="flex flex-col">
+                        <span className="text-[10px] font-black uppercase opacity-60">Statut actuel</span>
+                        <p className={cn("text-sm font-black", isGlobalActive ? "text-green-600" : "text-muted-foreground")}>{isGlobalActive ? `ACTIF JUSQU'AU ${format(globalGift!.expiresAt.toDate(), 'dd/MM HH:mm')}` : 'AUCUN ACCÈS ACTIF'}</p>
+                    </div>
+                    {isGlobalActive && (
+                        <Button variant="destructive" size="sm" onClick={handleStop} disabled={isSaving} className="h-8 font-black uppercase text-[10px]">Couper</Button>
+                    )}
+                </div>
+                <div className="space-y-4">
+                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Durée (jours)</Label>
+                        <Select value={duration} onValueChange={setDuration}>
+                            <SelectTrigger className="h-12 border-2 font-black"><SelectValue /></SelectTrigger>
+                            <SelectContent><SelectItem value="1">1 jour</SelectItem><SelectItem value="7">1 semaine</SelectItem><SelectItem value="30">1 mois</SelectItem><SelectItem value="90">3 mois</SelectItem></SelectContent>
+                        </Select>
+                    </div>
+                    <Button onClick={handleActivate} disabled={isSaving} className="w-full h-14 font-black uppercase tracking-widest bg-primary shadow-lg text-sm">
+                        {isSaving ? <RefreshCw className="size-5 animate-spin mr-2" /> : null}
+                        Activer l'offre cadeau
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function TokenManager({ tokens }: { tokens: AccessToken[] | null }) {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [duration, setDuration] = useState('1');
+    const [isGenerating, setIsGenerating] = useState(false);
+
+    const generateToken = () => {
+        if (!firestore) return;
+        setIsGenerating(true);
+        const id = `LBN-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+        const docRef = doc(firestore, 'access_tokens', id);
+        const data = {
+            id, status: 'active', durationMonths: parseInt(duration), createdAt: serverTimestamp()
+        };
+
+        setDoc(docRef, data)
+            .then(() => {
+                toast({ title: "Jeton généré !" });
+            })
+            .catch((error) => {
+                const permissionError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'write',
+                    requestResourceData: data,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            })
+            .finally(() => {
+                setIsGenerating(false);
+            });
+    };
+
+    return (
+        <Card className="border-2 shadow-lg">
+            <CardHeader><CardTitle className="text-xl font-black uppercase flex items-center gap-2"><Ticket className="size-6 text-accent" /> Jetons d'Accès</CardTitle></CardHeader>
+            <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1">Durée (mois)</Label>
+                        <Select value={duration} onValueChange={setDuration}>
+                            <SelectTrigger className="h-12 border-2"><SelectValue /></SelectTrigger>
+                            <SelectContent><SelectItem value="1">1 mois</SelectItem><SelectItem value="3">3 mois</SelectItem><SelectItem value="6">6 mois</SelectItem><SelectItem value="12">12 mois</SelectItem></SelectContent>
+                        </Select>
+                    </div>
+                    <div className="flex items-end"><Button onClick={generateToken} disabled={isGenerating} className="w-full h-12 font-black uppercase tracking-widest gap-2 bg-accent shadow-lg"><Zap className="size-4" /> Générer</Button></div>
+                </div>
+                <div className="max-h-64 overflow-y-auto border-2 rounded-2xl">
+                    <Table>
+                        <TableHeader><TableRow className="bg-muted/30"><TableHead className="text-[9px] font-black uppercase h-8 px-3">Code</TableHead><TableHead className="text-[9px] font-black uppercase h-8">Durée</TableHead><TableHead className="text-[9px] font-black uppercase h-8">État</TableHead><TableHead className="text-right text-[9px] font-black uppercase h-8 px-3">Action</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                            {tokens?.map(t => (
+                                <TableRow key={t.id}>
+                                    <TableCell className="px-3 py-2 font-mono text-[10px] font-black">{t.id}</TableCell>
+                                    <TableCell className="text-[10px] font-bold">{t.durationMonths} m</TableCell>
+                                    <TableCell><Badge variant={t.status === 'active' ? 'outline' : 'secondary'} className="text-[7px] font-black uppercase h-4 px-1">{t.status}</Badge></TableCell>
+                                    <TableCell className="text-right px-3"><Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(firestore!, 'access_tokens', t.id))} className="size-7 text-destructive"><Trash2 className="size-3" /></Button></TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
 function BusinessesManager({ businesses, users }: { businesses: Business[] | null, users: UserAccount[] | null }) {
     const firestore = useFirestore();
     const { toast } = useToast();
@@ -779,157 +930,6 @@ function CgvRibManager({ cgvData, ribData }: { cgvData: CgvSettings | null, ribD
                     <Label className="text-[10px] font-black uppercase">RIB (Virement)</Label>
                     <Textarea value={ribContent} onChange={e => setRibContent(e.target.value)} className="min-h-[80px] font-mono text-[10px]" />
                     <Button variant="outline" onClick={() => handleSave('rib')} disabled={isSaving} className="w-full h-10 font-black uppercase text-[10px] border-2">Mettre à jour le RIB</Button>
-                </div>
-            </CardContent>
-        </Card>
-    );
-}
-
-function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | null }) {
-    const firestore = useFirestore();
-    const { toast } = useToast();
-    const [duration, setDuration] = useState('7');
-    const [isSaving, setIsSaving] = useState(false);
-
-    const handleActivate = () => {
-        if (!firestore) return;
-        setIsSaving(true);
-        const durationNum = parseInt(duration);
-        const expiry = Timestamp.fromDate(addDays(new Date(), durationNum));
-        const docRef = doc(firestore, 'shared_access_tokens', 'GLOBAL');
-        const data = { expiresAt: expiry, updatedAt: serverTimestamp() };
-        
-        setDoc(docRef, data, { merge: true })
-            .then(() => {
-                toast({ title: "Accès Global activé !" });
-            })
-            .catch((error) => {
-                const permissionError = new FirestorePermissionError({
-                    path: docRef.path,
-                    operation: 'write',
-                    requestResourceData: data,
-                });
-                errorEmitter.emit('permission-error', permissionError);
-            })
-            .finally(() => {
-                setIsSaving(false);
-            });
-    };
-
-    const handleStop = () => {
-        if (!firestore) return;
-        setIsSaving(true);
-        const docRef = doc(firestore, 'shared_access_tokens', 'GLOBAL');
-        const data = { expiresAt: Timestamp.fromDate(new Date(0)), updatedAt: serverTimestamp() };
-        
-        setDoc(docRef, data, { merge: true })
-            .then(() => {
-                toast({ title: "Accès Global coupé" });
-            })
-            .catch((error) => {
-                const permissionError = new FirestorePermissionError({
-                    path: docRef.path,
-                    operation: 'write',
-                    requestResourceData: data,
-                });
-                errorEmitter.emit('permission-error', permissionError);
-            })
-            .finally(() => {
-                setIsSaving(false);
-            });
-    };
-
-    const isGlobalActive = globalGift && globalGift.expiresAt && isBefore(new Date(), globalGift.expiresAt.toDate());
-
-    return (
-        <Card className="border-2 shadow-lg">
-            <CardHeader><CardTitle className="text-xl font-black uppercase flex items-center gap-2 text-primary"><Sparkles className="size-6" /> Accès Global (Cadeau)</CardTitle></CardHeader>
-            <CardContent className="space-y-6">
-                <div className={cn("p-4 rounded-2xl border-2 flex items-center justify-between", isGlobalActive ? "bg-green-50 border-green-200" : "bg-muted/30 border-dashed")}>
-                    <div className="flex flex-col">
-                        <span className="text-[10px] font-black uppercase opacity-60">Statut actuel</span>
-                        <p className={cn("text-sm font-black", isGlobalActive ? "text-green-600" : "text-muted-foreground")}>{isGlobalActive ? `ACTIF JUSQU'AU ${format(globalGift!.expiresAt.toDate(), 'dd/MM HH:mm')}` : 'AUCUN ACCÈS ACTIF'}</p>
-                    </div>
-                    {isGlobalActive && (
-                        <Button variant="destructive" size="sm" onClick={handleStop} disabled={isSaving} className="h-8 font-black uppercase text-[10px]">Couper</Button>
-                    )}
-                </div>
-                <div className="space-y-4">
-                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase">Durée (jours)</Label>
-                        <Select value={duration} onValueChange={setDuration}>
-                            <SelectTrigger className="h-12 border-2 font-black"><SelectValue /></SelectTrigger>
-                            <SelectContent><SelectItem value="1">1 jour</SelectItem><SelectItem value="7">1 semaine</SelectItem><SelectItem value="30">1 mois</SelectItem><SelectItem value="90">3 mois</SelectItem></SelectContent>
-                        </Select>
-                    </div>
-                    <Button onClick={handleActivate} disabled={isSaving} className="w-full h-14 font-black uppercase tracking-widest bg-primary shadow-lg text-sm">
-                        {isSaving ? <RefreshCw className="size-5 animate-spin mr-2" /> : null}
-                        Activer l'offre cadeau
-                    </Button>
-                </div>
-            </CardContent>
-        </Card>
-    );
-}
-
-function TokenManager({ tokens }: { tokens: AccessToken[] | null }) {
-    const firestore = useFirestore();
-    const { toast } = useToast();
-    const [duration, setDuration] = useState('1');
-    const [isGenerating, setIsGenerating] = useState(false);
-
-    const generateToken = () => {
-        if (!firestore) return;
-        setIsGenerating(true);
-        const id = `LBN-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-        const docRef = doc(firestore, 'access_tokens', id);
-        const data = {
-            id, status: 'active', durationMonths: parseInt(duration), createdAt: serverTimestamp()
-        };
-
-        setDoc(docRef, data)
-            .then(() => {
-                toast({ title: "Jeton généré !" });
-            })
-            .catch((error) => {
-                const permissionError = new FirestorePermissionError({
-                    path: docRef.path,
-                    operation: 'write',
-                    requestResourceData: data,
-                });
-                errorEmitter.emit('permission-error', permissionError);
-            })
-            .finally(() => {
-                setIsGenerating(false);
-            });
-    };
-
-    return (
-        <Card className="border-2 shadow-lg">
-            <CardHeader><CardTitle className="text-xl font-black uppercase flex items-center gap-2"><Ticket className="size-6 text-accent" /> Jetons d'Accès</CardTitle></CardHeader>
-            <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1">Durée (mois)</Label>
-                        <Select value={duration} onValueChange={setDuration}>
-                            <SelectTrigger className="h-12 border-2"><SelectValue /></SelectTrigger>
-                            <SelectContent><SelectItem value="1">1 mois</SelectItem><SelectItem value="3">3 mois</SelectItem><SelectItem value="6">6 mois</SelectItem><SelectItem value="12">12 mois</SelectItem></SelectContent>
-                        </Select>
-                    </div>
-                    <div className="flex items-end"><Button onClick={generateToken} disabled={isGenerating} className="w-full h-12 font-black uppercase tracking-widest gap-2 bg-accent shadow-lg"><Zap className="size-4" /> Générer</Button></div>
-                </div>
-                <div className="max-h-64 overflow-y-auto border-2 rounded-2xl">
-                    <Table>
-                        <TableHeader><TableRow className="bg-muted/30"><TableHead className="text-[9px] font-black uppercase h-8 px-3">Code</TableHead><TableHead className="text-[9px] font-black uppercase h-8">Durée</TableHead><TableHead className="text-[9px] font-black uppercase h-8">État</TableHead><TableHead className="text-right text-[9px] font-black uppercase h-8 px-3">Action</TableHead></TableRow></TableHeader>
-                        <TableBody>
-                            {tokens?.map(t => (
-                                <TableRow key={t.id}>
-                                    <TableCell className="px-3 py-2 font-mono text-[10px] font-black">{t.id}</TableCell>
-                                    <TableCell className="text-[10px] font-bold">{t.durationMonths} m</TableCell>
-                                    <TableCell><Badge variant={t.status === 'active' ? 'outline' : 'secondary'} className="text-[7px] font-black uppercase h-4 px-1">{t.status}</Badge></TableCell>
-                                    <TableCell className="text-right px-3"><Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(firestore!, 'access_tokens', t.id))} className="size-7 text-destructive"><Trash2 className="size-3" /></Button></TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
                 </div>
             </CardContent>
         </Card>
