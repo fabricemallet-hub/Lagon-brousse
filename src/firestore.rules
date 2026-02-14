@@ -65,13 +65,9 @@ service cloud.firestore {
     match /businesses/{businessId} {
       allow get, list: if true;
       allow write: if isSignedIn();
+      match /promotions/{promoId} { allow read, write: if isSignedIn(); }
     }
-    
-    // Règle globale pour le catalogue Shopping (indispensable pour collectionGroup)
-    match /{path=**}/promotions/{promoId} {
-      allow read: if true;
-      allow write: if isSignedIn();
-    }
+    match /{path=**}/promotions/{promoId} { allow read: if true; }
 
     match /conversations/{id} {
       allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin());
