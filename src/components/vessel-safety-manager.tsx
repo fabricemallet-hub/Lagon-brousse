@@ -123,96 +123,98 @@ export function VesselSafetyManager() {
 
   return (
     <Card className="border-amber-200 bg-amber-50/30 overflow-hidden shadow-none">
-      <CardHeader className="p-6 pb-4">
-        <div className="flex gap-3">
-          <div className="p-2.5 bg-amber-100 rounded-xl h-fit border border-amber-200">
+      <CardHeader className="p-4 pb-4">
+        <div className="flex flex-col sm:flex-row gap-3 items-center sm:items-start text-center sm:text-left">
+          <div className="p-2.5 bg-amber-100 rounded-xl h-fit border border-amber-200 shrink-0">
             <ShieldCheck className="size-6 text-amber-900" />
           </div>
           <div className="space-y-1">
             <CardTitle className="text-xl font-black uppercase leading-tight tracking-tighter text-amber-900">
               Mes Équipements de Sécurité
             </CardTitle>
-            <CardDescription className="text-xs font-bold uppercase opacity-60 leading-relaxed text-amber-800/70">
+            <CardDescription className="text-[10px] font-bold uppercase opacity-60 leading-tight text-amber-800/70">
               Suivez les dates de péremption de votre matériel.
             </CardDescription>
           </div>
         </div>
       </CardHeader>
-      <CardContent className="p-6 pt-0 space-y-6">
+      <CardContent className="p-4 pt-0 space-y-6">
         {isLoading ? (
           <Skeleton className="h-20 w-full rounded-2xl" />
         ) : (
           <div className="grid gap-4">
             {vessels?.map((vessel) => (
               <div key={vessel.id} className="bg-white border-2 border-amber-100 rounded-2xl overflow-hidden shadow-sm">
-                <div className="p-4 bg-amber-50/50 border-b border-amber-100 flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <Ship className="size-5 text-primary" />
-                    <span className="font-black uppercase text-sm tracking-tight text-slate-800">{vessel.vesselName}</span>
+                <div className="p-3 bg-amber-50/50 border-b border-amber-100 flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <Ship className="size-4 text-primary shrink-0" />
+                    <span className="font-black uppercase text-xs tracking-tight text-slate-800 truncate max-w-[150px]">{vessel.vesselName}</span>
                   </div>
-                  <Button variant="ghost" size="icon" className="size-8 text-destructive/30 hover:text-destructive hover:bg-red-50 rounded-full" onClick={() => handleRemoveVessel(vessel.id)}>
-                    <Trash2 className="size-4" />
+                  <Button variant="ghost" size="icon" className="size-7 text-destructive/30 hover:text-destructive hover:bg-red-50 rounded-full" onClick={() => handleRemoveVessel(vessel.id)}>
+                    <Trash2 className="size-3.5" />
                   </Button>
                 </div>
                 
-                <div className="p-4 space-y-3">
+                <div className="p-3 space-y-3">
                   {vessel.equipment && vessel.equipment.length > 0 ? (
                     <div className="grid gap-2">
                       {vessel.equipment.map((item) => {
                         const status = getExpiryStatus(item.expiryDate);
                         const StatusIcon = status.icon;
                         return (
-                          <div key={item.id} className="flex items-center justify-between p-3 rounded-xl border-2 border-dashed border-slate-100 bg-slate-50/30">
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-xs font-black uppercase text-slate-800 tracking-tight">{item.label}</span>
-                              <span className="text-[9px] font-bold opacity-40 uppercase">Périme le {format(parseISO(item.expiryDate), 'dd/MM/yyyy')}</span>
+                          <div key={item.id} className="flex flex-col gap-2 p-3 rounded-xl border-2 border-dashed border-slate-100 bg-slate-50/30">
+                            <div className="flex justify-between items-start">
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-xs font-black uppercase text-slate-800 tracking-tight">{item.label}</span>
+                                <span className="text-[9px] font-bold opacity-40 uppercase">Périme le {format(parseISO(item.expiryDate), 'dd/MM/yyyy')}</span>
+                              </div>
+                              <button onClick={() => handleRemoveItem(vessel, item)} className="opacity-20 hover:opacity-100 transition-opacity p-1"><X className="size-3.5" /></button>
                             </div>
-                            <div className={cn("flex items-center gap-2 px-2.5 py-1.5 rounded-lg", status.bg)}>
+                            <div className={cn("flex items-center justify-center gap-2 py-1.5 rounded-lg w-full", status.bg)}>
                               <StatusIcon className={cn("size-3.5", status.color)} />
                               <span className={cn("text-[10px] font-black uppercase tracking-tighter", status.color)}>{status.label}</span>
-                              <button onClick={() => handleRemoveItem(vessel, item)} className="ml-1 opacity-20 hover:opacity-100 transition-opacity"><X className="size-3.5" /></button>
                             </div>
                           </div>
                         );
                       })}
                     </div>
                   ) : (
-                    <div className="text-center py-6 border-2 border-dashed border-slate-100 rounded-xl bg-slate-50/20">
-                      <p className="text-[10px] italic text-muted-foreground uppercase font-black opacity-30 tracking-widest">Aucun équipement enregistré</p>
+                    <div className="text-center py-4 border-2 border-dashed border-slate-100 rounded-xl bg-slate-50/20">
+                      <p className="text-[9px] italic text-muted-foreground uppercase font-black opacity-30 tracking-widest">Aucun équipement</p>
                     </div>
                   )}
 
                   {activeVesselId === vessel.id ? (
-                    <div className="pt-4 border-t border-dashed border-slate-200 mt-4 space-y-4 animate-in slide-in-from-top-2">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="pt-4 border-t border-dashed border-slate-200 mt-2 space-y-4 animate-in slide-in-from-top-2">
+                      <div className="grid grid-cols-1 gap-3">
                         <div className="space-y-1.5">
-                          <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Type</Label>
+                          <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Type d'objet</Label>
                           <Select value={newItemType} onValueChange={(v: any) => setNewItemType(v)}>
-                            <SelectTrigger className="h-12 text-xs font-black uppercase border-2"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="h-10 text-[10px] font-black uppercase border-2"><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="fusée" className="text-xs font-black uppercase">Fusée parachute</SelectItem>
-                              <SelectItem value="extincteur" className="text-xs font-black uppercase">Extincteur</SelectItem>
-                              <SelectItem value="autre" className="text-xs font-black uppercase">Autre équipement</SelectItem>
+                              <SelectItem value="fusée" className="text-[10px] font-black uppercase">Fusée parachute</SelectItem>
+                              <SelectItem value="extincteur" className="text-[10px] font-black uppercase">Extincteur</SelectItem>
+                              <SelectItem value="autre" className="text-[10px] font-black uppercase">Autre matériel</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
                         <div className="space-y-1.5">
-                          <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Libellé</Label>
-                          <Input value={newItemLabel} onChange={e => setNewItemLabel(e.target.value)} placeholder="EX: FUSÉE ROUGE" className="h-12 border-2 font-black text-sm uppercase" />
+                          <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Libellé</Label>
+                          <Input value={newItemLabel} onChange={e => setNewItemLabel(e.target.value)} placeholder="EX: FUSÉE ROUGE" className="h-10 border-2 font-black text-xs uppercase" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Date péremption</Label>
+                          <Input type="date" value={newItemExpiry} onChange={e => setNewItemExpiry(e.target.value)} className="h-10 border-2 font-black text-xs" />
                         </div>
                       </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Date de péremption</Label>
-                        <Input type="date" value={newItemExpiry} onChange={e => setNewItemExpiry(e.target.value)} className="h-12 border-2 font-black text-sm" />
-                      </div>
-                      <div className="flex gap-2 pt-2">
-                        <Button variant="outline" className="flex-1 h-12 font-black uppercase text-[10px] border-2" onClick={() => setActiveVesselId(null)}>Annuler</Button>
-                        <Button className="flex-[2] h-12 font-black uppercase text-[10px] shadow-md" onClick={() => handleAddItem(vessel)} disabled={isSaving || !newItemLabel || !newItemExpiry}>Enregistrer l'équipement</Button>
+                      <div className="flex gap-2 pt-1">
+                        <Button variant="outline" className="flex-1 h-10 font-black uppercase text-[9px] border-2" onClick={() => setActiveVesselId(null)}>Annuler</Button>
+                        <Button className="flex-[1.5] h-10 font-black uppercase text-[9px] shadow-md" onClick={() => handleAddItem(vessel)} disabled={isSaving || !newItemLabel || !newItemExpiry}>Enregistrer</Button>
                       </div>
                     </div>
                   ) : (
-                    <Button variant="outline" className="w-full h-12 border-2 border-dashed bg-white text-primary hover:bg-primary/5 font-black uppercase text-[10px] tracking-widest gap-2 rounded-xl mt-2" onClick={() => setActiveVesselId(vessel.id)}>
-                      <Plus className="size-4" /> Ajouter un équipement
+                    <Button variant="outline" className="w-full h-10 border-2 border-dashed bg-white text-primary hover:bg-primary/5 font-black uppercase text-[9px] tracking-tight gap-2 rounded-xl mt-1" onClick={() => setActiveVesselId(vessel.id)}>
+                      <Plus className="size-3.5" /> Ajouter un équipement
                     </Button>
                   )}
                 </div>
@@ -220,28 +222,31 @@ export function VesselSafetyManager() {
             ))}
 
             {isAddingVessel ? (
-              <div className="p-6 bg-white border-2 border-primary/30 rounded-[2rem] space-y-6 shadow-xl animate-in zoom-in-95 duration-200">
+              <div className="p-5 bg-white border-2 border-primary/30 rounded-[2rem] space-y-5 shadow-xl animate-in zoom-in-95 duration-200">
                 <div className="space-y-2">
-                  <Label className="text-[11px] font-black uppercase text-slate-500 ml-1 tracking-wider">Nom du navire</Label>
+                  <Label className="text-[10px] font-black uppercase text-slate-500 ml-1 tracking-wider">Nom du navire</Label>
                   <Input 
                     placeholder="EX: MON BATEAU" 
                     value={newVesselName} 
                     onChange={e => setNewVesselName(e.target.value)} 
-                    className="h-14 border-2 font-black text-lg uppercase tracking-tight shadow-inner" 
+                    className="h-12 border-2 font-black text-base uppercase tracking-tight shadow-inner" 
                   />
                 </div>
-                <div className="flex gap-3 pt-2">
-                  <Button variant="ghost" className="flex-1 h-14 font-black uppercase text-xs tracking-widest text-slate-600 hover:bg-slate-100" onClick={() => setIsAddingVessel(false)}>
-                    Annuler
+                <div className="flex flex-col gap-2 pt-1">
+                  <Button className="w-full h-12 font-black uppercase text-[10px] tracking-tight shadow-lg bg-primary hover:bg-primary/90" onClick={handleAddVessel} disabled={isSaving || !newVesselName}>
+                    Créer le profil navire
                   </Button>
-                  <Button className="flex-[1.5] h-14 font-black uppercase text-xs tracking-widest shadow-lg bg-primary hover:bg-primary/90" onClick={handleAddVessel} disabled={isSaving || !newVesselName}>
-                    Créer le profil
+                  <Button variant="ghost" className="w-full h-10 font-black uppercase text-[9px] tracking-widest text-slate-400 hover:bg-slate-50" onClick={() => setIsAddingVessel(false)}>
+                    Annuler l'ajout
                   </Button>
                 </div>
               </div>
             ) : (
-              <Button onClick={() => setIsAddingVessel(true)} className="w-full h-16 border-4 border-dashed border-primary/20 bg-background text-primary hover:bg-primary/5 font-black uppercase text-xs tracking-widest gap-3 rounded-[2rem] shadow-sm transition-all active:scale-95">
-                <Ship className="size-6" /> Ajouter un nouveau navire
+              <Button 
+                onClick={() => setIsAddingVessel(true)} 
+                className="w-full h-16 border-4 border-dashed border-primary/20 bg-background text-primary hover:bg-primary/5 font-black uppercase text-[10px] tracking-tight gap-3 rounded-[2rem] shadow-sm transition-all active:scale-95 px-4"
+              >
+                <Ship className="size-5 shrink-0" /> Ajouter un nouveau navire
               </Button>
             )}
           </div>
