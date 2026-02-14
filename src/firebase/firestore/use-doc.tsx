@@ -1,4 +1,3 @@
-
 'use client';
     
 import { useState, useEffect } from 'react';
@@ -27,17 +26,6 @@ export interface UseDocResult<T> {
 
 /**
  * React hook to subscribe to a single Firestore document in real-time.
- * Handles nullable references.
- * 
- * IMPORTANT! YOU MUST MEMOIZE the inputted memoizedTargetRefOrQuery or BAD THINGS WILL HAPPEN
- * use useMemo to memoize it per React guidence.  Also make sure that it's dependencies are stable
- * references
- *
- *
- * @template T Optional type for document data. Defaults to any.
- * @param {DocumentReference<DocumentData> | null | undefined} docRef -
- * The Firestore DocumentReference. Waits if null/undefined.
- * @returns {UseDocResult<T>} Object with data, isLoading, error.
  */
 export function useDoc<T = any>(
   memoizedDocRef: DocumentReference<DocumentData> | null | undefined,
@@ -65,35 +53,44 @@ export function useDoc<T = any>(
         if (snapshot.exists()) {
           setData({ ...(snapshot.data() as T), id: snapshot.id });
         } else {
-          // Document does not exist
           setData(null);
         }
-        setError(null); // Clear any previous error on successful snapshot (even if doc doesn't exist)
+        setError(null);
         setIsLoading(false);
       },
       (error: FirestoreError) => {
-        // Only report permission errors through the global emitter
         if (error.code === 'permission-denied') {
           const contextualError = new FirestorePermissionError({
             operation: 'get',
             path: memoizedDocRef.path,
-          })
+          });
 
-          setError(contextualError)
-          // trigger global error propagation
-          errorEmitter.emit('permission-error', contextualError);
+          setError(contextualError);
+          
+          // Chemins système pour lesquels on ne doit pas faire planter l'app en cas de 403 passager
+          const silentPaths = [
+            'shared_access_tokens',
+            'app_settings',
+            'system_notifications',
+            'users'
+          ];
+          
+          const isSilent = silentPaths.some(p => memoizedDocRef.path.toLowerCase().includes(p.toLowerCase()));
+          
+          if (!isSilent) {
+            errorEmitter.emit('permission-error', contextualError);
+          }
         } else {
-          // For other errors, just set the local error state
           setError(error);
         }
         
-        setData(null)
-        setIsLoading(false)
+        setData(null);
+        setIsLoading(false);
       }
     );
 
     return () => unsubscribe();
-  }, [memoizedDocRef]); // Re-run if the memoizedDocRef changes.
+  }, [memoizedDocRef]);
 
   return { data, isLoading, error };
 }

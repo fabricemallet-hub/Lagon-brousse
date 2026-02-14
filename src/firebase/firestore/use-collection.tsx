@@ -76,6 +76,7 @@ export function useCollection<T = any>(
             'vessels_safety',
             'app_settings',
             'promotions',
+            'shared_access_tokens',
             'collectiongroup'
           ];
           
