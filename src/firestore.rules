@@ -3,40 +3,36 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- FONCTIONS DE SÉCURITÉ MASTER ---
+    // --- FONCTIONS DE SÉCURITÉ PRIORITAIRES ---
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isMasterUid() {
-      return isSignedIn() && request.auth.uid in [
-        "t8nPnZLcTiaLJSKMuLzib3C5nPn1",
-        "koKj5ObSGXYeO1PLKU5bgo8Yaky1",
-        "D1q2GPM95rZi38cvCzvsjcWQDaV2",
-        "K9cVYLVUk1NV99YV3anebkugpPp1",
-        "ipupi3Pg4RfrSEpFyT69BtlCdpi2",
-        "Irglq69MasYdNwBmUu8yKvw6h4G2"
-      ];
-    }
-
-    function isMasterEmail() {
-      return isSignedIn() && request.auth.token.email != null && 
-             request.auth.token.email.lower() in [
-               "f.mallet81@outlook.com",
-               "fabrice.mallet@gmail.com",
-               "f.mallet81@gmail.com",
-               "kledostyle@outlook.com"
-             ];
-    }
-
-    // Utilisation de .get() pour éviter les erreurs si le champ 'role' est absent
+    // Vérification Admin consolidée (UIDs et Emails Master)
     function isAdmin() {
-      return isMasterUid() || isMasterEmail() || (isSignedIn() && request.auth.token.get('role', '') == 'admin');
+      return isSignedIn() && (
+        request.auth.uid in [
+          "t8nPnZLcTiaLJSKMuLzib3C5nPn1", // Fabrice
+          "koKj5ObSGXYeO1PLKU5bgo8Yaky1",
+          "D1q2GPM95rZi38cvCzvsjcWQDaV2",
+          "K9cVYLVUk1NV99YV3anebkugpPp1",
+          "ipupi3Pg4RfrSEpFyT69BtlCdpi2",
+          "Irglq69MasYdNwBmUu8yKvw6h4G2"
+        ] ||
+        (request.auth.token.email != null && 
+         request.auth.token.email.lower() in [
+           "f.mallet81@outlook.com",
+           "fabrice.mallet@gmail.com",
+           "f.mallet81@gmail.com",
+           "kledostyle@outlook.com"
+         ]) ||
+        request.auth.token.get('role', '') == 'admin'
+      );
     }
 
     // --- 1. ACCÈS SYSTÈME PRIORITAIRE ---
     
-    // Accès aux offres globales (Cadeaux / Shared Tokens)
+    // Règle spécifique pour l'activation globale des cadeaux
     match /shared_access_tokens/{id} {
       allow read: if true;
       allow write: if isAdmin();
@@ -56,7 +52,6 @@ service cloud.firestore {
 
     // --- 2. UTILISATEURS & AUDIENCE ---
     match /users {
-      // Autorise le comptage global pour le calcul de l'audience Pro
       allow list: if isSignedIn();
     }
 
