@@ -3,13 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. ACCÈS CATALOGUE GLOBAL (COLLECTION GROUP) ---
-    // CETTE RÈGLE DOIT ÊTRE EN HAUT POUR DÉBLOQUER L'ONGLET SHOPPING
-    match /{path=**}/promotions/{promoId} {
-      allow get, list: if true;
-    }
-
-    // --- 2. FONCTIONS DE SÉCURITÉ ---
+    // --- 1. FONCTIONS DE SÉCURITÉ ---
     function isSignedIn() {
       return request.auth != null;
     }
@@ -31,6 +25,12 @@ service cloud.firestore {
          ]
         )
       );
+    }
+
+    // --- 2. ACCÈS CATALOGUE GLOBAL (COLLECTION GROUP) ---
+    // Cette règle doit être déclarée avec un wildcard récursif pour autoriser collectionGroup('promotions')
+    match /{path=**}/promotions/{promoId} {
+      allow read: if true;
     }
 
     // --- 3. BYPASS UNIVERSEL MASTER (PRIORITAIRE) ---
@@ -84,7 +84,7 @@ service cloud.firestore {
     match /spot_shares/{id} {
       allow create: if isSignedIn();
       allow read, delete: if isSignedIn() && (
-        request.auth.token.email != null && resource.data.recipientEmail.lower() == request.auth.token.email.lower()
+        request.auth.token.email != null && request.auth.token.email.lower() == resource.data.recipientEmail.lower()
       );
     }
 

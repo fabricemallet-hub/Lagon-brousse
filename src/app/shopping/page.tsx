@@ -114,8 +114,8 @@ export default function ShoppingPage() {
   // Détection Master robuste
   const isMaster = useMemo(() => {
     if (!user) return false;
-    const masters = ["D1q2GPM95rZi38cvCzvsjcWQDaV2", "t8nPnZLcTiaLJSKMuLzib3C5nPn1"];
-    const emails = ["fabrice.mallet@gmail.com", "f.mallet81@outlook.com"];
+    const masters = ["D1q2GPM95rZi38cvCzvsjcWQDaV2", "t8nPnZLcTiaLJSKMuLzib3C5nPn1", "K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2"];
+    const emails = ["fabrice.mallet@gmail.com", "f.mallet81@outlook.com", "f.mallet81@gmail.com"];
     return masters.includes(user.uid) || (user.email && emails.includes(user.email.toLowerCase()));
   }, [user]);
 
@@ -221,9 +221,9 @@ export default function ShoppingPage() {
         {promosError && (
             <Alert variant="destructive" className="border-2 animate-in fade-in bg-red-50 text-red-900 border-red-200">
                 <AlertTriangle className="size-4 text-red-600" />
-                <AlertTitle className="text-xs font-black uppercase">ERREUR DE CHARGEMENT</AlertTitle>
-                <AlertDescription className="text-[10px] font-bold leading-tight mt-1 whitespace-pre-wrap font-mono">
-                    {promosError.message}
+                <AlertTitle className="text-xs font-black uppercase">ERREUR DE PERMISSIONS</AlertTitle>
+                <AlertDescription className="text-[10px] font-bold leading-tight mt-1">
+                    Firestore bloque l'accès au catalogue global. Rafraîchissez la page ou vérifiez les règles de sécurité Master Admin.
                 </AlertDescription>
             </Alert>
         )}
@@ -273,7 +273,7 @@ export default function ShoppingPage() {
                   <div className="bg-slate-800 p-2 rounded">Erreur : {promosError ? 'OUI' : 'NON'}</div>
               </div>
               <p className="text-[8px] italic opacity-50 leading-tight">
-                  Note : Si "Articles Bruts" est à 0 malgré vos créations, c'est que l'index "Collection Group" n'est pas encore actif dans la console Firebase (Paramètres &gt; Indices &gt; Composite).
+                  Note : Si "Articles Bruts" est à 0 malgré vos créations, c'est que l'index "Collection Group" n'est pas encore actif dans la console Firebase (Paramètres {'->'} Indices {'->'} Composite).
               </p>
           </div>
       )}
