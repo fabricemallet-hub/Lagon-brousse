@@ -366,10 +366,10 @@ export default function ProDashboard() {
                             {reachError && (
                                 <div className="p-3 bg-red-50 border-2 border-red-200 rounded-xl space-y-2">
                                     <p className="text-[9px] text-red-600 font-bold uppercase flex items-center gap-2">
-                                        <AlertCircle className="size-3" /> Comment relier le compte pro à un commerce ?
+                                        <AlertCircle className="size-3" /> Aide technique
                                     </p>
                                     <div className="p-2 bg-white/50 rounded-lg text-[8px] font-bold text-red-800 leading-tight uppercase italic">
-                                        Firestore refuse l'accès au comptage des utilisateurs (Erreur 403). Veuillez utiliser le bouton ci-dessous pour rafraîchir vos droits.
+                                        je n'ai pas d'audience qui s'affiche ce qui donne le message d'erreur sur le compte "pro". Veuillez utiliser le bouton ci-dessous pour rafraîchir vos droits.
                                     </div>
                                     <Button size="sm" variant="outline" className="w-full h-8 text-[8px] font-black uppercase border-red-200 text-red-600" onClick={handleLogout}>Déconnexion & Reconnexion</Button>
                                 </div>
