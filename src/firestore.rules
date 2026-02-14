@@ -29,8 +29,9 @@ service cloud.firestore {
              ];
     }
 
+    // Utilisation de .get() pour éviter les erreurs si le champ 'role' est absent
     function isAdmin() {
-      return isMasterUid() || isMasterEmail() || (isSignedIn() && request.auth.token.role == 'admin');
+      return isMasterUid() || isMasterEmail() || (isSignedIn() && request.auth.token.get('role', '') == 'admin');
     }
 
     // --- 1. ACCÈS SYSTÈME PRIORITAIRE ---
@@ -38,13 +39,13 @@ service cloud.firestore {
     // Accès aux offres globales (Cadeaux / Shared Tokens)
     match /shared_access_tokens/{id} {
       allow read: if true;
-      allow create, update, delete: if isAdmin();
+      allow write: if isAdmin();
     }
 
     // Paramètres d'application (Splash, CGV, RIB)
     match /app_settings/{id} {
       allow read: if true;
-      allow create, update, delete: if isAdmin();
+      allow write: if isAdmin();
     }
 
     // Catalogue Shopping (Collection Group)
