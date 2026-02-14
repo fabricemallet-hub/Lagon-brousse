@@ -122,33 +122,33 @@ export function VesselSafetyManager() {
   if (!user) return null;
 
   return (
-    <Card className="border-amber-200 bg-amber-50/30 overflow-hidden shadow-none">
-      <CardHeader className="p-4 pb-4">
+    <Card className="border-amber-200 bg-amber-50/30 overflow-hidden shadow-none rounded-2xl">
+      <CardHeader className="p-4 pb-2">
         <div className="flex flex-col sm:flex-row gap-3 items-center sm:items-start text-center sm:text-left">
-          <div className="p-2.5 bg-amber-100 rounded-xl h-fit border border-amber-200 shrink-0">
-            <ShieldCheck className="size-6 text-amber-900" />
+          <div className="p-2 bg-amber-100 rounded-xl h-fit border border-amber-200 shrink-0">
+            <ShieldCheck className="size-5 text-amber-900" />
           </div>
-          <div className="space-y-1">
-            <CardTitle className="text-xl font-black uppercase leading-tight tracking-tighter text-amber-900">
-              Mes Équipements de Sécurité
+          <div className="space-y-0.5">
+            <CardTitle className="text-lg font-black uppercase leading-tight tracking-tighter text-amber-900">
+              Équipements de Sécurité
             </CardTitle>
-            <CardDescription className="text-[10px] font-bold uppercase opacity-60 leading-tight text-amber-800/70">
-              Suivez les dates de péremption de votre matériel.
+            <CardDescription className="text-[9px] font-bold uppercase opacity-60 leading-tight text-amber-800/70">
+              Gestion de votre matériel par navire.
             </CardDescription>
           </div>
         </div>
       </CardHeader>
-      <CardContent className="p-4 pt-0 space-y-6">
+      <CardContent className="p-4 space-y-4">
         {isLoading ? (
           <Skeleton className="h-20 w-full rounded-2xl" />
         ) : (
-          <div className="grid gap-4">
+          <div className="flex flex-col gap-4">
             {vessels?.map((vessel) => (
               <div key={vessel.id} className="bg-white border-2 border-amber-100 rounded-2xl overflow-hidden shadow-sm">
                 <div className="p-3 bg-amber-50/50 border-b border-amber-100 flex justify-between items-center">
                   <div className="flex items-center gap-2">
                     <Ship className="size-4 text-primary shrink-0" />
-                    <span className="font-black uppercase text-xs tracking-tight text-slate-800 truncate max-w-[150px]">{vessel.vesselName}</span>
+                    <span className="font-black uppercase text-xs tracking-tight text-slate-800 truncate max-w-[120px]">{vessel.vesselName}</span>
                   </div>
                   <Button variant="ghost" size="icon" className="size-7 text-destructive/30 hover:text-destructive hover:bg-red-50 rounded-full" onClick={() => handleRemoveVessel(vessel.id)}>
                     <Trash2 className="size-3.5" />
@@ -213,7 +213,7 @@ export function VesselSafetyManager() {
                       </div>
                     </div>
                   ) : (
-                    <Button variant="outline" className="w-full h-10 border-2 border-dashed bg-white text-primary hover:bg-primary/5 font-black uppercase text-[9px] tracking-tight gap-2 rounded-xl mt-1" onClick={() => setActiveVesselId(vessel.id)}>
+                    <Button variant="outline" className="w-full h-10 border-2 border-dashed bg-white text-primary hover:bg-primary/5 font-black uppercase text-[9px] tracking-tight gap-2 rounded-xl mt-1 justify-center" onClick={() => setActiveVesselId(vessel.id)}>
                       <Plus className="size-3.5" /> Ajouter un équipement
                     </Button>
                   )}
@@ -242,12 +242,14 @@ export function VesselSafetyManager() {
                 </div>
               </div>
             ) : (
-              <Button 
-                onClick={() => setIsAddingVessel(true)} 
-                className="w-full h-16 border-4 border-dashed border-primary/20 bg-background text-primary hover:bg-primary/5 font-black uppercase text-[10px] tracking-tight gap-3 rounded-[2rem] shadow-sm transition-all active:scale-95 px-4"
-              >
-                <Ship className="size-5 shrink-0" /> Ajouter un nouveau navire
-              </Button>
+              <div className="w-full flex justify-center">
+                <Button 
+                  onClick={() => setIsAddingVessel(true)} 
+                  className="w-full h-16 border-4 border-dashed border-primary/20 bg-background text-primary hover:bg-primary/5 font-black uppercase text-[10px] tracking-tighter gap-2 rounded-[2rem] shadow-sm transition-all active:scale-95 px-4 flex items-center justify-center"
+                >
+                  <Ship className="size-5 shrink-0" /> Ajouter un nouveau navire
+                </Button>
+              </div>
             )}
           </div>
         )}
