@@ -30,12 +30,15 @@ service cloud.firestore {
     }
 
     // --- RÈGLES DE COLLECTION UTILISATEURS ---
-    match /users/{userId} {
-      // PRIORITÉ ABSOLUE : Autoriser le comptage au niveau racine pour éviter l'erreur 403.
-      // RunAggregationQuery (getCountFromServer) nécessite cette règle simple pour être validée statiquement par Google.
+    
+    // Règle isolée pour autoriser le comptage (list) au niveau de la racine /users
+    // Indispensable pour RunAggregationQuery (getCountFromServer)
+    match /users {
       allow list: if isSignedIn();
-      
-      // Accès aux données individuelles : seulement soi-même ou Admin
+    }
+
+    // Règles pour les documents individuels
+    match /users/{userId} {
       allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       
