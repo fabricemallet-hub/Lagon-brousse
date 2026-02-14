@@ -3,7 +3,13 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- FONCTIONS DE SÉCURITÉ ---
+    // --- 1. ACCÈS CATALOGUE GLOBAL (COLLECTION GROUP) ---
+    // CETTE RÈGLE DOIT ÊTRE EN HAUT POUR DÉBLOQUER L'ONGLET SHOPPING
+    match /{path=**}/promotions/{promoId} {
+      allow get, list: if true;
+    }
+
+    // --- 2. FONCTIONS DE SÉCURITÉ ---
     function isSignedIn() {
       return request.auth != null;
     }
@@ -27,18 +33,12 @@ service cloud.firestore {
       );
     }
 
-    // --- 1. ACCÈS CATALOGUE PUBLIC (INDISPENSABLE POUR SHOPPING NC) ---
-    // Cette règle autorise explicitement la lecture globale des promotions (Collection Group)
-    match /{path=**}/promotions/{promoId} {
-      allow get, list: if true;
-    }
-
-    // --- 2. BYPASS UNIVERSEL MASTER (PRIORITAIRE) ---
+    // --- 3. BYPASS UNIVERSEL MASTER (PRIORITAIRE) ---
     match /{allPaths=**} {
       allow read, write: if isMaster();
     }
 
-    // --- 3. ACCÈS PUBLICS & USAGERS ---
+    // --- 4. ACCÈS PUBLICS & USAGERS ---
     match /app_settings/{id} {
       allow read: if true;
     }
@@ -66,7 +66,7 @@ service cloud.firestore {
       allow read: if true;
     }
 
-    // --- 4. DONNÉES PRIVÉES (PROPRIÉTAIRE) ---
+    // --- 5. DONNÉES PRIVÉES (PROPRIÉTAIRE) ---
     match /users/{userId} {
       allow read, write: if isSignedIn() && (request.auth.uid == userId);
       match /{allPaths=**} {
@@ -103,7 +103,6 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid);
       
-      // La lecture des promos est déjà gérée globalement en haut
       match /promotions/{promoId} { 
         allow write: if isSignedIn() && (get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerId == request.auth.uid);
       }

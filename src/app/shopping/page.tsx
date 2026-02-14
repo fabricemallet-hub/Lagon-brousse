@@ -110,7 +110,16 @@ export default function ShoppingPage() {
   };
 
   const isLoading = isBusinessesLoading || isPromosLoading;
-  const isAdmin = profile?.role === 'admin' || profile?.subscriptionStatus === 'admin';
+  
+  // Détection Master robuste
+  const isMaster = useMemo(() => {
+    if (!user) return false;
+    const masters = ["D1q2GPM95rZi38cvCzvsjcWQDaV2", "t8nPnZLcTiaLJSKMuLzib3C5nPn1"];
+    const emails = ["fabrice.mallet@gmail.com", "f.mallet81@outlook.com"];
+    return masters.includes(user.uid) || (user.email && emails.includes(user.email.toLowerCase()));
+  }, [user]);
+
+  const isAdmin = isMaster || profile?.role === 'admin' || profile?.subscriptionStatus === 'admin';
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-20">
