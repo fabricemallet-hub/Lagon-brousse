@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, ImageIcon, X, Info, Pencil, Save, AlertCircle, LogOut } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, ImageIcon, X, Info, Pencil, Save, AlertCircle, LogOut, HelpCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -475,11 +475,8 @@ export default function ProDashboard() {
                         {reachError && (
                             <div className="p-3 bg-red-50 border border-red-100 rounded-xl space-y-2">
                                 <p className="text-[9px] text-red-600 font-bold flex items-center gap-2">
-                                    <AlertCircle className="size-3" /> Accès en cours de validation...
+                                    <AlertCircle className="size-3" /> Comment relié le compte pro a un commerce?
                                 </p>
-                                <Button variant="outline" size="sm" onClick={handleLogout} className="w-full h-8 text-[8px] font-black uppercase border-red-200 text-red-600">
-                                    <LogOut className="size-2 mr-1" /> Reconnexion requise
-                                </Button>
                             </div>
                         )}
                     </div>
@@ -506,10 +503,15 @@ export default function ProDashboard() {
                 </div>
 
                 <div className="p-4 bg-primary/5 rounded-2xl border-2 border-primary/10">
-                    <p className="text-[10px] font-black uppercase text-primary mb-2 flex items-center gap-2"><Info className="size-3" /> Note Technique</p>
-                    <p className="text-[9px] font-medium leading-relaxed text-muted-foreground italic">
-                        La diffusion flash envoie une notification immédiate aux utilisateurs ayant sélectionné <strong>{business.commune}</strong> comme localité et <strong>{targetCategory}</strong> comme catégorie favorite.
-                    </p>
+                    <p className="text-[10px] font-black uppercase text-primary mb-2 flex items-center gap-2"><HelpCircle className="size-3" /> Aide au Professionnel</p>
+                    <div className="space-y-3 text-[9px] font-medium leading-relaxed text-muted-foreground italic">
+                        <p>
+                            <strong>Liaison de compte :</strong> Pour relier votre compte à votre boutique, fournissez votre identifiant unique (en bas de cette page) à l'administrateur. La liaison se fait via l'onglet <strong>Admin &gt; Commerces</strong>.
+                        </p>
+                        <p>
+                            <strong>Diffusion flash :</strong> Cette option envoie une notification immédiate aux utilisateurs ayant sélectionné <strong>{business.commune}</strong> comme localité et <strong>{targetCategory}</strong> comme catégorie favorite.
+                        </p>
+                    </div>
                 </div>
             </div>
           </div>

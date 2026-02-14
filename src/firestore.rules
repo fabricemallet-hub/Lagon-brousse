@@ -3,7 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- FONCTIONS DE SÉCURITÉ (DÉFINIES EN PRIORITÉ) ---
+    // --- FONCTIONS DE SÉCURITÉ ---
     function isSignedIn() {
       return request.auth != null;
     }
@@ -35,14 +35,14 @@ service cloud.firestore {
       );
     }
 
-    // --- 1. ACCÈS TOTAL MASTER ---
+    // --- 1. ACCÈS TOTAL MASTER (BYPASS TOUT) ---
     match /{allPaths=**} {
       allow read, write: if isAdmin();
     }
 
     // --- 2. ACCÈS PUBLIC SHOPPING (Collection Group) ---
     match /{path=**}/promotions/{promoId} {
-      allow read: if true;
+      allow get, list: if true;
       allow write: if isSignedIn();
     }
 
@@ -82,7 +82,7 @@ service cloud.firestore {
 
     // --- 4. DONNÉES PRIVÉES & PROFILS ---
     match /users/{userId} {
-      // Un utilisateur lit son profil, un pro peut "lister" pour compter l'audience (Reach)
+      // Un utilisateur lit son profil, un pro peut "lister" (pour aggregation Count Reach)
       allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow list: if isSignedIn() && (isAdmin() || isProfessional());
       allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
