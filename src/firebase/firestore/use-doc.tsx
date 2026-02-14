@@ -68,8 +68,10 @@ export function useDoc<T = any>(
           setError(contextualError);
           
           // Chemins système pour lesquels on ne doit pas faire planter l'app en cas de 403 passager
+          // On ajoute explicitement shared_access_tokens pour éviter les crashes UI Admin
           const silentPaths = [
             'shared_access_tokens',
+            'access_tokens',
             'app_settings',
             'system_notifications',
             'users'

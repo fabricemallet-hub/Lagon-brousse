@@ -3,7 +3,25 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. FONCTIONS DE SÉCURITÉ ---
+    // --- 1. ACCÈS MASTER CRITIQUES (PRIORITÉ ABSOLUE) ---
+    // On autorise explicitement l'UID de Fabrice Mallet pour éviter toute erreur d'évaluation
+    
+    match /shared_access_tokens/GLOBAL {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1";
+    }
+
+    match /access_tokens/{tokenId} {
+      allow get: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1";
+    }
+
+    match /app_settings/{id} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1";
+    }
+
+    // --- 2. FONCTIONS DE SÉCURITÉ GÉNÉRALES ---
     function isSignedIn() {
       return request.auth != null;
     }
@@ -29,27 +47,7 @@ service cloud.firestore {
       );
     }
 
-    // --- 2. SYSTÈME (PRIORITÉ ABSOLUE) ---
-    
-    // Offre cadeau globale
-    match /shared_access_tokens/{tokenId} {
-      allow read: if true;
-      allow write: if request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || isAdmin();
-    }
-
-    // Jetons individuels
-    match /access_tokens/{tokenId} {
-      allow get: if isSignedIn();
-      allow list, write: if request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || isAdmin();
-    }
-
-    // Paramètres App
-    match /app_settings/{id} {
-      allow read: if true;
-      allow write: if request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || isAdmin();
-    }
-
-    // --- 3. CATALOGUE & SHOPPING ---
+    // --- 3. CATALOGUE & SHOPPING (Collection Group) ---
     match /{path=**}/promotions/{promoId} {
       allow read: if true;
       allow write: if isSignedIn();
