@@ -20,17 +20,6 @@ export interface UseCollectionResult<T> {
   error: FirestoreError | Error | null;
 }
 
-export interface InternalQuery extends Query<DocumentData> {
-  _query: {
-    path: {
-      canonicalString(): string;
-      toString(): string;
-      lastSegment(): string;
-    },
-    collectionGroup?: string;
-  }
-}
-
 export function useCollection<T = any>(
     memoizedTargetRefOrQuery: ((CollectionReference<DocumentData> | Query<DocumentData>) & {__memo?: boolean})  | null | undefined,
 ): UseCollectionResult<T> {
@@ -49,13 +38,11 @@ export function useCollection<T = any>(
       return;
     }
 
-    // Extraction robuste du chemin pour le reporting d'erreur
-    // On identifie explicitement le nom du groupe de collections
+    // Identification du chemin de manière robuste pour le débug
     const path: string =
       memoizedTargetRefOrQuery.type === 'collection'
         ? (memoizedTargetRefOrQuery as CollectionReference).path
         : (memoizedTargetRefOrQuery as any)._query?.collectionGroup || 
-          (memoizedTargetRefOrQuery as any)._query?.path?.lastSegment?.() || 
           (memoizedTargetRefOrQuery as any).path || 
           'CollectionGroup';
 
@@ -82,7 +69,7 @@ export function useCollection<T = any>(
 
           setError(contextualError);
           
-          // Chemins mis en sourdine pour éviter les plantages globaux en dev
+          // Chemins mis en sourdine pour éviter les plantages globaux lors du chargement initial
           const silentPaths = [
             'conversations', 
             'users', 

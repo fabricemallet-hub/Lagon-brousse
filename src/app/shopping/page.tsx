@@ -218,7 +218,7 @@ export default function ShoppingPage() {
       </Card>
 
       <div className="space-y-4">
-        {promosError && (
+        {promosError && !allPromotions && (
             <Alert variant="destructive" className="border-2 animate-in fade-in bg-red-50 text-red-900 border-red-200">
                 <AlertTriangle className="size-4 text-red-600" />
                 <AlertTitle className="text-xs font-black uppercase">ERREUR DE PERMISSIONS</AlertTitle>

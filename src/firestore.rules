@@ -27,15 +27,16 @@ service cloud.firestore {
       );
     }
 
-    // --- 2. ACCÈS CATALOGUE GLOBAL (COLLECTION GROUP) ---
-    // Cette règle doit être déclarée avec un wildcard récursif pour autoriser collectionGroup('promotions')
-    match /{path=**}/promotions/{promoId} {
-      allow read: if true;
-    }
-
-    // --- 3. BYPASS UNIVERSEL MASTER (PRIORITAIRE) ---
+    // --- 2. PRIORITÉ ABSOLUE : MASTER BYPASS ---
+    // Cette règle permet aux administrateurs de contourner toutes les restrictions
     match /{allPaths=**} {
       allow read, write: if isMaster();
+    }
+
+    // --- 3. ACCÈS CATALOGUE GLOBAL (COLLECTION GROUP) ---
+    // Requis pour l'onglet Shopping : autorise la lecture des promotions dans TOUS les sous-dossiers
+    match /{path=**}/promotions/{promoId} {
+      allow read: if true;
     }
 
     // --- 4. ACCÈS PUBLICS & USAGERS ---
@@ -104,6 +105,7 @@ service cloud.firestore {
       allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid);
       
       match /promotions/{promoId} { 
+        // L'écriture est réservée au propriétaire du magasin
         allow write: if isSignedIn() && (get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerId == request.auth.uid);
       }
     }
