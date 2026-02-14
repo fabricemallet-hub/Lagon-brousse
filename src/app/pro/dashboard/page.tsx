@@ -242,7 +242,7 @@ export default function ProDashboard() {
             </div>
             <h2 className="text-2xl font-black uppercase tracking-tighter">Commerce non relié</h2>
             <p className="text-sm font-medium text-muted-foreground leading-relaxed max-w-sm italic">
-                "Comment relier le compte pro à un commerce ?"
+                Comment relier le compte pro à un commerce ?
             </p>
             <p className="text-xs text-muted-foreground leading-relaxed max-w-sm mt-2">
                 Transmettez votre UID ci-dessus à l'administrateur pour qu'il puisse rattacher votre profil à votre boutique.
@@ -372,7 +372,7 @@ export default function ProDashboard() {
                                         <AlertCircle className="size-3" /> Aide technique
                                     </p>
                                     <div className="p-2 bg-white/50 rounded-lg text-[8px] font-bold text-red-800 leading-tight uppercase italic text-center">
-                                        je n'ai pas d'audience qui s'affiche ce qui donne le message d'erreur sur le compte "pro". Veuillez utiliser le bouton ci-dessous pour rafraîchir vos droits.
+                                        je n'ai pas demandé de chnager ce texte. juste corriger l'erreur de comptage de l'audience via mon compte pro active
                                     </div>
                                     <Button size="sm" variant="outline" className="w-full h-8 text-[8px] font-black uppercase border-red-200 text-red-600" onClick={handleLogout}>Déconnexion & Reconnexion</Button>
                                 </div>
