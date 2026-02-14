@@ -95,6 +95,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const isMaster = (user.email && masterEmails.includes(user.email.toLowerCase())) || 
                     masterUids.includes(user.uid);
 
+    // PRIORITÉ 1 : ADMIN
     if (isMaster || userProfile?.subscriptionStatus === 'admin' || userProfile?.role === 'admin') {
       return 'admin';
     }
@@ -102,20 +103,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (isProfileLoading) return 'loading';
     if (!userProfile) return 'limited';
 
+    // PRIORITÉ 2 : PRO
     if (userProfile.subscriptionStatus === 'professional' || userProfile.role === 'professional') {
         return 'professional';
     }
 
+    // PRIORITÉ 3 : ABONNÉ / ESSAI (Actif)
     const expiryDate = userProfile.subscriptionExpiryDate ? new Date(userProfile.subscriptionExpiryDate) : null;
     const isValid = expiryDate && !isNaN(expiryDate.getTime()) && isBefore(new Date(), expiryDate);
 
-    switch (userProfile.subscriptionStatus) {
-      case 'active':
-        return isValid ? 'active' : 'limited';
-      case 'trial':
-        return isValid ? 'trial' : 'limited';
-      default: return 'limited';
-    }
+    if (userProfile.subscriptionStatus === 'active' && isValid) return 'active';
+    if (userProfile.subscriptionStatus === 'trial' && isValid) return 'trial';
+
+    return 'limited';
   }, [user, isUserLoading, userProfile, isProfileLoading]);
 
   const isAuthPage = pathname === '/login' || pathname === '/signup';
@@ -260,6 +260,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   {status === 'trial' && <Badge variant="secondary" className="text-[10px] h-5 font-black uppercase">Essai</Badge>}
                   {status === 'limited' && <Badge variant="destructive" className="text-[10px] h-5 font-black uppercase">Limité</Badge>}
                   {status === 'professional' && <Badge variant="outline" className="text-[10px] h-5 font-black uppercase border-primary text-primary">Pro</Badge>}
+                  {status === 'active' && <Badge variant="default" className="text-[10px] h-5 font-black uppercase bg-primary">Abonné</Badge>}
                   {status === 'admin' && <Badge variant="default" className="text-[10px] h-5 font-black uppercase bg-slate-800">Admin</Badge>}
                 </div>
                 {isLocationLoading ? <Skeleton className="h-9 w-[120px]" /> : (

@@ -154,23 +154,34 @@ export default function ComptePage() {
         return { label: 'Professionnel', variant: 'outline', icon: Store, desc: "Compte Partenaire Professionnel." };
     }
 
-    // PRIORITÉ 3 : ACCÈS GLOBAL (CADEAU)
-    if (isSharedAccessActive) return { label: 'Accès Offert', variant: 'default', icon: Gift, desc: `Accès global jusqu'au ${format(sharedToken!.expiresAt.toDate(), 'dd/MM/yyyy', { locale: fr })}.` };
-    
-    // PRIORITÉ 4 : ABONNEMENTS ET ESSAIS
-    switch (userProfile.subscriptionStatus) {
-      case 'active':
-         const exp = new Date(userProfile.subscriptionExpiryDate!);
-         return isBefore(new Date(), exp) 
-            ? { label: 'Abonné', variant: 'default', icon: Star, desc: `Actif jusqu'au ${format(exp, 'dd MMMM yyyy', { locale: fr })}.` }
-            : { label: 'Expiré', variant: 'destructive', icon: XCircle, desc: "Abonnement terminé." };
-      case 'trial':
-         const tExp = new Date(userProfile.subscriptionExpiryDate!);
-         return isBefore(new Date(), tExp)
-            ? { label: 'Essai Gratuit', variant: 'secondary', icon: Zap, desc: `Période d'essai jusqu'au ${format(tExp, 'dd/MM/yy', { locale: fr })}.` }
-            : { label: 'Essai Expiré', variant: 'destructive', icon: XCircle, desc: "Période d'essai terminée." };
-      default: return { label: 'Mode Limité', variant: 'destructive', icon: XCircle, desc: "Accès 1 minute / jour." };
+    // PRIORITÉ 3 : ABONNÉS ACTIFS (Statut Utilisateur Payant)
+    if (userProfile.subscriptionStatus === 'active') {
+        const exp = userProfile.subscriptionExpiryDate ? new Date(userProfile.subscriptionExpiryDate) : null;
+        if (exp && isBefore(new Date(), exp)) {
+            return { label: 'Abonné', variant: 'default', icon: Star, desc: `Actif jusqu'au ${format(exp, 'dd MMMM yyyy', { locale: fr })}.` };
+        }
     }
+
+    // PRIORITÉ 4 : ESSAI GRATUIT ACTIF
+    if (userProfile.subscriptionStatus === 'trial') {
+        const tExp = userProfile.subscriptionExpiryDate ? new Date(userProfile.subscriptionExpiryDate) : null;
+        if (tExp && isBefore(new Date(), tExp)) {
+            return { label: 'Essai Gratuit', variant: 'secondary', icon: Zap, desc: `Période d'essai jusqu'au ${format(tExp, 'dd/MM/yy', { locale: fr })}.` };
+        }
+    }
+
+    // PRIORITÉ 5 : ACCÈS GLOBAL (CADEAU) - Seulement si non abonné/pro/essai
+    if (isSharedAccessActive) {
+        return { label: 'Accès Offert', variant: 'default', icon: Gift, desc: `Accès global jusqu'au ${format(sharedToken!.expiresAt.toDate(), 'dd/MM/yyyy', { locale: fr })}.` };
+    }
+    
+    // CAS D'EXPIRATION
+    if (userProfile.subscriptionStatus === 'active' || userProfile.subscriptionStatus === 'trial') {
+        return { label: 'Expiré', variant: 'destructive', icon: XCircle, desc: "Abonnement ou essai terminé." };
+    }
+
+    // PAR DÉFAUT
+    return { label: 'Mode Limité', variant: 'destructive', icon: XCircle, desc: "Accès 1 minute / jour." };
   };
 
   const status = getStatusInfo();
