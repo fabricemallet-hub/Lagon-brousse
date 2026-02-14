@@ -203,7 +203,17 @@ function BusinessesManager({ businesses, users }: { businesses: Business[] | nul
     const [commune, setCommune] = useState('');
     const [selectedCategories, setSelectedCategories] = useState<string[]>(['Pêche']);
     const [ownerId, setOwnerId] = useState('');
+    const [ownerSearch, setOwnerSearch] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+
+    const filteredUsers = useMemo(() => {
+        if (!users) return [];
+        return users.filter(u => 
+            u.email.toLowerCase().includes(ownerSearch.toLowerCase()) || 
+            u.displayName.toLowerCase().includes(ownerSearch.toLowerCase()) ||
+            u.id.toLowerCase() === ownerSearch.toLowerCase()
+        ).slice(0, 10);
+    }, [users, ownerSearch]);
 
     const toggleCategory = (cat: string) => {
         setSelectedCategories(prev => 
@@ -234,7 +244,7 @@ function BusinessesManager({ businesses, users }: { businesses: Business[] | nul
             });
             
             await batch.commit();
-            setName(''); setCommune(''); setOwnerId(''); setSelectedCategories(['Pêche']);
+            setName(''); setCommune(''); setOwnerId(''); setSelectedCategories(['Pêche']); setOwnerSearch('');
             toast({ title: "Commerce créé et lié à l'utilisateur" });
         } catch (e) {
             toast({ variant: 'destructive', title: "Erreur" });
@@ -276,13 +286,32 @@ function BusinessesManager({ businesses, users }: { businesses: Business[] | nul
                             </div>
                         </div>
                         <div className="space-y-1">
-                            <Label className="text-[10px] font-black uppercase">Propriétaire à lier (Utilisateur)</Label>
-                            <Select value={ownerId} onValueChange={setOwnerId}>
-                                <SelectTrigger><SelectValue placeholder="Choisir un utilisateur..." /></SelectTrigger>
-                                <SelectContent>
-                                    {users?.map(u => <SelectItem key={u.id} value={u.id}>{u.displayName} ({u.email})</SelectItem>)}
-                                </SelectContent>
-                            </Select>
+                            <Label className="text-[10px] font-black uppercase">Propriétaire (UID ou Email)</Label>
+                            <div className="space-y-2">
+                                <div className="relative">
+                                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-muted-foreground" />
+                                    <Input 
+                                        placeholder="Chercher par Email ou coller l'UID..." 
+                                        value={ownerSearch} 
+                                        onChange={e => setOwnerSearch(e.target.value)}
+                                        className="pl-8 text-xs h-9"
+                                    />
+                                </div>
+                                <Select value={ownerId} onValueChange={setOwnerId}>
+                                    <SelectTrigger className="h-10 text-xs font-bold"><SelectValue placeholder="Sélectionner le résultat..." /></SelectTrigger>
+                                    <SelectContent>
+                                        {filteredUsers.length > 0 ? (
+                                            filteredUsers.map(u => (
+                                                <SelectItem key={u.id} value={u.id} className="text-xs font-medium">
+                                                    {u.displayName} ({u.email}) - <span className="opacity-40 font-mono text-[8px]">{u.id}</span>
+                                                </SelectItem>
+                                            ))
+                                        ) : (
+                                            <p className="p-2 text-[10px] text-center italic opacity-40">Aucun utilisateur correspondant</p>
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
                     </div>
                     <Button onClick={handleAdd} disabled={isSaving || !name || !commune || !ownerId || selectedCategories.length === 0} className="w-full font-black uppercase h-12 shadow-lg bg-primary">Lier et créer le commerce</Button>
@@ -306,7 +335,13 @@ function BusinessesManager({ businesses, users }: { businesses: Business[] | nul
                                                 </div>
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-[10px] font-bold">{owner?.displayName || 'Inconnu'} <span className="opacity-40 italic">({owner?.email || 'N/A'})</span></TableCell>
+                                        <TableCell className="text-[10px] font-bold">
+                                            {owner?.displayName || 'Inconnu'} 
+                                            <div className="opacity-40 italic flex flex-col leading-tight">
+                                                <span>{owner?.email || 'N/A'}</span>
+                                                <span className="font-mono text-[8px]">{b.ownerId}</span>
+                                            </div>
+                                        </TableCell>
                                         <TableCell className="text-right px-4"><Button variant="ghost" size="icon" className="text-destructive/40 hover:text-destructive" onClick={() => deleteDoc(doc(firestore!, 'businesses', b.id))}><Trash2 className="size-3" /></Button></TableCell>
                                     </TableRow>
                                 );
@@ -1111,7 +1146,7 @@ function SupportConversationsManager({ conversations, error }: { conversations: 
                         <TableHeader><TableRow className="bg-muted/30">
                             <TableHead className="text-[10px] font-black uppercase h-10 px-4">Utilisateur</TableHead>
                             <TableHead className="text-[10px] font-black uppercase h-10">Dernier Message</TableHead>
-                            <TableHead className="text-right text-[10px] font-black uppercase h-10 px-4">Action</TableHead>
+                            <TableHead className="right text-[10px] font-black uppercase h-10 px-4">Action</TableHead>
                         </TableRow></TableHeader>
                         <TableBody>
                             {conversations?.map(conv => (

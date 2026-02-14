@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, ImageIcon, X, Info, Pencil, Save, AlertCircle, LogOut, HelpCircle } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, ImageIcon, X, Info, Pencil, Save, AlertCircle, LogOut, HelpCircle, Copy, Check } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -61,6 +61,7 @@ export default function ProDashboard() {
   const [promoImage, setPromoImage] = useState('');
   const [promoType, setPromoType] = useState<'Promo' | 'Nouvel Arrivage'>('Promo');
   const [isSaving, setIsSaving] = useState(false);
+  const [hasCopiedUid, setHasCopiedUid] = useState(false);
 
   // Smart Promo States
   const [originalPrice, setOriginalPrice] = useState('');
@@ -101,6 +102,14 @@ export default function ProDashboard() {
     };
     calculateReach();
   }, [firestore, business, targetCategory]);
+
+  const handleCopyUid = () => {
+    if (!user?.uid) return;
+    navigator.clipboard.writeText(user.uid);
+    setHasCopiedUid(true);
+    toast({ title: "UID Copié !", description: "Vous pouvez maintenant le transmettre à l'admin." });
+    setTimeout(() => setHasCopiedUid(false), 2000);
+  };
 
   const handleLogout = async () => {
     if (!auth) return;
@@ -263,12 +272,15 @@ export default function ProDashboard() {
         <h2 className="text-2xl font-black uppercase tracking-tighter">Espace Professionnel</h2>
         <div className="space-y-4 max-w-sm">
             <p className="text-sm font-medium text-muted-foreground leading-relaxed">
-                Votre compte n'est pas encore relié à un commerce. Pour lier votre boutique, veuillez contacter l'administrateur.
+                Votre compte n'est pas encore relié à un commerce. Pour lier votre boutique, veuillez transmettre votre identifiant ci-dessous à l'administrateur.
             </p>
-            <div className="p-4 bg-muted/30 rounded-xl border-2 border-dashed space-y-1">
-                <p className="text-[10px] font-black uppercase opacity-40">Votre identifiant unique à fournir :</p>
-                <p className="font-mono font-black text-primary text-xs select-all">{user?.uid}</p>
-            </div>
+            <Card className="border-2 border-dashed border-primary/30 bg-primary/5 p-4 relative group">
+                <p className="text-[10px] font-black uppercase text-primary mb-2 opacity-60">Votre Identifiant Unique (UID)</p>
+                <p className="font-mono font-black text-sm select-all break-all pr-10">{user?.uid}</p>
+                <Button variant="ghost" size="icon" className="absolute right-2 bottom-2 h-8 w-8 hover:bg-primary/10" onClick={handleCopyUid}>
+                    {hasCopiedUid ? <Check className="size-4 text-green-600" /> : <Copy className="size-4 text-primary" />}
+                </Button>
+            </Card>
         </div>
         <Button onClick={() => router.push('/compte')} variant="outline" className="mt-4 font-black uppercase text-xs h-12 border-2">Retour au compte</Button>
       </div>
@@ -506,14 +518,14 @@ export default function ProDashboard() {
                     <p className="text-[10px] font-black uppercase text-primary mb-2 flex items-center gap-2"><HelpCircle className="size-3" /> Aide au Professionnel</p>
                     <div className="space-y-3 text-[9px] font-medium leading-relaxed text-muted-foreground italic">
                         <p>
-                            <strong>Liaison de compte :</strong> Pour relier votre compte à votre boutique, fournissez votre identifiant unique (en bas de cette page) à l'administrateur. La liaison se fait via l'onglet <strong>Admin &gt; Commerces</strong>.
+                            <strong>Liaison de compte :</strong> Pour relier votre compte à votre boutique, transmettez l'identifiant ci-dessous à l'administrateur.
                         </p>
-                        <p>
-                            <strong>Diffusion flash :</strong> Cette option envoie une notification immédiate aux utilisateurs ayant sélectionné <strong>{business.commune}</strong> comme localité et <strong>{targetCategory}</strong> comme catégorie favorite.
-                        </p>
-                        <div className="pt-2 border-t border-dashed border-primary/10 mt-2">
-                            <p className="text-[8px] font-black uppercase opacity-40 not-italic">Votre identifiant unique :</p>
-                            <p className="font-mono font-black text-primary text-[10px] select-all not-italic">{user?.uid}</p>
+                        <div className="p-3 bg-white border-2 border-dashed border-primary/20 rounded-xl relative group">
+                            <p className="text-[8px] font-black uppercase opacity-40 not-italic">Votre identifiant unique (UID) :</p>
+                            <p className="font-mono font-black text-primary text-[10px] select-all not-italic pr-8 break-all">{user?.uid}</p>
+                            <Button variant="ghost" size="icon" className="absolute right-1 bottom-1 h-6 w-6" onClick={handleCopyUid}>
+                                {hasCopiedUid ? <Check className="size-3 text-green-600" /> : <Copy className="size-3 text-primary" />}
+                            </Button>
                         </div>
                     </div>
                 </div>
