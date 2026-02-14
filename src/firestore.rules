@@ -3,20 +3,19 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- FONCTIONS DE SÉCURITÉ PRIORITAIRES ---
+    // --- FONCTIONS DE BASE ---
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Vérification Admin consolidée (UIDs et Emails Master)
     function isAdmin() {
       return isSignedIn() && (
         request.auth.uid in [
           "t8nPnZLcTiaLJSKMuLzib3C5nPn1", // Fabrice
-          "koKj5ObSGXYeO1PLKU5bgo8Yaky1",
+          "koKj5ObSGXYeO1PLKU5bgo8Yaky1", // KOOLAPIK
           "D1q2GPM95rZi38cvCzvsjcWQDaV2",
-          "K9cVYLVUk1NV99YV3anebkugpPp1",
-          "ipupi3Pg4RfrSEpFyT69BtlCdpi2",
+          "K9cVYLVUk1NV99YV3anebkugpPp1", 
+          "ipupi3Pg4RfrSEpFyT69BtlCdpi2", 
           "Irglq69MasYdNwBmUu8yKvw6h4G2"
         ] ||
         (request.auth.token.email != null && 
@@ -25,20 +24,25 @@ service cloud.firestore {
            "fabrice.mallet@gmail.com",
            "f.mallet81@gmail.com",
            "kledostyle@outlook.com"
-         ]) ||
+         ]
+        ) ||
         request.auth.token.get('role', '') == 'admin'
       );
     }
 
-    // --- 1. ACCÈS SYSTÈME PRIORITAIRE ---
+    // --- 1. ACCÈS SYSTÈME PRIORITAIRE (FIX 403) ---
     
-    // Règle spécifique pour l'activation globale des cadeaux
+    // Règle d'exception directe pour le document GLOBAL
+    match /shared_access_tokens/GLOBAL {
+      allow read: if true;
+      allow write: if isAdmin() || request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || request.auth.uid == "koKj5ObSGXYeO1PLKU5bgo8Yaky1";
+    }
+
     match /shared_access_tokens/{id} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Paramètres d'application (Splash, CGV, RIB)
     match /app_settings/{id} {
       allow read: if true;
       allow write: if isAdmin();
@@ -50,7 +54,7 @@ service cloud.firestore {
       allow write: if isSignedIn();
     }
 
-    // --- 2. UTILISATEURS & AUDIENCE ---
+    // --- 2. UTILISATEURS & REACH ---
     match /users {
       allow list: if isSignedIn();
     }
@@ -62,7 +66,7 @@ service cloud.firestore {
       }
     }
 
-    // --- 3. CONTENU PUBLIC DYNAMIQUE ---
+    // --- 3. ACCÈS PUBLICS ---
     match /system_notifications/{id} { allow read: if true; }
     match /meteo_caledonie/{id} { 
       allow get, list: if true;
@@ -74,12 +78,11 @@ service cloud.firestore {
     }
     match /sound_library/{id} { allow read: if true; }
 
-    // --- 4. FONCTIONNALITÉS MÉTIER ---
+    // --- 4. FONCTIONNALITÉS CONNECTÉES ---
     match /access_tokens/{id} {
       allow get: if isSignedIn();
       allow list, write: if isAdmin();
     }
-    
     match /cms_support/faq/items/{id} { allow get, list: if true; }
     match /cms_support/tickets/items/{id} {
       allow create: if isSignedIn();

@@ -804,7 +804,8 @@ function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | n
     const handleActivate = () => {
         if (!firestore) return;
         setIsSaving(true);
-        const expiry = Timestamp.fromDate(addDays(new Date(), parseInt(duration)));
+        const durationNum = parseInt(duration);
+        const expiry = Timestamp.fromDate(addDays(new Date(), durationNum));
         const docRef = doc(firestore, 'shared_access_tokens', 'GLOBAL');
         const data = { expiresAt: expiry, updatedAt: serverTimestamp() };
         
