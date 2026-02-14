@@ -92,7 +92,8 @@ export default function VesselTrackerPage() {
   const shouldPanOnNextFix = useRef(false);
 
   const [currentPos, setCurrentPos] = useState<google.maps.LatLngLiteral | null>(null);
-  const [anchorPos, setAnchorPos] = useState<google.maps.LatLngLiteral | null>(null);
+  const currentPosRef = useRef<google.maps.LatLngLiteral | null>(null);
+  const anchorPosRef = useRef<google.maps.LatLngLiteral | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const watchIdRef = useRef<number | null>(null);
@@ -326,7 +327,7 @@ export default function VesselTrackerPage() {
     updateVesselInFirestore({ status: st, eventLabel: label || null });
     if (st === 'moving' || st === 'emergency') {
         immobilityStartTime.current = null;
-        setAnchorPos(null);
+        anchorPosRef.current = null;
     }
     toast({ title: label || (st === 'emergency' ? 'ALERTE ASSISTANCE' : 'Statut mis à jour') });
   };
@@ -334,7 +335,7 @@ export default function VesselTrackerPage() {
   const handleBirdsSignal = async (targetId?: string) => {
     const vesselId = targetId || sharingId;
     if (!vesselId || !user || !firestore) return;
-    if (!currentPos) {
+    if (!currentPosRef.current) {
         toast({ variant: "destructive", title: "GPS Requis", description: "Position introuvable." });
         return;
     }
@@ -343,8 +344,8 @@ export default function VesselTrackerPage() {
     const timeLabel = format(now, 'HH:mm');
     const newMarker: HuntingMarker = {
         id: Math.random().toString(36).substring(7),
-        lat: currentPos.lat,
-        lng: currentPos.lng,
+        lat: currentPosRef.current.lat,
+        lng: currentPosRef.current.lng,
         time: timeLabel
     };
     try {
@@ -368,7 +369,8 @@ export default function VesselTrackerPage() {
     await setDoc(doc(firestore, 'vessels', sharingId), { isSharing: false, lastActive: serverTimestamp() }, { merge: true });
     if (watchIdRef.current) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
     setCurrentPos(null);
-    setAnchorPos(null);
+    currentPosRef.current = null;
+    anchorPosRef.current = null;
     lastSentStatusRef.current = null;
     isFirstFixRef.current = true;
     toast({ title: "Partage arrêté" });
@@ -510,6 +512,7 @@ export default function VesselTrackerPage() {
       if (watchIdRef.current) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
       if (!shouldRunGps) { 
         setCurrentPos(null);
+        currentPosRef.current = null;
         isFirstFixRef.current = true;
       }
       return;
@@ -518,13 +521,14 @@ export default function VesselTrackerPage() {
       (position) => {
         const newPos = { lat: position.coords.latitude, lng: position.coords.longitude };
         setCurrentPos(newPos);
+        currentPosRef.current = newPos;
         if (shouldPanOnNextFix.current && map) { map.panTo(newPos); map.setZoom(15); shouldPanOnNextFix.current = false; }
         
         if (mode === 'sender') {
             const currentST = lastSentStatusRef.current;
             
             if (isFirstFixRef.current) {
-                setAnchorPos(newPos);
+                anchorPosRef.current = newPos;
                 updateVesselInFirestore({ 
                     location: { latitude: newPos.lat, longitude: newPos.lng }, 
                     status: 'moving', 
@@ -537,13 +541,17 @@ export default function VesselTrackerPage() {
             }
 
             if (currentST !== 'returning' && currentST !== 'landed' && currentST !== 'emergency') {
-                const dist = getDistance(newPos.lat, newPos.lng, anchorPos!.lat, anchorPos!.lng);
+                if (!anchorPosRef.current) {
+                    anchorPosRef.current = newPos;
+                    return;
+                }
+                const dist = getDistance(newPos.lat, newPos.lng, anchorPosRef.current.lat, anchorPosRef.current.lng);
                 const now = Date.now();
                 const timeDiff = now - (immobilityStartTime.current || 0);
 
                 if (dist > IMMOBILITY_THRESHOLD_METERS) {
                   setVesselStatus('moving'); 
-                  setAnchorPos(newPos); 
+                  anchorPosRef.current = newPos; 
                   immobilityStartTime.current = null;
                   updateVesselInFirestore({ 
                     location: { latitude: newPos.lat, longitude: newPos.lng }, 
@@ -557,6 +565,9 @@ export default function VesselTrackerPage() {
                     status: 'stationary', 
                     eventLabel: null 
                   });
+                } else {
+                  // Mettre à jour la position en temps réel sans changer le statut ni le label
+                  updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng } });
                 }
             } else { 
                 updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng } }); 
@@ -567,7 +578,7 @@ export default function VesselTrackerPage() {
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
-  }, [isSharing, isReceiverGpsActive, mode, anchorPos, updateVesselInFirestore, map, toast]);
+  }, [isSharing, isReceiverGpsActive, mode, updateVesselInFirestore, map, toast]);
 
   const toggleWakeLock = async () => {
     if (!('wakeLock' in navigator)) return;
@@ -577,9 +588,9 @@ export default function VesselTrackerPage() {
 
   const handleRecenter = () => {
     let pos = null;
-    if (mode === 'sender') { pos = currentPos; } 
+    if (mode === 'sender') { pos = currentPosRef.current; } 
     else {
-        if (isReceiverGpsActive && currentPos) { pos = currentPos; } 
+        if (isReceiverGpsActive && currentPosRef.current) { pos = currentPosRef.current; } 
         else {
             const activeVessel = followedVessels?.find(v => v.isSharing);
             if (activeVessel?.location) { pos = { lat: activeVessel.location.latitude, lng: activeVessel.location.longitude }; }
@@ -591,7 +602,7 @@ export default function VesselTrackerPage() {
 
   const sendEmergencySms = (type: 'SOS' | 'MAYDAY' | 'PAN PAN') => {
     if (!isEmergencyEnabled || !emergencyContact) return;
-    const pos = mode === 'sender' ? currentPos : (followedVessels?.find(v => v.isSharing)?.location ? { lat: followedVessels.find(v => v.isSharing)!.location.latitude, lng: followedVessels.find(v => v.isSharing)!.location.longitude } : null);
+    const pos = mode === 'sender' ? currentPosRef.current : (followedVessels?.find(v => v.isSharing)?.location ? { lat: followedVessels.find(v => v.isSharing)!.location.latitude, lng: followedVessels.find(v => v.isSharing)!.location.longitude } : null);
     const posUrl = pos ? `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}` : "[RECHERCHE GPS...]";
     const nicknamePrefix = vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : "";
     const customText = (isCustomMessageEnabled && vesselSmsMessage) ? vesselSmsMessage : "Requiert assistance immédiate.";
