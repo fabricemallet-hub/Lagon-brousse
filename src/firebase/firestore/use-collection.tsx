@@ -77,6 +77,7 @@ export function useCollection<T = any>(
             'app_settings',
             'promotions',
             'shared_access_tokens',
+            'access_tokens',
             'collectiongroup'
           ];
           
