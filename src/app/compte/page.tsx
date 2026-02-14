@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, isBefore, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { 
-  Crown, Star, XCircle, Ticket, Gift, LogOut, Mail, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink, Copy, Check, MapPin
+  Crown, Star, XCircle, Ticket, Gift, LogOut, Mail, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink, Copy, Check, MapPin, RefreshCw
 } from 'lucide-react';
 import {
   Select,
@@ -45,6 +45,7 @@ export default function ComptePage() {
   const [accessToken, setAccessToken] = useState('');
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [hasCopied, setHasCopied] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const userDocRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -69,8 +70,18 @@ export default function ComptePage() {
 
   const handleLogout = async () => {
     if (!auth) return;
-    await signOut(auth);
-    router.push('/login');
+    setIsLoggingOut(true);
+    try {
+      await signOut(auth);
+      // Nettoyage complet pour forcer le rafraîchissement de l'état
+      sessionStorage.clear();
+      localStorage.removeItem('usage_seconds'); // Reset du timer quotidien aussi
+      router.replace('/login');
+    } catch (e) {
+      toast({ variant: 'destructive', title: "Erreur", description: "Impossible de se déconnecter." });
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   const handleUpdateLocation = async (newLoc: string) => {
@@ -250,8 +261,14 @@ export default function ComptePage() {
                 </DialogContent>
               </Dialog>
 
-              <Button variant="outline" onClick={handleLogout} className="w-full h-12 font-black uppercase text-xs tracking-widest border-2">
-                <LogOut className="mr-2 size-4" /> Déconnexion
+              <Button 
+                variant="outline" 
+                onClick={handleLogout} 
+                disabled={isLoggingOut}
+                className="w-full h-12 font-black uppercase text-xs tracking-widest border-2"
+              >
+                {isLoggingOut ? <RefreshCw className="mr-2 size-4 animate-spin" /> : <LogOut className="mr-2 size-4" />}
+                {isLoggingOut ? 'Déconnexion...' : 'Déconnexion'}
               </Button>
             </div>
         </CardContent>

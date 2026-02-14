@@ -96,14 +96,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     masterUids.includes(user.uid);
 
     if (isMaster) {
-      console.log("L&B DEBUG SHELL: Détection MASTER ADMIN.");
       return 'admin';
     }
 
     if (isProfileLoading) return 'loading';
     if (!userProfile) return 'limited';
-
-    console.log(`L&B DEBUG SHELL: Statut profil base: ${userProfile.subscriptionStatus}`);
 
     const expiryDate = userProfile.subscriptionExpiryDate ? new Date(userProfile.subscriptionExpiryDate) : null;
     const isValid = expiryDate && !isNaN(expiryDate.getTime()) && isBefore(new Date(), expiryDate);
@@ -129,9 +126,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const handleLogout = useCallback(async () => { 
     if (auth) { 
-      await signOut(auth); 
-      sessionStorage.clear(); 
-      router.push('/login'); 
+      try {
+        await signOut(auth); 
+        sessionStorage.clear(); 
+        localStorage.removeItem('usage_seconds');
+        router.replace('/login'); 
+      } catch (e) {
+        console.error("Logout error:", e);
+      }
     } 
   }, [auth, router]);
 
