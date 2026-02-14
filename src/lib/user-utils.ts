@@ -27,7 +27,6 @@ export async function ensureUserDocument(
   ];
   const masterUids = [
     't8nPnZLcTiaLJSKMuLzib3C5nPn1', 
-    'koKj50bSGXYeO1PLKU5bgo8Yaky1',
     'koKj50bSGXYeO1PLKU5bgo8Yaky1'
   ];
   

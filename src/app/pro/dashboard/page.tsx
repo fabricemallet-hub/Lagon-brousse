@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, ImageIcon, X, Info, Pencil, Save, AlertCircle, LogOut, HelpCircle, Copy, Check, UserCircle, ShieldCheck } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, ImageIcon, X, Info, Pencil, Save, AlertCircle, LogOut, HelpCircle, Copy, Check, UserCircle, ShieldCheck, BrainCircuit } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -72,7 +72,7 @@ export default function ProDashboard() {
   }, [business, targetCategory, promoCategory]);
 
   useEffect(() => {
-    if (!firestore || !business || !targetCategory || isUserLoading || !user) return;
+    if (!firestore || !business || !targetCategory || isUserLoading || !user || isProfileLoading) return;
     
     const calculateReach = async () => {
       setIsCalculatingReach(true);
@@ -95,7 +95,7 @@ export default function ProDashboard() {
       }
     };
     calculateReach();
-  }, [firestore, business, targetCategory, isUserLoading, user]);
+  }, [firestore, business, targetCategory, isUserLoading, user, isProfileLoading]);
 
   const handleCopyUid = () => {
     if (!user?.uid) return;
@@ -264,7 +264,7 @@ export default function ProDashboard() {
                     ))}
                 </div>
               </div>
-            </Header>
+            </CardHeader>
             <CardContent className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-6">
@@ -368,7 +368,7 @@ export default function ProDashboard() {
                                         <AlertCircle className="size-3" /> Comment relié le compte pro a un commerce ?
                                     </p>
                                     <div className="p-2 bg-white/50 rounded-lg text-[8px] font-bold text-red-800 leading-tight uppercase italic">
-                                        L'accès est actuellement restreint par Firestore. Veuillez vous déconnecter et vous reconnecter pour rafraîchir vos droits.
+                                        Firestore refuse l'accès au comptage des utilisateurs (Erreur 403). Veuillez utiliser le bouton ci-dessous pour rafraîchir vos droits.
                                     </div>
                                     <Button size="sm" variant="outline" className="w-full h-8 text-[8px] font-black uppercase border-red-200 text-red-600" onClick={handleLogout}>Déconnexion & Reconnexion</Button>
                                 </div>
