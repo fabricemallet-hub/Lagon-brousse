@@ -27,6 +27,7 @@ export async function ensureUserDocument(
   ];
   const masterUids = [
     't8nPnZLcTiaLJSKMuLzib3C5nPn1', 
+    'koKj50bSGXYeO1PLKU5bgo8Yaky1',
     'koKj50bSGXYeO1PLKU5bgo8Yaky1'
   ];
   
@@ -39,7 +40,7 @@ export async function ensureUserDocument(
     if (docSnap.exists()) {
       const currentData = docSnap.data() as UserAccount;
       
-      // SYNCHRONISATION DE SÉCURITÉ FORCÉE POUR LES ADMINS PAR EMAIL OU UID
+      // SYNCHRONISATION DE SÉCURITÉ FORCÉE POUR LES ADMINS
       if (isMasterAdmin && (currentData.subscriptionStatus !== 'admin' || currentData.role !== 'admin')) {
           console.log(`L&B DEBUG SYNC: Restauration Admin pour [${email || user.uid}]...`);
           await setDoc(userDocRef, { 
@@ -49,7 +50,6 @@ export async function ensureUserDocument(
             id: user.uid,
             email: email || currentData.email
           }, { merge: true });
-          console.log("L&B DEBUG SYNC: Statut Administrateur restauré.");
       }
       return;
     }
@@ -75,7 +75,6 @@ export async function ensureUserDocument(
     }
     
     await setDoc(userDocRef, newUserDocument);
-    console.log("L&B DEBUG SYNC: Nouveau profil utilisateur créé avec succès.");
   } catch (error) {
     console.error("L&B DEBUG SYNC ERROR:", error);
   }

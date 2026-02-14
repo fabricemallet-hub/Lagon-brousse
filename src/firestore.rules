@@ -29,102 +29,54 @@ service cloud.firestore {
       );
     }
 
-    // Détection automatique du statut Pro ou Admin pour les outils business
-    function isProfessional() {
-      return isSignedIn() && (
-        request.auth.token.role in ['professional', 'pro', 'admin'] ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['professional', 'pro', 'admin'] ||
-        isAdmin()
-      );
-    }
-
-    // --- 1. ACCÈS TOTAL MASTER (BYPASS TOUT) ---
+    // --- 1. ACCÈS TOTAL MASTER (BYPASS) ---
     match /{allPaths=**} {
       allow read, write: if isAdmin();
     }
 
-    // --- 2. ACCÈS PUBLIC SHOPPING (Collection Group) ---
-    match /{path=**}/promotions/{promoId} {
+    // --- 2. ACCÈS PUBLICS & PARTAGÉS ---
+    match /app_settings/{id} { allow read: if true; }
+    match /system_notifications/{id} { allow read: if true; }
+    match /sound_library/{id} { allow read: if true; }
+    match /meteo_caledonie/{id} { 
       allow get, list: if true;
-      allow write: if isSignedIn();
+      match /previsions/{prevId} { allow get, list: if true; }
     }
-
-    // --- 3. ACCÈS PUBLICS STANDARDS ---
-    match /app_settings/{id} {
-      allow read: if true;
-    }
-
-    match /system_notifications/{id} {
-      allow read: if true;
-    }
-
-    match /meteo_caledonie/{id} {
-      allow get, list: if true;
-      match /previsions/{prevId} {
-        allow get, list: if true;
-      }
-    }
-
     match /fish_species/{id} {
       allow get, list: if true;
-      match /commune_stats/{communeId} {
-        allow get, list: if true;
-        allow create, update: if isSignedIn();
-      }
+      match /commune_stats/{communeId} { allow read, write: if isSignedIn(); }
     }
-
-    match /fish_species/{fishId}/commune_stats/{communeId} {
-      allow read: if true;
-      allow create, update: if isSignedIn();
-    }
-
-    match /sound_library/{id} {
-      allow read: if true;
-    }
-
     match /businesses/{businessId} {
       allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow write: if isSignedIn();
+      match /promotions/{promoId} { allow read, write: if isSignedIn(); }
     }
+    // Collection group pour le shopping
+    match /{path=**}/promotions/{promoId} { allow read: if true; }
 
-    // --- 4. DONNÉES PRIVÉES & PROFILS ---
-    match /users/{userId} {
-      // Autoriser le comptage (list) pour le calcul du Reach à tout utilisateur connecté
-      // Note: Le 'get' reste protégé, donc on peut compter mais pas lire les données.
+    // --- 3. UTILISATEURS & REACH ---
+    match /users {
+      // Indispensable pour RunAggregationQuery (Comptage Reach)
       allow list: if isSignedIn();
-      allow get, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       
-      match /{allPaths=**} {
-        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      match /{userId} {
+        allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+        allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+        
+        match /{allPaths=**} {
+          allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+        }
       }
     }
 
+    // --- 4. FONCTIONNALITÉS PRIVÉES ---
     match /conversations/{id} {
       allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin());
-      match /{allPaths=**} {
-        allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin());
-      }
+      match /{allPaths=**} { allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin()); }
     }
-
-    match /spot_shares/{id} {
-      allow create: if isSignedIn();
-      allow read, delete: if isSignedIn();
-    }
-
-    match /vessels/{id} {
-      allow read, write: if isSignedIn();
-      match /{allPaths=**} { allow read, write: if isSignedIn(); }
-    }
-
-    match /hunting_sessions/{id} {
-      allow read, write: if isSignedIn();
-      match /{allPaths=**} { allow read, write: if isSignedIn(); }
-    }
-
-    match /campaigns/{campaignId} {
-      allow create: if isSignedIn();
-      allow read: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
-    }
+    match /spot_shares/{id} { allow read, write: if isSignedIn(); }
+    match /vessels/{id} { allow read, write: if isSignedIn(); match /{allPaths=**} { allow read, write: if isSignedIn(); } }
+    match /hunting_sessions/{id} { allow read, write: if isSignedIn(); match /{allPaths=**} { allow read, write: if isSignedIn(); } }
+    match /campaigns/{campaignId} { allow read, write: if isSignedIn(); }
   }
 }
