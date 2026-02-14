@@ -36,7 +36,7 @@ service cloud.firestore {
     // --- 2. ACCÈS CATALOGUE PUBLIC (INDISPENSABLE POUR SHOPPING NC) ---
     // La syntaxe {path=**} est obligatoire pour autoriser le collectionGroup()
     match /{path=**}/promotions/{promoId} {
-      allow read: if true;
+      allow get, list: if true;
       // L'écriture est déjà gérée par le bypass Master ou la règle spécifique businesses ci-dessous
     }
 

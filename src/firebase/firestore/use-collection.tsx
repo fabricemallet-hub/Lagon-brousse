@@ -90,7 +90,8 @@ export function useCollection<T = any>(
             'sound_library',
             'vessels_safety',
             'app_settings',
-            'promotions'
+            'promotions',
+            'CollectionGroup'
           ];
           
           const isSilent = silentPaths.some(p => path.includes(p)) || path === "" || path === "/";
