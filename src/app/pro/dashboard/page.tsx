@@ -419,8 +419,11 @@ export default function ProDashboard() {
                             {reachError && (
                                 <div className="p-3 bg-red-50 border-2 border-red-200 rounded-xl space-y-2">
                                     <p className="text-[9px] text-red-600 font-bold uppercase flex items-center gap-2">
-                                        <AlertCircle className="size-3" /> Reconnexion requise (403)
+                                        <AlertCircle className="size-3" /> Comment relier le compte pro à un commerce ?
                                     </p>
+                                    <div className="p-2 bg-white/50 rounded-lg text-[8px] font-bold text-red-800 leading-tight uppercase italic">
+                                        Note : Seul l'administrateur peut lier votre compte via l'UID affiché en haut. Une reconnexion peut aider si vous venez d'être lié.
+                                    </div>
                                     <Button size="sm" variant="outline" className="w-full h-8 text-[8px] font-black uppercase border-red-200 text-red-600" onClick={handleLogout}>Déconnexion & Reconnexion</Button>
                                 </div>
                             )}

@@ -16,6 +16,7 @@ service cloud.firestore {
           "K9cVYLVUk1NV99YV3anebkugpPp1", 
           "ipupi3Pg4RfrSEpFyT69BtlCdpi2", 
           "Irglq69MasYdNwBmUu8yKvw6h4G2",
+          "koKj50bSGXYeO1PLKU5bgo8Yaky1",
           "koKj50bSGXYeO1PLKU5bgo8Yaky1"
         ] ||
         (request.auth.token.email != null && 
@@ -29,12 +30,28 @@ service cloud.firestore {
       );
     }
 
-    // --- 1. ACCÈS TOTAL MASTER (BYPASS) ---
+    function isProfessional() {
+      // Vérification dynamique du rôle dans le document profil
+      return isSignedIn() && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'professional' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'professional' ||
+        request.auth.token.role == 'professional'
+      );
+    }
+
+    // --- PRIORITÉ 1: COMPTAGE DES UTILISATEURS (REACH) ---
+    // Cette règle doit être au plus haut niveau pour RunAggregationQuery
+    match /users {
+      // Autorise le comptage technique pour le calcul du Reach (Professionnels et Admins)
+      allow list: if isSignedIn();
+    }
+
+    // --- PRIORITÉ 2: ACCÈS TOTAL MASTER (BYPASS) ---
     match /{allPaths=**} {
       allow read, write: if isAdmin();
     }
 
-    // --- 2. ACCÈS PUBLICS & PARTAGÉS ---
+    // --- PRIORITÉ 3: RÈGLES SPÉCIFIQUES ---
     match /app_settings/{id} { allow read: if true; }
     match /system_notifications/{id} { allow read: if true; }
     match /sound_library/{id} { allow read: if true; }
@@ -54,22 +71,17 @@ service cloud.firestore {
     // Collection group pour le shopping
     match /{path=**}/promotions/{promoId} { allow read: if true; }
 
-    // --- 3. UTILISATEURS & REACH ---
-    match /users {
-      // Indispensable pour RunAggregationQuery (Comptage Reach)
-      allow list: if isSignedIn();
+    // DÉTAILS UTILISATEURS (SÉCURITÉ STRICTE)
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       
-      match /{userId} {
-        allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-        allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-        
-        match /{allPaths=**} {
-          allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-        }
+      match /{allPaths=**} {
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       }
     }
 
-    // --- 4. FONCTIONNALITÉS PRIVÉES ---
+    // FONCTIONNALITÉS PRIVÉES
     match /conversations/{id} {
       allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin());
       match /{allPaths=**} { allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin()); }
