@@ -95,21 +95,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const isMaster = (user.email && masterEmails.includes(user.email.toLowerCase())) || 
                     masterUids.includes(user.uid);
 
-    if (isMaster) {
+    if (isMaster || userProfile?.subscriptionStatus === 'admin' || userProfile?.role === 'admin') {
       return 'admin';
     }
 
     if (isProfileLoading) return 'loading';
     if (!userProfile) return 'limited';
 
+    if (userProfile.subscriptionStatus === 'professional' || userProfile.role === 'professional') {
+        return 'professional';
+    }
+
     const expiryDate = userProfile.subscriptionExpiryDate ? new Date(userProfile.subscriptionExpiryDate) : null;
     const isValid = expiryDate && !isNaN(expiryDate.getTime()) && isBefore(new Date(), expiryDate);
 
     switch (userProfile.subscriptionStatus) {
-      case 'admin': return 'admin';
       case 'active':
         return isValid ? 'active' : 'limited';
-      case 'professional': return 'professional';
       case 'trial':
         return isValid ? 'trial' : 'limited';
       default: return 'limited';

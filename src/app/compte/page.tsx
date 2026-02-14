@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, isBefore, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { 
-  Crown, Star, XCircle, Ticket, Gift, LogOut, Mail, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink, Copy, Check, MapPin, RefreshCw
+  Crown, Star, XCircle, Ticket, Gift, LogOut, Mail, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink, Copy, Check, MapPin, RefreshCw, Store, Zap
 } from 'lucide-react';
 import {
   Select,
@@ -143,15 +143,32 @@ export default function ComptePage() {
 
   const getStatusInfo = () => {
     if (!userProfile) return { label: 'Chargement', variant: 'secondary', icon: Star, desc: '' };
+    
+    // PRIORITÉ 1 : ADMIN
+    if (userProfile.subscriptionStatus === 'admin' || userProfile.role === 'admin') {
+        return { label: 'Administrateur', variant: 'default', icon: Crown, desc: "Accès illimité Master." };
+    }
+
+    // PRIORITÉ 2 : PRO
+    if (userProfile.subscriptionStatus === 'professional' || userProfile.role === 'professional') {
+        return { label: 'Professionnel', variant: 'outline', icon: Store, desc: "Compte Partenaire Professionnel." };
+    }
+
+    // PRIORITÉ 3 : ACCÈS GLOBAL (CADEAU)
     if (isSharedAccessActive) return { label: 'Accès Offert', variant: 'default', icon: Gift, desc: `Accès global jusqu'au ${format(sharedToken!.expiresAt.toDate(), 'dd/MM/yyyy', { locale: fr })}.` };
     
+    // PRIORITÉ 4 : ABONNEMENTS ET ESSAIS
     switch (userProfile.subscriptionStatus) {
-      case 'admin': return { label: 'Administrateur', variant: 'default', icon: Crown, desc: "Accès illimité." };
       case 'active':
          const exp = new Date(userProfile.subscriptionExpiryDate!);
          return isBefore(new Date(), exp) 
             ? { label: 'Abonné', variant: 'default', icon: Star, desc: `Actif jusqu'au ${format(exp, 'dd MMMM yyyy', { locale: fr })}.` }
             : { label: 'Expiré', variant: 'destructive', icon: XCircle, desc: "Abonnement terminé." };
+      case 'trial':
+         const tExp = new Date(userProfile.subscriptionExpiryDate!);
+         return isBefore(new Date(), tExp)
+            ? { label: 'Essai Gratuit', variant: 'secondary', icon: Zap, desc: `Période d'essai jusqu'au ${format(tExp, 'dd/MM/yy', { locale: fr })}.` }
+            : { label: 'Essai Expiré', variant: 'destructive', icon: XCircle, desc: "Période d'essai terminée." };
       default: return { label: 'Mode Limité', variant: 'destructive', icon: XCircle, desc: "Accès 1 minute / jour." };
     }
   };
@@ -227,7 +244,7 @@ export default function ComptePage() {
             </div>
 
             <div className="pt-4 flex flex-col gap-3">
-              {userProfile?.subscriptionStatus !== 'active' && userProfile?.subscriptionStatus !== 'admin' && !isSharedAccessActive && (
+              {userProfile?.subscriptionStatus !== 'active' && userProfile?.subscriptionStatus !== 'admin' && userProfile?.subscriptionStatus !== 'professional' && !isSharedAccessActive && (
                 <Button onClick={handleSubscribe} className="w-full h-14 text-base font-black uppercase tracking-widest shadow-lg">
                   S'abonner (4.19€ / mois)
                 </Button>
@@ -276,7 +293,7 @@ export default function ComptePage() {
 
       <PushNotificationManager />
 
-      {!isSharedAccessActive && userProfile?.subscriptionStatus !== 'admin' && (
+      {!isSharedAccessActive && userProfile?.subscriptionStatus !== 'admin' && userProfile?.subscriptionStatus !== 'professional' && (
         <Card className="w-full shadow-none border-2">
             <CardHeader className="p-6 pb-2">
                 <CardTitle className="text-lg font-black uppercase tracking-tighter flex items-center gap-2"><Ticket className="text-primary" /> Activer un jeton</CardTitle>
