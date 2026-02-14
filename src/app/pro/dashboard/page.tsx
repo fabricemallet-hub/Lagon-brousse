@@ -214,14 +214,16 @@ export default function ProDashboard() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-32 px-1">
-      {/* IDENTITÉ PRO & STATUT EN HAUT */}
+      {/* IDENTITÉ PRO & NOM UTILISATEUR */}
       <Card className="border-2 border-primary bg-primary/5 shadow-lg overflow-hidden">
         <CardContent className="p-4 flex flex-col gap-4">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-primary text-white rounded-lg"><UserCircle className="size-5" /></div>
                     <div>
-                        <p className="font-black text-base uppercase leading-none mb-1 text-slate-800">{profile?.displayName || user?.displayName || 'Utilisateur'}</p>
+                        <p className="font-black text-lg uppercase leading-none mb-1 text-slate-800">
+                          {profile?.displayName || user?.displayName || 'Utilisateur Pro'}
+                        </p>
                         <p className="text-[9px] font-black uppercase text-primary/60">Identifiant de partage (UID)</p>
                         <p className="font-mono font-black text-xs tracking-tight select-all opacity-70">{user?.uid}</p>
                     </div>
@@ -243,11 +245,8 @@ export default function ProDashboard() {
             <div className="p-6 bg-muted rounded-full text-muted-foreground shadow-inner">
                 <Store className="size-16" />
             </div>
-            <h2 className="text-2xl font-black uppercase tracking-tighter">Commerce non relié</h2>
-            <p className="text-sm font-medium text-muted-foreground leading-relaxed max-w-sm italic">
-                Comment relier le compte pro à un commerce ?
-            </p>
-            <p className="text-xs text-muted-foreground leading-relaxed max-w-sm mt-2">
+            <h2 className="text-2xl font-black uppercase tracking-tighter">Comment relier le compte pro à un commerce ?</h2>
+            <p className="text-sm font-medium text-muted-foreground leading-relaxed max-w-sm mt-2">
                 Transmettez votre UID ci-dessus à l'administrateur pour qu'il puisse rattacher votre profil à votre boutique.
             </p>
             <Button onClick={() => router.push('/compte')} variant="ghost" className="mt-4 font-black uppercase text-[10px] tracking-widest border-2">Retour au profil</Button>
