@@ -397,7 +397,7 @@ export default function ProDashboard() {
                 {promotions?.map(promo => (
                     <Card key={promo.id} className={cn("overflow-hidden border-2 shadow-sm flex h-32", editingPromoId === promo.id && "border-accent bg-accent/5")}>
                         <div className="w-24 bg-muted/20 shrink-0 relative flex items-center justify-center border-r">
-                            {promo.imageUrl ? <img src={promo.imageUrl} className="w-full h-full object-cover" /> : <ImageIcon className="size-6 opacity-20" />}
+                            {promo.imageUrl ? <img src={promo.imageUrl} className="w-full h-full object-cover" alt={promo.title} /> : <ImageIcon className="size-6 opacity-20" />}
                         </div>
                         <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
                             <div className="space-y-1">

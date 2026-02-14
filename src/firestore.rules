@@ -29,20 +29,13 @@ service cloud.firestore {
       );
     }
 
-    function isProfessional() {
-      return isSignedIn() && (
-        request.auth.token.role == 'professional' ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'professional'
-      );
-    }
-
     // --- RÈGLES DE COLLECTION UTILISATEURS ---
     match /users/{userId} {
-      // CRITIQUE : Autoriser le comptage (list) pour tout le monde connecté 
-      // pour débloquer le calcul du Reach (Aggregation Queries)
+      // CRITIQUE : Autoriser le comptage (list) au sommet de la collection 
+      // pour débloquer le calcul du Reach (Aggregation Queries) sans erreur 403.
       allow list: if isSignedIn();
       
-      // Accès aux données privées : seulement soi-même ou Admin
+      // Accès aux données individuelles : seulement soi-même ou Admin
       allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       
