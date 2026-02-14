@@ -5,7 +5,6 @@ service cloud.firestore {
 
     // ======================================================
     // 1. PRIORITÉ ABSOLUE : MASTER ADMIN BYPASS (GOD MODE)
-    // Cet UID et ces emails ont un accès total à TOUTE la base.
     // ======================================================
     match /{allPaths=**} {
       allow read, write: if request.auth != null && (
@@ -15,7 +14,7 @@ service cloud.firestore {
         request.auth.uid == "K9cVYLVUk1NV99YV3anebkugpPp1" ||
         request.auth.uid == "ipupi3Pg4RfrSEpFyT69BtlCdpi2" ||
         request.auth.uid == "Irglq69MasYdNwBmUu8yKvw6h4G2" ||
-        (request.auth.token.email != null && request.auth.token.email.lower() in [
+        (request.auth.token.email != null && request.auth.token.email.toLower() in [
           "f.mallet81@outlook.com",
           "fabrice.mallet@gmail.com",
           "f.mallet81@gmail.com",
@@ -40,7 +39,7 @@ service cloud.firestore {
           "Irglq69MasYdNwBmUu8yKvw6h4G2"
         ] ||
         request.auth.token.get('role', '') == 'admin' ||
-        (request.auth.token.email != null && request.auth.token.email.lower() in [
+        (request.auth.token.email != null && request.auth.token.email.toLower() in [
           "f.mallet81@outlook.com",
           "fabrice.mallet@gmail.com",
           "f.mallet81@gmail.com",
@@ -50,10 +49,11 @@ service cloud.firestore {
     }
 
     // --- 2. ACCÈS PUBLICS & SYSTÈME ---
-    match /shared_access_tokens/{id} { allow read: if true; }
-    match /app_settings/{id} { allow read: if true; }
-    match /system_notifications/{id} { allow read: if true; }
-    match /sound_library/{id} { allow read: if true; }
+    match /shared_access_tokens/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /access_tokens/{id} { allow read, write: if isAdmin(); }
+    match /app_settings/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /system_notifications/{id} { allow read: if true; allow write: if isAdmin(); }
+    match /sound_library/{id} { allow read: if true; allow write: if isAdmin(); }
     match /meteo_caledonie/{id} { 
       allow get, list: if true;
       match /previsions/{prevId} { allow get, list: if true; }
@@ -79,7 +79,7 @@ service cloud.firestore {
     }
 
     // --- 5. FONCTIONNALITÉS MÉTIER ---
-    match /cms_support/{allPaths=**} { allow read, write: if isSignedIn(); }
+    match /cms_support/{allPaths=**} { allow read, write: if isAdmin(); }
     match /hunting_sessions/{id} { allow read, write: if isSignedIn(); match /{allPaths=**} { allow read, write: if isSignedIn(); } }
     match /vessels/{id} { allow read, write: if isSignedIn(); match /{allPaths=**} { allow read, write: if isSignedIn(); } }
     match /spot_shares/{id} { allow read, write: if isSignedIn(); }
@@ -87,7 +87,9 @@ service cloud.firestore {
     match /campaigns/{campaignId} { allow read, write: if isAdmin(); }
     match /conversations/{id} {
       allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin());
-      match /{allPaths=**} { allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin()); }
+      match /{allPaths=**} {
+        allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin());
+      }
     }
   }
 }
