@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -298,8 +297,6 @@ export default function VesselTrackerPage() {
             updatePayload.location = { latitude: currentPosRef.current.lat, longitude: currentPosRef.current.lng };
         }
 
-        // CRITICAL: Only update statusChangedAt if a real change occurs.
-        // Heartbeats (GPS updates without status change) should NOT update this timestamp.
         if (data.status || lastSentStatusRef.current === null || data.eventLabel) {
             updatePayload.statusChangedAt = serverTimestamp();
             if (data.status) lastSentStatusRef.current = data.status;
@@ -440,7 +437,6 @@ export default function VesselTrackerPage() {
     followedVessels.forEach(vessel => {
         const isSharingActive = vessel.isSharing === true;
         const currentStatus = isSharingActive ? (vessel.status || 'moving') : 'offline';
-        // ONLY use statusChangedAt for history to avoid heartbeats spamming the log
         const statusTime = vessel.statusChangedAt;
         const currentEvent = vessel.eventLabel || '';
         const currentBattery = vessel.batteryLevel ?? 100;
@@ -461,7 +457,6 @@ export default function VesselTrackerPage() {
             lastClearTimesRef.current[vessel.id] = clearTimeKey;
         }
 
-        // CRITICAL: Skip history update if no real status change timestamp is present
         if (timeKey === 0) return;
         
         const eventUniqueKey = `${vessel.id}-${timeKey}-${currentStatus}-${currentEvent}-${vessel.isPositionHidden}`;
@@ -630,7 +625,7 @@ export default function VesselTrackerPage() {
 
   const sendEmergencySms = (type: 'SOS' | 'MAYDAY' | 'PAN PAN') => {
     if (!isEmergencyEnabled || !emergencyContact) return;
-    const pos = mode === 'sender' ? currentPosRef.current : (followedVessels?.find(v => v.isSharing && !v.isPositionHidden)?.location ? { lat: followedVessels.find(v => v.isSharing)!.location!.latitude, lng: followedVessels.find(v => v.isSharing)!.location!.longitude } : null);
+    const pos = currentPosRef.current || (followedVessels?.find(v => v.isSharing && !v.isPositionHidden)?.location ? { lat: followedVessels.find(v => v.isSharing)!.location!.latitude, lng: followedVessels.find(v => v.isSharing)!.location!.longitude } : null);
     
     if (!pos) {
         toast({ variant: "destructive", title: "GPS non verrouillé", description: "Attendez que votre position s'affiche sur la carte." });
@@ -707,10 +702,10 @@ export default function VesselTrackerPage() {
                             <Switch checked={isPositionHidden} onCheckedChange={handleToggleHidePosition} />
                         </div>
 
-                        <Button variant="destructive" className="w-full h-16 font-black uppercase text-[10px] px-2 leading-tight border-2 border-red-400 gap-3 shadow-md animate-pulse" onClick={() => handleManualStatus('emergency')} disabled={vesselStatus === 'emergency'}>
+                        <Button variant="destructive" className="w-full h-16 font-black uppercase text-[10px] tracking-tight px-2 leading-tight border-2 border-red-400 gap-3 shadow-md animate-pulse" onClick={() => handleManualStatus('emergency')} disabled={vesselStatus === 'emergency'}>
                             <AlertCircle className="size-6 shrink-0" /> DEMANDE ASSISTANCE (PROBLÈME)
                         </Button>
-                        <Button variant="outline" className="w-full h-16 font-black uppercase text-[10px] px-2 leading-tight border-2 bg-blue-50 border-blue-200 gap-3 text-blue-700" onClick={() => handleBirdsSignal()}>
+                        <Button variant="outline" className="w-full h-16 font-black uppercase text-[10px] tracking-tight px-2 leading-tight border-2 bg-blue-50 border-blue-200 gap-3 text-blue-700" onClick={() => handleBirdsSignal()}>
                             <Bird className="size-6 shrink-0 animate-bounce" /> REGROUPEMENT D'OISEAUX (CHASSE)
                         </Button>
                         <div className="grid grid-cols-2 gap-2">
