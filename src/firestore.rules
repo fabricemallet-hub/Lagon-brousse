@@ -90,8 +90,9 @@ service cloud.firestore {
 
     // --- 4. DONNÉES PRIVÉES & PROFILS ---
     match /users/{userId} {
-      // Autoriser le comptage (list) pour le calcul du Reach aux Pros et Admins
-      allow list: if isProfessional();
+      // Autoriser le comptage (list) pour le calcul du Reach à tout utilisateur connecté
+      // Note: Le 'get' reste protégé, donc on peut compter mais pas lire les données.
+      allow list: if isSignedIn();
       allow get, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       
       match /{allPaths=**} {
