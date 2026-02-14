@@ -3,27 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. PRIORITÉ ABSOLUE : RESSOURCES PUBLIQUES & SYSTÈME ---
-    
-    // Catalogue Shopping (Collection Group)
-    match /{path=**}/promotions/{promoId} {
-      allow read, get, list: if true;
-      allow write: if request.auth != null;
-    }
-
-    // Accès aux offres globales (Cadeaux / Shared Tokens)
-    match /shared_access_tokens/{id} {
-      allow read, get: if true;
-      allow write: if isAdmin();
-    }
-
-    // Paramètres d'application (Splash, CGV, RIB)
-    match /app_settings/{id} {
-      allow read, get: if true;
-      allow write: if isAdmin();
-    }
-
-    // --- FONCTIONS DE BASE ---
+    // --- 1. FONCTIONS DE SÉCURITÉ ---
     function isSignedIn() {
       return request.auth != null;
     }
@@ -50,7 +30,27 @@ service cloud.firestore {
       );
     }
 
-    // --- 2. UTILISATEURS & AUDIENCE ---
+    // --- 2. RESSOURCES SYSTÈME PRIORITAIRES ---
+    
+    // Accès aux offres globales (Cadeaux / Shared Tokens)
+    match /shared_access_tokens/{id} {
+      allow read, get: if true;
+      allow write: if isAdmin();
+    }
+
+    // Paramètres d'application (Splash, CGV, RIB)
+    match /app_settings/{id} {
+      allow read, get: if true;
+      allow write: if isAdmin();
+    }
+
+    // Catalogue Shopping (Collection Group)
+    match /{path=**}/promotions/{promoId} {
+      allow read, get, list: if true;
+      allow write: if isSignedIn();
+    }
+
+    // --- 3. UTILISATEURS & AUDIENCE ---
     match /users {
       allow list: if isSignedIn();
     }
@@ -62,7 +62,7 @@ service cloud.firestore {
       }
     }
 
-    // --- 3. CONTENU PUBLIC DYNAMIQUE ---
+    // --- 4. CONTENU PUBLIC DYNAMIQUE ---
     match /system_notifications/{id} { allow read: if true; }
     match /meteo_caledonie/{id} { 
       allow get, list: if true;
@@ -74,7 +74,7 @@ service cloud.firestore {
     }
     match /sound_library/{id} { allow read: if true; }
 
-    // --- 4. FONCTIONNALITÉS CONNECTÉES ---
+    // --- 5. FONCTIONNALITÉS CONNECTÉES ---
     match /access_tokens/{id} {
       allow get: if isSignedIn();
       allow list, write: if isAdmin();

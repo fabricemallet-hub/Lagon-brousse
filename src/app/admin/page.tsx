@@ -57,6 +57,8 @@ import { format, addMonths, addDays, isBefore, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 export default function AdminPage() {
   const { user, isUserLoading } = useUser();
@@ -797,20 +799,51 @@ function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | n
     const [duration, setDuration] = useState('7');
     const [isSaving, setIsSaving] = useState(false);
 
-    const handleActivate = async () => {
+    const handleActivate = () => {
         if (!firestore) return;
         setIsSaving(true);
-        try {
-            const expiry = Timestamp.fromDate(addDays(new Date(), parseInt(duration)));
-            await setDoc(doc(firestore, 'shared_access_tokens', 'GLOBAL'), { expiresAt: expiry, updatedAt: serverTimestamp() });
-            toast({ title: "Accès Global activé !" });
-        } finally { setIsSaving(false); }
+        const expiry = Timestamp.fromDate(addDays(new Date(), parseInt(duration)));
+        const docRef = doc(firestore, 'shared_access_tokens', 'GLOBAL');
+        const data = { expiresAt: expiry, updatedAt: serverTimestamp() };
+        
+        setDoc(docRef, data)
+            .then(() => {
+                toast({ title: "Accès Global activé !" });
+            })
+            .catch(async (error) => {
+                const permissionError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'write',
+                    requestResourceData: data,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            })
+            .finally(() => {
+                setIsSaving(false);
+            });
     };
 
-    const handleStop = async () => {
+    const handleStop = () => {
         if (!firestore) return;
-        await setDoc(doc(firestore, 'shared_access_tokens', 'GLOBAL'), { expiresAt: Timestamp.fromDate(new Date(0)), updatedAt: serverTimestamp() });
-        toast({ title: "Accès Global coupé" });
+        setIsSaving(true);
+        const docRef = doc(firestore, 'shared_access_tokens', 'GLOBAL');
+        const data = { expiresAt: Timestamp.fromDate(new Date(0)), updatedAt: serverTimestamp() };
+        
+        setDoc(docRef, data)
+            .then(() => {
+                toast({ title: "Accès Global coupé" });
+            })
+            .catch(async (error) => {
+                const permissionError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'write',
+                    requestResourceData: data,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            })
+            .finally(() => {
+                setIsSaving(false);
+            });
     };
 
     const isGlobalActive = globalGift && globalGift.expiresAt && isBefore(new Date(), globalGift.expiresAt.toDate());
@@ -824,7 +857,11 @@ function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | n
                     <div className="flex flex-col"><span className="text-[10px] font-black uppercase opacity-60">Statut actuel</span>
                         <p className={cn("text-sm font-black", isGlobalActive ? "text-green-600" : "text-muted-foreground")}>{isGlobalActive ? `ACTIF JUSQU'AU ${format(globalGift!.expiresAt.toDate(), 'dd/MM HH:mm')}` : 'AUCUN ACCÈS ACTIF'}</p>
                     </div>
-                    {isGlobalActive && <Button variant="destructive" size="sm" onClick={handleStop} className="h-8 font-black uppercase text-[10px]">Couper</Button>}
+                    {isGlobalActive && (
+                        <Button variant="destructive" size="sm" onClick={handleStop} disabled={isSaving} className="h-8 font-black uppercase text-[10px]">
+                            {isSaving ? <RefreshCw className="size-3 animate-spin" /> : 'Couper'}
+                        </Button>
+                    )}
                 </div>
                 <div className="space-y-4">
                     <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Durée de l'offre (jours)</Label>
@@ -833,7 +870,10 @@ function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | n
                             <SelectContent><SelectItem value="1">1 jour</SelectItem><SelectItem value="7">1 semaine</SelectItem><SelectItem value="30">1 mois</SelectItem><SelectItem value="90">3 mois</SelectItem></SelectContent>
                         </Select>
                     </div>
-                    <Button onClick={handleActivate} disabled={isSaving} className="w-full h-14 font-black uppercase tracking-widest bg-primary shadow-lg text-sm">Activer l'offre cadeau</Button>
+                    <Button onClick={handleActivate} disabled={isSaving} className="w-full h-14 font-black uppercase tracking-widest bg-primary shadow-lg text-sm">
+                        {isSaving ? <RefreshCw className="size-5 animate-spin mr-2" /> : null}
+                        Activer l'offre cadeau
+                    </Button>
                 </div>
             </CardContent>
         </Card>
@@ -1096,7 +1136,7 @@ function FishManager({ species }: { species: FishSpeciesInfo[] | null }) {
                                 <div className="flex gap-2">
                                     <Input value={editingFish.imageUrl || ''} onChange={e => setEditingFish({...editingFish, imageUrl: e.target.value})} className="flex-grow" />
                                     <Button variant="outline" size="icon" className="shrink-0 h-10 w-10 border-2" onClick={() => editFileInputRef.current?.click()}><Camera className="size-4" /></Button>
-                                    <input type="file" accept="image/*" ref={editFileInputRef} className="hidden" onChange={e => handleFileChange(e, true)} />
+                                    <input type="file" accept="image/*" ref={editFileInputRef} className="hidden" onChange={handleFileChange} />
                                 </div>
                             </div>
 
