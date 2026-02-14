@@ -107,7 +107,7 @@ export default function ProDashboard() {
     if (!user?.uid) return;
     navigator.clipboard.writeText(user.uid);
     setHasCopiedUid(true);
-    toast({ title: "UID Copié !", description: "Vous pouvez maintenant le transmettre à l'admin." });
+    toast({ title: "UID Copié !", description: "Transmettez-le à l'administrateur." });
     setTimeout(() => setHasCopiedUid(false), 2000);
   };
 
@@ -264,7 +264,7 @@ export default function ProDashboard() {
   if (isUserLoading || isProfileLoading || isBusinessLoading) return <div className="p-8"><Skeleton className="h-64 w-full" /></div>;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-32">
+    <div className="max-w-4xl mx-auto space-y-8 pb-32 px-1">
       {/* IDENTIFIANT PRO - TOUJOURS VISIBLE ET MIS EN AVANT */}
       <Card className="border-2 border-dashed border-primary/40 bg-primary/5 shadow-inner">
         <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -443,11 +443,11 @@ export default function ProDashboard() {
                             </div>
                             
                             {reachError && (
-                                <div className="p-3 bg-red-50 border border-red-100 rounded-xl space-y-2">
+                                <div className="p-3 bg-red-50 border-2 border-red-200 rounded-xl space-y-2 animate-in fade-in">
                                     <p className="text-[9px] text-red-600 font-bold flex items-center gap-2 uppercase">
-                                        <AlertCircle className="size-3" /> Accès en cours... Reconnexion requise
+                                        <AlertCircle className="size-3" /> Reconnexion requise (Erreur 403)
                                     </p>
-                                    <Button size="sm" variant="outline" className="w-full h-8 text-[8px] font-black uppercase border-red-200 text-red-600" onClick={handleLogout}>Se déconnecter & Reconnecter</Button>
+                                    <Button size="sm" variant="outline" className="w-full h-8 text-[8px] font-black uppercase border-red-200 text-red-600 bg-white" onClick={handleLogout}>Déconnexion & Reconnexion</Button>
                                 </div>
                             )}
 

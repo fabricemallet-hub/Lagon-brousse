@@ -29,13 +29,11 @@ service cloud.firestore {
       );
     }
 
-    // Détection automatique du statut Pro via le document utilisateur
+    // Détection automatique du statut Pro ou Admin pour les outils business
     function isProfessional() {
       return isSignedIn() && (
-        request.auth.token.role == 'professional' || 
-        request.auth.token.role == 'pro' ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'professional' ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'pro' ||
+        request.auth.token.role in ['professional', 'pro', 'admin'] ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['professional', 'pro', 'admin'] ||
         isAdmin()
       );
     }
