@@ -3,45 +3,48 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. FONCTIONS DE SÉCURITÉ ---
+    // --- FONCTIONS DE SÉCURITÉ MASTER ---
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isAdmin() {
-      return isSignedIn() && (
-        request.auth.uid in [
-          "koKj5ObSGXYeO1PLKU5bgo8Yaky1",
-          "D1q2GPM95rZi38cvCzvsjcWQDaV2",
-          "t8nPnZLcTiaLJSKMuLzib3C5nPn1", 
-          "K9cVYLVUk1NV99YV3anebkugpPp1", 
-          "ipupi3Pg4RfrSEpFyT69BtlCdpi2", 
-          "Irglq69MasYdNwBmUu8yKvw6h4G2"
-        ] ||
-        (request.auth.token.email != null && 
-         request.auth.token.email.lower() in [
-           "kledostyle@outlook.com",
-           "fabrice.mallet@gmail.com",
-           "f.mallet81@gmail.com",
-           "f.mallet81@outlook.com"
-         ]
-        ) ||
-        request.auth.token.role == 'admin'
-      );
+    function isMasterUid() {
+      return isSignedIn() && request.auth.uid in [
+        "t8nPnZLcTiaLJSKMuLzib3C5nPn1",
+        "koKj5ObSGXYeO1PLKU5bgo8Yaky1",
+        "D1q2GPM95rZi38cvCzvsjcWQDaV2",
+        "K9cVYLVUk1NV99YV3anebkugpPp1",
+        "ipupi3Pg4RfrSEpFyT69BtlCdpi2",
+        "Irglq69MasYdNwBmUu8yKvw6h4G2"
+      ];
     }
 
-    // --- 2. RESSOURCES SYSTÈME PRIORITAIRES ---
+    function isMasterEmail() {
+      return isSignedIn() && request.auth.token.email != null && 
+             request.auth.token.email.lower() in [
+               "f.mallet81@outlook.com",
+               "fabrice.mallet@gmail.com",
+               "f.mallet81@gmail.com",
+               "kledostyle@outlook.com"
+             ];
+    }
+
+    function isAdmin() {
+      return isMasterUid() || isMasterEmail() || (isSignedIn() && request.auth.token.role == 'admin');
+    }
+
+    // --- 1. ACCÈS SYSTÈME PRIORITAIRE ---
     
     // Accès aux offres globales (Cadeaux / Shared Tokens)
     match /shared_access_tokens/{id} {
-      allow read, get: if true;
-      allow write: if isAdmin();
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
     }
 
     // Paramètres d'application (Splash, CGV, RIB)
     match /app_settings/{id} {
-      allow read, get: if true;
-      allow write: if isAdmin();
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
     }
 
     // Catalogue Shopping (Collection Group)
@@ -50,8 +53,9 @@ service cloud.firestore {
       allow write: if isSignedIn();
     }
 
-    // --- 3. UTILISATEURS & AUDIENCE ---
+    // --- 2. UTILISATEURS & AUDIENCE ---
     match /users {
+      // Autorise le comptage global pour le calcul de l'audience Pro
       allow list: if isSignedIn();
     }
 
@@ -62,7 +66,7 @@ service cloud.firestore {
       }
     }
 
-    // --- 4. CONTENU PUBLIC DYNAMIQUE ---
+    // --- 3. CONTENU PUBLIC DYNAMIQUE ---
     match /system_notifications/{id} { allow read: if true; }
     match /meteo_caledonie/{id} { 
       allow get, list: if true;
@@ -74,7 +78,7 @@ service cloud.firestore {
     }
     match /sound_library/{id} { allow read: if true; }
 
-    // --- 5. FONCTIONNALITÉS CONNECTÉES ---
+    // --- 4. FONCTIONNALITÉS MÉTIER ---
     match /access_tokens/{id} {
       allow get: if isSignedIn();
       allow list, write: if isAdmin();

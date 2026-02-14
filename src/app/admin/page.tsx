@@ -72,6 +72,8 @@ export default function AdminPage() {
     if (!user) return false;
     const masterAdminUids = [
       't8nPnZLcTiaLJSKMuLzib3C5nPn1',
+      'koKj5ObSGXYeO1PLKU5bgo8Yaky1',
+      'D1q2GPM95rZi38cvCzvsjcWQDaV2',
       'K9cVYLVUk1NV99YV3anebkugpPp1',
       'ipupi3Pg4RfrSEpFyT69BtlCdpi2',
       'Irglq69MasYdNwBmUu8yKvw6h4G2'
@@ -806,7 +808,7 @@ function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | n
         const docRef = doc(firestore, 'shared_access_tokens', 'GLOBAL');
         const data = { expiresAt: expiry, updatedAt: serverTimestamp() };
         
-        setDoc(docRef, data)
+        setDoc(docRef, data, { merge: true })
             .then(() => {
                 toast({ title: "Accès Global activé !" });
             })
@@ -829,7 +831,7 @@ function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | n
         const docRef = doc(firestore, 'shared_access_tokens', 'GLOBAL');
         const data = { expiresAt: Timestamp.fromDate(new Date(0)), updatedAt: serverTimestamp() };
         
-        setDoc(docRef, data)
+        setDoc(docRef, data, { merge: true })
             .then(() => {
                 toast({ title: "Accès Global coupé" });
             })
