@@ -65,14 +65,15 @@ export default function ProDashboard() {
 
   // Initialize target category from business categories
   useEffect(() => {
-    if (business && business.categories && business.categories.length > 0) {
-      if (!targetCategory) setTargetCategory(business.categories[0]);
-      if (!promoCategory) setPromoCategory(business.categories[0]);
+    if (business && (business.categories || [business.category]).length > 0) {
+      const defaultCat = (business.categories || [business.category])[0];
+      if (!targetCategory) setTargetCategory(defaultCat);
+      if (!promoCategory) setPromoCategory(defaultCat);
     }
   }, [business, targetCategory, promoCategory]);
 
   useEffect(() => {
-    if (!firestore || !business || !targetCategory || isUserLoading || !user || isProfileLoading) return;
+    if (!firestore || !business || !targetCategory || isUserLoading || !user) return;
     
     const calculateReach = async () => {
       setIsCalculatingReach(true);
@@ -95,7 +96,7 @@ export default function ProDashboard() {
       }
     };
     calculateReach();
-  }, [firestore, business, targetCategory, isUserLoading, user, isProfileLoading]);
+  }, [firestore, business, targetCategory, isUserLoading, user]);
 
   const handleCopyUid = () => {
     if (!user?.uid) return;
@@ -157,8 +158,8 @@ export default function ProDashboard() {
     setPromoTitle('');
     setPromoDescription('');
     setPromoImage('');
-    if (business && business.categories && business.categories.length > 0) {
-        setPromoCategory(business.categories[0]);
+    if (business && (business.categories || [business.category]).length > 0) {
+        setPromoCategory((business.categories || [business.category])[0]);
     }
   };
 
@@ -211,7 +212,7 @@ export default function ProDashboard() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-32 px-1">
-      {/* IDENTITÉ PRO & STATUT */}
+      {/* IDENTITÉ PRO & STATUT EN HAUT */}
       <Card className="border-2 border-primary bg-primary/5 shadow-lg overflow-hidden">
         <CardContent className="p-4 flex flex-col gap-4">
             <div className="flex items-center justify-between">
@@ -222,14 +223,14 @@ export default function ProDashboard() {
                         <p className="font-mono font-black text-sm tracking-tight select-all">{user?.uid}</p>
                     </div>
                 </div>
-                <Button variant="outline" size="sm" className="font-black uppercase text-[10px] h-10 gap-2 border-2" onClick={handleCopyUid}>
+                <Button variant="outline" size="sm" className="font-black uppercase text-[10px] h-10 gap-2 border-2 bg-white" onClick={handleCopyUid}>
                     {hasCopiedUid ? <Check className="size-3 text-green-600" /> : <Copy className="size-3" />}
                     Copier
                 </Button>
             </div>
             <div className="flex flex-wrap gap-2 pt-2 border-t border-primary/10">
                 <Badge className="font-black uppercase text-[10px] bg-primary">Rôle: {profile?.role}</Badge>
-                <Badge variant="outline" className="font-black uppercase text-[10px] border-primary text-primary">Statut: {profile?.subscriptionStatus}</Badge>
+                <Badge variant="outline" className="font-black uppercase text-[10px] border-primary text-primary bg-white">Statut: {profile?.subscriptionStatus}</Badge>
             </div>
         </CardContent>
       </Card>

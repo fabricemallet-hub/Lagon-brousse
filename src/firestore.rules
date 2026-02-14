@@ -31,8 +31,8 @@ service cloud.firestore {
 
     // --- RÈGLES DE COLLECTION UTILISATEURS ---
     match /users/{userId} {
-      // CRITIQUE : Autoriser le comptage (list) au sommet de la collection 
-      // pour débloquer le calcul du Reach (Aggregation Queries) sans erreur 403.
+      // PRIORITÉ ABSOLUE : Autoriser le comptage au niveau racine pour éviter l'erreur 403.
+      // RunAggregationQuery (getCountFromServer) nécessite cette règle simple pour être validée statiquement par Google.
       allow list: if isSignedIn();
       
       // Accès aux données individuelles : seulement soi-même ou Admin
