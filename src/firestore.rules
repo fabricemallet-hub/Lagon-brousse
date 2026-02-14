@@ -3,17 +3,16 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- FONCTIONS DE BASE ---
+    // --- 1. FONCTIONS DE SÉCURITÉ ---
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Fonction Administrateur ultra-robuste
     function isAdmin() {
       return isSignedIn() && (
         request.auth.uid in [
-          "t8nPnZLcTiaLJSKMuLzib3C5nPn1", // Fabrice
-          "koKj5ObSGXYeO1PLKU5bgo8Yaky1", // KOOLAPIK
+          "t8nPnZLcTiaLJSKMuLzib3C5nPn1", 
+          "koKj5ObSGXYeO1PLKU5bgo8Yaky1",
           "D1q2GPM95rZi38cvCzvsjcWQDaV2",
           "K9cVYLVUk1NV99YV3anebkugpPp1", 
           "ipupi3Pg4RfrSEpFyT69BtlCdpi2", 
@@ -30,33 +29,33 @@ service cloud.firestore {
       );
     }
 
-    // --- 1. PRIORITÉ ABSOLUE : SYSTÈME & SHOPPING ---
+    // --- 2. SYSTÈME (PRIORITÉ ABSOLUE) ---
     
-    // Accès direct pour l'offre cadeau globale (GLOBAL)
-    match /shared_access_tokens/GLOBAL {
+    // Offre cadeau globale
+    match /shared_access_tokens/{tokenId} {
       allow read: if true;
-      allow write: if request.auth != null && (request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || isAdmin());
+      allow write: if request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || isAdmin();
     }
 
-    // Jetons d'accès individuels
-    match /access_tokens/{id} {
+    // Jetons individuels
+    match /access_tokens/{tokenId} {
       allow get: if isSignedIn();
-      allow list, write: if request.auth != null && (request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || isAdmin());
+      allow list, write: if request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || isAdmin();
     }
 
-    // Catalogue Shopping (Collection Group)
+    // Paramètres App
+    match /app_settings/{id} {
+      allow read: if true;
+      allow write: if request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || isAdmin();
+    }
+
+    // --- 3. CATALOGUE & SHOPPING ---
     match /{path=**}/promotions/{promoId} {
-      allow read, get, list: if true;
+      allow read: if true;
       allow write: if isSignedIn();
     }
 
-    // Paramètres de l'application (Splash, CGV, RIB)
-    match /app_settings/{id} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    // --- 2. UTILISATEURS & REACH ---
+    // --- 4. UTILISATEURS & REACH ---
     match /users {
       allow list: if isSignedIn();
     }
@@ -68,7 +67,7 @@ service cloud.firestore {
       }
     }
 
-    // --- 3. ACCÈS PUBLICS ---
+    // --- 5. ACCÈS PUBLICS ---
     match /system_notifications/{id} { allow read: if true; }
     match /meteo_caledonie/{id} { 
       allow get, list: if true;
@@ -80,12 +79,8 @@ service cloud.firestore {
     }
     match /sound_library/{id} { allow read: if true; }
 
-    // --- 4. FONCTIONNALITÉS CONNECTÉES ---
-    match /cms_support/faq/items/{id} { allow get, list: if true; }
-    match /cms_support/tickets/items/{id} {
-      allow create: if isSignedIn();
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-    }
+    // --- 6. FONCTIONNALITÉS MÉTIER ---
+    match /cms_support/{allPaths=**} { allow read, write: if isSignedIn(); }
     match /hunting_sessions/{id} { allow read, write: if isSignedIn(); match /{allPaths=**} { allow read, write: if isSignedIn(); } }
     match /vessels/{id} { allow read, write: if isSignedIn(); match /{allPaths=**} { allow read, write: if isSignedIn(); } }
     match /spot_shares/{id} { allow read, write: if isSignedIn(); }

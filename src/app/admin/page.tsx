@@ -809,11 +809,12 @@ function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | n
         const docRef = doc(firestore, 'shared_access_tokens', 'GLOBAL');
         const data = { expiresAt: expiry, updatedAt: serverTimestamp() };
         
+        // Non-blocking conforme au standard Firebase Client
         setDoc(docRef, data, { merge: true })
             .then(() => {
                 toast({ title: "Accès Global activé !" });
             })
-            .catch((error) => {
+            .catch(async (error) => {
                 const permissionError = new FirestorePermissionError({
                     path: docRef.path,
                     operation: 'write',
@@ -836,7 +837,7 @@ function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | n
             .then(() => {
                 toast({ title: "Accès Global coupé" });
             })
-            .catch((error) => {
+            .catch(async (error) => {
                 const permissionError = new FirestorePermissionError({
                     path: docRef.path,
                     operation: 'write',
@@ -898,11 +899,12 @@ function TokenManager({ tokens }: { tokens: AccessToken[] | null }) {
             id, status: 'active', durationMonths: parseInt(duration), createdAt: serverTimestamp()
         };
 
+        // Opération non-bloquante avec gestion d'erreurs contextuelle
         setDoc(docRef, data)
             .then(() => {
                 toast({ title: "Jeton généré !" });
             })
-            .catch((error) => {
+            .catch(async (error) => {
                 const permissionError = new FirestorePermissionError({
                     path: docRef.path,
                     operation: 'write',
