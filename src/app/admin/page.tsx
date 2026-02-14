@@ -57,7 +57,8 @@ import { format, addMonths, addDays, isBefore, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { FirestorePermissionError } from '@/firebase/errors';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 export default function AdminPage() {
   const { user, isUserLoading } = useUser();
@@ -248,7 +249,9 @@ function BusinessesManager({ businesses, users }: { businesses: Business[] | nul
                 setName(''); setCommune(''); setOwnerId(''); setSelectedCategories(['Pêche']); setOwnerSearch('');
                 toast({ title: "Commerce créé et lié à l'utilisateur" });
             })
-            .catch(() => toast({ variant: 'destructive', title: "Erreur" }))
+            .catch((err) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'businesses', operation: 'write', requestResourceData: businessData }));
+            })
             .finally(() => setIsSaving(false));
     };
 
@@ -364,12 +367,16 @@ function SystemNotificationsManager({ notifications }: { notifications: SystemNo
     const handleAdd = () => {
         if (!firestore || !title || !content) return;
         setIsSaving(true);
-        addDoc(collection(firestore, 'system_notifications'), {
-            title, content, type, isActive: true, createdAt: serverTimestamp()
-        }).then(() => {
-            setTitle(''); setContent('');
-            toast({ title: "Notification publiée" });
-        }).finally(() => setIsSaving(false));
+        const data = { title, content, type, isActive: true, createdAt: serverTimestamp() };
+        addDoc(collection(firestore, 'system_notifications'), data)
+            .then(() => {
+                setTitle(''); setContent('');
+                toast({ title: "Notification publiée" });
+            })
+            .catch((err) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'system_notifications', operation: 'create', requestResourceData: data }));
+            })
+            .finally(() => setIsSaving(false));
     };
 
     const toggleStatus = (id: string, current: boolean) => {
@@ -423,12 +430,16 @@ function SoundLibraryManager({ sounds }: { sounds: SoundLibraryEntry[] | null })
     const handleAdd = () => {
         if (!firestore || !label || !url) return;
         setIsSaving(true);
-        addDoc(collection(firestore, 'sound_library'), {
-            label, url, categories: ['General'], createdAt: serverTimestamp()
-        }).then(() => {
-            setLabel(''); setUrl('');
-            toast({ title: "Son ajouté" });
-        }).finally(() => setIsSaving(false));
+        const data = { label, url, categories: ['General'], createdAt: serverTimestamp() };
+        addDoc(collection(firestore, 'sound_library'), data)
+            .then(() => {
+                setLabel(''); setUrl('');
+                toast({ title: "Son ajouté" });
+            })
+            .catch((err) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'sound_library', operation: 'create', requestResourceData: data }));
+            })
+            .finally(() => setIsSaving(false));
     };
 
     return (
@@ -463,7 +474,10 @@ function CampaignsManager({ campaigns }: { campaigns: Campaign[] | null }) {
     const updateStatus = (id: string, status: 'sent' | 'pending') => {
         if (!firestore) return;
         updateDoc(doc(firestore, 'campaigns', id), { status })
-            .then(() => toast({ title: "Campagne mise à jour" }));
+            .then(() => toast({ title: "Campagne mise à jour" }))
+            .catch((err) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `campaigns/${id}`, operation: 'update', requestResourceData: { status } }));
+            });
     };
 
     return (
@@ -517,16 +531,24 @@ function UsersManager({ users, isUsersLoading }: { users: UserAccount[] | null, 
                 setIsEditDialogOpen(false);
                 setEditingUser(null);
             })
+            .catch((err) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `users/${editingUser.id}`, operation: 'write', requestResourceData: editingUser }));
+            })
             .finally(() => setIsSaving(false));
     };
 
     const updateStatus = (uid: string, status: string) => {
         if (!firestore) return;
         const expiryDate = status === 'active' ? addMonths(new Date(), 1).toISOString() : null;
-        setDoc(doc(firestore, 'users', uid), { 
+        const data = { 
             subscriptionStatus: status,
             subscriptionExpiryDate: expiryDate
-        }, { merge: true }).then(() => toast({ title: "Statut mis à jour" }));
+        };
+        setDoc(doc(firestore, 'users', uid), data, { merge: true })
+            .then(() => toast({ title: "Statut mis à jour" }))
+            .catch((err) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `users/${uid}`, operation: 'update', requestResourceData: data }));
+            });
     };
 
     return (
@@ -670,6 +692,9 @@ function SplashManager({ initialSettings }: { initialSettings: SplashScreenSetti
         setIsSaving(true);
         setDoc(doc(firestore, 'app_settings', 'splash'), settings, { merge: true })
             .then(() => toast({ title: "Splash mis à jour" }))
+            .catch((err) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'app_settings/splash', operation: 'write', requestResourceData: settings }));
+            })
             .finally(() => setIsSaving(false));
     };
 
@@ -735,10 +760,16 @@ function CgvRibManager({ cgvData, ribData }: { cgvData: CgvSettings | null, ribD
             const newVersion = (cgvData?.version || 0) + 1;
             setDoc(doc(firestore, 'app_settings', 'cgv'), { content: cgvContent, version: newVersion, updatedAt: serverTimestamp() })
                 .then(() => toast({ title: "CGV mises à jour" }))
+                .catch((err) => {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'app_settings/cgv', operation: 'write', requestResourceData: { content: cgvContent, version: newVersion } }));
+                })
                 .finally(() => setIsSaving(false));
         } else {
             setDoc(doc(firestore, 'app_settings', 'rib'), { details: ribContent, updatedAt: serverTimestamp() })
                 .then(() => toast({ title: "RIB mis à jour" }))
+                .catch((err) => {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'app_settings/rib', operation: 'write', requestResourceData: { details: ribContent } }));
+                })
                 .finally(() => setIsSaving(false));
         }
     };
@@ -781,8 +812,12 @@ function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | n
                 toast({ title: "Accès Global activé !" });
             })
             .catch((error) => {
-                console.error("Global Access Error:", error);
-                toast({ variant: "destructive", title: "Erreur Permission", description: "Vérifiez vos droits Master dans les règles." });
+                const permissionError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'write',
+                    requestResourceData: data,
+                });
+                errorEmitter.emit('permission-error', permissionError);
             })
             .finally(() => {
                 setIsSaving(false);
@@ -800,8 +835,12 @@ function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | n
                 toast({ title: "Accès Global coupé" });
             })
             .catch((error) => {
-                console.error("Global Stop Error:", error);
-                toast({ variant: "destructive", title: "Erreur" });
+                const permissionError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'write',
+                    requestResourceData: data,
+                });
+                errorEmitter.emit('permission-error', permissionError);
             })
             .finally(() => {
                 setIsSaving(false);
@@ -860,8 +899,12 @@ function TokenManager({ tokens }: { tokens: AccessToken[] | null }) {
                 toast({ title: "Jeton généré !" });
             })
             .catch((error) => {
-                console.error("Token Generation Error:", error);
-                toast({ variant: "destructive", title: "Erreur", description: "Vérifiez vos permissions Master." });
+                const permissionError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'write',
+                    requestResourceData: data,
+                });
+                errorEmitter.emit('permission-error', permissionError);
             })
             .finally(() => {
                 setIsGenerating(false);
@@ -934,6 +977,9 @@ function FishManager({ species }: { species: FishSpeciesInfo[] | null }) {
         };
         setDoc(doc(firestore, 'fish_species', id), { ...data, id }, { merge: true })
             .then(() => { setName(''); setScieName(''); setCurrentImageUrl(''); toast({ title: "Espèce ajoutée" }); })
+            .catch((err) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `fish_species/${id}`, operation: 'write', requestResourceData: data }));
+            })
             .finally(() => setIsSaving(false));
     };
 
