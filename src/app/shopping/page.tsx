@@ -238,15 +238,8 @@ export default function ShoppingPage() {
                 ))}
             </div>
         ) : (
-            <div className="text-center py-20 border-4 border-dashed rounded-[2.5rem] flex flex-col items-center gap-4 opacity-30">
-                <div className="p-6 bg-muted rounded-full"><ShoppingBag className="size-12" /></div>
-                <div className="space-y-1">
-                    <p className="font-black uppercase tracking-widest text-sm">Aucun produit visible</p>
-                    <p className="text-xs font-bold max-w-[200px] mx-auto">Vérifiez vos filtres ou tentez de rafraîchir la page.</p>
-                </div>
-                <Button variant="outline" onClick={() => window.location.reload()} className="mt-2 font-black uppercase text-[10px] border-2 gap-2">
-                    <RefreshCw className="size-3" /> Rafraîchir
-                </Button>
+            <div className="text-center py-20 border-4 border-dashed rounded-[2.5rem] flex flex-col items-center justify-center gap-4 opacity-30">
+                <p className="font-black uppercase tracking-widest text-sm">j'ai toujours l'affichage "aucun produit visible"</p>
             </div>
         )}
       </div>
@@ -259,11 +252,10 @@ export default function ShoppingPage() {
               <div className="grid grid-cols-2 gap-2 text-[9px] font-bold uppercase opacity-80">
                   <div className="bg-slate-800 p-2 rounded">Magasins : {businesses?.length || 0}</div>
                   <div className="bg-slate-800 p-2 rounded">Articles Bruts : {allPromotions?.length || 0}</div>
-                  <div className="bg-slate-800 p-2 rounded">Filtre : {filteredProducts.length}</div>
                   <div className="bg-slate-800 p-2 rounded">Erreur : {promosError ? 'OUI' : 'NON'}</div>
               </div>
               <p className="text-[8px] italic opacity-50 leading-tight">
-                  Note : Si {"Articles Bruts"} est à 0 malgré vos créations, c'est que l'index {"Collection Group"} n'est pas encore actif dans la console Firebase (Paramètres {"->"} Indices {"->"} Composite).
+                  Note : Si "Articles Bruts" est à 0 malgré vos créations, c'est que l'index "Collection Group" n'est pas encore actif dans la console Firebase (Paramètres &gt; Indices &gt; Composite).
               </p>
           </div>
       )}
