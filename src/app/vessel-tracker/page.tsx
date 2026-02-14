@@ -566,7 +566,6 @@ export default function VesselTrackerPage() {
                     eventLabel: null 
                   });
                 } else {
-                  // Mettre à jour la position en temps réel sans changer le statut ni le label
                   updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng } });
                 }
             } else { 
@@ -706,6 +705,13 @@ export default function VesselTrackerPage() {
           ) : (
             <div className="space-y-4">
               <div className="space-y-1"><Label className="text-[9px] font-black uppercase ml-1 opacity-60">Suivre le navire ID</Label><div className="flex gap-2"><Input placeholder="ENTREZ L'ID..." value={vesselIdToFollow} onChange={e => setVesselIdToFollow(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest" /><Button variant="default" className="h-12 px-4 font-black uppercase text-[10px] shrink-0" onClick={handleSaveVessel} disabled={!vesselIdToFollow.trim()}><Check className="size-4" /></Button></div></div>
+              
+              {isReceiverGpsActive && (
+                <Button variant="destructive" className="w-full h-14 font-black uppercase text-xs shadow-lg rounded-xl gap-3 animate-in fade-in zoom-in-95" onClick={() => setIsReceiverGpsActive(false)}>
+                    <X className="size-5" /> ARRÊTER MON GPS (RÉCEPTEUR)
+                </Button>
+              )}
+
               {savedVesselIds.length > 0 && (
                 <div className="space-y-3">
                     <Label className="text-[9px] font-black uppercase ml-1 opacity-40">Flotte suivie</Label>

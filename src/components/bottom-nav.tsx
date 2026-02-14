@@ -27,7 +27,11 @@ export function BottomNav() {
   
   // On récupère les liens correspondants en respectant l'ordre défini
   const visibleLinks = mobileTabs.map(href => {
-    return navLinks.find(l => l.href === href);
+    const link = navLinks.find(l => l.href === href);
+    if (!link) return null;
+    // Raccourcir le libellé pour le mobile
+    if (link.href === '/vessel-tracker') return { ...link, label: 'Tracker' };
+    return link;
   }).filter(Boolean);
 
   return (
