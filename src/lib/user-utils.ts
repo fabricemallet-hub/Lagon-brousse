@@ -28,7 +28,11 @@ export async function ensureUserDocument(
   ];
   const masterUids = [
     't8nPnZLcTiaLJSKMuLzib3C5nPn1', 
-    'koKj5ObSGXYeO1PLKU5bgo8Yaky1'
+    'koKj5ObSGXYeO1PLKU5bgo8Yaky1',
+    'D1q2GPM95rZi38cvCzvsjcWQDaV2',
+    'K9cVYLVUk1NV99YV3anebkugpPp1',
+    'ipupi3Pg4RfrSEpFyT69BtlCdpi2',
+    'Irglq69MasYdNwBmUu8yKvw6h4G2'
   ];
   
   const isMasterAdmin = (email && masterEmails.includes(email)) || 

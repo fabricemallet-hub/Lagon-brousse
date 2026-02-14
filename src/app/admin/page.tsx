@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, setDoc, addDoc, deleteDoc, serverTimestamp, Timestamp, increment, getDocs, where, writeBatch, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, doc, setDoc, addDoc, deleteDoc, serverTimestamp, Timestamp, writeBatch, updateDoc } from 'firebase/firestore';
 import type { UserAccount, Business, Conversation, AccessToken, SharedAccessToken, FishSpeciesInfo, SplashScreenSettings, CgvSettings, RibSettings, SystemNotification, Campaign, SoundLibraryEntry } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,7 +20,6 @@ import {
   MessageSquare, 
   ShieldCheck, 
   Users, 
-  Settings, 
   KeyRound, 
   Fish, 
   Plus, 
@@ -28,36 +27,29 @@ import {
   RefreshCw, 
   Save, 
   Zap, 
-  Gift, 
   Ticket, 
   BrainCircuit, 
   Smartphone,
-  Info,
-  AlertTriangle,
-  CheckCircle2,
   Megaphone,
   Sparkles,
   Search,
-  Eye,
-  CreditCard,
   FileText,
   Camera,
   Pencil,
   X,
   Volume2,
   Play,
-  Calendar,
   Store
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
-import { format, addMonths, addDays, isBefore, parseISO } from 'date-fns';
+import { format, addMonths, addDays, isBefore } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
+import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 
 export default function AdminPage() {
@@ -951,8 +943,6 @@ function FishManager({ species }: { species: FishSpeciesInfo[] | null }) {
     const [scieName, setScieName] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
-    const [editingFish, setEditingFish] = useState<FishSpeciesInfo | null>(null);
-    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [currentImageUrl, setCurrentImageUrl] = useState('');
     const addFileInputRef = useRef<HTMLInputElement>(null);
 

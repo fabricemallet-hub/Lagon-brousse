@@ -3,60 +3,73 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. ACCÈS PRIORITAIRES (SYSTÈME) ---
-    
-    // Bypass Master Admin - Autorise TOUT pour l'UID principal et l'email Master
+    // ======================================================
+    // 1. PRIORITÉ ABSOLUE : MASTER ADMIN BYPASS (GOD MODE)
+    // Cet UID et ces emails ont un accès total à TOUTE la base.
+    // ======================================================
     match /{allPaths=**} {
       allow read, write: if request.auth != null && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || 
-        request.auth.token.get('email', '').lower() == "f.mallet81@outlook.com" ||
-        request.auth.token.get('email', '').lower() == "fabrice.mallet@gmail.com"
+        request.auth.uid == "koKj5ObSGXYeO1PLKU5bgo8Yaky1" ||
+        request.auth.uid == "D1q2GPM95rZi38cvCzvsjcWQDaV2" ||
+        request.auth.uid == "K9cVYLVUk1NV99YV3anebkugpPp1" ||
+        request.auth.uid == "ipupi3Pg4RfrSEpFyT69BtlCdpi2" ||
+        request.auth.uid == "Irglq69MasYdNwBmUu8yKvw6h4G2" ||
+        (request.auth.token.email != null && request.auth.token.email.lower() in [
+          "f.mallet81@outlook.com",
+          "fabrice.mallet@gmail.com",
+          "f.mallet81@gmail.com",
+          "kledostyle@outlook.com"
+        ])
       );
     }
 
-    // Accès public aux jetons partagés (Offres cadeaux)
-    match /shared_access_tokens/{id} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    // Paramètres de l'application (Splash, CGV, etc.)
-    match /app_settings/{id} {
-      allow read: if true;
-      allow write: if isAdmin();
-    }
-
-    // Jetons d'accès individuels
-    match /access_tokens/{id} {
-      allow get: if request.auth != null;
-      allow write: if isAdmin();
-    }
-
-    // --- 2. FONCTIONS DE BASE ---
+    // --- FONCTIONS DE BASE ---
     function isSignedIn() {
       return request.auth != null;
     }
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
-        request.auth.uid == "koKj5ObSGXYeO1PLKU5bgo8Yaky1" ||
+        request.auth.uid in [
+          "t8nPnZLcTiaLJSKMuLzib3C5nPn1",
+          "koKj5ObSGXYeO1PLKU5bgo8Yaky1",
+          "D1q2GPM95rZi38cvCzvsjcWQDaV2",
+          "K9cVYLVUk1NV99YV3anebkugpPp1",
+          "ipupi3Pg4RfrSEpFyT69BtlCdpi2",
+          "Irglq69MasYdNwBmUu8yKvw6h4G2"
+        ] ||
         request.auth.token.get('role', '') == 'admin' ||
-        request.auth.token.get('email', '').lower() in [
+        (request.auth.token.email != null && request.auth.token.email.lower() in [
           "f.mallet81@outlook.com",
           "fabrice.mallet@gmail.com",
           "f.mallet81@gmail.com",
           "kledostyle@outlook.com"
-        ]
+        ])
       );
     }
 
-    // --- 3. MÉTIER & CATALOGUE ---
+    // --- 2. ACCÈS PUBLICS & SYSTÈME ---
+    match /shared_access_tokens/{id} { allow read: if true; }
+    match /app_settings/{id} { allow read: if true; }
+    match /system_notifications/{id} { allow read: if true; }
+    match /sound_library/{id} { allow read: if true; }
+    match /meteo_caledonie/{id} { 
+      allow get, list: if true;
+      match /previsions/{prevId} { allow get, list: if true; }
+    }
+    match /fish_species/{id} {
+      allow get, list: if true;
+      match /commune_stats/{communeId} { allow read, write: if isSignedIn(); }
+    }
+
+    // --- 3. CATALOGUE SHOPPING (Collection Group) ---
     match /{path=**}/promotions/{promoId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
+    // --- 4. UTILISATEURS & REACH ---
     match /users { allow list: if isSignedIn(); }
     match /users/{userId} {
       allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
@@ -65,25 +78,13 @@ service cloud.firestore {
       }
     }
 
-    match /meteo_caledonie/{id} { 
-      allow get, list: if true;
-      match /previsions/{prevId} { allow get, list: if true; }
-    }
-
-    match /fish_species/{id} {
-      allow get, list: if true;
-      match /commune_stats/{communeId} { allow read, write: if isSignedIn(); }
-    }
-
-    // --- 4. FONCTIONNALITÉS CONNECTÉES ---
-    match /sound_library/{id} { allow read: if true; }
-    match /system_notifications/{id} { allow read: if true; }
+    // --- 5. FONCTIONNALITÉS MÉTIER ---
     match /cms_support/{allPaths=**} { allow read, write: if isSignedIn(); }
     match /hunting_sessions/{id} { allow read, write: if isSignedIn(); match /{allPaths=**} { allow read, write: if isSignedIn(); } }
     match /vessels/{id} { allow read, write: if isSignedIn(); match /{allPaths=**} { allow read, write: if isSignedIn(); } }
     match /spot_shares/{id} { allow read, write: if isSignedIn(); }
-    match /businesses/{businessId} { allow get, list: if true; allow write: if isSignedIn(); }
-    match /campaigns/{campaignId} { allow read, write: if isSignedIn(); }
+    match /businesses/{businessId} { allow get, list: if true; allow write: if isAdmin(); }
+    match /campaigns/{campaignId} { allow read, write: if isAdmin(); }
     match /conversations/{id} {
       allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin());
       match /{allPaths=**} { allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin()); }
