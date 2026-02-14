@@ -27,15 +27,15 @@ service cloud.firestore {
       );
     }
 
-    // --- 1. ACCÈS CATALOGUE (SHOPPING) ---
-    // Cette règle est CRITIQUE pour permettre les requêtes collectionGroup('promotions')
-    match /{path=**}/promotions/{promoId} {
-      allow read: if true;
-    }
-
-    // --- 2. BYPASS UNIVERSEL MASTER ---
+    // --- 1. BYPASS UNIVERSEL MASTER (PRIORITAIRE) ---
     match /{allPaths=**} {
       allow read, write: if isMaster();
+    }
+
+    // --- 2. ACCÈS CATALOGUE PUBLIC (POUR COLLECTION GROUP) ---
+    // Indispensable pour l'onglet Shopping NC
+    match /{path=**}/promotions/{promoId} {
+      allow read: if true;
     }
 
     // --- 3. ACCÈS PUBLICS & USAGERS ---
@@ -45,7 +45,6 @@ service cloud.firestore {
 
     match /system_notifications/{id} {
       allow read: if true;
-      allow write: if isMaster();
     }
 
     match /meteo_caledonie/{id} {
@@ -65,29 +64,27 @@ service cloud.firestore {
 
     match /sound_library/{id} {
       allow read: if true;
-      allow write: if isMaster();
     }
 
-    // --- 4. DONNÉES PRIVÉES (PROPRIÉTAIRE OU MASTER) ---
+    // --- 4. DONNÉES PRIVÉES (PROPRIÉTAIRE) ---
     match /users/{userId} {
-      allow read, write: if isSignedIn() && (request.auth.uid == userId || isMaster());
+      allow read, write: if isSignedIn() && (request.auth.uid == userId);
       match /{allPaths=**} {
-        allow read, write: if isSignedIn() && (request.auth.uid == userId || isMaster());
+        allow read, write: if isSignedIn() && (request.auth.uid == userId);
       }
     }
 
     match /conversations/{id} {
-      allow read, write: if isSignedIn() && (request.auth.uid == id || isMaster());
+      allow read, write: if isSignedIn() && (request.auth.uid == id);
       match /{allPaths=**} {
-        allow read, write: if isSignedIn() && (request.auth.uid == id || isMaster());
+        allow read, write: if isSignedIn() && (request.auth.uid == id);
       }
     }
 
     match /spot_shares/{id} {
       allow create: if isSignedIn();
       allow read, delete: if isSignedIn() && (
-        isMaster() || 
-        (request.auth.token.email != null && resource.data.recipientEmail.lower() == request.auth.token.email.lower())
+        request.auth.token.email != null && resource.data.recipientEmail.lower() == request.auth.token.email.lower()
       );
     }
 
@@ -104,16 +101,17 @@ service cloud.firestore {
     match /businesses/{businessId} {
       allow get, list: if true;
       allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isMaster());
+      allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid);
       
       match /promotions/{promoId} { 
         allow read: if true;
-        allow write: if isSignedIn() && (get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerId == request.auth.uid || isMaster());
+        allow write: if isSignedIn() && (get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerId == request.auth.uid);
       }
     }
 
     match /campaigns/{campaignId} {
-      allow read, write: if isMaster();
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (resource.data.ownerId == request.auth.uid);
     }
   }
 }

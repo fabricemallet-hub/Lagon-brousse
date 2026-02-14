@@ -47,10 +47,13 @@ export function useCollection<T = any>(
       return;
     }
 
+    // Extraction robuste du chemin pour le reporting d'erreur
     const path: string =
       memoizedTargetRefOrQuery.type === 'collection'
         ? (memoizedTargetRefOrQuery as CollectionReference).path
-        : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString();
+        : (memoizedTargetRefOrQuery as any)._query?.path?.canonicalString?.() || 
+          (memoizedTargetRefOrQuery as any).path || 
+          'CollectionGroup query';
 
     setIsLoading(true);
     setError(null);
@@ -75,7 +78,7 @@ export function useCollection<T = any>(
 
           setError(contextualError);
           
-          // Silencing error for sensitive paths to avoid disruptive dev overlays during rule propagation
+          // Chemins sensibles mis en sourdine pour éviter les overlays disruptifs en dev
           const silentPaths = [
             'conversations', 
             'users', 
@@ -85,10 +88,11 @@ export function useCollection<T = any>(
             'sound_library',
             'vessels_safety',
             'app_settings',
-            'promotions'
+            'promotions',
+            'CollectionGroup'
           ];
           
-          const isSilent = silentPaths.some(p => path.includes(p)) || path === "";
+          const isSilent = silentPaths.some(p => path.includes(p)) || path === "" || path === "/";
           
           if (!isSilent) {
             errorEmitter.emit('permission-error', contextualError);
