@@ -813,7 +813,7 @@ function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | n
             .then(() => {
                 toast({ title: "Accès Global activé !" });
             })
-            .catch(async (error) => {
+            .catch((error) => {
                 const permissionError = new FirestorePermissionError({
                     path: docRef.path,
                     operation: 'write',
@@ -836,7 +836,7 @@ function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | n
             .then(() => {
                 toast({ title: "Accès Global coupé" });
             })
-            .catch(async (error) => {
+            .catch((error) => {
                 const permissionError = new FirestorePermissionError({
                     path: docRef.path,
                     operation: 'write',
@@ -902,10 +902,10 @@ function TokenManager({ tokens }: { tokens: AccessToken[] | null }) {
             .then(() => {
                 toast({ title: "Jeton généré !" });
             })
-            .catch(async (error) => {
+            .catch((error) => {
                 const permissionError = new FirestorePermissionError({
                     path: docRef.path,
-                    operation: 'create',
+                    operation: 'write',
                     requestResourceData: data,
                 });
                 errorEmitter.emit('permission-error', permissionError);

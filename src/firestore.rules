@@ -8,7 +8,7 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Fonction Administrateur robuste
+    // Fonction Administrateur robuste et rapide
     function isAdmin() {
       return isSignedIn() && (
         request.auth.uid in [
@@ -31,21 +31,12 @@ service cloud.firestore {
       );
     }
 
-    // --- 1. ACCÈS SYSTÈME PRIORITAIRE (FIX 403) ---
+    // --- 1. ACCÈS SYSTÈME PRIORITAIRE (CONFIGURATIONS & TOKENS) ---
     
-    // Règle d'exception directe pour le document GLOBAL (Cadeau)
-    match /shared_access_tokens/GLOBAL {
-      allow read: if true;
-      allow write: if isSignedIn() && (
-        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || 
-        request.auth.uid == "koKj5ObSGXYeO1PLKU5bgo8Yaky1" ||
-        isAdmin()
-      );
-    }
-
+    // Règle d'exception directe pour les tokens partagés (Cadeau Global)
     match /shared_access_tokens/{id} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAdmin() || request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1";
     }
 
     // Jetons d'accès individuels
@@ -54,12 +45,13 @@ service cloud.firestore {
       allow list, write: if isAdmin() || request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1";
     }
 
+    // Paramètres de l'application (Splash, CGV, RIB)
     match /app_settings/{id} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Catalogue Shopping (Collection Group)
+    // Priorité Shopping (Collection Group)
     match /{path=**}/promotions/{promoId} {
       allow read, get, list: if true;
       allow write: if isSignedIn();
