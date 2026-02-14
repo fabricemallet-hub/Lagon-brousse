@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -367,7 +366,7 @@ export default function ProDashboard() {
                             {reachError && (
                                 <div className="p-3 bg-red-50 border-2 border-red-200 rounded-xl space-y-2">
                                     <p className="text-[9px] text-red-600 font-bold uppercase flex items-center gap-2">
-                                        <AlertCircle className="size-3" /> Comment relié le compte pro a un commerce ?
+                                        <AlertCircle className="size-3" /> Comment relier le compte pro à un commerce ?
                                     </p>
                                     <div className="p-2 bg-white/50 rounded-lg text-[8px] font-bold text-red-800 leading-tight uppercase italic">
                                         Firestore refuse l'accès au comptage des utilisateurs (Erreur 403). Veuillez utiliser le bouton ci-dessous pour rafraîchir vos droits.

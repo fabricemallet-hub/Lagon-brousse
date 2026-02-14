@@ -31,14 +31,11 @@ service cloud.firestore {
 
     // --- RÈGLES DE COLLECTION UTILISATEURS ---
     
-    // Règle isolée pour autoriser le comptage (list) au niveau de la racine /users
-    // Indispensable pour RunAggregationQuery (getCountFromServer)
-    match /users {
-      allow list: if isSignedIn();
-    }
-
-    // Règles pour les documents individuels
+    // Règle de niveau document qui régit les requêtes sur la collection
     match /users/{userId} {
+      // allow list est indispensable ici pour autoriser getCountFromServer (agrégations)
+      allow list: if isSignedIn();
+      
       allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       
