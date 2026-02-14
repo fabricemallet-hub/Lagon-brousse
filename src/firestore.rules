@@ -4,8 +4,6 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // --- 1. PRIORITÉ ABSOLUE : CATALOGUE SHOPPING (Collection Group) ---
-    // Cette règle autorise tous les statuts à voir les produits mis en ligne.
-    // Indispensable pour éviter l'erreur 403 sur CollectionGroup.
     match /{path=**}/promotions/{promoId} {
       allow read, get, list: if true;
       allow write: if request.auth != null;
@@ -40,7 +38,6 @@ service cloud.firestore {
 
     // --- 2. UTILISATEURS & REACH ---
     match /users {
-      // Autorise le comptage global pour le calcul de l'audience Pro (Reach)
       allow list: if isSignedIn();
     }
 
@@ -51,7 +48,7 @@ service cloud.firestore {
       }
     }
 
-    // --- 3. ACCÈS PUBLICS ---
+    // --- 3. ACCÈS PUBLICS & PARAMÈTRES ---
     match /app_settings/{id} { allow read: if true; }
     match /system_notifications/{id} { allow read: if true; }
     match /meteo_caledonie/{id} { 
@@ -63,8 +60,19 @@ service cloud.firestore {
       match /commune_stats/{communeId} { allow read, write: if isSignedIn(); }
     }
     match /sound_library/{id} { allow read: if true; }
+    
+    // Accès aux offres globales (Cadeaux)
+    match /shared_access_tokens/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
 
     // --- 4. FONCTIONNALITÉS CONNECTÉES ---
+    match /access_tokens/{id} {
+      allow get: if isSignedIn();
+      allow list, write: if isAdmin();
+    }
+    
     match /cms_support/faq/items/{id} { allow get, list: if true; }
     match /cms_support/tickets/items/{id} {
       allow create: if isSignedIn();
