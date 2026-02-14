@@ -8,7 +8,7 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Fonction Administrateur robuste et rapide
+    // Fonction Administrateur ultra-robuste
     function isAdmin() {
       return isSignedIn() && (
         request.auth.uid in [
@@ -26,23 +26,28 @@ service cloud.firestore {
            "f.mallet81@gmail.com",
            "kledostyle@outlook.com"
          ]
-        ) ||
-        request.auth.token.get('role', '') == 'admin'
+        )
       );
     }
 
-    // --- 1. ACCÈS SYSTÈME PRIORITAIRE (CONFIGURATIONS & TOKENS) ---
+    // --- 1. PRIORITÉ ABSOLUE : SYSTÈME & SHOPPING ---
     
-    // Règle d'exception directe pour les tokens partagés (Cadeau Global)
-    match /shared_access_tokens/{id} {
+    // Accès direct pour l'offre cadeau globale (GLOBAL)
+    match /shared_access_tokens/GLOBAL {
       allow read: if true;
-      allow write: if isAdmin() || request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1";
+      allow write: if request.auth != null && (request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || isAdmin());
     }
 
     // Jetons d'accès individuels
     match /access_tokens/{id} {
       allow get: if isSignedIn();
-      allow list, write: if isAdmin() || request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1";
+      allow list, write: if request.auth != null && (request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || isAdmin());
+    }
+
+    // Catalogue Shopping (Collection Group)
+    match /{path=**}/promotions/{promoId} {
+      allow read, get, list: if true;
+      allow write: if isSignedIn();
     }
 
     // Paramètres de l'application (Splash, CGV, RIB)
@@ -51,15 +56,8 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Priorité Shopping (Collection Group)
-    match /{path=**}/promotions/{promoId} {
-      allow read, get, list: if true;
-      allow write: if isSignedIn();
-    }
-
     // --- 2. UTILISATEURS & REACH ---
     match /users {
-      // Autorise le comptage global pour le calcul de l'audience Pro
       allow list: if isSignedIn();
     }
 
