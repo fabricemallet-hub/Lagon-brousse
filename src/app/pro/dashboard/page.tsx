@@ -511,6 +511,10 @@ export default function ProDashboard() {
                         <p>
                             <strong>Diffusion flash :</strong> Cette option envoie une notification immédiate aux utilisateurs ayant sélectionné <strong>{business.commune}</strong> comme localité et <strong>{targetCategory}</strong> comme catégorie favorite.
                         </p>
+                        <div className="pt-2 border-t border-dashed border-primary/10 mt-2">
+                            <p className="text-[8px] font-black uppercase opacity-40 not-italic">Votre identifiant unique :</p>
+                            <p className="font-mono font-black text-primary text-[10px] select-all not-italic">{user?.uid}</p>
+                        </div>
                     </div>
                 </div>
             </div>
