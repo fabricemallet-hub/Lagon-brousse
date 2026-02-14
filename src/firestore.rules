@@ -11,7 +11,7 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         request.auth.uid in [
-          "koKj5ObSGXYeO1PLKU5bgo8Yaky1", // Identifiant correct (O majuscule)
+          "koKj5ObSGXYeO1PLKU5bgo8Yaky1", // Identifiant KOOLAPIK (O majuscule)
           "D1q2GPM95rZi38cvCzvsjcWQDaV2",
           "t8nPnZLcTiaLJSKMuLzib3C5nPn1", 
           "K9cVYLVUk1NV99YV3anebkugpPp1", 
@@ -29,16 +29,21 @@ service cloud.firestore {
       );
     }
 
-    // --- RÈGLES UTILISATEURS & COMPTAGE (REACH) ---
-    
-    // Règle isolée pour autoriser le comptage au niveau de la racine /users
+    // --- 1. PROMOTIONS & SHOPPING (Accès Prioritaire pour CollectionGroup) ---
+    // Cette règle doit être globale pour permettre le query(collectionGroup(db, 'promotions'))
+    match /{path=**}/promotions/{promoId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // --- 2. UTILISATEURS & COMPTAGE (REACH) ---
+    // 'list' est indispensable sur la racine pour getCountFromServer
     match /users {
       allow list: if isSignedIn();
     }
 
     match /users/{userId} {
-      allow list: if isSignedIn();
-      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow get, list: if isSignedIn();
       allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       
       match /{allPaths=**} {
@@ -46,15 +51,7 @@ service cloud.firestore {
       }
     }
 
-    // --- PROMOTIONS & SHOPPING (Accès Global) ---
-    
-    // Règle explicite pour le catalogue global (collectionGroup)
-    match /{path=**}/promotions/{promoId} {
-      allow read: if true;
-      allow write: if isSignedIn();
-    }
-
-    // --- AUTRES COLLECTIONS ---
+    // --- 3. AUTRES COLLECTIONS ---
 
     match /app_settings/{id} { allow read: if true; }
     match /system_notifications/{id} { allow read: if true; }
