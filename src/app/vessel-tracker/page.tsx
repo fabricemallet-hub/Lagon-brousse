@@ -778,20 +778,45 @@ export default function VesselTrackerPage() {
                             <AccordionTrigger className="flex-1 text-[10px] font-black uppercase hover:no-underline py-0"><div className="flex items-center gap-2"><History className="size-3"/> Journal de bord</div></AccordionTrigger>
                             <Button variant="ghost" size="sm" className="h-7 px-2 text-[8px] font-black text-destructive border border-destructive/20" onClick={(e) => { e.stopPropagation(); handleClearHistory(); }}><Trash2 className="size-3 mr-1" /> Reset</Button>
                         </div>
-                        <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide">
+                        <AccordionContent className="space-y-3 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide">
                             {history.length > 0 ? (
-                                <div className="space-y-2 px-3">
+                                <div className="space-y-3 px-3">
                                     {history.map((h, i) => (
-                                        <div key={i} className={cn("flex items-center justify-between p-3 rounded-xl border-2 text-[10px] shadow-sm animate-in fade-in slide-in-from-left-2", h.statusLabel.includes('ASSISTANCE') ? "bg-red-50 border-red-200" : "bg-white border-slate-100")}>
-                                            <div className="flex flex-col gap-0.5">
-                                              <div className="flex items-center gap-2">
-                                                <span className="font-black text-primary">{h.vesselName}</span>
-                                                <span className={cn("font-black uppercase", h.statusLabel.includes('ASSISTANCE') ? 'text-red-600 animate-pulse' : h.statusLabel.includes('CHASSE') ? 'text-blue-600' : h.statusLabel.includes('POSITION') ? 'text-green-600' : 'text-slate-600')}>{h.statusLabel}</span>
-                                                {h.batteryLevel !== undefined && <span className="flex items-center gap-1 bg-slate-100 px-1.5 py-0.5 rounded text-[8px] font-black text-slate-500 border border-slate-200"><BatteryIconComp level={h.batteryLevel} charging={h.isCharging} className="size-2.5" />{h.batteryLevel}%</span>}
-                                              </div>
-                                              <span className="text-[9px] font-bold opacity-40">{format(h.time, 'dd/MM HH:mm:ss')}</span>
+                                        <div key={i} className={cn(
+                                            "flex flex-col p-3 rounded-xl border-2 text-[10px] shadow-sm animate-in fade-in slide-in-from-left-2 gap-2 transition-colors", 
+                                            h.statusLabel.includes('ASSISTANCE') ? "bg-red-50 border-red-200" : "bg-white border-slate-100"
+                                        )}>
+                                            <div className="flex items-center justify-between border-b border-dashed pb-2">
+                                                <span className="font-black text-primary truncate max-w-[120px] uppercase">{h.vesselName}</span>
+                                                {h.batteryLevel !== undefined && (
+                                                    <span className="flex items-center gap-1 bg-slate-100 px-1.5 py-0.5 rounded text-[8px] font-black text-slate-500 border border-slate-200">
+                                                        <BatteryIconComp level={h.batteryLevel} charging={h.isCharging} className="size-2.5" />
+                                                        {h.batteryLevel}%
+                                                    </span>
+                                                )}
                                             </div>
-                                            <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase border-2 px-3" onClick={() => { map?.panTo(h.pos); map?.setZoom(17); }}><MapPin className="size-3 text-primary" /> GPS</Button>
+                                            
+                                            <div className="flex items-center justify-between gap-4">
+                                                <div className="flex flex-col gap-1 min-w-0 flex-1">
+                                                    <span className={cn(
+                                                        "font-black uppercase text-[11px] leading-tight break-words", 
+                                                        h.statusLabel.includes('ASSISTANCE') ? 'text-red-600' : 
+                                                        h.statusLabel.includes('CHASSE') ? 'text-blue-600' : 
+                                                        h.statusLabel.includes('POSITION') ? 'text-green-600' : 'text-slate-600'
+                                                    )}>
+                                                        {h.statusLabel}
+                                                    </span>
+                                                    <span className="text-[9px] font-bold opacity-40 uppercase">{format(h.time, 'dd/MM HH:mm:ss')}</span>
+                                                </div>
+                                                <Button 
+                                                    variant="outline" 
+                                                    size="sm" 
+                                                    className="h-9 text-[9px] font-black uppercase border-2 px-3 shrink-0 gap-2 bg-background hover:bg-primary/5 active:scale-95" 
+                                                    onClick={() => { map?.panTo(h.pos); map?.setZoom(17); }}
+                                                >
+                                                    <MapPin className="size-3 text-primary" /> GPS
+                                                </Button>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
