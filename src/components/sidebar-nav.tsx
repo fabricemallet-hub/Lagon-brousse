@@ -1,4 +1,3 @@
-
 'use client';
 
 import { usePathname } from 'next/navigation';
@@ -34,6 +33,8 @@ export function SidebarNav() {
     // Identifiants de confiance absolus (Administrateurs)
     const masterAdminUids = [
       't8nPnZLcTiaLJSKMuLzib3C5nPn1',
+      'koKj5ObSGXYeO1PLKU5bgo8Yaky1',
+      'D1q2GPM95rZi38cvCzvsjcWQDaV2',
       'K9cVYLVUk1NV99YV3anebkugpPp1',
       'ipupi3Pg4RfrSEpFyT69BtlCdpi2',
       'Irglq69MasYdNwBmUu8yKvw6h4G2'
@@ -42,7 +43,8 @@ export function SidebarNav() {
     const masterAdminEmails = [
       'f.mallet81@outlook.com',
       'fabrice.mallet@gmail.com', 
-      'f.mallet81@gmail.com'
+      'f.mallet81@gmail.com',
+      'kledostyle@outlook.com'
     ];
 
     // Détection immédiate par UID/Email technique
@@ -67,13 +69,12 @@ export function SidebarNav() {
       <SidebarMenu className="flex-grow">
         {navLinks.map((link) => {
           // 1. Filtrage Admin Only (Strict)
-          // Le lien ne s'affiche que si l'utilisateur est reconnu comme admin
           if (link.adminOnly && !roles.isAdmin) return null;
 
           // 2. Filtrage Pro Only
           if (link.proOnly && !roles.isPro) return null;
           
-          // 3. Masquage du contact pour l'admin (qui utilise le dashboard messages)
+          // 3. Masquage du contact pour l'admin
           if (link.href === '/contact' && roles.isAdmin) return null;
           if (link.href === '/contact' && !user) return null;
           
