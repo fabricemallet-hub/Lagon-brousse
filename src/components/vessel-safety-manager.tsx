@@ -45,15 +45,15 @@ export function VesselSafetyManager() {
     try {
       await addDoc(collection(firestore, 'users', user.uid, 'vessels_safety'), {
         userId: user.uid,
-        vesselName: newVesselName.trim(),
+        vesselName: newVesselName.trim().toUpperCase(),
         equipment: [],
         createdAt: serverTimestamp()
       });
       setNewVesselName('');
       setIsAddingVessel(false);
-      toast({ title: "Navire ajouté" });
+      toast({ title: "NAVIRE AJOUTÉ" });
     } catch (e) {
-      toast({ variant: 'destructive', title: "Erreur" });
+      toast({ variant: 'destructive', title: "ERREUR" });
     } finally {
       setIsSaving(false);
     }
@@ -63,9 +63,9 @@ export function VesselSafetyManager() {
     if (!user || !firestore) return;
     try {
       await deleteDoc(doc(firestore, 'users', user.uid, 'vessels_safety', vesselId));
-      toast({ title: "Navire supprimé" });
+      toast({ title: "NAVIRE SUPPRIMÉ" });
     } catch (e) {
-      toast({ variant: 'destructive', title: "Erreur" });
+      toast({ variant: 'destructive', title: "ERREUR" });
     }
   };
 
@@ -76,7 +76,7 @@ export function VesselSafetyManager() {
       const item: SafetyItem = {
         id: Math.random().toString(36).substring(7),
         type: newItemType,
-        label: newItemLabel.trim(),
+        label: newItemLabel.trim().toUpperCase(),
         expiryDate: newItemExpiry
       };
       
@@ -88,9 +88,9 @@ export function VesselSafetyManager() {
       setNewItemLabel('');
       setNewItemExpiry('');
       setActiveVesselId(null);
-      toast({ title: "Équipement ajouté" });
+      toast({ title: "ÉQUIPEMENT AJOUTÉ" });
     } catch (e) {
-      toast({ variant: 'destructive', title: "Erreur" });
+      toast({ variant: 'destructive', title: "ERREUR" });
     } finally {
       setIsSaving(false);
     }
@@ -103,9 +103,9 @@ export function VesselSafetyManager() {
       await updateDoc(vesselRef, {
         equipment: arrayRemove(item)
       });
-      toast({ title: "Équipement retiré" });
+      toast({ title: "ÉQUIPEMENT RETIRÉ" });
     } catch (e) {
-      toast({ variant: 'destructive', title: "Erreur" });
+      toast({ variant: 'destructive', title: "ERREUR" });
     }
   };
 
@@ -115,97 +115,104 @@ export function VesselSafetyManager() {
     const daysLeft = differenceInDays(expiryDate, today);
     
     if (daysLeft < 0) return { label: 'EXPIRÉ', color: 'text-red-600', bg: 'bg-red-50', icon: AlertTriangle };
-    if (daysLeft < 90) return { label: `Expire dans ${daysLeft} j`, color: 'text-orange-600', bg: 'bg-orange-50', icon: Clock };
-    return { label: 'Conforme', color: 'text-green-600', bg: 'bg-green-50', icon: Check };
+    if (daysLeft < 90) return { label: `EXPIRE DANS ${daysLeft} J`, color: 'text-orange-600', bg: 'bg-orange-50', icon: Clock };
+    return { label: 'CONFORME', color: 'text-green-600', bg: 'bg-green-50', icon: Check };
   };
 
   if (!user) return null;
 
   return (
-    <Card className="border-amber-200 bg-amber-50/30">
-      <CardHeader className="p-4 pb-2">
-        <CardTitle className="text-sm font-black uppercase flex items-center gap-2 text-amber-900">
-          <ShieldCheck className="size-4" /> Mes Équipements de Sécurité
-        </CardTitle>
-        <CardDescription className="text-[10px] font-bold uppercase opacity-60">
-          Suivez les dates de péremption de votre matériel.
-        </CardDescription>
+    <Card className="border-amber-200 bg-amber-50/30 overflow-hidden shadow-none">
+      <CardHeader className="p-6 pb-4">
+        <div className="flex gap-3">
+          <div className="p-2.5 bg-amber-100 rounded-xl h-fit border border-amber-200">
+            <ShieldCheck className="size-6 text-amber-900" />
+          </div>
+          <div className="space-y-1">
+            <CardTitle className="text-xl font-black uppercase leading-tight tracking-tighter text-amber-900">
+              Mes Équipements de Sécurité
+            </CardTitle>
+            <CardDescription className="text-xs font-bold uppercase opacity-60 leading-relaxed text-amber-800/70">
+              Suivez les dates de péremption de votre matériel.
+            </CardDescription>
+          </div>
+        </div>
       </CardHeader>
-      <CardContent className="p-4 space-y-4">
+      <CardContent className="p-6 pt-0 space-y-6">
         {isLoading ? (
-          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full rounded-2xl" />
         ) : (
-          <div className="grid gap-3">
+          <div className="grid gap-4">
             {vessels?.map((vessel) => (
-              <div key={vessel.id} className="bg-white border-2 rounded-xl overflow-hidden shadow-sm">
-                <div className="p-3 bg-muted/10 border-b flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <Ship className="size-4 text-primary" />
-                    <span className="font-black uppercase text-xs">{vessel.vesselName}</span>
+              <div key={vessel.id} className="bg-white border-2 border-amber-100 rounded-2xl overflow-hidden shadow-sm">
+                <div className="p-4 bg-amber-50/50 border-b border-amber-100 flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <Ship className="size-5 text-primary" />
+                    <span className="font-black uppercase text-sm tracking-tight text-slate-800">{vessel.vesselName}</span>
                   </div>
-                  <Button variant="ghost" size="icon" className="size-7 text-destructive/40" onClick={() => handleRemoveVessel(vessel.id)}>
-                    <Trash2 className="size-3" />
+                  <Button variant="ghost" size="icon" className="size-8 text-destructive/30 hover:text-destructive hover:bg-red-50 rounded-full" onClick={() => handleRemoveVessel(vessel.id)}>
+                    <Trash2 className="size-4" />
                   </Button>
                 </div>
                 
-                <div className="p-3 space-y-2">
+                <div className="p-4 space-y-3">
                   {vessel.equipment && vessel.equipment.length > 0 ? (
                     <div className="grid gap-2">
                       {vessel.equipment.map((item) => {
                         const status = getExpiryStatus(item.expiryDate);
                         const StatusIcon = status.icon;
                         return (
-                          <div key={item.id} className="flex items-center justify-between p-2 rounded-lg border-2 border-dashed">
-                            <div className="flex flex-col">
-                              <span className="text-[10px] font-black uppercase text-slate-800">{item.label}</span>
-                              <div className="flex items-center gap-1.5 mt-0.5">
-                                <span className="text-[9px] font-bold opacity-40 uppercase">Périme le {format(parseISO(item.expiryDate), 'dd/MM/yyyy')}</span>
-                              </div>
+                          <div key={item.id} className="flex items-center justify-between p-3 rounded-xl border-2 border-dashed border-slate-100 bg-slate-50/30">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs font-black uppercase text-slate-800 tracking-tight">{item.label}</span>
+                              <span className="text-[9px] font-bold opacity-40 uppercase">Périme le {format(parseISO(item.expiryDate), 'dd/MM/yyyy')}</span>
                             </div>
-                            <div className={cn("flex items-center gap-1.5 px-2 py-1 rounded-md", status.bg)}>
-                              <StatusIcon className={cn("size-3", status.color)} />
-                              <span className={cn("text-[8px] font-black uppercase", status.color)}>{status.label}</span>
-                              <button onClick={() => handleRemoveItem(vessel, item)} className="ml-1 opacity-20 hover:opacity-100"><X className="size-3" /></button>
+                            <div className={cn("flex items-center gap-2 px-2.5 py-1.5 rounded-lg", status.bg)}>
+                              <StatusIcon className={cn("size-3.5", status.color)} />
+                              <span className={cn("text-[10px] font-black uppercase tracking-tighter", status.color)}>{status.label}</span>
+                              <button onClick={() => handleRemoveItem(vessel, item)} className="ml-1 opacity-20 hover:opacity-100 transition-opacity"><X className="size-3.5" /></button>
                             </div>
                           </div>
                         );
                       })}
                     </div>
                   ) : (
-                    <p className="text-[9px] italic text-muted-foreground text-center py-2 uppercase font-bold opacity-40">Aucun équipement enregistré</p>
+                    <div className="text-center py-6 border-2 border-dashed border-slate-100 rounded-xl bg-slate-50/20">
+                      <p className="text-[10px] italic text-muted-foreground uppercase font-black opacity-30 tracking-widest">Aucun équipement enregistré</p>
+                    </div>
                   )}
 
                   {activeVesselId === vessel.id ? (
-                    <div className="pt-2 border-t mt-3 space-y-3 animate-in slide-in-from-top-2">
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <Label className="text-[8px] font-black uppercase opacity-60">Type</Label>
+                    <div className="pt-4 border-t border-dashed border-slate-200 mt-4 space-y-4 animate-in slide-in-from-top-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Type</Label>
                           <Select value={newItemType} onValueChange={(v: any) => setNewItemType(v)}>
-                            <SelectTrigger className="h-8 text-[9px] font-black uppercase"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="h-12 text-xs font-black uppercase border-2"><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="fusée">Fusée</SelectItem>
-                              <SelectItem value="extincteur">Extincteur</SelectItem>
-                              <SelectItem value="autre">Autre</SelectItem>
+                              <SelectItem value="fusée" className="text-xs font-black uppercase">Fusée parachute</SelectItem>
+                              <SelectItem value="extincteur" className="text-xs font-black uppercase">Extincteur</SelectItem>
+                              <SelectItem value="autre" className="text-xs font-black uppercase">Autre équipement</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="space-y-1">
-                          <Label className="text-[8px] font-black uppercase opacity-60">Label</Label>
-                          <Input value={newItemLabel} onChange={e => setNewItemLabel(e.target.value)} placeholder="Ex: Fusée parachute" className="h-8 text-[9px] font-bold" />
+                        <div className="space-y-1.5">
+                          <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Libellé</Label>
+                          <Input value={newItemLabel} onChange={e => setNewItemLabel(e.target.value)} placeholder="EX: FUSÉE ROUGE" className="h-12 border-2 font-black text-sm uppercase" />
                         </div>
                       </div>
-                      <div className="space-y-1">
-                        <Label className="text-[8px] font-black uppercase opacity-60">Date de péremption</Label>
-                        <Input type="date" value={newItemExpiry} onChange={e => setNewItemExpiry(e.target.value)} className="h-8 text-[9px] font-bold" />
+                      <div className="space-y-1.5">
+                        <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Date de péremption</Label>
+                        <Input type="date" value={newItemExpiry} onChange={e => setNewItemExpiry(e.target.value)} className="h-12 border-2 font-black text-sm" />
                       </div>
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="sm" className="flex-1 h-8 text-[9px] font-black uppercase" onClick={() => setActiveVesselId(null)}>Annuler</Button>
-                        <Button size="sm" className="flex-[2] h-8 text-[9px] font-black uppercase" onClick={() => handleAddItem(vessel)} disabled={isSaving || !newItemLabel || !newItemExpiry}>Enregistrer l'item</Button>
+                      <div className="flex gap-2 pt-2">
+                        <Button variant="outline" className="flex-1 h-12 font-black uppercase text-[10px] border-2" onClick={() => setActiveVesselId(null)}>Annuler</Button>
+                        <Button className="flex-[2] h-12 font-black uppercase text-[10px] shadow-md" onClick={() => handleAddItem(vessel)} disabled={isSaving || !newItemLabel || !newItemExpiry}>Enregistrer l'équipement</Button>
                       </div>
                     </div>
                   ) : (
-                    <Button variant="outline" className="w-full h-8 border-dashed text-[9px] font-black uppercase gap-2" onClick={() => setActiveVesselId(vessel.id)}>
-                      <Plus className="size-3" /> Ajouter un équipement
+                    <Button variant="outline" className="w-full h-12 border-2 border-dashed bg-white text-primary hover:bg-primary/5 font-black uppercase text-[10px] tracking-widest gap-2 rounded-xl mt-2" onClick={() => setActiveVesselId(vessel.id)}>
+                      <Plus className="size-4" /> Ajouter un équipement
                     </Button>
                   )}
                 </div>
@@ -213,24 +220,28 @@ export function VesselSafetyManager() {
             ))}
 
             {isAddingVessel ? (
-              <div className="p-4 bg-white border-2 border-primary/20 rounded-xl space-y-3 animate-in slide-in-from-top-2">
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-black uppercase opacity-60">Nom du navire</Label>
+              <div className="p-6 bg-white border-2 border-primary/30 rounded-[2rem] space-y-6 shadow-xl animate-in zoom-in-95 duration-200">
+                <div className="space-y-2">
+                  <Label className="text-[11px] font-black uppercase text-slate-500 ml-1 tracking-wider">Nom du navire</Label>
                   <Input 
-                    placeholder="Ex: Mon Bateau" 
+                    placeholder="EX: MON BATEAU" 
                     value={newVesselName} 
                     onChange={e => setNewVesselName(e.target.value)} 
-                    className="h-10 border-2 font-bold text-sm uppercase" 
+                    className="h-14 border-2 font-black text-lg uppercase tracking-tight shadow-inner" 
                   />
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="ghost" className="flex-1 h-10 font-black uppercase text-[10px]" onClick={() => setIsAddingVessel(false)}>Annuler</Button>
-                  <Button className="flex-1 h-10 font-black uppercase text-[10px]" onClick={handleAddVessel} disabled={isSaving || !newVesselName}>Créer le profil</Button>
+                <div className="flex gap-3 pt-2">
+                  <Button variant="ghost" className="flex-1 h-14 font-black uppercase text-xs tracking-widest text-slate-600 hover:bg-slate-100" onClick={() => setIsAddingVessel(false)}>
+                    Annuler
+                  </Button>
+                  <Button className="flex-[1.5] h-14 font-black uppercase text-xs tracking-widest shadow-lg bg-primary hover:bg-primary/90" onClick={handleAddVessel} disabled={isSaving || !newVesselName}>
+                    Créer le profil
+                  </Button>
                 </div>
               </div>
             ) : (
-              <Button onClick={() => setIsAddingVessel(true)} className="w-full h-12 border-2 border-dashed bg-background text-primary hover:bg-primary/5 font-black uppercase text-[10px] tracking-widest gap-2">
-                <Plus className="size-4" /> Ajouter un Navire
+              <Button onClick={() => setIsAddingVessel(true)} className="w-full h-16 border-4 border-dashed border-primary/20 bg-background text-primary hover:bg-primary/5 font-black uppercase text-xs tracking-widest gap-3 rounded-[2rem] shadow-sm transition-all active:scale-95">
+                <Ship className="size-6" /> Ajouter un nouveau navire
               </Button>
             )}
           </div>
