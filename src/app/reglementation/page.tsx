@@ -14,8 +14,32 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Ban, Check, Scale, BookOpen, Crosshair, LifeBuoy, ShieldCheck, Info, Zap, Plus } from 'lucide-react';
+import { 
+  Ban, 
+  Check, 
+  Scale, 
+  BookOpen, 
+  Crosshair, 
+  LifeBuoy, 
+  ShieldCheck, 
+  Info, 
+  Zap, 
+  Plus, 
+  ClipboardCheck, 
+  Lightbulb, 
+  ShieldAlert, 
+  FileText,
+  Fish,
+  Leaf,
+  PhoneCall
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { VesselSafetyManager } from '@/components/vessel-safety-manager';
 
@@ -72,329 +96,376 @@ const huntingCalendarData = [
 
 const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
 
-
 export default function ReglementationPage() {
   return (
-    <div className="space-y-6 pb-12">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl font-black uppercase tracking-tighter">Réglementation NC</CardTitle>
-          <CardDescription className="text-xs">
-            Résumé des principales règles de pêche, de chasse et de sécurité maritime.
-            Ce guide ne remplace pas les textes officiels de la Province Sud et de la DAM.
+    <div className="space-y-6 pb-24 px-1">
+      <Card className="border-none shadow-none bg-transparent">
+        <CardHeader className="px-0 pt-2 pb-4">
+          <CardTitle className="text-2xl font-black uppercase tracking-tighter">Réglementation & Conseils</CardTitle>
+          <CardDescription className="text-xs font-bold uppercase opacity-60">
+            Guide officiel et bonnes pratiques du terroir calédonien.
           </CardDescription>
         </CardHeader>
       </Card>
-      
-      {/* SECTION SÉCURITÉ MARITIME */}
-      <Card className="border-primary/20 bg-primary/5">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 font-black uppercase text-base">
-            <LifeBuoy className="text-primary size-5" />
-            Sécurité & Armement des Navires
-          </CardTitle>
-          <CardDescription className="text-[10px] font-bold uppercase opacity-70">
-            Réglementation adaptée localement (Délibération n°119/CP de 2018).
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-xs font-medium leading-relaxed italic text-muted-foreground border-l-4 border-primary pl-3 py-1">
-            En Nouvelle-Calédonie, le contenu de votre "boîte" ou armement de sécurité dépend de votre distance d'un abri.
-          </p>
 
-          <Accordion type="single" collapsible className="w-full space-y-2">
-            <AccordionItem value="basique" className="border-2 rounded-xl bg-card overflow-hidden">
-              <AccordionTrigger className="px-4 py-3 hover:no-underline text-sm font-black uppercase">
-                1. Navigation Basique ({"<"} 2 milles)
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4 pt-2">
-                <div className="space-y-3">
-                  <p className="text-[10px] font-black uppercase text-primary">Minimum pour le lagon proche ou les baies :</p>
-                  <ul className="space-y-2">
-                    <li className="flex gap-2 text-xs font-medium">
-                      <Check className="size-3 text-green-600 shrink-0 mt-0.5" />
-                      <span><strong>EIF :</strong> Un gilet par personne, minimum 50 Newtons.</span>
-                    </li>
-                    <li className="flex gap-2 text-xs font-medium">
-                      <Check className="size-3 text-green-600 shrink-0 mt-0.5" />
-                      <span><strong>Dispositif lumineux :</strong> Lampe torche étanche ou moyen de repérage individuel (flash-light) avec 6h d'autonomie.</span>
-                    </li>
-                    <li className="flex gap-2 text-xs font-medium">
-                      <Check className="size-3 text-green-600 shrink-0 mt-0.5" />
-                      <span><strong>Incendie :</strong> Extincteur(s) selon préconisations du constructeur.</span>
-                    </li>
-                    <li className="flex gap-2 text-xs font-medium">
-                      <Check className="size-3 text-green-600 shrink-0 mt-0.5" />
-                      <span><strong>Remorquage :</strong> Point d'amarrage (taquet) et ligne de mouillage/remorquage adaptée.</span>
-                    </li>
-                    <li className="flex gap-2 text-xs font-medium">
-                      <Check className="size-3 text-green-600 shrink-0 mt-0.5" />
-                      <span><strong>Écopage :</strong> Écope manuelle ou pompe de cale.</span>
-                    </li>
-                    <li className="flex gap-2 text-xs font-medium">
-                      <Check className="size-3 text-green-600 shrink-0 mt-0.5" />
-                      <span><strong>Annuaire des marées :</strong> Format papier ou numérique.</span>
-                    </li>
-                    <li className="flex gap-2 text-xs font-medium">
-                      <Check className="size-3 text-green-600 shrink-0 mt-0.5" />
-                      <span><strong>Pavillon national :</strong> Obligatoire (sauf propulsion humaine).</span>
-                    </li>
-                  </ul>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
+      <Tabs defaultValue="regles" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 h-12 mb-6 border-2">
+          <TabsTrigger value="regles" className="font-black uppercase text-[10px]">Réglementation</TabsTrigger>
+          <TabsTrigger value="conseils" className="font-black uppercase text-[10px]">Conseils Pratiques</TabsTrigger>
+        </TabsList>
 
-            <AccordionItem value="cotiere" className="border-2 rounded-xl bg-card overflow-hidden">
-              <AccordionTrigger className="px-4 py-3 hover:no-underline text-sm font-black uppercase">
-                2. Navigation Côtière ({"<"} 6 milles)
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4 pt-2">
-                <div className="space-y-3">
-                  <p className="text-[10px] font-black uppercase text-primary">Sorties aux îlots (Amédée, Signal, etc.). Matériel "Basique" + :</p>
-                  <ul className="space-y-2">
-                    <li className="flex gap-2 text-xs font-medium">
-                      <Plus className="size-3 text-primary shrink-0 mt-0.5" />
-                      <span><strong>Gilets de sauvetage :</strong> Doivent passer à 100 Newtons minimum.</span>
-                    </li>
-                    <li className="flex gap-2 text-xs font-medium">
-                      <Plus className="size-3 text-primary shrink-0 mt-0.5" />
-                      <span><strong>Repérage :</strong> Lampe torche étanche ou feu à retournement.</span>
-                    </li>
-                    <li className="flex gap-2 text-xs font-medium">
-                      <Plus className="size-3 text-primary shrink-0 mt-0.5" />
-                      <span><strong>Signalisation :</strong> 3 feux rouges à main.</span>
-                    </li>
-                    <li className="flex gap-2 text-xs font-medium">
-                      <Plus className="size-3 text-primary shrink-0 mt-0.5" />
-                      <span><strong>Compas :</strong> Magnétique étanche et fixé (ou GPS sous conditions).</span>
-                    </li>
-                    <li className="flex gap-2 text-xs font-medium">
-                      <Plus className="size-3 text-primary shrink-0 mt-0.5" />
-                      <span><strong>Cartes marines :</strong> Papier ou électronique officielle de la zone.</span>
-                    </li>
-                    <li className="flex gap-2 text-xs font-medium">
-                      <Plus className="size-3 text-primary shrink-0 mt-0.5" />
-                      <span><strong>RIPAM :</strong> Règlement pour prévenir les abordages.</span>
-                    </li>
-                    <li className="flex gap-2 text-xs font-medium">
-                      <Plus className="size-3 text-primary shrink-0 mt-0.5" />
-                      <span><strong>Miroir de signalisation.</strong></span>
-                    </li>
-                  </ul>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
+        <TabsContent value="regles" className="space-y-6 animate-in fade-in slide-in-from-left-2 duration-300">
+          {/* SECTION SÉCURITÉ MARITIME */}
+          <Card className="border-primary/20 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 font-black uppercase text-base">
+                <LifeBuoy className="text-primary size-5" />
+                Sécurité & Armement des Navires
+              </CardTitle>
+              <CardDescription className="text-[10px] font-bold uppercase opacity-70">
+                Réglementation adaptée localement (Délibération n°119/CP de 2018).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-xs font-medium leading-relaxed italic text-muted-foreground border-l-4 border-primary pl-3 py-1">
+                En Nouvelle-Calédonie, le contenu de votre "boîte" ou armement de sécurité dépend de votre distance d'un abri.
+              </p>
 
-            <AccordionItem value="semi-hauturiere" className="border-2 rounded-xl bg-card overflow-hidden">
-              <AccordionTrigger className="px-4 py-3 hover:no-underline text-sm font-black uppercase">
-                3. Navigation Semi-Hauturière (6 à 60 milles)
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4 pt-2">
-                <div className="space-y-3">
-                  <p className="text-[10px] font-black uppercase text-primary">Hors lagon ou vers les Loyauté. Matériel "Côtier" + :</p>
-                  <ul className="space-y-2">
-                    <li className="flex gap-2 text-xs font-medium">
-                      <Plus className="size-3 text-primary shrink-0 mt-0.5" />
-                      <span><strong>Gilets :</strong> Minimum 150 Newtons.</span>
-                    </li>
-                    <li className="flex gap-2 text-xs font-medium">
-                      <Plus className="size-3 text-primary shrink-0 mt-0.5" />
-                      <span><strong>Radeau de survie :</strong> Obligatoire.</span>
-                    </li>
-                    <li className="flex gap-2 text-xs font-medium">
-                      <Plus className="size-3 text-primary shrink-0 mt-0.5" />
-                      <span><strong>Signalisation :</strong> 3 fusées à parachute et 2 fumigènes (ou VHF ASN fixe).</span>
-                    </li>
-                    <li className="flex gap-2 text-xs font-medium">
-                      <Plus className="size-3 text-primary shrink-0 mt-0.5" />
-                      <span><strong>VHF fixe :</strong> Obligatoire.</span>
-                    </li>
-                    <li className="flex gap-2 text-xs font-medium">
-                      <Plus className="size-3 text-primary shrink-0 mt-0.5" />
-                      <span><strong>Trousse de secours :</strong> Conforme à la réglementation.</span>
-                    </li>
-                  </ul>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
+              <Accordion type="single" collapsible className="w-full space-y-2">
+                <AccordionItem value="basique" className="border-2 rounded-xl bg-card overflow-hidden">
+                  <AccordionTrigger className="px-4 py-3 hover:no-underline text-sm font-black uppercase">
+                    1. Navigation Basique ({"<"} 2 milles)
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pb-4 pt-2">
+                    <div className="space-y-3">
+                      <p className="text-[10px] font-black uppercase text-primary">Minimum pour le lagon proche ou les baies :</p>
+                      <ul className="space-y-2">
+                        <li className="flex gap-2 text-xs font-medium">
+                          <Check className="size-3 text-green-600 shrink-0 mt-0.5" />
+                          <span><strong>EIF :</strong> Un gilet par personne, minimum 50 Newtons.</span>
+                        </li>
+                        <li className="flex gap-2 text-xs font-medium">
+                          <Check className="size-3 text-green-600 shrink-0 mt-0.5" />
+                          <span><strong>Dispositif lumineux :</strong> Lampe torche étanche ou flash-light (6h).</span>
+                        </li>
+                        <li className="flex gap-2 text-xs font-medium">
+                          <Check className="size-3 text-green-600 shrink-0 mt-0.5" />
+                          <span><strong>Incendie :</strong> Extincteur(s) selon préconisations.</span>
+                        </li>
+                        <li className="flex gap-2 text-xs font-medium">
+                          <Check className="size-3 text-green-600 shrink-0 mt-0.5" />
+                          <span><strong>Remorquage :</strong> Point d'amarrage et ligne de mouillage.</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
 
-            <AccordionItem value="recos" className="border-2 rounded-xl bg-amber-50 border-amber-200 overflow-hidden">
-              <AccordionTrigger className="px-4 py-3 hover:no-underline text-sm font-black uppercase text-amber-900">
-                <div className="flex items-center gap-2"><Zap className="size-4 fill-amber-500 text-amber-500" /> Conseils Experts NC</div>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4 pt-2 space-y-4">
-                <div className="space-y-3">
-                  <div className="bg-white p-3 rounded-lg border border-amber-100 shadow-sm">
-                    <p className="text-[10px] font-black uppercase text-amber-600 mb-1">VHF Portable</p>
-                    <p className="text-xs font-medium leading-relaxed">
-                      Bien que non obligatoire en zone côtière, elle est **fortement recommandée** par la SNSM et la DAM car le réseau téléphone est capricieux sur l'eau.
-                    </p>
+                <AccordionItem value="cotiere" className="border-2 rounded-xl bg-card overflow-hidden">
+                  <AccordionTrigger className="px-4 py-3 hover:no-underline text-sm font-black uppercase">
+                    2. Navigation Côtière ({"<"} 6 milles)
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pb-4 pt-2">
+                    <div className="space-y-3">
+                      <p className="text-[10px] font-black uppercase text-primary">Sorties aux îlots. Matériel "Basique" + :</p>
+                      <ul className="space-y-2">
+                        <li className="flex gap-2 text-xs font-medium">
+                          <Plus className="size-3 text-primary shrink-0 mt-0.5" />
+                          <span><strong>Gilets :</strong> Doivent passer à 100 Newtons minimum.</span>
+                        </li>
+                        <li className="flex gap-2 text-xs font-medium">
+                          <Plus className="size-3 text-primary shrink-0 mt-0.5" />
+                          <span><strong>Signalisation :</strong> 3 feux rouges à main.</span>
+                        </li>
+                        <li className="flex gap-2 text-xs font-medium">
+                          <Plus className="size-3 text-primary shrink-0 mt-0.5" />
+                          <span><strong>Compas :</strong> Magnétique étanche et fixé.</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="recos" className="border-2 rounded-xl bg-amber-50 border-amber-200 overflow-hidden">
+                  <AccordionTrigger className="px-4 py-3 hover:no-underline text-sm font-black uppercase text-amber-900">
+                    <div className="flex items-center gap-2"><Zap className="size-4 fill-amber-500 text-amber-500" /> Vos Équipements</div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pb-4 pt-2 space-y-4">
+                    <VesselSafetyManager />
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 font-black uppercase text-base">
+                <BookOpen className="text-primary size-5" />
+                Calendrier des Pêches
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {fishingCalendarData.map((item) => (
+                <div key={item.name} className="border-b last:border-0 pb-6 last:pb-0">
+                  <h4 className="font-bold text-sm mb-3 uppercase tracking-tight">{item.name}</h4>
+                  <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-1 mb-2">
+                    {months.map((month, index) => (
+                      <div
+                        key={month}
+                        className={cn(
+                          'flex flex-col items-center justify-center rounded-md h-12 text-center p-1',
+                          item.forbidden.includes(index)
+                            ? 'bg-destructive/10 text-destructive'
+                            : 'bg-green-600/10 text-green-800'
+                        )}
+                      >
+                        <span className="text-[9px] font-black uppercase">{month}</span>
+                        {item.forbidden.includes(index) ? (
+                          <Ban className="size-3.5 mt-1" />
+                        ) : (
+                          <Check className="size-3.5 mt-1 text-green-600" />
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  <div className="bg-white p-3 rounded-lg border border-amber-100 shadow-sm">
-                    <p className="text-[10px] font-black uppercase text-amber-600 mb-1">Miroir de signalisation</p>
-                    <p className="text-xs font-medium leading-relaxed">
-                      Très utile sous le soleil calédonien pour attirer l'attention de loin par réverbération.
-                    </p>
-                  </div>
-                  
-                  <VesselSafetyManager />
+                  <p className="text-[11px] font-medium text-muted-foreground italic leading-tight">{item.details}</p>
                 </div>
-                <div className="flex items-start gap-2 p-3 bg-slate-100 rounded-lg">
-                  <Info className="size-4 text-slate-500 shrink-0 mt-0.5" />
-                  <p className="text-[10px] font-bold italic leading-tight text-slate-600">
-                    <strong>Note sur l'Abri :</strong> Un "abri" est un lieu où le navire peut accoster ou mouiller en sécurité et où les personnes à bord peuvent être débarquées en sécurité.
-                  </p>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </CardContent>
-      </Card>
+              ))}
+            </CardContent>
+          </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 font-black uppercase text-base">
-            <BookOpen className="text-primary size-5" />
-            Calendrier des Pêches
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {fishingCalendarData.map((item) => (
-            <div key={item.name} className="border-b last:border-0 pb-6 last:pb-0">
-              <h4 className="font-bold text-sm mb-3 uppercase tracking-tight">{item.name}</h4>
-              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-1 mb-2">
-                {months.map((month, index) => (
-                  <div
-                    key={month}
-                    className={cn(
-                      'flex flex-col items-center justify-center rounded-md h-12 text-center p-1',
-                      item.forbidden.includes(index)
-                        ? 'bg-destructive/10 text-destructive'
-                        : 'bg-green-600/10 text-green-800'
-                    )}
-                  >
-                    <span className="text-[9px] font-black uppercase">{month}</span>
-                    {item.forbidden.includes(index) ? (
-                      <Ban className="size-3.5 mt-1" />
-                    ) : (
-                      <Check className="size-3.5 mt-1 text-green-600" />
-                    )}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 font-black uppercase text-base">
+                <Crosshair className="text-primary size-5" />
+                Calendrier de Chasse
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {huntingCalendarData.map((item) => (
+                <div key={item.name} className="border-b last:border-0 pb-6 last:pb-0">
+                  <h4 className="font-bold text-sm mb-3 uppercase tracking-tight">{item.name}</h4>
+                  <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-1 mb-2">
+                    {months.map((month, index) => (
+                      <div
+                        key={month}
+                        className={cn(
+                          'flex flex-col items-center justify-center rounded-md h-12 text-center p-1',
+                          item.allowed.includes(index)
+                            ? 'bg-green-600/10 text-green-800'
+                            : 'bg-destructive/10 text-destructive'
+                        )}
+                      >
+                        <span className="text-[9px] font-black uppercase">{month}</span>
+                        {item.allowed.includes(index) ? (
+                          <Check className="size-3.5 mt-1 text-green-600" />
+                        ) : (
+                          <Ban className="size-3.5 mt-1" />
+                        )}
+                      </div>
+                    ))}
                   </div>
-                ))}
+                  <p className="text-[11px] font-medium text-muted-foreground italic leading-tight">{item.details}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="conseils" className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
+          {/* PÊCHE */}
+          <Card className="overflow-hidden border-2 shadow-lg">
+            <CardHeader className="bg-cyan-600 text-white p-5">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                  <Fish className="size-6" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl font-black uppercase tracking-tight">Préparer une sortie pêche</CardTitle>
+                  <CardDescription className="text-white/70 font-bold uppercase text-[10px]">Pêche</CardDescription>
+                </div>
               </div>
-              <p className="text-[11px] font-medium text-muted-foreground italic leading-tight">{item.details}</p>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 font-black uppercase text-base">
-            <Crosshair className="text-primary size-5" />
-            Calendrier de Chasse
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {huntingCalendarData.map((item) => (
-            <div key={item.name} className="border-b last:border-0 pb-6 last:pb-0">
-              <h4 className="font-bold text-sm mb-3 uppercase tracking-tight">{item.name}</h4>
-              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-12 gap-1 mb-2">
-                {months.map((month, index) => (
-                  <div
-                    key={month}
-                    className={cn(
-                      'flex flex-col items-center justify-center rounded-md h-12 text-center p-1',
-                      item.allowed.includes(index)
-                        ? 'bg-green-600/10 text-green-800'
-                        : 'bg-destructive/10 text-destructive'
-                    )}
-                  >
-                    <span className="text-[9px] font-black uppercase">{month}</span>
-                    {item.allowed.includes(index) ? (
-                      <Check className="size-3.5 mt-1 text-green-600" />
-                    ) : (
-                      <Ban className="size-3.5 mt-1" />
-                    )}
-                  </div>
-                ))}
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              <div className="space-y-4">
+                <h4 className="flex items-center gap-2 font-black uppercase text-xs text-slate-800">
+                  <ClipboardCheck className="size-4 text-cyan-600" /> Étapes à suivre
+                </h4>
+                <div className="grid gap-4">
+                  {[
+                    "Vérifier les horaires de marée",
+                    "Consulter la météo",
+                    "Préparer le matériel (cannes, appâts, glacière)",
+                    "Vérifier l'équipement de sécurité",
+                    "Informer vos proches de votre itinéraire"
+                  ].map((step, i) => (
+                    <div key={i} className="flex items-center gap-4 group">
+                      <div className="size-7 rounded-full bg-cyan-50 border-2 border-cyan-100 flex items-center justify-center text-[10px] font-black text-cyan-600 group-hover:bg-cyan-600 group-hover:text-white transition-colors shrink-0">
+                        {i + 1}
+                      </div>
+                      <span className="text-sm font-medium text-slate-700">{step}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <p className="text-[11px] font-medium text-muted-foreground italic leading-tight">{item.details}</p>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 font-black uppercase text-base">
-            <Scale className="text-primary size-5" />
-            Autres Réglementations (Pêche)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Accordion type="single" collapsible className="w-full">
-            <AccordionItem value="item-1">
-              <AccordionTrigger className="text-sm font-bold">Tailles & Quantités</AccordionTrigger>
-              <AccordionContent>
-                <ul className="list-disc space-y-2 pl-5 text-xs">
-                  <li>
-                    <strong>Bénitier:</strong> Limité à 2 par sortie, par
-                    bateau/pêcheur.
+              <div className="p-4 bg-amber-50 border-2 border-amber-100 rounded-2xl space-y-2">
+                <p className="text-[10px] font-black uppercase text-amber-600 flex items-center gap-2">
+                  <Lightbulb className="size-3" /> Conseils Pratiques
+                </p>
+                <ul className="space-y-1.5 pl-1">
+                  <li className="text-sm font-bold text-amber-900 flex items-start gap-2">
+                    <span className="mt-1.5 size-1 bg-amber-400 rounded-full shrink-0" />
+                    Partez 1h avant la marée haute
                   </li>
-                  <li>
-                    <strong>Troca:</strong> Diamètre de base entre 9 et 12 cm.
-                  </li>
-                  <li>
-                    <strong>Huître roche ou de palétuvier:</strong> Taille {">"} 6 cm, limité à 10
-                    douzaines par bateau/sortie.
-                  </li>
-                  <li>
-                    <strong>Crabe de palétuvier:</strong> Les règles
-                    d'interdiction ne s'appliquent pas aux crabes de taille
-                    inférieure à 14 cm et aux crabes mous.
+                  <li className="text-sm font-bold text-amber-900 flex items-start gap-2">
+                    <span className="mt-1.5 size-1 bg-amber-400 rounded-full shrink-0" />
+                    Emportez suffisamment d'eau et de protection solaire
                   </li>
                 </ul>
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-2">
-              <AccordionTrigger className="text-sm font-bold">Marquage Obligatoire</AccordionTrigger>
-              <AccordionContent>
-                <p className="text-xs leading-relaxed">
-                  <strong>
-                    Langoustes, popinées, et cigales de mer (grainées ou non):
-                  </strong>{' '}
-                  Le marquage de la queue est obligatoire toute l'année dès la capture.
-                </p>
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-3">
-              <AccordionTrigger className="text-sm font-bold">Espèces Strictement Protégées</AccordionTrigger>
-              <AccordionContent>
-                <p className="text-xs leading-relaxed mb-3">
-                  La pêche, capture, détention, transport, ou commercialisation
-                  sont <strong>formellement interdits</strong> pour :
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                    {[
-                        'Tricot rayé', 'Tortues marines', 'Dugong',
-                        'Cétacés', 'Requins', 'Napoléon', 'Volute', 'Toutoute',
-                        'Casque', 'Nautile', 'Oiseaux marins', 'Coraux vivants'
-                    ].map(species => <Badge key={species} variant="destructive" className="text-[8px] font-black uppercase px-1.5 h-4">{species}</Badge>)}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* CHASSE */}
+          <Card className="overflow-hidden border-2 shadow-lg">
+            <CardHeader className="bg-orange-600 text-white p-5">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                  <Crosshair className="size-6" />
                 </div>
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="item-4">
-              <AccordionTrigger className="text-sm font-bold">Sanctions</AccordionTrigger>
-              <AccordionContent className="text-xs leading-relaxed">
-                Le non-respect de la réglementation expose les contrevenants
-                à des amendes lourdes, à la saisie du matériel, des produits de la
-                pêche et du navire.
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </CardContent>
-      </Card>
+                <div>
+                  <CardTitle className="text-xl font-black uppercase tracking-tight">Organiser une chasse en brousse</CardTitle>
+                  <CardDescription className="text-white/70 font-bold uppercase text-[10px]">Chasse</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              <div className="space-y-4">
+                <h4 className="flex items-center gap-2 font-black uppercase text-xs text-slate-800">
+                  <ClipboardCheck className="size-4 text-orange-600" /> Étapes à suivre
+                </h4>
+                <div className="grid gap-4">
+                  {[
+                    "Vérifier la période d'ouverture",
+                    "Obtenir les permis nécessaires",
+                    "Préparer l'équipement (arme, munitions, vêtements)",
+                    "Repérer la zone de chasse",
+                    "Partir tôt le matin (avant l'aube)"
+                  ].map((step, i) => (
+                    <div key={i} className="flex items-center gap-4 group">
+                      <div className="size-7 rounded-full bg-orange-50 border-2 border-orange-100 flex items-center justify-center text-[10px] font-black text-orange-600 group-hover:bg-orange-600 group-hover:text-white transition-colors shrink-0">
+                        {i + 1}
+                      </div>
+                      <span className="text-sm font-medium text-slate-700">{step}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-4 bg-amber-50 border-2 border-amber-100 rounded-2xl space-y-2">
+                <p className="text-[10px] font-black uppercase text-amber-600 flex items-center gap-2">
+                  <Lightbulb className="size-3" /> Conseils Pratiques
+                </p>
+                <ul className="space-y-1.5 pl-1">
+                  <li className="text-sm font-bold text-amber-900 flex items-start gap-2">
+                    <span className="mt-1.5 size-1 bg-amber-400 rounded-full shrink-0" />
+                    Portez toujours un gilet orange
+                  </li>
+                  <li className="text-sm font-bold text-amber-900 flex items-start gap-2">
+                    <span className="mt-1.5 size-1 bg-amber-400 rounded-full shrink-0" />
+                    Ne chassez jamais seul
+                  </li>
+                  <li className="text-sm font-bold text-amber-900 flex items-start gap-2">
+                    <span className="mt-1.5 size-1 bg-amber-400 rounded-full shrink-0" />
+                    Respectez les zones interdites
+                  </li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* JARDINAGE */}
+          <Card className="overflow-hidden border-2 shadow-lg">
+            <CardHeader className="bg-green-600 text-white p-5">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                  <Leaf className="size-6" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl font-black uppercase tracking-tight">Planifier les travaux de jardinage</CardTitle>
+                  <CardDescription className="text-white/70 font-bold uppercase text-[10px]">Jardinage</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              <div className="space-y-4">
+                <h4 className="flex items-center gap-2 font-black uppercase text-xs text-slate-800">
+                  <ClipboardCheck className="size-4 text-green-600" /> Étapes à suivre
+                </h4>
+                <div className="grid gap-4">
+                  {[
+                    "Consulter la phase lunaire",
+                    "Vérifier la météo de la semaine",
+                    "Préparer les outils et graines",
+                    "Choisir le bon moment (matin ou soir)",
+                    "Arroser après la plantation"
+                  ].map((step, i) => (
+                    <div key={i} className="flex items-center gap-4 group">
+                      <div className="size-7 rounded-full bg-green-50 border-2 border-green-100 flex items-center justify-center text-[10px] font-black text-green-600 group-hover:bg-green-600 group-hover:text-white transition-colors shrink-0">
+                        {i + 1}
+                      </div>
+                      <span className="text-sm font-medium text-slate-700">{step}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-4 bg-amber-50 border-2 border-amber-100 rounded-2xl space-y-2">
+                <p className="text-[10px] font-black uppercase text-amber-600 flex items-center gap-2">
+                  <Lightbulb className="size-3" /> Conseils Pratiques
+                </p>
+                <ul className="space-y-1.5 pl-1">
+                  <li className="text-sm font-bold text-amber-900 flex items-start gap-2">
+                    <span className="mt-1.5 size-1 bg-amber-400 rounded-full shrink-0" />
+                    Jardinez tôt le matin pour éviter la chaleur
+                  </li>
+                  <li className="text-sm font-bold text-amber-900 flex items-start gap-2">
+                    <span className="mt-1.5 size-1 bg-amber-400 rounded-full shrink-0" />
+                    Paillez le sol pour conserver l'humidité
+                  </li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* SÉCURITÉ GENERALE */}
+          <Card className="border-2 border-red-200 bg-red-50/30 overflow-hidden shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 font-black uppercase text-base text-red-800">
+                <ShieldAlert className="size-5" /> Consignes de Sécurité
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 space-y-3">
+              {[
+                "Toujours informer quelqu'un de votre destination et heure de retour prévue",
+                "Emporter un téléphone chargé et les numéros d'urgence",
+                "Vérifier les conditions météo avant de partir",
+                "Respecter les réglementations en vigueur"
+              ].map((rule, idx) => (
+                <div key={idx} className="flex items-start gap-3 bg-white p-3 rounded-xl border border-red-100 shadow-sm">
+                  <ShieldCheck className="size-4 text-red-600 shrink-0 mt-0.5" />
+                  <span className="text-xs font-bold leading-tight text-red-950">{rule}</span>
+                </div>
+              ))}
+              <div className="pt-2 border-t border-red-100 mt-2">
+                <p className="text-[9px] font-black uppercase text-red-600/60 text-center tracking-widest">Sécurité Priorité Absolue</p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
