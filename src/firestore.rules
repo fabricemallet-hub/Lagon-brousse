@@ -31,8 +31,8 @@ service cloud.firestore {
 
     // --- RÈGLES DE COLLECTION UTILISATEURS ---
     
-    // Règle isolée pour autoriser le comptage (list) au niveau de la racine /users
-    // Indispensable pour RunAggregationQuery (getCountFromServer)
+    // Règle isolée pour autoriser le comptage au niveau de la collection entière
+    // Indispensable pour RunAggregationQuery (getCountFromServer) avec des filtres
     match /users {
       allow list: if isSignedIn();
     }
