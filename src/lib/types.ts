@@ -21,6 +21,12 @@ export interface UserAccount {
   subscriptionStartDate?: string;
   cgvAcceptedAt?: string;
   cgvVersionSeen?: number;
+  savedVesselIds?: string[];
+  lastVesselId?: string;
+  isEmergencyEnabled?: boolean;
+  isCustomMessageEnabled?: boolean;
+  emergencyContact?: string;
+  vesselSmsMessage?: string;
 }
 
 export interface Business {
@@ -28,7 +34,7 @@ export interface Business {
   ownerId: string;
   name: string;
   commune: string;
-  categories: string[]; // Changé de category: string à categories: string[]
+  categories: string[];
   logoUrl?: string;
   description?: string;
   createdAt: any;
@@ -38,7 +44,7 @@ export interface Promotion {
   id: string;
   businessId: string;
   title: string;
-  category?: string; // Ajouté pour le classement par produit
+  category?: string;
   description?: string;
   price: number;
   originalPrice?: number | null;
@@ -284,7 +290,7 @@ export interface VesselStatus {
   id: string;
   userId: string;
   displayName: string;
-  location: { latitude: number; longitude: number; };
+  location: { latitude: number; longitude: number; } | null;
   status: 'moving' | 'stationary' | 'offline' | 'returning' | 'landed' | 'emergency';
   lastActive: any;
   isSharing: boolean;
@@ -294,6 +300,7 @@ export interface VesselStatus {
   eventLabel?: string;
   historyClearedAt?: any;
   huntingMarkers?: HuntingMarker[];
+  isPositionHidden?: boolean;
 }
 
 export interface SoundLibraryEntry {
@@ -382,4 +389,23 @@ export interface SystemNotification {
   type: 'info' | 'warning' | 'error' | 'success';
   isActive: boolean;
   createdAt: any;
+}
+
+export interface SessionParticipant {
+  id: string;
+  displayName: string;
+  location?: { latitude: number; longitude: number };
+  battery?: { level: number; charging: boolean };
+  updatedAt: any;
+  mapIcon: string;
+  mapColor: string;
+  baseStatus?: string;
+  isGibierEnVue?: boolean;
+}
+
+export interface HuntingSession {
+  id: string;
+  organizerId: string;
+  createdAt: any;
+  expiresAt: any;
 }
