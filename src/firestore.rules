@@ -15,7 +15,8 @@ service cloud.firestore {
           "t8nPnZLcTiaLJSKMuLzib3C5nPn1", 
           "K9cVYLVUk1NV99YV3anebkugpPp1", 
           "ipupi3Pg4RfrSEpFyT69BtlCdpi2", 
-          "Irglq69MasYdNwBmUu8yKvw6h4G2"
+          "Irglq69MasYdNwBmUu8yKvw6h4G2",
+          "koKj50bSGXYeO1PLKU5bgo8Yaky1" // UID kledostyle ajouté en Master Admin
         ] ||
         (request.auth.token.email != null && 
          request.auth.token.email.lower() in [
@@ -87,11 +88,9 @@ service cloud.firestore {
 
     // --- 4. DONNÉES PRIVÉES & PROFILS ---
     match /users/{userId} {
-      // Autoriser le comptage (list) pour tout utilisateur connecté (nécessaire pour le Reach)
-      // Mais interdire la lecture des données (get) sauf pour soi-même ou l'admin
-      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow list: if isSignedIn(); 
-      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      // Autoriser le comptage (list) pour le calcul du Reach
+      allow list: if isSignedIn();
+      allow get, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       
       match /{allPaths=**} {
         allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
