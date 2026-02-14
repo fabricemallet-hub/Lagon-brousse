@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
 import { collection, collectionGroup, query, orderBy, doc } from 'firebase/firestore';
 import type { Promotion, Business, UserAccount } from '@/lib/types';
@@ -35,10 +36,21 @@ export default function ShoppingPage() {
 
   const promosRef = useMemoFirebase(() => {
     if (!firestore) return null;
+    // La requête collectionGroup nécessite un index composite dans Firebase
     return collectionGroup(firestore, 'promotions');
   }, [firestore]);
   
   const { data: allPromotions, isLoading: isPromosLoading, error: promosError } = useCollection<Promotion>(promosRef);
+
+  // LOGS DE DÉBOGAGE
+  useEffect(() => {
+    if (promosError) {
+        console.error("L&B Shopping: Erreur de chargement du catalogue", promosError);
+    }
+    if (allPromotions) {
+        console.log("L&B Shopping: Catalogue chargé =", allPromotions.length, "articles.");
+    }
+  }, [promosError, allPromotions]);
 
   // --- FILTERS STATE ---
   const [search, setSearch] = useState('');
@@ -103,7 +115,7 @@ export default function ShoppingPage() {
   
   const isMaster = useMemo(() => {
     if (!user) return false;
-    const masters = ["D1q2GPM95rZi38cvCzvsjcWQDaV2", "t8nPnZLcTiaLJSKMuLzib3C5nPn1", "K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2"];
+    const masters = ["D1q2GPM95rZi38cvCzvsjcWQDaV2", "t8nPnZLcTiaLJSKMuLzib3C5nPn1", "K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2", "koKj5ObSGXYeO1PLKU5bgo8Yaky1"];
     const emails = ["fabrice.mallet@gmail.com", "f.mallet81@outlook.com", "f.mallet81@gmail.com"];
     return masters.includes(user.uid) || (user.email && emails.includes(user.email.toLowerCase()));
   }, [user]);
@@ -262,7 +274,7 @@ export default function ShoppingPage() {
                   <div className="bg-slate-800 p-2 rounded">Erreur : {promosError ? 'OUI' : 'NON'}</div>
               </div>
               <p className="text-[8px] italic opacity-50 leading-tight">
-                  Note : Si "Articles Bruts" est à 0 malgré vos créations, c'est que l'index "Collection Group" n'est pas encore actif dans la console Firebase (Paramètres &gt; Indices &gt; Composite).
+                  Note : Si "Articles Bruts" est à 0 malgré vos créations, c'est que l'index "Collection Group" n'est pas encore actif dans la console Firebase.
               </p>
           </div>
       )}

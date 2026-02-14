@@ -77,6 +77,7 @@ export default function ProDashboard() {
     if (!firestore || !business || !targetCategory || isUserLoading || !user) return;
     
     const calculateReach = async () => {
+      console.log("L&B Reach: Début du calcul pour", { commune: business.commune, cat: targetCategory });
       setIsCalculatingReach(true);
       setReachError(false);
       try {
@@ -87,9 +88,10 @@ export default function ProDashboard() {
           where('favoriteCategory', '==', targetCategory)
         );
         const snap = await getCountFromServer(q);
+        console.log("L&B Reach: Résultat obtenu =", snap.data().count);
         setTargetCount(snap.data().count);
-      } catch (e) {
-        console.error("Reach calculation error:", e);
+      } catch (e: any) {
+        console.error("L&B Reach: Échec de la requête d'agrégation", e);
         setReachError(true);
         setTargetCount(0);
       } finally {
