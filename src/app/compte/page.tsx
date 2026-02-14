@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, isBefore, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { 
-  Crown, Star, XCircle, Ticket, Gift, LogOut, Mail, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink, Copy, Check, MapPin, RefreshCw, Store, Zap
+  Crown, Star, XCircle, Ticket, Gift, LogOut, Mail, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink, Copy, Check, MapPin, RefreshCw, Store, Zap, Pencil
 } from 'lucide-react';
 import {
   Select,
@@ -23,7 +23,7 @@ import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/firebase';
-import { signOut } from 'firebase/auth';
+import { signOut, updateProfile } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { PushNotificationManager } from '@/components/push-notification-manager';
 import {
@@ -33,6 +33,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { locations } from '@/lib/locations';
 
@@ -42,10 +43,16 @@ export default function ComptePage() {
   const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
+  
   const [accessToken, setAccessToken] = useState('');
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [hasCopied, setHasCopied] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // Name editing states
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [isSavingName, setIsSavingName] = useState(false);
 
   const userDocRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -53,6 +60,14 @@ export default function ComptePage() {
   }, [user, firestore]);
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
+
+  useEffect(() => {
+    if (userProfile?.displayName) {
+      setNewName(userProfile.displayName);
+    } else if (user?.displayName) {
+      setNewName(user.displayName);
+    }
+  }, [userProfile, user]);
 
   const sharedTokenRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -73,14 +88,30 @@ export default function ComptePage() {
     setIsLoggingOut(true);
     try {
       await signOut(auth);
-      // Nettoyage complet pour forcer le rafraîchissement de l'état
       sessionStorage.clear();
-      localStorage.removeItem('usage_seconds'); // Reset du timer quotidien aussi
+      localStorage.removeItem('usage_seconds');
       router.replace('/login');
     } catch (e) {
       toast({ variant: 'destructive', title: "Erreur", description: "Impossible de se déconnecter." });
     } finally {
       setIsLoggingOut(false);
+    }
+  };
+
+  const handleUpdateName = async () => {
+    if (!user || !firestore || !newName.trim()) return;
+    setIsSavingName(true);
+    try {
+      await updateProfile(user, { displayName: newName.trim() });
+      await updateDoc(doc(firestore, 'users', user.uid), {
+        displayName: newName.trim()
+      });
+      toast({ title: "Nom mis à jour !" });
+      setIsEditingName(false);
+    } catch (e) {
+      toast({ variant: 'destructive', title: "Erreur lors de la mise à jour du nom" });
+    } finally {
+      setIsSavingName(false);
     }
   };
 
@@ -147,17 +178,14 @@ export default function ComptePage() {
     const roleLower = userProfile.role?.toLowerCase() || '';
     const subLower = userProfile.subscriptionStatus?.toLowerCase() || '';
 
-    // PRIORITÉ 1 : ADMIN
     if (roleLower === 'admin' || subLower === 'admin') {
         return { label: 'Administrateur', variant: 'default', icon: Crown, desc: "Accès illimité Master." };
     }
 
-    // PRIORITÉ 2 : PRO
     if (roleLower === 'professional' || subLower === 'professional' || roleLower === 'pro' || subLower === 'pro') {
         return { label: 'Professionnel', variant: 'outline', icon: Store, desc: "Compte Partenaire Professionnel." };
     }
 
-    // PRIORITÉ 3 : ABONNÉS ACTIFS (Statut Utilisateur Payant)
     if (subLower === 'active') {
         const exp = userProfile.subscriptionExpiryDate ? new Date(userProfile.subscriptionExpiryDate) : null;
         if (exp && isBefore(new Date(), exp)) {
@@ -165,7 +193,6 @@ export default function ComptePage() {
         }
     }
 
-    // PRIORITÉ 4 : ESSAI GRATUIT ACTIF
     if (subLower === 'trial') {
         const tExp = userProfile.subscriptionExpiryDate ? new Date(userProfile.subscriptionExpiryDate) : null;
         if (tExp && isBefore(new Date(), tExp)) {
@@ -173,17 +200,14 @@ export default function ComptePage() {
         }
     }
 
-    // PRIORITÉ 5 : ACCÈS GLOBAL (CADEAU) - Seulement si non abonné/pro/essai
     if (isSharedAccessActive) {
         return { label: 'Accès Offert', variant: 'default', icon: Gift, desc: `Accès global jusqu'au ${format(sharedToken!.expiresAt.toDate(), 'dd/MM/yyyy', { locale: fr })}.` };
     }
     
-    // CAS D'EXPIRATION
     if (subLower === 'active' || subLower === 'trial') {
         return { label: 'Expiré', variant: 'destructive', icon: XCircle, desc: "Abonnement ou essai terminé." };
     }
 
-    // PAR DÉFAUT
     return { label: 'Mode Limité', variant: 'destructive', icon: XCircle, desc: "Accès 1 minute / jour." };
   };
 
@@ -196,11 +220,42 @@ export default function ComptePage() {
        <Card className="w-full shadow-none border-2">
         <CardHeader className="p-6 border-b bg-muted/10">
           <div className="flex flex-col items-center text-center gap-4">
-            <div className="size-20 rounded-full bg-primary/10 flex items-center justify-center border-4 border-background shadow-lg">
+            <div className="size-20 rounded-full bg-primary/10 flex items-center justify-center border-4 border-background shadow-lg relative group">
               <User className="size-10 text-primary" />
             </div>
             <div className="space-y-1">
-              <CardTitle className="text-xl font-black uppercase tracking-tighter">{user?.email?.split('@')[0]}</CardTitle>
+              <div className="flex items-center justify-center gap-2">
+                <CardTitle className="text-xl font-black uppercase tracking-tighter">
+                  {userProfile?.displayName || user?.displayName || user?.email?.split('@')[0]}
+                </CardTitle>
+                <Dialog open={isEditingName} onOpenChange={setIsEditingName}>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="size-8 rounded-full hover:bg-primary/10 text-primary">
+                      <Pencil className="size-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-xs rounded-2xl">
+                    <DialogHeader>
+                      <DialogTitle className="font-black uppercase tracking-tighter">Modifier mon nom</DialogTitle>
+                      <DialogDescription className="text-[10px] font-bold uppercase">Saisissez votre nouveau nom d'affichage</DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                      <Input 
+                        value={newName} 
+                        onChange={(e) => setNewName(e.target.value)} 
+                        placeholder="Nouveau nom..." 
+                        className="font-bold h-12 border-2"
+                      />
+                    </div>
+                    <DialogFooter>
+                      <Button onClick={handleUpdateName} disabled={isSavingName || !newName.trim()} className="w-full font-black uppercase tracking-widest h-12">
+                        {isSavingName ? <RefreshCw className="size-4 animate-spin mr-2" /> : null}
+                        Enregistrer
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
               <Badge variant={status.variant as any} className="font-black uppercase tracking-widest text-[10px]">
                 {status.label}
               </Badge>
@@ -217,7 +272,6 @@ export default function ComptePage() {
                 </div>
               </div>
 
-              {/* SECTION MA COMMUNE */}
               <div className="flex items-center gap-4 p-4 bg-primary/5 rounded-xl border border-primary/10">
                 <div className="p-2 bg-background rounded-lg shadow-sm"><MapPin className="size-5 text-primary" /></div>
                 <div className="flex flex-col flex-1">
