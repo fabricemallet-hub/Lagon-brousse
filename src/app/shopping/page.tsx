@@ -36,7 +36,6 @@ export default function ShoppingPage() {
   // Requête groupée pour récupérer toutes les promotions de tous les magasins
   const promosRef = useMemoFirebase(() => {
     if (!firestore) return null;
-    // On utilise collectionGroup pour chercher dans tous les sous-dossiers 'promotions'
     return collectionGroup(firestore, 'promotions');
   }, [firestore]);
   
@@ -63,31 +62,23 @@ export default function ShoppingPage() {
         business: businessMap.get(promo.businessId)
       }))
       .filter(item => {
-        // 1. Recherche textuelle
         const matchesSearch = !search || 
                              item.title.toLowerCase().includes(search.toLowerCase()) || 
                              (item.description?.toLowerCase() || '').includes(search.toLowerCase());
         if (!matchesSearch) return false;
 
-        // 2. Filtre Commune
         if (filterCommune !== 'USER_DEFAULT' && filterCommune !== 'ALL') {
             if (item.business && item.business.commune !== filterCommune) return false;
             if (!item.business) return false; 
         }
 
-        // 3. Filtre Catégorie
         if (filterCategory !== 'ALL' && item.category !== filterCategory) return false;
-
-        // 4. Filtre Magasin
         if (filterBusiness !== 'ALL' && item.businessId !== filterBusiness) return false;
-
-        // 5. Filtre Type
         if (filterType !== 'ALL' && item.promoType !== filterType) return false;
 
         return true;
       })
       .sort((a, b) => {
-        // Tri prioritaire par commune de l'utilisateur
         if (filterCommune === 'USER_DEFAULT') {
             const aInCommune = a.business?.commune === userCommune;
             const bInCommune = b.business?.commune === userCommune;
@@ -111,7 +102,6 @@ export default function ShoppingPage() {
 
   const isLoading = isBusinessesLoading || isPromosLoading;
   
-  // Détection Master robuste
   const isMaster = useMemo(() => {
     if (!user) return false;
     const masters = ["D1q2GPM95rZi38cvCzvsjcWQDaV2", "t8nPnZLcTiaLJSKMuLzib3C5nPn1", "K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2"];
@@ -218,19 +208,19 @@ export default function ShoppingPage() {
       </Card>
 
       <div className="space-y-4">
-        {promosError && !allPromotions && (
+        {promosError && (
             <Alert variant="destructive" className="border-2 animate-in fade-in bg-red-50 text-red-900 border-red-200">
                 <AlertTriangle className="size-4 text-red-600" />
                 <AlertTitle className="text-xs font-black uppercase">ERREUR DE PERMISSIONS</AlertTitle>
                 <AlertDescription className="text-[10px] font-bold leading-tight mt-1">
-                    Firestore bloque l'accès au catalogue global. Rafraîchissez la page ou vérifiez les règles de sécurité Master Admin.
+                    Firestore bloque l'accès au catalogue global. Rafraîchissez la page ou vérifiez les règles Master Admin.
                 </AlertDescription>
             </Alert>
         )}
 
         <div className="flex items-center justify-between px-1">
             <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                <Tag className="size-3" /> {filteredProducts.length} Produit{filteredProducts.length > 1 ? 's' : ''} trouvé{filteredProducts.length > 1 ? 's' : ''}
+                <Tag className="size-3" /> {filteredProducts.length} Article{filteredProducts.length > 1 ? 's' : ''} trouvé{filteredProducts.length > 1 ? 's' : ''}
             </h3>
             {filterCommune === 'USER_DEFAULT' && (
                 <Badge variant="outline" className="text-[8px] h-4 font-black border-primary/30 text-primary uppercase">Priorité {userCommune}</Badge>
@@ -273,7 +263,7 @@ export default function ShoppingPage() {
                   <div className="bg-slate-800 p-2 rounded">Erreur : {promosError ? 'OUI' : 'NON'}</div>
               </div>
               <p className="text-[8px] italic opacity-50 leading-tight">
-                  Note : Si "Articles Bruts" est à 0 malgré vos créations, c'est que l'index "Collection Group" n'est pas encore actif dans la console Firebase (Paramètres {'->'} Indices {'->'} Composite).
+                  Note : Si {"Articles Bruts"} est à 0 malgré vos créations, c'est que l'index {"Collection Group"} n'est pas encore actif dans la console Firebase (Paramètres {"->"} Indices {"->"} Composite).
               </p>
           </div>
       )}

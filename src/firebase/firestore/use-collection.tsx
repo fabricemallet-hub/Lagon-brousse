@@ -38,13 +38,10 @@ export function useCollection<T = any>(
       return;
     }
 
-    // Identification du chemin de manière robuste pour le débug
     const path: string =
       memoizedTargetRefOrQuery.type === 'collection'
         ? (memoizedTargetRefOrQuery as CollectionReference).path
-        : (memoizedTargetRefOrQuery as any)._query?.collectionGroup || 
-          (memoizedTargetRefOrQuery as any).path || 
-          'CollectionGroup';
+        : 'CollectionGroup';
 
     setIsLoading(true);
     setError(null);
@@ -69,7 +66,6 @@ export function useCollection<T = any>(
 
           setError(contextualError);
           
-          // Chemins mis en sourdine pour éviter les plantages globaux lors du chargement initial
           const silentPaths = [
             'conversations', 
             'users', 
@@ -83,7 +79,7 @@ export function useCollection<T = any>(
             'collectiongroup'
           ];
           
-          const isSilent = silentPaths.some(p => path.toLowerCase().includes(p)) || path === "" || path === "/";
+          const isSilent = silentPaths.some(p => path.toLowerCase().includes(p)) || path === "" || path === "/" || path === "CollectionGroup";
           
           if (!isSilent) {
             errorEmitter.emit('permission-error', contextualError);

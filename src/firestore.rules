@@ -28,15 +28,16 @@ service cloud.firestore {
     }
 
     // --- 2. PRIORITÉ ABSOLUE : MASTER BYPASS ---
-    // Cette règle permet aux administrateurs de contourner toutes les restrictions
+    // Cette règle autorise TOUT pour les administrateurs Master identifiés ci-dessus
     match /{allPaths=**} {
       allow read, write: if isMaster();
     }
 
-    // --- 3. ACCÈS CATALOGUE GLOBAL (COLLECTION GROUP) ---
-    // Requis pour l'onglet Shopping : autorise la lecture des promotions dans TOUS les sous-dossiers
+    // --- 3. ACCÈS CATALOGUE GLOBAL (SHOPPING) ---
+    // Cette règle spécifique est cruciale pour le bon fonctionnement du collectionGroup('promotions')
     match /{path=**}/promotions/{promoId} {
       allow read: if true;
+      allow write: if isSignedIn() && (get(/databases/$(database)/documents/businesses/$(resource.data.businessId)).data.ownerId == request.auth.uid);
     }
 
     // --- 4. ACCÈS PUBLICS & USAGERS ---
@@ -67,7 +68,7 @@ service cloud.firestore {
       allow read: if true;
     }
 
-    // --- 5. DONNÉES PRIVÉES (PROPRIÉTAIRE) ---
+    // --- 5. DONNÉES PRIVÉES (RESTRICTIF) ---
     match /users/{userId} {
       allow read, write: if isSignedIn() && (request.auth.uid == userId);
       match /{allPaths=**} {
@@ -103,11 +104,6 @@ service cloud.firestore {
       allow get, list: if true;
       allow create: if isSignedIn();
       allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid);
-      
-      match /promotions/{promoId} { 
-        // L'écriture est réservée au propriétaire du magasin
-        allow write: if isSignedIn() && (get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerId == request.auth.uid);
-      }
     }
 
     match /campaigns/{campaignId} {
