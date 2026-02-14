@@ -23,11 +23,12 @@ export async function ensureUserDocument(
   const masterEmails = [
     'f.mallet81@outlook.com', 
     'fabrice.mallet@gmail.com', 
-    'f.mallet81@gmail.com'
+    'f.mallet81@gmail.com',
+    'kledostyle@outlook.com'
   ];
   const masterUids = [
     't8nPnZLcTiaLJSKMuLzib3C5nPn1', 
-    'koKj50bSGXYeO1PLKU5bgo8Yaky1'
+    'koKj5ObSGXYeO1PLKU5bgo8Yaky1'
   ];
   
   const isMasterAdmin = (email && masterEmails.includes(email)) || 

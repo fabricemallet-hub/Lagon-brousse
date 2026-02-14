@@ -78,7 +78,7 @@ export default function AdminPage() {
       'ipupi3Pg4RfrSEpFyT69BtlCdpi2',
       'Irglq69MasYdNwBmUu8yKvw6h4G2'
     ];
-    const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
+    const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com', 'kledostyle@outlook.com'];
     return masterAdminUids.includes(user.uid) || (user.email && masterEmails.includes(user.email.toLowerCase()));
   }, [user]);
 
@@ -889,16 +889,30 @@ function TokenManager({ tokens }: { tokens: AccessToken[] | null }) {
     const [duration, setDuration] = useState('1');
     const [isGenerating, setIsGenerating] = useState(false);
 
-    const generateToken = async () => {
+    const generateToken = () => {
         if (!firestore) return;
         setIsGenerating(true);
-        try {
-            const id = `LBN-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-            await setDoc(doc(firestore, 'access_tokens', id), {
-                id, status: 'active', durationMonths: parseInt(duration), createdAt: serverTimestamp()
+        const id = `LBN-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+        const docRef = doc(firestore, 'access_tokens', id);
+        const data = {
+            id, status: 'active', durationMonths: parseInt(duration), createdAt: serverTimestamp()
+        };
+
+        setDoc(docRef, data)
+            .then(() => {
+                toast({ title: "Jeton généré !" });
+            })
+            .catch(async (error) => {
+                const permissionError = new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'create',
+                    requestResourceData: data,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+            })
+            .finally(() => {
+                setIsGenerating(false);
             });
-            toast({ title: "Jeton généré !" });
-        } finally { setIsGenerating(false); }
     };
 
     return (

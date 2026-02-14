@@ -8,6 +8,7 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Fonction Administrateur robuste
     function isAdmin() {
       return isSignedIn() && (
         request.auth.uid in [
@@ -32,15 +33,25 @@ service cloud.firestore {
 
     // --- 1. ACCÈS SYSTÈME PRIORITAIRE (FIX 403) ---
     
-    // Règle d'exception directe pour le document GLOBAL
+    // Règle d'exception directe pour le document GLOBAL (Cadeau)
     match /shared_access_tokens/GLOBAL {
       allow read: if true;
-      allow write: if isAdmin() || request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || request.auth.uid == "koKj5ObSGXYeO1PLKU5bgo8Yaky1";
+      allow write: if isSignedIn() && (
+        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || 
+        request.auth.uid == "koKj5ObSGXYeO1PLKU5bgo8Yaky1" ||
+        isAdmin()
+      );
     }
 
     match /shared_access_tokens/{id} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    // Jetons d'accès individuels
+    match /access_tokens/{id} {
+      allow get: if isSignedIn();
+      allow list, write: if isAdmin() || request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1";
     }
 
     match /app_settings/{id} {
@@ -56,6 +67,7 @@ service cloud.firestore {
 
     // --- 2. UTILISATEURS & REACH ---
     match /users {
+      // Autorise le comptage global pour le calcul de l'audience Pro
       allow list: if isSignedIn();
     }
 
@@ -79,10 +91,6 @@ service cloud.firestore {
     match /sound_library/{id} { allow read: if true; }
 
     // --- 4. FONCTIONNALITÉS CONNECTÉES ---
-    match /access_tokens/{id} {
-      allow get: if isSignedIn();
-      allow list, write: if isAdmin();
-    }
     match /cms_support/faq/items/{id} { allow get, list: if true; }
     match /cms_support/tickets/items/{id} {
       allow create: if isSignedIn();
