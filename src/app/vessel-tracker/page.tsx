@@ -523,17 +523,15 @@ export default function VesselTrackerPage() {
         if (mode === 'sender') {
             const currentST = lastSentStatusRef.current;
             
-            // LOGIQUE DE LANCEMENT AVEC DÉLAI DE 30 SECONDES
             if (isFirstFixRef.current) {
                 setAnchorPos(newPos);
-                // On affiche "MAJ DE LA POSITION" au lieu de "EN MOUVEMENT"
                 updateVesselInFirestore({ 
                     location: { latitude: newPos.lat, longitude: newPos.lng }, 
                     status: 'moving', 
                     isSharing: true,
                     eventLabel: 'MAJ DE LA POSITION'
                 });
-                immobilityStartTime.current = Date.now(); // On démarre le timer des 30s immédiatement
+                immobilityStartTime.current = Date.now(); 
                 isFirstFixRef.current = false;
                 return;
             }
@@ -544,7 +542,6 @@ export default function VesselTrackerPage() {
                 const timeDiff = now - (immobilityStartTime.current || 0);
 
                 if (dist > IMMOBILITY_THRESHOLD_METERS) {
-                  // Si on a bougé significativement
                   setVesselStatus('moving'); 
                   setAnchorPos(newPos); 
                   immobilityStartTime.current = null;
@@ -555,7 +552,6 @@ export default function VesselTrackerPage() {
                     eventLabel: null 
                   });
                 } else if (timeDiff > 30000 && currentST !== 'stationary') {
-                  // Si 30s se sont écoulées sans mouvement significatif
                   setVesselStatus('stationary'); 
                   updateVesselInFirestore({ 
                     status: 'stationary', 
@@ -650,19 +646,19 @@ export default function VesselTrackerPage() {
                     </div>
 
                     <div className="bg-muted/20 p-4 rounded-2xl border-2 border-dashed space-y-3">
-                        <Button variant="destructive" className="w-full h-14 font-black uppercase text-[11px] border-2 border-red-400 gap-3 shadow-md animate-pulse" onClick={() => handleManualStatus('emergency')} disabled={vesselStatus === 'emergency'}>
-                            <AlertCircle className="size-6" /> DEMANDE ASSISTANCE (PROBLÈME)
+                        <Button variant="destructive" className="w-full h-16 font-black uppercase text-[10px] px-2 leading-tight border-2 border-red-400 gap-3 shadow-md animate-pulse" onClick={() => handleManualStatus('emergency')} disabled={vesselStatus === 'emergency'}>
+                            <AlertCircle className="size-6 shrink-0" /> DEMANDE ASSISTANCE (PROBLÈME)
                         </Button>
-                        <Button variant="outline" className="w-full h-14 font-black uppercase text-[11px] border-2 bg-blue-50 border-blue-200 gap-3 text-blue-700" onClick={() => handleBirdsSignal()}>
-                            <Bird className="size-6 animate-bounce" /> REGROUPEMENT D'OISEAUX (CHASSE)
+                        <Button variant="outline" className="w-full h-16 font-black uppercase text-[10px] px-2 leading-tight border-2 bg-blue-50 border-blue-200 gap-3 text-blue-700" onClick={() => handleBirdsSignal()}>
+                            <Bird className="size-6 shrink-0 animate-bounce" /> REGROUPEMENT D'OISEAUX (CHASSE)
                         </Button>
                         <div className="grid grid-cols-2 gap-2">
                             <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatus('returning')} disabled={vesselStatus === 'returning'}><Navigation className="size-4 text-blue-600" /> Retour</Button>
                             <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatus('landed')} disabled={vesselStatus === 'landed'}><Home className="size-4 text-green-600" /> À terre</Button>
                         </div>
-                        <Button variant="ghost" className="w-full h-12 font-black uppercase text-[9px] border-2 border-dashed gap-2 text-orange-600" onClick={() => handleManualStatus('moving', 'REPRISE MODE AUTO')}><RefreshCw className="size-4" /> REPRISE MODE AUTO</Button>
+                        <Button variant="ghost" className="w-full h-12 font-black uppercase text-[10px] border-2 border-dashed gap-2 text-orange-600" onClick={() => handleManualStatus('moving', 'REPRISE MODE AUTO')}><RefreshCw className="size-4" /> REPRISE MODE AUTO</Button>
                     </div>
-                    <Button variant="destructive" className="w-full h-16 text-xs font-black uppercase tracking-widest shadow-lg rounded-xl gap-3" onClick={handleStopSharing}><X className="size-5" /> Arrêter le partage</Button>
+                    <Button variant="destructive" className="w-full h-16 text-xs font-black uppercase tracking-widest shadow-lg rounded-xl gap-3" onClick={handleStopSharing}><X className="size-5" /> ARRÊTER LE PARTAGE</Button>
                 </div>
               ) : (
                 <div className="space-y-4">
