@@ -37,13 +37,15 @@ service cloud.firestore {
     }
 
     // --- RÈGLES DE COLLECTION UTILISATEURS ---
-    // CRITIQUE : Autoriser le comptage global pour le calcul d'audience (Reach)
-    match /users {
-      allow list: if isSignedIn();
-    }
-
     match /users/{userId} {
-      allow get, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      // CRITIQUE : Autoriser le comptage (list) pour tout le monde connecté 
+      // pour débloquer le calcul du Reach (Aggregation Queries)
+      allow list: if isSignedIn();
+      
+      // Accès aux données privées : seulement soi-même ou Admin
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      
       match /{allPaths=**} {
         allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       }
