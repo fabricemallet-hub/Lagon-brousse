@@ -33,7 +33,6 @@ export default function ShoppingPage() {
   }, [firestore]);
   const { data: businesses, isLoading: isBusinessesLoading } = useCollection<Business>(businessesRef);
 
-  // Requête groupée pour récupérer toutes les promotions de tous les magasins
   const promosRef = useMemoFirebase(() => {
     if (!firestore) return null;
     return collectionGroup(firestore, 'promotions');
@@ -239,7 +238,14 @@ export default function ShoppingPage() {
             </div>
         ) : (
             <div className="text-center py-20 border-4 border-dashed rounded-[2.5rem] flex flex-col items-center justify-center gap-4 opacity-30">
-                <p className="font-black uppercase tracking-widest text-sm">j'ai toujours l'affichage "aucun produit visible"</p>
+                <ShoppingBag className="size-12 mb-2" />
+                <div className="space-y-1">
+                    <h3 className="font-black uppercase tracking-widest text-sm">Aucun produit visible</h3>
+                    <p className="text-[10px] font-bold uppercase">Vérifiez vos filtres ou tentez de rafraîchir la page.</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="h-10 font-black uppercase text-[10px] mt-2 border-2 gap-2">
+                    <RefreshCw className="size-3" /> Rafraîchir
+                </Button>
             </div>
         )}
       </div>
@@ -252,6 +258,7 @@ export default function ShoppingPage() {
               <div className="grid grid-cols-2 gap-2 text-[9px] font-bold uppercase opacity-80">
                   <div className="bg-slate-800 p-2 rounded">Magasins : {businesses?.length || 0}</div>
                   <div className="bg-slate-800 p-2 rounded">Articles Bruts : {allPromotions?.length || 0}</div>
+                  <div className="bg-slate-800 p-2 rounded">Filtre : {filteredProducts.length}</div>
                   <div className="bg-slate-800 p-2 rounded">Erreur : {promosError ? 'OUI' : 'NON'}</div>
               </div>
               <p className="text-[8px] italic opacity-50 leading-tight">

@@ -3,8 +3,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- 1. BYPASS MASTER ABSOLU (PRIORITÉ 1) ---
-    // Votre compte a un accès total et inconditionnel à TOUS les documents.
+    // --- 1. ACCÈS TOTAL MASTER (PRIORITÉ ABSOLUE) ---
     match /{allPaths=**} {
       allow read, write: if request.auth != null && (
         request.auth.uid in [
@@ -24,14 +23,14 @@ service cloud.firestore {
       );
     }
 
-    // --- 2. ACCÈS CATALOGUE GLOBAL (SHOPPING) ---
-    // Autorise la lecture de toutes les promotions pour le collectionGroup.
+    // --- 2. ACCÈS PUBLIC SHOPPING (Collection Group) ---
+    // Cette règle est CRITIQUE pour l'affichage de l'onglet Shopping
     match /{path=**}/promotions/{promoId} {
       allow read: if true;
       allow write: if request.auth != null;
     }
 
-    // --- 3. ACCÈS PUBLICS ---
+    // --- 3. ACCÈS PUBLICS STANDARDS ---
     match /app_settings/{id} {
       allow read: if true;
     }
