@@ -33,7 +33,8 @@ service cloud.firestore {
     
     // Règle de niveau document qui régit les requêtes sur la collection
     match /users/{userId} {
-      // allow list est indispensable ici pour autoriser getCountFromServer (agrégations)
+      // Permission de liste (indispensable pour le comptage du Reach)
+      // On l'autorise pour tout utilisateur connecté au niveau de la racine /users
       allow list: if isSignedIn();
       
       allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
