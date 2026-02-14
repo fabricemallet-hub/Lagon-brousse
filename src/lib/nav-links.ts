@@ -9,7 +9,7 @@ export const navLinks = [
   { href: '/lagon', label: 'Lagon', icon: Waves, adminOnly: false },
   { href: '/calendrier', label: 'Calendrier', icon: Calendar, adminOnly: false },
   { href: '/peche', label: 'Pêche', icon: Fish, adminOnly: false },
-  { href: '/vessel-tracker', label: 'Boat Tracker', icon: Navigation, adminOnly: false },
+  { href: '/vessel-tracker', label: 'Tracker', icon: Navigation, adminOnly: false },
   { href: '/fish', label: 'Fish', icon: Fish, adminOnly: false },
   { href: '/chasse', label: 'Chasse', icon: Crosshair, adminOnly: false },
   { href: '/champs', label: 'Champs', icon: Leaf, adminOnly: false },
@@ -17,6 +17,6 @@ export const navLinks = [
   { href: '/reglementation', label: 'Réglementation', icon: Scale, adminOnly: false },
   { href: '/aide/faq', label: 'FAQ & Support', icon: HelpCircle, adminOnly: false },
   { href: '/aide', label: 'Mode opératoire', icon: BookOpen, adminOnly: false },
-  { href: '/compte', label: 'Compte', icon: User, adminOnly: false },
+  { href: '/compte', label: 'Profil', icon: User, adminOnly: false },
   { href: '/admin', label: 'Admin', icon: Shield, adminOnly: true },
 ];

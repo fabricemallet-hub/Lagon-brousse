@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -8,7 +9,6 @@ import { cn } from '@/lib/utils';
 import { doc } from 'firebase/firestore';
 import type { UserAccount } from '@/lib/types';
 import { LogIn, User } from 'lucide-react';
-
 
 export function BottomNav() {
   const pathname = usePathname();
@@ -22,52 +22,54 @@ export function BottomNav() {
 
   const { data: userProfile } = useDoc<UserAccount>(userDocRef);
 
-  // Mobile navigation filters
-  const visibleLinks = navLinks.filter(link => {
-    // List of main tabs for mobile - adjusted to include Vessel Tracker and remove Lagon
-    const mobileTabs = ['/', '/peche', '/vessel-tracker', '/chasse', '/champs'];
-    return mobileTabs.includes(link.href);
-  });
-
-  // Find the icon for the account page or fallback to default User icon
-  const accountLink = navLinks.find(l => l.href === '/compte');
-  const AccountIcon = accountLink?.icon || User;
+  // Configuration de la barre de navigation mobile (6 items max pour la lisibilité)
+  const mobileTabs = ['/', '/peche', '/vessel-tracker', '/chasse', '/champs', '/compte'];
+  
+  // On récupère les liens correspondants en respectant l'ordre défini
+  const visibleLinks = mobileTabs.map(href => {
+    return navLinks.find(l => l.href === href);
+  }).filter(Boolean);
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-[40] bg-card border-t border-border shadow-[0_-4px_10px_rgba(0,0,0,0.05)] pb-[env(safe-area-inset-bottom)] h-[calc(4.5rem+env(safe-area-inset-bottom))]">
-      <div className="flex justify-around items-center h-16 px-1">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-[40] bg-card/95 backdrop-blur-lg border-t border-border shadow-[0_-4px_12px_rgba(0,0,0,0.08)] pb-[env(safe-area-inset-bottom)] h-[calc(4.2rem+env(safe-area-inset-bottom))]">
+      <div className="flex justify-between items-center h-16 px-0.5">
         {visibleLinks.map(link => {
+          if (!link) return null;
           const isActive = pathname === link.href;
+          const isCompte = link.href === '/compte';
+          const label = (isCompte && !user) ? 'Login' : link.label;
+          const Icon = link.icon;
           
           return (
             <Link
-              href={link.href}
-              key={link.label}
+              href={isCompte && !user ? '/login' : link.href}
+              key={link.href}
               className={cn(
-                'flex flex-col items-center justify-center text-center w-full h-full text-muted-foreground transition-all active:scale-90',
-                isActive && 'text-primary font-bold'
+                'flex flex-col items-center justify-center text-center flex-1 h-full transition-all active:scale-90 relative',
+                isActive ? 'text-primary' : 'text-muted-foreground/60'
               )}
             >
-              <link.icon className={cn("size-6 mb-1", isActive && "scale-110")} />
-              <span className="text-[9px] uppercase tracking-tighter leading-none">{link.label}</span>
+              {/* Indicateur de sélection supérieur */}
+              {isActive && (
+                <div className="absolute -top-[1px] left-1/2 -translate-x-1/2 w-8 h-[3px] bg-primary rounded-b-full shadow-[0_2px_8px_rgba(var(--primary),0.4)] animate-in fade-in zoom-in duration-300" />
+              )}
+              
+              <div className={cn(
+                "p-1.5 rounded-xl transition-all duration-300",
+                isActive ? "bg-primary/10" : ""
+              )}>
+                <Icon className={cn("size-5", isActive && "stroke-[2.5px]")} />
+              </div>
+              
+              <span className={cn(
+                "text-[8px] font-black uppercase tracking-tighter leading-none mt-1 whitespace-nowrap",
+                isActive ? "opacity-100" : "opacity-70"
+              )}>
+                {label}
+              </span>
             </Link>
           );
         })}
-        
-        <Link
-          href={user ? "/compte" : "/login"}
-          className={cn(
-            'flex flex-col items-center justify-center text-center w-full h-full text-muted-foreground transition-all active:scale-90',
-            (pathname === '/compte' || pathname === '/login') && 'text-primary font-bold'
-          )}
-        >
-          {user ? (
-            <AccountIcon className="size-6 mb-1" />
-          ) : (
-            <LogIn className="size-6 mb-1" />
-          )}
-          <span className="text-[9px] uppercase tracking-tighter leading-none">{user ? 'Profil' : 'Log'}</span>
-        </Link>
       </div>
     </nav>
   );
