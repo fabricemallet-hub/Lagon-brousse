@@ -58,6 +58,8 @@ export default function ProDashboard() {
   const [promoTitle, setPromoTitle] = useState('');
   const [promoCategory, setPromoCategory] = useState('');
   const [promoDescription, setPromoDescription] = useState('');
+  const [promoPrice, setPromoPrice] = useState<string>('');
+  const [originalPrice, setOriginalPrice] = useState<string>('');
   const [promoImage, setPromoImage] = useState('');
   const [promoType, setPromoType] = useState<'Promo' | 'Nouvel Arrivage'>('Promo');
   const [isSaving, setIsSaving] = useState(false);
@@ -129,12 +131,22 @@ export default function ProDashboard() {
     if (!firestore || !business || !promoTitle || !promoCategory) return;
     setIsSaving(true);
     try {
+      const priceNum = parseFloat(promoPrice) || 0;
+      const originalPriceNum = parseFloat(originalPrice) || null;
+      let discount = null;
+      
+      if (originalPriceNum && originalPriceNum > priceNum) {
+        discount = ((originalPriceNum - priceNum) / originalPriceNum) * 100;
+      }
+
       const promoData: any = {
         businessId: business.id,
         title: promoTitle,
         category: promoCategory,
         description: promoDescription,
-        price: 0,
+        price: priceNum,
+        originalPrice: originalPriceNum,
+        discountPercentage: discount,
         promoType,
         imageUrl: promoImage,
         updatedAt: serverTimestamp(),
@@ -159,6 +171,8 @@ export default function ProDashboard() {
     setEditingPromoId(null);
     setPromoTitle('');
     setPromoDescription('');
+    setPromoPrice('');
+    setOriginalPrice('');
     setPromoImage('');
     if (business && (business.categories || [business.category]).length > 0) {
         setPromoCategory((business.categories || [business.category])[0]);
@@ -170,6 +184,8 @@ export default function ProDashboard() {
     setPromoTitle(promo.title);
     setPromoCategory(promo.category || (business?.categories?.[0] || ''));
     setPromoDescription(promo.description || '');
+    setPromoPrice(promo.price?.toString() || '');
+    setOriginalPrice(promo.originalPrice?.toString() || '');
     setPromoImage(promo.imageUrl || '');
     setPromoType(promo.promoType);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -299,6 +315,29 @@ export default function ProDashboard() {
                             ))}
                         </SelectContent>
                       </Select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Prix de vente (F)</Label>
+                            <Input 
+                                type="number" 
+                                value={promoPrice} 
+                                onChange={e => setPromoPrice(e.target.value)} 
+                                placeholder="Ex: 1500" 
+                                className="font-bold border-2 h-11" 
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Prix d'origine (Barré)</Label>
+                            <Input 
+                                type="number" 
+                                value={originalPrice} 
+                                onChange={e => setOriginalPrice(e.target.value)} 
+                                placeholder="Ex: 2000" 
+                                className="font-medium border-2 h-11" 
+                            />
+                        </div>
                     </div>
 
                     <div className="space-y-1.5">
