@@ -11,7 +11,8 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         request.auth.uid in [
-          "koKj50bSGXYeO1PLKU5bgo8Yaky1",
+          "koKj5ObSGXYeO1PLKU5bgo8Yaky1", // UID corrigé (O au lieu de 0)
+          "koKj50bSGXYeO1PLKU5bgo8Yaky1", // Double sécurité
           "D1q2GPM95rZi38cvCzvsjcWQDaV2",
           "t8nPnZLcTiaLJSKMuLzib3C5nPn1", 
           "K9cVYLVUk1NV99YV3anebkugpPp1", 
@@ -31,20 +32,22 @@ service cloud.firestore {
 
     // --- RÈGLES DE COLLECTION UTILISATEURS ---
     
-    // Règle isolée pour autoriser le comptage (list) au niveau de la racine /users
-    // Indispensable pour RunAggregationQuery (getCountFromServer)
-    match /users {
-      allow list: if isSignedIn();
-    }
-
-    // Règles pour les documents individuels
     match /users/{userId} {
+      // Permission de liste simplifiée pour le comptage du Reach
+      allow list: if isSignedIn();
       allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       
       match /{allPaths=**} {
         allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       }
+    }
+
+    // --- PROMOTIONS & SHOPPING (Accès Global) ---
+    // Cette règle globale est indispensable pour les requêtes collectionGroup
+    match /{path=**}/promotions/{promoId} {
+      allow read: if true;
+      allow write: if isSignedIn();
     }
 
     // --- AUTRES COLLECTIONS ---
@@ -65,9 +68,7 @@ service cloud.firestore {
     match /businesses/{businessId} {
       allow get, list: if true;
       allow write: if isSignedIn();
-      match /promotions/{promoId} { allow read, write: if isSignedIn(); }
     }
-    match /{path=**}/promotions/{promoId} { allow read: if true; }
 
     match /conversations/{id} {
       allow read, write: if isSignedIn() && (request.auth.uid == id || isAdmin());
