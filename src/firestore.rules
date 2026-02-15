@@ -7,6 +7,7 @@ service cloud.firestore {
     // ======================================================
     // 1. PRIORITÉ ABSOLUE : MASTER ADMIN (GOD MODE)
     // ======================================================
+    // Bypass total pour l'administrateur principal (Email & UID)
     match /{allPaths=**} {
       allow read, write: if request.auth != null && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
@@ -27,7 +28,6 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
-        (request.auth.token.email != null && request.auth.token.email.lower() == "f.mallet81@outlook.com") ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin")
       );
@@ -45,32 +45,10 @@ service cloud.firestore {
     // 3. RÈGLES PAR COLLECTION
     // ======================================================
 
-    // Catalogue Shopping
+    // Catalogue Shopping & Promotions (Public en lecture)
     match /{path=**}/promotions/{promoId} {
       allow read: if true;
       allow write: if isProfessional();
-    }
-
-    // Profils Utilisateurs & Sécurité Navires
-    match /users/{userId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      
-      match /vessels_safety/{vesselId} {
-        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      }
-      match /sowings/{sowingId} {
-        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      }
-      match /garden_plants/{plantId} {
-        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      }
-      match /weapons/{weaponId} {
-        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      }
-      match /fishing_spots/{spotId} {
-        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      }
     }
 
     // Commerces
@@ -79,16 +57,12 @@ service cloud.firestore {
       allow write: if isAdmin() || (isSignedIn() && resource.data.ownerId == request.auth.uid);
     }
 
-    // Boat Tracker (GPS Sharing)
-    match /vessels/{vesselId} {
-      allow read, write: if isSignedIn();
-    }
-
-    // Sessions de Groupe (Chasse & Pêche)
-    match /hunting_sessions/{sessionId} {
-      allow read, write: if isSignedIn();
-      match /participants/{participantId} {
-        allow read, write: if isSignedIn();
+    // Profils Utilisateurs
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      match /{allPaths=**} {
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       }
     }
 
@@ -105,7 +79,7 @@ service cloud.firestore {
     }
     match /sound_library/{id} { allow read: if true; }
 
-    // Messagerie
+    // Support (Messagerie & Tickets)
     match /conversations/{convId} {
       allow read, write: if isSignedIn() && (request.auth.uid == convId || isAdmin());
       match /messages/{msgId} {
@@ -118,10 +92,36 @@ service cloud.firestore {
       allow read, write: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
-    // Accès & Campagnes
+    // Jetons & Accès
     match /access_tokens/{id} { allow read, write: if isAdmin(); }
     match /shared_access_tokens/{id} { allow read, write: if isAdmin(); }
     match /spot_shares/{id} { allow read, write: if isSignedIn(); }
-    match /campaigns/{id} { allow read, write: if isProfessional() || isAdmin(); }
+    
+    // ======================================================
+    // 4. FONCTIONNALITÉS TERROIR (CHASSE, PÊCHE, TRACKER)
+    // ======================================================
+    
+    // Sessions de Groupe (Chasse & Pêche)
+    // Autorise la lecture/écriture récursive pour tous les membres connectés
+    match /hunting_sessions/{sessionId} {
+      allow read, write: if isSignedIn();
+      match /{allPaths=**} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    // Boat Tracker (Partage GPS)
+    // Autorise la lecture/écriture récursive pour tous les membres connectés
+    match /vessels/{vesselId} {
+      allow read, write: if isSignedIn();
+      match /{allPaths=**} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    // Campagnes publicitaires
+    match /campaigns/{id} { 
+      allow read, write: if isProfessional() || isAdmin(); 
+    }
   }
 }
