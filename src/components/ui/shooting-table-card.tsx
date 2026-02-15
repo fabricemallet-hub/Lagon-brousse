@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -50,7 +51,7 @@ const BALLISTIC_DATABASE: MunitionData[] = [
 
   // .25-06 Remington
   { id: '25-06-100-cl', caliber: '.25-06 Rem', model: 'Remington Core-Lokt', weight: 100, v0: 980, bc: 0.323, usage: 'Calibre "Laser" très précis, trajectoire très tendue avec un recul modéré. Idéal pour l\'approche sur biche ou jeune cerf.', color: 'bg-cyan-500' },
-  { id: '25-06-115-bt', caliber: '.25-06 Rem', model: 'Nosler Ballistic Tip', weight: 115, v0: 910, bc: 0.453, usage: 'Précision laser à longue portée, trajectoire stable même par vent latéral modéré.', color: 'bg-cyan-500' },
+  { id: '25-06-115-bt', caliber: '.25-06 Rem', model: 'Remington Core-Lokt', weight: 115, v0: 910, bc: 0.453, usage: 'Précision laser à longue portée, trajectoire stable même par vent latéral modéré.', color: 'bg-cyan-500' },
   { id: '25-06-120-fus', caliber: '.25-06 Rem', model: 'Federal Fusion', weight: 120, v0: 910, bc: 0.468, usage: 'Puissante et efficace sur moyenne et longue distance. Balle soudée à excellente rétention.', color: 'bg-cyan-500' },
 
   // 6.5 Creedmoor
@@ -95,20 +96,28 @@ const BALLISTIC_DATABASE: MunitionData[] = [
 
   // Calibres Lisses - CALIBRE 12 (Slugs / Balles)
   { id: '12-sauv-26', caliber: 'Calibre 12', model: 'Balle Sauvestre (Flèche)', weight: 26, v0: 480, bc: 0.120, usage: 'Balle flèche sous-calibrée. Précision remarquable et trajectoire tendue jusqu\'à 100m.', color: 'bg-red-600' },
-  { id: '12-brenn-31', caliber: 'Calibre 12', model: 'Balle Brenneke Classique', weight: 31, v0: 415, bc: 0.080, usage: 'La référence brousse pour le gros cochon. Puissance d\'arrêt et pénétration garanties.', color: 'bg-red-600' },
-  { id: '12-brenn-mag-39', caliber: 'Calibre 12', model: 'Balle Brenneke Magnum', weight: 39, v0: 440, bc: 0.090, usage: 'Puissance d\'arrêt maximale pour fusils chambrés 76mm. Idéal pour stopper net un gros spécimen.', color: 'bg-red-600' },
-  { id: '12-brenn-s-28', caliber: 'Calibre 12', model: 'Balle Brenneke "S"', weight: 28, v0: 430, bc: 0.075, usage: 'Version standard plus rapide avec un recul maîtrisé. Excellent pour le tir vif.', color: 'bg-red-600' },
-  
+  { id: '12-brenn-31', caliber: 'Calibre 12', model: 'Balle Brenneke Classique', weight: 31, v0: 415, bc: 0.080, usage: 'La référence brousse pour le gros cochon en battue. Puissance d\'arrêt et pénétration garanties.', color: 'bg-red-600' },
+  { id: '12-brenn-mag-39', caliber: 'Calibre 12', model: 'Balle Brenneke Magnum', weight: 39, v0: 440, bc: 0.090, usage: 'Puissance d\'arrêt maximale pour fusils chambrés 76mm.', color: 'bg-red-600' },
+  { id: '12-brenn-s-28', caliber: 'Calibre 12', model: 'Balle Brenneke "S"', weight: 28, v0: 430, bc: 0.075, usage: 'Version standard plus rapide avec un recul maîtrisé.', color: 'bg-red-600' },
+  { id: '12-plomb-2', caliber: 'Calibre 12', model: 'Cartouche Plomb n°2', weight: 36, v0: 400, bc: 0.022, usage: 'Pour la roussette (renard volant) ou les gros oiseaux.', color: 'bg-red-600' },
+  { id: '12-plomb-4', caliber: 'Calibre 12', model: 'Cartouche Plomb n°4', weight: 36, v0: 400, bc: 0.019, usage: 'Idéal pour le Notou ou le Pigeon vert.', color: 'bg-red-600' },
+  { id: '12-plomb-6', caliber: 'Calibre 12', model: 'Cartouche Plomb n°6', weight: 36, v0: 400, bc: 0.015, usage: 'Polyvalent pour le petit gibier à plume.', color: 'bg-red-600' },
+  { id: '12-chev-9', caliber: 'Calibre 12', model: 'Chevrotine 9 grains', weight: 32, v0: 400, bc: 0.045, usage: 'Utilisée pour le cochon au fourré.', color: 'bg-red-600' },
+
   // Calibre 16
   { id: '16-brenn-21', caliber: 'Calibre 16', model: 'Balle Brenneke', weight: 21, v0: 415, bc: 0.060, usage: 'Efficacité classique pour fusils de calibre 16.', color: 'bg-orange-800' },
+  { id: '16-plomb-4', caliber: 'Calibre 16', model: 'Cartouche Plomb n°4', weight: 28, v0: 390, bc: 0.019, usage: 'Efficace pour le gibier à plume de taille moyenne.', color: 'bg-orange-800' },
+  { id: '16-plomb-6', caliber: 'Calibre 16', model: 'Cartouche Plomb n°6', weight: 28, v0: 390, bc: 0.015, usage: 'Standard pour le petit gibier.', color: 'bg-orange-800' },
   
   // Calibre 20
-  { id: '20-brenn-18', caliber: 'Calibre 20', model: 'Balle Brenneke', weight: 18, v0: 425, bc: 0.055, usage: 'Idéal pour fusils légers, offre une précision surprenante à courte distance.', color: 'bg-yellow-800' },
+  { id: '20-brenn-18', caliber: 'Calibre 20', model: 'Balle Brenneke', weight: 18, v0: 425, bc: 0.055, usage: 'Idéal pour fusils légers.', color: 'bg-yellow-800' },
+  { id: '20-plomb-4', caliber: 'Calibre 20', model: 'Cartouche Plomb n°4', weight: 24, v0: 390, bc: 0.019, usage: 'Pour fusils légers, idéal plume.', color: 'bg-yellow-800' },
+  { id: '20-plomb-6', caliber: 'Calibre 20', model: 'Cartouche Plomb n°6', weight: 24, v0: 390, bc: 0.015, usage: 'Excellent pour le petit gibier.', color: 'bg-yellow-800' },
   
   // Calibre .410
-  { id: '410-brenn-7', caliber: 'Calibre .410', model: 'Balle Brenneke', weight: 7, v0: 530, bc: 0.065, usage: 'Petit calibre de brousse pour nuisibles ou cochon à très courte distance.', color: 'bg-slate-700' },
+  { id: '410-brenn-7', caliber: 'Calibre .410', model: 'Balle Brenneke', weight: 7, v0: 530, bc: 0.065, usage: 'Petit calibre de brousse pour nuisibles.', color: 'bg-slate-700' },
 
-  // 22mm (Tir de loisir / Nuisibles)
+  // 22mm
   { id: '22mm-lr-40', caliber: '22mm', model: '.22 LR Standard', weight: 40, v0: 330, bc: 0.125, usage: 'Petits nuisibles et tir de loisir.', color: 'bg-zinc-500' },
   { id: '22mm-wmr-40', caliber: '22mm', model: '.22 WMR (Magnum)', weight: 40, v0: 570, bc: 0.145, usage: 'Vitesse élevée pour renard et nuisibles.', color: 'bg-zinc-500' },
 ];
@@ -286,7 +295,7 @@ export function ShootingTableCard() {
             </div>
 
             <div className="space-y-1.5">
-                <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Modèle d'ogive</Label>
+                <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Modèle d'ogive / Plomb</Label>
                 <Select value={selectedModel} onValueChange={setSelectedModel}>
                     <SelectTrigger className="h-10 border-2 font-bold text-xs bg-white shadow-sm">
                         <SelectValue />
@@ -420,7 +429,7 @@ export function ShootingTableCard() {
 
         <div className="space-y-4">
             <div className="flex items-center justify-between px-1">
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
                     <Crosshair className="size-3 text-primary" /> Corrections (Zéroté à {zeroDistance}m)
                 </h3>
                 <Badge variant="outline" className="text-[8px] font-black uppercase h-5 border-blue-200 text-blue-600">
