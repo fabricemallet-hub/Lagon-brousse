@@ -49,22 +49,22 @@ const BALLISTIC_DATABASE: MunitionData[] = [
   { id: '243-win-95-sst', caliber: '.243 Win', model: 'Hornady SST', weight: 95, v0: 970, bc: 0.355, usage: 'Expansion rapide, tir tendu.', color: 'bg-yellow-600' },
 
   // .25-06 Remington
-  { id: '25-06-100-cl', caliber: '.25-06 Rem', model: 'Remington Core-Lokt', weight: 100, v0: 980, bc: 0.323, usage: 'Un laser pour la biche en savane.', color: 'bg-cyan-500' },
-  { id: '25-06-115-bt', caliber: '.25-06 Rem', model: 'Nosler Ballistic Tip', weight: 115, v0: 910, bc: 0.453, usage: 'Précision laser longue distance.', color: 'bg-cyan-500' },
-  { id: '25-06-120-fus', caliber: '.25-06 Rem', model: 'Federal Fusion', weight: 120, v0: 910, bc: 0.468, usage: 'Balle soudée, excellente rétention.', color: 'bg-cyan-500' },
+  { id: '25-06-100-cl', caliber: '.25-06 Rem', model: 'Remington Core-Lokt', weight: 100, v0: 980, bc: 0.323, usage: 'Calibre "Laser" très précis, trajectoire très tendue avec un recul modéré. Idéal pour l\'approche sur biche ou jeune cerf.', color: 'bg-cyan-500' },
+  { id: '25-06-115-bt', caliber: '.25-06 Rem', model: 'Nosler Ballistic Tip', weight: 115, v0: 910, bc: 0.453, usage: 'Précision laser à longue portée, trajectoire stable même par vent latéral modéré.', color: 'bg-cyan-500' },
+  { id: '25-06-120-fus', caliber: '.25-06 Rem', model: 'Federal Fusion', weight: 120, v0: 910, bc: 0.468, usage: 'Puissante et efficace sur moyenne et longue distance. Balle soudée à excellente rétention.', color: 'bg-cyan-500' },
 
   // 6.5 Creedmoor
   { id: '65-cm-143-eldx', caliber: '6.5 Creedmoor', model: 'Hornady ELD-X', weight: 143, v0: 820, bc: 0.625, usage: 'Précision extrême à longue distance.', color: 'bg-teal-600' },
 
   // .270 Winchester
-  { id: '270-win-130-sst', caliber: '.270 Win', model: 'Hornady SST', weight: 130, v0: 930, bc: 0.460, usage: 'Expansion rapide pour la savane.', color: 'bg-orange-500' },
-  { id: '270-win-140-sst', caliber: '.270 Win', model: 'Hornady SST', weight: 140, v0: 900, bc: 0.485, usage: 'Bon compromis vitesse/énergie.', color: 'bg-orange-500' },
-  { id: '270-win-130-ds', caliber: '.270 Win', model: 'Winchester Deer Season', weight: 130, v0: 930, bc: 0.392, usage: 'Choc immédiat sur cervidés.', color: 'bg-orange-500' },
-  { id: '270-win-150-ab', caliber: '.270 Win', model: 'Nosler AccuBond', weight: 150, v0: 870, bc: 0.500, usage: 'Pénétration profonde, gros cerf.', color: 'bg-orange-500' },
+  { id: '270-win-130-sst', caliber: '.270 Win', model: 'Hornady SST', weight: 130, v0: 930, bc: 0.460, usage: 'Expansion rapide et trajectoire tendue. Idéal pour le tir à longue distance en savane.', color: 'bg-orange-500' },
+  { id: '270-win-140-sst', caliber: '.270 Win', model: 'Hornady SST', weight: 140, v0: 900, bc: 0.485, usage: 'Le grand classique polyvalent. Puissant et précis pour le cerf et le sanglier.', color: 'bg-orange-500' },
+  { id: '270-win-130-ds', caliber: '.270 Win', model: 'Winchester Deer Season', weight: 130, v0: 930, bc: 0.392, usage: 'Choc immédiat sur cervidés. Trajectoire stable même par vent léger.', color: 'bg-orange-500' },
+  { id: '270-win-150-ab', caliber: '.270 Win', model: 'Nosler AccuBond', weight: 150, v0: 870, bc: 0.500, usage: 'Pénétration profonde pour gros cerfs. Excellent rapport entre recul et performance.', color: 'bg-orange-500' },
   
   // .270 WSM
-  { id: '270-wsm-130-bst', caliber: '.270 WSM', model: 'Winchester Ballistic Silvertip', weight: 130, v0: 990, bc: 0.433, usage: 'Magnum ultra-rapide, trajectoire extrêmement tendue.', color: 'bg-orange-700' },
-  { id: '270-wsm-150-fus', caliber: '.270 WSM', model: 'Federal Fusion', weight: 150, v0: 940, bc: 0.470, usage: 'Puissance Magnum pour gros cervidés.', color: 'bg-orange-700' },
+  { id: '270-wsm-130-bst', caliber: '.270 WSM', model: 'Winchester Ballistic Silvertip', weight: 130, v0: 990, bc: 0.433, usage: 'Version modernisée et sur-vitaminée du .270. Vitesse exceptionnelle et trajectoire ultra-plate.', color: 'bg-orange-700' },
+  { id: '270-wsm-150-fus', caliber: '.270 WSM', model: 'Federal Fusion', weight: 150, v0: 940, bc: 0.470, usage: 'Puissance Magnum compacte. Pouvoir d\'arrêt optimal sur les grands gibiers (cerf, sanglier).', color: 'bg-orange-700' },
 
   // .308 Winchester
   { id: '308-win-150-pp', caliber: '.308 Win', model: 'Winchester Power-Point', weight: 150, v0: 860, bc: 0.294, usage: 'Standard polyvalent, brousse.', color: 'bg-blue-500' },
