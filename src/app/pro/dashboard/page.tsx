@@ -77,6 +77,9 @@ export default function ProDashboard() {
   }, [firestore, business?.id]);
   const { data: promotions, isLoading: isPromosLoading } = useCollection<Promotion>(promosRef);
 
+  // --- SELECTION ARTICLES ---
+  const [selectedPromoIds, setSelectedPromoIds] = useState<string[]>([]);
+
   // --- REACH CALCULATION ---
   const [targetCategory, setTargetCategory] = useState<string>('Pêche');
   const [targetCount, setTargetCount] = useState<number | null>(null);
@@ -140,7 +143,6 @@ export default function ProDashboard() {
           qTotal = query(usersRef, where('selectedRegion', '==', 'TAHITI'));
           qTarget = query(usersRef, where('selectedRegion', '==', 'TAHITI'), where('subscribedCategories', 'array-contains', targetCategory));
         } else if (selectedTargetCommunes.length > 0) {
-          // Firestore 'in' limitation: max 30 values.
           const communesToQuery = selectedTargetCommunes.slice(0, 30);
           qTotal = query(
             usersRef, 
@@ -177,15 +179,16 @@ export default function ProDashboard() {
   }, [firestore, business, targetCategory, isUserLoading, user, targetScope, selectedTargetCommunes]);
 
   const totalCalculatedCost = useMemo(() => {
-    if (!pricing || targetCount === null) return 0;
+    if (!pricing || targetCount === null || selectedPromoIds.length === 0) return 0;
     
     let unitSum = pricing.unitPricePerUser || 0;
     if (selectedChannels.includes('SMS')) unitSum += (pricing.priceSMS || 0);
     if (selectedChannels.includes('PUSH')) unitSum += (pricing.pricePush || 0);
     if (selectedChannels.includes('MAIL')) unitSum += (pricing.priceMail || 0);
 
-    return pricing.fixedPrice + (targetCount * unitSum);
-  }, [pricing, targetCount, selectedChannels]);
+    const baseCostPerPromo = pricing.fixedPrice + (targetCount * unitSum);
+    return baseCostPerPromo * selectedPromoIds.length;
+  }, [pricing, targetCount, selectedChannels, selectedPromoIds]);
 
   const handleCopyUid = () => {
     if (!user?.uid) return;
@@ -294,13 +297,18 @@ export default function ProDashboard() {
         await deleteDoc(doc(firestore, 'businesses', business.id, 'promotions', id));
         toast({ title: "Produit supprimé" });
         if (editingPromoId === id) resetForm();
+        setSelectedPromoIds(prev => prev.filter(pid => pid !== id));
     } catch (e) {
         toast({ variant: 'destructive', title: "Erreur" });
     }
   };
 
+  const handleTogglePromoSelection = (id: string) => {
+    setSelectedPromoIds(prev => prev.includes(id) ? prev.filter(pid => pid !== id) : [...prev, id]);
+  };
+
   const handleDiffuse = async () => {
-    if (!firestore || !business || targetCount === null || !targetCategory) return;
+    if (!firestore || !business || targetCount === null || !targetCategory || selectedPromoIds.length === 0) return;
     setIsSaving(true);
     
     let targetLabel = "";
@@ -309,13 +317,16 @@ export default function ProDashboard() {
     else if (targetScope === 'TAHITI') targetLabel = "TOUTE LA POLYNÉSIE (TAHITI)";
     else targetLabel = selectedTargetCommunes.join(', ');
 
+    const selectedPromos = promotions?.filter(p => selectedPromoIds.includes(p.id)) || [];
+    const promoTitles = selectedPromos.map(p => p.title).join(', ');
+
     try {
       const campaignData: Omit<Campaign, 'id'> = {
         ownerId: user!.uid,
         businessId: business.id,
         businessName: business.name,
-        title: `${business.name} : ${promoTitle || 'Nouvelle offre !'}`,
-        message: promoDescription || `Découvrez nos offres en ${targetCategory}.`,
+        title: `${business.name} : ${selectedPromos.length} offres spéciales !`,
+        message: `Découvrez nos offres : ${promoTitles}. ${promoDescription}`,
         targetCommune: targetLabel,
         targetCategory: targetCategory,
         reach: targetCount,
@@ -341,7 +352,6 @@ export default function ProDashboard() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-32 px-1">
-      {/* IDENTITÉ PRO CONSOLIDÉE */}
       <Card className="border-2 border-primary bg-primary/5 shadow-lg overflow-hidden">
         <CardContent className="p-4 flex flex-col gap-4">
             <div className="flex items-center justify-between">
@@ -621,7 +631,7 @@ export default function ProDashboard() {
                             </div>
 
                             {/* FACTURATION CAMPAGNE */}
-                            {targetCount !== null && targetCount > 0 && pricing && (
+                            {targetCount !== null && targetCount > 0 && pricing && selectedPromoIds.length > 0 && (
                                 <div className="p-4 bg-primary/5 border-2 border-primary/20 rounded-2xl space-y-3 animate-in fade-in zoom-in-95">
                                     <p className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
                                         <DollarSign className="size-3" /> Détails de la facturation
@@ -655,9 +665,14 @@ export default function ProDashboard() {
                                             </div>
                                         )}
 
-                                        <div className="flex justify-between pt-2 border-t-2 border-primary/20 text-primary font-black">
-                                            <span className="uppercase">Total à régler</span>
-                                            <span className="text-lg">{totalCalculatedCost} FCFP</span>
+                                        <div className="flex justify-between pt-2 border-t-2 border-primary/20 text-slate-800 font-black">
+                                            <span className="uppercase">Total par article</span>
+                                            <span>{totalCalculatedCost / selectedPromoIds.length} F</span>
+                                        </div>
+
+                                        <div className="flex justify-between items-center bg-primary/10 p-2 rounded-lg border border-primary/20 mt-2">
+                                            <span className="text-[10px] font-black uppercase text-primary">Multiplié par {selectedPromoIds.length} article{selectedPromoIds.length > 1 ? 's' : ''}</span>
+                                            <span className="text-xl text-primary font-black">{totalCalculatedCost} FCFP</span>
                                         </div>
                                     </div>
                                 </div>
@@ -674,10 +689,10 @@ export default function ProDashboard() {
 
                             <Button 
                                 onClick={handleDiffuse} 
-                                disabled={isSaving || !targetCount || reachError || selectedChannels.length === 0 || (targetScope === 'SPECIFIC' && selectedTargetCommunes.length === 0)} 
+                                disabled={isSaving || !targetCount || reachError || selectedChannels.length === 0 || selectedPromoIds.length === 0 || (targetScope === 'SPECIFIC' && selectedTargetCommunes.length === 0)} 
                                 className="w-full h-14 bg-accent hover:bg-accent/90 text-white font-black uppercase tracking-widest shadow-lg gap-2"
                             >
-                                <Megaphone className="size-5" /> Lancer la campagne
+                                <Megaphone className="size-5" /> Lancer la campagne ({selectedPromoIds.length} art.)
                             </Button>
                         </div>
                     </div>
@@ -687,40 +702,63 @@ export default function ProDashboard() {
           </Card>
 
           <div className="space-y-4">
-            <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
-                <Store className="size-4" /> Vos articles en ligne ({promotions?.length || 0})
-            </h3>
+            <div className="flex items-center justify-between px-1">
+                <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                    <Store className="size-4" /> Vos articles en ligne ({promotions?.length || 0})
+                </h3>
+                {selectedPromoIds.length > 0 && (
+                    <Badge variant="outline" className="bg-primary text-white font-black text-[9px] border-none px-2 h-5">{selectedPromoIds.length} sélectionné{selectedPromoIds.length > 1 ? 's' : ''}</Badge>
+                )}
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {promotions?.map(promo => (
-                    <Card key={promo.id} className={cn("overflow-hidden border-2 shadow-sm flex h-32", editingPromoId === promo.id && "border-accent bg-accent/5")}>
-                        <div className="w-24 bg-muted/20 shrink-0 relative flex items-center justify-center border-r">
-                            {promo.imageUrl ? (
-                                <>
-                                    <img src={promo.imageUrl} className="w-full h-full object-cover" alt={promo.title} />
-                                    {promo.images && promo.images.length > 1 && (
-                                        <Badge className="absolute bottom-1 right-1 bg-black/60 text-[8px] font-black h-4 px-1 border-none shadow-lg">
-                                            {promo.images.length}
-                                        </Badge>
-                                    )}
-                                </>
-                            ) : <ImageIcon className="size-6 opacity-20" />}
-                        </div>
-                        <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
-                            <div className="space-y-1">
-                                <h4 className="font-black uppercase text-xs truncate">{promo.title}</h4>
-                                <p className="text-[9px] text-muted-foreground line-clamp-2 italic">{promo.description || "Pas de description."}</p>
+                {promotions?.map(promo => {
+                    const isSelected = selectedPromoIds.includes(promo.id);
+                    return (
+                        <Card 
+                            key={promo.id} 
+                            className={cn(
+                                "overflow-hidden border-2 shadow-sm flex h-32 transition-all cursor-pointer", 
+                                editingPromoId === promo.id && "border-accent bg-accent/5",
+                                isSelected ? "border-primary ring-2 ring-primary/10" : "hover:border-primary/30"
+                            )}
+                            onClick={() => handleTogglePromoSelection(promo.id)}
+                        >
+                            <div className="w-8 bg-muted/30 border-r flex items-center justify-center shrink-0" onClick={(e) => e.stopPropagation()}>
+                                <Checkbox 
+                                    checked={isSelected} 
+                                    onCheckedChange={() => handleTogglePromoSelection(promo.id)} 
+                                    className="size-5 border-2"
+                                />
                             </div>
-                            <div className="flex items-center justify-between">
-                                <Badge variant="outline" className="text-[7px] h-4 font-black uppercase border-primary/20 text-primary">{promo.promoType}</Badge>
-                                <div className="flex gap-1">
-                                    <Button variant="ghost" size="icon" className="size-7 border rounded-full" onClick={() => handleEditPromotion(promo)}><Pencil className="size-3" /></Button>
-                                    <Button variant="ghost" size="icon" className="size-7 text-destructive border rounded-full" onClick={() => handleDeletePromotion(promo.id)}><Trash2 className="size-3" /></Button>
+                            <div className="w-24 bg-muted/20 shrink-0 relative flex items-center justify-center border-r">
+                                {promo.imageUrl ? (
+                                    <>
+                                        <img src={promo.imageUrl} className="w-full h-full object-cover" alt={promo.title} />
+                                        {promo.images && promo.images.length > 1 && (
+                                            <Badge className="absolute bottom-1 right-1 bg-black/60 text-[8px] font-black h-4 px-1 border-none shadow-lg">
+                                                {promo.images.length}
+                                            </Badge>
+                                        )}
+                                    </>
+                                ) : <ImageIcon className="size-6 opacity-20" />}
+                            </div>
+                            <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
+                                <div className="space-y-1">
+                                    <h4 className="font-black uppercase text-xs truncate">{promo.title}</h4>
+                                    <p className="text-[9px] text-muted-foreground line-clamp-2 italic">{promo.description || "Pas de description."}</p>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <Badge variant="outline" className="text-[7px] h-4 font-black uppercase border-primary/20 text-primary">{promo.promoType}</Badge>
+                                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                                        <Button variant="ghost" size="icon" className="size-7 border rounded-full" onClick={() => handleEditPromotion(promo)}><Pencil className="size-3" /></Button>
+                                        <Button variant="ghost" size="icon" className="size-7 text-destructive border rounded-full" onClick={() => handleDeletePromotion(promo.id)}><Trash2 className="size-3" /></Button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </Card>
-                ))}
+                        </Card>
+                    );
+                })}
             </div>
           </div>
         </>
