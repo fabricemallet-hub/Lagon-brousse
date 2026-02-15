@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, doc, setDoc, addDoc, deleteDoc, serverTimestamp, Timestamp, updateDoc, writeBatch } from 'firebase/firestore';
-import type { UserAccount, Business, Conversation, AccessToken, SharedAccessToken, SplashScreenSettings, CgvSettings, RibSettings, SystemNotification, FishSpeciesInfo, SoundLibraryEntry } from '@/lib/types';
+import type { UserAccount, Business, Conversation, AccessToken, SharedAccessToken, SplashScreenSettings, CgvSettings, RibSettings, SystemNotification, FishSpeciesInfo, SoundLibraryEntry, SupportTicket } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,7 +46,10 @@ import {
   Volume2,
   Play,
   Camera,
-  ImageIcon
+  ImageIcon,
+  Clock,
+  Send,
+  CheckCircle2
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -80,7 +83,15 @@ export default function AdminPage() {
   const { data: businesses } = useCollection<Business>(businessRef);
 
   const convsRef = useMemoFirebase(() => (firestore && isAdmin) ? query(collection(firestore, 'conversations'), orderBy('lastMessageAt', 'desc')) : null, [firestore, isAdmin]);
-  const { data: conversations } = useCollection<Conversation>(convsRef);
+  const { data: conversations, isLoading: isConvsLoading } = useCollection<Conversation>(convsRef);
+
+  const ticketsRef = useMemoFirebase(() => (firestore && isAdmin) ? collection(firestore, 'cms_support', 'tickets', 'items') : null, [firestore, isAdmin]);
+  const { data: rawTickets, isLoading: isTicketsLoading } = useCollection<SupportTicket>(ticketsRef);
+  
+  const tickets = useMemo(() => {
+    if (!rawTickets) return null;
+    return [...rawTickets].sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+  }, [rawTickets]);
 
   const tokensRef = useMemoFirebase(() => (firestore && isAdmin) ? query(collection(firestore, 'access_tokens'), orderBy('createdAt', 'desc')) : null, [firestore, isAdmin]);
   const { data: tokens } = useCollection<AccessToken>(tokensRef);
@@ -138,7 +149,7 @@ export default function AdminPage() {
               <StatsCard title="Utilisateurs" value={users?.length || 0} icon={UsersIcon} color="text-slate-500" />
               <StatsCard title="Abonnés" value={users?.filter(u => u.subscriptionStatus === 'active' || u.subscriptionStatus === 'admin' || u.subscriptionStatus === 'professional').length || 0} icon={ShieldCheck} color="text-primary" />
               <StatsCard title="Boutiques" value={businesses?.length || 0} icon={Store} color="text-accent" />
-              <StatsCard title="Support" value={conversations?.filter(c => !c.isReadByAdmin).length || 0} icon={MessageSquare} color="text-green-600" />
+              <StatsCard title="Messages" value={(conversations?.filter(c => !c.isReadByAdmin).length || 0) + (tickets?.filter(t => t.statut === 'ouvert').length || 0)} icon={MessageSquare} color="text-green-600" />
             </div>
           </TabsContent>
 
@@ -175,7 +186,12 @@ export default function AdminPage() {
           </TabsContent>
 
           <TabsContent value="support">
-            <SupportManager conversations={conversations} />
+            <SupportManager 
+                conversations={conversations} 
+                isLoadingConvs={isConvsLoading}
+                tickets={tickets}
+                isLoadingTickets={isTicketsLoading}
+            />
           </TabsContent>
         </div>
       </Tabs>
@@ -772,29 +788,147 @@ function AppSettingsManager() {
     );
 }
 
-function SupportManager({ conversations }: { conversations: Conversation[] | null }) {
+function SupportManager({ 
+    conversations, 
+    isLoadingConvs,
+    tickets,
+    isLoadingTickets
+}: { 
+    conversations: Conversation[] | null, 
+    isLoadingConvs: boolean,
+    tickets: SupportTicket[] | null,
+    isLoadingTickets: boolean
+}) {
+    const [subTab, setSubTab] = useState<'chats' | 'tickets'>('chats');
+
     return (
         <Card className="border-2 shadow-lg overflow-hidden rounded-2xl">
-            <CardHeader className="p-5 bg-green-50 border-b"><CardTitle className="text-lg font-black uppercase flex items-center gap-2 text-green-800"><MessageSquare className="size-5" /> Support Direct</CardTitle></CardHeader>
+            <CardHeader className="p-5 bg-green-50 border-b flex flex-col gap-4">
+                <div className="flex items-center gap-2 text-green-800">
+                    <MessageSquare className="size-5" /> 
+                    <CardTitle className="text-lg font-black uppercase">Support & Tickets</CardTitle>
+                </div>
+                <Tabs value={subTab} onValueChange={(v: any) => setSubTab(v)} className="w-full">
+                    <TabsList className="grid grid-cols-2 h-10 border-2 bg-white/50">
+                        <TabsTrigger value="chats" className="font-black uppercase text-[10px]">Direct Chats</TabsTrigger>
+                        <TabsTrigger value="tickets" className="font-black uppercase text-[10px]">Tickets Aide</TabsTrigger>
+                    </TabsList>
+                </Tabs>
+            </CardHeader>
             <CardContent className="p-3 space-y-3">
-                {conversations && conversations.length > 0 ? conversations.map(c => (
-                    <Link key={c.id} href={`/admin/messages/${c.id}`} className={cn("flex flex-col p-5 border-2 rounded-3xl bg-white shadow-sm transition-all active:scale-[0.98]", !c.isReadByAdmin && "border-primary bg-primary/5 ring-2 ring-primary/10")}>
-                        <div className="flex justify-between items-start mb-3">
-                            <div className="min-w-0 flex-1">
-                                <p className="font-black text-sm uppercase truncate text-slate-800">{c.userDisplayName}</p>
-                                <p className="text-[10px] font-bold opacity-40 leading-none mt-1">{c.userEmail}</p>
-                            </div>
-                            {!c.isReadByAdmin && <Badge className="bg-primary animate-pulse text-[9px] h-5 px-2 font-black uppercase tracking-wider">Nouveau</Badge>}
-                        </div>
-                        <div className="bg-muted/10 p-3 rounded-2xl border-2 border-dashed border-muted-foreground/10">
-                            <p className="text-xs text-muted-foreground italic line-clamp-2 leading-relaxed font-medium">"{c.lastMessageContent}"</p>
-                        </div>
-                        <div className="mt-4 pt-4 border-t border-dashed flex justify-between items-center">
-                            <span className="text-[10px] font-black opacity-30 uppercase tracking-widest">{c.lastMessageAt ? format(c.lastMessageAt.toDate(), 'dd/MM HH:mm') : '...'}</span>
-                            <div className="flex items-center gap-2 font-black uppercase text-[10px] text-primary">Répondre <ChevronRight className="size-4" /></div>
-                        </div>
-                    </Link>
-                )) : <div className="p-20 text-center text-muted-foreground font-black uppercase opacity-30 italic text-sm tracking-[0.2em]">Aucun message actif.</div>}
+                {subTab === 'chats' ? (
+                    <>
+                        {isLoadingConvs ? (
+                            <div className="space-y-3"><Skeleton className="h-24 w-full rounded-2xl"/><Skeleton className="h-24 w-full rounded-2xl"/></div>
+                        ) : conversations && conversations.length > 0 ? conversations.map(c => (
+                            <Link key={c.id} href={`/admin/messages/${c.id}`} className={cn("flex flex-col p-5 border-2 rounded-3xl bg-white shadow-sm transition-all active:scale-[0.98]", !c.isReadByAdmin && "border-primary bg-primary/5 ring-2 ring-primary/10")}>
+                                <div className="flex justify-between items-start mb-3">
+                                    <div className="min-w-0 flex-1">
+                                        <p className="font-black text-sm uppercase truncate text-slate-800">{c.userDisplayName}</p>
+                                        <p className="text-[10px] font-bold opacity-40 leading-none mt-1">{c.userEmail}</p>
+                                    </div>
+                                    {!c.isReadByAdmin && <Badge className="bg-primary animate-pulse text-[9px] h-5 px-2 font-black uppercase tracking-wider">Nouveau</Badge>}
+                                </div>
+                                <div className="bg-muted/10 p-3 rounded-2xl border-2 border-dashed border-muted-foreground/10">
+                                    <p className="text-xs text-muted-foreground italic line-clamp-2 leading-relaxed font-medium">"{c.lastMessageContent}"</p>
+                                </div>
+                                <div className="mt-4 pt-4 border-t border-dashed flex justify-between items-center">
+                                    <span className="text-[10px] font-black opacity-30 uppercase tracking-widest">{c.lastMessageAt ? format(c.lastMessageAt.toDate(), 'dd/MM HH:mm') : '...'}</span>
+                                    <div className="flex items-center gap-2 font-black uppercase text-[10px] text-primary">Répondre <ChevronRight className="size-4" /></div>
+                                </div>
+                            </Link>
+                        )) : <div className="p-20 text-center text-muted-foreground font-black uppercase opacity-30 italic text-sm tracking-[0.2em]">Aucun message actif.</div>}
+                    </>
+                ) : (
+                    <>
+                        {isLoadingTickets ? (
+                            <div className="space-y-3"><Skeleton className="h-24 w-full rounded-2xl"/><Skeleton className="h-24 w-full rounded-2xl"/></div>
+                        ) : tickets && tickets.length > 0 ? tickets.map(t => (
+                            <TicketAdminCard key={t.id} ticket={t} />
+                        )) : <div className="p-20 text-center text-muted-foreground font-black uppercase opacity-30 italic text-sm tracking-[0.2em]">Aucun ticket actif.</div>}
+                    </>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
+function TicketAdminCard({ ticket }: { ticket: SupportTicket }) {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [response, setResponse] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    const handleReply = async () => {
+        if (!firestore || !response.trim()) return;
+        setIsSaving(true);
+        try {
+            await updateDoc(doc(firestore, 'cms_support', 'tickets', 'items', ticket.id), {
+                adminResponse: response.trim(),
+                statut: 'ferme',
+                respondedAt: serverTimestamp()
+            });
+            toast({ title: "Ticket clôturé avec réponse" });
+            setIsExpanded(false);
+        } catch (e) {
+            toast({ variant: 'destructive', title: "Erreur" });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <Card className={cn("overflow-hidden border-2 transition-all", ticket.statut === 'ouvert' ? "border-orange-200 bg-orange-50/10" : "bg-white opacity-70")}>
+            <CardHeader className="p-4 cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
+                <div className="flex justify-between items-start mb-2">
+                    <Badge variant={ticket.statut === 'ouvert' ? 'default' : 'secondary'} className="text-[8px] font-black uppercase h-4">
+                        {ticket.statut}
+                    </Badge>
+                    <span className="text-[9px] font-bold opacity-40">{ticket.createdAt ? format(ticket.createdAt.toDate(), 'dd/MM HH:mm') : '...'}</span>
+                </div>
+                <CardTitle className="text-xs font-black uppercase text-slate-800">{ticket.sujet}</CardTitle>
+                <CardDescription className="text-[10px] font-bold truncate">{ticket.userEmail}</CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 pt-0 space-y-4">
+                <div className="p-3 bg-white border-2 rounded-xl text-xs leading-relaxed font-medium italic text-muted-foreground">
+                    "{ticket.description}"
+                </div>
+
+                {isExpanded && (
+                    <div className="space-y-3 animate-in slide-in-from-top-2 pt-2 border-t border-dashed">
+                        <Label className="text-[9px] font-black uppercase text-primary">Votre réponse d'expert</Label>
+                        <Textarea 
+                            value={response} 
+                            onChange={e => setResponse(e.target.value)} 
+                            placeholder="Saisissez la réponse..." 
+                            className="min-h-[100px] border-2 text-xs font-medium"
+                        />
+                        <Button 
+                            className="w-full h-12 font-black uppercase tracking-widest gap-2 shadow-lg" 
+                            onClick={handleReply} 
+                            disabled={isSaving || !response.trim()}
+                        >
+                            {isSaving ? <RefreshCw className="size-4 animate-spin" /> : <Send className="size-4" />}
+                            Répondre & Fermer
+                        </Button>
+                    </div>
+                )}
+
+                {ticket.adminResponse && !isExpanded && (
+                    <div className="p-3 bg-green-50 border-2 border-green-100 rounded-xl space-y-1">
+                        <p className="text-[9px] font-black uppercase text-green-700 flex items-center gap-1">
+                            <CheckCircle2 className="size-3" /> Réponse envoyée
+                        </p>
+                        <p className="text-[10px] font-bold italic line-clamp-2">"{ticket.adminResponse}"</p>
+                    </div>
+                )}
+
+                {!isExpanded && (
+                    <Button variant="ghost" className="w-full h-8 text-[9px] font-black uppercase text-primary gap-2" onClick={() => setIsExpanded(true)}>
+                        {ticket.adminResponse ? "Modifier la réponse" : "Ouvrir pour répondre"} <ChevronRight className="size-3" />
+                    </Button>
+                )}
             </CardContent>
         </Card>
     );

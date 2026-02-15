@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -12,7 +13,8 @@ service cloud.firestore {
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
         request.auth.token.email.lower() == "f.mallet81@outlook.com" ||
         request.auth.token.email.lower() == "fabrice.mallet@gmail.com" ||
-        request.auth.token.email.lower() == "f.mallet81@gmail.com"
+        request.auth.token.email.lower() == "f.mallet81@gmail.com" ||
+        request.auth.token.email.lower() == "kledostyle@outlook.com"
       );
     }
 
@@ -26,7 +28,8 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         request.auth.uid in ["t8nPnZLcTiaLJSKMuLzib3C5nPn1", "koKj5ObSGXYeO1PLKU5bgo8Yaky1", "D1q2GPM95rZi38cvCzvsjcWQDaV2", "K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2"] ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin"
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin" ||
+        (request.auth.token.email != null && request.auth.token.email.lower() == "kledostyle@outlook.com")
       );
     }
 
@@ -72,12 +75,17 @@ service cloud.firestore {
     }
     match /sound_library/{id} { allow read: if true; }
 
-    // Support (Messagerie)
+    // Support (Messagerie & Tickets)
     match /conversations/{convId} {
       allow read, write: if isSignedIn() && (request.auth.uid == convId || isAdmin());
       match /messages/{msgId} {
         allow read, write: if isSignedIn() && (request.auth.uid == convId || isAdmin());
       }
+    }
+    
+    match /cms_support/tickets/items/{id} {
+      allow create: if isSignedIn();
+      allow read, write: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
     // Jetons & Accès
