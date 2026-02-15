@@ -160,6 +160,19 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
   const prevParticipantsRef = useRef<SessionParticipant[] | null>(null);
   const hasLoadedInitialPrefs = useRef(false);
 
+  // DATA FETCHING
+  const userDocRef = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [user, firestore]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
+
+  const participantsQuery = useMemoFirebase(() => {
+    if (!firestore || !session?.id) return null;
+    return collection(firestore, 'hunting_sessions', session.id, 'participants');
+  }, [firestore, session?.id]);
+  const { data: participants } = useCollection<SessionParticipant>(participantsQuery);
+
   const labels = useMemo(() => {
     if (sessionType === 'peche') {
       return {
