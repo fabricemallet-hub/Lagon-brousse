@@ -324,7 +324,7 @@ export function ShootingTableCard() {
               <div className="flex flex-col items-end gap-2">
                 {myWeapons && myWeapons.length > 0 ? (
                     <Select onValueChange={handleLoadWeapon}>
-                        <SelectTrigger className="h-10 border-white/20 font-black uppercase text-[10px] bg-white/10 text-white w-48 shadow-lg ring-2 ring-primary/20">
+                        <SelectTrigger className="h-12 border-white/30 font-black uppercase text-xs bg-white/20 text-white w-full sm:w-56 shadow-xl ring-2 ring-primary/30 active:scale-95 transition-all">
                             <Package className="size-4 mr-2 text-primary" />
                             <SelectValue placeholder="Charger une arme..." />
                         </SelectTrigger>
