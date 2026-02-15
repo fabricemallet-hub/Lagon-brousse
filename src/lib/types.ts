@@ -19,6 +19,7 @@ export interface BallisticsPrefs {
   manualWeight: string;
   manualV0: string;
   manualBC: string;
+  customTargetDist?: string;
 }
 
 export interface UserAccount {

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
@@ -176,6 +177,7 @@ export function ShootingTableCard() {
   const [selectedModel, setSelectedModel] = useState('');
   const [selectedWeight, setSelectedWeight] = useState<number>(0);
   const [zeroDistance, setZeroDistance] = useState('100');
+  const [customTargetDist, setCustomTargetDist] = useState('150');
   
   const [windKmh, setWindKmh] = useState('10');
   const [windAngle, setWindAngle] = useState('90'); 
@@ -200,6 +202,7 @@ export function ShootingTableCard() {
       setSelectedModel(prefs.model || '');
       setSelectedWeight(prefs.weight || 0);
       setZeroDistance(prefs.zeroDistance || '100');
+      setCustomTargetDist(prefs.customTargetDist || '150');
       setWindKmh(prefs.windKmh || '10');
       setWindAngle(prefs.windAngle || '90');
       setHasSilencer(prefs.hasSilencer ?? false);
@@ -223,6 +226,7 @@ export function ShootingTableCard() {
         model: selectedModel,
         weight: selectedWeight,
         zeroDistance,
+        customTargetDist,
         windKmh,
         windAngle,
         hasSilencer,
@@ -239,7 +243,7 @@ export function ShootingTableCard() {
 
     return () => clearTimeout(timer);
   }, [
-    selectedCaliber, selectedModel, selectedWeight, zeroDistance, 
+    selectedCaliber, selectedModel, selectedWeight, zeroDistance, customTargetDist,
     windKmh, windAngle, hasSilencer, hasMuzzleBrake, 
     selectedChoke, shotDistance, manualWeight, manualV0, manualBC,
     user, firestore
@@ -342,15 +346,23 @@ export function ShootingTableCard() {
   }, [selectedMunition, selectedCaliber, zeroDistance, windKmh, windAngle, hasSilencer]);
 
   const resultsTable = useMemo(() => {
+    let distances = [];
     if (selectedCaliber.includes('.410')) {
-        if (selectedMunition.type === 'shot' || selectedMunition.type === 'buckshot') return [calculateBallistics(10), calculateBallistics(20), calculateBallistics(30)];
-        return [calculateBallistics(25), calculateBallistics(50), calculateBallistics(75)];
+        if (selectedMunition.type === 'shot' || selectedMunition.type === 'buckshot') distances = [10, 20, 30];
+        else distances = [25, 50, 75];
+    } else if (selectedCaliber.startsWith('Calibre')) {
+        distances = [50, 75, 100];
+    } else {
+        distances = [100, 200, 300];
     }
-    if (selectedCaliber.startsWith('Calibre')) {
-        return [calculateBallistics(50), calculateBallistics(75), calculateBallistics(100)];
+    
+    const dCustom = parseFloat(customTargetDist);
+    if (!isNaN(dCustom) && dCustom > 0 && !distances.includes(dCustom)) {
+        distances.push(dCustom);
     }
-    return [100, 200, 300].map(d => calculateBallistics(d));
-  }, [selectedCaliber, selectedMunition.type, calculateBallistics]);
+    
+    return distances.sort((a, b) => a - b).map(d => calculateBallistics(d));
+  }, [selectedCaliber, selectedMunition.type, calculateBallistics, customTargetDist]);
 
   const patternDiameter = useMemo(() => {
     const choke = CHOKES.find(c => c.label === selectedChoke) || CHOKES[2];
@@ -642,9 +654,21 @@ export function ShootingTableCard() {
                     <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
                         <Crosshair className="size-3 text-primary" /> Corrections (Zéroté à {zeroDistance}m)
                     </h3>
-                    <Badge variant="outline" className="text-[8px] font-black uppercase h-5 border-blue-200 text-blue-600">
-                        1 clic = 1cm à 100m
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 bg-primary/5 border border-primary/20 rounded-lg px-2 py-1 h-8">
+                            <Label className="text-[8px] font-black uppercase text-primary">Cible :</Label>
+                            <Input 
+                                type="number" 
+                                value={customTargetDist} 
+                                onChange={e => setCustomTargetDist(e.target.value)}
+                                className="w-12 h-6 border-none bg-transparent p-0 font-black text-xs text-center focus-visible:ring-0" 
+                            />
+                            <span className="text-[8px] font-black text-primary/60">m</span>
+                        </div>
+                        <Badge variant="outline" className="text-[8px] font-black uppercase h-5 border-blue-200 text-blue-600">
+                            1 clic = 1cm à 100m
+                        </Badge>
+                    </div>
                 </div>
 
                 <div className="border-2 rounded-2xl overflow-hidden bg-white shadow-md">
