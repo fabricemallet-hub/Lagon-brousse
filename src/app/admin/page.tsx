@@ -969,7 +969,7 @@ function FishGuideManager() {
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogContent className="max-w-2xl w-[95vw] rounded-3xl max-h-[90vh] overflow-y-auto p-0 border-none shadow-2xl">
                     <DialogHeader className="p-6 bg-slate-50 border-b"><DialogTitle className="font-black uppercase tracking-tighter text-xl">{editingFish ? "Modifier" : "Nouvelle Fiche"}</DialogTitle></DialogHeader>
-                    <div className="p-6 space-y-6">
+                    <div className="p-6 py-4 space-y-6">
                         <div className="space-y-4">
                             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">Nom Local</Label><Input value={name} onChange={e => setName(e.target.value)} className="h-14 border-2 font-black text-lg" /></div>
                             
@@ -1308,7 +1308,10 @@ function SystemNotificationsManager() {
                             <div key={n.id} className="p-4 flex items-center justify-between border-2 rounded-2xl bg-white shadow-sm">
                                 <div className="flex items-center gap-4 min-w-0 flex-1">
                                     <div className={cn("size-3 rounded-full shrink-0 shadow-sm", n.type === 'error' ? 'bg-red-500' : n.type === 'warning' ? 'bg-orange-500' : n.type === 'success' ? 'bg-green-500' : 'bg-blue-500')} />
-                                    <span className="font-black uppercase text-xs truncate text-slate-800">{n.title}</span>
+                                    <div className="flex flex-col min-w-0">
+                                        <span className="font-black uppercase text-xs truncate text-slate-800">{n.title}</span>
+                                        {n.isActive && <span className="text-[8px] font-black text-green-600 uppercase">En ligne sur l'accueil</span>}
+                                    </div>
                                 </div>
                                 <Button variant="ghost" size="icon" className="text-destructive/40 hover:text-destructive size-10 rounded-xl" onClick={() => deleteDoc(doc(firestore!, 'system_notifications', n.id))}><Trash2 className="size-5" /></Button>
                             </div>
@@ -1498,12 +1501,14 @@ function TicketAdminCard({ ticket }: { ticket: SupportTicket }) {
                 {isExpanded && (
                     <div className="space-y-3 animate-in slide-in-from-top-2 pt-2 border-t border-dashed">
                         <Label className="text-[9px] font-black uppercase text-primary">Votre réponse d'expert</Label>
-                        <Textarea 
-                            value={response} 
-                            onChange={setResponse} 
-                            placeholder="Saisissez la réponse..." 
-                            className="min-h-[100px] border-2 text-xs font-medium"
-                        />
+                        <TableContent>
+                            <Textarea 
+                                value={response} 
+                                onChange={setResponse} 
+                                placeholder="Saisissez la réponse..." 
+                                className="min-h-[100px] border-2 text-xs font-medium"
+                            />
+                        </TableContent>
                         <div className="flex gap-2">
                             <Button 
                                 variant="outline"
