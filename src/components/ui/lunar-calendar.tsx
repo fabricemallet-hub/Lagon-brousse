@@ -46,7 +46,8 @@ import {
   Fish,
   Waves,
   Star,
-  Clock
+  Clock,
+  Info
 } from 'lucide-react';
 import { Button } from './button';
 import { cn, getRegionalNow } from '@/lib/utils';
@@ -344,23 +345,72 @@ export function LunarCalendar() {
       </div>
 
       <Dialog open={!!detailedDay} onOpenChange={(isOpen) => !isOpen && setDetailedDay(null)}>
-        <DialogContent className="w-[95vw] sm:max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto p-0">
+        <DialogContent className="w-[95vw] sm:max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto p-0 border-none shadow-2xl">
           <DialogHeader className="p-6 pb-4 border-b sticky top-0 bg-background z-10">
             <DialogTitle className="text-xl font-black uppercase tracking-tight text-slate-800">
-              {detailedDay ? format(detailedDay, 'eeee d MMMM', { locale: fr }) : ''}
+              {detailedDay ? format(detailedDay, 'eeee d MMMM', { locale: fr }).toUpperCase() : ''}
             </DialogTitle>
             <DialogDescription className="text-xs font-bold uppercase opacity-60">
               Fiche Tactique Journalière • {selectedRegion}
             </DialogDescription>
           </DialogHeader>
-          <div className="p-6">
+          <div className="p-6 bg-slate-50/50">
             {detailedDay && detailedDayData && (
               <div className="space-y-8">
                 {calendarView === 'champs' ? (
-                  <div className="p-4 bg-primary/5 rounded-xl border border-primary/10">
-                    <p className="text-sm font-medium leading-relaxed">
-                      {detailedDayData.farming.recommendation}
-                    </p>
+                  <div className="space-y-6">
+                    {/* SECTION 1: LUNE & ZODIAQUE CARDS */}
+                    <div className="grid gap-3">
+                      <div className="flex items-center justify-between p-4 bg-white border-2 rounded-2xl shadow-sm">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-primary/5 rounded-xl border border-primary/10">
+                            <MoonPhaseIcon phase={detailedDayData.weather.moon.phase} className="size-5 text-primary" />
+                          </div>
+                          <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Lune</span>
+                        </div>
+                        <span className="font-black text-xs uppercase text-slate-800">{detailedDayData.weather.moon.phase}</span>
+                      </div>
+
+                      <div className="flex items-center justify-between p-4 bg-white border-2 rounded-2xl shadow-sm">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-accent/5 rounded-xl border border-accent/10">
+                            {React.createElement({ Fruits: Spade, Racines: Carrot, Fleurs: Flower, Feuilles: Leaf }[detailedDayData.farming.zodiac] || Spade, { className: "size-5 text-accent" })}
+                          </div>
+                          <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Zodiaque</span>
+                        </div>
+                        <span className="font-black text-xs uppercase text-slate-800">Jour {detailedDayData.farming.zodiac}</span>
+                      </div>
+                    </div>
+
+                    {/* SECTION 2: RECOMMENDATION BOX */}
+                    <div className="p-5 bg-white border-2 border-dashed border-accent/20 rounded-2xl">
+                      <p className="text-sm font-bold leading-relaxed text-slate-700 text-center italic">
+                        "{detailedDayData.farming.recommendation}"
+                      </p>
+                    </div>
+
+                    {/* SECTION 3: TRAVAUX RECOMMANDÉS */}
+                    <div className="space-y-4">
+                      <h3 className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-2">
+                        <Info className="size-3" /> Travaux recommandés
+                      </h3>
+                      <div className="grid gap-3">
+                        {detailedDayData.farming.details.map((item, idx) => {
+                          const Icon = { Spade, Carrot, Flower, Leaf, Scissors, RefreshCw }[item.icon] || Leaf;
+                          return (
+                            <div key={idx} className="flex items-center gap-4 p-4 bg-white border-2 rounded-2xl shadow-sm">
+                              <div className="p-3 bg-primary/5 rounded-xl border border-primary/10 shrink-0">
+                                <Icon className="size-6 text-primary" />
+                              </div>
+                              <div className="space-y-1 min-w-0">
+                                <h4 className="font-black uppercase text-xs tracking-tight text-slate-800">{item.task}</h4>
+                                <p className="text-[10px] font-medium text-muted-foreground leading-tight">{item.description}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-8">
@@ -477,7 +527,7 @@ export function LunarCalendar() {
           </div>
           <DialogFooter className="p-4 border-t bg-muted/10">
             <DialogClose asChild>
-              <Button variant="outline" className="w-full h-12 font-black uppercase shadow-sm">Compris</Button>
+              <Button variant="outline" className="w-full h-14 font-black uppercase shadow-xl bg-white hover:bg-slate-50 transition-all border-2 text-slate-800">FERMER</Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
