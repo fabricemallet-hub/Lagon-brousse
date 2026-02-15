@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
@@ -551,12 +550,20 @@ export function ShootingTableCard() {
                         <Crosshair className="size-3 text-primary" /> Corrections (Zéroté à {zeroDistance}m)
                     </h3>
                     <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1.5 bg-primary/5 border border-primary/20 rounded-lg px-2 py-1 h-8">
-                            <Label className="text-[8px] font-black uppercase text-primary">Cible :</Label>
-                            <Input type="number" value={customTargetDist} onChange={e => setCustomTargetDist(e.target.value)} className="w-12 h-6 border-none bg-transparent p-0 font-black text-xs text-center focus-visible:ring-0" />
-                            <span className="text-[8px] font-black text-primary/60">m</span>
+                        <div className="flex items-center gap-2 bg-primary/10 border-2 border-primary/30 rounded-xl px-3 py-1.5 h-11 shadow-sm transition-all focus-within:ring-2 focus-within:ring-primary/20">
+                            <Label className="text-[10px] font-black uppercase text-primary whitespace-nowrap leading-none">Cible :</Label>
+                            <div className="flex items-center gap-1">
+                                <Input 
+                                    type="number" 
+                                    inputMode="decimal"
+                                    value={customTargetDist} 
+                                    onChange={e => setCustomTargetDist(e.target.value)} 
+                                    className="w-16 h-8 border-none bg-white rounded-lg p-0 font-black text-base text-center focus-visible:ring-0 shadow-inner" 
+                                />
+                                <span className="text-[10px] font-black text-primary/60">m</span>
+                            </div>
                         </div>
-                        <Badge variant="outline" className="text-[8px] font-black uppercase h-5 border-blue-200 text-blue-600">1 clic = 1cm à 100m</Badge>
+                        <Badge variant="outline" className="text-[9px] font-black uppercase h-11 border-blue-200 text-blue-600 px-3 bg-white/50">1 clic = 1cm à 100m</Badge>
                     </div>
                 </div>
 
