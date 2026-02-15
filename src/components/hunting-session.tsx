@@ -807,7 +807,22 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
         </Card>
         {mySessions.length > 0 && <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-bold uppercase text-muted-foreground">Mes sessions</CardTitle></CardHeader>
             <CardContent className="space-y-2">{mySessions.map(s => <div key={s.id} className="flex justify-between items-center p-3 border rounded-lg text-sm bg-card"><span className="font-bold">{s.id}</span><div className="flex gap-2"><Button variant="ghost" size="sm" onClick={() => setJoinCode(s.id)}>Sélectionner</Button><Button variant="ghost" size="icon" onClick={() => setSessionToDelete(s.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></div></div>)}</CardContent></Card>}
-        {sessionToDelete && <AlertDialog open={!!sessionToDelete} onOpenChange={(o) => !o && setSessionToDelete(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Supprimer ?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Annuler</AlertDialogCancel><AlertDialogAction onClick={handleDeleteSessionConfirmed}>Supprimer</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>}
+        {sessionToDelete && (
+          <AlertDialog open={!!sessionToDelete} onOpenChange={(o) => !o && setSessionToDelete(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Supprimer la session ?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Cette action est irréversible. Toutes les données de position et les participants seront supprimés de cette session.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteSessionConfirmed}>Supprimer définitivement</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
     </div>
   );
 }

@@ -99,15 +99,15 @@ service cloud.firestore {
     match /spot_shares/{id} { allow read, write: if isSignedIn(); }
     
     // ======================================================
-    // 4. FONCTIONNALITÉS TERROIR (RÉCURSIF)
+    // 4. FONCTIONNALITÉS TERROIR (ACCÈS RÉCURSIF GÉNÉRIQUE)
     // ======================================================
     
-    // Sessions de Groupe (Chasse & Pêche)
+    // Sessions de Groupe (Chasse & Pêche) - Récursif
     match /hunting_sessions/{allPaths=**} {
       allow read, write: if isSignedIn();
     }
 
-    // Boat Tracker (Partage GPS)
+    // Boat Tracker (Partage GPS) - Récursif
     match /vessels/{allPaths=**} {
       allow read, write: if isSignedIn();
     }
