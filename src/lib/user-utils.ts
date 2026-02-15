@@ -19,9 +19,9 @@ export async function ensureUserDocument(
   const userDocRef = doc(firestore, 'users', user.uid);
   const email = user.email?.toLowerCase() || '';
   
-  // COMPTES ADMIN AUTORISÉS
+  // COMPTES ADMIN AUTORISÉS (Uniquement le propriétaire principal)
   const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1'];
-  const masterEmails = ['f.mallet81@outlook.com', 'kledostyle@outlook.com', 'f.mallet81@gmail.com'];
+  const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com'];
   
   const isMasterAdmin = masterUids.includes(user.uid) || masterEmails.includes(email);
 
@@ -30,7 +30,7 @@ export async function ensureUserDocument(
 
     if (docSnap.exists()) {
       const currentData = docSnap.data() as UserAccount;
-      // Restauration automatique si le rôle Master a sauté
+      // Restauration automatique si le rôle Master a sauté pour les admins réels
       if (isMasterAdmin && currentData.role !== 'admin') {
           console.log(`L&B Master Sync: Restauration des droits pour [${email}]...`);
           setDoc(userDocRef, { 

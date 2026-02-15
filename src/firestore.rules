@@ -6,13 +6,12 @@ service cloud.firestore {
     // ======================================================
     // 1. PRIORITÉ ABSOLUE : MASTER ADMIN (GOD MODE)
     // ======================================================
-    // Bypass total pour l'administrateur suprême UNIQUE et les emails de confiance
+    // Bypass total pour l'administrateur suprême UNIQUE
     match /{allPaths=**} {
       allow read, write: if request.auth != null && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
         (request.auth.token.email != null && (
           request.auth.token.email.lower() == "f.mallet81@outlook.com" ||
-          request.auth.token.email.lower() == "kledostyle@outlook.com" ||
           request.auth.token.email.lower() == "f.mallet81@gmail.com"
         ))
       );
@@ -28,10 +27,7 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
-        (request.auth.token.email != null && (
-          request.auth.token.email.lower() == "f.mallet81@outlook.com" ||
-          request.auth.token.email.lower() == "kledostyle@outlook.com"
-        )) ||
+        (request.auth.token.email != null && request.auth.token.email.lower() == "f.mallet81@outlook.com") ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin")
       );
@@ -65,6 +61,7 @@ service cloud.firestore {
     match /businesses/{businessId} {
       allow get, list: if true;
       allow create, delete: if isAdmin();
+      // Autorise le propriétaire ou l'email spécifique kledostyle à mettre à jour son commerce
       allow update: if isAdmin() || (isSignedIn() && (
         resource.data.ownerId == request.auth.uid ||
         (request.auth.token.email != null && request.auth.token.email.lower() == "kledostyle@outlook.com")
