@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
@@ -236,7 +237,8 @@ function HuntingSessionContent() {
   
   useEffect(() => {
     if (userProfile && !hasLoadedInitialPrefs.current) {
-      setNickname(userProfile.displayName || user?.displayName || user?.email?.split('@')[0] || '');
+      // Use huntingNickname if available, fallback to displayName for first-time use
+      setNickname(userProfile.huntingNickname || userProfile.displayName || user?.displayName || user?.email?.split('@')[0] || '');
       setSelectedIcon(userProfile.mapIcon || 'Navigation');
       setSelectedColor(userProfile.mapColor || '#3b82f6');
       
@@ -416,7 +418,7 @@ function HuntingSessionContent() {
     try {
         const currentVesselPrefs = userProfile?.vesselPrefs || {};
         const prefs = { 
-          displayName: nickname, 
+          huntingNickname: nickname, 
           mapIcon: selectedIcon, 
           mapColor: selectedColor,
           vesselPrefs: {
@@ -540,8 +542,8 @@ function HuntingSessionContent() {
                                 <AccordionContent className="space-y-4 pt-2 px-1">
                                     <div className="space-y-4 rounded-lg border p-4 bg-muted/30">
                                         <div className="space-y-1.5">
-                                          <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Mon Surnom</Label>
-                                          <Input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="Surnom..." />
+                                          <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Mon Surnom Chasse</Label>
+                                          <Input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="Surnom Chasse..." />
                                         </div>
                                         
                                         <Button variant={wakeLock ? "secondary" : "outline"} size="sm" className="w-full h-11 border-2" onClick={toggleWakeLock}><Zap className="size-4 mr-2" />{wakeLock ? "ÉVEIL ACTIF" : "MAINTENIR ÉCRAN"}</Button>

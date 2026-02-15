@@ -10,6 +10,7 @@ export interface UserAccount {
   role: UserRole;
   businessId?: string;
   vesselNickname?: string;
+  huntingNickname?: string;
   subscriptionStatus: 'active' | 'inactive' | 'trial' | 'admin' | 'professional' | 'limited';
   subscriptionExpiryDate?: string;
   lastSelectedLocation?: string;

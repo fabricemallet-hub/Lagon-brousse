@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -745,7 +746,7 @@ export default function VesselTrackerPage() {
                             <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl"><Settings className="size-4 text-primary" /><span className="text-[10px] font-black uppercase">Identité & Surnom</span></AccordionTrigger>
                             <AccordionContent className="pt-4 space-y-4">
                                 <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">ID du navire</Label><div className="flex gap-2"><Input placeholder="ID EX: BATEAU-1" value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest flex-grow" /><Button variant="outline" size="icon" className="h-12 w-12 border-2 shrink-0" onClick={handleSaveVessel}><Save className="size-4" /></Button></div></div>
-                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Surnom</Label><Input placeholder="EX: CAPITAINE NEMO" value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} className="font-bold text-center h-12 border-2 uppercase flex-grow w-full" /></div>
+                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Surnom Tracker</Label><Input placeholder="EX: CAPITAINE NEMO" value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} className="font-bold text-center h-12 border-2 uppercase flex-grow w-full" /></div>
                                 <Button variant={wakeLock ? "secondary" : "outline"} className="w-full h-12 font-black uppercase text-[10px] tracking-widest border-2 gap-2" onClick={toggleWakeLock}><Zap className={cn("size-4", wakeLock && "fill-primary")} />{wakeLock ? "MODE ÉVEIL ACTIF" : "ACTIVER MODE ÉVEIL"}</Button>
                             </AccordionContent>
                         </AccordionItem>
