@@ -6,7 +6,7 @@ import { locations } from './locations';
 const proceduralCache = new Map<string, LocationData>();
 
 /**
- * STATIONS DE RÉFÉRENCE (Source: Météo NC / SHOM)
+ * STATIONS DE RÉFÉRENCE (Source: Météo NC / SHOM / Tahiti Tides)
  * Données moyennes annuelles pour définir les seuils automatiques.
  */
 const tideStations = {
@@ -79,6 +79,16 @@ const tideStations = {
       { type: 'haute', time: '20:50', height: 1.15, current: 'Fort' },
       { type: 'basse', time: '02:30', height: 0.40, current: 'Modéré' },
     ]
+  },
+  'Papeete': {
+    avgHigh: 0.50,
+    avgLow: 0.15,
+    tides: [
+      { type: 'haute', time: '00:00', height: 0.50, current: 'Nul' },
+      { type: 'basse', time: '06:00', height: 0.15, current: 'Faible' },
+      { type: 'haute', time: '12:00', height: 0.45, current: 'Nul' },
+      { type: 'basse', time: '18:00', height: 0.20, current: 'Faible' },
+    ]
   }
 };
 
@@ -86,6 +96,7 @@ const tideStations = {
  * MAPPING COMMUNE -> STATION
  */
 export const communeToTideStationMap: { [key: string]: string } = {
+  // --- NOUVELLE CALÉDONIE ---
   'Bélep': 'Koumac', 
   'Boulouparis': 'Nouméa', 
   'Bourail': 'Bourail', 
@@ -118,6 +129,21 @@ export const communeToTideStationMap: { [key: string]: string } = {
   'Thio': 'Thio', 
   'Voh': 'Koné', 
   'Yaté': 'Nouméa',
+  // --- TAHITI ---
+  'Papeete': 'Papeete',
+  'Faaa': 'Papeete',
+  'Punaauia': 'Papeete',
+  'Pirae': 'Papeete',
+  'Mahina': 'Papeete',
+  'Paea': 'Papeete',
+  'Papara': 'Papeete',
+  'Taravao': 'Papeete',
+  'Teahupoo': 'Papeete',
+  'Mataiea': 'Papeete',
+  'Papeari': 'Papeete',
+  'Afareaitu (Moorea)': 'Papeete',
+  'Papetoai (Moorea)': 'Papeete',
+  'Haapiti (Moorea)': 'Papeete',
 };
 
 // Données de base par défaut

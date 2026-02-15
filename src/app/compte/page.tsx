@@ -1,7 +1,8 @@
+
 'use client';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, getDoc, writeBatch, serverTimestamp, updateDoc } from 'firebase/firestore';
-import type { UserAccount, AccessToken, SharedAccessToken, RibSettings } from '@/lib/types';
+import type { UserAccount, AccessToken, SharedAccessToken, RibSettings, Region } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, isBefore, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { 
-  Crown, Star, XCircle, Ticket, Gift, LogOut, Mail, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink, Copy, Check, MapPin, RefreshCw, Store, Zap, Pencil, LayoutGrid, Heart, Save
+  Crown, Star, XCircle, Ticket, Gift, LogOut, Mail, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink, Copy, Check, MapPin, RefreshCw, Store, Zap, Pencil, LayoutGrid, Heart, Save, Globe
 } from 'lucide-react';
 import {
   Select,
@@ -35,9 +36,10 @@ import {
   DialogTrigger,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { locations } from '@/lib/locations';
+import { locationsByRegion, regions } from '@/lib/locations';
 import { navLinks } from '@/lib/nav-links';
 import { cn } from '@/lib/utils';
+import { useLocation } from '@/context/location-context';
 
 export default function ComptePage() {
   const { user, isUserLoading } = useUser();
@@ -45,6 +47,7 @@ export default function ComptePage() {
   const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
+  const { selectedRegion, setSelectedRegion } = useLocation();
   
   const [accessToken, setAccessToken] = useState('');
   const [isRedeeming, setIsRedeeming] = useState(false);
@@ -267,6 +270,10 @@ export default function ComptePage() {
     });
   }, [userProfile]);
 
+  const availableLocations = useMemo(() => {
+    return Object.keys(locationsByRegion[selectedRegion] || {}).sort();
+  }, [selectedRegion]);
+
   if (isUserLoading || isProfileLoading || isSharedTokenLoading) return <div className="space-y-6 px-1"><Skeleton className="h-48 w-full" /><Skeleton className="h-48 w-full" /></div>;
 
   return (
@@ -326,23 +333,40 @@ export default function ComptePage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 p-4 bg-primary/5 rounded-xl border border-primary/10">
-                <div className="p-2 bg-background rounded-lg shadow-sm"><MapPin className="size-5 text-primary" /></div>
-                <div className="flex flex-col flex-1">
-                  <span className="text-[10px] font-black uppercase text-muted-foreground mb-1">Ma Localité (NC)</span>
-                  <Select 
-                    defaultValue={userProfile?.lastSelectedLocation || 'Nouméa'} 
-                    onValueChange={handleUpdateLocation}
-                  >
-                    <SelectTrigger className="h-9 border-2 font-bold text-xs bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-64">
-                      {Object.keys(locations).sort().map(loc => (
-                        <SelectItem key={loc} value={loc}>{loc}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <div className="flex flex-col gap-3 p-4 bg-primary/5 rounded-xl border border-primary/10">
+                <div className="flex items-center gap-4">
+                  <div className="p-2 bg-background rounded-lg shadow-sm"><Globe className="size-5 text-primary" /></div>
+                  <div className="flex flex-col flex-1">
+                    <span className="text-[10px] font-black uppercase text-muted-foreground mb-1">Ma Région</span>
+                    <Select value={selectedRegion} onValueChange={(v: Region) => setSelectedRegion(v)}>
+                      <SelectTrigger className="h-9 border-2 font-bold text-xs bg-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {regions.map(reg => <SelectItem key={reg} value={reg} className="text-xs font-black uppercase">{reg}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 border-t border-dashed pt-3 mt-1">
+                  <div className="p-2 bg-background rounded-lg shadow-sm"><MapPin className="size-5 text-primary" /></div>
+                  <div className="flex flex-col flex-1">
+                    <span className="text-[10px] font-black uppercase text-muted-foreground mb-1">Ma Commune ({selectedRegion})</span>
+                    <Select 
+                      value={userProfile?.lastSelectedLocation || selectedLocation} 
+                      onValueChange={handleUpdateLocation}
+                    >
+                      <SelectTrigger className="h-9 border-2 font-bold text-xs bg-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-64">
+                        {availableLocations.map(loc => (
+                          <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
 

@@ -3,6 +3,8 @@ export type WindDirection = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
 
 export type UserRole = 'client' | 'professional' | 'admin';
 
+export type Region = 'CALEDONIE' | 'TAHITI';
+
 export interface UserAccount {
   id: string;
   email: string;
@@ -13,6 +15,7 @@ export interface UserAccount {
   huntingNickname?: string;
   subscriptionStatus: 'active' | 'inactive' | 'trial' | 'admin' | 'professional' | 'limited';
   subscriptionExpiryDate?: string;
+  selectedRegion?: Region;
   lastSelectedLocation?: string;
   favoriteCategory?: 'Pêche' | 'Chasse' | 'Jardinage';
   notificationsEnabled?: boolean;

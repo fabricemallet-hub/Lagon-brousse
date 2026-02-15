@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -23,7 +24,7 @@ import {
 import { useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -33,20 +34,18 @@ import {
 } from 'firebase/auth';
 import { doc, collection, addDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { ForgotPasswordDialog } from './forgot-password-dialog';
-import { Eye, EyeOff, Ticket, MapPin, ScrollText } from 'lucide-react';
+import { Eye, EyeOff, Ticket, MapPin, ScrollText, Globe } from 'lucide-react';
 import { ensureUserDocument } from '@/lib/user-utils';
 import { redeemAccessToken } from '@/lib/token-utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import type { CgvSettings } from '@/lib/types';
-import { locations } from '@/lib/locations';
+import type { CgvSettings, Region } from '@/lib/types';
+import { locationsByRegion, regions } from '@/lib/locations';
 
 type AuthFormProps = {
   mode: 'login' | 'signup';
 };
-
-const locationOptions = Object.keys(locations).sort();
 
 // Schéma pour la connexion
 const loginSchema = z.object({
@@ -61,6 +60,7 @@ const signupSchema = z.object({
   displayName: z.string().min(3, { message: 'Le nom doit contenir au moins 3 caractères.' }),
   email: z.string().email({ message: 'Veuillez entrer une adresse email valide.' }),
   password: z.string().min(6, { message: 'Le mot de passe doit contenir au moins 6 caractères.' }),
+  region: z.enum(['CALEDONIE', 'TAHITI']),
   commune: z.string().min(1, { message: 'Veuillez choisir votre commune.' }),
   token: z.string().optional(),
   acceptCgv: z.boolean().refine(val => val === true, {
@@ -85,12 +85,25 @@ export function AuthForm({ mode }: AuthFormProps) {
       displayName: '',
       email: '',
       password: '',
+      region: 'CALEDONIE',
       commune: 'Nouméa',
       token: '',
       rememberMe: false,
       acceptCgv: false,
     },
   });
+
+  const selectedRegion = form.watch('region') as Region;
+  const availableLocations = useMemo(() => {
+    return Object.keys(locationsByRegion[selectedRegion] || {}).sort();
+  }, [selectedRegion]);
+
+  // Reset commune when region changes
+  useEffect(() => {
+    if (mode === 'signup' && selectedRegion) {
+      form.setValue('commune', availableLocations[0]);
+    }
+  }, [selectedRegion, availableLocations, form, mode]);
 
   const cgvRef = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -158,8 +171,19 @@ export function AuthForm({ mode }: AuthFormProps) {
               displayName: signupValues.displayName
           });
 
-          // Enregistrement de la commune choisie
-          await ensureUserDocument(firestore, user, signupValues.displayName, signupValues.commune);
+          // Enregistrement de la commune et région choisie
+          const userDocRef = doc(firestore, 'users', user.uid);
+          await setDoc(userDocRef, {
+            id: user.uid,
+            email: emailLower,
+            displayName: signupValues.displayName,
+            role: 'client',
+            subscriptionStatus: 'trial',
+            selectedRegion: signupValues.region,
+            lastSelectedLocation: signupValues.commune,
+            subscriptionStartDate: new Date().toISOString(),
+            subscriptionExpiryDate: addMonths(new Date(), 3).toISOString()
+          });
 
           if (cgvData) {
             const acceptanceRef = collection(firestore, 'users', user.uid, 'cgv_acceptances');
@@ -217,28 +241,52 @@ export function AuthForm({ mode }: AuthFormProps) {
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="commune"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Votre Commune (NC)</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger className="h-12 border-2">
-                        <SelectValue placeholder="Choisir une commune..." />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent className="max-h-64">
-                      {locationOptions.map(loc => (
-                        <SelectItem key={loc} value={loc}>{loc}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            
+            <div className="grid grid-cols-2 gap-3">
+              <FormField
+                control={form.control}
+                name="region"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-1.5"><Globe className="size-3 text-primary" /> Région</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="h-12 border-2 text-[10px] font-black uppercase">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {regions.map(reg => <SelectItem key={reg} value={reg} className="text-[10px] font-black uppercase">{reg}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="commune"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-1.5"><MapPin className="size-3 text-primary" /> Commune</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="h-12 border-2 text-xs font-bold">
+                          <SelectValue placeholder="Choisir..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="max-h-64">
+                        {availableLocations.map(loc => (
+                          <SelectItem key={loc} value={loc} className="text-xs font-bold">{loc}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
           </>
         )}
         <FormField

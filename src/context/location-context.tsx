@@ -1,13 +1,17 @@
+
 'use client';
 
-import { locations as locationsMap } from '@/lib/locations';
+import { locationsByRegion } from '@/lib/locations';
 import type { ReactNode } from 'react';
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
-import type { UserAccount } from '@/lib/types';
+import type { UserAccount, Region } from '@/lib/types';
 
 type LocationContextType = {
+  regions: string[];
+  selectedRegion: Region;
+  setSelectedRegion: (region: Region) => void;
   locations: string[];
   selectedLocation: string;
   setSelectedLocation: (location: string) => void;
@@ -19,9 +23,11 @@ const LocationContext = createContext<LocationContextType | undefined>(
 );
 
 export function LocationProvider({ children }: { children: ReactNode }) {
-  const locations = Object.keys(locationsMap);
+  const regions = Object.keys(locationsByRegion);
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
+  
+  const [selectedRegion, _setSelectedRegion] = useState<Region>('CALEDONIE');
   const [selectedLocation, _setSelectedLocation] = useState<string>('Nouméa');
   const [isLocationLoading, setIsLocationLoading] = useState(true);
 
@@ -32,40 +38,55 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
+  // Filtered locations based on selected region
+  const availableLocations = useMemo(() => {
+    return Object.keys(locationsByRegion[selectedRegion] || {}).sort();
+  }, [selectedRegion]);
+
   useEffect(() => {
-    // While any user or profile data is loading, the location is loading.
     if (isUserLoading || (user && isProfileLoading)) {
       setIsLocationLoading(true);
       return;
     }
     
-    // Once loading is finished...
-    // If we have a user with a saved location, use it.
-    if (userProfile && userProfile.lastSelectedLocation && locations.includes(userProfile.lastSelectedLocation)) {
-      _setSelectedLocation(userProfile.lastSelectedLocation);
-    } else {
-      // Otherwise (no user, or user without saved location), use default.
-      _setSelectedLocation('Nouméa');
+    if (userProfile) {
+      if (userProfile.selectedRegion && regions.includes(userProfile.selectedRegion)) {
+        _setSelectedRegion(userProfile.selectedRegion);
+      }
+      if (userProfile.lastSelectedLocation) {
+        // We only set it if it belongs to the current region or after region is determined
+        _setSelectedLocation(userProfile.lastSelectedLocation);
+      }
     }
 
-    // In any case, loading is finished now.
     setIsLocationLoading(false);
-
   }, [user, isUserLoading, userProfile, isProfileLoading]);
 
+  const setSelectedRegion = useCallback((region: Region) => {
+    _setSelectedRegion(region);
+    const firstLoc = Object.keys(locationsByRegion[region])[0];
+    _setSelectedLocation(firstLoc);
+    
+    if (userDocRef) {
+      updateDoc(userDocRef, { 
+        selectedRegion: region,
+        lastSelectedLocation: firstLoc 
+      }).catch(console.warn);
+    }
+  }, [userDocRef]);
 
   const setSelectedLocation = useCallback((location: string) => {
     _setSelectedLocation(location);
     if (userDocRef) {
-      updateDoc(userDocRef, { lastSelectedLocation: location }).catch(error => {
-        // Not critical, can fail silently or with a console log.
-        console.warn("Could not save last selected location:", error);
-      });
+      updateDoc(userDocRef, { lastSelectedLocation: location }).catch(console.warn);
     }
   }, [userDocRef]);
 
   const value = {
-    locations,
+    regions: [...regions],
+    selectedRegion,
+    setSelectedRegion,
+    locations: availableLocations,
     selectedLocation,
     setSelectedLocation,
     isLocationLoading

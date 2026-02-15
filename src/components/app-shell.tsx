@@ -28,7 +28,8 @@ import {
   MailWarning,
   RefreshCw,
   ShieldCheck,
-  Mail
+  Mail,
+  Globe
 } from 'lucide-react';
 import {
   Select,
@@ -50,7 +51,7 @@ import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/fireb
 import { Skeleton } from './ui/skeleton';
 import { signOut, sendEmailVerification } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
-import type { UserAccount } from '@/lib/types';
+import type { UserAccount, Region } from '@/lib/types';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -62,7 +63,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { ensureUserDocument } from '@/lib/user-utils';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { locations, selectedLocation, setSelectedLocation, isLocationLoading } = useLocation();
+  const { regions, selectedRegion, setSelectedRegion, locations, selectedLocation, setSelectedLocation, isLocationLoading } = useLocation();
   const { selectedDate, setSelectedDate } = useDate();
   const pathname = usePathname();
   const router = useRouter();
@@ -262,12 +263,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   {status === 'active' && <Badge variant="default" className="text-[10px] h-5 font-black uppercase bg-primary">Abonné</Badge>}
                   {status === 'admin' && <Badge variant="default" className="text-[10px] h-5 font-black uppercase bg-slate-800">Admin</Badge>}
                 </div>
-                {isLocationLoading ? <Skeleton className="h-9 w-[120px]" /> : (
-                  <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-                    <SelectTrigger className="w-[130px] h-9 text-xs font-bold border-2"><SelectValue placeholder="Commune" /></SelectTrigger>
-                    <SelectContent className="max-h-80">{locations.map((loc: string) => <SelectItem key={loc} value={loc} className="text-xs font-bold">{loc}</SelectItem>)}</SelectContent>
+                
+                <div className="flex items-center gap-2">
+                  <Select value={selectedRegion} onValueChange={(v: Region) => setSelectedRegion(v)}>
+                    <SelectTrigger className="w-[110px] h-9 text-[10px] font-black uppercase border-2 border-primary/20 bg-primary/5">
+                      <Globe className="size-3 mr-1 text-primary" />
+                      <SelectValue placeholder="Région" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {regions.map(reg => (
+                        <SelectItem key={reg} value={reg} className="text-[10px] font-black uppercase">{reg}</SelectItem>
+                      ))}
+                    </SelectContent>
                   </Select>
-                )}
+
+                  {isLocationLoading ? <Skeleton className="h-9 w-[120px]" /> : (
+                    <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+                      <SelectTrigger className="w-[130px] h-9 text-xs font-bold border-2"><SelectValue placeholder="Commune" /></SelectTrigger>
+                      <SelectContent className="max-h-80">{locations.map((loc: string) => <SelectItem key={loc} value={loc} className="text-xs font-bold">{loc}</SelectItem>)}</SelectContent>
+                    </Select>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center justify-between w-full gap-2">
