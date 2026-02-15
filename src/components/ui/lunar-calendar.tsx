@@ -53,7 +53,7 @@ import { Button } from './button';
 import { cn, getRegionalNow } from '@/lib/utils';
 import { useCalendarView } from '@/context/calendar-view-context';
 import type { Tide } from '@/lib/types';
-import { CrabIcon, LobsterIcon } from '../icons';
+import { CrabIcon, LobsterIcon, OctopusIcon } from '../icons';
 import { Badge } from './badge';
 
 export const MoonPhaseIcon = ({
@@ -91,7 +91,6 @@ const DayCell = React.memo(({
   
   const data = useMemo(() => generateProceduralData(selectedLocation, day), [selectedLocation, day]);
 
-  // Use regional today instead of local browser date
   const today = useMemo(() => startOfDay(getRegionalNow(selectedRegion)), [selectedRegion]);
   const cellDate = startOfDay(day);
   const isPastDay = cellDate < today;
@@ -105,12 +104,10 @@ const DayCell = React.memo(({
     return [...data.tides].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
   }, [data.tides]);
 
-  // Calcul du score de pêche maximal pour la journée
   const maxFishRating = useMemo(() => {
     return Math.max(...data.fishing.flatMap(slot => slot.fish.map(f => f.rating)));
   }, [data.fishing]);
 
-  // Détection de l'activité pélagique (Tazard, Wahoo, Thon)
   const hasHighPelagicActivity = useMemo(() => {
     if (!data.pelagicInfo?.inSeason) return false;
     const pelagicNames = ['Wahoo', 'Tazard', 'Thon Jaune'];
@@ -145,7 +142,6 @@ const DayCell = React.memo(({
 
       {calendarView === 'peche' ? (
         <div className="flex-grow flex flex-col justify-center items-center gap-0.5 pt-1">
-          {/* Notation par nombre de poissons */}
           <div className="flex items-center justify-center gap-0.5 h-4 mb-1">
             <div className="flex gap-0.5">
                 {maxFishRating >= 5 && (
@@ -159,7 +155,6 @@ const DayCell = React.memo(({
                 )}
             </div>
             
-            {/* Indicateur Pélagiques (Orange) */}
             {hasHighPelagicActivity && (
                 <div className="border-l border-primary/20 ml-1 pl-1">
                     <Fish className="size-3 text-orange-500 fill-orange-500 drop-shadow-sm" />
@@ -167,10 +162,11 @@ const DayCell = React.memo(({
             )}
           </div>
 
-          <div className="flex items-center justify-center gap-0.5 h-3 overflow-hidden flex-nowrap whitespace-nowrap w-full border-t border-dashed border-primary/10 pt-1">
+          <div className="flex items-center justify-center gap-0.5 h-3.5 overflow-hidden flex-nowrap whitespace-nowrap w-full border-t border-dashed border-primary/10 pt-1">
             {data.crabAndLobster.crabStatus === 'Plein' && <CrabIcon className="size-3.5 text-green-600 shrink-0" />}
             {data.crabAndLobster.crabStatus === 'Mout' && <CrabIcon className="size-3.5 text-destructive shrink-0" />}
             {data.crabAndLobster.lobsterActivity === 'Élevée' && <LobsterIcon className="size-3.5 text-blue-600 shrink-0" />}
+            {data.crabAndLobster.octopusActivity === 'Élevée' && <OctopusIcon className="size-3.5 text-indigo-600 shrink-0" />}
           </div>
 
           <div className="mt-auto w-full flex flex-col items-center gap-0 pb-0.5">
@@ -220,7 +216,6 @@ export function LunarCalendar() {
   const initialDistRef = useRef<number | null>(null);
   const initialZoomRef = useRef<number>(1);
 
-  // Sync calendar month when region changes (which updates selectedDate via getRegionalNow)
   useEffect(() => {
     setDisplayDate(startOfMonth(selectedDate));
   }, [selectedRegion]);
@@ -377,7 +372,6 @@ export function LunarCalendar() {
               <div className="space-y-8">
                 {calendarView === 'champs' ? (
                   <div className="space-y-6">
-                    {/* SECTION 1: LUNE & ZODIAQUE CARDS */}
                     <div className="grid gap-3">
                       <div className="flex items-center justify-between p-4 bg-white border-2 rounded-2xl shadow-sm">
                         <div className="flex items-center gap-3">
@@ -400,14 +394,12 @@ export function LunarCalendar() {
                       </div>
                     </div>
 
-                    {/* SECTION 2: RECOMMENDATION BOX */}
                     <div className="p-5 bg-white border-2 border-dashed border-accent/20 rounded-2xl">
                       <p className="text-sm font-bold leading-relaxed text-slate-700 text-center italic">
                         "{detailedDayData.farming.recommendation}"
                       </p>
                     </div>
 
-                    {/* SECTION 3: TRAVAUX RECOMMANDÉS */}
                     <div className="space-y-4">
                       <h3 className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-2">
                         <Info className="size-3" /> Travaux recommandés
@@ -432,7 +424,6 @@ export function LunarCalendar() {
                   </div>
                 ) : (
                   <div className="space-y-8">
-                    {/* SECTION 1: MARÉES DU JOUR */}
                     <div className="space-y-3">
                       <h3 className="text-[10px] font-black uppercase text-primary tracking-widest px-1 flex items-center gap-2">
                         <Waves className="size-3" /> Marées du jour
@@ -459,7 +450,6 @@ export function LunarCalendar() {
                       </div>
                     </div>
 
-                    {/* SECTION 2: CRUSTACÉS & MOLLUSQUES */}
                     <div className="space-y-3">
                       <h3 className="text-[10px] font-black uppercase text-primary tracking-widest px-1 flex items-center gap-2">
                         <CrabIcon className="size-3" /> Crustacés & Mollusques
@@ -485,10 +475,19 @@ export function LunarCalendar() {
                           </div>
                           <Badge variant="outline" className="text-[8px] font-black uppercase border-primary/20 text-primary h-5 px-1.5">{detailedDayData.crabAndLobster.lobsterActivity}</Badge>
                         </div>
+                        <div className="flex items-center justify-between p-3 bg-white border-2 rounded-2xl shadow-sm">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-indigo-50 rounded-xl"><OctopusIcon className="size-5 text-indigo-500" /></div>
+                            <div>
+                              <p className="font-black text-xs uppercase">Poulpe</p>
+                              <p className="text-[9px] font-medium text-muted-foreground leading-tight">{detailedDayData.crabAndLobster.octopusMessage}</p>
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="text-[8px] font-black uppercase border-primary/20 text-primary h-5 px-1.5">{detailedDayData.crabAndLobster.octopusActivity}</Badge>
+                        </div>
                       </div>
                     </div>
 
-                    {/* SECTION 3: PRÉVISIONS PAR ESPÈCES */}
                     <div className="space-y-6">
                       <h3 className="text-[10px] font-black uppercase text-primary tracking-widest px-1 flex items-center gap-2">
                         <Fish className="size-3" /> Prévisions par espèces

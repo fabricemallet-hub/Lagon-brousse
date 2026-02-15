@@ -25,7 +25,7 @@ import {
   Zap,
   Star
 } from 'lucide-react';
-import { CrabIcon, LobsterIcon } from '@/components/icons';
+import { CrabIcon, LobsterIcon, OctopusIcon } from '@/components/icons';
 import { cn } from '@/lib/utils';
 
 export default function CalendrierPage() {
@@ -112,7 +112,11 @@ export default function CalendrierPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="p-1.5 bg-blue-100 rounded-lg"><LobsterIcon className="size-4 text-blue-600" /></div>
-                    <span className="text-xs font-bold">Activité Langouste Élevée</span>
+                    <span className="text-xs font-bold">Langouste (Vives-eaux = Platier)</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="p-1.5 bg-indigo-100 rounded-lg"><OctopusIcon className="size-4 text-indigo-600" /></div>
+                    <span className="text-xs font-bold">Poulpe (Marée basse &lt; 0.23m)</span>
                   </div>
                 </div>
               </div>

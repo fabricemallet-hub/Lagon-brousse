@@ -13,7 +13,7 @@ import {
 import { getDataForDate, LocationData } from '@/lib/data';
 import { useLocation } from '@/context/location-context';
 import { useDate } from '@/context/date-context';
-import { Clock, Waves, TrendingUp, TrendingDown, Fish, Star } from 'lucide-react';
+import { Clock, Waves, TrendingUp, TrendingDown, Fish, Star, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,6 +24,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import { CrabIcon, LobsterIcon, OctopusIcon } from '@/components/icons';
 
 // Import dynamique du carnet de pêche
 const FishingLogCard = dynamic(() => import('@/components/ui/fishing-log-card').then(mod => mod.FishingLogCard), { 
@@ -109,13 +110,14 @@ export default function PechePage() {
         <Card className="w-full border-2 shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-              <Clock className="size-4" /> Activité Crustacés
+              <Clock className="size-4" /> Activité Crustacés & Poulpes
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="flex items-start gap-4 p-3 rounded-xl bg-muted/30 border">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
+                  <div className="p-1.5 bg-white rounded-lg shadow-sm"><CrabIcon className="size-4 text-red-500" /></div>
                   <h4 className="font-black uppercase text-xs tracking-tight">Crabe de palétuvier</h4>
                   <Badge variant={crabAndLobster.crabStatus === 'Plein' ? 'default' : (crabAndLobster.crabStatus === 'Mout' ? 'destructive' : 'secondary')} className="text-[9px] font-black h-5 uppercase">
                     {crabAndLobster.crabStatus}
@@ -127,17 +129,36 @@ export default function PechePage() {
             <div className="flex items-start gap-4 p-3 rounded-xl bg-muted/30 border">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
+                  <div className="p-1.5 bg-white rounded-lg shadow-sm"><LobsterIcon className="size-4 text-blue-500" /></div>
                   <h4 className="font-black uppercase text-xs tracking-tight">Langouste</h4>
                   <div className="flex gap-1">
                     <Badge variant={crabAndLobster.lobsterActivity === 'Élevée' ? 'default' : 'secondary'} className="text-[9px] font-black h-5 uppercase">
                       {crabAndLobster.lobsterActivity}
                     </Badge>
                     <Badge variant="outline" className="text-[9px] font-black h-5 uppercase border-primary/30 text-primary">
-                      {crabAndLobster.lobsterActivity === 'Élevée' ? 'Intérieur' : 'Extérieur'}
+                      {crabAndLobster.lobsterActivity === 'Élevée' ? 'Platier (Int.)' : 'Récif (Ext.)'}
                     </Badge>
                   </div>
                 </div>
                 <p className="text-[11px] font-medium text-muted-foreground leading-relaxed">{crabAndLobster.lobsterMessage}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4 p-3 rounded-xl bg-muted/30 border">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="p-1.5 bg-white rounded-lg shadow-sm"><OctopusIcon className="size-4 text-indigo-600" /></div>
+                  <h4 className="font-black uppercase text-xs tracking-tight">Poulpe</h4>
+                  <Badge variant={crabAndLobster.octopusActivity === 'Élevée' ? 'default' : 'secondary'} className="bg-indigo-600 text-white border-none text-[9px] font-black h-5 uppercase">
+                    {crabAndLobster.octopusActivity}
+                  </Badge>
+                </div>
+                <p className="text-[11px] font-medium text-muted-foreground leading-relaxed">{crabAndLobster.octopusMessage}</p>
+                {crabAndLobster.octopusActivity === 'Élevée' && (
+                    <div className="mt-2 p-2 bg-indigo-50 border border-indigo-100 rounded-lg flex gap-2">
+                        <Info className="size-3 text-indigo-600 shrink-0 mt-0.5" />
+                        <p className="text-[9px] font-bold text-indigo-900 leading-tight">Truc : Cherchez le "jardin" (débris de coquillages) devant les trous.</p>
+                    </div>
+                )}
               </div>
             </div>
           </CardContent>

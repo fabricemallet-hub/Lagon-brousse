@@ -214,7 +214,6 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation' | 'tideThresholds'> =
  * GÉNÉRATEUR PROCÉDURAL PRINCIPAL
  */
 export function generateProceduralData(location: string, date: Date): LocationData {
-  // Fix: Get dateKey in date's "local" time instead of toISOString UTC
   const dateKey = format(date, 'yyyy-MM-dd');
   const cacheKey = `${location}-${dateKey}`;
   
@@ -222,7 +221,6 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     return proceduralCache.get(cacheKey)!;
   }
 
-  // Force start of day in target location time
   const effectiveDate = new Date(dateKey + 'T00:00:00');
   const dayOfMonth = effectiveDate.getDate();
   const month = effectiveDate.getMonth();
@@ -330,7 +328,7 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     locationData.crabAndLobster.crabStatus = 'Mout';
     locationData.crabAndLobster.crabMessage = "Mortes-eaux (Quartier) : Période de mue des crabes (mouts).";
     locationData.crabAndLobster.lobsterActivity = 'Faible';
-    locationData.crabAndLobster.lobsterMessage = "Les langouste sont calées dans les trous du récif extérieur (en dehors).";
+    locationData.crabAndLobster.lobsterMessage = "Les langouste sont calées dans les trous du récif extérieur.";
   } else if (isFullOrNew) {
     locationData.crabAndLobster.crabStatus = 'Plein';
     locationData.crabAndLobster.crabMessage = "Vives-eaux : Les crabes sont actifs et bien pleins.";
@@ -343,12 +341,29 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     locationData.crabAndLobster.lobsterMessage = "Activité régulière en bordure de récif.";
   }
 
+  // --- LOGIQUE POULPE (NC & TAHITI) ---
+  const isOctopusSeason = [5, 6, 7, 8, 9].includes(month); // Juin à Octobre
+  const hasVeryLowTide = locationData.tides.some(t => t.type === 'basse' && t.height <= 0.23);
+  
+  if (hasVeryLowTide) {
+    locationData.crabAndLobster.octopusActivity = 'Élevée';
+    locationData.crabAndLobster.octopusMessage = isOctopusSeason 
+      ? "Saison idéale : Grande marée basse en hiver austral. Cherchez les 'jardins' sur le platier."
+      : "Excellent : Grande marée basse. Cherchez les cavités avec débris de coquillages.";
+  } else if (isOctopusSeason) {
+    locationData.crabAndLobster.octopusActivity = 'Moyenne';
+    locationData.crabAndLobster.octopusMessage = "Saison favorable mais marée moyenne. Privilégiez l'aube ou le crépuscule.";
+  } else {
+    locationData.crabAndLobster.octopusActivity = 'Faible';
+    locationData.crabAndLobster.octopusMessage = "Peu de découvert : les poulpes restent profonds.";
+  }
+
   locationData.weather.wind.forEach((forecast: WindForecast, index: number) => {
     const baseSpeed = 8 + Math.sin(dateSeed * 0.2 + locationSeed + index) * 5;
     forecast.speedLagon = Math.max(0, Math.round(baseSpeed));
-    forecast.speedLarge = Math.max(0, Math.round(baseSpeed * 1.4)); // Plus fort au large
-    forecast.speedLand = Math.max(0, Math.round(baseSpeed * 0.7)); // Plus faible à terre
-    forecast.speed = forecast.speedLagon; // Pour compatibilité legacy
+    forecast.speedLarge = Math.max(0, Math.round(baseSpeed * 1.4)); 
+    forecast.speedLand = Math.max(0, Math.round(baseSpeed * 0.7)); 
+    forecast.speed = forecast.speedLagon; 
 
     const directions: WindDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
     forecast.direction = directions[Math.floor(((dateSeed / 5) + locationSeed + index * 2) % directions.length)];
@@ -384,7 +399,6 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     ? `Lune montante : la sève est active. Idéal pour le bouturage et la plantation des variétés ${currentZodiac}.`
     : `Lune descendante : la sève descend vers les racines. Idéal pour la taille, la tonte et les légumes ${currentZodiac}.`;
 
-  // Peuplement des tâches détaillées (farming.details)
   locationData.farming.details = [];
   
   if (locationData.farming.isGoodForPruning) {
@@ -411,7 +425,6 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     });
   }
 
-  // Tâche basée sur le zodiaque du jour
   const zodiacTasks = {
     Fruits: { task: 'Légumes Fruits', desc: 'Favorisez les semis et plantations de tomates, piments, aubergines et concombres.', icon: 'Spade' },
     Racines: { task: 'Légumes Racines', desc: 'Idéal pour semer ou planter carottes, radis, oignons et pommes de terre.', icon: 'Carrot' },
