@@ -18,12 +18,12 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { LocationData, FishingSpot, SwellForecast, Tide, SpotShare } from '@/lib/types';
 import { getDataForDate, generateProceduralData } from '@/lib/data';
-import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown, Pencil, History, Navigation, Map as MapIcon, RefreshCw, X, Share2, Send, Info } from 'lucide-react';
+import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown, Pencil, History, Navigation, Map as MapIcon, RefreshCw, X, Share2, Send, Info, Search, Filter, ArrowDownWideArrow } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from './alert';
 import { useLocation } from '@/context/location-context';
 import { findSimilarDay, analyzeBestDay } from '@/ai/flows/find-best-fishing-day';
-import { recommendBestSpot } from '@/ai/schemas';
+import { recommendBestSpot } from '@/ai/flows/recommend-best-spot';
 import type { FishingAnalysisOutput, RecommendBestSpotOutput } from '@/ai/schemas';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
@@ -82,6 +82,11 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     const [isRecommendDialogOpen, setIsRecommendDialogOpen] = useState(false);
     const [selectedSpotIds, setSelectedSpotIds] = useState<string[]>([]);
     
+    // --- FILTERS STATE ---
+    const [filterSearch, setFilterSearch] = useState('');
+    const [filterTypes, setFilterTypes] = useState<string[]>([]);
+    const [sortByDistance, setSortByDistance] = useState(false);
+
     const [openSpotId, setOpenSpotId] = useState<string | undefined>(undefined);
     const spotRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -102,6 +107,47 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         return query(collection(firestore, 'users', user.uid, 'fishing_spots'), orderBy('createdAt', 'desc'));
     }, [user, firestore]);
     const { data: savedSpots, isLoading: areSpotsLoading } = useCollection<FishingSpot>(fishingSpotsRef);
+
+    // Filtered and Sorted Spots
+    const filteredAndSortedSpots = useMemo(() => {
+        if (!savedSpots) return [];
+        
+        let result = [...savedSpots];
+
+        // 1. Multi-Technique Filter
+        if (filterTypes.length > 0) {
+            result = result.filter(spot => 
+                spot.fishingTypes?.some(t => filterTypes.includes(t))
+            );
+        }
+
+        // 2. Search Text (Name or Notes)
+        if (filterSearch.trim()) {
+            const s = filterSearch.toLowerCase();
+            result = result.filter(spot => 
+                spot.name.toLowerCase().includes(s) || 
+                (spot.notes?.toLowerCase() || '').includes(s)
+            );
+        }
+
+        // 3. Sorting
+        if (sortByDistance && userLocation) {
+            result.sort((a, b) => {
+                const distA = getDistance(userLocation.lat, userLocation.lng, a.location.latitude, a.location.longitude);
+                const distB = getDistance(userLocation.lat, userLocation.lng, b.location.latitude, b.location.longitude);
+                return distA - distB;
+            });
+        } else {
+            // Default: Most recent first
+            result.sort((a, b) => {
+                const timeA = a.createdAt?.toMillis?.() || 0;
+                const timeB = b.createdAt?.toMillis?.() || 0;
+                return timeB - timeA;
+            });
+        }
+
+        return result;
+    }, [savedSpots, filterSearch, filterTypes, sortByDistance, userLocation]);
 
     // Listener pour les spots reçus
     const sharesRef = useMemoFirebase(() => {
@@ -201,6 +247,14 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     
     const handleToggleFishingType = (typeId: string) => {
         setSelectedFishingTypes(prev =>
+            prev.includes(typeId)
+                ? prev.filter(id => id !== typeId)
+                : [...prev, typeId]
+        );
+    };
+
+    const handleToggleFilterType = (typeId: string) => {
+        setFilterTypes(prev =>
             prev.includes(typeId)
                 ? prev.filter(id => id !== typeId)
                 : [...prev, typeId]
@@ -645,8 +699,79 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                 </div>
 
                 {!isFullscreen && (
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-2">
+                    <div className="space-y-6">
+                        {/* RECHERCHE RAPIDE & FILTRES */}
+                        <div className="space-y-4 bg-muted/20 p-4 rounded-[2rem] border-2 border-dashed border-primary/10">
+                            <div className="flex items-center justify-between px-1">
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                                    <Search className="size-3" /> Recherche Rapide
+                                </h4>
+                                <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-6 text-[8px] font-black uppercase text-muted-foreground"
+                                    onClick={() => {
+                                        setFilterSearch('');
+                                        setFilterTypes([]);
+                                        setSortByDistance(false);
+                                    }}
+                                >
+                                    Effacer tout
+                                </Button>
+                            </div>
+
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                                <Input 
+                                    placeholder="Nom du spot ou note..." 
+                                    value={filterSearch}
+                                    onChange={(e) => setFilterSearch(e.target.value)}
+                                    className="pl-10 h-11 border-2 bg-white font-bold text-xs"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <p className="text-[8px] font-black uppercase text-muted-foreground ml-1">Type de pêche (Choix multiple)</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {fishingTypes.map(t => {
+                                        const isSelected = filterTypes.includes(t.id);
+                                        return (
+                                            <button 
+                                                key={t.id}
+                                                onClick={() => handleToggleFilterType(t.id)}
+                                                className={cn(
+                                                    "px-3 py-1.5 rounded-full text-[9px] font-black uppercase border-2 transition-all active:scale-95 shadow-sm",
+                                                    isSelected ? "bg-primary text-white border-primary" : "bg-white border-slate-100 text-muted-foreground opacity-70"
+                                                )}
+                                            >
+                                                {t.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            <div className="pt-2 border-t border-primary/5">
+                                <Button 
+                                    variant={sortByDistance ? 'default' : 'outline'} 
+                                    className={cn(
+                                        "w-full h-11 font-black uppercase text-[10px] gap-3 border-2 transition-all",
+                                        sortByDistance ? "bg-primary shadow-lg scale-[1.02]" : "bg-white border-primary/20 text-primary"
+                                    )}
+                                    onClick={() => {
+                                        if (!sortByDistance && watchId.current === null) {
+                                            startWatchingPosition();
+                                        }
+                                        setSortByDistance(!sortByDistance);
+                                    }}
+                                >
+                                    {sortByDistance ? <Check className="size-4" /> : <ArrowDownWideArrow className="size-4" />}
+                                    {sortByDistance ? "Trié par distance (Plus proches)" : "Trier par distance (Plus proches)"}
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 px-1">
                             <Button 
                                 variant="outline" 
                                 className="flex-1 font-bold h-12 uppercase text-[10px] leading-tight tracking-widest border-2 px-2" 
@@ -657,111 +782,127 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                 Analyser {selectedSpotIds.length > 0 ? `(${selectedSpotIds.length})` : ''}
                             </Button>
                         </div>
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 mb-2 px-1">
-                            <History className="size-3" /> Historique de vos spots
-                        </h4>
-                        {!areSpotsLoading && savedSpots && savedSpots.length > 0 ? (
-                            <AccordionPrimitive.Root 
-                                type="single" 
-                                collapsible 
-                                className="w-full space-y-2"
-                                value={openSpotId}
-                                onValueChange={setOpenSpotId}
-                            >
-                               {savedSpots.map(spot => (
-                                   <AccordionPrimitive.Item 
-                                        ref={(el) => (spotRefs.current[spot.id] = el)}
-                                        value={spot.id} 
-                                        key={spot.id} 
-                                        className="border-2 rounded-xl bg-card overflow-hidden shadow-sm"
-                                    >
-                                       <div className="flex items-center w-full">
-                                            <div className="pl-3 py-4" onClick={(e) => e.stopPropagation()}>
-                                                <Checkbox
-                                                    id={`select-spot-${spot.id}`}
-                                                    className="size-5 border-2"
-                                                    checked={selectedSpotIds.includes(spot.id)}
-                                                    onCheckedChange={() => handleSpotSelection(spot.id)}
-                                                />
-                                            </div>
-                                            <AccordionPrimitive.Header asChild>
-                                                <AccordionPrimitive.Trigger className='flex flex-1 items-center justify-between py-4 font-medium transition-all hover:no-underline [&[data-state=open]>svg]:rotate-180 pl-2 pr-4 text-left'>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="p-2 rounded-lg" style={{backgroundColor: spot.color + '15'}}>
-                                                            {React.createElement(mapIcons[spot.icon as keyof typeof mapIcons] || MapPin, { className: 'size-5', style: {color: spot.color} })}
-                                                        </div>
-                                                        <div className="min-w-0">
-                                                            <p className="font-black uppercase tracking-tight text-xs leading-none truncate">{spot.name}</p>
-                                                            <div className="flex flex-wrap items-center gap-2 mt-1">
-                                                                <p className="text-[9px] font-bold text-muted-foreground/60 uppercase">
-                                                                    {spot.createdAt ? format(spot.createdAt.toDate(), 'd MMM yyyy à HH:mm', { locale: fr }) : '...'}
-                                                                </p>
-                                                                {spot.fishingTypes?.map(typeId => {
-                                                                    const typeInfo = fishingTypes.find(t => t.id === typeId);
-                                                                    return (
-                                                                        <span 
-                                                                            key={typeId} 
-                                                                            className={cn(
-                                                                                "text-[7px] h-3.5 px-1.5 flex items-center rounded-full font-black uppercase text-white shadow-sm",
-                                                                                typeInfo?.bgColor || "bg-slate-500"
-                                                                            )}
-                                                                        >
-                                                                            {typeInfo?.label || typeId}
-                                                                        </span>
-                                                                    );
-                                                                })}
-                                                                {spot.sharedBy && (
-                                                                    <Badge variant="outline" className="text-[7px] font-black uppercase h-3.5 px-1 border-primary/30 text-primary">Reçu de {spot.sharedBy}</Badge>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <ChevronDown className="size-4 shrink-0 transition-transform duration-200 opacity-30" />
-                                                </AccordionPrimitive.Trigger>
-                                            </AccordionPrimitive.Header>
-                                       </div>
-                                       <AccordionPrimitive.Content className="overflow-hidden text-sm transition-all border-t border-dashed">
-                                           <div className="pb-4 px-4 space-y-4 pt-4 bg-muted/5">
-                                           <div className="text-[11px] leading-relaxed text-muted-foreground bg-white border rounded-xl p-4 space-y-2 shadow-inner">
-                                               {spot.notes && <p className="italic text-foreground font-medium mb-3">"{spot.notes}"</p>}
-                                                <p><strong>Conditions :</strong> {spot.context.airTemperature}°C, {spot.context.windSpeed} nds {spot.context.windDirection}</p>
-                                                <p><strong>Lune :</strong> {spot.context.moonPhase}</p>
-                                                <p><strong>Marée :</strong> {spot.context.tideMovement} ({spot.context.tideHeight.toFixed(2)}m)</p>
-                                                {spot.context.closestLowTide && <p><strong>Basse Mer :</strong> {spot.context.closestLowTide.time} ({spot.context.closestLowTide.height.toFixed(2)}m)</p>}
-                                                {spot.context.closestHighTide && <p><strong>Pleine Mer :</strong> {spot.context.closestHighTide.time} ({spot.context.closestHighTide.height.toFixed(2)}m)</p>}
-                                           </div>
-                                           <div className="flex flex-wrap gap-2">
-                                               <Button variant="outline" className="flex-1 min-h-12 py-2 font-black uppercase text-[10px] border-2 px-3 whitespace-normal text-center leading-tight gap-2" onClick={() => handleFindSimilarDay(spot)} disabled={isAnalyzing}>
-                                                   <BrainCircuit className="size-4 text-primary shrink-0"/> Jour similaire
-                                               </Button>
-                                               <Button variant="outline" className="flex-1 min-h-12 font-black uppercase text-[10px] border-2 px-3 gap-2" onClick={() => {
-                                                   if (map && spot.location) {
-                                                       map.panTo({ lat: spot.location.latitude, lng: spot.location.longitude });
-                                                       map.setZoom(16);
-                                                       mapContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                                   }
-                                               }}>
-                                                   <LocateFixed className="size-4 text-primary shrink-0" /> GPS
-                                               </Button>
-                                               <div className="flex w-full sm:w-auto gap-2">
-                                                   <Button variant="outline" size="icon" className="h-12 w-12 border-2 shrink-0 text-primary hover:bg-primary/5" onClick={() => handleOpenShare(spot)}>
-                                                       <Share2 className="size-4" />
-                                                   </Button>
-                                                   <Button variant="outline" size="icon" className="h-12 w-12 border-2 shrink-0" onClick={() => handleEditClick(spot)}><Pencil className="size-4" /></Button>
-                                                   <Button variant="destructive" size="icon" className="h-12 w-12 shrink-0" onClick={() => handleDeleteSpot(spot.id)}><Trash2 className="size-4" /></Button>
-                                               </div>
-                                           </div>
-                                           </div>
-                                       </AccordionPrimitive.Content>
-                                   </AccordionPrimitive.Item>
-                               ))}
-                            </AccordionPrimitive.Root>
-                        ) : (
-                            <div className="text-center py-12 border-2 border-dashed rounded-2xl opacity-40">
-                                <Anchor className="size-8 mx-auto mb-2" />
-                                <p className="text-[10px] font-black uppercase tracking-widest">Aucun spot sauvegardé</p>
+
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between px-1">
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                                    <History className="size-3" /> Résultats ({filteredAndSortedSpots.length})
+                                </h4>
+                                {sortByDistance && userLocation && (
+                                    <Badge variant="outline" className="text-[8px] h-4 font-black bg-primary/5 text-primary border-primary/20">GPS ACTIF</Badge>
+                                )}
                             </div>
-                        )}
+
+                            {filteredAndSortedSpots.length > 0 ? (
+                                <AccordionPrimitive.Root 
+                                    type="single" 
+                                    collapsible 
+                                    className="w-full space-y-2"
+                                    value={openSpotId}
+                                    onValueChange={setOpenSpotId}
+                                >
+                                {filteredAndSortedSpots.map(spot => {
+                                    const dist = userLocation ? Math.round(getDistance(userLocation.lat, userLocation.lng, spot.location.latitude, spot.location.longitude)) : null;
+                                    return (
+                                        <AccordionPrimitive.Item 
+                                                ref={(el) => (spotRefs.current[spot.id] = el)}
+                                                value={spot.id} 
+                                                key={spot.id} 
+                                                className="border-2 rounded-xl bg-card overflow-hidden shadow-sm"
+                                            >
+                                            <div className="flex items-center w-full">
+                                                    <div className="pl-3 py-4" onClick={(e) => e.stopPropagation()}>
+                                                        <Checkbox
+                                                            id={`select-spot-${spot.id}`}
+                                                            className="size-5 border-2"
+                                                            checked={selectedSpotIds.includes(spot.id)}
+                                                            onCheckedChange={() => handleSpotSelection(spot.id)}
+                                                        />
+                                                    </div>
+                                                    <AccordionPrimitive.Header asChild>
+                                                        <AccordionPrimitive.Trigger className='flex flex-1 items-center justify-between py-4 font-medium transition-all hover:no-underline [&[data-state=open]>svg]:rotate-180 pl-2 pr-4 text-left'>
+                                                            <div className="flex items-center gap-3 min-w-0">
+                                                                <div className="p-2 rounded-lg shrink-0" style={{backgroundColor: spot.color + '15'}}>
+                                                                    {React.createElement(mapIcons[spot.icon as keyof typeof mapIcons] || MapPin, { className: 'size-5', style: {color: spot.color} })}
+                                                                </div>
+                                                                <div className="min-w-0 flex-1">
+                                                                    <div className="flex items-center gap-2 mb-1">
+                                                                        <p className="font-black uppercase tracking-tight text-xs leading-none truncate">{spot.name}</p>
+                                                                        {dist !== null && (
+                                                                            <Badge variant="secondary" className="text-[8px] h-4 px-1.5 font-black bg-blue-50 text-blue-600 border-none">
+                                                                                {dist > 1000 ? `${(dist/1000).toFixed(1)}km` : `${dist}m`}
+                                                                            </Badge>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                                                                        <p className="text-[9px] font-bold text-muted-foreground/60 uppercase shrink-0">
+                                                                            {spot.createdAt ? format(spot.createdAt.toDate(), 'd MMM yyyy', { locale: fr }) : '...'}
+                                                                        </p>
+                                                                        {spot.fishingTypes?.map(typeId => {
+                                                                            const typeInfo = fishingTypes.find(t => t.id === typeId);
+                                                                            return (
+                                                                                <span 
+                                                                                    key={typeId} 
+                                                                                    className={cn(
+                                                                                        "text-[7px] h-3.5 px-1.5 flex items-center rounded-full font-black uppercase text-white shadow-sm",
+                                                                                        typeInfo?.bgColor || "bg-slate-500"
+                                                                                    )}
+                                                                                >
+                                                                                    {typeInfo?.label || typeId}
+                                                                                </span>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <ChevronDown className="size-4 shrink-0 transition-transform duration-200 opacity-30 ml-2" />
+                                                        </AccordionPrimitive.Trigger>
+                                                    </AccordionPrimitive.Header>
+                                            </div>
+                                            <AccordionPrimitive.Content className="overflow-hidden text-sm transition-all border-t border-dashed">
+                                                <div className="pb-4 px-4 space-y-4 pt-4 bg-muted/5">
+                                                <div className="text-[11px] leading-relaxed text-muted-foreground bg-white border rounded-xl p-4 space-y-2 shadow-inner">
+                                                    {spot.notes && <p className="italic text-foreground font-medium mb-3">"{spot.notes}"</p>}
+                                                        <p><strong>Conditions :</strong> {spot.context.airTemperature}°C, {spot.context.windSpeed} nds {spot.context.windDirection}</p>
+                                                        <p><strong>Lune :</strong> {spot.context.moonPhase}</p>
+                                                        <p><strong>Marée :</strong> {spot.context.tideMovement} ({spot.context.tideHeight.toFixed(2)}m)</p>
+                                                        {spot.context.closestLowTide && <p><strong>Basse Mer :</strong> {spot.context.closestLowTide.time} ({spot.context.closestLowTide.height.toFixed(2)}m)</p>}
+                                                        {spot.context.closestHighTide && <p><strong>Pleine Mer :</strong> {spot.context.closestHighTide.time} ({spot.context.closestHighTide.height.toFixed(2)}m)</p>}
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    <Button variant="outline" className="flex-1 min-h-12 py-2 font-black uppercase text-[10px] border-2 px-3 whitespace-normal text-center leading-tight gap-2" onClick={() => handleFindSimilarDay(spot)} disabled={isAnalyzing}>
+                                                        <BrainCircuit className="size-4 text-primary shrink-0"/> Jour similaire
+                                                    </Button>
+                                                    <Button variant="outline" className="flex-1 min-h-12 font-black uppercase text-[10px] border-2 px-3 gap-2" onClick={() => {
+                                                        if (map && spot.location) {
+                                                            map.panTo({ lat: spot.location.latitude, lng: spot.location.longitude });
+                                                            map.setZoom(16);
+                                                            mapContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                        }
+                                                    }}>
+                                                        <LocateFixed className="size-4 text-primary shrink-0" /> GPS
+                                                    </Button>
+                                                    <div className="flex w-full sm:w-auto gap-2">
+                                                        <Button variant="outline" size="icon" className="h-12 w-12 border-2 shrink-0 text-primary hover:bg-primary/5" onClick={() => handleOpenShare(spot)}>
+                                                            <Share2 className="size-4" />
+                                                        </Button>
+                                                        <Button variant="outline" size="icon" className="h-12 w-12 border-2 shrink-0" onClick={() => handleEditClick(spot)}><Pencil className="size-4" /></Button>
+                                                        <Button variant="destructive" size="icon" className="h-12 w-12 shrink-0" onClick={() => handleDeleteSpot(spot.id)}><Trash2 className="size-4" /></Button>
+                                                    </div>
+                                                </div>
+                                                </div>
+                                            </AccordionPrimitive.Content>
+                                        </AccordionPrimitive.Item>
+                                    );
+                                })}
+                                </AccordionPrimitive.Root>
+                            ) : (
+                                <div className="text-center py-12 border-2 border-dashed rounded-[2rem] opacity-40">
+                                    <Filter className="size-8 mx-auto mb-2" />
+                                    <p className="text-[10px] font-black uppercase tracking-widest">Aucun spot ne correspond aux filtres</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
             </CardContent>
