@@ -1,6 +1,6 @@
 
 import { LocationData, SwellForecast, Tide, WindDirection, WindForecast, HourlyForecast } from './types';
-import { locations } from './locations';
+import { format } from 'date-fns';
 
 // Cache simple pour éviter les calculs procéduraux redondants
 const proceduralCache = new Map<string, LocationData>();
@@ -214,7 +214,8 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation' | 'tideThresholds'> =
  * GÉNÉRATEUR PROCÉDURAL PRINCIPAL
  */
 export function generateProceduralData(location: string, date: Date): LocationData {
-  const dateKey = date.toISOString().split('T')[0];
+  // Fix: Get dateKey in date's "local" time instead of toISOString UTC
+  const dateKey = format(date, 'yyyy-MM-dd');
   const cacheKey = `${location}-${dateKey}`;
   
   if (proceduralCache.has(cacheKey)) {

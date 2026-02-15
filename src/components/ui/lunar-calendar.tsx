@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -46,7 +47,7 @@ import {
   Waves
 } from 'lucide-react';
 import { Button } from './button';
-import { cn } from '@/lib/utils';
+import { cn, getRegionalNow } from '@/lib/utils';
 import { useCalendarView } from '@/context/calendar-view-context';
 import type { Tide } from '@/lib/types';
 import { CrabIcon, LobsterIcon } from '../icons';
@@ -81,12 +82,13 @@ const DayCell = React.memo(({
   isSelected: boolean;
   onDateSelect: (d: Date) => void;
 }) => {
-  const { selectedLocation } = useLocation();
+  const { selectedLocation, selectedRegion } = useLocation();
   const { calendarView } = useCalendarView();
   
   const data = useMemo(() => generateProceduralData(selectedLocation, day), [selectedLocation, day]);
 
-  const today = startOfDay(new Date());
+  // Use regional today instead of local browser date
+  const today = useMemo(() => startOfDay(getRegionalNow(selectedRegion)), [selectedRegion]);
   const cellDate = startOfDay(day);
   const isPastDay = cellDate < today;
   const isTodayDay = isSameDay(day, today);
@@ -187,15 +189,21 @@ DayCell.displayName = 'DayCell';
 export function LunarCalendar() {
   const { selectedDate, setSelectedDate } = useDate();
   const { calendarView } = useCalendarView();
-  const { selectedLocation } = useLocation();
+  const { selectedLocation, selectedRegion } = useLocation();
   const [displayDate, setDisplayDate] = useState(startOfMonth(selectedDate));
-  const [detailedDay, setDetailedDay] = useState<Date | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const [zoom, setZoom] = useState(1);
   const [isPinching, setIsPinching] = useState(false);
   const initialDistRef = useRef<number | null>(null);
   const initialZoomRef = useRef<number>(1);
+
+  // Sync calendar month when region changes (which updates selectedDate via getRegionalNow)
+  useEffect(() => {
+    setDisplayDate(startOfMonth(selectedDate));
+  }, [selectedRegion]);
+
+  const [detailedDay, setDetailedDay] = useState<Date | null>(null);
 
   const handleDayClick = (day: Date) => { 
     setSelectedDate(day); 
@@ -251,7 +259,7 @@ export function LunarCalendar() {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [displayDate]);
+  }, [displayDate, selectedRegion]);
 
   const detailedDayData = useMemo(() => {
     if (!detailedDay) return null;
@@ -338,7 +346,9 @@ export function LunarCalendar() {
             <DialogTitle className="text-xl font-black uppercase tracking-tight text-slate-800">
               {detailedDay ? format(detailedDay, 'eeee d MMMM', { locale: fr }) : ''}
             </DialogTitle>
-            <DialogDescription className="text-xs font-bold uppercase opacity-60">Détails tactiques de la journée</DialogDescription>
+            <DialogDescription className="text-xs font-bold uppercase opacity-60">
+              Détails tactiques de la journée • {selectedRegion}
+            </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             {detailedDay && detailedDayData && (

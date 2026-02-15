@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -10,6 +11,7 @@ import {
 import { LunarCalendar } from '@/components/ui/lunar-calendar';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCalendarView } from '@/context/calendar-view-context';
+import { useLocation } from '@/context/location-context';
 import { 
   Fish, 
   Leaf, 
@@ -28,6 +30,7 @@ import { cn } from '@/lib/utils';
 
 export default function CalendrierPage() {
   const { calendarView, setCalendarView } = useCalendarView();
+  const { selectedRegion } = useLocation();
 
   return (
     <div className="space-y-6 w-full pb-20">
@@ -37,7 +40,7 @@ export default function CalendrierPage() {
             <div>
               <CardTitle className="text-2xl font-black uppercase tracking-tighter">Calendrier Lunaire</CardTitle>
               <CardDescription className="text-xs font-bold uppercase opacity-60">
-                Basculer entre Pêche et Champs pour voir les prévisions spécifiques.
+                Région : {selectedRegion} • Basculer entre Pêche et Champs pour voir les prévisions spécifiques.
               </CardDescription>
             </div>
             
@@ -88,11 +91,11 @@ export default function CalendrierPage() {
                       <Fish className="size-3.5 text-primary" />
                       <Fish className="size-3.5 text-primary" />
                     </div>
-                    <span className="text-xs font-bold">Bonne activité (7-8/10)</span>
+                    <span className="text-xs font-black uppercase">Bonne activité (7-8/10)</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <Fish className="size-3.5 text-primary opacity-60" />
-                    <span className="text-xs font-bold text-muted-foreground">Activité modérée (5-6/10)</span>
+                    <span className="text-xs font-black uppercase text-muted-foreground">Activité modérée (5-6/10)</span>
                   </div>
                 </div>
               </div>
