@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, doc, setDoc, addDoc, deleteDoc, serverTimestamp, Timestamp, updateDoc, writeBatch, where, getCountFromServer, getDoc, collectionGroup } from 'firebase/firestore';
-import type { UserAccount, Business, Conversation, AccessToken, SharedAccessToken, SplashScreenSettings, CgvSettings, RibSettings, SystemNotification, FishSpeciesInfo, SoundLibraryEntry, SupportTicket, FishingSpot } from '@/lib/types';
+import type { UserAccount, Business, Conversation, AccessToken, SharedAccessToken, SplashScreenSettings, CgvSettings, RibSettings, SystemNotification, FishSpeciesInfo, SoundLibraryEntry, SupportTicket, FishingSpot, Region } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -59,11 +59,13 @@ import {
   LocateFixed,
   Expand,
   Shrink,
-  Anchor
+  Anchor,
+  Globe,
+  Filter
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { cn } from '@/lib/utils';
+import { cn, getDistance } from '@/lib/utils';
 import { format, addDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import Link from 'next/link';
@@ -80,11 +82,32 @@ import {
   AlertDialogTitle 
 } from '@/components/ui/alert-dialog';
 import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
-import { locations } from '@/lib/locations';
+import { locations, locationsByRegion, regions } from '@/lib/locations';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
+
+const fishingTypes = [
+  { id: 'Dérive', label: 'Dérive' },
+  { id: 'Mouillage', label: 'Mouillage' },
+  { id: 'Pêche à la ligne', label: 'Ligne' },
+  { id: 'Pêche au lancer', label: 'Lancer' },
+  { id: 'Traine', label: 'Traîne' },
+];
+
+const getClosestCommune = (lat: number, lng: number) => {
+    let closestName = 'Inconnue';
+    let minDistance = Infinity;
+    Object.entries(locations).forEach(([name, coords]) => {
+        const dist = getDistance(lat, lng, coords.lat, coords.lon);
+        if (dist < minDistance) {
+            minDistance = dist;
+            closestName = name;
+        }
+    });
+    return closestName;
+};
 
 export default function AdminPage() {
   const { user, isUserLoading } = useUser();
@@ -285,11 +308,18 @@ function StatsCard({ title, value, icon: Icon, color }: { title: string, value: 
 
 function GlobalSpotsManager({ users }: { users: UserAccount[] | null }) {
     const firestore = useFirestore();
+    const { toast } = useToast();
     const { isLoaded, loadError } = useGoogleMaps();
     const [map, setMap] = useState<google.maps.Map | null>(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [searchUser, setSearchUser] = useState('');
     const [selectedSpot, setSelectedSpot] = useState<FishingSpot | null>(null);
+    
+    // FILTRES
+    const [filterRegion, setFilterRegion] = useState<string>('ALL');
+    const [filterCommune, setFilterCommune] = useState<string>('ALL');
+    const [filterType, setFilterType] = useState<string>('ALL');
+    const [userLocation, setUserLocation] = useState<google.maps.LatLngLiteral | null>(null);
 
     const spotsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -304,39 +334,128 @@ function GlobalSpotsManager({ users }: { users: UserAccount[] | null }) {
         return m;
     }, [users]);
 
+    const availableCommunes = useMemo(() => {
+        if (filterRegion === 'ALL') return [];
+        return Object.keys(locationsByRegion[filterRegion as Region] || {}).sort();
+    }, [filterRegion]);
+
+    const handleActivateGps = () => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition((pos) => {
+                const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                setUserLocation(p);
+                map?.panTo(p);
+                map?.setZoom(14);
+                toast({ title: "GPS Activé", description: "Carte centrée sur votre position." });
+            }, () => {
+                toast({ variant: "destructive", title: "Erreur GPS", description: "Impossible de récupérer votre position." });
+            });
+        }
+    };
+
     const filteredSpots = useMemo(() => {
         if (!allSpots) return [];
-        if (!searchUser.trim()) return allSpots;
-        const s = searchUser.toLowerCase();
         return allSpots.filter(spot => {
             const owner = userMap.get(spot.userId);
-            return spot.name.toLowerCase().includes(s) || 
+            
+            // Filtre Recherche
+            const s = searchUser.toLowerCase();
+            const matchesSearch = !searchUser.trim() || 
+                   spot.name.toLowerCase().includes(s) || 
                    owner?.email?.toLowerCase().includes(s) || 
                    owner?.displayName?.toLowerCase().includes(s);
+            if (!matchesSearch) return false;
+
+            // Filtre Région
+            if (filterRegion !== 'ALL') {
+                const uReg = owner?.selectedRegion;
+                if (uReg !== filterRegion) return false;
+            }
+
+            // Filtre Commune
+            if (filterCommune !== 'ALL') {
+                const spotCommune = getClosestCommune(spot.location.latitude, spot.location.longitude);
+                if (spotCommune !== filterCommune) return false;
+            }
+
+            // Filtre Type
+            if (filterType !== 'ALL') {
+                if (!spot.fishingTypes?.includes(filterType)) return false;
+            }
+
+            return true;
         });
-    }, [allSpots, searchUser, userMap]);
+    }, [allSpots, searchUser, userMap, filterRegion, filterCommune, filterType]);
 
     if (loadError) return <Alert variant="destructive"><AlertTitle>Erreur Google Maps</AlertTitle></Alert>;
     if (!isLoaded) return <Skeleton className="h-96 w-full" />;
 
     return (
         <Card className="border-2 shadow-lg rounded-2xl overflow-hidden">
-            <CardHeader className="p-5 border-b bg-muted/5">
-                <div className="flex flex-col gap-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <CardTitle className="text-lg font-black uppercase flex items-center gap-2 text-primary"><MapIcon className="size-5" /> Cartographie des Points Utilisateurs</CardTitle>
-                            <CardDescription className="text-[10px] font-bold uppercase mt-1">Surveillance globale des coins de pêche enregistrés ({allSpots?.length || 0} points).</CardDescription>
-                        </div>
+            <CardHeader className="p-5 border-b bg-muted/5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <CardTitle className="text-lg font-black uppercase flex items-center gap-2 text-primary"><MapIcon className="size-5" /> Cartographie des Points Utilisateurs</CardTitle>
+                        <CardDescription className="text-[10px] font-bold uppercase mt-1">Surveillance globale des coins de pêche enregistrés ({filteredSpots.length} / {allSpots?.length || 0} points).</CardDescription>
                     </div>
+                    <Button onClick={handleActivateGps} variant="outline" className="font-black uppercase text-[10px] h-10 border-2 gap-2 shadow-sm">
+                        <LocateFixed className="size-4 text-primary" /> Activer mon GPS
+                    </Button>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                         <Input 
                             placeholder="Chercher par nom de spot, email ou nom d'utilisateur..." 
                             value={searchUser} 
                             onChange={e => setSearchUser(e.target.value)} 
-                            className="pl-10 h-12 border-2 font-bold text-xs" 
+                            className="pl-10 h-12 border-2 font-bold text-xs bg-white" 
                         />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-1">
+                            <Label className="text-[8px] font-black uppercase ml-1 opacity-40">Région</Label>
+                            <Select value={filterRegion} onValueChange={(v) => { setFilterRegion(v); setFilterCommune('ALL'); }}>
+                                <SelectTrigger className="h-9 text-[10px] font-black uppercase bg-white border-2">
+                                    <Globe className="size-3 mr-1 text-primary" />
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="ALL" className="text-[10px] font-black uppercase">Toutes</SelectItem>
+                                    {regions.map(r => <SelectItem key={r} value={r} className="text-[10px] font-black uppercase">{r}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-1">
+                            <Label className="text-[8px] font-black uppercase ml-1 opacity-40">Commune</Label>
+                            <Select value={filterCommune} onValueChange={setFilterCommune} disabled={filterRegion === 'ALL'}>
+                                <SelectTrigger className="h-9 text-[10px] font-black uppercase bg-white border-2">
+                                    <MapPin className="size-3 mr-1 text-primary" />
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="max-h-64">
+                                    <SelectItem value="ALL" className="text-[10px] font-black uppercase">Toutes</SelectItem>
+                                    {availableCommunes.map(c => <SelectItem key={c} value={c} className="text-[10px] font-black uppercase">{c}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-1">
+                            <Label className="text-[8px] font-black uppercase ml-1 opacity-40">Technique</Label>
+                            <Select value={filterType} onValueChange={setFilterType}>
+                                <SelectTrigger className="h-9 text-[10px] font-black uppercase bg-white border-2">
+                                    <Filter className="size-3 mr-1 text-primary" />
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="ALL" className="text-[10px] font-black uppercase">Toutes</SelectItem>
+                                    {fishingTypes.map(t => <SelectItem key={t.id} value={t.id} className="text-[10px] font-black uppercase">{t.label}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
                 </div>
             </CardHeader>
@@ -349,6 +468,11 @@ function GlobalSpotsManager({ users }: { users: UserAccount[] | null }) {
                         onLoad={setMap}
                         options={{ disableDefaultUI: false, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
                     >
+                        {userLocation && (
+                            <OverlayView position={userLocation} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                                <div style={{ transform: 'translate(-50%, -50%)' }} className="size-6 bg-blue-500 border-4 border-white rounded-full shadow-lg animate-pulse" />
+                            </OverlayView>
+                        )}
                         {filteredSpots.map(spot => (
                             <OverlayView 
                                 key={spot.id} 
