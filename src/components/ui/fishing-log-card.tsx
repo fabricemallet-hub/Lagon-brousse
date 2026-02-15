@@ -72,7 +72,7 @@ const availableColors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', 
 const fishingTypes = [
   { id: 'Dérive', bgColor: 'bg-blue-600', label: 'Dérive' },
   { id: 'Mouillage', bgColor: 'bg-emerald-600', label: 'Mouillage' },
-  { id: 'Pêche à la ligne', bgColor: 'bg-amber-50', label: 'Ligne' },
+  { id: 'Pêche à la ligne', bgColor: 'bg-amber-600', label: 'Ligne' },
   { id: 'Pêche au lancer', bgColor: 'bg-purple-600', label: 'Lancer' },
   { id: 'Traine', bgColor: 'bg-rose-600', label: 'Traîne' },
 ];
