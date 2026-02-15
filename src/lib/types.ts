@@ -302,6 +302,7 @@ export interface VesselStatus {
   historyClearedAt?: any;
   huntingMarkers?: HuntingMarker[];
   isPositionHidden?: boolean;
+  accuracy?: number;
 }
 
 export interface SoundLibraryEntry {

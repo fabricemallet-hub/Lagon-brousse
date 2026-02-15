@@ -96,6 +96,7 @@ export default function VesselTrackerPage() {
 
   const [currentPos, setCurrentPos] = useState<google.maps.LatLngLiteral | null>(null);
   const currentPosRef = useRef<google.maps.LatLngLiteral | null>(null);
+  const currentAccuracyRef = useRef<number | null>(null);
   const anchorPosRef = useRef<google.maps.LatLngLiteral | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
   const [map, setMap] = useState<google.maps.Map | null>(null);
@@ -117,7 +118,15 @@ export default function VesselTrackerPage() {
     batterySound: ''
   });
   
-  const [history, setHistory] = useState<{ vesselName: string, statusLabel: string, time: Date, pos: google.maps.LatLngLiteral | null, batteryLevel?: number, isCharging?: boolean }[]>([]);
+  const [history, setHistory] = useState<{ 
+    vesselName: string, 
+    statusLabel: string, 
+    time: Date, 
+    pos: google.maps.LatLngLiteral | null, 
+    batteryLevel?: number, 
+    isCharging?: boolean,
+    accuracy?: number
+  }[]>([]);
   const lastStatusesRef = useRef<Record<string, string>>({});
   const lastEventsRef = useRef<Record<string, string>>({});
   const lastUpdatesRef = useRef<Record<string, number>>({});
@@ -288,6 +297,7 @@ export default function VesselTrackerPage() {
             isSharing: data.isSharing !== undefined ? data.isSharing : isSharing, 
             isPositionHidden: effectiveHidePos,
             lastActive: serverTimestamp(),
+            accuracy: currentAccuracyRef.current,
             ...batteryInfo,
             ...data 
         };
@@ -382,6 +392,7 @@ export default function VesselTrackerPage() {
     if (watchIdRef.current) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
     setCurrentPos(null);
     currentPosRef.current = null;
+    currentAccuracyRef.current = null;
     anchorPosRef.current = null;
     lastSentStatusRef.current = null;
     isFirstFixRef.current = true;
@@ -442,6 +453,7 @@ export default function VesselTrackerPage() {
         const currentEvent = vessel.eventLabel || '';
         const currentBattery = vessel.batteryLevel ?? 100;
         const currentCharging = vessel.isCharging ?? false;
+        const currentAccuracy = vessel.accuracy;
         
         const getTimeMillis = (t: any) => {
             if (!t) return 0;
@@ -487,7 +499,8 @@ export default function VesselTrackerPage() {
             time: new Date(), 
             pos, 
             batteryLevel: currentBattery, 
-            isCharging: currentCharging 
+            isCharging: currentCharging,
+            accuracy: currentAccuracy
         });
         
         if (mode === 'receiver' && lastStatus && vesselPrefs.isNotifyEnabled) {
@@ -538,6 +551,7 @@ export default function VesselTrackerPage() {
       if (!shouldRunGps) { 
         setCurrentPos(null);
         currentPosRef.current = null;
+        currentAccuracyRef.current = null;
         isFirstFixRef.current = true;
       }
       return;
@@ -545,8 +559,10 @@ export default function VesselTrackerPage() {
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         const newPos = { lat: position.coords.latitude, lng: position.coords.longitude };
+        const accuracy = Math.round(position.coords.accuracy);
         setCurrentPos(newPos);
         currentPosRef.current = newPos;
+        currentAccuracyRef.current = accuracy;
         if (shouldPanOnNextFix.current && map) { map.panTo(newPos); map.setZoom(15); shouldPanOnNextFix.current = false; }
         
         if (mode === 'sender') {
@@ -633,10 +649,12 @@ export default function VesselTrackerPage() {
         return;
     }
 
+    const accuracy = mode === 'sender' ? currentAccuracyRef.current : (followedVessels?.find(v => v.isSharing && !v.isPositionHidden)?.accuracy);
     const posUrl = `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
     const nicknamePrefix = vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : "";
     const customText = (isCustomMessageEnabled && vesselSmsMessage) ? vesselSmsMessage : "Requiert assistance immédiate.";
-    const body = `${nicknamePrefix}${customText} [${type}] Position : ${posUrl}`;
+    const accuracyText = accuracy ? ` [Précision GPS: ${accuracy}m]` : "";
+    const body = `${nicknamePrefix}${customText} [${type}] Position : ${posUrl}${accuracyText}`;
     
     try {
         window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
@@ -1040,7 +1058,10 @@ export default function VesselTrackerPage() {
                                                     )}>
                                                         {h.statusLabel}
                                                     </span>
-                                                    <span className="text-[9px] font-bold opacity-40 uppercase">{format(h.time, 'dd/MM HH:mm:ss')}</span>
+                                                    <span className="text-[9px] font-bold opacity-40 uppercase">
+                                                        {format(h.time, 'dd/MM HH:mm:ss')}
+                                                        {h.accuracy !== undefined && ` • GPS: +/-${h.accuracy}m`}
+                                                    </span>
                                                 </div>
                                                 {h.pos && (
                                                     <Button 
