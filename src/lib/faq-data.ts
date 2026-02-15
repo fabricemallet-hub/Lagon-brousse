@@ -15,7 +15,7 @@ export const INITIAL_FAQ_DATA = [
   { categorie: "General", ordre: 8, question: "Comment installer l'app sur mon iPhone ?", reponse: "Ouvrez Safari, appuyez sur 'Partager' puis 'Sur l'écran d'accueil'. C'est une PWA." },
   { categorie: "General", ordre: 9, question: "Comment installer l'app sur Android ?", reponse: "Via Chrome, appuyez sur les 3 points puis 'Installer l'application'." },
   { categorie: "General", ordre: 10, question: "Mes données GPS sont-elles privées ?", reponse: "Oui. Elles ne sont partagées QUE si vous activez volontairement le Boat Tracker ou une session de Chasse." },
-  { categorie: "General", ordre: 11, question: "L'app fonctionne-t-elle aux Îles Loyauté ?", reponse: "Oui, les stations de Lifou, Maré et Ouvéa sont intégrées." },
+  { categorie: "General", ordre: 11, Wood: "L'app fonctionne-t-elle aux Îles Loyauté ?", reponse: "Oui, les stations de Lifou, Maré et Ouvéa sont intégrées." },
   { categorie: "General", ordre: 12, question: "Qui a développé cette application ?", reponse: "Une équipe de passionnés du terroir calédonien, pour les gens du pays." },
   { categorie: "General", ordre: 13, question: "Comment signaler un bug ?", reponse: "Via l'onglet 'FAQ & Support', ouvrez un ticket technique." },
   { categorie: "General", ordre: 14, question: "L'heure affichée est-elle celle de NC ?", reponse: "Oui, l'application est configurée sur le fuseau GMT+11 (Nouméa)." },
@@ -93,6 +93,8 @@ export const INITIAL_FAQ_DATA = [
   { categorie: "Chasse", ordre: 73, question: "Le frein de bouche modifie-t-il les clics ?", reponse: "Non, il n'influe pas sur la trajectoire mais améliore la stabilité du canon pour un second tir plus rapide." },
   { categorie: "Chasse", ordre: 74, question: "Pourquoi limiter les fusils lisses à 100m ?", reponse: "Au-delà de 100m, la chute de vitesse et la dispersion des balles de fusils lisses (Brenneke/Sauvestre) rendent le tir trop imprécis pour la chasse." },
   { categorie: "Chasse", ordre: 75, question: "Qui voit ma position en chasse ?", reponse: "Uniquement les personnes ayant rejoint votre code de session spécifique." },
+  { categorie: "Chasse", ordre: 108, question: "Comment utiliser 'Mon Râtelier' ?", reponse: "Allez dans l'onglet Chasse > vignettes 'Balistique'. Enregistrez vos armes avec leur calibre et munition favorite. Dans la Table de Tir, utilisez le menu 'Charger une arme' pour remplir instantanément tous les paramètres techniques." },
+  { categorie: "Chasse", ordre: 109, question: "Puis-je enregistrer plusieurs carabines ?", reponse: "Oui, vous pouvez créer un nombre illimité de fiches personnalisées. Chaque fiche mémorise ses réglages propres (Zéro, poids, munition)." },
 
   // --- CHAMPS (15) ---
   { categorie: "Champs", ordre: 76, question: "Pourquoi l'arrosage est en secondes ?", reponse: "Pour vous aider à doser précisément au jet d'eau selon les besoins de chaque plante." },

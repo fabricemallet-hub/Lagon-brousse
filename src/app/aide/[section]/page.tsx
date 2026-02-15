@@ -164,20 +164,20 @@ const sectionContent: Record<string, {
     role: "Optimisez vos sorties en brousse grâce à l'analyse du vent, au suivi de groupe et désormais à un calculateur balistique complet pour carabines et fusils lisses.",
     steps: [
       "Consultez la période biologique (Brame, Chute des bois) pour adapter votre stratégie.",
-      "Utilisez la carte du vent pour visualiser d'où vient l'air par rapport au relief.",
-      "Table de Tir : Sélectionnez votre calibre, le modèle d'ogive et le grammage précis (Grains ou Grammes).",
-      "Réglages Optiques : Indiquez votre distance de zérotage pour obtenir le nombre de clics exacts à appliquer sur vos tourelles.",
+      "Table de Tir & Râtelier : Enregistrez vos armes favorites (nom, calibre, munition) dans la section 'Mon Râtelier' pour les charger instantanément.",
+      "Réglages Optiques : Indiquez votre distance de zérotage pour obtenir le nombre de clics exacts à appliquer sur vos tourelles (1 clic = 1cm à 100m).",
+      "Cible Mobile : Saisissez une distance cible personnalisée via le pavé numérique pour obtenir des corrections précises à n'importe quelle portée.",
       "Compensation Vent : Saisissez la force et direction du vent pour corriger la dérive latérale en temps réel.",
       "Accessoires : Activez le mode 'Silencieux' pour recalculer la poussée prolongée (+2% V0) et la stabilité au vent.",
       "Simulateur de Gerbe : Pour les fusils lisses (12, 16, 20), visualisez le diamètre d'impact selon le Choke et la distance.",
       "Session de Groupe : Partagez votre position GPS en temps réel avec vos partenaires au-dessus de la carte satellite via un code unique.",
-      "Alertes Tactiques : Signalez 'Gibier en vue' d'un clic. Une alerte visuelle et sonore préviendra immédiatement vos coéquipiers."
+      "Sécurité Équipe : Visualisez le statut tactique (En position, En battue) et le niveau de batterie de vos coéquipiers en direct."
     ],
     tips: [
-      "Le silencieux augmente légèrement la vitesse car il agit comme un prolongement du canon pour les gaz.",
+      "Mon Râtelier : Utilisez des noms explicites comme 'Ma Tikka Savane' pour identifier rapidement vos réglages sur le terrain.",
       "Simulateur de Gerbe : Au-delà de 40m au plomb n°6, la dispersion est trop forte pour un prélèvement éthique.",
       "Mode Expert : Utilisez le modèle 'PERSONNALISÉ' pour saisir manuellement vos propres données de rechargement.",
-      "1 Clic = 1cm à 100m. Le tableau vous donne le sens de rotation (HAUT/BAS, DROITE/GAUCHE) pour chaque distance."
+      "Batterie : Gardez un œil sur le pourcentage de batterie de vos partenaires dans la liste d'équipe pour anticiper les pertes de signal."
     ]
   },
   'champs': {
@@ -218,7 +218,7 @@ const sectionContent: Record<string, {
     title: 'Calendrier Pêche',
     icon: Calendar,
     color: 'bg-slate-700',
-    role: "Planification stratégique à long terme basée sur les cycles biologiques marins.",
+    role: "Planification stratégique à long terme basée on les cycles biologiques marins.",
     steps: [
       "Suivi des Crustacés : Repérez les jours 'Crabe Plein' (vives-eaux) ou 'Crabe Mout' (mue).",
       "Saisons : Identifiez les périodes de passage (ex: Tazard en Nov/Déc) via les alertes intégrées.",
