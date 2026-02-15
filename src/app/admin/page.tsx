@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -685,7 +684,7 @@ function FishGuideManager() {
 
                         <div className="grid grid-cols-3 gap-2 p-5 bg-muted/20 rounded-2xl border-2 border-dashed">
                             <p className="col-span-3 text-[10px] font-black uppercase text-center opacity-50 tracking-widest mb-1 flex items-center justify-center gap-2">
-                                <Ruler className="size-3" /> Tailles Estimées (ex: < 30cm) : P / M / G
+                                <Ruler className="size-3" /> Tailles Estimées (ex: &lt; 30cm) : P / M / G
                             </p>
                             <Input value={lengthSmall} onChange={e => setLengthSmall(e.target.value)} placeholder="Petit" className="h-12 text-center font-black text-sm" />
                             <Input value={lengthMedium} onChange={e => setLengthMedium(e.target.value)} placeholder="Moyen" className="h-12 text-center font-black text-sm" />
@@ -896,7 +895,7 @@ function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | n
                 </div>
                 <div className="space-y-4">
                     <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Durée de l'offre</Label>
-                        <Select value={duration} onValueChange={setDuration}><SelectTrigger className="h-14 border-2 font-black text-lg"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1" className="font-black uppercase">1 jour</SelectItem><SelectItem value="7" className="font-black uppercase">1 semaine</SelectItem><SelectItem value="30" className="font-black uppercase">1 mois</SelectItem></SelectContent></Select>
+                        <Select value={duration} onValueChange={setDuration}><SelectTrigger className="h-14 font-black text-lg"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1" className="font-black uppercase">1 jour</SelectItem><SelectItem value="7" className="font-black uppercase">1 semaine</SelectItem><SelectItem value="30" className="font-black uppercase">1 mois</SelectItem></SelectContent></Select>
                     </div>
                     <Button onClick={handleActivate} disabled={isSaving} className="w-full h-16 font-black uppercase shadow-xl text-base tracking-widest">Activer l'Accès Libre</Button>
                 </div>
