@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -21,7 +21,8 @@ import {
   AlertCircle,
   Zap,
   Crosshair,
-  Pencil
+  Pencil,
+  ArrowDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -100,11 +101,26 @@ const BALLISTIC_DATABASE: MunitionData[] = [
 
 const CALIBERS = Array.from(new Set(BALLISTIC_DATABASE.map(m => m.caliber)));
 
+const WIND_DIRECTIONS = [
+    { label: 'De Face (12h)', angle: 0 },
+    { label: '3/4 Avant Droite (1h30)', angle: 45 },
+    { label: 'Plein Travers Droite (3h)', angle: 90 },
+    { label: '3/4 Arrière Droite (4h30)', angle: 135 },
+    { label: 'Arrière (6h)', angle: 180 },
+    { label: '3/4 Arrière Gauche (7h30)', angle: 225 },
+    { label: 'Plein Travers Gauche (9h)', angle: 270 },
+    { label: '3/4 Avant Gauche (10h30)', angle: 315 },
+];
+
 export function ShootingTableCard() {
   const [selectedCaliber, setSelectedCaliber] = useState(CALIBERS[0]);
   const [selectedModel, setSelectedModel] = useState('');
   const [selectedWeight, setSelectedWeight] = useState<number>(0);
   const [zeroDistance, setZeroDistance] = useState('100');
+  
+  // Paramètres environnementaux
+  const [windKmh, setWindKmh] = useState('10');
+  const [windAngle, setWindAngle] = useState('90'); // 90° = Travers droit
 
   // Manual input states
   const [manualWeight, setManualWeight] = useState('150');
@@ -161,14 +177,16 @@ export function ShootingTableCard() {
     return found || munitionsForCaliber[0] || BALLISTIC_DATABASE[0];
   }, [munitionsForCaliber, selectedModel, selectedWeight, isCustomMode, manualWeight, manualV0, manualBC, selectedCaliber]);
 
-  const calculateBallistics = (dist: number) => {
+  const calculateBallistics = useCallback((dist: number) => {
     const z = parseFloat(zeroDistance) || 100;
-    const windKmh = 15;
+    const wSpeed = parseFloat(windKmh) || 0;
+    const wAng = parseFloat(windAngle) || 0;
     const g = 9.81;
     const { v0, bc } = selectedMunition;
 
-    if (v0 <= 0 || bc <= 0) return { dist, dropCm: 0, clicks: 0, driftCm: 0, driftClicks: 0 };
+    if (v0 <= 0 || bc <= 0) return { dist, dropCm: 0, clicks: 0, driftCm: 0, driftClicks: 0, elevationDir: 'UP', driftDir: 'RIGHT' };
 
+    // Approximation de chute (simple simulation parabolique avec traînée G1 simplifiée)
     const calculateDropAt = (d: number) => {
         const vAvg = v0 * (1 - (0.00008 * d) / bc);
         const time = d / vAvg;
@@ -178,23 +196,35 @@ export function ShootingTableCard() {
     const dropAtTarget = calculateDropAt(dist);
     const dropAtZero = calculateDropAt(z);
     const scopeHeight = 4.5;
+    
+    // Correction par rapport au zérotage
     const correctionCm = dropAtTarget - (dropAtZero + scopeHeight) * (dist / z) + scopeHeight;
 
+    // Calcul de dérive au vent
     const vAvgTarget = v0 * (1 - (0.00008 * dist) / bc);
     const timeTarget = dist / vAvgTarget;
-    const windMps = windKmh / 3.6;
-    const windDriftCm = windMps * (timeTarget - dist / v0) * 100;
+    
+    // Composante latérale du vent (Full crosswind à 90°)
+    const angleRad = (wAng * Math.PI) / 180;
+    const crosswindMps = (wSpeed / 3.6) * Math.sin(angleRad);
+    
+    // Formule simplifiée de dérive au vent : Drift = W * (T - D/V0)
+    const windDriftCm = crosswindMps * (timeTarget - dist / v0) * 100;
 
     const distFactor = dist / 100;
 
     return {
         dist,
-        dropCm: parseFloat(correctionCm.toFixed(1)),
-        clicks: Math.round(correctionCm / distFactor),
-        driftCm: Math.abs(parseFloat(windDriftCm.toFixed(1))),
-        driftClicks: Math.round(Math.abs(windDriftCm) / distFactor)
+        dropCm: parseFloat(Math.abs(correctionCm).toFixed(1)),
+        // Si correctionCm > 0, la balle est en dessous de la ligne de visée -> on monte la lunette
+        clicks: Math.abs(Math.round(correctionCm / distFactor)),
+        elevationDir: correctionCm > 0 ? 'HAUT' : 'BAS',
+        driftCm: parseFloat(Math.abs(windDriftCm).toFixed(1)),
+        // Si windDriftCm > 0 (vent de droite), la balle part à gauche -> on clique à droite
+        driftClicks: Math.abs(Math.round(windDriftCm / distFactor)),
+        driftDir: windDriftCm > 0 ? 'DROITE' : 'GAUCHE'
     };
-  };
+  }, [selectedMunition, zeroDistance, windKmh, windAngle]);
 
   const resultsTable = useMemo(() => {
     if (selectedMunition.caliber.startsWith('Calibre')) {
@@ -229,7 +259,7 @@ export function ShootingTableCard() {
       </CardHeader>
       
       <CardContent className="p-6 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-5 bg-muted/20 rounded-3xl border-2 border-dashed border-primary/10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-5 bg-muted/20 rounded-3xl border-2 border-dashed border-primary/10">
             <div className="space-y-1.5">
                 <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Calibre</Label>
                 <Select value={selectedCaliber} onValueChange={setSelectedCaliber}>
@@ -296,6 +326,36 @@ export function ShootingTableCard() {
                 />
             </div>
 
+            {/* SECTION VENT */}
+            <div className="space-y-1.5">
+                <Label className="text-[9px] font-black uppercase text-blue-600 ml-1">Force du Vent (km/h)</Label>
+                <div className="relative">
+                    <Input 
+                        type="number" 
+                        value={windKmh} 
+                        onChange={e => setWindKmh(e.target.value)}
+                        className="h-10 border-2 border-blue-100 font-black text-center text-sm bg-white pl-8"
+                    />
+                    <Wind className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-blue-500" />
+                </div>
+            </div>
+
+            <div className="space-y-1.5">
+                <Label className="text-[9px] font-black uppercase text-blue-600 ml-1">Direction du Vent</Label>
+                <Select value={windAngle} onValueChange={setWindAngle}>
+                    <SelectTrigger className="h-10 border-2 border-blue-100 font-black uppercase text-[10px] bg-white">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {WIND_DIRECTIONS.map(dir => (
+                            <SelectItem key={dir.angle} value={dir.angle.toString()} className="text-[10px] font-black uppercase">
+                                {dir.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+
             {isCustomMode && (
                 <div className="md:col-span-4 grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
                     <div className="space-y-1.5">
@@ -349,7 +409,7 @@ export function ShootingTableCard() {
         <div className="space-y-4">
             <div className="flex items-center justify-between px-1">
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                    <Crosshair className="size-3 text-primary" /> Corrections (Vent 15 km/h)
+                    <Crosshair className="size-3 text-primary" /> Corrections (Zéroté à {zeroDistance}m)
                 </h3>
                 <Badge variant="outline" className="text-[8px] font-black uppercase h-5 border-blue-200 text-blue-600">
                     1 clic = 1cm à 100m
@@ -361,8 +421,8 @@ export function ShootingTableCard() {
                     <TableHeader className="bg-slate-50">
                         <TableRow className="hover:bg-transparent border-b-2">
                             <BlockHead label="Distance" />
-                            <BlockHead label="Hausse (cm)" className="text-primary" />
-                            <BlockHead label="Réglage (clics)" className="text-primary" />
+                            <BlockHead label="Chute (cm)" />
+                            <BlockHead label="Élévation (clics)" className="text-primary" />
                             <BlockHead label="Dérive (clics)" className="text-accent" />
                         </TableRow>
                     </TableHeader>
@@ -370,18 +430,23 @@ export function ShootingTableCard() {
                         {resultsTable.map((res, idx) => (
                             <TableRow key={idx} className="hover:bg-primary/5 transition-colors h-14">
                                 <TableCell className="font-black text-center text-sm">{res.dist}m</TableCell>
-                                <TableCell className="font-bold text-center text-slate-600">{res.dropCm > 0 ? '+' : ''}{res.dropCm} cm</TableCell>
+                                <TableCell className="font-bold text-center text-slate-600">{res.dropCm} cm</TableCell>
                                 <TableCell className="text-center">
-                                    <div className="inline-flex items-center gap-2 bg-primary text-white font-black text-xs px-3 py-1.5 rounded-lg shadow-sm">
-                                        <ArrowUp className="size-3" /> {res.clicks}
+                                    <div className={cn(
+                                        "inline-flex items-center gap-2 font-black text-xs px-3 py-1.5 rounded-lg shadow-sm min-w-[80px] justify-center",
+                                        res.clicks > 0 ? "bg-primary text-white" : "bg-slate-100 text-slate-400"
+                                    )}>
+                                        {res.elevationDir === 'HAUT' ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />} 
+                                        {res.clicks}
                                     </div>
                                 </TableCell>
                                 <TableCell className="text-center">
                                     <div className={cn(
-                                        "inline-flex items-center gap-2 font-black text-xs px-3 py-1.5 rounded-lg shadow-sm",
+                                        "inline-flex items-center gap-2 font-black text-xs px-3 py-1.5 rounded-lg shadow-sm min-w-[80px] justify-center",
                                         res.driftClicks > 0 ? "bg-accent text-white" : "bg-slate-100 text-slate-400"
                                     )}>
-                                        <ArrowLeft className="size-3" /> {res.driftClicks}
+                                        {res.driftDir === 'GAUCHE' ? <ArrowLeft className="size-3" /> : <ArrowRight className="size-3" />} 
+                                        {res.driftClicks}
                                     </div>
                                 </TableCell>
                             </TableRow>
@@ -399,7 +464,7 @@ export function ShootingTableCard() {
                 Avis de Sécurité
             </AlertTitle>
             <AlertDescription className="text-[9px] leading-relaxed italic text-slate-300 font-medium">
-                Simulation théorique G1. Ne prend pas en compte l'inclinaison (cosinus) ni l'humidité. Vérifiez toujours votre réglage sur cible avant de chasser.
+                Simulation théorique G1. Les calculs de dérive sont donnés pour une force de vent constante sur toute la trajectoire. Vérifiez toujours votre réglage sur cible avant de chasser.
             </AlertDescription>
         </Alert>
       </CardContent>
