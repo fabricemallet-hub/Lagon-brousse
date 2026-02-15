@@ -1,3 +1,4 @@
+
 'use client';
 import { doc, getDoc, setDoc, Firestore } from 'firebase/firestore';
 import { User } from 'firebase/auth';
@@ -22,8 +23,7 @@ export async function ensureUserDocument(
   const masterEmails = [
     'f.mallet81@outlook.com', 
     'fabrice.mallet@gmail.com', 
-    'f.mallet81@gmail.com',
-    'kledostyle@outlook.com'
+    'f.mallet81@gmail.com'
   ];
   const masterUids = [
     't8nPnZLcTiaLJSKMuLzib3C5nPn1', 

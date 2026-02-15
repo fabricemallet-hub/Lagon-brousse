@@ -1,3 +1,4 @@
+
 'use client';
 
 import { usePathname } from 'next/navigation';
@@ -43,8 +44,7 @@ export function SidebarNav() {
     const masterAdminEmails = [
       'f.mallet81@outlook.com',
       'fabrice.mallet@gmail.com', 
-      'f.mallet81@gmail.com',
-      'kledostyle@outlook.com'
+      'f.mallet81@gmail.com'
     ];
 
     const userEmail = user.email?.toLowerCase() || '';
