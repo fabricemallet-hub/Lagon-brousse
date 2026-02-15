@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, setDoc, addDoc, deleteDoc, serverTimestamp, Timestamp, updateDoc, increment } from 'firebase/firestore';
+import { collection, query, orderBy, doc, setDoc, addDoc, deleteDoc, serverTimestamp, Timestamp, updateDoc, increment, writeBatch } from 'firebase/firestore';
 import type { UserAccount, Business, Conversation, AccessToken, SharedAccessToken, SplashScreenSettings, CgvSettings, RibSettings, SystemNotification, FishSpeciesInfo } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -42,7 +42,10 @@ import {
   X,
   AlertTriangle,
   Target,
-  ChefHat
+  ChefHat,
+  Store,
+  Link as LinkIcon,
+  Check
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -55,6 +58,7 @@ import Link from 'next/link';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
+import { locations } from '@/lib/locations';
 
 export default function AdminPage() {
   const { user, isUserLoading } = useUser();
@@ -85,8 +89,8 @@ export default function AdminPage() {
   const usersRef = useMemoFirebase(() => (firestore && isAdmin) ? collection(firestore, 'users') : null, [firestore, isAdmin]);
   const { data: users, isLoading: isUsersLoading } = useCollection<UserAccount>(usersRef);
 
-  const businessRef = useMemoFirebase(() => (firestore && isAdmin) ? collection(firestore, 'businesses') : null, [firestore, isAdmin]);
-  const { data: businesses } = useCollection<Business>(businessRef);
+  const businessRef = useMemoFirebase(() => (firestore && isAdmin) ? query(collection(firestore, 'businesses'), orderBy('name', 'asc')) : null, [firestore, isAdmin]);
+  const { data: businesses, isLoading: isBusinessesLoading } = useCollection<Business>(businessRef);
 
   const convsRef = useMemoFirebase(() => (firestore && isAdmin) ? query(collection(firestore, 'conversations'), orderBy('lastMessageAt', 'desc')) : null, [firestore, isAdmin]);
   const { data: conversations } = useCollection<Conversation>(convsRef);
@@ -111,27 +115,29 @@ export default function AdminPage() {
             <ShieldCheck className="size-48" />
         </div>
         <CardHeader className="py-8 relative z-10">
-          <CardTitle className="font-black uppercase tracking-tighter text-3xl">Tableau de Bord Administrateur</CardTitle>
+          <CardTitle className="font-black uppercase tracking-tighter text-3xl">Dashboard Master</CardTitle>
           <CardDescription className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">{user?.email}</CardDescription>
         </CardHeader>
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 mb-6 h-auto bg-muted/50 border-2 rounded-2xl p-1.5 shadow-sm gap-1">
-          <TabsTrigger value="stats" className="text-[10px] font-black uppercase py-3 rounded-xl">Vue d'ensemble</TabsTrigger>
-          <TabsTrigger value="users" className="text-[10px] font-black uppercase py-3 rounded-xl">Utilisateurs</TabsTrigger>
-          <TabsTrigger value="design" className="text-[10px] font-black uppercase py-3 rounded-xl">Design & Splash</TabsTrigger>
-          <TabsTrigger value="fish" className="text-[10px] font-black uppercase py-3 rounded-xl">Guide Poissons</TabsTrigger>
-          <TabsTrigger value="acces" className="text-[10px] font-black uppercase py-3 rounded-xl">Accès</TabsTrigger>
-          <TabsTrigger value="support" className="text-[10px] font-black uppercase py-3 rounded-xl">Support</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4 sm:grid-cols-8 mb-6 h-auto bg-muted/50 border-2 rounded-2xl p-1 shadow-sm gap-1">
+          <TabsTrigger value="stats" className="text-[9px] font-black uppercase py-3 rounded-xl">Stats</TabsTrigger>
+          <TabsTrigger value="users" className="text-[9px] font-black uppercase py-3 rounded-xl">Comptes</TabsTrigger>
+          <TabsTrigger value="businesses" className="text-[9px] font-black uppercase py-3 rounded-xl">Commerces</TabsTrigger>
+          <TabsTrigger value="fish" className="text-[9px] font-black uppercase py-3 rounded-xl">Poissons</TabsTrigger>
+          <TabsTrigger value="notifications" className="text-[9px] font-black uppercase py-3 rounded-xl">Alertes</TabsTrigger>
+          <TabsTrigger value="design" className="text-[9px] font-black uppercase py-3 rounded-xl">Réglages</TabsTrigger>
+          <TabsTrigger value="acces" className="text-[9px] font-black uppercase py-3 rounded-xl">Accès</TabsTrigger>
+          <TabsTrigger value="support" className="text-[9px] font-black uppercase py-3 rounded-xl">Support</TabsTrigger>
         </TabsList>
 
         <TabsContent value="stats">
           <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
             <Card className="border-2 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase opacity-40">Utilisateurs</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{users?.length || 0}</div></CardContent></Card>
             <Card className="border-2 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-primary">Abonnés</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{users?.filter(u => u.subscriptionStatus === 'active' || u.subscriptionStatus === 'admin').length || 0}</div></CardContent></Card>
-            <Card className="border-2 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-accent">Commerces</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{businesses?.length || 0}</div></CardContent></Card>
-            <Card className="border-2 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-green-600">Support</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{conversations?.length || 0}</div></CardContent></Card>
+            <Card className="border-2 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-accent">Boutiques</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{businesses?.length || 0}</div></CardContent></Card>
+            <Card className="border-2 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-green-600">Messages</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{conversations?.length || 0}</div></CardContent></Card>
           </div>
         </TabsContent>
 
@@ -141,13 +147,21 @@ export default function AdminPage() {
                 <UsersManager users={users} />
             </div>
         </TabsContent>
-        
-        <TabsContent value="design">
-            <AppSettingsManager />
-        </TabsContent>
 
+        <TabsContent value="businesses">
+            <BusinessManager businesses={businesses} users={users} />
+        </TabsContent>
+        
         <TabsContent value="fish">
             <FishGuideManager />
+        </TabsContent>
+
+        <TabsContent value="notifications">
+            <SystemNotificationsManager />
+        </TabsContent>
+
+        <TabsContent value="design">
+            <AppSettingsManager />
         </TabsContent>
 
         <TabsContent value="acces">
@@ -161,6 +175,139 @@ export default function AdminPage() {
       </Tabs>
     </div>
   );
+}
+
+function BusinessManager({ businesses, users }: { businesses: Business[] | null, users: UserAccount[] | null }) {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [isSaving, setIsSaving] = useState(false);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    
+    // Form
+    const [editingBusiness, setEditingBusiness] = useState<Business | null>(null);
+    const [name, setName] = useState('');
+    const [commune, setCommune] = useState('Nouméa');
+    const [ownerId, setOwnerId] = useState('');
+    const [categories, setCategories] = useState<string[]>([]);
+
+    const availableCats = ["Pêche", "Chasse", "Jardinage"];
+
+    const handleSave = async () => {
+        if (!firestore || !name || !ownerId) return;
+        setIsSaving(true);
+        
+        const businessId = editingBusiness ? editingBusiness.id : `BUS-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+        const bData = {
+            id: businessId,
+            name,
+            commune,
+            ownerId,
+            categories,
+            updatedAt: serverTimestamp()
+        };
+
+        try {
+            const batch = writeBatch(firestore);
+            
+            // 1. Update/Create Business
+            batch.set(doc(firestore, 'businesses', businessId), bData, { merge: true });
+            
+            // 2. Link to User
+            const userRef = doc(firestore, 'users', ownerId);
+            batch.update(userRef, { 
+                businessId: businessId, 
+                role: 'professional',
+                subscriptionStatus: 'professional'
+            });
+
+            await batch.commit();
+            toast({ title: "Boutique liée au compte !" });
+            setIsDialogOpen(false);
+            setEditingBusiness(null);
+        } catch (e) {
+            toast({ variant: 'destructive', title: "Erreur de liaison" });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleEdit = (b: Business) => {
+        setEditingBusiness(b);
+        setName(b.name);
+        setCommune(b.commune);
+        setOwnerId(b.ownerId);
+        setCategories(b.categories || []);
+        setIsDialogOpen(true);
+    };
+
+    return (
+        <Card className="border-2 shadow-lg">
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle className="text-xl font-black uppercase flex items-center gap-2"><Store className="size-6 text-primary" /> Partenaires Pro</CardTitle>
+                    <CardDescription className="text-[10px] font-bold uppercase">Liez un commerce à un compte utilisateur via son UID.</CardDescription>
+                </div>
+                <Button onClick={() => { setEditingBusiness(null); setName(''); setOwnerId(''); setCategories([]); setIsDialogOpen(true); }} className="h-10 font-black uppercase text-[10px] gap-2"><Plus className="size-4" /> Nouveau</Button>
+            </CardHeader>
+            <CardContent className="p-0 border-t">
+                <Table>
+                    <TableHeader><TableRow className="bg-muted/30"><TableHead className="px-4">Commerce</TableHead><TableHead>Commune</TableHead><TableHead>Propriétaire (UID)</TableHead><TableHead className="text-right px-4">Actions</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                        {businesses?.map(b => (
+                            <TableRow key={b.id}>
+                                <TableCell className="px-4 font-black uppercase text-xs">{b.name}</TableCell>
+                                <TableCell className="text-[10px] font-bold">{b.commune}</TableCell>
+                                <TableCell className="font-mono text-[9px] opacity-60">{b.ownerId}</TableCell>
+                                <TableCell className="text-right px-4">
+                                    <div className="flex justify-end gap-2">
+                                        <Button variant="ghost" size="icon" className="size-8 border-2" onClick={() => handleEdit(b)}><Pencil className="size-3" /></Button>
+                                        <Button variant="ghost" size="icon" className="size-8 text-destructive border-2" onClick={() => deleteDoc(doc(firestore!, 'businesses', b.id))}><Trash2 className="size-3" /></Button>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </CardContent>
+
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogContent className="max-w-md rounded-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="font-black uppercase flex items-center gap-2">
+                            <LinkIcon className="size-5 text-primary" /> {editingBusiness ? "Modifier" : "Lier un commerce"}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4">
+                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase">Nom de l'établissement</Label><Input value={name} onChange={e => setName(e.target.value)} className="h-11 border-2 font-black" /></div>
+                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase">UID de l'utilisateur (Pro)</Label><Input value={ownerId} onChange={e => setOwnerId(e.target.value)} placeholder="Coller l'UID ici..." className="h-11 border-2 font-mono text-xs" /></div>
+                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase">Commune</Label>
+                            <Select value={commune} onValueChange={setCommune}>
+                                <SelectTrigger className="h-11 border-2 font-bold text-xs"><SelectValue /></SelectTrigger>
+                                <SelectContent className="max-h-64">
+                                    {Object.keys(locations).sort().map(loc => <SelectItem key={loc} value={loc}>{loc}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase">Rayons d'activité</Label>
+                            <div className="flex flex-wrap gap-2">
+                                {availableCats.map(cat => (
+                                    <Badge 
+                                        key={cat} 
+                                        variant={categories.includes(cat) ? "default" : "outline"} 
+                                        className="cursor-pointer font-black uppercase text-[9px] py-1.5"
+                                        onClick={() => setCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])}
+                                    >
+                                        {cat}
+                                    </Badge>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                    <DialogFooter><Button onClick={handleSave} disabled={isSaving} className="w-full h-14 font-black uppercase tracking-widest shadow-lg">{isSaving ? "Liaison..." : "Confirmer la liaison"}</Button></DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </Card>
+    );
 }
 
 function FishGuideManager() {
@@ -744,8 +891,6 @@ function AppSettingsManager() {
                     <Button onClick={handleSaveCgv} className="w-full h-12 font-black uppercase text-xs tracking-widest gap-2"><Save className="size-4" /> Publier la nouvelle version</Button>
                 </CardContent>
             </Card>
-
-            <div className="md:col-span-2"><SystemNotificationsManager /></div>
         </div>
     );
 }
