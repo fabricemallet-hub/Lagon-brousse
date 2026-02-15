@@ -31,7 +31,7 @@ export function SidebarNav() {
   const roles = useMemo(() => {
     if (!user) return { isAdmin: false, isPro: false, isClient: true };
     
-    // Identifiants de confiance absolus (Administrateurs)
+    // Identifiants de confiance absolus (Administrateurs Master)
     const masterAdminUids = [
       't8nPnZLcTiaLJSKMuLzib3C5nPn1',
       'koKj5ObSGXYeO1PLKU5bgo8Yaky1',
@@ -48,13 +48,16 @@ export function SidebarNav() {
       'kledostyle@outlook.com'
     ];
 
+    const userEmail = user.email?.toLowerCase() || '';
+
     // Détection Admin
     const isAdmin = masterAdminUids.includes(user.uid) || 
-                    (user.email && masterAdminEmails.includes(user.email.toLowerCase())) ||
-                    userProfile?.role === 'admin';
+                    (userEmail && masterAdminEmails.includes(userEmail)) ||
+                    userProfile?.role === 'admin' || 
+                    userProfile?.subscriptionStatus === 'admin';
 
     // Détection Pro
-    const isPro = isAdmin || userProfile?.role === 'professional';
+    const isPro = isAdmin || userProfile?.role === 'professional' || userProfile?.subscriptionStatus === 'professional';
     
     return { isAdmin, isPro, isClient: !isAdmin && !isPro };
   }, [user, userProfile]);

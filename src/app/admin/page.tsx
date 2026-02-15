@@ -71,8 +71,14 @@ export default function AdminPage() {
       'ipupi3Pg4RfrSEpFyT69BtlCdpi2',
       'Irglq69MasYdNwBmUu8yKvw6h4G2'
     ];
-    const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com', 'kledostyle@outlook.com'];
-    return masterAdminUids.includes(user.uid) || (user.email && masterEmails.includes(user.email.toLowerCase()));
+    const masterEmails = [
+      'f.mallet81@outlook.com', 
+      'fabrice.mallet@gmail.com', 
+      'f.mallet81@gmail.com', 
+      'kledostyle@outlook.com'
+    ];
+    const userEmail = user.email?.toLowerCase() || '';
+    return masterAdminUids.includes(user.uid) || (userEmail && masterEmails.includes(userEmail));
   }, [user]);
 
   const usersRef = useMemoFirebase(() => (firestore && isAdmin) ? collection(firestore, 'users') : null, [firestore, isAdmin]);
@@ -217,11 +223,11 @@ function PermissionsManager({ users }: { users: UserAccount[] | null }) {
         setIsUpdating(userId);
         
         const userRef = doc(firestore, 'users', userId);
-        const updateData = { role: newRole };
+        const updateData = { role: newRole, subscriptionStatus: newRole === 'admin' ? 'admin' : (newRole === 'professional' ? 'professional' : 'trial') };
 
         updateDoc(userRef, updateData)
             .then(() => {
-                toast({ title: "Rôle mis à jour", description: `L'utilisateur est désormais ${newRole}.` });
+                toast({ title: "Permissions mises à jour", description: `L'utilisateur est désormais ${newRole}.` });
             })
             .catch((error) => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({

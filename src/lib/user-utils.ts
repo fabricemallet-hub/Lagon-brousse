@@ -20,7 +20,7 @@ export async function ensureUserDocument(
   const userDocRef = doc(firestore, 'users', user.uid);
   const email = user.email?.toLowerCase() || '';
   
-  // Identifiants de confiance absolue (Administrateurs)
+  // Identifiants de confiance absolue (Administrateurs Master)
   const masterEmails = [
     'f.mallet81@outlook.com', 
     'fabrice.mallet@gmail.com', 
@@ -51,6 +51,7 @@ export async function ensureUserDocument(
           setDoc(userDocRef, { 
             ...currentData, 
             role: 'admin',
+            subscriptionStatus: 'admin',
             id: user.uid,
             email: email || currentData.email
           }, { merge: true });
