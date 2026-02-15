@@ -33,7 +33,8 @@ import {
   ShieldAlert,
   RefreshCw,
   Save,
-  Package
+  Package,
+  History
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
@@ -230,7 +231,8 @@ export function ShootingTableCard() {
     const g = 9.81;
     
     const baseV0 = selectedMunition.v0;
-    const silencerBonus = (selectedCaliber.includes('.410') && hasSilencer) ? 1.03 : (hasSilencer ? 1.02 : 1.0);
+    const is410 = selectedCaliber.includes('.410');
+    const silencerBonus = (is410 && hasSilencer) ? 1.03 : (hasSilencer ? 1.02 : 1.0);
     const v0 = baseV0 * silencerBonus;
     const { bc } = selectedMunition;
 
@@ -321,10 +323,10 @@ export function ShootingTableCard() {
                   </div>
               </div>
               <div className="flex flex-col items-end gap-2">
-                {myWeapons && myWeapons.length > 0 && (
+                {myWeapons && myWeapons.length > 0 ? (
                     <Select onValueChange={handleLoadWeapon}>
-                        <SelectTrigger className="h-8 border-white/20 font-black uppercase text-[10px] bg-white/10 text-white w-40">
-                            <Package className="size-3 mr-1" />
+                        <SelectTrigger className="h-10 border-white/20 font-black uppercase text-[10px] bg-white/10 text-white w-48 shadow-lg ring-2 ring-primary/20">
+                            <Package className="size-4 mr-2 text-primary" />
                             <SelectValue placeholder="Charger une arme..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -335,6 +337,10 @@ export function ShootingTableCard() {
                             ))}
                         </SelectContent>
                     </Select>
+                ) : (
+                    <Badge variant="outline" className="h-8 border-white/10 text-white/40 font-bold uppercase text-[8px] italic">
+                        Râtelier vide : enregistrez vos armes ci-dessous
+                    </Badge>
                 )}
                 <Badge className={cn("font-black uppercase text-[10px] px-3 h-7 border-none shadow-md", selectedMunition.color)}>
                     {selectedMunition.caliber}
