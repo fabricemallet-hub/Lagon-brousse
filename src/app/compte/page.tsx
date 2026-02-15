@@ -1,8 +1,7 @@
-
 'use client';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, getDoc, writeBatch, serverTimestamp, updateDoc } from 'firebase/firestore';
-import type { UserAccount, AccessToken, SharedAccessToken, RibSettings, Region } from '@/lib/types';
+import type { UserAccount, Business, AccessToken, SharedAccessToken, RibSettings, Region } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -86,6 +85,13 @@ export default function ComptePage() {
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
+  // Fetch business name for pro accounts
+  const businessDataRef = useMemoFirebase(() => {
+    if (!firestore || !userProfile?.businessId) return null;
+    return doc(firestore, 'businesses', userProfile.businessId);
+  }, [firestore, userProfile?.businessId]);
+  const { data: businessData } = useDoc<Business>(businessDataRef);
+
   useEffect(() => {
     if (userProfile?.displayName) {
       setNewName(userProfile.displayName);
@@ -144,10 +150,18 @@ export default function ComptePage() {
       await updateDoc(doc(firestore, 'users', user.uid), {
         displayName: newName.trim()
       });
-      toast({ title: "Nom mis à jour !" });
+      
+      // Also update business name if pro
+      if (userProfile?.businessId) {
+        await updateDoc(doc(firestore, 'businesses', userProfile.businessId), {
+          name: newName.trim()
+        });
+      }
+      
+      toast({ title: userProfile?.role === 'professional' ? "Nom du magasin mis à jour !" : "Nom mis à jour !" });
       setIsEditingName(false);
     } catch (e) {
-      toast({ variant: 'destructive', title: "Erreur lors de la mise à jour du nom" });
+      toast({ variant: 'destructive', title: "Erreur lors de la mise à jour" });
     } finally {
       setIsSavingName(false);
     }
@@ -356,7 +370,7 @@ export default function ComptePage() {
             <div className="space-y-1">
               <div className="flex items-center justify-center gap-2">
                 <CardTitle className="text-xl font-black uppercase tracking-tighter">
-                  {userProfile?.displayName || user?.displayName || user?.email?.split('@')[0]}
+                  {businessData?.name || userProfile?.displayName || user?.displayName || user?.email?.split('@')[0]}
                 </CardTitle>
                 <Dialog open={isEditingName} onOpenChange={setIsEditingName}>
                   <DialogTrigger asChild>
@@ -366,14 +380,18 @@ export default function ComptePage() {
                   </DialogTrigger>
                   <DialogContent className="max-w-xs rounded-2xl">
                     <DialogHeader>
-                      <DialogTitle className="font-black uppercase tracking-tighter">Modifier mon nom</DialogTitle>
-                      <DialogDescription className="text-[10px] font-bold uppercase">Saisissez votre nouveau nom d'affichage</DialogDescription>
+                      <DialogTitle className="font-black uppercase tracking-tighter">
+                        {userProfile?.role === 'professional' ? "Nom du magasin" : "Modifier mon nom"}
+                      </DialogTitle>
+                      <DialogDescription className="text-[10px] font-bold uppercase">
+                        {userProfile?.role === 'professional' ? "Saisissez le nouveau nom de votre établissement" : "Saisissez votre nouveau nom d'affichage"}
+                      </DialogDescription>
                     </DialogHeader>
                     <div className="py-4">
                       <Input 
                         value={newName} 
                         onChange={(e) => setNewName(e.target.value)} 
-                        placeholder="Nouveau nom..." 
+                        placeholder={userProfile?.role === 'professional' ? "Nom de l'établissement" : "Nouveau nom..."} 
                         className="font-bold h-12 border-2"
                       />
                     </div>
