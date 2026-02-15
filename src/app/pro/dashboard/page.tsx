@@ -186,8 +186,11 @@ export default function ProDashboard() {
     if (selectedChannels.includes('PUSH')) unitSum += (pricing.pricePush || 0);
     if (selectedChannels.includes('MAIL')) unitSum += (pricing.priceMail || 0);
 
-    const baseCostPerPromo = pricing.fixedPrice + (targetCount * unitSum);
-    return baseCostPerPromo * selectedPromoIds.length;
+    const variableCostPerPromo = targetCount * unitSum;
+    const totalVariableCost = variableCostPerPromo * selectedPromoIds.length;
+    
+    // Fixed price is unique per campaign, not per article
+    return pricing.fixedPrice + totalVariableCost;
   }, [pricing, targetCount, selectedChannels, selectedPromoIds]);
 
   const handleCopyUid = () => {
@@ -638,40 +641,39 @@ export default function ProDashboard() {
                                     </p>
                                     <div className="space-y-1.5 text-[11px] font-bold text-slate-600">
                                         <div className="flex justify-between">
-                                            <span className="opacity-60">Frais fixes de lancement</span>
-                                            <span>{pricing.fixedPrice} F</span>
+                                            <span className="opacity-60">Frais fixes de lancement (Unique)</span>
+                                            <span className="font-black text-primary">{pricing.fixedPrice} F</span>
                                         </div>
                                         
-                                        <div className="flex justify-between border-t border-dashed pt-1 mt-1">
-                                            <span className="opacity-60">Base ({pricing.unitPricePerUser}F x {targetCount})</span>
-                                            <span>{pricing.unitPricePerUser * targetCount} F</span>
+                                        <div className="pt-2 border-t border-dashed space-y-1.5">
+                                            <p className="text-[9px] font-black uppercase text-muted-foreground mb-1">Coûts variables (x{selectedPromoIds.length} article{selectedPromoIds.length > 1 ? 's' : ''}) :</p>
+                                            
+                                            <div className="flex justify-between">
+                                                <span className="opacity-60">Base ({pricing.unitPricePerUser}F x {targetCount})</span>
+                                                <span>{pricing.unitPricePerUser * targetCount * selectedPromoIds.length} F</span>
+                                            </div>
+                                            {selectedChannels.includes('SMS') && (
+                                                <div className="flex justify-between text-blue-600">
+                                                    <span className="flex items-center gap-1"><Smartphone className="size-2"/> SMS ({pricing.priceSMS}F x {targetCount})</span>
+                                                    <span>{(pricing.priceSMS || 0) * targetCount * selectedPromoIds.length} F</span>
+                                                </div>
+                                            )}
+                                            {selectedChannels.includes('PUSH') && (
+                                                <div className="flex justify-between text-primary">
+                                                    <span className="flex items-center gap-1"><Zap className="size-2"/> Push ({pricing.pricePush}F x {targetCount})</span>
+                                                    <span>{(pricing.pricePush || 0) * targetCount * selectedPromoIds.length} F</span>
+                                                </div>
+                                            )}
+                                            {selectedChannels.includes('MAIL') && (
+                                                <div className="flex justify-between text-green-600">
+                                                    <span className="flex items-center gap-1"><Mail className="size-2"/> Email ({pricing.priceMail}F x {targetCount})</span>
+                                                    <span>{(pricing.priceMail || 0) * targetCount * selectedPromoIds.length} F</span>
+                                                </div>
+                                            )}
                                         </div>
-                                        {selectedChannels.includes('SMS') && (
-                                            <div className="flex justify-between text-blue-600">
-                                                <span className="flex items-center gap-1"><Smartphone className="size-2"/> SMS ({pricing.priceSMS}F x {targetCount})</span>
-                                                <span>{(pricing.priceSMS || 0) * targetCount} F</span>
-                                            </div>
-                                        )}
-                                        {selectedChannels.includes('PUSH') && (
-                                            <div className="flex justify-between text-primary">
-                                                <span className="flex items-center gap-1"><Zap className="size-2"/> Push ({pricing.pricePush}F x {targetCount})</span>
-                                                <span>{(pricing.pricePush || 0) * targetCount} F</span>
-                                            </div>
-                                        )}
-                                        {selectedChannels.includes('MAIL') && (
-                                            <div className="flex justify-between text-green-600">
-                                                <span className="flex items-center gap-1"><Mail className="size-2"/> Email ({pricing.priceMail}F x {targetCount})</span>
-                                                <span>{(pricing.priceMail || 0) * targetCount} F</span>
-                                            </div>
-                                        )}
 
-                                        <div className="flex justify-between pt-2 border-t-2 border-primary/20 text-slate-800 font-black">
-                                            <span className="uppercase">Total par article</span>
-                                            <span>{totalCalculatedCost / selectedPromoIds.length} F</span>
-                                        </div>
-
-                                        <div className="flex justify-between items-center bg-primary/10 p-2 rounded-lg border border-primary/20 mt-2">
-                                            <span className="text-[10px] font-black uppercase text-primary">Multiplié par {selectedPromoIds.length} article{selectedPromoIds.length > 1 ? 's' : ''}</span>
+                                        <div className="flex justify-between items-center bg-primary/10 p-3 rounded-xl border border-primary/20 mt-3">
+                                            <span className="text-[10px] font-black uppercase text-primary">Total à régler</span>
                                             <span className="text-xl text-primary font-black">{totalCalculatedCost} FCFP</span>
                                         </div>
                                     </div>
