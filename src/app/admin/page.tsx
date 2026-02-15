@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, setDoc, addDoc, deleteDoc, serverTimestamp, Timestamp, updateDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, doc, setDoc, addDoc, deleteDoc, serverTimestamp, Timestamp, updateDoc, writeBatch, where, getCountFromServer } from 'firebase/firestore';
 import type { UserAccount, Business, Conversation, AccessToken, SharedAccessToken, SplashScreenSettings, CgvSettings, RibSettings, SystemNotification, FishSpeciesInfo, SoundLibraryEntry, SupportTicket } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -49,7 +49,8 @@ import {
   ImageIcon,
   Clock,
   Send,
-  CheckCircle2
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -150,6 +151,50 @@ export default function AdminPage() {
               <StatsCard title="Abonnés" value={users?.filter(u => u.subscriptionStatus === 'active' || u.subscriptionStatus === 'admin' || u.subscriptionStatus === 'professional').length || 0} icon={ShieldCheck} color="text-primary" />
               <StatsCard title="Boutiques" value={businesses?.length || 0} icon={Store} color="text-accent" />
               <StatsCard title="Messages" value={(conversations?.filter(c => !c.isReadByAdmin).length || 0) + (tickets?.filter(t => t.statut === 'ouvert').length || 0)} icon={MessageSquare} color="text-green-600" />
+            </div>
+
+            {/* QUICK VIEW FOR MESSAGES & TICKETS ON LANDING */}
+            <div className="mt-8 space-y-4">
+                <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
+                    <Zap className="size-4 text-primary" /> Demandes en attente
+                </h3>
+                
+                <div className="flex flex-col gap-3">
+                    {/* Conversations non lues */}
+                    {conversations?.filter(c => !c.isReadByAdmin).slice(0, 3).map(c => (
+                        <Link key={c.id} href={`/admin/messages/${c.id}`} className="p-4 border-2 border-primary bg-primary/5 rounded-2xl flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-left-2 transition-all active:scale-[0.98]">
+                            <div className="min-w-0 flex-1">
+                                <p className="font-black text-xs uppercase truncate text-slate-800">{c.userDisplayName}</p>
+                                <p className="text-[10px] font-bold opacity-60 truncate italic mt-0.5">"{c.lastMessageContent}"</p>
+                            </div>
+                            <div className="flex flex-col items-end gap-1 shrink-0 ml-4">
+                                <Badge className="bg-primary text-[8px] h-4 font-black uppercase">Chat</Badge>
+                                <span className="text-[8px] font-black opacity-30 uppercase">{c.lastMessageAt ? format(c.lastMessageAt.toDate(), 'HH:mm') : '...'}</span>
+                            </div>
+                        </Link>
+                    ))}
+
+                    {/* Tickets ouverts */}
+                    {tickets?.filter(t => t.statut === 'ouvert').slice(0, 3).map(t => (
+                        <div key={t.id} onClick={() => setActiveTab('support')} className="p-4 border-2 border-orange-200 bg-orange-50/10 rounded-2xl flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-left-2 cursor-pointer transition-all active:scale-[0.98]">
+                            <div className="min-w-0 flex-1">
+                                <p className="font-black text-xs uppercase truncate text-orange-950">{t.sujet}</p>
+                                <p className="text-[10px] font-bold opacity-60 truncate italic mt-0.5">"{t.description}"</p>
+                            </div>
+                            <div className="flex flex-col items-end gap-1 shrink-0 ml-4">
+                                <Badge variant="outline" className="border-orange-300 text-orange-700 bg-white text-[8px] h-4 font-black uppercase">Ticket</Badge>
+                                <span className="text-[8px] font-black opacity-30 uppercase">{t.createdAt ? format(t.createdAt.toDate(), 'HH:mm') : '...'}</span>
+                            </div>
+                        </div>
+                    ))}
+
+                    {(!conversations?.some(c => !c.isReadByAdmin) && !tickets?.some(t => t.statut === 'ouvert')) && (
+                        <div className="p-12 text-center border-4 border-dashed rounded-[2.5rem] opacity-20 flex flex-col items-center gap-3">
+                            <CheckCircle2 className="size-10" />
+                            <p className="font-black uppercase tracking-[0.2em] text-[10px]">Toutes les demandes sont traitées</p>
+                        </div>
+                    )}
+                </div>
             </div>
           </TabsContent>
 
