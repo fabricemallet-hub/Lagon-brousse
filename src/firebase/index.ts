@@ -13,47 +13,31 @@ import {
 /**
  * @fileOverview Initialisation de Firebase Singleton.
  * Mode Long Polling forcé pour la stabilité dans l'environnement Cloud.
+ * Utilisation de la version 11.10.0 pour corriger les erreurs d'assertion interne.
  */
-
-declare global {
-  var __LB_FIREBASE_APP: FirebaseApp | undefined;
-  var __LB_FIREBASE_AUTH: Auth | undefined;
-  var __LB_FIREBASE_FIRESTORE: Firestore | undefined;
-}
 
 export function initializeFirebase() {
   if (typeof window !== 'undefined') {
     // 1. Singleton App
-    if (!globalThis.__LB_FIREBASE_APP) {
-      console.log("L&B DEBUG: Initialisation Firebase App...");
-      globalThis.__LB_FIREBASE_APP = getApps().length === 0 
-        ? initializeApp(firebaseConfig) 
-        : getApp();
-    }
-    const app = globalThis.__LB_FIREBASE_APP;
+    const app = getApps().length === 0 
+      ? initializeApp(firebaseConfig) 
+      : getApp();
 
     // 2. Singleton Auth
-    if (!globalThis.__LB_FIREBASE_AUTH) {
-      console.log("L&B DEBUG: Initialisation Firebase Auth...");
-      globalThis.__LB_FIREBASE_AUTH = getAuth(app);
-    }
-    const auth = globalThis.__LB_FIREBASE_AUTH;
+    const auth = getAuth(app);
 
     // 3. Singleton Firestore (STABLE TRANSPORT)
-    if (!globalThis.__LB_FIREBASE_FIRESTORE) {
-      console.log("L&B DEBUG: Configuration Firestore (Stable Transport)...");
-      try {
-        // On tente d'abord une initialisation propre
-        globalThis.__LB_FIREBASE_FIRESTORE = initializeFirestore(app, {
-          localCache: memoryLocalCache(),
-          experimentalForceLongPolling: true 
-        });
-      } catch (e) {
-        // Si déjà initialisé, on récupère l'instance existante
-        globalThis.__LB_FIREBASE_FIRESTORE = getFirestore(app);
-      }
+    let firestore: Firestore;
+    try {
+      // On tente une initialisation avec configuration spécifique
+      firestore = initializeFirestore(app, {
+        localCache: memoryLocalCache(),
+        experimentalForceLongPolling: true 
+      });
+    } catch (e) {
+      // Si déjà initialisé (HMR), on récupère l'instance existante
+      firestore = getFirestore(app);
     }
-    const firestore = globalThis.__LB_FIREBASE_FIRESTORE;
 
     return { firebaseApp: app, auth, firestore };
   }

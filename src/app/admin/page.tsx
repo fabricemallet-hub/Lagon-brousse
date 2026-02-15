@@ -51,7 +51,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Calendar,
-  XCircle
+  XCircle,
+  Maximize2
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -1081,7 +1082,7 @@ function TicketAdminCard({ ticket }: { ticket: SupportTicket }) {
                         <Label className="text-[9px] font-black uppercase text-primary">Votre réponse d'expert</Label>
                         <Textarea 
                             value={response} 
-                            onChange={e => setResponse(e.target.value)} 
+                            onChange={setResponse} 
                             placeholder="Saisissez la réponse..." 
                             className="min-h-[100px] border-2 text-xs font-medium"
                         />
