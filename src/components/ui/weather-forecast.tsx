@@ -17,8 +17,9 @@ import {
 import { format, formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { WeatherData, HourlyForecast, WindDirection, Tide } from '@/lib/types';
-import { cn, translateWindDirection } from '@/lib/utils';
+import { cn, translateWindDirection, getRegionalNow } from '@/lib/utils';
 import { Skeleton } from './skeleton';
+import { useLocation } from '@/context/location-context';
 
 const WeatherConditionIcon = ({
   condition,
@@ -93,6 +94,7 @@ export function WeatherForecast({
   tides: Tide[];
   isToday?: boolean;
 }) {
+  const { selectedRegion } = useLocation();
   const [isClient, setIsClient] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -101,10 +103,10 @@ export function WeatherForecast({
 
   useEffect(() => {
     setIsClient(true);
-    setNow(new Date());
-    const timer = setInterval(() => setNow(new Date()), 60000);
+    setNow(getRegionalNow(selectedRegion));
+    const timer = setInterval(() => setNow(getRegionalNow(selectedRegion)), 60000);
     return () => clearInterval(timer);
-  }, []);
+  }, [selectedRegion]);
 
   const currentHour = now ? now.getHours() : 0;
 
@@ -160,8 +162,6 @@ export function WeatherForecast({
     };
   }, [now, weather, tides, currentHour]);
 
-  // Centrage auto : On retire 'now' des dépendances pour ne pas recalculer à chaque minute,
-  // seulement quand l'heure change réellement ou que le composant est prêt.
   useEffect(() => {
     if (isClient && isToday && scrollRef.current) {
         if (hasCenteredForHour.current !== currentHour) {
@@ -176,7 +176,6 @@ export function WeatherForecast({
                     const scrollLeft = elementLeft - (containerWidth / 2) + (elementWidth / 2);
                     container.scrollTo({ 
                       left: scrollLeft, 
-                      // 'auto' au premier coup pour éviter les violations scheduler, 'smooth' ensuite
                       behavior: hasCenteredForHour.current === null ? 'auto' : 'smooth' 
                     });
                     hasCenteredForHour.current = currentHour;

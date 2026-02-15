@@ -6,6 +6,21 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Retourne l'heure actuelle ajustée à la région (Fuseau horaire).
+ * Utile pour synchroniser l'UI quand on bascule entre NC (UTC+11) et Tahiti (UTC-10).
+ */
+export function getRegionalNow(region: string): Date {
+  const tz = region === 'TAHITI' ? 'Pacific/Tahiti' : 'Pacific/Noumea';
+  // On utilise toLocaleString pour obtenir une chaîne de date dans le fuseau, 
+  // puis on recrée un objet Date pour manipuler les heures/jours facilement en UI.
+  try {
+    return new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
+  } catch (e) {
+    return new Date();
+  }
+}
+
+/**
  * Traduit les codes de direction du vent en français.
  */
 export function translateWindDirection(direction: string): string {

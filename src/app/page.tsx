@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -23,7 +22,7 @@ import {
 import { useLocation } from '@/context/location-context';
 import { useDate } from '@/context/date-context';
 import { WeatherForecast } from '@/components/ui/weather-forecast';
-import { cn } from '@/lib/utils';
+import { cn, getRegionalNow } from '@/lib/utils';
 import { useMemo, useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
@@ -60,7 +59,7 @@ const getProgressiveUV = (maxUV: number, date: Date): number => {
 };
 
 export default function Home() {
-  const { selectedLocation } = useLocation();
+  const { selectedLocation, selectedRegion } = useLocation();
   const { selectedDate } = useDate();
   const { user } = useUser();
   const firestore = useFirestore();
@@ -69,12 +68,12 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [now, setNow] = useState<Date | null>(null);
 
-  // Avoid hydration mismatch by setting time after mount
+  // Synchronisation de l'heure actuelle avec la région sélectionnée
   useEffect(() => {
-    setNow(new Date());
-    const timer = setInterval(() => setNow(new Date()), 60000);
+    setNow(getRegionalNow(selectedRegion));
+    const timer = setInterval(() => setNow(getRegionalNow(selectedRegion)), 60000);
     return () => clearInterval(timer);
-  }, []);
+  }, [selectedRegion]);
 
   // Récupération des données Météo Live en temps réel depuis Firestore
   const meteoRef = useMemoFirebase(() => {
@@ -93,21 +92,20 @@ export default function Home() {
 
   // Détection des alertes de péremption
   const safetyAlerts = useMemo(() => {
-    if (!vesselsSafety) return [];
+    if (!vesselsSafety || !now) return [];
     const alerts: { vessel: string, item: string, daysLeft: number }[] = [];
-    const today = new Date();
-
+    
     vesselsSafety.forEach(v => {
       v.equipment?.forEach(item => {
         const expiry = parseISO(item.expiryDate);
-        const daysLeft = differenceInDays(expiry, today);
+        const daysLeft = differenceInDays(expiry, now);
         if (daysLeft < 90) {
           alerts.push({ vessel: v.vesselName, item: item.label, daysLeft });
         }
       });
     });
     return alerts.sort((a, b) => a.daysLeft - b.daysLeft);
-  }, [vesselsSafety]);
+  }, [vesselsSafety, now]);
 
   useEffect(() => {
     setIsLoading(true);
@@ -136,13 +134,13 @@ export default function Home() {
   const weatherWithLiveUpdates = useMemo(() => {
     if (!data?.weather || !now) return null;
     
-    // On n'applique le Live que si on regarde la date d'aujourd'hui
+    // On n'applique le Live que si on regarde la date d'aujourd'hui (régionalisée)
     const isToday = now.toDateString() === selectedDate.toDateString();
     if (!liveMeteo || !isToday) return data.weather;
 
     const currentHour = now.getHours();
     
-    // Correction intelligence UV progressive
+    // Correction intelligence UV progressive basée sur l'heure régionale
     const effectiveUV = getProgressiveUV(liveMeteo.uv, now);
     
     return {

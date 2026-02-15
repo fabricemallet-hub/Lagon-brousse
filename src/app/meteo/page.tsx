@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useState, useMemo, useEffect } from 'react';
 import type { MeteoLive, MeteoForecast, WindDirection } from '@/lib/types';
-import { translateWindDirection, degreesToCardinal, getMeteoCondition } from '@/lib/utils';
+import { translateWindDirection, degreesToCardinal, getMeteoCondition, getRegionalNow } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -81,16 +81,16 @@ const WindArrow = ({ direction, degrees, className }: { direction?: string, degr
 
 export default function MeteoLivePage() {
   const firestore = useFirestore();
-  const { selectedLocation } = useLocation();
+  const { selectedLocation, selectedRegion } = useLocation();
   const [search, setSearch] = useState('');
   const [selectedCommuneId, setSelectedCommuneId] = useState<string | null>(null);
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
-    setNow(new Date());
-    const timer = setInterval(() => setNow(new Date()), 60000);
+    setNow(getRegionalNow(selectedRegion));
+    const timer = setInterval(() => setNow(getRegionalNow(selectedRegion)), 60000);
     return () => clearInterval(timer);
-  }, []);
+  }, [selectedRegion]);
   
   const meteoQuery = useMemoFirebase(() => {
     if (!firestore) return null;
