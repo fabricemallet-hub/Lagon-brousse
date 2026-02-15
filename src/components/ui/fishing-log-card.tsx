@@ -23,7 +23,7 @@ import { cn, getDistance } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from './alert';
 import { useLocation } from '@/context/location-context';
 import { findSimilarDay, analyzeBestDay } from '@/ai/flows/find-best-fishing-day';
-import { recommendBestSpot } from '@/ai/flows/recommend-best-spot';
+import { recommendBestSpot } from '@/ai/schemas';
 import type { FishingAnalysisOutput, RecommendBestSpotOutput } from '@/ai/schemas';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
@@ -40,11 +40,11 @@ const availableIcons = Object.keys(mapIcons);
 const availableColors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
 
 const fishingTypes = [
-  { id: 'Dérive', bgColor: 'bg-blue-500', label: 'Dérive' },
-  { id: 'Mouillage', bgColor: 'bg-green-500', label: 'Mouillage' },
-  { id: 'Pêche à la ligne', bgColor: 'bg-yellow-500', label: 'Ligne' },
-  { id: 'Pêche au lancer', bgColor: 'bg-purple-500', label: 'Lancer' },
-  { id: 'Traine', bgColor: 'bg-red-500', label: 'Traine' },
+  { id: 'Dérive', bgColor: 'bg-blue-600', label: 'Dérive' },
+  { id: 'Mouillage', bgColor: 'bg-emerald-600', label: 'Mouillage' },
+  { id: 'Pêche à la ligne', bgColor: 'bg-amber-500', label: 'Ligne' },
+  { id: 'Pêche au lancer', bgColor: 'bg-purple-600', label: 'Lancer' },
+  { id: 'Traine', bgColor: 'bg-rose-600', label: 'Traîne' },
 ];
 
 const PulsingDot = () => (
@@ -115,14 +115,12 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         if (incomingShares && incomingShares.length > 0 && user && firestore) {
             incomingShares.forEach(async (share) => {
                 try {
-                    // Ajouter le spot reçu à la liste de l'utilisateur
                     await addDoc(collection(firestore, 'users', user.uid, 'fishing_spots'), {
                         ...share.spotData,
                         userId: user.uid,
                         createdAt: serverTimestamp(),
                         sharedBy: share.senderName || 'Un ami'
                     });
-                    // Supprimer le document de partage pour ne pas le ré-importer
                     await deleteDoc(doc(firestore, 'spot_shares', share.id));
                     
                     toast({ 
@@ -373,7 +371,6 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
         if (!user || !firestore || !sharingSpot || !recipientEmail.trim()) return;
         setIsSendingShare(true);
         try {
-            // Créer un document de partage
             await addDoc(collection(firestore, 'spot_shares'), {
                 senderId: user.uid,
                 senderName: user.displayName || user.email?.split('@')[0] || 'Un ami',
@@ -553,11 +550,14 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                 <span className="text-xs font-bold text-foreground whitespace-nowrap">{spot.name}</span>
                                                 {spot.fishingTypes && spot.fishingTypes.length > 0 && (
                                                     <div className="flex flex-wrap gap-1 justify-center mt-0.5">
-                                                        {spot.fishingTypes.map(type => (
-                                                            <span key={type} className="text-[8px] font-black uppercase text-primary leading-none bg-primary/10 px-1 py-0.5 rounded">
-                                                                {type.split(' ').pop()}
-                                                            </span>
-                                                        ))}
+                                                        {spot.fishingTypes.map(typeId => {
+                                                            const typeInfo = fishingTypes.find(t => t.id === typeId);
+                                                            return (
+                                                                <span key={typeId} className={cn("text-[8px] font-black uppercase text-white leading-none px-1 py-0.5 rounded shadow-sm", typeInfo?.bgColor || "bg-slate-500")}>
+                                                                    {typeInfo?.label || typeId.split(' ').pop()}
+                                                                </span>
+                                                            );
+                                                        })}
                                                     </div>
                                                 )}
                                             </div>
@@ -692,10 +692,24 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                         </div>
                                                         <div className="min-w-0">
                                                             <p className="font-black uppercase tracking-tight text-xs leading-none truncate">{spot.name}</p>
-                                                            <div className="flex items-center gap-2 mt-1">
+                                                            <div className="flex flex-wrap items-center gap-2 mt-1">
                                                                 <p className="text-[9px] font-bold text-muted-foreground/60 uppercase">
                                                                     {spot.createdAt ? format(spot.createdAt.toDate(), 'd MMM yyyy à HH:mm', { locale: fr }) : '...'}
                                                                 </p>
+                                                                {spot.fishingTypes?.map(typeId => {
+                                                                    const typeInfo = fishingTypes.find(t => t.id === typeId);
+                                                                    return (
+                                                                        <span 
+                                                                            key={typeId} 
+                                                                            className={cn(
+                                                                                "text-[7px] h-3.5 px-1.5 flex items-center rounded-full font-black uppercase text-white shadow-sm",
+                                                                                typeInfo?.bgColor || "bg-slate-500"
+                                                                            )}
+                                                                        >
+                                                                            {typeInfo?.label || typeId}
+                                                                        </span>
+                                                                    );
+                                                                })}
                                                                 {spot.sharedBy && (
                                                                     <Badge variant="outline" className="text-[7px] font-black uppercase h-3.5 px-1 border-primary/30 text-primary">Reçu de {spot.sharedBy}</Badge>
                                                                 )}
@@ -752,7 +766,6 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                 )}
             </CardContent>
 
-            {/* Dialog Partage */}
             <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
                 <DialogContent className="max-w-md rounded-2xl">
                     <DialogHeader>
