@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, ImageIcon, X, Info, Pencil, Save, AlertCircle, LogOut, HelpCircle, Copy, Check, UserCircle, ShieldCheck, BrainCircuit, MapPin, ChevronDown, Globe, Smartphone, Mail, Zap } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { cn } from '@/lib/utils';
+import { cn, getDistance } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { signOut } from 'firebase/auth';
 import { useAuth } from '@/firebase';
@@ -108,17 +108,17 @@ export default function ProDashboard() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasCopiedUid, setHasCopiedUid] = useState(false);
 
-  // Auto-calculate original price when promo price or manual discount changes
+  // Auto-calculate selling price when original price or manual discount changes
   useEffect(() => {
-    if (manualDiscountInput && promoPrice) {
+    if (manualDiscountInput && originalPrice) {
         const pct = parseFloat(manualDiscountInput);
-        const salePrice = parseFloat(promoPrice);
-        if (pct > 0 && pct < 100 && salePrice > 0) {
-            const calculatedOriginal = salePrice / (1 - pct / 100);
-            setOriginalPrice(Math.round(calculatedOriginal).toString());
+        const origPrice = parseFloat(originalPrice);
+        if (pct >= 0 && pct <= 100 && origPrice > 0) {
+            const calculatedSale = origPrice * (1 - pct / 100);
+            setPromoPrice(Math.round(calculatedSale).toString());
         }
     }
-  }, [promoPrice, manualDiscountInput]);
+  }, [manualDiscountInput, originalPrice]);
 
   const calculatedDiscount = useMemo(() => {
     const priceNum = parseFloat(promoPrice);
@@ -331,48 +331,55 @@ export default function ProDashboard() {
                   <div className="space-y-3">
                     <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Titre</Label><Input value={promoTitle} onChange={e => setPromoTitle(e.target.value)} className="font-bold border-2" /></div>
                     <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Rayon</Label><Select value={promoCategory} onValueChange={setPromoCategory}><SelectTrigger className="border-2 font-black uppercase text-xs"><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs uppercase">{cat}</SelectItem>)}</SelectContent></Select></div>
-                    <div className="grid grid-cols-2 gap-3">
+                    
+                    <div className="grid grid-cols-2 gap-3 p-4 bg-muted/10 rounded-2xl border-2 border-dashed border-primary/5">
                         <div className="space-y-1">
-                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Prix (F)</Label>
-                            <Input 
-                                type="number" 
-                                value={promoPrice} 
-                                onChange={e => setPromoPrice(e.target.value)} 
-                                className="font-bold border-2" 
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1 flex items-center justify-between">
-                                Prix Barré
-                                {calculatedDiscount && <Badge variant="destructive" className="h-4 px-1.5 text-[8px] font-black">-{calculatedDiscount}%</Badge>}
-                            </Label>
+                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Prix Barré (Origine)</Label>
                             <Input 
                                 type="number" 
                                 value={originalPrice} 
-                                onChange={e => {
-                                    setOriginalPrice(e.target.value);
-                                    setManualDiscountInput('');
-                                }} 
-                                className="border-2" 
+                                onChange={e => setOriginalPrice(e.target.value)} 
+                                className="border-2 bg-white" 
                             />
                         </div>
-                        <div className="col-span-2 space-y-1">
-                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Calculer via Remise (%)</Label>
+                        <div className="space-y-1">
+                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Remise (%)</Label>
                             <div className="relative">
                                 <Input 
                                     type="number" 
-                                    placeholder="Saisir % (ex: 20)" 
+                                    placeholder="Ex: 50" 
                                     value={manualDiscountInput}
                                     onChange={e => setManualDiscountInput(e.target.value)}
-                                    className="h-10 border-2 font-black text-center text-xs bg-white pl-10" 
+                                    className="h-10 border-2 font-black text-center text-xs bg-white pl-8" 
                                 />
-                                <Percent className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-primary opacity-40" />
+                                <Percent className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-primary opacity-40" />
                             </div>
-                            <p className="text-[8px] font-bold text-muted-foreground px-1 italic">
-                                Saisissez le % de remise pour que le Prix Barré se calcule tout seul par rapport au Prix de vente.
-                            </p>
+                        </div>
+                        <div className="col-span-2 space-y-1 mt-2">
+                            <Label className="text-[10px] font-black uppercase text-primary ml-1 flex items-center justify-between">
+                                Prix Final (S'affiche à l'écran)
+                                {calculatedDiscount && (
+                                    <Badge variant="destructive" className="h-5 px-2 text-[10px] font-black animate-pulse shadow-md">
+                                        -{calculatedDiscount}%
+                                    </Badge>
+                                )}
+                            </Label>
+                            <Input 
+                                type="number" 
+                                value={promoPrice} 
+                                onChange={e => {
+                                    setPromoPrice(e.target.value);
+                                    // Si on modifie le prix de vente directement, on vide le % maître pour laisser la main
+                                    if (!originalPrice) setManualDiscountInput('');
+                                }} 
+                                className={cn(
+                                    "font-black text-lg border-2 h-12 transition-all",
+                                    calculatedDiscount ? "border-red-200 bg-red-50 text-red-600 ring-2 ring-red-100" : "bg-white"
+                                )} 
+                            />
                         </div>
                     </div>
+
                     <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Description</Label><Textarea value={promoDescription} onChange={e => setPromoDescription(e.target.value)} className="font-medium border-2 min-h-[80px]" /></div>
                     <div className="space-y-2">
                         <Label className="text-[10px] font-black uppercase opacity-60">Photos (Max 4)</Label>
