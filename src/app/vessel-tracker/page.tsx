@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -653,7 +652,7 @@ export default function VesselTrackerPage() {
     const posUrl = `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
     const nicknamePrefix = vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : "";
     const customText = (isCustomMessageEnabled && vesselSmsMessage) ? vesselSmsMessage : "Requiert assistance immédiate.";
-    const accuracyText = accuracy ? ` [Précision GPS: ${accuracy}m]` : "";
+    const accuracyText = accuracy ? ` [Précision signal GPS: +/-${accuracy}m]` : "";
     const body = `${nicknamePrefix}${customText} [${type}] Position : ${posUrl}${accuracyText}`;
     
     try {
@@ -1060,7 +1059,7 @@ export default function VesselTrackerPage() {
                                                     </span>
                                                     <span className="text-[9px] font-bold opacity-40 uppercase">
                                                         {format(h.time, 'dd/MM HH:mm:ss')}
-                                                        {h.accuracy !== undefined && ` • GPS: +/-${h.accuracy}m`}
+                                                        {h.accuracy !== undefined && ` • Précision signal GPS: +/-${h.accuracy}m`}
                                                     </span>
                                                 </div>
                                                 {h.pos && (
