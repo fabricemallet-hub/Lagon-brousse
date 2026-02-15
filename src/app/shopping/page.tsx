@@ -13,6 +13,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
+    Carousel, 
+    CarouselContent, 
+    CarouselItem, 
+    type CarouselApi 
+} from '@/components/ui/carousel';
+import { 
     Search, 
     ShoppingBag, 
     Store, 
@@ -66,15 +72,33 @@ export default function ShoppingPage() {
   // --- DETAIL VIEW STATE ---
   const [selectedProductForDetail, setSelectedProductForDetail] = useState<Promotion & { business?: Business } | null>(null);
   const [activeImageIdx, setActiveImageIdx] = useState(0);
+  const [api, setApi] = useState<CarouselApi>();
 
   // --- CONTACT DIALOG STATE ---
   const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
   const [selectedBusinessContact, setSelectedBusinessContact] = useState<Business | null>(null);
   const [isLoadingContact, setIsLoadingContact] = useState(false);
 
+  // Sync Carousel with Dots
   useEffect(() => {
-    if (selectedProductForDetail) setActiveImageIdx(0);
-  }, [selectedProductForDetail]);
+    if (!api) return;
+    
+    const onSelect = () => {
+      setActiveImageIdx(api.selectedScrollSnap());
+    };
+
+    api.on("select", onSelect);
+    return () => {
+      api.off("select", onSelect);
+    };
+  }, [api]);
+
+  useEffect(() => {
+    if (selectedProductForDetail) {
+        setActiveImageIdx(0);
+        api?.scrollTo(0, true);
+    }
+  }, [selectedProductForDetail, api]);
 
   const handleOpenContact = async (businessId: string) => {
     setIsLoadingContact(true);
@@ -374,25 +398,31 @@ export default function ShoppingPage() {
                         
                         <button 
                             onClick={() => setSelectedProductForDetail(null)}
-                            className="absolute top-4 right-4 z-20 p-2 bg-black/20 hover:bg-black/40 rounded-full text-white backdrop-blur-md transition-colors shadow-lg"
+                            className="absolute top-4 right-4 z-[160] p-2 bg-black/20 hover:bg-black/40 rounded-full text-white backdrop-blur-md transition-colors shadow-lg"
                         >
                             <X className="size-5" />
                         </button>
                         
-                        <div className="aspect-video sm:aspect-[16/9] bg-muted relative overflow-hidden">
+                        <div className="aspect-video sm:aspect-[16/9] bg-muted relative overflow-hidden group">
                             {selectedProductForDetail.images && selectedProductForDetail.images.length > 0 ? (
-                                <>
-                                    <img 
-                                        src={selectedProductForDetail.images[activeImageIdx]} 
-                                        className="w-full h-full object-cover animate-in fade-in duration-500" 
-                                        alt={selectedProductForDetail.title} 
-                                    />
+                                <Carousel setApi={setApi} className="w-full h-full">
+                                    <CarouselContent className="h-full ml-0">
+                                        {selectedProductForDetail.images.map((img, idx) => (
+                                            <CarouselItem key={idx} className="h-full pl-0">
+                                                <img 
+                                                    src={img} 
+                                                    className="w-full h-full object-cover" 
+                                                    alt={`${selectedProductForDetail.title} - ${idx + 1}`} 
+                                                />
+                                            </CarouselItem>
+                                        ))}
+                                    </CarouselContent>
                                     {selectedProductForDetail.images.length > 1 && (
-                                        <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 px-4">
+                                        <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 px-4 z-[160]">
                                             {selectedProductForDetail.images.map((_, idx) => (
                                                 <button 
                                                     key={idx} 
-                                                    onClick={() => setActiveImageIdx(idx)}
+                                                    onClick={() => api?.scrollTo(idx)}
                                                     className={cn(
                                                         "size-2 rounded-full transition-all shadow-md",
                                                         activeImageIdx === idx ? "bg-primary w-6" : "bg-white/60 hover:bg-white"
@@ -401,14 +431,14 @@ export default function ShoppingPage() {
                                             ))}
                                         </div>
                                     )}
-                                </>
+                                </Carousel>
                             ) : (
                                 <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground/30">
                                     <ImageIcon className="size-16" />
                                     <span className="font-black uppercase text-[10px] mt-2">Aucun visuel</span>
                                 </div>
                             )}
-                            <div className="absolute top-4 left-4 flex flex-col gap-2">
+                            <div className="absolute top-4 left-4 flex flex-col gap-2 z-20">
                                 <Badge className={cn(
                                     "font-black text-[10px] uppercase border-none shadow-lg px-3 h-7",
                                     selectedProductForDetail.promoType === 'Promo' ? "bg-red-600 animate-pulse" : "bg-primary"
