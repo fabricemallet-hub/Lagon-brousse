@@ -10,9 +10,11 @@ service cloud.firestore {
     match /{allPaths=**} {
       allow read, write: if request.auth != null && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
-        request.auth.token.email.lower() == "f.mallet81@outlook.com" ||
-        request.auth.token.email.lower() == "kledostyle@outlook.com" ||
-        request.auth.token.email.lower() == "f.mallet81@gmail.com"
+        (request.auth.token.email != null && (
+          request.auth.token.email.lower() == "f.mallet81@outlook.com" ||
+          request.auth.token.email.lower() == "kledostyle@outlook.com" ||
+          request.auth.token.email.lower() == "f.mallet81@gmail.com"
+        ))
       );
     }
 
@@ -26,15 +28,19 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
-        request.auth.token.email.lower() == "f.mallet81@outlook.com" ||
-        request.auth.token.email.lower() == "kledostyle@outlook.com" ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin"
+        (request.auth.token.email != null && (
+          request.auth.token.email.lower() == "f.mallet81@outlook.com" ||
+          request.auth.token.email.lower() == "kledostyle@outlook.com"
+        )) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin")
       );
     }
 
     function isProfessional() {
       return isSignedIn() && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "professional" || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "professional") || 
         isAdmin()
       );
     }
@@ -61,7 +67,7 @@ service cloud.firestore {
       allow create, delete: if isAdmin();
       allow update: if isAdmin() || (isSignedIn() && (
         resource.data.ownerId == request.auth.uid ||
-        request.auth.token.email.lower() == "kledostyle@outlook.com"
+        (request.auth.token.email != null && request.auth.token.email.lower() == "kledostyle@outlook.com")
       ));
     }
 

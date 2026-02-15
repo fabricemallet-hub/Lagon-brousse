@@ -6,7 +6,7 @@ import { addMonths } from 'date-fns';
 
 /**
  * Synchronisation du profil utilisateur.
- * Sécurité Master : Force les droits administrateurs pour l'unique compte de confiance.
+ * Sécurité Master : Force les droits administrateurs pour les comptes de confiance.
  */
 export async function ensureUserDocument(
   firestore: Firestore, 
@@ -19,8 +19,11 @@ export async function ensureUserDocument(
   const userDocRef = doc(firestore, 'users', user.uid);
   const email = user.email?.toLowerCase() || '';
   
-  // UNIQUE COMPTE ADMIN AUTORISÉ (UID de f.mallet81@outlook.com)
-  const isMasterAdmin = (user.uid === 't8nPnZLcTiaLJSKMuLzib3C5nPn1');
+  // COMPTES ADMIN AUTORISÉS
+  const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1'];
+  const masterEmails = ['f.mallet81@outlook.com', 'kledostyle@outlook.com', 'f.mallet81@gmail.com'];
+  
+  const isMasterAdmin = masterUids.includes(user.uid) || masterEmails.includes(email);
 
   try {
     const docSnap = await getDoc(userDocRef);
