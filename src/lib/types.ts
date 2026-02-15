@@ -27,6 +27,7 @@ export interface UserAccount {
   isCustomMessageEnabled?: boolean;
   emergencyContact?: string;
   vesselSmsMessage?: string;
+  favoriteNavLinks?: string[];
 }
 
 export interface Business {

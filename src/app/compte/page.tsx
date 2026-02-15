@@ -1,3 +1,4 @@
+
 'use client';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, getDoc, writeBatch, serverTimestamp, updateDoc } from 'firebase/firestore';
@@ -9,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, isBefore, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { 
-  Crown, Star, XCircle, Ticket, Gift, LogOut, Mail, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink, Copy, Check, MapPin, RefreshCw, Store, Zap, Pencil
+  Crown, Star, XCircle, Ticket, Gift, LogOut, Mail, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink, Copy, Check, MapPin, RefreshCw, Store, Zap, Pencil, LayoutGrid, Heart
 } from 'lucide-react';
 import {
   Select,
@@ -19,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/firebase';
@@ -36,6 +37,8 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { locations } from '@/lib/locations';
+import { navLinks } from '@/lib/nav-links';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function ComptePage() {
   const { user, isUserLoading } = useUser();
@@ -54,6 +57,10 @@ export default function ComptePage() {
   const [newName, setNewName] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
 
+  // Favorites state
+  const [tempFavorites, setTempFavorites] = useState<string[]>([]);
+  const [isSavingFavorites, setIsSavingFavorites] = useState(false);
+
   const userDocRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return doc(firestore, 'users', user.uid);
@@ -66,6 +73,12 @@ export default function ComptePage() {
       setNewName(userProfile.displayName);
     } else if (user?.displayName) {
       setNewName(user.displayName);
+    }
+    
+    if (userProfile?.favoriteNavLinks) {
+      setTempFavorites(userProfile.favoriteNavLinks);
+    } else {
+      setTempFavorites(['/', '/peche', '/vessel-tracker', '/chasse', '/champs', '/compte']);
     }
   }, [userProfile, user]);
 
@@ -124,6 +137,36 @@ export default function ComptePage() {
       toast({ title: "Localité mise à jour", description: `Votre commune favorite est désormais ${newLoc}.` });
     } catch (e) {
       toast({ variant: 'destructive', title: "Erreur", description: "Impossible de mettre à jour la commune." });
+    }
+  };
+
+  const handleToggleFavorite = (href: string) => {
+    setTempFavorites(prev => {
+      if (prev.includes(href)) {
+        // Toujours garder au moins 2 favoris pour la stabilité
+        if (prev.length <= 2) return prev;
+        return prev.filter(h => h !== href);
+      }
+      if (prev.length >= 6) {
+        toast({ title: "Limite atteinte", description: "Maximum 6 favoris autorisés." });
+        return prev;
+      }
+      return [...prev, href];
+    });
+  };
+
+  const handleSaveFavorites = async () => {
+    if (!user || !firestore) return;
+    setIsSavingFavorites(true);
+    try {
+      await updateDoc(doc(firestore, 'users', user.uid), {
+        favoriteNavLinks: tempFavorites
+      });
+      toast({ title: "Raccourcis mis à jour !", description: "Votre barre de navigation a été personnalisée." });
+    } catch (e) {
+      toast({ variant: 'destructive', title: "Erreur", description: "Échec de l'enregistrement des favoris." });
+    } finally {
+      setIsSavingFavorites(false);
     }
   };
 
@@ -212,6 +255,18 @@ export default function ComptePage() {
   };
 
   const status = getStatusInfo();
+
+  // Liste filtrée des liens pour les favoris
+  const filteredNavLinks = useMemo(() => {
+    return navLinks.filter(link => {
+      // Masquer Admin et Pro pour les clients
+      if (link.adminOnly && userProfile?.role !== 'admin' && userProfile?.subscriptionStatus !== 'admin') return false;
+      if (link.proOnly && userProfile?.role !== 'professional' && userProfile?.role !== 'admin') return false;
+      // Masquer FAQ, Mode opératoire et Login de la sélection favoris (optionnel)
+      if (['/aide/faq', '/aide', '/login', '/signup'].includes(link.href)) return false;
+      return true;
+    });
+  }, [userProfile]);
 
   if (isUserLoading || isProfileLoading || isSharedTokenLoading) return <div className="space-y-6 px-1"><Skeleton className="h-48 w-full" /><Skeleton className="h-48 w-full" /></div>;
 
@@ -309,6 +364,57 @@ export default function ComptePage() {
                   <span className="text-sm font-bold">{userProfile?.notificationsEnabled ? 'Activées' : 'Désactivées'}</span>
                 </div>
               </div>
+            </div>
+
+            {/* PERSONNALISATION BARRE DE NAV */}
+            <div className="pt-4 space-y-4">
+              <div className="flex items-center gap-2 px-1">
+                <LayoutGrid className="size-4 text-primary" />
+                <h3 className="text-sm font-black uppercase tracking-widest text-slate-800">Ma Barre de Navigation</h3>
+              </div>
+              
+              <Card className="border-2 border-primary/10 bg-muted/5 shadow-inner">
+                <CardContent className="p-4 space-y-4">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase leading-relaxed italic">
+                    Choisissez jusqu'à 6 raccourcis à afficher dans votre barre inférieure mobile.
+                  </p>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    {filteredNavLinks.map(link => {
+                      const isSelected = tempFavorites.includes(link.href);
+                      return (
+                        <div 
+                          key={link.href} 
+                          onClick={() => handleToggleFavorite(link.href)}
+                          className={cn(
+                            "flex items-center gap-2 p-2.5 rounded-xl border-2 transition-all cursor-pointer select-none",
+                            isSelected ? "bg-primary text-white border-primary shadow-md scale-95" : "bg-white border-slate-100 opacity-70 grayscale-[0.5]"
+                          )}
+                        >
+                          <link.icon className={cn("size-4 shrink-0", isSelected ? "text-white" : "text-primary")} />
+                          <span className="text-[10px] font-black uppercase tracking-tighter truncate">{link.label}</span>
+                          {isSelected && <Heart className="size-3 ml-auto fill-white" />}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="pt-2 flex flex-col gap-2">
+                    <div className="flex justify-between items-center px-1">
+                      <span className="text-[9px] font-black uppercase text-muted-foreground">Sélection : {tempFavorites.length} / 6</span>
+                      {tempFavorites.length < 2 && <span className="text-[8px] font-bold text-red-500 uppercase">Min. 2 requis</span>}
+                    </div>
+                    <Button 
+                      onClick={handleSaveFavorites} 
+                      disabled={isSavingFavorites || tempFavorites.length < 2}
+                      className="w-full h-12 font-black uppercase tracking-widest shadow-lg gap-2"
+                    >
+                      {isSavingFavorites ? <RefreshCw className="size-4 animate-spin" /> : <Save className="size-4" />}
+                      Enregistrer mes raccourcis
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
             <div className="pt-4 flex flex-col gap-3">

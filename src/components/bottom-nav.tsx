@@ -22,13 +22,22 @@ export function BottomNav() {
 
   const { data: userProfile } = useDoc<UserAccount>(userDocRef);
 
-  // Configuration de la barre de navigation mobile (6 items max pour la lisibilité)
-  const mobileTabs = ['/', '/peche', '/vessel-tracker', '/chasse', '/champs', '/compte'];
+  // Configuration par défaut si l'utilisateur n'a pas encore choisi de favoris
+  const defaultTabs = ['/', '/peche', '/vessel-tracker', '/chasse', '/champs', '/compte'];
+  
+  // Utilisation des favoris de l'utilisateur ou de la configuration par défaut
+  const userFavorites = userProfile?.favoriteNavLinks;
+  const mobileTabs = (userFavorites && userFavorites.length > 0) ? userFavorites : defaultTabs;
   
   // On récupère les liens correspondants en respectant l'ordre défini
   const visibleLinks = mobileTabs.map(href => {
     const link = navLinks.find(l => l.href === href);
     if (!link) return null;
+    
+    // Sécurité supplémentaire : On vérifie si l'utilisateur a le droit de voir ce lien
+    if (link.adminOnly && userProfile?.role !== 'admin' && userProfile?.subscriptionStatus !== 'admin') return null;
+    if (link.proOnly && userProfile?.role !== 'professional' && userProfile?.role !== 'admin') return null;
+
     // Raccourcir le libellé pour le mobile
     if (link.href === '/vessel-tracker') return { ...link, label: 'Tracker' };
     return link;
