@@ -69,6 +69,11 @@ export interface UserAccount {
   mapIcon_v2?: string;
   mapColor_v2?: string;
   fcmToken?: string;
+  // Nouveaux champs de contact
+  phoneNumber?: string;
+  landline?: string;
+  address?: string;
+  contactLocation?: { latitude: number; longitude: number };
 }
 
 export interface Business {
@@ -80,6 +85,11 @@ export interface Business {
   logoUrl?: string;
   description?: string;
   createdAt: any;
+  // Nouveaux champs de contact pour les pros
+  phoneNumber?: string;
+  landline?: string;
+  address?: string;
+  location?: { latitude: number; longitude: number };
 }
 
 export interface Promotion {

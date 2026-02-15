@@ -34,7 +34,7 @@ import {
 } from 'firebase/auth';
 import { doc, collection, addDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { ForgotPasswordDialog } from './forgot-password-dialog';
-import { Eye, EyeOff, Ticket, MapPin, ScrollText, Globe, Bell, Mail, Smartphone } from 'lucide-react';
+import { Eye, EyeOff, Ticket, MapPin, ScrollText, Globe, Bell, Mail, Smartphone, Phone, Home } from 'lucide-react';
 import { redeemAccessToken } from '@/lib/token-utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -63,6 +63,9 @@ const signupSchema = z.object({
   password: z.string().min(6, { message: 'Le mot de passe doit contenir au moins 6 caractères.' }),
   region: z.enum(['CALEDONIE', 'TAHITI']),
   commune: z.string().min(1, { message: 'Veuillez choisir votre commune.' }),
+  phoneNumber: z.string().optional(),
+  landline: z.string().optional(),
+  address: z.string().optional(),
   token: z.string().optional(),
   acceptCgv: z.boolean().refine(val => val === true, {
     message: "Vous devez accepter les conditions générales de vente."
@@ -91,6 +94,9 @@ export function AuthForm({ mode }: AuthFormProps) {
       password: '',
       region: 'CALEDONIE',
       commune: 'Nouméa',
+      phoneNumber: '',
+      landline: '',
+      address: '',
       token: '',
       rememberMe: false,
       acceptCgv: false,
@@ -188,6 +194,9 @@ export function AuthForm({ mode }: AuthFormProps) {
             subscriptionStatus: 'trial',
             selectedRegion: signupValues.region,
             lastSelectedLocation: signupValues.commune,
+            phoneNumber: signupValues.phoneNumber || '',
+            landline: signupValues.landline || '',
+            address: signupValues.address || '',
             subscribedCategories: signupValues.subscribedCategories,
             allowsPromoEmails: signupValues.allowsPromoEmails,
             allowsPromoPush: signupValues.allowsPromoPush,
@@ -293,6 +302,53 @@ export function AuthForm({ mode }: AuthFormProps) {
                       </SelectContent>
                     </Select>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="p-4 bg-muted/10 border-2 border-dashed rounded-2xl space-y-4 animate-in fade-in">
+              <div className="flex items-center gap-2 border-b border-dashed pb-2">
+                <Phone className="size-4 text-primary" />
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-800">Coordonnées (Optionnel)</h3>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <FormField
+                  control={form.control}
+                  name="phoneNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px]">Mobile</FormLabel>
+                      <FormControl>
+                        <Input type="tel" placeholder="Mobile" {...field} className="h-10 border-2" />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="landline"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-[10px]">Fixe</FormLabel>
+                      <FormControl>
+                        <Input type="tel" placeholder="Fixe" {...field} className="h-10 border-2" />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px]">Adresse physique</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: 12 rue des Flamboyants" {...field} className="h-10 border-2" />
+                    </FormControl>
                   </FormItem>
                 )}
               />

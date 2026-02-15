@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, isBefore, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { 
-  Crown, Star, XCircle, Ticket, Gift, LogOut, Mail, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink, Copy, Check, MapPin, RefreshCw, Store, Zap, Pencil, LayoutGrid, Heart, Save, Globe, Smartphone
+  Crown, Star, XCircle, Ticket, Gift, LogOut, Mail, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink, Copy, Check, MapPin, RefreshCw, Store, Zap, Pencil, LayoutGrid, Heart, Save, Globe, Smartphone, Phone, Home, Map as MapIcon, Target
 } from 'lucide-react';
 import {
   Select,
@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/firebase';
@@ -40,8 +40,11 @@ import { locationsByRegion, regions } from '@/lib/locations';
 import { navLinks } from '@/lib/nav-links';
 import { cn } from '@/lib/utils';
 import { useLocation } from '@/context/location-context';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
+import { GoogleMap, OverlayView } from '@react-google-maps/api';
+import { useGoogleMaps } from '@/context/google-maps-context';
+
+const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
 export default function ComptePage() {
   const { user, isUserLoading } = useUser();
@@ -50,6 +53,7 @@ export default function ComptePage() {
   const router = useRouter();
   const { toast } = useToast();
   const { selectedRegion, setSelectedRegion, selectedLocation } = useLocation();
+  const { isLoaded: isMapLoaded } = useGoogleMaps();
   
   const [accessToken, setAccessToken] = useState('');
   const [isRedeeming, setIsRedeeming] = useState(false);
@@ -61,8 +65,14 @@ export default function ComptePage() {
   const [newName, setNewName] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
 
-  // Preferences editing states
-  const [isSavingPrefs, setIsSavingPrefs] = useState(false);
+  // Contact details states
+  const [isEditingContact, setIsEditingContact] = useState(false);
+  const [tempPhone, setTempPhone] = useState('');
+  const [tempLandline, setTempLandline] = useState('');
+  const [tempAddress, setTempAddress] = useState('');
+  const [tempLocation, setTempLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [isSavingContact, setIsSavingContact] = useState(false);
+  const [map, setMap] = useState<google.maps.Map | null>(null);
 
   // Favorites state
   const [tempFavorites, setTempFavorites] = useState<string[]>([]);
@@ -82,6 +92,13 @@ export default function ComptePage() {
       setNewName(user.displayName);
     }
     
+    if (userProfile) {
+        setTempPhone(userProfile.phoneNumber || '');
+        setTempLandline(userProfile.landline || '');
+        setTempAddress(userProfile.address || '');
+        setTempLocation(userProfile.contactLocation || null);
+    }
+
     if (userProfile?.favoriteNavLinks) {
       setTempFavorites(userProfile.favoriteNavLinks);
     } else {
@@ -132,6 +149,25 @@ export default function ComptePage() {
       toast({ variant: 'destructive', title: "Erreur lors de la mise à jour du nom" });
     } finally {
       setIsSavingName(false);
+    }
+  };
+
+  const handleSaveContact = async () => {
+    if (!user || !firestore) return;
+    setIsSavingContact(true);
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            phoneNumber: tempPhone,
+            landline: tempLandline,
+            address: tempAddress,
+            contactLocation: tempLocation
+        });
+        toast({ title: "Coordonnées enregistrées !" });
+        setIsEditingContact(false);
+    } catch (e) {
+        toast({ variant: 'destructive', title: "Erreur" });
+    } finally {
+        setIsSavingContact(false);
     }
   };
 
@@ -385,6 +421,101 @@ export default function ComptePage() {
                   </div>
                 </div>
               </div>
+
+              {/* COORDONNÉES DE CONTACT */}
+              <Card className="border-2 border-primary/10 bg-muted/5 shadow-inner">
+                <CardHeader className="p-4 pb-2 flex-row justify-between items-center">
+                    <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                        <Phone className="size-3 text-primary" /> Mes Coordonnées
+                    </CardTitle>
+                    <Dialog open={isEditingContact} onOpenChange={setIsEditingContact}>
+                        <DialogTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-6 text-[8px] font-black uppercase text-primary border border-primary/20">Modifier</Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-md w-[95vw] rounded-2xl max-h-[90vh] overflow-y-auto">
+                            <DialogHeader>
+                                <DialogTitle className="font-black uppercase tracking-tight">Mes Coordonnées</DialogTitle>
+                                <DialogDescription className="text-[10px] font-bold uppercase">Informations de contact pour le Shopping</DialogDescription>
+                            </DialogHeader>
+                            <div className="py-4 space-y-4">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <Label className="text-[9px] font-black uppercase opacity-60">Mobile</Label>
+                                        <Input type="tel" value={tempPhone} onChange={e => setTempPhone(e.target.value)} placeholder="00 00 00" className="font-bold border-2" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-[9px] font-black uppercase opacity-60">Fixe</Label>
+                                        <Input type="tel" value={tempLandline} onChange={e => setTempLandline(e.target.value)} placeholder="00 00 00" className="font-bold border-2" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-[9px] font-black uppercase opacity-60">Adresse physique</Label>
+                                    <Input value={tempAddress} onChange={e => setTempAddress(e.target.value)} placeholder="Rue, quartier..." className="font-bold border-2" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-[9px] font-black uppercase opacity-60 flex items-center gap-2">
+                                        <MapIcon className="size-3" /> Point GPS Boutique
+                                    </Label>
+                                    <div className="h-48 rounded-xl overflow-hidden border-2 relative">
+                                        {isMapLoaded ? (
+                                            <GoogleMap
+                                                mapContainerClassName="w-full h-full"
+                                                center={tempLocation ? { lat: tempLocation.latitude, lng: tempLocation.longitude } : INITIAL_CENTER}
+                                                zoom={tempLocation ? 15 : 8}
+                                                onClick={(e) => { if (e.latLng) setTempLocation({ latitude: e.latLng.lat(), longitude: e.latLng.lng() }); }}
+                                                options={{ disableDefaultUI: true, mapTypeId: 'satellite' }}
+                                            >
+                                                {tempLocation && (
+                                                    <OverlayView position={{ lat: tempLocation.latitude, lng: tempLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                                                        <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center">
+                                                            <div className="p-1.5 bg-primary rounded-full border-2 border-white shadow-lg"><MapPin className="size-4 text-white" /></div>
+                                                        </div>
+                                                    </OverlayView>
+                                                )}
+                                            </GoogleMap>
+                                        ) : <Skeleton className="h-full w-full" />}
+                                        <div className="absolute bottom-2 left-2 right-2 bg-black/60 backdrop-blur-md p-1.5 rounded-lg text-[8px] text-white text-center font-bold uppercase">
+                                            Cliquez sur la carte pour définir votre position
+                                        </div>
+                                    </div>
+                                    {tempLocation && (
+                                        <Button variant="ghost" size="sm" className="w-full h-6 text-[8px] font-black uppercase text-destructive" onClick={() => setTempLocation(null)}>
+                                            Supprimer le point GPS
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button onClick={handleSaveContact} disabled={isSavingContact} className="w-full h-12 font-black uppercase tracking-widest">
+                                    {isSavingContact ? <RefreshCw className="size-4 animate-spin mr-2" /> : <Save className="size-4 mr-2" />}
+                                    Sauvegarder
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                </CardHeader>
+                <CardContent className="p-4 pt-0 space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
+                            <Smartphone className="size-3 text-primary opacity-40" /> 
+                            {userProfile?.phoneNumber || 'Non renseigné'}
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
+                            <Phone className="size-3 text-primary opacity-40" /> 
+                            {userProfile?.landline || 'Non renseigné'}
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-600">
+                        <Home className="size-3 text-primary opacity-40" /> 
+                        <span className="truncate">{userProfile?.address || 'Adresse non renseignée'}</span>
+                    </div>
+                    {userProfile?.contactLocation && (
+                        <div className="flex items-center gap-2 text-[9px] font-black text-primary uppercase">
+                            <Target className="size-3" /> Position GPS enregistrée
+                        </div>
+                    )}
+                </CardContent>
+              </Card>
 
               <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-xl border">
                 <div className="p-2 bg-background rounded-lg shadow-sm"><Mail className="size-5 text-muted-foreground" /></div>

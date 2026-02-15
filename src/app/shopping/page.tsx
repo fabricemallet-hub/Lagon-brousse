@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
-import { collection, collectionGroup, query, orderBy, doc } from 'firebase/firestore';
+import { collection, collectionGroup, query, orderBy, doc, getDoc } from 'firebase/firestore';
 import type { Promotion, Business, UserAccount } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,9 +13,28 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Search, ShoppingBag, Store, MapPin, Tag, Percent, Filter, RefreshCw, AlertTriangle, ChevronRight, ShieldCheck } from 'lucide-react';
+import { 
+    Search, 
+    ShoppingBag, 
+    Store, 
+    MapPin, 
+    Tag, 
+    Percent, 
+    Filter, 
+    RefreshCw, 
+    AlertTriangle, 
+    ChevronRight, 
+    ShieldCheck, 
+    Phone, 
+    Smartphone, 
+    Home, 
+    Navigation, 
+    ExternalLink,
+    X
+} from 'lucide-react';
 import { locations } from '@/lib/locations';
 import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 export default function ShoppingPage() {
   const { user } = useUser();
@@ -36,21 +55,46 @@ export default function ShoppingPage() {
 
   const promosRef = useMemoFirebase(() => {
     if (!firestore) return null;
-    // La requête collectionGroup nécessite un index composite dans Firebase
     return collectionGroup(firestore, 'promotions');
   }, [firestore]);
   
   const { data: allPromotions, isLoading: isPromosLoading, error: promosError } = useCollection<Promotion>(promosRef);
 
-  // LOGS DE DÉBOGAGE
-  useEffect(() => {
-    if (promosError) {
-        console.error("L&B Shopping: Erreur de chargement du catalogue", promosError);
+  // --- CONTACT DIALOG STATE ---
+  const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
+  const [selectedBusinessContact, setSelectedBusinessContact] = useState<Business | null>(null);
+  const [isLoadingContact, setIsLoadingContact] = useState(false);
+
+  const handleOpenContact = async (businessId: string) => {
+    setIsLoadingContact(true);
+    setIsContactDialogOpen(true);
+    if (!firestore) return;
+    
+    try {
+        const bSnap = await getDoc(doc(firestore, 'businesses', businessId));
+        if (bSnap.exists()) {
+            const bData = bSnap.data() as Business;
+            // On enrichit avec les données du propriétaire si les champs business sont vides
+            const ownerSnap = await getDoc(doc(firestore, 'users', bData.ownerId));
+            if (ownerSnap.exists()) {
+                const oData = ownerSnap.data() as UserAccount;
+                setSelectedBusinessContact({
+                    ...bData,
+                    phoneNumber: bData.phoneNumber || oData.phoneNumber,
+                    landline: bData.landline || oData.landline,
+                    address: bData.address || oData.address,
+                    location: bData.location || oData.contactLocation
+                });
+            } else {
+                setSelectedBusinessContact(bData);
+            }
+        }
+    } catch (e) {
+        console.error(e);
+    } finally {
+        setIsLoadingContact(false);
     }
-    if (allPromotions) {
-        console.log("L&B Shopping: Catalogue chargé =", allPromotions.length, "articles.");
-    }
-  }, [promosError, allPromotions]);
+  };
 
   // --- FILTERS STATE ---
   const [search, setSearch] = useState('');
@@ -115,7 +159,6 @@ export default function ShoppingPage() {
   
   const isAdmin = useMemo(() => {
     if (!user) return false;
-    // UNIQUE COMPTE ADMIN AUTORISÉ
     return (user.email?.toLowerCase() === 'f.mallet81@outlook.com' || user.uid === 't8nPnZLcTiaLJSKMuLzib3C5nPn1') || profile?.role === 'admin' || profile?.subscriptionStatus === 'admin';
   }, [user, profile]);
 
@@ -242,7 +285,7 @@ export default function ShoppingPage() {
         ) : filteredProducts.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {filteredProducts.map((item) => (
-                    <ProductCard key={item.id} product={item} />
+                    <ProductCard key={item.id} product={item} onContact={handleOpenContact} />
                 ))}
             </div>
         ) : (
@@ -259,27 +302,78 @@ export default function ShoppingPage() {
         )}
       </div>
 
-      {isAdmin && (
-          <div className="p-4 bg-slate-900 text-white rounded-2xl border-2 border-slate-700 space-y-3 shadow-xl">
-              <p className="text-[10px] font-black uppercase flex items-center gap-2 text-primary">
-                  <ShieldCheck className="size-3" /> Diagnostics Administrateur
-              </p>
-              <div className="grid grid-cols-2 gap-2 text-[9px] font-bold uppercase opacity-80">
-                  <div className="bg-slate-800 p-2 rounded">Magasins : {businesses?.length || 0}</div>
-                  <div className="bg-slate-800 p-2 rounded">Articles Bruts : {allPromotions?.length || 0}</div>
-                  <div className="bg-slate-800 p-2 rounded">Filtre : {filteredProducts.length}</div>
-                  <div className="bg-slate-800 p-2 rounded">Erreur : {promosError ? 'OUI' : 'NON'}</div>
-              </div>
-              <p className="text-[8px] italic opacity-50 leading-tight">
-                  Note : Si "Articles Bruts" est à 0 malgré vos créations, c'est que l'index "Collection Group" n'est pas encore actif dans la console Firebase.
-              </p>
-          </div>
-      )}
+      <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
+        <DialogContent className="max-w-md w-[95vw] rounded-3xl p-0 overflow-hidden border-none shadow-2xl">
+            <DialogHeader className="p-6 bg-primary text-white border-b relative">
+                <DialogTitle className="text-2xl font-black uppercase tracking-tighter pr-8 break-words">
+                    {selectedBusinessContact?.name || "Chargement..."}
+                </DialogTitle>
+                <DialogDescription className="text-white/70 font-bold uppercase text-[10px]">Coordonnées de l'établissement</DialogDescription>
+                <button onClick={() => setIsContactDialogOpen(false)} className="absolute top-4 right-4 text-white/40 hover:text-white"><X className="size-6" /></button>
+            </DialogHeader>
+            <div className="p-6 space-y-6 bg-slate-50">
+                {isLoadingContact ? (
+                    <div className="space-y-4">
+                        <Skeleton className="h-12 w-full" />
+                        <Skeleton className="h-12 w-full" />
+                        <Skeleton className="h-24 w-full" />
+                    </div>
+                ) : selectedBusinessContact ? (
+                    <div className="space-y-5 animate-in fade-in">
+                        <div className="grid grid-cols-1 gap-3">
+                            {selectedBusinessContact.phoneNumber && (
+                                <a href={`tel:${selectedBusinessContact.phoneNumber}`} className="flex items-center justify-between p-4 bg-white rounded-2xl border-2 shadow-sm active:scale-[0.98] transition-transform">
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-2 bg-green-50 text-green-600 rounded-xl"><Smartphone className="size-5" /></div>
+                                        <div className="flex flex-col"><span className="text-[9px] font-black uppercase opacity-40">Mobile</span><span className="font-black text-lg">{selectedBusinessContact.phoneNumber}</span></div>
+                                    </div>
+                                    <ChevronRight className="size-5 opacity-20" />
+                                </a>
+                            )}
+                            {selectedBusinessContact.landline && (
+                                <a href={`tel:${selectedBusinessContact.landline}`} className="flex items-center justify-between p-4 bg-white rounded-2xl border-2 shadow-sm active:scale-[0.98] transition-transform">
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-2 bg-blue-50 text-blue-600 rounded-xl"><Phone className="size-5" /></div>
+                                        <div className="flex flex-col"><span className="text-[9px] font-black uppercase opacity-40">Fixe</span><span className="font-black text-lg">{selectedBusinessContact.landline}</span></div>
+                                    </div>
+                                    <ChevronRight className="size-5 opacity-20" />
+                                </a>
+                            )}
+                        </div>
+
+                        <div className="p-4 bg-white rounded-2xl border-2 shadow-sm space-y-3">
+                            <div className="flex items-start gap-4">
+                                <div className="p-2 bg-primary/5 text-primary rounded-xl shrink-0"><Home className="size-5" /></div>
+                                <div className="space-y-1">
+                                    <span className="text-[9px] font-black uppercase opacity-40">Adresse physique</span>
+                                    <p className="text-sm font-bold leading-relaxed">{selectedBusinessContact.address || `Commune de ${selectedBusinessContact.commune}`}</p>
+                                </div>
+                            </div>
+                            
+                            {selectedBusinessContact.location && (
+                                <div className="pt-3 border-t border-dashed">
+                                    <Button 
+                                        className="w-full h-14 bg-slate-900 text-white font-black uppercase tracking-widest gap-3 shadow-lg rounded-xl"
+                                        onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${selectedBusinessContact.location!.latitude},${selectedBusinessContact.location!.longitude}`, '_blank')}
+                                    >
+                                        <Navigation className="size-5 text-primary" /> S'y rendre (GPS)
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ) : <p className="text-center text-xs font-bold opacity-40 uppercase py-10">Aucune information trouvée</p>}
+            </div>
+            <DialogFooter className="p-4 bg-white border-t">
+                <Button variant="outline" onClick={() => setIsContactDialogOpen(false)} className="w-full h-12 font-black uppercase text-[10px] tracking-widest border-2">Fermer la fiche</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function ProductCard({ product }: { product: Promotion & { business?: Business } }) {
+function ProductCard({ product, onContact }: { product: Promotion & { business?: Business }, onContact: (id: string) => void }) {
     const isPromo = product.promoType === 'Promo';
     
     return (
@@ -354,7 +448,11 @@ function ProductCard({ product }: { product: Promotion & { business?: Business }
             </div>
             
             <div className="p-2 border-t bg-muted/10">
-                <Button variant="ghost" className="w-full h-8 text-[9px] font-black uppercase text-primary gap-2 hover:bg-primary/5">
+                <Button 
+                    variant="ghost" 
+                    className="w-full h-10 text-[9px] font-black uppercase text-primary gap-2 hover:bg-primary/5 active:scale-95 transition-transform"
+                    onClick={() => onContact(product.businessId)}
+                >
                     Contacter le magasin <ChevronRight className="size-3" />
                 </Button>
             </div>
