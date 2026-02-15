@@ -47,7 +47,7 @@ export default function ComptePage() {
   const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
-  const { selectedRegion, setSelectedRegion } = useLocation();
+  const { selectedRegion, setSelectedRegion, selectedLocation } = useLocation();
   
   const [accessToken, setAccessToken] = useState('');
   const [isRedeeming, setIsRedeeming] = useState(false);
