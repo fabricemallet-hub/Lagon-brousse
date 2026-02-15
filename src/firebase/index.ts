@@ -3,17 +3,11 @@
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
-import { 
-  initializeFirestore, 
-  Firestore, 
-  getFirestore, 
-  memoryLocalCache
-} from 'firebase/firestore';
+import { getFirestore, Firestore } from 'firebase/firestore';
 
 /**
  * @fileOverview Initialisation de Firebase Singleton.
- * Correction définitive de l'erreur ASSERTION FAILED (ID: ca9).
- * Utilise des variables globales au module pour garantir une instance unique.
+ * Correction de l'erreur ASSERTION FAILED (ID: ca9).
  */
 
 let firebaseApp: FirebaseApp;
@@ -35,18 +29,9 @@ export function initializeFirebase() {
     auth = getAuth(firebaseApp);
   }
 
-  // 3. Singleton Firestore avec transport stable
+  // 3. Singleton Firestore (Mode standard pour stabilité maximale)
   if (!firestore) {
-    try {
-      firestore = initializeFirestore(firebaseApp, {
-        localCache: memoryLocalCache(),
-        // On n'utilise plus experimentalForceLongPolling car il peut entrer en conflit 
-        // avec les réglages par défaut lors des re-init.
-      });
-    } catch (e) {
-      console.warn("Firestore already initialized, falling back to getFirestore()");
-      firestore = getFirestore(firebaseApp);
-    }
+    firestore = getFirestore(firebaseApp);
   }
 
   return { firebaseApp, auth, firestore };
