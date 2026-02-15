@@ -5,8 +5,8 @@ import type { UserAccount } from '@/lib/types';
 import { addMonths } from 'date-fns';
 
 /**
- * Gère la création et la mise à jour du document profil utilisateur dans Firestore.
- * Sécurité Master : Force le rôle admin pour les Emails de confiance absolue.
+ * Synchronisation du profil utilisateur.
+ * Sécurité Master : Force les droits administrateurs pour les comptes de confiance.
  */
 export async function ensureUserDocument(
   firestore: Firestore, 
@@ -19,7 +19,6 @@ export async function ensureUserDocument(
   const userDocRef = doc(firestore, 'users', user.uid);
   const email = user.email?.toLowerCase() || '';
   
-  // Identifiants de confiance absolue (Administrateurs Master)
   const masterEmails = [
     'f.mallet81@outlook.com', 
     'fabrice.mallet@gmail.com', 
@@ -35,34 +34,22 @@ export async function ensureUserDocument(
     'Irglq69MasYdNwBmUu8yKvw6h4G2'
   ];
   
-  const isMasterAdmin = (email && masterEmails.includes(email)) || 
-                        masterUids.includes(user.uid);
+  const isMasterAdmin = (email && masterEmails.includes(email)) || masterUids.includes(user.uid);
 
   try {
     const docSnap = await getDoc(userDocRef);
 
     if (docSnap.exists()) {
       const currentData = docSnap.data() as UserAccount;
-      
-      // SYNCHRONISATION DE SÉCURITÉ FORCÉE POUR LES ADMINS
-      if (isMasterAdmin && (currentData.role !== 'admin')) {
-          console.log(`L&B DEBUG SYNC: Restauration Admin pour [${email || user.uid}]...`);
-          setDoc(userDocRef, { 
-            ...currentData, 
-            role: 'admin',
-            subscriptionStatus: 'admin',
-            id: user.uid,
-            email: email || currentData.email
-          }, { merge: true });
+      if (isMasterAdmin && currentData.role !== 'admin') {
+          console.log(`L&B Master Sync: Restauration des droits pour [${email}]...`);
+          setDoc(userDocRef, { ...currentData, role: 'admin', subscriptionStatus: 'admin' }, { merge: true });
       }
       return;
     }
 
-    // Création d'un nouveau profil
-    console.log(`L&B DEBUG SYNC: Création nouveau profil pour [${email}]...`);
     const effectiveDisplayName = displayName || user.displayName || email.split('@')[0] || 'Utilisateur';
-    
-    const newUserDocument: UserAccount = {
+    const newUser: UserAccount = {
       id: user.uid,
       email: email,
       displayName: effectiveDisplayName,
@@ -71,15 +58,13 @@ export async function ensureUserDocument(
       lastSelectedLocation: commune || 'Nouméa',
     };
 
-    // Période d'essai pour les clients (3 mois)
     if (!isMasterAdmin) {
-      const trialStartDate = new Date();
-      newUserDocument.subscriptionStartDate = trialStartDate.toISOString();
-      newUserDocument.subscriptionExpiryDate = addMonths(trialStartDate, 3).toISOString();
+      newUser.subscriptionStartDate = new Date().toISOString();
+      newUser.subscriptionExpiryDate = addMonths(new Date(), 3).toISOString();
     }
     
-    setDoc(userDocRef, newUserDocument);
+    setDoc(userDocRef, newUser);
   } catch (error) {
-    console.error("L&B DEBUG SYNC ERROR:", error);
+    console.error("L&B Master Sync Error:", error);
   }
 }
