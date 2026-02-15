@@ -35,6 +35,7 @@ service cloud.firestore {
 
     function isProfessional() {
       return isSignedIn() && (
+        request.auth.uid in ["D1q2GPM95rZi38cvCzvsjcWQDaV2", "koKj5ObSGXYeO1PLKU5bgo8Yaky1"] ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "professional") || 
         isAdmin()
@@ -98,7 +99,7 @@ service cloud.firestore {
     match /spot_shares/{id} { allow read, write: if isSignedIn(); }
     
     // ======================================================
-    // 4. FONCTIONNALITÉS TERROIR (CHASSE, PÊCHE, TRACKER)
+    // 4. FONCTIONNALITÉS TERROIR (RÉCURSIF)
     // ======================================================
     
     // Sessions de Groupe (Chasse & Pêche)
