@@ -88,24 +88,26 @@ export default function AdminPage() {
     if (!isUserLoading && !isAdmin && user) router.push('/compte');
   }, [isAdmin, isUserLoading, router, user]);
 
-  if (isUserLoading) return <div className="p-4 sm:p-8"><Skeleton className="h-64 w-full rounded-2xl" /></div>;
+  if (isUserLoading) return <div className="p-4"><Skeleton className="h-64 w-full rounded-2xl" /></div>;
   if (!isAdmin) return <div className="p-12 text-center font-black uppercase text-muted-foreground animate-pulse">Accès Master Requis...</div>;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-4 pb-32 px-1 sm:px-4">
-      <Card className="border-2 shadow-xl bg-slate-900 text-white overflow-hidden relative">
-        <div className="absolute right-0 top-0 opacity-10 -translate-y-4 translate-x-4">
-            <ShieldCheck className="size-24 sm:size-48" />
+    <div className="w-full space-y-4 pb-32 px-1">
+      {/* HEADER COMPACT MOBILE */}
+      <Card className="border-none shadow-lg bg-slate-900 text-white overflow-hidden relative rounded-2xl">
+        <div className="absolute right-0 top-0 opacity-10 -translate-y-2 translate-x-2">
+            <ShieldCheck className="size-20" />
         </div>
-        <CardHeader className="py-4 sm:py-8 relative z-10">
-          <CardTitle className="font-black uppercase tracking-tighter text-xl sm:text-3xl">Dashboard Master</CardTitle>
-          <CardDescription className="text-slate-400 font-bold uppercase text-[8px] sm:text-[10px] tracking-widest truncate">{user?.email}</CardDescription>
+        <CardHeader className="py-6 px-5 relative z-10">
+          <CardTitle className="font-black uppercase tracking-tighter text-2xl">Dashboard Master</CardTitle>
+          <CardDescription className="text-slate-400 font-bold uppercase text-[9px] tracking-widest truncate">{user?.email}</CardDescription>
         </CardHeader>
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="sticky top-[64px] z-30 bg-background/95 backdrop-blur-md -mx-1 px-1 py-2 border-b-2 border-primary/10 mb-4">
-          <TabsList className="flex w-full overflow-x-auto scrollbar-hide bg-transparent p-0 gap-1.5 h-auto justify-start">
+        {/* TAB LIST SCROLLABLE HORIZONTALE */}
+        <div className="sticky top-[64px] z-30 bg-background/95 backdrop-blur-md -mx-1 px-2 py-3 border-b-2 border-primary/10 mb-4 overflow-x-auto scrollbar-hide">
+          <TabsList className="flex w-max bg-transparent p-0 gap-2 h-auto justify-start">
             {[
               { id: 'stats', label: 'Stats' },
               { id: 'users', label: 'Comptes' },
@@ -119,7 +121,7 @@ export default function AdminPage() {
               <TabsTrigger 
                 key={tab.id} 
                 value={tab.id} 
-                className="shrink-0 text-[10px] font-black uppercase py-2.5 px-4 rounded-xl border-2 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:border-primary transition-all"
+                className="shrink-0 text-[10px] font-black uppercase py-3 px-5 rounded-xl border-2 data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:border-primary transition-all shadow-sm"
               >
                 {tab.label}
               </TabsTrigger>
@@ -129,7 +131,7 @@ export default function AdminPage() {
 
         <div className="space-y-6">
           <TabsContent value="stats">
-            <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 grid-cols-2">
               <StatsCard title="Utilisateurs" value={users?.length || 0} icon={UsersIcon} color="text-slate-500" />
               <StatsCard title="Abonnés" value={users?.filter(u => u.subscriptionStatus === 'active' || u.subscriptionStatus === 'admin' || u.subscriptionStatus === 'professional').length || 0} icon={ShieldCheck} color="text-primary" />
               <StatsCard title="Boutiques" value={businesses?.length || 0} icon={Store} color="text-accent" />
@@ -159,7 +161,7 @@ export default function AdminPage() {
           </TabsContent>
 
           <TabsContent value="acces">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="flex flex-col gap-6">
               <GlobalAccessManager globalGift={globalGift} />
               <TokenManager tokens={tokens} />
             </div>
@@ -176,15 +178,15 @@ export default function AdminPage() {
 
 function StatsCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: any, color: string }) {
   return (
-    <Card className="border-2 shadow-sm overflow-hidden group">
-      <CardHeader className="p-3 sm:p-4 pb-1">
+    <Card className="border-2 shadow-sm overflow-hidden bg-white rounded-2xl">
+      <CardHeader className="p-4 pb-1">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-[9px] font-black uppercase opacity-40">{title}</CardTitle>
-          <Icon className={cn("size-4 opacity-20", color)} />
+          <CardTitle className="text-[10px] font-black uppercase opacity-40 tracking-wider">{title}</CardTitle>
+          <Icon className={cn("size-4 opacity-30", color)} />
         </div>
       </CardHeader>
-      <CardContent className="p-3 sm:p-4 pt-0">
-        <div className="text-xl sm:text-2xl font-black">{value}</div>
+      <CardContent className="p-4 pt-0">
+        <div className="text-2xl font-black">{value}</div>
       </CardContent>
     </Card>
   );
@@ -219,59 +221,61 @@ function BusinessManager({ businesses, users }: { businesses: Business[] | null,
     };
 
     return (
-        <Card className="border-2 shadow-lg overflow-hidden">
-            <CardHeader className="p-4 border-b bg-muted/10">
-                <div className="flex items-center justify-between gap-4">
-                    <div>
-                        <CardTitle className="text-lg font-black uppercase flex items-center gap-2"><Store className="size-5 text-primary" /> Partenaires PRO</CardTitle>
-                        <CardDescription className="text-[9px] font-bold uppercase">Liez un commerce via UID.</CardDescription>
+        <Card className="border-2 shadow-lg overflow-hidden rounded-2xl">
+            <CardHeader className="p-5 border-b bg-muted/5">
+                <div className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle className="text-lg font-black uppercase flex items-center gap-2"><Store className="size-5 text-primary" /> Partenaires PRO</CardTitle>
+                            <CardDescription className="text-[10px] font-bold uppercase mt-1">Liez un commerce via UID.</CardDescription>
+                        </div>
                     </div>
-                    <Button onClick={() => { setEditingBusiness(null); setName(''); setOwnerId(''); setCategories([]); setIsDialogOpen(true); }} size="sm" className="font-black uppercase text-[10px] h-10 px-4"><Plus className="size-4 mr-1" /> Ajouter</Button>
+                    <Button onClick={() => { setEditingBusiness(null); setName(''); setOwnerId(''); setCategories([]); setIsDialogOpen(true); }} className="w-full font-black uppercase h-14 tracking-widest shadow-md"><Plus className="size-5 mr-2" /> Créer / Lier une boutique</Button>
                 </div>
             </CardHeader>
-            <CardContent className="p-2 space-y-2">
+            <CardContent className="p-3 space-y-3">
                 {businesses?.map(b => (
-                    <div key={b.id} className="flex items-center justify-between p-3 border-2 rounded-xl bg-white shadow-sm">
-                        <div className="flex flex-col min-w-0 flex-1 pr-2">
-                            <span className="font-black uppercase text-xs truncate">{b.name}</span>
-                            <div className="flex items-center gap-2 mt-1">
-                                <Badge variant="outline" className="text-[8px] font-bold uppercase border-primary/30 text-primary">{b.commune}</Badge>
-                                <span className="text-[8px] font-mono opacity-40 truncate">UID: {b.ownerId.substring(0, 8)}...</span>
+                    <div key={b.id} className="flex flex-col p-4 border-2 rounded-2xl bg-white shadow-sm gap-4">
+                        <div className="flex flex-col min-w-0">
+                            <span className="font-black uppercase text-sm leading-tight text-slate-800">{b.name}</span>
+                            <div className="flex items-center gap-2 mt-2">
+                                <Badge variant="outline" className="text-[9px] font-black uppercase border-primary/30 text-primary">{b.commune}</Badge>
+                                <span className="text-[9px] font-mono font-bold opacity-40 truncate">UID: {b.ownerId.substring(0, 12)}...</span>
                             </div>
                         </div>
-                        <div className="flex gap-1">
-                            <Button variant="ghost" size="icon" className="size-9 border-2" onClick={() => { setEditingBusiness(b); setName(b.name); setCommune(b.commune); setOwnerId(b.ownerId); setCategories(b.categories || []); setIsDialogOpen(true); }}><Pencil className="size-4" /></Button>
-                            <Button variant="ghost" size="icon" className="size-9 text-destructive border-2" onClick={() => deleteDoc(doc(firestore!, 'businesses', b.id))}><Trash2 className="size-4" /></Button>
+                        <div className="flex gap-2 border-t pt-3">
+                            <Button variant="outline" className="flex-1 h-12 font-black uppercase text-[10px] border-2" onClick={() => { setEditingBusiness(b); setName(b.name); setCommune(b.commune); setOwnerId(b.ownerId); setCategories(b.categories || []); setIsDialogOpen(true); }}><Pencil className="size-4 mr-2" /> Modifier</Button>
+                            <Button variant="ghost" className="h-12 px-4 text-destructive border-2 border-destructive/10" onClick={() => deleteDoc(doc(firestore!, 'businesses', b.id))}><Trash2 className="size-4" /></Button>
                         </div>
                     </div>
                 ))}
             </CardContent>
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent className="max-w-md w-[95vw] rounded-2xl overflow-hidden p-0">
+                <DialogContent className="max-w-md w-[95vw] rounded-3xl overflow-hidden p-0 border-none shadow-2xl">
                     <DialogHeader className="p-6 bg-slate-50 border-b">
-                        <DialogTitle className="font-black uppercase flex items-center gap-2">
+                        <DialogTitle className="font-black uppercase tracking-tighter flex items-center gap-2">
                             <LinkIcon className="size-5 text-primary" /> {editingBusiness ? "Modifier Boutique" : "Lier un compte PRO"}
                         </DialogTitle>
                     </DialogHeader>
-                    <div className="p-6 space-y-4">
-                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase">Nom du magasin</Label><Input value={name} onChange={e => setName(e.target.value)} className="h-12 border-2 font-black" /></div>
-                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase">UID Utilisateur Pro</Label><Input value={ownerId} onChange={e => setOwnerId(e.target.value)} placeholder="Coller l'UID..." className="h-12 border-2 font-mono text-xs" /></div>
-                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase">Commune</Label>
+                    <div className="p-6 space-y-5 overflow-y-auto max-h-[60vh] scrollbar-hide">
+                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">Nom du magasin</Label><Input value={name} onChange={e => setName(e.target.value)} className="h-14 border-2 font-black text-lg" /></div>
+                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">UID Utilisateur Pro</Label><Input value={ownerId} onChange={e => setOwnerId(e.target.value)} placeholder="Coller l'UID..." className="h-14 border-2 font-mono text-sm" /></div>
+                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">Commune</Label>
                             <Select value={commune} onValueChange={setCommune}>
-                                <SelectTrigger className="h-12 border-2 font-bold"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="h-14 border-2 font-bold text-base"><SelectValue /></SelectTrigger>
                                 <SelectContent className="max-h-64">{Object.keys(locations).sort().map(loc => <SelectItem key={loc} value={loc}>{loc}</SelectItem>)}</SelectContent>
                             </Select>
                         </div>
-                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase">Rayons</Label>
+                        <div className="space-y-2"><Label className="text-[10px] font-black uppercase ml-1">Rayons autorisés</Label>
                             <div className="flex flex-wrap gap-2">
                                 {availableCats.map(cat => (
-                                    <Badge key={cat} variant={categories.includes(cat) ? "default" : "outline"} className="cursor-pointer font-black uppercase text-[9px] py-2 h-8" onClick={() => setCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])}>{cat}</Badge>
+                                    <Badge key={cat} variant={categories.includes(cat) ? "default" : "outline"} className="cursor-pointer font-black uppercase text-[10px] py-3 px-4 h-auto border-2 transition-all" onClick={() => setCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])}>{cat}</Badge>
                                 ))}
                             </div>
                         </div>
                     </div>
-                    <DialogFooter className="p-4 bg-muted/10 border-t"><Button onClick={handleSave} disabled={isSaving} className="w-full h-14 font-black uppercase tracking-widest shadow-lg">{isSaving ? "Traitement..." : "Valider Liaison"}</Button></DialogFooter>
+                    <DialogFooter className="p-4 bg-muted/10 border-t"><Button onClick={handleSave} disabled={isSaving} className="w-full h-16 font-black uppercase tracking-widest shadow-xl text-base">{isSaving ? "Traitement..." : "Valider Liaison"}</Button></DialogFooter>
                 </DialogContent>
             </Dialog>
         </Card>
@@ -310,55 +314,57 @@ function FishGuideManager() {
     };
 
     return (
-        <Card className="border-2 shadow-lg overflow-hidden">
-            <CardHeader className="p-4 bg-muted/10 border-b space-y-4">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <CardTitle className="text-lg font-black uppercase flex items-center gap-2 text-primary"><Fish className="size-5" /> Guide Poissons</CardTitle>
-                        <CardDescription className="text-[9px] font-bold uppercase">Catalogue des espèces NC.</CardDescription>
+        <Card className="border-2 shadow-lg overflow-hidden rounded-2xl">
+            <CardHeader className="p-5 bg-muted/5 border-b space-y-4">
+                <div className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle className="text-lg font-black uppercase flex items-center gap-2 text-primary"><Fish className="size-5" /> Guide Poissons</CardTitle>
+                            <CardDescription className="text-[10px] font-bold uppercase mt-1">Catalogue des espèces NC.</CardDescription>
+                        </div>
                     </div>
-                    <Button onClick={() => { setEditingFish(null); setName(''); setScientificName(''); setIsDialogOpen(true); }} size="sm" className="font-black uppercase text-[10px] h-10 px-4"><Plus className="size-4 mr-1" /> Nouveau</Button>
+                    <div className="relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" /><Input placeholder="Chercher un poisson..." value={search} onChange={e => setSearch(e.target.value)} className="pl-12 h-14 border-2 font-bold text-base" /></div>
+                    <Button onClick={() => { setEditingFish(null); setName(''); setScientificName(''); setIsDialogOpen(true); }} className="w-full h-14 font-black uppercase tracking-widest shadow-md"><Plus className="size-5 mr-2" /> Nouvelle espèce</Button>
                 </div>
-                <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" /><Input placeholder="Chercher un poisson..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 h-11 border-2 font-bold text-xs" /></div>
             </CardHeader>
-            <CardContent className="p-2 space-y-2">
-                {isLoading ? <Skeleton className="h-20 w-full rounded-xl" /> : filtered.map(f => (
-                    <div key={f.id} className="flex items-center justify-between p-3 border-2 rounded-xl bg-white shadow-sm">
-                        <div className="flex flex-col min-w-0 flex-1 pr-2">
-                            <span className="font-black uppercase text-xs truncate">{f.name}</span>
-                            <div className="flex items-center gap-2 mt-1">
-                                <Badge variant="outline" className="text-[8px] font-black uppercase h-4 px-1">{f.category}</Badge>
-                                <span className="text-[9px] italic opacity-40 truncate">{f.scientificName}</span>
+            <CardContent className="p-3 space-y-3">
+                {isLoading ? <Skeleton className="h-32 w-full rounded-2xl" /> : filtered.map(f => (
+                    <div key={f.id} className="flex flex-col p-4 border-2 rounded-2xl bg-white shadow-sm gap-4">
+                        <div className="flex flex-col min-w-0">
+                            <span className="font-black uppercase text-sm leading-tight text-slate-800">{f.name}</span>
+                            <div className="flex items-center gap-2 mt-2">
+                                <Badge variant="outline" className="text-[9px] font-black uppercase h-5 px-2 border-primary/20">{f.category}</Badge>
+                                <span className="text-[9px] italic font-bold opacity-40 truncate">{f.scientificName}</span>
                             </div>
                         </div>
-                        <div className="flex gap-1">
-                            <Button variant="ghost" size="icon" className="size-9 border-2" onClick={() => { setEditingFish(f); setName(f.name); setScientificName(f.scientificName); setCategory(f.category); setGratteRiskSmall(f.gratteRiskSmall?.toString() || '0'); setGratteRiskMedium(f.gratteRiskMedium?.toString() || '0'); setGratteRiskLarge(f.gratteRiskLarge?.toString() || '0'); setFishingAdvice(f.fishingAdvice || ''); setCulinaryAdvice(f.culinaryAdvice || ''); setIsDialogOpen(true); }}><Pencil className="size-4" /></Button>
-                            <Button variant="ghost" size="icon" className="size-9 text-destructive border-2" onClick={() => deleteDoc(doc(firestore!, 'fish_species', f.id))}><Trash2 className="size-4" /></Button>
+                        <div className="flex gap-2 border-t pt-3">
+                            <Button variant="outline" className="flex-1 h-12 font-black uppercase text-[10px] border-2" onClick={() => { setEditingFish(f); setName(f.name); setScientificName(f.scientificName); setCategory(f.category); setGratteRiskSmall(f.gratteRiskSmall?.toString() || '0'); setGratteRiskMedium(f.gratteRiskMedium?.toString() || '0'); setGratteRiskLarge(f.gratteRiskLarge?.toString() || '0'); setFishingAdvice(f.fishingAdvice || ''); setCulinaryAdvice(f.culinaryAdvice || ''); setIsDialogOpen(true); }}><Pencil className="size-4 mr-2" /> Modifier</Button>
+                            <Button variant="ghost" className="h-12 px-4 text-destructive border-2 border-destructive/10" onClick={() => deleteDoc(doc(firestore!, 'fish_species', f.id))}><Trash2 className="size-4" /></Button>
                         </div>
                     </div>
                 ))}
             </CardContent>
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent className="max-w-2xl w-[95vw] rounded-2xl max-h-[90vh] overflow-y-auto p-0 border-none shadow-2xl">
-                    <DialogHeader className="p-6 bg-slate-50 border-b"><DialogTitle className="font-black uppercase tracking-tighter">{editingFish ? "Modifier" : "Nouvelle Fiche"}</DialogTitle></DialogHeader>
+                <DialogContent className="max-w-2xl w-[95vw] rounded-3xl max-h-[90vh] overflow-y-auto p-0 border-none shadow-2xl">
+                    <DialogHeader className="p-6 bg-slate-50 border-b"><DialogTitle className="font-black uppercase tracking-tighter text-xl">{editingFish ? "Modifier" : "Nouvelle Fiche"}</DialogTitle></DialogHeader>
                     <div className="p-6 space-y-6">
                         <div className="space-y-4">
-                            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase">Nom Local</Label><Input value={name} onChange={e => setName(e.target.value)} className="h-12 border-2 font-black" /></div>
-                            <Button onClick={async () => { setIsGenerating(true); try { const info = await generateFishInfo({ name, scientificName }); setScientificName(info.scientificName); setCategory(info.category); setGratteRiskSmall(info.gratteRiskSmall.toString()); setGratteRiskMedium(info.gratteRiskMedium.toString()); setGratteRiskLarge(info.gratteRiskLarge.toString()); setFishingAdvice(info.fishingAdvice); setCulinaryAdvice(info.culinaryAdvice); toast({ title: "Généré !" }); } finally { setIsGenerating(false); } }} disabled={isGenerating || !name} variant="secondary" className="w-full h-12 font-black uppercase text-[10px] gap-2 border-2"><BrainCircuit className="size-4" /> Assistant IA</Button>
+                            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">Nom Local</Label><Input value={name} onChange={e => setName(e.target.value)} className="h-14 border-2 font-black text-lg" /></div>
+                            <Button onClick={async () => { setIsGenerating(true); try { const info = await generateFishInfo({ name, scientificName }); setScientificName(info.scientificName); setCategory(info.category); setGratteRiskSmall(info.gratteRiskSmall.toString()); setGratteRiskMedium(info.gratteRiskMedium.toString()); setGratteRiskLarge(info.gratteRiskLarge.toString()); setFishingAdvice(info.fishingAdvice); setCulinaryAdvice(info.culinaryAdvice); toast({ title: "Généré !" }); } finally { setIsGenerating(false); } }} disabled={isGenerating || !name} variant="secondary" className="w-full h-14 font-black uppercase text-xs gap-3 border-2 shadow-sm"><BrainCircuit className="size-5" /> Assistant IA (Générer fiche)</Button>
                         </div>
-                        <div className="grid grid-cols-3 gap-2 p-4 bg-muted/20 rounded-2xl border-2 border-dashed">
-                            <p className="col-span-3 text-[9px] font-black uppercase text-center opacity-40">Risques de Gratte (%) : P / M / G</p>
-                            <Input type="number" value={gratteRiskSmall} onChange={e => setGratteRiskSmall(e.target.value)} className="h-10 text-center font-black" />
-                            <Input type="number" value={gratteRiskMedium} onChange={e => setGratteRiskMedium(e.target.value)} className="h-10 text-center font-black" />
-                            <Input type="number" value={gratteRiskLarge} onChange={e => setGratteRiskLarge(e.target.value)} className="h-10 text-center font-black" />
+                        <div className="grid grid-cols-3 gap-2 p-5 bg-muted/20 rounded-2xl border-2 border-dashed">
+                            <p className="col-span-3 text-[10px] font-black uppercase text-center opacity-50 tracking-widest mb-1">Risques de Gratte (%) : P / M / G</p>
+                            <Input type="number" value={gratteRiskSmall} onChange={e => setGratteRiskSmall(e.target.value)} className="h-12 text-center font-black text-lg" />
+                            <Input type="number" value={gratteRiskMedium} onChange={e => setGratteRiskMedium(e.target.value)} className="h-12 text-center font-black text-lg" />
+                            <Input type="number" value={gratteRiskLarge} onChange={e => setGratteRiskLarge(e.target.value)} className="h-12 text-center font-black text-lg" />
                         </div>
                         <div className="space-y-4">
-                            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase">Conseils Pêche</Label><Textarea value={fishingAdvice} onChange={e => setFishingAdvice(e.target.value)} className="min-h-[80px] border-2" /></div>
-                            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase">Conseils Cuisine</Label><Textarea value={culinaryAdvice} onChange={e => setCulinaryAdvice(e.target.value)} className="min-h-[80px] border-2" /></div>
+                            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">Conseils Pêche</Label><Textarea value={fishingAdvice} onChange={e => setFishingAdvice(e.target.value)} className="min-h-[100px] border-2 font-medium" /></div>
+                            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">Conseils Cuisine</Label><Textarea value={culinaryAdvice} onChange={e => setCulinaryAdvice(e.target.value)} className="min-h-[100px] border-2 font-medium" /></div>
                         </div>
                     </div>
-                    <DialogFooter className="p-4 border-t bg-muted/10"><Button onClick={handleSave} disabled={isSaving} className="w-full h-14 font-black uppercase tracking-widest shadow-lg">Sauvegarder la fiche</Button></DialogFooter>
+                    <DialogFooter className="p-4 border-t bg-muted/10"><Button onClick={handleSave} disabled={isSaving} className="w-full h-16 font-black uppercase tracking-widest shadow-xl text-base">Sauvegarder l'espèce</Button></DialogFooter>
                 </DialogContent>
             </Dialog>
         </Card>
@@ -372,20 +378,23 @@ function PermissionsManager({ users }: { users: UserAccount[] | null }) {
     const filtered = users?.filter(u => u.email.toLowerCase().includes(search.toLowerCase())).slice(0, 5) || [];
 
     return (
-        <Card className="border-2 shadow-lg overflow-hidden">
-            <CardHeader className="p-4 bg-primary/5 border-b"><CardTitle className="text-lg font-black uppercase flex items-center gap-2 text-primary"><UserCog className="size-5" /> Permissions Master</CardTitle></CardHeader>
-            <CardContent className="p-2 space-y-2">
-                <div className="p-2"><Input placeholder="Chercher email..." value={search} onChange={e => setSearch(e.target.value)} className="h-11 border-2 font-bold" /></div>
+        <Card className="border-2 shadow-lg overflow-hidden rounded-2xl">
+            <CardHeader className="p-5 bg-primary/5 border-b"><CardTitle className="text-lg font-black uppercase flex items-center gap-2 text-primary"><UserCog className="size-5" /> Permissions Master</CardTitle></CardHeader>
+            <CardContent className="p-3 space-y-3">
+                <div className="p-1"><Input placeholder="Chercher email..." value={search} onChange={e => setSearch(e.target.value)} className="h-14 border-2 font-bold text-base" /></div>
                 {filtered.map(u => (
-                    <div key={u.id} className="p-3 border-2 rounded-xl bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+                    <div key={u.id} className="p-4 border-2 rounded-2xl bg-white flex flex-col gap-4 shadow-sm">
                         <div className="min-w-0">
-                            <p className="font-black text-xs uppercase truncate">{u.displayName}</p>
-                            <p className="text-[9px] font-bold text-muted-foreground truncate">{u.email}</p>
+                            <p className="font-black text-sm uppercase truncate text-slate-800">{u.displayName}</p>
+                            <p className="text-[10px] font-bold text-muted-foreground truncate">{u.email}</p>
                         </div>
-                        <Select defaultValue={u.role || 'client'} onValueChange={(val) => updateDoc(doc(firestore!, 'users', u.id), { role: val, subscriptionStatus: val === 'admin' ? 'admin' : (val === 'professional' ? 'professional' : 'trial') }).then(() => toast({ title: "Mis à jour" }))}>
-                            <SelectTrigger className="w-full sm:w-32 h-10 text-[10px] font-black uppercase border-2"><SelectValue /></SelectTrigger>
-                            <SelectContent><SelectItem value="client">Client</SelectItem><SelectItem value="professional">Pro</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent>
-                        </Select>
+                        <div className="flex flex-col gap-2">
+                            <Label className="text-[9px] font-black uppercase opacity-40 ml-1">Changer le rôle</Label>
+                            <Select defaultValue={u.role || 'client'} onValueChange={(val) => updateDoc(doc(firestore!, 'users', u.id), { role: val, subscriptionStatus: val === 'admin' ? 'admin' : (val === 'professional' ? 'professional' : 'trial') }).then(() => toast({ title: "Mis à jour" }))}>
+                                <SelectTrigger className="w-full h-12 text-xs font-black uppercase border-2"><SelectValue /></SelectTrigger>
+                                <SelectContent><SelectItem value="client" className="font-black uppercase text-xs">Client</SelectItem><SelectItem value="professional" className="font-black uppercase text-xs">Pro</SelectItem><SelectItem value="admin" className="font-black uppercase text-xs text-red-600">Admin</SelectItem></SelectContent>
+                            </Select>
+                        </div>
                     </div>
                 ))}
             </CardContent>
@@ -398,19 +407,19 @@ function UsersManager({ users }: { users: UserAccount[] | null }) {
     const filtered = users?.filter(u => u.email.toLowerCase().includes(search.toLowerCase()) || u.displayName.toLowerCase().includes(search.toLowerCase())).slice(0, 10) || [];
 
     return (
-        <Card className="border-2 shadow-sm overflow-hidden">
-            <CardHeader className="p-4 bg-muted/10 border-b"><CardTitle className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2"><UsersIcon className="size-4" /> Liste des Comptes</CardTitle></CardHeader>
-            <CardContent className="p-2 space-y-2">
-                <div className="p-2"><Input placeholder="Chercher nom ou email..." value={search} onChange={e => setSearch(e.target.value)} className="h-10 border-2 text-xs" /></div>
+        <Card className="border-2 shadow-sm overflow-hidden rounded-2xl">
+            <CardHeader className="p-5 bg-muted/5 border-b"><CardTitle className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2"><UsersIcon className="size-4" /> Liste des Comptes</CardTitle></CardHeader>
+            <CardContent className="p-3 space-y-3">
+                <div className="p-1"><Input placeholder="Chercher nom ou email..." value={search} onChange={e => setSearch(e.target.value)} className="h-12 border-2 text-sm" /></div>
                 {filtered.map(u => (
-                    <div key={u.id} className="p-3 border rounded-xl flex items-center justify-between text-[10px] bg-card">
+                    <div key={u.id} className="p-4 border rounded-2xl flex items-center justify-between bg-card shadow-sm">
                         <div className="flex flex-col min-w-0 pr-2">
-                            <span className="font-black uppercase truncate">{u.displayName}</span>
-                            <span className="opacity-40 truncate">{u.email}</span>
+                            <span className="font-black uppercase text-xs truncate text-slate-800">{u.displayName}</span>
+                            <span className="text-[10px] font-bold opacity-40 truncate">{u.email}</span>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                            <Badge variant="secondary" className="text-[7px] font-black uppercase">{u.subscriptionStatus}</Badge>
-                            <button onClick={() => { navigator.clipboard.writeText(u.id); }} className="p-1 hover:bg-muted rounded"><Copy className="size-3 opacity-30" /></button>
+                        <div className="flex items-center gap-3 shrink-0">
+                            <Badge variant="secondary" className="text-[8px] font-black uppercase py-1 px-2">{u.subscriptionStatus}</Badge>
+                            <button onClick={() => { navigator.clipboard.writeText(u.id); }} className="p-3 bg-muted/20 hover:bg-muted rounded-xl transition-colors"><Copy className="size-4 opacity-40" /></button>
                         </div>
                     </div>
                 ))}
@@ -434,15 +443,19 @@ function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | n
     const isGlobalActive = globalGift && globalGift.expiresAt && globalGift.expiresAt.toDate() > new Date();
 
     return (
-        <Card className="border-2 shadow-lg">
-            <CardHeader><CardTitle className="text-lg font-black uppercase flex items-center gap-2 text-primary"><Sparkles className="size-5" /> Accès Cadeau Global</CardTitle></CardHeader>
-            <CardContent className="space-y-4 p-4">
-                <div className={cn("p-4 rounded-xl border-2 flex items-center justify-between", isGlobalActive ? "bg-green-50 border-green-200" : "bg-muted/30 border-dashed")}>
-                    <p className={cn("text-[10px] font-black", isGlobalActive ? "text-green-600" : "text-muted-foreground")}>{isGlobalActive ? `ACTIF JUSQU'AU ${format(globalGift!.expiresAt.toDate(), 'dd/MM HH:mm')}` : 'OFFRE INACTIVE'}</p>
-                    {isGlobalActive && <Button variant="destructive" size="sm" onClick={() => updateDoc(doc(firestore!, 'shared_access_tokens', 'GLOBAL'), { expiresAt: Timestamp.fromDate(new Date(0)) })} className="h-8 font-black uppercase text-[10px]">Off</Button>}
+        <Card className="border-2 shadow-lg rounded-2xl overflow-hidden">
+            <CardHeader className="p-5 bg-primary/5 border-b"><CardTitle className="text-lg font-black uppercase flex items-center gap-2 text-primary"><Sparkles className="size-5" /> Accès Cadeau Global</CardTitle></CardHeader>
+            <CardContent className="space-y-5 p-5">
+                <div className={cn("p-5 rounded-2xl border-2 flex flex-col gap-3", isGlobalActive ? "bg-green-50 border-green-200" : "bg-muted/10 border-dashed")}>
+                    <p className={cn("text-xs font-black uppercase tracking-widest text-center", isGlobalActive ? "text-green-600" : "text-muted-foreground")}>{isGlobalActive ? `ACTIF JUSQU'AU ${format(globalGift!.expiresAt.toDate(), 'dd/MM HH:mm')}` : 'OFFRE INACTIVE'}</p>
+                    {isGlobalActive && <Button variant="destructive" className="w-full h-12 font-black uppercase text-xs shadow-md" onClick={() => updateDoc(doc(firestore!, 'shared_access_tokens', 'GLOBAL'), { expiresAt: Timestamp.fromDate(new Date(0)) })}>Désactiver l'accès libre</Button>}
                 </div>
-                <Select value={duration} onValueChange={setDuration}><SelectTrigger className="h-12 border-2 font-black"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1">1 jour</SelectItem><SelectItem value="7">1 semaine</SelectItem><SelectItem value="30">1 mois</SelectItem></SelectContent></Select>
-                <Button onClick={handleActivate} disabled={isSaving} className="w-full h-14 font-black uppercase shadow-lg">Activer l'Accès Libre</Button>
+                <div className="space-y-4">
+                    <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Durée de l'offre</Label>
+                        <Select value={duration} onValueChange={setDuration}><SelectTrigger className="h-14 border-2 font-black text-lg"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1" className="font-black uppercase">1 jour</SelectItem><SelectItem value="7" className="font-black uppercase">1 semaine</SelectItem><SelectItem value="30" className="font-black uppercase">1 mois</SelectItem></SelectContent></Select>
+                    </div>
+                    <Button onClick={handleActivate} disabled={isSaving} className="w-full h-16 font-black uppercase shadow-xl text-base tracking-widest">Activer l'Accès Libre</Button>
+                </div>
             </CardContent>
         </Card>
     );
@@ -461,20 +474,28 @@ function TokenManager({ tokens }: { tokens: AccessToken[] | null }) {
     };
 
     return (
-        <Card className="border-2 shadow-lg">
-            <CardHeader><CardTitle className="text-lg font-black uppercase flex items-center gap-2 text-accent"><Ticket className="size-5" /> Jetons Premium</CardTitle></CardHeader>
-            <CardContent className="space-y-4 p-4">
-                <div className="flex gap-2">
-                    <Select value={duration} onValueChange={setDuration}><SelectTrigger className="h-12 border-2 flex-1"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1">1 mois</SelectItem><SelectItem value="3">3 mois</SelectItem><SelectItem value="12">12 mois</SelectItem></SelectContent></Select>
-                    <Button onClick={generateToken} disabled={isGenerating} className="h-12 px-6 font-black uppercase bg-accent shadow-lg"><Zap className="size-4" /></Button>
+        <Card className="border-2 shadow-lg rounded-2xl overflow-hidden">
+            <CardHeader className="p-5 bg-accent/5 border-b"><CardTitle className="text-lg font-black uppercase flex items-center gap-2 text-accent"><Ticket className="size-5" /> Jetons Premium</CardTitle></CardHeader>
+            <CardContent className="space-y-6 p-5">
+                <div className="flex flex-col gap-4 p-5 bg-accent/5 rounded-2xl border-2 border-accent/10">
+                    <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Validité du jeton</Label>
+                        <Select value={duration} onValueChange={setDuration}><SelectTrigger className="h-14 border-2 font-black text-lg bg-white"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="1" className="font-black uppercase">1 mois</SelectItem><SelectItem value="3" className="font-black uppercase">3 mois</SelectItem><SelectItem value="12" className="font-black uppercase">12 mois</SelectItem></SelectContent></Select>
+                    </div>
+                    <Button onClick={generateToken} disabled={isGenerating} className="w-full h-16 bg-accent hover:bg-accent/90 text-white font-black uppercase tracking-widest shadow-xl text-base gap-3"><Zap className="size-5" /> Générer un Jeton</Button>
                 </div>
-                <div className="max-h-64 overflow-y-auto border-2 rounded-xl divide-y bg-muted/10">
-                    {tokens?.slice(0, 20).map(t => (
-                        <div key={t.id} className="p-3 flex items-center justify-between text-[10px] font-bold">
-                            <code className="font-black text-primary select-all">{t.id}</code>
-                            <div className="flex items-center gap-3"><span>{t.durationMonths}m</span><Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(firestore!, 'access_tokens', t.id))} className="size-7 text-destructive"><Trash2 className="size-3.5" /></Button></div>
-                        </div>
-                    ))}
+                <div className="space-y-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Jetons actifs ({tokens?.length || 0})</p>
+                    <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+                        {tokens?.slice(0, 20).map(t => (
+                            <div key={t.id} className="p-4 flex items-center justify-between border-2 rounded-2xl bg-white shadow-sm">
+                                <div className="flex flex-col">
+                                    <code className="font-black text-primary text-xs select-all tracking-wider">{t.id}</code>
+                                    <span className="text-[9px] font-bold uppercase opacity-40 mt-1">{t.durationMonths} mois d'accès</span>
+                                </div>
+                                <Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(firestore!, 'access_tokens', t.id))} className="size-10 text-destructive/40 hover:text-destructive hover:bg-red-50 rounded-xl"><Trash2 className="size-5" /></Button>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </CardContent>
         </Card>
@@ -492,24 +513,30 @@ function SystemNotificationsManager() {
     const { data: notifications } = useCollection<SystemNotification>(notifsRef);
 
     return (
-        <Card className="border-2 shadow-lg overflow-hidden">
-            <CardHeader className="p-4 bg-primary/5 border-b"><CardTitle className="text-lg font-black uppercase flex items-center gap-2 text-primary"><Bell className="size-5" /> Alertes Système</CardTitle></CardHeader>
+        <Card className="border-2 shadow-lg overflow-hidden rounded-2xl">
+            <CardHeader className="p-5 bg-primary/5 border-b"><CardTitle className="text-lg font-black uppercase flex items-center gap-2 text-primary"><Bell className="size-5" /> Alertes Système</CardTitle></CardHeader>
             <CardContent className="p-4 space-y-6">
-                <div className="grid gap-4 p-4 bg-muted/20 rounded-2xl border-2 border-dashed">
-                    <div className="grid grid-cols-1 gap-4">
-                        <div className="space-y-1"><Label className="text-[9px] font-black uppercase ml-1">Titre</Label><Input value={title} onChange={e => setTitle(e.target.value)} className="h-12 border-2 font-black" /></div>
-                        <div className="space-y-1"><Label className="text-[9px] font-black uppercase ml-1">Couleur / Niveau</Label><Select value={type} onValueChange={(v: any) => setType(v)}><SelectTrigger className="h-12 border-2 font-black text-xs uppercase"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="info">Info (Bleu)</SelectItem><SelectItem value="warning">Alerte (Jaune)</SelectItem><SelectItem value="error">Urgent (Rouge)</SelectItem><SelectItem value="success">Succès (Vert)</SelectItem></SelectContent></Select></div>
+                <div className="grid gap-5 p-5 bg-muted/10 rounded-[2rem] border-2 border-dashed">
+                    <div className="space-y-4">
+                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Titre de l'alerte</Label><Input value={title} onChange={e => setTitle(e.target.value)} className="h-14 border-2 font-black text-base uppercase" /></div>
+                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Niveau / Couleur</Label><Select value={type} onValueChange={(v: any) => setType(v)}><SelectTrigger className="h-14 border-2 font-black text-sm uppercase bg-white"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="info" className="font-black uppercase text-xs text-blue-600">Information (Bleu)</SelectItem><SelectItem value="warning" className="font-black uppercase text-xs text-orange-600">Vigilance (Jaune)</SelectItem><SelectItem value="error" className="font-black uppercase text-xs text-red-600">Urgent (Rouge)</SelectItem><SelectItem value="success" className="font-black uppercase text-xs text-green-600">Succès (Vert)</SelectItem></SelectContent></Select></div>
+                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Message</Label><Textarea value={content} onChange={e => setContent(e.target.value)} placeholder="Détails du message..." className="border-2 min-h-[100px] font-medium text-sm" /></div>
                     </div>
-                    <Textarea value={content} onChange={e => setContent(e.target.value)} placeholder="Message..." className="border-2 min-h-[80px]" />
-                    <Button onClick={() => addDoc(collection(firestore!, 'system_notifications'), { title, content, type, isActive: true, createdAt: serverTimestamp() }).then(() => { setTitle(''); setContent(''); toast({ title: "Diffusé !" }); })} className="w-full h-14 font-black uppercase shadow-lg"><Plus className="size-5 mr-2" /> Diffuser</Button>
+                    <Button onClick={() => addDoc(collection(firestore!, 'system_notifications'), { title, content, type, isActive: true, createdAt: serverTimestamp() }).then(() => { setTitle(''); setContent(''); toast({ title: "Diffusé !" }); })} className="w-full h-16 font-black uppercase shadow-xl text-base tracking-widest gap-3"><Plus className="size-6" /> Diffuser l'alerte</Button>
                 </div>
-                <div className="divide-y border-2 rounded-xl bg-white">
-                    {notifications?.map(n => (
-                        <div key={n.id} className="p-3 flex items-center justify-between">
-                            <div className="flex items-center gap-3 min-w-0 flex-1"><div className={cn("size-2.5 rounded-full shrink-0", n.type === 'error' ? 'bg-red-500' : 'bg-blue-500')} /><span className="font-black uppercase text-[10px] truncate">{n.title}</span></div>
-                            <Button variant="ghost" size="icon" className="text-destructive size-9" onClick={() => deleteDoc(doc(firestore!, 'system_notifications', n.id))}><Trash2 className="size-4" /></Button>
-                        </div>
-                    ))}
+                <div className="space-y-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Historique des diffusions</p>
+                    <div className="flex flex-col gap-2">
+                        {notifications?.map(n => (
+                            <div key={n.id} className="p-4 flex items-center justify-between border-2 rounded-2xl bg-white shadow-sm">
+                                <div className="flex items-center gap-4 min-w-0 flex-1">
+                                    <div className={cn("size-3 rounded-full shrink-0 shadow-sm", n.type === 'error' ? 'bg-red-500' : n.type === 'warning' ? 'bg-orange-500' : n.type === 'success' ? 'bg-green-500' : 'bg-blue-500')} />
+                                    <span className="font-black uppercase text-xs truncate text-slate-800">{n.title}</span>
+                                </div>
+                                <Button variant="ghost" size="icon" className="text-destructive/40 hover:text-destructive size-10 rounded-xl" onClick={() => deleteDoc(doc(firestore!, 'system_notifications', n.id))}><Trash2 className="size-5" /></Button>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </CardContent>
         </Card>
@@ -537,27 +564,30 @@ function AppSettingsManager() {
     useEffect(() => { if (cgv) setCgvContent(cgv.content || ''); }, [cgv]);
 
     return (
-        <div className="grid grid-cols-1 gap-6">
-            <Card className="border-2 shadow-lg">
-                <CardHeader><CardTitle className="text-lg font-black uppercase flex items-center gap-2"><Smartphone className="size-5" /> Splash Screen</CardTitle></CardHeader>
-                <CardContent className="space-y-4 p-4">
-                    <Input value={splashText} onChange={e => setSplashText(e.target.value)} className="h-12 border-2 font-black" />
-                    <div className="flex gap-2"><Input type="color" value={splashBgColor} onChange={e => setSplashBgColor(e.target.value)} className="h-12 w-20 border-2" /><Input value={splashBgColor} readOnly className="font-mono text-xs border-2 flex-1" /></div>
-                    <Button onClick={() => updateDoc(doc(firestore!, 'app_settings', 'splash'), { splashText, splashBgColor }).then(() => toast({ title: "Splash mis à jour" }))} className="w-full h-12 font-black uppercase text-[10px] gap-2"><Save className="size-4" /> Sauver Design</Button>
+        <div className="flex flex-col gap-6">
+            <Card className="border-2 shadow-lg rounded-2xl overflow-hidden">
+                <CardHeader className="p-5 bg-muted/5 border-b"><CardTitle className="text-lg font-black uppercase flex items-center gap-2"><Smartphone className="size-5 text-primary" /> Splash Screen</CardTitle></CardHeader>
+                <CardContent className="p-5 space-y-5">
+                    <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Texte d'accueil</Label><Input value={splashText} onChange={e => setSplashText(e.target.value)} className="h-14 border-2 font-black text-lg" /></div>
+                    <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Couleur de fond</Label>
+                        <div className="flex gap-2"><Input type="color" value={splashBgColor} onChange={e => setSplashBgColor(e.target.value)} className="h-14 w-20 border-2 p-1 rounded-xl" /><Input value={splashBgColor} readOnly className="font-mono font-bold text-center h-14 border-2 flex-1" /></div>
+                    </div>
+                    <Button onClick={() => updateDoc(doc(firestore!, 'app_settings', 'splash'), { splashText, splashBgColor }).then(() => toast({ title: "Splash mis à jour" }))} className="w-full h-16 font-black uppercase shadow-xl text-base tracking-widest gap-3"><Save className="size-6" /> Sauver Design</Button>
                 </CardContent>
             </Card>
-            <Card className="border-2 shadow-lg">
-                <CardHeader><CardTitle className="text-lg font-black uppercase flex items-center gap-2"><Landmark className="size-5" /> Coordonnées RIB</CardTitle></CardHeader>
-                <CardContent className="space-y-4 p-4">
-                    <Textarea value={ribDetails} onChange={e => setRibDetails(e.target.value)} className="min-h-[100px] border-2 font-mono text-xs" />
-                    <Button onClick={() => setDoc(doc(firestore!, 'app_settings', 'rib'), { details: ribDetails, updatedAt: serverTimestamp() }, { merge: true }).then(() => toast({ title: "RIB mis à jour" }))} className="w-full h-12 font-black uppercase text-[10px] gap-2"><Save className="size-4" /> Sauver RIB</Button>
+            <Card className="border-2 shadow-lg rounded-2xl overflow-hidden">
+                <CardHeader className="p-5 bg-muted/5 border-b"><CardTitle className="text-lg font-black uppercase flex items-center gap-2"><Landmark className="size-5 text-primary" /> Coordonnées RIB</CardTitle></CardHeader>
+                <CardContent className="p-5 space-y-5">
+                    <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Détails bancaires (DONS)</Label><Textarea value={ribDetails} onChange={e => setRibDetails(e.target.value)} className="min-h-[120px] border-2 font-mono text-sm leading-tight" /></div>
+                    <Button onClick={() => setDoc(doc(firestore!, 'app_settings', 'rib'), { details: ribDetails, updatedAt: serverTimestamp() }, { merge: true }).then(() => toast({ title: "RIB mis à jour" }))} className="w-full h-16 font-black uppercase shadow-xl text-base tracking-widest gap-3"><Save className="size-6" /> Sauver RIB</Button>
                 </CardContent>
             </Card>
-            <Card className="border-2 shadow-lg">
-                <CardHeader><CardTitle className="text-lg font-black uppercase flex items-center gap-2"><ScrollText className="size-5" /> Conditions (CGV)</CardTitle></CardHeader>
-                <CardContent className="space-y-4 p-4">
-                    <Textarea value={cgvContent} onChange={e => setCgvContent(e.target.value)} className="min-h-[200px] border-2 text-xs" />
-                    <Button onClick={() => setDoc(doc(firestore!, 'app_settings', 'cgv'), { content: cgvContent, version: (cgv?.version || 0) + 1, updatedAt: serverTimestamp() }, { merge: true }).then(() => toast({ title: "CGV Version " + ((cgv?.version || 0) + 1) }))} className="w-full h-14 font-black uppercase tracking-widest shadow-lg">Mettre à jour CGV</Button>
+            <Card className="border-2 shadow-lg rounded-2xl overflow-hidden">
+                <CardHeader className="p-5 bg-muted/5 border-b"><CardTitle className="text-lg font-black uppercase flex items-center gap-2"><ScrollText className="size-5 text-primary" /> Conditions (CGV)</CardTitle></CardHeader>
+                <CardContent className="p-5 space-y-5">
+                    <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Contenu des conditions</Label><Textarea value={cgvContent} onChange={e => setCgvContent(e.target.value)} className="min-h-[250px] border-2 text-xs leading-relaxed font-medium" /></div>
+                    <div className="p-4 bg-muted/30 rounded-xl border-2 border-dashed flex justify-between items-center"><span className="text-[10px] font-black uppercase opacity-60">Version actuelle :</span><Badge variant="default" className="font-black text-xs h-7 px-3">{cgv?.version || 0}</Badge></div>
+                    <Button onClick={() => setDoc(doc(firestore!, 'app_settings', 'cgv'), { content: cgvContent, version: (cgv?.version || 0) + 1, updatedAt: serverTimestamp() }, { merge: true }).then(() => toast({ title: "CGV Version " + ((cgv?.version || 0) + 1) }))} className="w-full h-16 font-black uppercase shadow-xl text-base tracking-widest gap-3"><RefreshCw className="size-6" /> Mettre à jour (Nouvelle Version)</Button>
                 </CardContent>
             </Card>
         </div>
@@ -566,25 +596,27 @@ function AppSettingsManager() {
 
 function SupportManager({ conversations }: { conversations: Conversation[] | null }) {
     return (
-        <Card className="border-2 shadow-lg overflow-hidden">
-            <CardHeader className="p-4 bg-green-50/50 border-b"><CardTitle className="text-lg font-black uppercase flex items-center gap-2 text-green-700"><MessageSquare className="size-5" /> Support Direct</CardTitle></CardHeader>
-            <CardContent className="p-2 space-y-2">
+        <Card className="border-2 shadow-lg overflow-hidden rounded-2xl">
+            <CardHeader className="p-5 bg-green-50 border-b"><CardTitle className="text-lg font-black uppercase flex items-center gap-2 text-green-800"><MessageSquare className="size-5" /> Support Direct</CardTitle></CardHeader>
+            <CardContent className="p-3 space-y-3">
                 {conversations && conversations.length > 0 ? conversations.map(c => (
-                    <Link key={c.id} href={`/admin/messages/${c.id}`} className={cn("flex flex-col p-4 border-2 rounded-2xl bg-white shadow-sm transition-all active:scale-[0.98]", !c.isReadByAdmin && "border-primary bg-primary/5")}>
-                        <div className="flex justify-between items-start mb-2">
+                    <Link key={c.id} href={`/admin/messages/${c.id}`} className={cn("flex flex-col p-5 border-2 rounded-3xl bg-white shadow-sm transition-all active:scale-[0.98]", !c.isReadByAdmin && "border-primary bg-primary/5 ring-2 ring-primary/10")}>
+                        <div className="flex justify-between items-start mb-3">
                             <div className="min-w-0 flex-1">
-                                <p className="font-black text-xs uppercase truncate">{c.userDisplayName}</p>
-                                <p className="text-[9px] font-bold opacity-40">{c.userEmail}</p>
+                                <p className="font-black text-sm uppercase truncate text-slate-800">{c.userDisplayName}</p>
+                                <p className="text-[10px] font-bold opacity-40 leading-none mt-1">{c.userEmail}</p>
                             </div>
-                            {!c.isReadByAdmin && <Badge className="bg-primary animate-pulse text-[8px] h-4 font-black uppercase">Nouveau</Badge>}
+                            {!c.isReadByAdmin && <Badge className="bg-primary animate-pulse text-[9px] h-5 px-2 font-black uppercase tracking-wider">Nouveau</Badge>}
                         </div>
-                        <p className="text-[11px] text-muted-foreground italic line-clamp-2 leading-relaxed">"{c.lastMessageContent}"</p>
-                        <div className="mt-3 pt-3 border-t border-dashed flex justify-between items-center">
-                            <span className="text-[8px] font-bold opacity-30 uppercase">{c.lastMessageAt ? format(c.lastMessageAt.toDate(), 'dd/MM HH:mm') : '...'}</span>
-                            <span className="text-[9px] font-black uppercase text-primary flex items-center gap-1">Répondre <ChevronRight className="size-3" /></span>
+                        <div className="bg-muted/10 p-3 rounded-2xl border-2 border-dashed border-muted-foreground/10">
+                            <p className="text-xs text-muted-foreground italic line-clamp-2 leading-relaxed font-medium">"{c.lastMessageContent}"</p>
+                        </div>
+                        <div className="mt-4 pt-4 border-t border-dashed flex justify-between items-center">
+                            <span className="text-[10px] font-black opacity-30 uppercase tracking-widest">{c.lastMessageAt ? format(c.lastMessageAt.toDate(), 'dd/MM HH:mm') : '...'}</span>
+                            <div className="flex items-center gap-2 font-black uppercase text-[10px] text-primary">Répondre <ChevronRight className="size-4" /></div>
                         </div>
                     </Link>
-                )) : <div className="p-12 text-center text-muted-foreground font-black uppercase opacity-30 italic">Aucun message.</div>}
+                )) : <div className="p-20 text-center text-muted-foreground font-black uppercase opacity-30 italic text-sm tracking-[0.2em]">Aucun message actif.</div>}
             </CardContent>
         </Card>
     );
