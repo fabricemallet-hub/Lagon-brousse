@@ -56,20 +56,29 @@ export function SidebarNav() {
                     userProfile?.subscriptionStatus === 'admin';
 
     // Détection Pro
-    const isPro = isAdmin || userProfile?.role === 'professional' || userProfile?.subscriptionStatus === 'professional';
+    const isPro = isAdmin || 
+                  userProfile?.role === 'professional' || 
+                  userProfile?.subscriptionStatus === 'professional';
     
-    return { isAdmin, isPro, isClient: !isAdmin && !isPro };
+    // Un utilisateur est client s'il n'est ni admin ni pro
+    const isClient = !isAdmin && !isPro;
+    
+    return { isAdmin, isPro, isClient };
   }, [user, userProfile]);
 
   return (
     <div className="flex flex-col h-full">
       <SidebarMenu className="flex-grow">
         {navLinks.map((link) => {
-          // Filtrage dynamique basé sur les rôles
+          // FILTRAGE DYNAMIQUE BASÉ SUR LES RÔLES
+          
+          // 1. Si le lien est réservé aux Admins et que l'utilisateur n'est pas Admin
           if (link.adminOnly && !roles.isAdmin) return null;
+          
+          // 2. Si le lien est réservé aux Pros et que l'utilisateur n'est pas Pro (ou Admin)
           if (link.proOnly && !roles.isPro) return null;
           
-          // Masquage du contact pour l'admin et les non-connectés
+          // 3. Masquage du contact pour l'admin et les non-connectés
           if (link.href === '/contact' && (roles.isAdmin || !user)) return null;
           
           return (

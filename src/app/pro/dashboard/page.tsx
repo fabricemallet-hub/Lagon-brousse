@@ -34,6 +34,20 @@ export default function ProDashboard() {
   }, [user, firestore]);
   const { data: profile, isLoading: isProfileLoading } = useDoc<UserAccount>(userProfileRef);
 
+  // SÉCURITÉ : REDIRECTION SI NON PRO/ADMIN
+  useEffect(() => {
+    if (!isUserLoading && profile && !isProfileLoading) {
+        const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com', 'kledostyle@outlook.com'];
+        const isMaster = (user?.email && masterEmails.includes(user.email.toLowerCase()));
+        
+        const isPro = isMaster || profile.role === 'professional' || profile.role === 'admin' || profile.subscriptionStatus === 'professional' || profile.subscriptionStatus === 'admin';
+        
+        if (!isPro) {
+            router.replace('/compte');
+        }
+    }
+  }, [profile, isProfileLoading, isUserLoading, router, user]);
+
   const businessRef = useMemoFirebase(() => {
     if (!firestore || !profile?.businessId) return null;
     return doc(firestore, 'businesses', profile.businessId);
@@ -78,7 +92,6 @@ export default function ProDashboard() {
     if (!firestore || !business || !targetCategory || isUserLoading || !user) return;
     
     const calculateReach = async () => {
-      console.log("L&B Reach: Tentative de calcul...", { commune: business.commune, cat: targetCategory });
       setIsCalculatingReach(true);
       setReachError(false);
       try {
@@ -89,10 +102,8 @@ export default function ProDashboard() {
           where('favoriteCategory', '==', targetCategory)
         );
         const snap = await getCountFromServer(q);
-        console.log("L&B Reach: Succès, Audience =", snap.data().count);
         setTargetCount(snap.data().count);
       } catch (e: any) {
-        console.error("L&B Reach: ERREUR CRITIQUE", e);
         setReachError(true);
         setTargetCount(0);
       } finally {
@@ -414,9 +425,6 @@ export default function ProDashboard() {
                                     <p className="text-[9px] text-red-600 font-bold uppercase flex items-center gap-2">
                                         <AlertCircle className="size-3" /> Aide technique
                                     </p>
-                                    <div className="p-2 bg-white/50 rounded-lg text-[8px] font-bold text-red-800 leading-tight uppercase italic text-center">
-                                        je n'ai pas demandé de chnager ce texte. juste corriger l'erreur de comptage de l'audience via mon compte pro active
-                                    </div>
                                     <Button size="sm" variant="outline" className="w-full h-8 text-[8px] font-black uppercase border-red-200 text-red-600" onClick={handleLogout}>Déconnexion & Reconnexion</Button>
                                 </div>
                             )}
