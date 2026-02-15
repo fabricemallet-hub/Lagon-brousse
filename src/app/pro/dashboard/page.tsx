@@ -26,6 +26,8 @@ import { locations } from '@/lib/locations';
 
 type TargetScope = 'SPECIFIC' | 'CALEDONIE' | 'TAHITI' | 'ALL';
 
+const MAIN_CATEGORIES = ["Pêche", "Chasse", "Jardinage"];
+
 export default function ProDashboard() {
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
@@ -69,7 +71,7 @@ export default function ProDashboard() {
   const { data: promotions, isLoading: isPromosLoading } = useCollection<Promotion>(promosRef);
 
   // --- REACH CALCULATION ---
-  const [targetCategory, setTargetCategory] = useState<string>('');
+  const [targetCategory, setTargetCategory] = useState<string>('Pêche');
   const [targetCount, setTargetCount] = useState<number | null>(null);
   const [totalCommuneUsers, setTotalCommuneUsers] = useState<number | null>(null);
   const [isCalculatingReach, setIsCalculatingReach] = useState(false);
@@ -83,7 +85,7 @@ export default function ProDashboard() {
   // --- FORM STATES ---
   const [editingPromoId, setEditingPromoId] = useState<string | null>(null);
   const [promoTitle, setPromoTitle] = useState('');
-  const [promoCategory, setPromoCategory] = useState('');
+  const [promoCategory, setPromoCategory] = useState('Pêche');
   const [promoDescription, setPromoDescription] = useState('');
   const [promoPrice, setPromoPrice] = useState<string>('');
   const [originalPrice, setOriginalPrice] = useState<string>('');
@@ -236,15 +238,13 @@ export default function ProDashboard() {
     setPromoPrice('');
     setOriginalPrice('');
     setPromoImage('');
-    if (business && (business.categories || []).length > 0) {
-        setPromoCategory(business.categories[0]);
-    }
+    setPromoCategory('Pêche');
   };
 
   const handleEditPromotion = (promo: Promotion) => {
     setEditingPromoId(promo.id);
     setPromoTitle(promo.title);
-    setPromoCategory(promo.category || (business?.categories?.[0] || ''));
+    setPromoCategory(promo.category || 'Pêche');
     setPromoDescription(promo.description || '');
     setPromoPrice(promo.price?.toString() || '');
     setOriginalPrice(promo.originalPrice?.toString() || '');
@@ -385,7 +385,7 @@ export default function ProDashboard() {
                             <SelectValue placeholder="Choisir..." />
                         </SelectTrigger>
                         <SelectContent>
-                            {(business.categories || []).map(cat => (
+                            {MAIN_CATEGORIES.map(cat => (
                                 <SelectItem key={cat} value={cat} className="font-black text-xs uppercase">{cat}</SelectItem>
                             ))}
                         </SelectContent>
@@ -464,7 +464,7 @@ export default function ProDashboard() {
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {(business.categories || []).map(cat => (
+                                        {MAIN_CATEGORIES.map(cat => (
                                             <SelectItem key={cat} value={cat} className="font-black uppercase text-[10px]">{cat}</SelectItem>
                                         ))}
                                     </SelectContent>
