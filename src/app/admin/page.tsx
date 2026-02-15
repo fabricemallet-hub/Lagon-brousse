@@ -82,10 +82,8 @@ export default function AdminPage() {
 
   const isAdmin = useMemo(() => {
     if (!user) return false;
-    const masterAdminUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'koKj5ObSGXYeO1PLKU5bgo8Yaky1', 'D1q2GPM95rZi38cvCzvsjcWQDaV2', 'K9cVYLVUk1NV99YV3anebkugpPp1', 'ipupi3Pg4RfrSEpFyT69BtlCdpi2', 'Irglq69MasYdNwBmUu8yKvw6h4G2'];
-    const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
-    const userEmail = user.email?.toLowerCase() || '';
-    return masterAdminUids.includes(user.uid) || (userEmail && masterEmails.includes(userEmail));
+    // UNIQUE COMPTE ADMIN AUTORISÉ
+    return (user.email?.toLowerCase() === 'f.mallet81@outlook.com' || user.uid === 't8nPnZLcTiaLJSKMuLzib3C5nPn1');
   }, [user]);
 
   const usersRef = useMemoFirebase(() => (firestore && isAdmin) ? collection(firestore, 'users') : null, [firestore, isAdmin]);

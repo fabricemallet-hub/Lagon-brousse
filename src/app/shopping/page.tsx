@@ -113,14 +113,11 @@ export default function ShoppingPage() {
 
   const isLoading = isBusinessesLoading || isPromosLoading;
   
-  const isMaster = useMemo(() => {
+  const isAdmin = useMemo(() => {
     if (!user) return false;
-    const masters = ["D1q2GPM95rZi38cvCzvsjcWQDaV2", "t8nPnZLcTiaLJSKMuLzib3C5nPn1", "K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2", "koKj5ObSGXYeO1PLKU5bgo8Yaky1"];
-    const emails = ["fabrice.mallet@gmail.com", "f.mallet81@outlook.com", "f.mallet81@gmail.com"];
-    return masters.includes(user.uid) || (user.email && emails.includes(user.email.toLowerCase()));
-  }, [user]);
-
-  const isAdmin = isMaster || profile?.role === 'admin' || profile?.subscriptionStatus === 'admin';
+    // UNIQUE COMPTE ADMIN AUTORISÉ
+    return (user.email?.toLowerCase() === 'f.mallet81@outlook.com' || user.uid === 't8nPnZLcTiaLJSKMuLzib3C5nPn1') || profile?.role === 'admin' || profile?.subscriptionStatus === 'admin';
+  }, [user, profile]);
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-20">

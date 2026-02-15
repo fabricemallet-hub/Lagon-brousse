@@ -7,13 +7,11 @@ service cloud.firestore {
     // ======================================================
     // 1. PRIORITÉ ABSOLUE : MASTER ADMIN (GOD MODE)
     // ======================================================
-    // Bypass total pour l'administrateur principal
+    // Bypass total pour l'administrateur unique
     match /{allPaths=**} {
       allow read, write: if request.auth != null && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
-        request.auth.token.email.lower() == "f.mallet81@outlook.com" ||
-        request.auth.token.email.lower() == "fabrice.mallet@gmail.com" ||
-        request.auth.token.email.lower() == "f.mallet81@gmail.com"
+        request.auth.token.email.lower() == "f.mallet81@outlook.com"
       );
     }
 
@@ -26,7 +24,7 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.uid in ["t8nPnZLcTiaLJSKMuLzib3C5nPn1", "koKj5ObSGXYeO1PLKU5bgo8Yaky1", "D1q2GPM95rZi38cvCzvsjcWQDaV2", "K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2"] ||
+        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin"
       );
     }

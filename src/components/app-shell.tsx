@@ -91,11 +91,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (isUserLoading) return 'loading';
     if (!user) return 'limited';
 
-    const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
-    const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'koKj5ObSGXYeO1PLKU5bgo8Yaky1', 'D1q2GPM95rZi38cvCzvsjcWQDaV2', 'K9cVYLVUk1NV99YV3anebkugpPp1', 'ipupi3Pg4RfrSEpFyT69BtlCdpi2', 'Irglq69MasYdNwBmUu8yKvw6h4G2'];
-
-    const isMaster = (user.email && masterEmails.includes(user.email.toLowerCase())) || 
-                    masterUids.includes(user.uid);
+    // UNIQUE COMPTE ADMIN AUTORISÉ
+    const isMaster = (user.email?.toLowerCase() === 'f.mallet81@outlook.com' || user.uid === 't8nPnZLcTiaLJSKMuLzib3C5nPn1');
 
     // PRIORITÉ 1 : ADMIN
     if (isMaster || userProfile?.subscriptionStatus === 'admin' || userProfile?.role === 'admin') {
@@ -163,7 +160,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       await sendEmailVerification(user);
       toast({ title: "Email envoyé", description: "Un nouveau lien de validation a été envoyé." });
     } catch (e) {
-      toast({ variant: 'destructive', title: "Erreur", description: "Trop de tentatives. Veuillez réessayer plus tard." });
+      toast({ variant: 'destructive', title: "Erreur", description: "Too many attempts. Please try again later." });
     } finally {
       setIsRefreshing(false);
     }
