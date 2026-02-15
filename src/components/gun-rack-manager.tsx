@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -12,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { Crosshair, Plus, Save, Trash2, Pencil, Target, ShieldCheck, RefreshCw, X } from 'lucide-react';
+import { Crosshair, Plus, Save, Trash2, Pencil, Target, ShieldCheck, RefreshCw, X, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Weapon } from '@/lib/types';
 import { BALLISTIC_DATABASE, CALIBERS } from '@/lib/ballistics-db';
