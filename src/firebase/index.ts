@@ -1,41 +1,54 @@
 'use client';
 
 import { firebaseConfig } from '@/firebase/config';
-import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore, initializeFirestore, memoryLocalCache } from 'firebase/firestore';
 
 /**
- * @fileOverview Initialisation de Firebase Singleton robuste.
- * Correction de l'erreur ASSERTION FAILED (ID: ca9) par stockage global sécurisé.
+ * @fileOverview Initialisation de Firebase Singleton ultra-robuste.
+ * Correction définitive de l'erreur ASSERTION FAILED (ID: ca9) en forçant le cache mémoire.
  */
 
 export function initializeFirebase() {
   if (typeof window === 'undefined') {
-    return { firebaseApp: null as any, auth: null as any, firestore: null as any };
+    return { firebaseApp: null, auth: null, firestore: null };
   }
 
-  // Utilisation d'un namespace global pour persister les instances entre les rechargements (Fast Refresh)
   const global = window as any;
 
-  if (!global.__LBN_FIREBASE_APP__) {
-    global.__LBN_FIREBASE_APP__ = getApps().length === 0 
+  // 1. Initialisation de l'App (Singleton)
+  if (!global.__LBN_APP__) {
+    global.__LBN_APP__ = getApps().length === 0 
       ? initializeApp(firebaseConfig) 
       : getApp();
   }
+  const app = global.__LBN_APP__;
 
-  if (!global.__LBN_FIREBASE_AUTH__) {
-    global.__LBN_FIREBASE_AUTH__ = getAuth(global.__LBN_FIREBASE_APP__);
+  // 2. Initialisation de l'Auth (Singleton)
+  if (!global.__LBN_AUTH__) {
+    global.__LBN_AUTH__ = getAuth(app);
   }
+  const auth = global.__LBN_AUTH__;
 
-  if (!global.__LBN_FIREBASE_FIRESTORE__) {
-    global.__LBN_FIREBASE_FIRESTORE__ = getFirestore(global.__LBN_FIREBASE_APP__);
+  // 3. Initialisation de Firestore (Singleton avec cache mémoire forcé)
+  // L'erreur ca9 est causée par IndexedDB. Forcer memoryLocalCache() règle le problème.
+  if (!global.__LBN_FIRESTORE__) {
+    try {
+      global.__LBN_FIRESTORE__ = initializeFirestore(app, {
+        localCache: memoryLocalCache(),
+      });
+    } catch (e) {
+      // Fallback si déjà initialisé par un autre module
+      global.__LBN_FIRESTORE__ = getFirestore(app);
+    }
   }
+  const firestore = global.__LBN_FIRESTORE__;
 
   return { 
-    firebaseApp: global.__LBN_FIREBASE_APP__, 
-    auth: global.__LBN_FIREBASE_AUTH__, 
-    firestore: global.__LBN_FIREBASE_FIRESTORE__ 
+    firebaseApp: app, 
+    auth, 
+    firestore 
   };
 }
 
