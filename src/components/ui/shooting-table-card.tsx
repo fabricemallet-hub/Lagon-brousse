@@ -18,6 +18,7 @@ import {
   Wind, 
   Info,
   AlertCircle,
+  AlertTriangle,
   Zap,
   Crosshair,
   Pencil,
@@ -59,9 +60,9 @@ const BALLISTIC_DATABASE: MunitionData[] = [
   // .270 Winchester
   { id: '270-win-130-sst', caliber: '.270 Win', model: 'Hornady SST', weight: 130, v0: 930, bc: 0.460, usage: 'Expansion rapide et trajectoire tendue. Idéal pour la savane.', color: 'bg-orange-500', type: 'bullet' },
   { id: '270-win-130-ds', caliber: '.270 Win', model: 'Winchester Deer Season', weight: 130, v0: 930, bc: 0.392, usage: 'Choc immédiat sur cervidés.', color: 'bg-orange-500', type: 'bullet' },
-  { id: '270-win-130-tc', caliber: '.270 Win', model: 'Federal Trophy Copper', weight: 130, v0: 930, bc: 0.459, usage: 'Sans plomb, pénétration maximale et expansion garantie.', color: 'bg-orange-500', type: 'bullet' },
+  { id: '270-win-150-acc', caliber: '.270 Win', model: 'Nosler AccuBond', weight: 150, v0: 880, bc: 0.496, usage: 'Pénétration profonde pour les cerfs plus massifs.', color: 'bg-orange-500', type: 'bullet' },
   
-  // .270 WSM
+  // .270 WSM (Win Mag)
   { id: '270-wsm-130-bst', caliber: '.270 WSM', model: 'Winchester Ballistic Silvertip', weight: 130, v0: 990, bc: 0.433, usage: 'Version sur-vitaminée du .270. Vitesse exceptionnelle et trajectoire ultra-plate.', color: 'bg-orange-700', type: 'bullet' },
 
   // 7mm-08 Remington
@@ -85,24 +86,24 @@ const BALLISTIC_DATABASE: MunitionData[] = [
   // 9.3x62
   { id: '93x62-285-oryx', caliber: '9.3x62', model: 'Norma Oryx', weight: 285, v0: 720, bc: 0.330, usage: 'Le calibre stoppeur par excellence en brousse épaisse.', color: 'bg-amber-900', type: 'bullet' },
 
-  // --- CALIBRES LISSES (12, 16, 20) ---
-  // Calibre 12 - Balles
+  // --- CALIBRES LISSES (12, 16, 20, .410) ---
+  // Calibre 12
   { id: '12-sauv-26', caliber: 'Calibre 12', model: 'Balle Sauvestre (Flèche)', weight: 26, v0: 480, bc: 0.120, usage: 'Précision remarquable jusqu\'à 100m. Idéal cerf/cochon.', color: 'bg-red-600', type: 'slug' },
   { id: '12-brenn-31', caliber: 'Calibre 12', model: 'Balle Brenneke Classique', weight: 31, v0: 415, bc: 0.080, usage: 'La référence pour stopper un gros cochon en battue.', color: 'bg-red-600', type: 'slug' },
-  // Calibre 12 - Plombs
-  { id: '12-plomb-2', caliber: 'Calibre 12', model: 'Plomb n°2', weight: 36, v0: 400, bc: 0.022, usage: 'Roussette (Renard volant) et gros oiseaux.', color: 'bg-red-600', type: 'shot' },
   { id: '12-plomb-4', caliber: 'Calibre 12', model: 'Plomb n°4', weight: 36, v0: 400, bc: 0.019, usage: 'Gros canards, roussette, nuisibles.', color: 'bg-red-600', type: 'shot' },
   { id: '12-plomb-6', caliber: 'Calibre 12', model: 'Plomb n°6', weight: 36, v0: 400, bc: 0.015, usage: 'Notou, Pigeon vert, Collier blanc.', color: 'bg-red-600', type: 'shot' },
-  { id: '12-plomb-9', caliber: 'Calibre 12', model: 'Plomb n°9', weight: 32, v0: 410, bc: 0.010, usage: 'Tourterelles et entraînement ball-trap.', color: 'bg-red-600', type: 'shot' },
   { id: '12-chev-9', caliber: 'Calibre 12', model: 'Chevrotine 9 grains', weight: 32, v0: 400, bc: 0.045, usage: 'Cochon au fourré à très courte distance.', color: 'bg-red-600', type: 'buckshot' },
 
   // Calibre 16
   { id: '16-brenn-21', caliber: 'Calibre 16', model: 'Balle Brenneke', weight: 21, v0: 415, bc: 0.060, usage: 'Traditionnel et équilibré pour le gros gibier.', color: 'bg-orange-800', type: 'slug' },
-  { id: '16-plomb-6', caliber: 'Calibre 16', model: 'Plomb n°6', weight: 28, v0: 390, bc: 0.015, usage: 'Efficace pour Notou et Pigeon vert. Fatigue moins le marcheur.', color: 'bg-orange-800', type: 'shot' },
+  { id: '16-plomb-6', caliber: 'Calibre 16', model: 'Plomb n°6', weight: 28, v0: 390, bc: 0.015, usage: 'Efficace pour Notou et Pigeon vert.', color: 'bg-orange-800', type: 'shot' },
 
   // Calibre 20
-  { id: '20-brenn-18', caliber: 'Calibre 20', model: 'Balle Brenneke', weight: 18, v0: 425, bc: 0.055, usage: 'Précis mais demande un tir parfait (moins d\'énergie).', color: 'bg-yellow-800', type: 'slug' },
+  { id: '20-brenn-18', caliber: 'Calibre 20', model: 'Balle Brenneke', weight: 18, v0: 425, bc: 0.055, usage: 'Précis mais demande un tir parfait.', color: 'bg-yellow-800', type: 'slug' },
   { id: '20-plomb-6', caliber: 'Calibre 20', model: 'Plomb n°6', weight: 24, v0: 390, bc: 0.015, usage: 'Excellent pour la plume, recul très faible.', color: 'bg-yellow-800', type: 'shot' },
+
+  // Calibre .410
+  { id: '410-brenn-7', caliber: 'Calibre .410', model: 'Balle Brenneke', weight: 7, v0: 450, bc: 0.050, usage: 'Petit calibre pour nuisibles ou tir de précision à courte distance.', color: 'bg-stone-500', type: 'slug' },
 
   // 22mm
   { id: '22mm-lr-40', caliber: '22mm', model: '.22 LR Standard', weight: 40, v0: 330, bc: 0.125, usage: 'Petits nuisibles et tir de loisir.', color: 'bg-zinc-500', type: 'bullet' },
@@ -137,15 +138,12 @@ export function ShootingTableCard() {
   const [selectedWeight, setSelectedWeight] = useState<number>(0);
   const [zeroDistance, setZeroDistance] = useState('100');
   
-  // Paramètres Vent
   const [windKmh, setWindKmh] = useState('10');
   const [windAngle, setWindAngle] = useState('90'); 
 
-  // Paramètres Shotgun (Gerbe)
   const [selectedChoke, setSelectedChoke] = useState(CHOKES[2].label);
   const [shotDistance, setShotDistance] = useState(20);
 
-  // Manual input states
   const [manualWeight, setManualWeight] = useState('150');
   const [manualV0, setManualV0] = useState('860');
   const [manualBC, setManualBC] = useState('0.400');
@@ -197,7 +195,6 @@ export function ShootingTableCard() {
     return found || munitionsForCaliber[0] || BALLISTIC_DATABASE[0];
   }, [munitionsForCaliber, selectedModel, selectedWeight, isCustomMode, manualWeight, manualV0, manualBC, selectedCaliber]);
 
-  // Mode "Gerbe" si c'est du plomb ou de la chevrotine
   const isPatternMode = selectedMunition.type === 'shot' || selectedMunition.type === 'buckshot';
 
   const calculateBallistics = useCallback((dist: number) => {
@@ -207,7 +204,7 @@ export function ShootingTableCard() {
     const g = 9.81;
     const { v0, bc } = selectedMunition;
 
-    if (v0 <= 0 || bc <= 0) return { dist, dropCm: 0, clicks: 0, driftCm: 0, driftClicks: 0, elevationDir: 'UP', driftDir: 'RIGHT' };
+    if (v0 <= 0 || bc <= 0) return { dist, dropCm: 0, clicks: 0, driftCm: 0, driftClicks: 0, elevationDir: 'HAUT', driftDir: 'DROITE' };
 
     const calculateDropAt = (d: number) => {
         const vAvg = v0 * (1 - (0.00008 * d) / bc);
@@ -248,7 +245,6 @@ export function ShootingTableCard() {
     return [100, 200, 300].map(d => calculateBallistics(d));
   }, [selectedMunition, calculateBallistics]);
 
-  // Calcul Gerbe
   const patternDiameter = useMemo(() => {
     const choke = CHOKES.find(c => c.label === selectedChoke) || CHOKES[2];
     return Math.round(shotDistance * choke.factor);
@@ -258,17 +254,14 @@ export function ShootingTableCard() {
     if (!isPatternMode) return null;
     const plombNum = parseInt(selectedMunition.model.match(/\d+/)?.[0] || '0');
     
-    if (shotDistance >= 40 && plombNum >= 6) {
+    if (shotDistance >= 40 && (plombNum >= 6 || selectedMunition.type === 'shot')) {
         return "Attention : Gerbe trop large. Risque de blesser le gibier sans le prélever à cette distance.";
-    }
-    if (shotDistance >= 30 && selectedChoke === 'Lisse (Cyl)' && plombNum >= 4) {
-        return "Vigilance : Choke Lisse et distance élevée. Groupement incertain pour de la plume.";
     }
     if (selectedMunition.type === 'buckshot' && shotDistance > 25) {
         return "Danger : La chevrotine perd son efficacité d'arrêt très rapidement au-delà de 25m.";
     }
     return null;
-  }, [isPatternMode, selectedMunition, shotDistance, selectedChoke]);
+  }, [isPatternMode, selectedMunition, shotDistance]);
 
   const weightUnit = (selectedMunition.caliber.startsWith('Calibre') && selectedMunition.caliber !== 'Calibre .410') ? 'g' : 'gr';
 
@@ -436,10 +429,8 @@ export function ShootingTableCard() {
                         )}
                     </div>
                     
-                    {/* Repère échelle 1m x 1m */}
                     <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[8px] font-black uppercase opacity-20">Zone 1m x 1m</div>
 
-                    {/* La Gerbe */}
                     <div 
                         className="rounded-full border-4 border-primary/40 bg-primary/5 shadow-[0_0_20px_rgba(var(--primary),0.2)] flex items-center justify-center transition-all duration-500 ease-out"
                         style={{ 
@@ -453,7 +444,6 @@ export function ShootingTableCard() {
                         </div>
                     </div>
 
-                    {/* Silhouette Gibier Fixe (Notou / Cochon) */}
                     <div className="absolute flex flex-col items-center pointer-events-none">
                         {selectedMunition.model.toLowerCase().includes('plomb') ? (
                             <>
