@@ -20,7 +20,8 @@ import {
   Maximize2,
   AlertCircle,
   Zap,
-  Crosshair
+  Crosshair,
+  Pencil
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -105,17 +106,22 @@ export function ShootingTableCard() {
   const [selectedWeight, setSelectedWeight] = useState<number>(0);
   const [zeroDistance, setZeroDistance] = useState('100');
 
+  // Manual input states
+  const [manualWeight, setManualWeight] = useState('150');
+  const [manualV0, setManualV0] = useState('860');
+  const [manualBC, setManualBC] = useState('0.400');
+
   const munitionsForCaliber = useMemo(() => 
     BALLISTIC_DATABASE.filter(m => m.caliber === selectedCaliber)
   , [selectedCaliber]);
 
-  const availableModels = useMemo(() => 
-    Array.from(new Set(munitionsForCaliber.map(m => m.model)))
-  , [munitionsForCaliber]);
+  const availableModels = useMemo(() => {
+    const models = Array.from(new Set(munitionsForCaliber.map(m => m.model)));
+    return [...models, "PERSONNALISÉ"];
+  }, [munitionsForCaliber]);
 
   useEffect(() => {
     if (availableModels.length > 0) {
-      // Préserver le modèle si possible, sinon reset
       if (!availableModels.includes(selectedModel)) {
         setSelectedModel(availableModels[0]);
       }
@@ -137,16 +143,31 @@ export function ShootingTableCard() {
     }
   }, [availableWeights, selectedWeight]);
 
+  const isCustomMode = selectedModel === "PERSONNALISÉ";
+
   const selectedMunition = useMemo(() => {
+    if (isCustomMode) {
+        return {
+            caliber: selectedCaliber,
+            model: "Personnalisé",
+            weight: parseFloat(manualWeight) || 0,
+            v0: parseFloat(manualV0) || 0,
+            bc: parseFloat(manualBC) || 0,
+            usage: "Paramètres personnalisés définis par l'utilisateur.",
+            color: "bg-slate-700"
+        } as MunitionData;
+    }
     const found = munitionsForCaliber.find(m => m.model === selectedModel && m.weight === selectedWeight);
     return found || munitionsForCaliber[0] || BALLISTIC_DATABASE[0];
-  }, [munitionsForCaliber, selectedModel, selectedWeight]);
+  }, [munitionsForCaliber, selectedModel, selectedWeight, isCustomMode, manualWeight, manualV0, manualBC, selectedCaliber]);
 
   const calculateBallistics = (dist: number) => {
     const z = parseFloat(zeroDistance) || 100;
     const windKmh = 15;
     const g = 9.81;
     const { v0, bc } = selectedMunition;
+
+    if (v0 <= 0 || bc <= 0) return { dist, dropCm: 0, clicks: 0, driftCm: 0, driftClicks: 0 };
 
     const calculateDropAt = (d: number) => {
         const vAvg = v0 * (1 - (0.00008 * d) / bc);
@@ -229,7 +250,7 @@ export function ShootingTableCard() {
                     </SelectTrigger>
                     <SelectContent>
                         {availableModels.map(m => (
-                            <SelectItem key={m} value={m} className="text-xs">
+                            <SelectItem key={m} value={m} className={cn("text-xs", m === "PERSONNALISÉ" && "text-primary font-black")}>
                                 {m}
                             </SelectItem>
                         ))}
@@ -239,18 +260,30 @@ export function ShootingTableCard() {
 
             <div className="space-y-1.5">
                 <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Poids ({weightUnit})</Label>
-                <Select value={selectedWeight.toString()} onValueChange={(v) => setSelectedWeight(parseFloat(v))}>
-                    <SelectTrigger className="h-10 border-2 font-black text-xs bg-white">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {availableWeights.map(w => (
-                            <SelectItem key={w} value={w.toString()} className="font-black text-xs">
-                                {w} {weightUnit}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                {isCustomMode ? (
+                    <div className="relative">
+                        <Input 
+                            type="number" 
+                            value={manualWeight} 
+                            onChange={e => setManualWeight(e.target.value)} 
+                            className="h-10 border-2 font-black text-center text-xs bg-white pl-7"
+                        />
+                        <Pencil className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3 text-primary opacity-40" />
+                    </div>
+                ) : (
+                    <Select value={selectedWeight.toString()} onValueChange={(v) => setSelectedWeight(parseFloat(v))}>
+                        <SelectTrigger className="h-10 border-2 font-black text-xs bg-white">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {availableWeights.map(w => (
+                                <SelectItem key={w} value={w.toString()} className="font-black text-xs">
+                                    {w} {weightUnit}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                )}
             </div>
 
             <div className="space-y-1.5">
@@ -262,6 +295,30 @@ export function ShootingTableCard() {
                     className="h-10 border-2 font-black text-center text-sm bg-white"
                 />
             </div>
+
+            {isCustomMode && (
+                <div className="md:col-span-4 grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="space-y-1.5">
+                        <Label className="text-[9px] font-black uppercase text-primary ml-1">Vitesse Initiale V0 (m/s)</Label>
+                        <Input 
+                            type="number" 
+                            value={manualV0} 
+                            onChange={e => setManualV0(e.target.value)} 
+                            className="h-10 border-2 border-primary/30 font-black text-center text-sm bg-white"
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <Label className="text-[9px] font-black uppercase text-primary ml-1">Coef. Balistique (BC G1)</Label>
+                        <Input 
+                            type="number" 
+                            step="0.001"
+                            value={manualBC} 
+                            onChange={e => setManualBC(e.target.value)} 
+                            className="h-10 border-2 border-primary/30 font-black text-center text-sm bg-white"
+                        />
+                    </div>
+                </div>
+            )}
 
             <div className="md:col-span-4 pt-2 border-t border-dashed border-primary/10">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
