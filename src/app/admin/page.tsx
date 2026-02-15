@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, doc, setDoc, addDoc, deleteDoc, serverTimestamp, Timestamp, updateDoc, writeBatch } from 'firebase/firestore';
-import type { UserAccount, Business, Conversation, AccessToken, SharedAccessToken, SplashScreenSettings, CgvSettings, RibSettings, SystemNotification, FishSpeciesInfo } from '@/lib/types';
+import type { UserAccount, Business, Conversation, AccessToken, SharedAccessToken, SplashScreenSettings, CgvSettings, RibSettings, SystemNotification, FishSpeciesInfo, SoundLibraryEntry } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,7 +42,9 @@ import {
   ChevronRight,
   UserCircle,
   Copy,
-  Mail
+  Mail,
+  Volume2,
+  Play
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -113,6 +115,7 @@ export default function AdminPage() {
               { id: 'users', label: 'Comptes' },
               { id: 'businesses', label: 'Pros' },
               { id: 'fish', label: 'Poissons' },
+              { id: 'sons', label: 'Sons' },
               { id: 'notifications', label: 'Alertes' },
               { id: 'settings', label: 'Réglages' },
               { id: 'acces', label: 'Accès' },
@@ -150,6 +153,10 @@ export default function AdminPage() {
           
           <TabsContent value="fish">
             <FishGuideManager />
+          </TabsContent>
+
+          <TabsContent value="sons">
+            <SoundLibraryManager />
           </TabsContent>
 
           <TabsContent value="notifications">
@@ -190,6 +197,88 @@ function StatsCard({ title, value, icon: Icon, color }: { title: string, value: 
       </CardContent>
     </Card>
   );
+}
+
+function SoundLibraryManager() {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [label, setLabel] = useState('');
+    const [url, setUrl] = useState('');
+    const [categories, setCategories] = useState<string[]>(['General']);
+    const [isSaving, setIsSaving] = useState(false);
+
+    const soundsRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'sound_library'), orderBy('label', 'asc')) : null, [firestore]);
+    const { data: sounds } = useCollection<SoundLibraryEntry>(soundsRef);
+
+    const handleSave = async () => {
+        if (!firestore || !label || !url) return;
+        setIsSaving(true);
+        try {
+            await addDoc(collection(firestore, 'sound_library'), {
+                label,
+                url,
+                categories,
+                createdAt: serverTimestamp()
+            });
+            setLabel('');
+            setUrl('');
+            toast({ title: "Son ajouté !" });
+        } catch (e) {
+            toast({ variant: 'destructive', title: "Erreur" });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!firestore) return;
+        await deleteDoc(doc(firestore, 'sound_library', id));
+        toast({ title: "Son supprimé" });
+    };
+
+    return (
+        <Card className="border-2 shadow-lg overflow-hidden rounded-2xl">
+            <CardHeader className="p-5 bg-muted/5 border-b">
+                <CardTitle className="text-lg font-black uppercase flex items-center gap-2 text-primary"><Volume2 className="size-5" /> Bibliothèque Sonore</CardTitle>
+                <CardDescription className="text-[10px] font-bold uppercase mt-1">Gérez les sons pour le tracker et la chasse.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 space-y-6">
+                <div className="grid gap-4 p-5 bg-muted/10 rounded-2xl border-2 border-dashed">
+                    <div className="space-y-4">
+                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Nom du son</Label><Input value={label} onChange={e => setLabel(e.target.value)} placeholder="Ex: Alerte, Bip..." className="h-12 border-2 font-bold" /></div>
+                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">URL MP3</Label><Input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://..." className="h-12 border-2 text-xs font-mono" /></div>
+                        <div className="space-y-2"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Catégories</Label>
+                            <div className="flex flex-wrap gap-2">
+                                {['Vessel', 'Hunting', 'General'].map(cat => (
+                                    <Badge key={cat} variant={categories.includes(cat) ? "default" : "outline"} className="cursor-pointer font-black uppercase text-[9px] py-2 px-3 h-auto border-2" onClick={() => setCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])}>{cat}</Badge>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                    <Button onClick={handleSave} disabled={isSaving || !label || !url} className="w-full h-14 font-black uppercase tracking-widest shadow-md"><Plus className="size-4 mr-2" /> Ajouter le son</Button>
+                </div>
+                <div className="space-y-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Sons enregistrés ({sounds?.length || 0})</p>
+                    <div className="flex flex-col gap-2">
+                        {sounds?.map(s => (
+                            <div key={s.id} className="p-3 flex items-center justify-between border-2 rounded-xl bg-white shadow-sm">
+                                <div className="flex flex-col min-w-0 pr-2">
+                                    <span className="font-black uppercase text-xs truncate text-slate-800">{s.label}</span>
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                        {s.categories?.map(c => <Badge key={c} variant="outline" className="text-[7px] h-3.5 px-1 uppercase font-black border-primary/20 text-primary">{c}</Badge>)}
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                    <Button variant="ghost" size="icon" className="h-10 w-10 border rounded-xl" onClick={() => { const a = new Audio(s.url); a.play(); }}><Play className="size-4" /></Button>
+                                    <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive/40 hover:text-destructive border rounded-xl" onClick={() => handleDelete(s.id)}><Trash2 className="size-4" /></Button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+    );
 }
 
 function BusinessManager({ businesses, users }: { businesses: Business[] | null, users: UserAccount[] | null }) {
