@@ -102,10 +102,23 @@ export default function ProDashboard() {
   const [promoDescription, setPromoDescription] = useState('');
   const [promoPrice, setPromoPrice] = useState<string>('');
   const [originalPrice, setOriginalPrice] = useState<string>('');
+  const [manualDiscountInput, setManualDiscountInput] = useState('');
   const [promoImages, setPromoImages] = useState<string[]>([]);
   const [promoType, setPromoType] = useState<'Promo' | 'Nouvel Arrivage'>('Promo');
   const [isSaving, setIsSaving] = useState(false);
   const [hasCopiedUid, setHasCopiedUid] = useState(false);
+
+  // Auto-calculate original price when promo price or manual discount changes
+  useEffect(() => {
+    if (manualDiscountInput && promoPrice) {
+        const pct = parseFloat(manualDiscountInput);
+        const salePrice = parseFloat(promoPrice);
+        if (pct > 0 && pct < 100 && salePrice > 0) {
+            const calculatedOriginal = salePrice / (1 - pct / 100);
+            setOriginalPrice(Math.round(calculatedOriginal).toString());
+        }
+    }
+  }, [promoPrice, manualDiscountInput]);
 
   const calculatedDiscount = useMemo(() => {
     const priceNum = parseFloat(promoPrice);
@@ -125,7 +138,7 @@ export default function ProDashboard() {
       }
       if (selectedTargetCommunes.length === 0) setSelectedTargetCommunes([business.commune]);
     }
-  }, [business]);
+  }, [business, targetCategory, promoCategory, selectedTargetCommunes.length]);
 
   useEffect(() => {
     if (!firestore || !business || isUserLoading || !user) return;
@@ -229,12 +242,32 @@ export default function ProDashboard() {
     } finally { setIsSaving(false); }
   };
 
-  const resetForm = () => { setEditingPromoId(null); setPromoTitle(''); setPromoDescription(''); setPromoPrice(''); setOriginalPrice(''); setPromoImages([]); setPromoCategory('Pêche'); };
+  const resetForm = () => { 
+    setEditingPromoId(null); 
+    setPromoTitle(''); 
+    setPromoDescription(''); 
+    setPromoPrice(''); 
+    setOriginalPrice(''); 
+    setManualDiscountInput('');
+    setPromoImages([]); 
+    setPromoCategory('Pêche'); 
+  };
 
   const handleEditPromotion = (promo: Promotion) => {
-    setEditingPromoId(promo.id); setPromoTitle(promo.title); setPromoCategory(promo.category || 'Pêche'); setPromoDescription(promo.description || '');
-    setPromoPrice(promo.price?.toString() || ''); setOriginalPrice(promo.originalPrice?.toString() || ''); setPromoImages(promo.images || [promo.imageUrl || '']);
-    setPromoType(promo.promoType); window.scrollTo({ top: 0, behavior: 'smooth' });
+    setEditingPromoId(promo.id); 
+    setPromoTitle(promo.title); 
+    setPromoCategory(promo.category || 'Pêche'); 
+    setPromoDescription(promo.description || '');
+    setPromoPrice(promo.price?.toString() || ''); 
+    setOriginalPrice(promo.originalPrice?.toString() || ''); 
+    if (promo.price && promo.originalPrice && promo.originalPrice > promo.price) {
+        setManualDiscountInput(Math.round(((promo.originalPrice - promo.price) / promo.originalPrice) * 100).toString());
+    } else {
+        setManualDiscountInput('');
+    }
+    setPromoImages(promo.images || [promo.imageUrl || '']);
+    setPromoType(promo.promoType); 
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDeletePromotion = async (id: string) => {
@@ -299,13 +332,45 @@ export default function ProDashboard() {
                     <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Titre</Label><Input value={promoTitle} onChange={e => setPromoTitle(e.target.value)} className="font-bold border-2" /></div>
                     <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Rayon</Label><Select value={promoCategory} onValueChange={setPromoCategory}><SelectTrigger className="border-2 font-black uppercase text-xs"><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs uppercase">{cat}</SelectItem>)}</SelectContent></Select></div>
                     <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Prix (F)</Label><Input type="number" value={promoPrice} onChange={e => setPromoPrice(e.target.value)} className="font-bold border-2" /></div>
+                        <div className="space-y-1">
+                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Prix (F)</Label>
+                            <Input 
+                                type="number" 
+                                value={promoPrice} 
+                                onChange={e => setPromoPrice(e.target.value)} 
+                                className="font-bold border-2" 
+                            />
+                        </div>
                         <div className="space-y-1">
                             <Label className="text-[10px] font-black uppercase opacity-60 ml-1 flex items-center justify-between">
                                 Prix Barré
                                 {calculatedDiscount && <Badge variant="destructive" className="h-4 px-1.5 text-[8px] font-black">-{calculatedDiscount}%</Badge>}
                             </Label>
-                            <Input type="number" value={originalPrice} onChange={e => setOriginalPrice(e.target.value)} className="border-2" />
+                            <Input 
+                                type="number" 
+                                value={originalPrice} 
+                                onChange={e => {
+                                    setOriginalPrice(e.target.value);
+                                    setManualDiscountInput('');
+                                }} 
+                                className="border-2" 
+                            />
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Calculer via Remise (%)</Label>
+                            <div className="relative">
+                                <Input 
+                                    type="number" 
+                                    placeholder="Saisir % (ex: 20)" 
+                                    value={manualDiscountInput}
+                                    onChange={e => setManualDiscountInput(e.target.value)}
+                                    className="h-10 border-2 font-black text-center text-xs bg-white pl-10" 
+                                />
+                                <Percent className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-primary opacity-40" />
+                            </div>
+                            <p className="text-[8px] font-bold text-muted-foreground px-1 italic">
+                                Saisissez le % de remise pour que le Prix Barré se calcule tout seul par rapport au Prix de vente.
+                            </p>
                         </div>
                     </div>
                     <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Description</Label><Textarea value={promoDescription} onChange={e => setPromoDescription(e.target.value)} className="font-medium border-2 min-h-[80px]" /></div>
@@ -313,7 +378,7 @@ export default function ProDashboard() {
                         <Label className="text-[10px] font-black uppercase opacity-60">Photos (Max 4)</Label>
                         <div className="grid grid-cols-4 gap-2">
                             {promoImages.map((img, idx) => (
-                                <div key={idx} className="relative aspect-square rounded-xl border-2 overflow-hidden bg-muted"><img src={img} className="w-full h-full object-cover" /><button onClick={() => setPromoImages(prev => prev.filter((_, i) => i !== idx))} className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1"><X className="size-3" /></button></div>
+                                <div key={idx} className="relative aspect-square rounded-xl border-2 overflow-hidden bg-muted"><img src={img} className="w-full h-full object-cover" alt="" /><button onClick={() => setPromoImages(prev => prev.filter((_, i) => i !== idx))} className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1"><X className="size-3" /></button></div>
                             ))}
                             {promoImages.length < 4 && <button onClick={() => fileInputRef.current?.click()} className="aspect-square rounded-xl border-2 border-dashed border-primary/20 flex items-center justify-center text-primary/40"><Plus className="size-5" /></button>}
                         </div>
@@ -369,7 +434,7 @@ export default function ProDashboard() {
                                                             prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name].slice(0, 30)
                                                         );
                                                     }}>
-                                                        <Checkbox checked={selectedTargetCommunes.includes(name)} />
+                                                        <Checkbox id={`check-${name}`} checked={selectedTargetCommunes.includes(name)} />
                                                         <span className="text-xs font-bold uppercase">{name}</span>
                                                     </div>
                                                 ))}
