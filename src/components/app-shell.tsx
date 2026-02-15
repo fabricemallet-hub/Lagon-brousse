@@ -55,6 +55,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { BottomNav } from './bottom-nav';
 import { UsageTimer } from './usage-timer';
+import { NotificationBanner } from './notification-banner';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { ensureUserDocument } from '@/lib/user-utils';
@@ -89,8 +90,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (isUserLoading) return 'loading';
     if (!user) return 'limited';
 
-    const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com'];
-    const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1'];
+    const masterEmails = ['f.mallet81@outlook.com', 'fabrice.mallet@gmail.com', 'f.mallet81@gmail.com', 'kledostyle@outlook.com'];
+    const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'koKj5ObSGXYeO1PLKU5bgo8Yaky1', 'D1q2GPM95rZi38cvCzvsjcWQDaV2', 'K9cVYLVUk1NV99YV3anebkugpPp1', 'ipupi3Pg4RfrSEpFyT69BtlCdpi2', 'Irglq69MasYdNwBmUu8yKvw6h4G2'];
 
     const isMaster = (user.email && masterEmails.includes(user.email.toLowerCase())) || 
                     masterUids.includes(user.uid);
@@ -292,6 +293,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
             </header>
             <div className="flex-1 flex flex-col gap-6 p-4 pb-32 md:pb-12 w-full transform-gpu">
+              <NotificationBanner />
               {children}
             </div>
             <BottomNav />
