@@ -79,7 +79,6 @@ export default function ProDashboard() {
   const [selectedPromoIds, setSelectedPromoIds] = useState<string[]>([]);
   const [targetCategory, setTargetCategory] = useState<string>('Pêche');
   
-  // Audiences séparées par canal
   const [pushTargetCount, setPushTargetCount] = useState<number | null>(null);
   const [mailTargetCount, setMailTargetCount] = useState<number | null>(null);
   const [smsTargetCount, setSmsTargetCount] = useState<number | null>(null);
@@ -107,6 +106,15 @@ export default function ProDashboard() {
   const [promoType, setPromoType] = useState<'Promo' | 'Nouvel Arrivage'>('Promo');
   const [isSaving, setIsSaving] = useState(false);
   const [hasCopiedUid, setHasCopiedUid] = useState(false);
+
+  const calculatedDiscount = useMemo(() => {
+    const priceNum = parseFloat(promoPrice);
+    const originalPriceNum = parseFloat(originalPrice);
+    if (priceNum && originalPriceNum && originalPriceNum > priceNum) {
+      return Math.round(((originalPriceNum - priceNum) / originalPriceNum) * 100);
+    }
+    return null;
+  }, [promoPrice, originalPrice]);
 
   useEffect(() => {
     if (business) {
@@ -292,7 +300,13 @@ export default function ProDashboard() {
                     <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Rayon</Label><Select value={promoCategory} onValueChange={setPromoCategory}><SelectTrigger className="border-2 font-black uppercase text-xs"><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs uppercase">{cat}</SelectItem>)}</SelectContent></Select></div>
                     <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Prix (F)</Label><Input type="number" value={promoPrice} onChange={e => setPromoPrice(e.target.value)} className="font-bold border-2" /></div>
-                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Prix Barré</Label><Input type="number" value={originalPrice} onChange={e => setOriginalPrice(e.target.value)} className="border-2" /></div>
+                        <div className="space-y-1">
+                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1 flex items-center justify-between">
+                                Prix Barré
+                                {calculatedDiscount && <Badge variant="destructive" className="h-4 px-1.5 text-[8px] font-black">-{calculatedDiscount}%</Badge>}
+                            </Label>
+                            <Input type="number" value={originalPrice} onChange={e => setOriginalPrice(e.target.value)} className="border-2" />
+                        </div>
                     </div>
                     <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Description</Label><Textarea value={promoDescription} onChange={e => setPromoDescription(e.target.value)} className="font-medium border-2 min-h-[80px]" /></div>
                     <div className="space-y-2">
@@ -443,8 +457,17 @@ export default function ProDashboard() {
                         <div className="w-8 bg-muted/30 border-r flex items-center justify-center shrink-0"><Checkbox checked={selectedPromoIds.includes(promo.id)} onCheckedChange={() => {}} /></div>
                         <div className="w-24 bg-muted/20 shrink-0 relative overflow-hidden flex items-center justify-center border-r">{promo.imageUrl ? <img src={promo.imageUrl} className="w-full h-full object-cover" alt="" /> : <ImageIcon className="size-6 opacity-20" />}</div>
                         <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
-                            <div className="space-y-1"><h4 className="font-black uppercase text-xs truncate">{promo.title}</h4><p className="text-[9px] text-muted-foreground line-clamp-2 italic">{promo.description || "Pas de description."}</p></div>
-                            <div className="flex items-center justify-between"><Badge variant="outline" className="text-[7px] h-4 font-black uppercase border-primary/20 text-primary">{promo.price} F</Badge>
+                            <div className="space-y-1">
+                                <div className="flex justify-between items-start">
+                                    <h4 className="font-black uppercase text-xs truncate flex-1">{promo.title}</h4>
+                                    {promo.discountPercentage && (
+                                        <Badge variant="destructive" className="h-3.5 px-1 text-[7px] font-black">-{Math.round(promo.discountPercentage)}%</Badge>
+                                    )}
+                                </div>
+                                <p className="text-[9px] text-muted-foreground line-clamp-2 italic">{promo.description || "Pas de description."}</p>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <Badge variant="outline" className="text-[7px] h-4 font-black uppercase border-primary/20 text-primary">{promo.price} F</Badge>
                                 <div className="flex gap-1" onClick={(e) => e.stopPropagation()}><Button variant="ghost" size="icon" className="size-7 border rounded-full" onClick={() => handleEditPromotion(promo)}><Pencil className="size-3" /></Button><Button variant="ghost" size="icon" className="size-7 text-destructive border rounded-full" onClick={() => handleDeletePromotion(promo.id)}><Trash2 className="size-3" /></Button></div>
                             </div>
                         </div>
