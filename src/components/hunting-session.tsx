@@ -1,4 +1,3 @@
-
 'use client';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
@@ -237,7 +236,6 @@ function HuntingSessionContent() {
   
   useEffect(() => {
     if (userProfile && !hasLoadedInitialPrefs.current) {
-      // Use huntingNickname if available, fallback to displayName for first-time use
       setNickname(userProfile.huntingNickname || userProfile.displayName || user?.displayName || user?.email?.split('@')[0] || '');
       setSelectedIcon(userProfile.mapIcon || 'Navigation');
       setSelectedColor(userProfile.mapColor || '#3b82f6');
@@ -559,7 +557,7 @@ function HuntingSessionContent() {
 
                                           <div className={cn("space-y-4 transition-opacity", !isSoundEnabled && "opacity-40 pointer-events-none")}>
                                             <div className="space-y-3">
-                                              <Label className="text-[10px] font-black uppercase opacity-60 flex items-center gap-2">
+                                              <Label className="text-[10px] font-black uppercase flex items-center gap-2">
                                                 <Volume2 className="size-3" /> Volume des alertes
                                               </Label>
                                               <Slider 
@@ -615,12 +613,34 @@ function HuntingSessionContent() {
                             </AccordionItem>
                         </Accordion>
                         <div className="space-y-2">
-                            <h4 className="font-bold text-xs uppercase flex items-center gap-2 px-1"><Users className="size-4" /> Équipe ({participants?.length || 0})</h4>
-                            <div className="max-h-48 overflow-y-auto space-y-1 divide-y border rounded-lg bg-card">
+                            <h4 className="font-black text-[10px] uppercase tracking-widest flex items-center gap-2 px-1 text-muted-foreground"><Users className="size-3" /> Équipe ({participants?.length || 0})</h4>
+                            <div className="max-h-64 overflow-y-auto space-y-1 divide-y border-2 rounded-xl bg-card shadow-inner scrollbar-hide">
                                 {participants?.map(p => (
-                                    <div key={p.id} className={cn("flex justify-between items-center p-3 text-sm", p.isGibierEnVue && "bg-red-50")}>
-                                        <div className="flex items-center gap-3"><div className="size-3 rounded-full" style={{ backgroundColor: p.mapColor || '#3b82f6' }} /><span className="font-bold">{p.displayName}</span></div>
-                                        {p.battery && <BatteryIcon level={p.battery.level} charging={p.battery.charging} />}
+                                    <div key={p.id} className={cn("flex justify-between items-center p-3 text-sm transition-colors", p.isGibierEnVue && "bg-red-50 animate-pulse")}>
+                                        <div className="flex flex-col min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <div className="size-2.5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: p.mapColor || '#3b82f6' }} />
+                                                <span className="font-black uppercase text-xs truncate text-slate-800">{p.displayName}</span>
+                                            </div>
+                                            {(p.baseStatus || p.isGibierEnVue) && (
+                                                <span className={cn(
+                                                    "text-[9px] font-black uppercase ml-4.5 mt-0.5 px-1.5 rounded w-fit leading-tight",
+                                                    p.isGibierEnVue ? "text-red-600 bg-red-100" : "text-primary bg-primary/5"
+                                                )}>
+                                                    {p.isGibierEnVue ? 'GIBIER EN VUE !' : p.baseStatus}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0 ml-4">
+                                            {p.battery && (
+                                                <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-lg border-2 border-slate-100 text-[10px] font-black shadow-sm">
+                                                    <span className={cn(p.battery.level < 0.2 ? "text-red-600 animate-pulse" : "text-slate-500")}>
+                                                        {Math.round(p.battery.level * 100)}%
+                                                    </span>
+                                                    <BatteryIcon level={p.battery.level} charging={p.battery.charging} />
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 ))}
                             </div>
