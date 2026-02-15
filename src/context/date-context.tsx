@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react';
 import { useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { SplashScreen } from '@/components/splash-screen';
@@ -21,7 +21,6 @@ export function DateProvider({ children }: { children: ReactNode }) {
   const [showSplash, setShowSplash] = useState(true);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  // Fetch splash settings from Firestore
   const settingsRef = useMemoFirebase(() => {
     if (!firestore) return null;
     return doc(firestore, 'app_settings', 'splash');
@@ -30,7 +29,6 @@ export function DateProvider({ children }: { children: ReactNode }) {
   const { data: splashSettings, isLoading: isSettingsLoading } = useDoc<SplashScreenSettings>(settingsRef);
 
   useEffect(() => {
-    // Nettoyage des anciens timers si splashSettings change
     timersRef.current.forEach(clearTimeout);
     timersRef.current = [];
 
@@ -41,7 +39,7 @@ export function DateProvider({ children }: { children: ReactNode }) {
       const timer2 = setTimeout(() => {
         setShowSplash(false);
         setSelectedDate(new Date());
-      }, 1000); // Wait for fade out animation
+      }, 1000);
       timersRef.current.push(timer2);
     }, duration);
 
@@ -53,19 +51,22 @@ export function DateProvider({ children }: { children: ReactNode }) {
     };
   }, [splashSettings]);
 
-  // Default settings using the NEW logo
-  const defaultSettings: SplashScreenSettings = {
+  const defaultSettings: SplashScreenSettings = useMemo(() => ({
     splashMode: 'image',
     splashImageUrl: '/icon-512x512.png',
     splashBgColor: '#000000',
     splashImageFit: 'contain',
     splashDuration: 2.5
-  };
+  }), []);
 
-  // If loading, we use defaultSettings with the new logo.
   const finalSettings = isSettingsLoading 
     ? defaultSettings 
     : (splashSettings || defaultSettings);
+
+  const value = useMemo(() => ({
+    selectedDate: selectedDate || new Date(),
+    setSelectedDate,
+  }), [selectedDate]);
 
   if (showSplash) {
     return <SplashScreen settings={finalSettings} isExiting={isExiting} />;
@@ -74,11 +75,6 @@ export function DateProvider({ children }: { children: ReactNode }) {
   if (!selectedDate) {
     return null;
   }
-
-  const value = {
-    selectedDate,
-    setSelectedDate,
-  };
 
   return (
     <DateContext.Provider value={value}>

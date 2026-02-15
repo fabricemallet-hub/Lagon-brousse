@@ -2,7 +2,7 @@
 
 import { useJsApiLoader } from '@react-google-maps/api';
 import type { ReactNode } from 'react';
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 
 type GoogleMapsContextType = {
   isLoaded: boolean;
@@ -23,10 +23,10 @@ export function GoogleMapsProvider({ children }: { children: ReactNode }) {
     preventGoogleFontsLoading: true,
   });
 
-  const value = {
+  const value = useMemo(() => ({
     isLoaded,
     loadError,
-  };
+  }), [isLoaded, loadError]);
 
   return (
     <GoogleMapsContext.Provider value={value}>

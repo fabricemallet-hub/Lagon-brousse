@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useMemo } from 'react';
 
 export type CalendarView = 'peche' | 'champs';
 
@@ -17,10 +17,10 @@ const CalendarViewContext = createContext<CalendarViewContextType | undefined>(
 export function CalendarViewProvider({ children }: { children: ReactNode }) {
   const [calendarView, setCalendarView] = useState<CalendarView>('peche');
 
-  const value = {
+  const value = useMemo(() => ({
     calendarView,
     setCalendarView,
-  };
+  }), [calendarView]);
 
   return (
     <CalendarViewContext.Provider value={value}>

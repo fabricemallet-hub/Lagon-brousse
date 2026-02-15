@@ -23,8 +23,10 @@ const LocationContext = createContext<LocationContextType | undefined>(
   undefined
 );
 
+// Move regions list outside to make it static and stable
+const REGIONS_LIST = Object.keys(locationsByRegion);
+
 export function LocationProvider({ children }: { children: ReactNode }) {
-  const regions = Object.keys(locationsByRegion);
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const { setSelectedDate } = useDate();
@@ -40,7 +42,6 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
-  // Filtered locations based on selected region
   const availableLocations = useMemo(() => {
     return Object.keys(locationsByRegion[selectedRegion] || {}).sort();
   }, [selectedRegion]);
@@ -52,26 +53,27 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     }
     
     if (userProfile) {
-      if (userProfile.selectedRegion && regions.includes(userProfile.selectedRegion)) {
-        _setSelectedRegion(userProfile.selectedRegion);
-        // On synchronise la date affichée au chargement
-        setSelectedDate(getRegionalNow(userProfile.selectedRegion));
+      if (userProfile.selectedRegion && REGIONS_LIST.includes(userProfile.selectedRegion)) {
+        if (selectedRegion !== userProfile.selectedRegion) {
+          _setSelectedRegion(userProfile.selectedRegion);
+          // Only update date if it's different to avoid loops
+          const regionalNow = getRegionalNow(userProfile.selectedRegion);
+          setSelectedDate(regionalNow);
+        }
       }
-      if (userProfile.lastSelectedLocation) {
+      if (userProfile.lastSelectedLocation && selectedLocation !== userProfile.lastSelectedLocation) {
         _setSelectedLocation(userProfile.lastSelectedLocation);
       }
     }
 
     setIsLocationLoading(false);
-  }, [user, isUserLoading, userProfile, isProfileLoading, setSelectedDate, regions]);
+  }, [user, isUserLoading, userProfile, isProfileLoading, setSelectedDate, selectedRegion, selectedLocation]);
 
   const setSelectedRegion = useCallback((region: Region) => {
     _setSelectedRegion(region);
     const firstLoc = Object.keys(locationsByRegion[region])[0];
     _setSelectedLocation(firstLoc);
     
-    // CRITIQUE : Si on change de région, on recalcule "Aujourd'hui" pour cette région
-    // (Tahiti a 21h de retard sur la NC, la date peut donc changer)
     setSelectedDate(getRegionalNow(region));
     
     if (userDocRef) {
@@ -89,15 +91,15 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     }
   }, [userDocRef]);
 
-  const value = {
-    regions: [...regions],
+  const value = useMemo(() => ({
+    regions: REGIONS_LIST,
     selectedRegion,
     setSelectedRegion,
     locations: availableLocations,
     selectedLocation,
     setSelectedLocation,
     isLocationLoading
-  };
+  }), [selectedRegion, setSelectedRegion, availableLocations, selectedLocation, setSelectedLocation, isLocationLoading]);
 
   return (
     <LocationContext.Provider value={value}>
