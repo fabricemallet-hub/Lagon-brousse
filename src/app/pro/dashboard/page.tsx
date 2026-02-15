@@ -96,7 +96,7 @@ export default function ProDashboard() {
   const [promoDescription, setPromoDescription] = useState('');
   const [promoPrice, setPromoPrice] = useState<string>('');
   const [originalPrice, setOriginalPrice] = useState<string>('');
-  const [promoImage, setPromoImage] = useState('');
+  const [promoImages, setPromoImages] = useState<string[]>([]);
   const [promoType, setPromoType] = useState<'Promo' | 'Nouvel Arrivage'>('Promo');
   const [isSaving, setIsSaving] = useState(false);
   const [hasCopiedUid, setHasCopiedUid] = useState(false);
@@ -193,14 +193,27 @@ export default function ProDashboard() {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-        setPromoImage(event.target?.result as string);
-        toast({ title: "Photo chargée" });
-    };
-    reader.readAsDataURL(file);
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    
+    const canAdd = 4 - promoImages.length;
+    if (canAdd <= 0) {
+        toast({ variant: 'destructive', title: "Limite atteinte", description: "Max 4 photos." });
+        return;
+    }
+
+    const toProcess = files.slice(0, canAdd);
+    toProcess.forEach(f => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            setPromoImages(prev => [...prev, ev.target?.result as string].slice(0, 4));
+        };
+        reader.readAsDataURL(f);
+    });
+    
+    if (files.length > canAdd) {
+        toast({ title: "Note", description: "Seules les 4 premières photos ont été conservées." });
+    }
   };
 
   const handleSavePromotion = async () => {
@@ -224,7 +237,8 @@ export default function ProDashboard() {
         originalPrice: originalPriceNum,
         discountPercentage: discount,
         promoType,
-        imageUrl: promoImage,
+        imageUrl: promoImages[0] || '',
+        images: promoImages,
         updatedAt: serverTimestamp(),
       };
 
@@ -249,7 +263,7 @@ export default function ProDashboard() {
     setPromoDescription('');
     setPromoPrice('');
     setOriginalPrice('');
-    setPromoImage('');
+    setPromoImages([]);
     setPromoCategory('Pêche');
   };
 
@@ -260,7 +274,7 @@ export default function ProDashboard() {
     setPromoDescription(promo.description || '');
     setPromoPrice(promo.price?.toString() || '');
     setOriginalPrice(promo.originalPrice?.toString() || '');
-    setPromoImage(promo.imageUrl || '');
+    setPromoImages(promo.images || (promo.imageUrl ? [promo.imageUrl] : []));
     setPromoType(promo.promoType);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -432,7 +446,37 @@ export default function ProDashboard() {
                       <Textarea value={promoDescription} onChange={e => setPromoDescription(e.target.value)} placeholder="Détails de l'offre..." className="font-medium border-2 min-h-[80px]" />
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Photos de l'article (Max 4)</Label>
+                        <div className="grid grid-cols-4 gap-2">
+                            {promoImages.map((img, idx) => (
+                                <div key={idx} className="group relative aspect-square rounded-xl border-2 overflow-hidden bg-muted shadow-sm">
+                                    <img src={img} className="w-full h-full object-cover" />
+                                    <button 
+                                        type="button"
+                                        onClick={() => setPromoImages(prev => prev.filter((_, i) => i !== idx))}
+                                        className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                        <X className="size-3" />
+                                    </button>
+                                    {idx === 0 && <Badge className="absolute bottom-1 left-1 bg-primary text-[6px] h-3 px-1 font-black uppercase">Principale</Badge>}
+                                </div>
+                            ))}
+                            {promoImages.length < 4 && (
+                                <button 
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="aspect-square rounded-xl border-2 border-dashed border-primary/20 flex flex-col items-center justify-center text-primary/40 hover:bg-primary/5 hover:text-primary transition-all active:scale-95"
+                                >
+                                    <Plus className="size-5" />
+                                    <span className="text-[8px] font-black uppercase mt-1">Ajouter</span>
+                                </button>
+                            )}
+                        </div>
+                        <input type="file" accept="image/*" multiple ref={fileInputRef} className="hidden" onChange={handleFileChange} />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4">
                         <div className="space-y-1.5">
                             <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Type d'offre</Label>
                             <Select value={promoType} onValueChange={(v: any) => setPromoType(v)}>
@@ -442,13 +486,6 @@ export default function ProDashboard() {
                                 <SelectItem value="Nouvel Arrivage">Nouveauté</SelectItem>
                             </SelectContent>
                             </Select>
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Photo smartphone</Label>
-                            <Button variant="outline" className="w-full h-11 border-2 gap-2 font-black uppercase text-[10px]" onClick={() => fileInputRef.current?.click()}>
-                                <Camera className="size-3" /> Charger
-                            </Button>
-                            <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
                         </div>
                     </div>
 
@@ -618,7 +655,16 @@ export default function ProDashboard() {
                 {promotions?.map(promo => (
                     <Card key={promo.id} className={cn("overflow-hidden border-2 shadow-sm flex h-32", editingPromoId === promo.id && "border-accent bg-accent/5")}>
                         <div className="w-24 bg-muted/20 shrink-0 relative flex items-center justify-center border-r">
-                            {promo.imageUrl ? <img src={promo.imageUrl} className="w-full h-full object-cover" alt={promo.title} /> : <ImageIcon className="size-6 opacity-20" />}
+                            {promo.imageUrl ? (
+                                <>
+                                    <img src={promo.imageUrl} className="w-full h-full object-cover" alt={promo.title} />
+                                    {promo.images && promo.images.length > 1 && (
+                                        <Badge className="absolute bottom-1 right-1 bg-black/60 text-[8px] font-black h-4 px-1 border-none shadow-lg">
+                                            {promo.images.length}
+                                        </Badge>
+                                    )}
+                                </>
+                            ) : <ImageIcon className="size-6 opacity-20" />}
                         </div>
                         <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
                             <div className="space-y-1">

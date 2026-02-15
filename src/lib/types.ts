@@ -103,6 +103,7 @@ export interface Promotion {
   discountPercentage?: number | null;
   promoType: 'Promo' | 'Nouvel Arrivage';
   imageUrl?: string;
+  images?: string[];
   createdAt: any;
 }
 

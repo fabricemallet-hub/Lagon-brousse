@@ -31,7 +31,8 @@ import {
     Navigation, 
     ExternalLink,
     X,
-    Globe
+    Globe,
+    ImageIcon
 } from 'lucide-react';
 import { locations, locationsByRegion, regions } from '@/lib/locations';
 import { cn } from '@/lib/utils';
@@ -421,6 +422,7 @@ export default function ShoppingPage() {
 
 function ProductCard({ product, onContact }: { product: Promotion & { business?: Business }, onContact: (id: string) => void }) {
     const isPromo = product.promoType === 'Promo';
+    const images = product.images || (product.imageUrl ? [product.imageUrl] : []);
     
     return (
         <Card className={cn(
@@ -443,9 +445,17 @@ function ProductCard({ product, onContact }: { product: Promotion & { business?:
             </div>
 
             <div className="flex min-h-[140px] h-auto">
-                <div className="w-32 bg-muted/20 shrink-0 relative flex items-center justify-center border-r">
-                    {product.imageUrl ? (
-                        <img src={product.imageUrl} className="w-full h-full object-cover transition-transform group-hover:scale-105" alt={product.title} />
+                <div className="w-32 bg-muted/20 shrink-0 relative flex items-center justify-center border-r overflow-hidden">
+                    {images.length > 0 ? (
+                        <>
+                            <img src={images[0]} className="w-full h-full object-cover transition-transform group-hover:scale-105" alt={product.title} />
+                            {images.length > 1 && (
+                                <div className="absolute bottom-1 right-1 bg-black/60 backdrop-blur-md text-white font-black text-[8px] px-1.5 py-0.5 rounded flex items-center gap-1 shadow-lg border border-white/10">
+                                    <ImageIcon className="size-2" />
+                                    {images.length}
+                                </div>
+                            )}
+                        </>
                     ) : (
                         <ShoppingBag className="size-10 text-muted-foreground/20" />
                     )}
