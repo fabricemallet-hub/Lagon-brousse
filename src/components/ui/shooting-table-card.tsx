@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -29,7 +28,9 @@ import {
   Bird,
   Volume2,
   Waves,
-  ShieldAlert
+  ShieldAlert,
+  RefreshCw,
+  Save
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -47,73 +48,56 @@ type MunitionData = {
 
 const BALLISTIC_DATABASE: MunitionData[] = [
   // .222 Remington
-  { id: '222-rem-50-vmax', caliber: '.222 Rem', model: 'Hornady V-MAX', weight: 50, v0: 950, bc: 0.242, usage: 'Précision redoutable sur petits nuisibles et biche à l\'approche.', color: 'bg-emerald-500', type: 'bullet' },
-  { id: '222-rem-50-pp', caliber: '.222 Rem', model: 'Winchester Power-Point', weight: 50, v0: 950, bc: 0.176, usage: 'Standard polyvalent pour petit gibier.', color: 'bg-emerald-500', type: 'bullet' },
-
+  { id: '222-rem-50-vmax', caliber: '.222 Rem', model: 'Hornady V-MAX', weight: 50, v0: 960, bc: 0.242, usage: 'Nuisibles / Précision', color: 'bg-emerald-500', type: 'bullet' },
+  
   // .243 Winchester
-  { id: '243-win-80-fed', caliber: '.243 Win', model: 'Federal Soft Point', weight: 80, v0: 1000, bc: 0.288, usage: 'Vitesse très élevée, idéal nuisibles.', color: 'bg-yellow-600', type: 'bullet' },
-  { id: '243-win-100-pp', caliber: '.243 Win', model: 'Winchester Power-Point', weight: 100, v0: 900, bc: 0.356, usage: 'Approche biche et petit cerf, recul faible.', color: 'bg-yellow-600', type: 'bullet' },
+  { id: '243-win-100-gk', caliber: '.243 Win', model: 'Sierra GameKing', weight: 100, v0: 900, bc: 0.430, usage: 'Biche / Jeune Cerf', color: 'bg-yellow-600', type: 'bullet' },
 
   // .25-06 Remington
-  { id: '25-06-100-cl', caliber: '.25-06 Rem', model: 'Remington Core-Lokt', weight: 100, v0: 980, bc: 0.323, usage: 'Calibre "Laser" très précis, trajectoire très tendue. Idéal biche ou jeune cerf.', color: 'bg-cyan-500', type: 'bullet' },
-  { id: '25-06-115-bt', caliber: '.25-06 Rem', model: 'Nosler Ballistic Tip', weight: 115, v0: 910, bc: 0.453, usage: 'Précision laser à longue portée, trajectoire stable.', color: 'bg-cyan-500', type: 'bullet' },
+  { id: '25-06-rem-120-cl', caliber: '.25-06 Rem', model: 'Remington Core-Lokt', weight: 120, v0: 910, bc: 0.391, usage: 'Plaine / Savane', color: 'bg-cyan-500', type: 'bullet' },
 
   // 6.5 Creedmoor
-  { id: '65-cm-143-eldx', caliber: '6.5 Creedmoor', model: 'Hornady ELD-X', weight: 143, v0: 820, bc: 0.625, usage: 'Précision extrême à longue distance.', color: 'bg-teal-600', type: 'bullet' },
+  { id: '65-cm-140-eldm', caliber: '6.5 Creedmoor', model: 'Hornady ELD-Match', weight: 140, v0: 820, bc: 0.646, usage: 'Longue distance', color: 'bg-teal-600', type: 'bullet' },
 
   // .270 Winchester
-  { id: '270-win-130-sst', caliber: '.270 Win', model: 'Hornady SST', weight: 130, v0: 930, bc: 0.460, usage: 'Expansion rapide et trajectoire tendue. Idéal pour la savane.', color: 'bg-orange-500', type: 'bullet' },
-  { id: '270-win-130-ds', caliber: '.270 Win', model: 'Winchester Deer Season', weight: 130, v0: 930, bc: 0.392, usage: 'Choc immédiat sur cervidés.', color: 'bg-orange-500', type: 'bullet' },
-  { id: '270-win-150-acc', caliber: '.270 Win', model: 'Nosler AccuBond', weight: 150, v0: 880, bc: 0.496, usage: 'Pénétration profonde pour les cerfs plus massifs.', color: 'bg-orange-500', type: 'bullet' },
-  
-  // .270 WSM (Win Mag)
-  { id: '270-wsm-130-bst', caliber: '.270 WSM', model: 'Winchester Ballistic Silvertip', weight: 130, v0: 990, bc: 0.433, usage: 'Version sur-vitaminée du .270. Vitesse exceptionnelle et trajectoire ultra-plate.', color: 'bg-orange-700', type: 'bullet' },
-
-  // 7mm-08 Remington
-  { id: '7mm08-140-eldx', caliber: '7mm-08 Rem', model: 'Hornady ELD-X', weight: 140, v0: 850, bc: 0.623, usage: 'Précision chirurgicale longue distance.', color: 'bg-indigo-600', type: 'bullet' },
-  { id: '7mm08-140-ttsx', caliber: '7mm-08 Rem', model: 'Barnes TTSX', weight: 140, v0: 860, bc: 0.412, usage: 'Tout cuivre, idéal pour le cochon.', color: 'bg-indigo-600', type: 'bullet' },
+  { id: '270-win-130-sst', caliber: '.270 Win', model: 'Hornady SST', weight: 130, v0: 930, bc: 0.460, usage: 'Cerf Rusa (Savane)', color: 'bg-orange-500', type: 'bullet' },
 
   // .308 Winchester
-  { id: '308-win-150-pp', caliber: '.308 Win', model: 'Winchester Power-Point', weight: 150, v0: 860, bc: 0.294, usage: 'Le plus polyvalent sur le Caillou, disponible partout.', color: 'bg-blue-500', type: 'bullet' },
-  { id: '308-win-180-shh', caliber: '.308 Win', model: 'Sako Super Hammerhead', weight: 180, v0: 780, bc: 0.380, usage: 'Balle soudée, idéale pour les os lourds des gros cerfs.', color: 'bg-blue-500', type: 'bullet' },
+  { id: '308-win-150-pp', caliber: '.308 Win', model: 'Winchester Power-Point', weight: 150, v0: 860, bc: 0.294, usage: 'Polyvalent Brousse', color: 'bg-blue-500', type: 'bullet' },
+  { id: '308-win-180-partition', caliber: '.308 Win', model: 'Nosler Partition', weight: 180, v0: 790, bc: 0.474, usage: 'Gros Cerf / Cochon', color: 'bg-blue-500', type: 'bullet' },
 
-  // .30-06 Springfield
-  { id: '30-06-180-cl', caliber: '.30-06', model: 'Remington Core-Lokt', weight: 180, v0: 820, bc: 0.383, usage: 'La référence brousse. Puissant, idéal pour stopper un gros cochon.', color: 'bg-green-600', type: 'bullet' },
-  { id: '30-06-180-oryx', caliber: '.30-06', model: 'Norma Oryx', weight: 180, v0: 820, bc: 0.354, usage: 'Balle soudée, pénétration maximale sans fragmentation.', color: 'bg-green-600', type: 'bullet' },
+  // 7mm-08
+  { id: '7mm-08-140-ab', caliber: '7mm-08', model: 'Nosler AccuBond', weight: 140, v0: 850, bc: 0.485, usage: 'Approche / Montagne', color: 'bg-indigo-600', type: 'bullet' },
+
+  // .30-06 Sprg
+  { id: '30-06-180-shh', caliber: '.30-06 Sprg', model: 'Sako Hammerhead', weight: 180, v0: 820, bc: 0.383, usage: 'Arrêt net (Cochon)', color: 'bg-green-600', type: 'bullet' },
 
   // 7mm Rem Mag
-  { id: '7mm-rm-162-eldx', caliber: '7mm Rem Mag', model: 'Hornady ELD-X', weight: 162, v0: 896, bc: 0.631, usage: 'Magnum polyvalent, tir très longue distance.', color: 'bg-rose-700', type: 'bullet' },
+  { id: '7mm-rm-150-tc', caliber: '7mm Rem Mag', model: 'Federal Trophy Copper', weight: 150, v0: 940, bc: 0.490, usage: 'Très longue distance', color: 'bg-rose-700', type: 'bullet' },
 
   // .300 Win Mag
-  { id: '300-wm-180-pp', caliber: '.300 Win Mag', model: 'Winchester Power-Point', weight: 180, v0: 900, bc: 0.382, usage: 'Puissance d\'arrêt massive pour les plus gros spécimens.', color: 'bg-red-800', type: 'bullet' },
+  { id: '300-wm-200-eldx', caliber: '.300 Win Mag', model: 'Hornady ELD-X', weight: 200, v0: 870, bc: 0.626, usage: 'Gros gibier / Énergie', color: 'bg-red-800', type: 'bullet' },
 
-  // 9.3x62
-  { id: '93x62-285-oryx', caliber: '9.3x62', model: 'Norma Oryx', weight: 285, v0: 720, bc: 0.330, usage: 'Le calibre stoppeur par excellence en brousse épaisse.', color: 'bg-amber-900', type: 'bullet' },
-
-  // --- CALIBRES LISSES (12, 16, 20, .410) ---
   // Calibre 12
-  { id: '12-sauv-26', caliber: 'Calibre 12', model: 'Balle Sauvestre (Flèche)', weight: 26, v0: 480, bc: 0.120, usage: 'Précision remarquable jusqu\'à 100m. Idéal cerf/cochon.', color: 'bg-red-600', type: 'slug' },
-  { id: '12-brenn-31', caliber: 'Calibre 12', model: 'Balle Brenneke Classique', weight: 31, v0: 415, bc: 0.080, usage: 'La référence pour stopper un gros cochon en battue.', color: 'bg-red-600', type: 'slug' },
+  { id: '12-bfs-26', caliber: 'Calibre 12', model: 'Balle Sauvestre (BFS)', weight: 26, v0: 500, bc: 0.170, usage: 'Battue (0-80m)', color: 'bg-red-600', type: 'slug' },
+  { id: '12-brenn-31', caliber: 'Calibre 12', model: 'Balle Brenneke', weight: 31.5, v0: 430, bc: 0.120, usage: 'Forêt dense (0-50m)', color: 'bg-red-600', type: 'slug' },
   { id: '12-plomb-4', caliber: 'Calibre 12', model: 'Plomb n°4', weight: 36, v0: 400, bc: 0.019, usage: 'Gros canards, roussette, nuisibles.', color: 'bg-red-600', type: 'shot' },
   { id: '12-plomb-6', caliber: 'Calibre 12', model: 'Plomb n°6', weight: 36, v0: 400, bc: 0.015, usage: 'Notou, Pigeon vert, Collier blanc.', color: 'bg-red-600', type: 'shot' },
   { id: '12-chev-9', caliber: 'Calibre 12', model: 'Chevrotine 9 grains', weight: 32, v0: 400, bc: 0.045, usage: 'Cochon au fourré à très courte distance.', color: 'bg-red-600', type: 'buckshot' },
 
   // Calibre 16
-  { id: '16-brenn-21', caliber: 'Calibre 16', model: 'Balle Brenneke', weight: 21, v0: 415, bc: 0.060, usage: 'Traditionnel et équilibré pour le gros gibier.', color: 'bg-orange-800', type: 'slug' },
+  { id: '16-slug-24', caliber: 'Calibre 16', model: 'Balle Type Slug', weight: 24.5, v0: 400, bc: 0.100, usage: 'Tradition / Forêt', color: 'bg-orange-800', type: 'slug' },
   { id: '16-plomb-6', caliber: 'Calibre 16', model: 'Plomb n°6', weight: 28, v0: 390, bc: 0.015, usage: 'Efficace pour Notou et Pigeon vert.', color: 'bg-orange-800', type: 'shot' },
 
   // Calibre 20
-  { id: '20-brenn-18', caliber: 'Calibre 20', model: 'Balle Brenneke', weight: 18, v0: 425, bc: 0.055, usage: 'Précis mais demande un tir parfait.', color: 'bg-yellow-800', type: 'slug' },
+  { id: '20-win-22', caliber: 'Calibre 20', model: 'Balle Winchester', weight: 22.5, v0: 420, bc: 0.110, usage: 'Léger / Précis', color: 'bg-yellow-800', type: 'slug' },
   { id: '20-plomb-6', caliber: 'Calibre 20', model: 'Plomb n°6', weight: 24, v0: 390, bc: 0.015, usage: 'Excellent pour la plume, recul très faible.', color: 'bg-yellow-800', type: 'shot' },
 
   // Calibre .410
-  { id: '410-slug-75', caliber: 'Calibre .410', model: 'Balle Slug (Brenneke)', weight: 7.5, v0: 530, bc: 0.055, usage: 'Excellent pour la régulation des petits cochons ou jeune cerf à courte distance (<50m).', color: 'bg-stone-500', type: 'slug' },
-  { id: '410-pdx1', caliber: 'Calibre .410', model: 'Winchester PDX1 (Défense)', weight: 19, v0: 350, bc: 0.040, usage: 'Hybride : 3 disques + 12 billes. Très impressionnant pour stopper un nuisible de près.', color: 'bg-stone-500', type: 'slug' },
-  { id: '410-000buck', caliber: 'Calibre .410', model: 'Chevrotine 000 Buck', weight: 15, v0: 340, bc: 0.045, usage: '3 à 5 billes de 9mm. Pour le cochon au fourré à très courte distance (<15m).', color: 'bg-stone-500', type: 'buckshot' },
-  { id: '410-plomb-4', caliber: 'Calibre .410', model: 'Plomb n°4', weight: 12, v0: 370, bc: 0.019, usage: 'Pigeon vert ou Collier blanc à courte distance. Gerbe serrée.', color: 'bg-stone-500', type: 'shot' },
-  { id: '410-plomb-6', caliber: 'Calibre .410', model: 'Plomb n°6', weight: 12, v0: 370, bc: 0.015, usage: 'Le standard pour Tourterelles et petits oiseaux. Précision requise.', color: 'bg-stone-500', type: 'shot' },
-  { id: '410-plomb-7.5', caliber: 'Calibre .410', model: 'Plomb n°7.5', weight: 12, v0: 350, bc: 0.012, usage: 'Spécial Merles calédoniens et Tourterelles. Très discret.', color: 'bg-stone-500', type: 'shot' },
-  { id: '410-plomb-9', caliber: 'Calibre .410', model: 'Plomb n°9', weight: 12, v0: 350, bc: 0.010, usage: 'Tir de jardin et petits nuisibles. Discrétion maximale.', color: 'bg-stone-500', type: 'shot' },
+  { id: '410-brenn-7.5', caliber: 'Calibre .410', model: 'Balle Brenneke', weight: 7.5, v0: 530, bc: 0.090, usage: 'Jeune Cerf / Cochon', color: 'bg-stone-500', type: 'slug' },
+  { id: '410-pdx1', caliber: 'Calibre .410', model: 'Winchester PDX1 (Défense)', weight: 19, v0: 350, bc: 0.040, usage: 'Hybride : 3 disques + 12 billes. Très impressionnant de près.', color: 'bg-stone-500', type: 'slug' },
+  { id: '410-plomb-6', caliber: 'Calibre .410', model: 'Plomb n°6', weight: 12, v0: 370, bc: 0.015, usage: 'Tourterelles et petits oiseaux. Précision requise.', color: 'bg-stone-500', type: 'shot' },
+  { id: '410-plomb-7.5', caliber: 'Calibre .410', model: 'Plomb n°7.5', weight: 12, v0: 350, bc: 0.012, usage: 'Spécial Merles calédoniens et Tourterelles.', color: 'bg-stone-500', type: 'shot' },
 
   // 22mm
   { id: '22mm-lr-40', caliber: '22mm', model: '.22 LR Standard', weight: 40, v0: 330, bc: 0.125, usage: 'Petits nuisibles et tir de loisir.', color: 'bg-zinc-500', type: 'bullet' },
@@ -151,7 +135,6 @@ export function ShootingTableCard() {
   const [windKmh, setWindKmh] = useState('10');
   const [windAngle, setWindAngle] = useState('90'); 
 
-  // Accessoires
   const [hasSilencer, setHasSilencer] = useState(false);
   const [hasMuzzleBrake, setHasMuzzleBrake] = useState(false);
 
@@ -217,7 +200,6 @@ export function ShootingTableCard() {
     const wAng = parseFloat(windAngle) || 0;
     const g = 9.81;
     
-    // Le .410 exploite mieux le silencieux (+3% V0 au lieu de +2%)
     const baseV0 = selectedMunition.v0;
     const silencerBonus = (selectedCaliber === 'Calibre .410' && hasSilencer) ? 1.03 : (hasSilencer ? 1.02 : 1.0);
     const v0 = baseV0 * silencerBonus;
@@ -240,7 +222,6 @@ export function ShootingTableCard() {
     const timeTarget = dist / vAvgTarget;
     const angleRad = (wAng * Math.PI) / 180;
     
-    // Le silencieux réduit légèrement la dérive car la balle est souvent mieux stabilisée
     const windDriftFactor = hasSilencer ? 0.95 : 1.0;
     const crosswindMps = (wSpeed / 3.6) * Math.sin(angleRad) * windDriftFactor;
     
@@ -274,19 +255,14 @@ export function ShootingTableCard() {
 
   const patternDiameter = useMemo(() => {
     const choke = CHOKES.find(c => c.label === selectedChoke) || CHOKES[2];
-    // Le .410 a une gerbe naturellement plus serrée
     const caliberFactor = selectedCaliber === 'Calibre .410' ? 0.85 : 1.0;
     return Math.round(shotDistance * choke.factor * caliberFactor);
   }, [selectedChoke, shotDistance, selectedCaliber]);
 
   const patternWarning = useMemo(() => {
     if (!isPatternMode) return null;
-    const plombNum = parseInt(selectedMunition.model.match(/\d+/)?.[0] || '0');
-    
-    // Le .410 perd son efficacité plus tôt au plomb
     const maxDist = selectedCaliber === 'Calibre .410' ? 25 : 40;
-
-    if (shotDistance >= maxDist && (plombNum >= 6 || selectedMunition.type === 'shot')) {
+    if (shotDistance >= maxDist) {
         return `Attention : Gerbe trop large pour ce calibre. Risque de blesser le gibier sans le prélever à cette distance (> ${maxDist}m).`;
     }
     if (selectedMunition.type === 'buckshot' && shotDistance > 25) {
@@ -439,7 +415,6 @@ export function ShootingTableCard() {
               </div>
           </div>
 
-          {/* ACCESSOIRES DE CANON */}
           {!isPatternMode && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-primary/5 rounded-2xl border-2 border-primary/10">
                 <div className="flex items-center justify-between p-3 bg-white rounded-xl border-2 shadow-sm">
