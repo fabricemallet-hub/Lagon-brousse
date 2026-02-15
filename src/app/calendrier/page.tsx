@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -116,7 +115,7 @@ export default function CalendrierPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="p-1.5 bg-indigo-100 rounded-lg"><OctopusIcon className="size-4 text-indigo-600" /></div>
-                    <span className="text-xs font-bold">Poulpe (Marée basse &lt; 0.23m)</span>
+                    <span className="text-xs font-bold">Poulpe (Marée basse)</span>
                   </div>
                 </div>
               </div>

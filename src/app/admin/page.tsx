@@ -61,7 +61,8 @@ import {
   Shrink,
   Anchor,
   Globe,
-  Filter
+  Filter,
+  Info
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -85,6 +86,7 @@ import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
 import { locations, locationsByRegion, regions } from '@/lib/locations';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -1284,6 +1286,13 @@ function SystemNotificationsManager() {
         <Card className="border-2 shadow-lg overflow-hidden rounded-2xl">
             <CardHeader className="p-5 bg-primary/5 border-b"><CardTitle className="text-lg font-black uppercase flex items-center gap-2 text-primary"><Bell className="size-5" /> Alertes Système</CardTitle></CardHeader>
             <CardContent className="p-4 space-y-6">
+                <Alert className="bg-primary/5 border-dashed border-2">
+                    <Info className="size-4 text-primary" />
+                    <AlertDescription className="text-[10px] font-bold leading-relaxed">
+                        Les alertes diffusées ici s'affichent instantanément en haut de la page d'accueil de tous les utilisateurs connectés.
+                    </AlertDescription>
+                </Alert>
+
                 <div className="grid gap-5 p-5 bg-muted/10 rounded-[2rem] border-2 border-dashed">
                     <div className="space-y-4">
                         <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Titre de l'alerte</Label><Input value={title} onChange={e => setTitle(e.target.value)} className="h-14 border-2 font-black text-base uppercase" /></div>
