@@ -10,7 +10,31 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Search, ChevronLeft, HelpCircle, MessageSquare, Sparkles, Send, RefreshCw, TrendingUp, X } from 'lucide-react';
+import { 
+  Search, 
+  ChevronLeft, 
+  HelpCircle, 
+  MessageSquare, 
+  Sparkles, 
+  Send, 
+  RefreshCw, 
+  TrendingUp, 
+  X,
+  BookOpen,
+  Home,
+  Waves,
+  Sun,
+  Navigation,
+  Fish,
+  BrainCircuit,
+  Crosshair,
+  Leaf,
+  Sprout,
+  Calendar,
+  Scale,
+  User,
+  ChevronRight
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
@@ -21,6 +45,22 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
 const CATEGORIES = ["General", "Peche", "Boat Tracker", "Chasse", "Champs", "Compte"];
+
+const helpSections = [
+  { id: 'accueil', title: 'Accueil', icon: Home, color: 'bg-blue-500' },
+  { id: 'lagon', title: 'Lagon', icon: Waves, color: 'bg-cyan-500' },
+  { id: 'meteo', title: 'Météo Live', icon: Sun, color: 'bg-yellow-500' },
+  { id: 'vessel-tracker', title: 'Boat Tracker', icon: Navigation, color: 'bg-blue-600' },
+  { id: 'peche', title: 'Pêche', icon: Fish, color: 'bg-indigo-500' },
+  { id: 'fish', title: 'Guide Poissons', icon: BrainCircuit, color: 'bg-cyan-600' },
+  { id: 'chasse', title: 'Chasse', icon: Crosshair, color: 'bg-orange-600' },
+  { id: 'champs', title: 'Champs', icon: Leaf, color: 'bg-green-600' },
+  { id: 'semis', title: 'Guide Culture', icon: Sprout, color: 'bg-emerald-500' },
+  { id: 'calendrier-peche', title: 'Calendrier Pêche', icon: Calendar, color: 'bg-slate-700' },
+  { id: 'calendrier-champs', title: 'Calendrier Champs', icon: Calendar, color: 'bg-green-800' },
+  { id: 'reglementation', title: 'Réglementation', icon: Scale, color: 'bg-slate-500' },
+  { id: 'compte', title: 'Compte', icon: User, color: 'bg-zinc-600' }
+];
 
 export default function FaqPage() {
   const router = useRouter();
@@ -89,7 +129,34 @@ export default function FaqPage() {
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-20">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" onClick={() => router.back()}><ChevronLeft className="size-6" /></Button>
-        <h1 className="text-2xl font-black uppercase tracking-tighter">FAQ & Support</h1>
+        <h1 className="text-2xl font-black uppercase tracking-tighter">FAQ &amp; Support</h1>
+      </div>
+
+      {/* SECTION: MODES OPERATOIRES (USER GUIDES) */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between px-1">
+            <h2 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <BookOpen className="size-3 text-primary" /> Guides d'utilisation
+            </h2>
+            <Link href="/aide" className="text-[9px] font-black uppercase text-primary hover:underline flex items-center gap-1">
+                Voir tout <ChevronRight className="size-2" />
+            </Link>
+        </div>
+        <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide px-1">
+            {helpSections.map(section => (
+                <Link key={section.id} href={`/aide/${section.id}`} className="flex flex-col items-center gap-2 shrink-0 group">
+                    <div className={cn(
+                        "size-14 rounded-2xl flex items-center justify-center text-white shadow-md transition-all active:scale-95 group-hover:scale-105 border-2 border-white", 
+                        section.color
+                    )}>
+                        <section.icon className="size-6" />
+                    </div>
+                    <span className="text-[9px] font-black uppercase tracking-tighter text-center max-w-[64px] leading-[1.1] text-slate-600 group-hover:text-primary">
+                        {section.title}
+                    </span>
+                </Link>
+            ))}
+        </div>
       </div>
 
       <div className="flex flex-col gap-4">
@@ -128,7 +195,7 @@ export default function FaqPage() {
 
       <div className="space-y-4">
         <div className="flex items-center gap-2 px-1 text-[10px] font-black uppercase text-muted-foreground tracking-widest">
-            <TrendingUp className="size-3 text-primary" /> Classé par popularité
+            <TrendingUp className="size-3 text-primary" /> Questions les plus posées
         </div>
         {isLoading ? (
           <div className="space-y-3">
