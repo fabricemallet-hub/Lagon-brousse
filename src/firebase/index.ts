@@ -1,8 +1,8 @@
 'use client';
 
 import { firebaseConfig } from '@/firebase/config';
-import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
 import { 
   initializeFirestore, 
   Firestore, 
@@ -12,43 +12,39 @@ import {
 
 /**
  * @fileOverview Initialisation de Firebase Singleton.
- * Mode Long Polling forcé pour la stabilité dans l'environnement Cloud.
- * Utilisation de la version 11.10.0 pour corriger les erreurs d'assertion interne.
+ * Correction de l'erreur ASSERTION FAILED (ID: ca9).
+ * Force le Long Polling et le cache en mémoire pour une stabilité totale sur mobile.
  */
 
 export function initializeFirebase() {
-  if (typeof window !== 'undefined') {
-    // 1. Singleton App
-    const app = getApps().length === 0 
-      ? initializeApp(firebaseConfig) 
-      : getApp();
+  // 1. Initialisation de l'App (Singleton)
+  const app = getApps().length === 0 
+    ? initializeApp(firebaseConfig) 
+    : getApp();
 
-    // 2. Singleton Auth
-    const auth = getAuth(app);
+  // 2. Singleton Auth
+  const auth = getAuth(app);
 
-    // 3. Singleton Firestore (STABLE TRANSPORT)
-    let firestore: Firestore;
+  // 3. Singleton Firestore avec configuration de transport ultra-stable
+  let firestore: Firestore;
+  
+  // On vérifie si Firestore est déjà initialisé pour cette app
+  // @ts-ignore - Accès interne pour vérifier l'existence de l'instance
+  if (app.container.getProvider('firestore').isInitialized()) {
+    firestore = getFirestore(app);
+  } else {
     try {
-      // On tente une initialisation avec configuration spécifique
       firestore = initializeFirestore(app, {
         localCache: memoryLocalCache(),
-        experimentalForceLongPolling: true 
+        experimentalForceLongPolling: true, // Crucial pour éviter les erreurs d'assertion sur mobile
       });
     } catch (e) {
-      // Si déjà initialisé (HMR), on récupère l'instance existante
+      console.warn("Firestore already initialized, falling back to getFirestore()");
       firestore = getFirestore(app);
     }
-
-    return { firebaseApp: app, auth, firestore };
   }
 
-  // Fallback Serveur (SSR)
-  const ssrApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
-  return {
-    firebaseApp: ssrApp,
-    auth: getAuth(ssrApp),
-    firestore: getFirestore(ssrApp),
-  };
+  return { firebaseApp: app, auth, firestore };
 }
 
 export * from './provider';
