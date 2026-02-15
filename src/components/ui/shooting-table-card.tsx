@@ -653,6 +653,7 @@ export function ShootingTableCard() {
                             <TableRow className="hover:bg-transparent border-b-2">
                                 <BlockHead label="Distance" />
                                 <BlockHead label="Chute (cm)" />
+                                <BlockHead label="Dérive (cm)" />
                                 <BlockHead label="Élévation" className="text-primary" />
                                 <BlockHead label="Dérive" className="text-accent" />
                             </TableRow>
@@ -662,6 +663,7 @@ export function ShootingTableCard() {
                                 <TableRow key={idx} className="hover:bg-primary/5 transition-colors h-14">
                                     <TableCell className="font-black text-center text-sm">{res.dist}m</TableCell>
                                     <TableCell className="font-bold text-center text-slate-600">{res.dropCm} cm</TableCell>
+                                    <TableCell className="font-bold text-center text-accent/70">{res.driftCm} cm</TableCell>
                                     <TableCell className="text-center">
                                         <div className={cn(
                                             "inline-flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg min-w-[70px] justify-center",
