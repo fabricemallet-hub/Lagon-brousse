@@ -61,24 +61,28 @@ const BALLISTIC_DATABASE: MunitionData[] = [
   { id: '270-win-140-sst', caliber: '.270 Win', model: 'Hornady SST', weight: 140, v0: 900, bc: 0.485, usage: 'Le grand classique polyvalent. Puissant et précis pour le cerf et le sanglier.', color: 'bg-orange-500' },
   { id: '270-win-130-ds', caliber: '.270 Win', model: 'Winchester Deer Season', weight: 130, v0: 930, bc: 0.392, usage: 'Choc immédiat sur cervidés. Trajectoire stable même par vent léger.', color: 'bg-orange-500' },
   { id: '270-win-150-ab', caliber: '.270 Win', model: 'Nosler AccuBond', weight: 150, v0: 870, bc: 0.500, usage: 'Pénétration profonde pour gros cerfs. Excellent rapport entre recul et performance.', color: 'bg-orange-500' },
+  { id: '270-win-130-tc', caliber: '.270 Win', model: 'Federal Trophy Copper', weight: 130, v0: 930, bc: 0.459, usage: 'Munition sans plomb, pénétration maximale et excellente expansion.', color: 'bg-orange-500' },
   
   // .270 WSM
   { id: '270-wsm-130-bst', caliber: '.270 WSM', model: 'Winchester Ballistic Silvertip', weight: 130, v0: 990, bc: 0.433, usage: 'Version modernisée et sur-vitaminée du .270. Vitesse exceptionnelle et trajectoire ultra-plate.', color: 'bg-orange-700' },
   { id: '270-wsm-150-fus', caliber: '.270 WSM', model: 'Federal Fusion', weight: 150, v0: 940, bc: 0.470, usage: 'Puissance Magnum compacte. Pouvoir d\'arrêt optimal sur les grands gibiers (cerf, sanglier).', color: 'bg-orange-700' },
+
+  // 7mm-08 Remington
+  { id: '7mm08-140-eldx', caliber: '7mm-08 Rem', model: 'Hornady ELD-X', weight: 140, v0: 850, bc: 0.623, usage: 'Précision chirurgicale longue distance.', color: 'bg-indigo-600' },
+  { id: '7mm08-140-ttsx', caliber: '7mm-08 Rem', model: 'Barnes TTSX', weight: 140, v0: 860, bc: 0.412, usage: 'Tout cuivre, pénétration foudroyante, idéal pour le cochon.', color: 'bg-indigo-600' },
 
   // .308 Winchester
   { id: '308-win-150-pp', caliber: '.308 Win', model: 'Winchester Power-Point', weight: 150, v0: 860, bc: 0.294, usage: 'Standard polyvalent, brousse.', color: 'bg-blue-500' },
   { id: '308-win-180-pp', caliber: '.308 Win', model: 'Winchester Power-Point', weight: 180, v0: 800, bc: 0.382, usage: 'Poids lourd pour stopper net.', color: 'bg-blue-500' },
   { id: '308-win-150-sst', caliber: '.308 Win', model: 'Hornady SST', weight: 150, v0: 860, bc: 0.415, usage: 'Vitesse et expansion rapide.', color: 'bg-blue-500' },
   { id: '308-win-180-np', caliber: '.308 Win', model: 'Nosler Partition', weight: 180, v0: 790, bc: 0.474, usage: 'Puissance d\'arrêt, gros spécimens.', color: 'bg-blue-500' },
+  { id: '308-win-180-shh', caliber: '.308 Win', model: 'Sako Super Hammerhead', weight: 180, v0: 780, bc: 0.380, usage: 'Balle soudée, idéale pour traverser les os lourds des gros cerfs.', color: 'bg-blue-500' },
 
   // .30-06 Springfield
   { id: '30-06-150-cl', caliber: '.30-06', model: 'Remington Core-Lokt', weight: 150, v0: 880, bc: 0.314, usage: 'Vitesse accrue pour tir de savane.', color: 'bg-green-600' },
   { id: '30-06-180-cl', caliber: '.30-06', model: 'Remington Core-Lokt', weight: 180, v0: 820, bc: 0.383, usage: 'La référence brousse depuis 1939.', color: 'bg-green-600' },
   { id: '30-06-180-oryx', caliber: '.30-06', model: 'Norma Oryx', weight: 180, v0: 820, bc: 0.354, usage: 'Balle soudée, pénétration maximale.', color: 'bg-green-600' },
-
-  // 7mm-08 Remington
-  { id: '7mm08-140-eldx', caliber: '7mm-08 Rem', model: 'Hornady ELD-X', weight: 140, v0: 850, bc: 0.623, usage: 'Précision chirurgicale longue distance.', color: 'bg-indigo-600' },
+  { id: '30-06-180-club', caliber: '.30-06', model: 'Remington Core-Lokt Ultra', weight: 180, v0: 820, bc: 0.383, usage: 'Version renforcée de la Core-Lokt pour les plus gros animaux.', color: 'bg-green-600' },
 
   // 7mm Rem Mag
   { id: '7mm-rm-162-eldx', caliber: '7mm Rem Mag', model: 'Hornady ELD-X', weight: 162, v0: 896, bc: 0.631, usage: 'Magnum polyvalent, tir longue distance.', color: 'bg-rose-700' },
@@ -86,10 +90,14 @@ const BALLISTIC_DATABASE: MunitionData[] = [
   // .300 Win Mag
   { id: '300-wm-180-pp', caliber: '.300 Win Mag', model: 'Winchester Power-Point', weight: 180, v0: 900, bc: 0.382, usage: 'Puissance d\'arrêt massive.', color: 'bg-red-800' },
 
+  // 9.3x62
+  { id: '93x62-285-oryx', caliber: '9.3x62', model: 'Norma Oryx', weight: 285, v0: 720, bc: 0.330, usage: 'Le calibre stoppeur par excellence. Énergie massive pour le gros cerf et le cochon en brousse.', color: 'bg-amber-900' },
+
   // Calibres Lisses
   { id: '12-b-28', caliber: 'Calibre 12', model: 'Balle Brenneke', weight: 28, v0: 430, bc: 0.075, usage: 'Référence pour le gros cochon en battue.', color: 'bg-red-600' },
   { id: '12-b-31', caliber: 'Calibre 12', model: 'Balle Brenneke', weight: 31, v0: 415, bc: 0.080, usage: 'Plus lourde pour traverser les fourrés.', color: 'bg-red-600' },
   { id: '12-b-39', caliber: 'Calibre 12', model: 'Balle Brenneke (Magnum)', weight: 39, v0: 440, bc: 0.090, usage: 'Puissance d\'arrêt maximale en Magnum.', color: 'bg-red-600' },
+  { id: '12-s-26', caliber: 'Calibre 12', model: 'Balle Sauvestre (Flèche)', weight: 26, v0: 480, bc: 0.120, usage: 'Balle sous-calibrée à haute vitesse. Précision remarquable jusqu\'à 100m.', color: 'bg-red-600' },
   { id: '16-b-21', caliber: 'Calibre 16', model: 'Balle Brenneke', weight: 21, v0: 415, bc: 0.060, usage: 'Ancien standard, recul modéré.', color: 'bg-orange-800' },
   { id: '20-b-18', caliber: 'Calibre 20', model: 'Balle Brenneke', weight: 18, v0: 425, bc: 0.055, usage: 'Idéal pour fusils légers, très précis.', color: 'bg-yellow-800' },
   { id: '410-b-7', caliber: 'Calibre .410', model: 'Balle Brenneke', weight: 7, v0: 530, bc: 0.065, usage: 'Petit calibre pour le cochon à courte distance.', color: 'bg-slate-700' },
@@ -263,7 +271,7 @@ export function ShootingTableCard() {
             <div className="space-y-1.5">
                 <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Calibre</Label>
                 <Select value={selectedCaliber} onValueChange={setSelectedCaliber}>
-                    <SelectTrigger className="h-10 border-2 font-black uppercase text-xs bg-white">
+                    <SelectTrigger className="h-10 border-2 font-black uppercase text-xs bg-white shadow-sm">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -275,7 +283,7 @@ export function ShootingTableCard() {
             <div className="space-y-1.5">
                 <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Modèle d'ogive</Label>
                 <Select value={selectedModel} onValueChange={setSelectedModel}>
-                    <SelectTrigger className="h-10 border-2 font-bold text-xs bg-white">
+                    <SelectTrigger className="h-10 border-2 font-bold text-xs bg-white shadow-sm">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -302,7 +310,7 @@ export function ShootingTableCard() {
                     </div>
                 ) : (
                     <Select value={selectedWeight.toString()} onValueChange={(v) => setSelectedWeight(parseFloat(v))}>
-                        <SelectTrigger className="h-10 border-2 font-black text-xs bg-white">
+                        <SelectTrigger className="h-10 border-2 font-black text-xs bg-white shadow-sm">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -322,7 +330,7 @@ export function ShootingTableCard() {
                     type="number" 
                     value={zeroDistance} 
                     onChange={e => setZeroDistance(e.target.value)}
-                    className="h-10 border-2 font-black text-center text-sm bg-white"
+                    className="h-10 border-2 font-black text-center text-sm bg-white shadow-sm"
                 />
             </div>
 
@@ -334,7 +342,7 @@ export function ShootingTableCard() {
                         type="number" 
                         value={windKmh} 
                         onChange={e => setWindKmh(e.target.value)}
-                        className="h-10 border-2 border-blue-100 font-black text-center text-sm bg-white pl-8"
+                        className="h-10 border-2 border-blue-100 font-black text-center text-sm bg-white pl-8 shadow-sm"
                     />
                     <Wind className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-blue-500" />
                 </div>
@@ -343,7 +351,7 @@ export function ShootingTableCard() {
             <div className="space-y-1.5">
                 <Label className="text-[9px] font-black uppercase text-blue-600 ml-1">Direction du Vent</Label>
                 <Select value={windAngle} onValueChange={setWindAngle}>
-                    <SelectTrigger className="h-10 border-2 border-blue-100 font-black uppercase text-[10px] bg-white">
+                    <SelectTrigger className="h-10 border-2 border-blue-100 font-black uppercase text-[10px] bg-white shadow-sm">
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -364,7 +372,7 @@ export function ShootingTableCard() {
                             type="number" 
                             value={manualV0} 
                             onChange={e => setManualV0(e.target.value)} 
-                            className="h-10 border-2 border-primary/30 font-black text-center text-sm bg-white"
+                            className="h-10 border-2 border-primary/30 font-black text-center text-sm bg-white shadow-sm"
                         />
                     </div>
                     <div className="space-y-1.5">
@@ -374,7 +382,7 @@ export function ShootingTableCard() {
                             step="0.001"
                             value={manualBC} 
                             onChange={e => setManualBC(e.target.value)} 
-                            className="h-10 border-2 border-primary/30 font-black text-center text-sm bg-white"
+                            className="h-10 border-2 border-primary/30 font-black text-center text-sm bg-white shadow-sm"
                         />
                     </div>
                 </div>
