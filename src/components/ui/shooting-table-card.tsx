@@ -37,6 +37,10 @@ type MunitionData = {
 };
 
 const BALLISTIC_DATABASE: MunitionData[] = [
+  // .222 Remington
+  { id: '222-rem-50-vmax', caliber: '.222 Rem', model: 'Hornady V-MAX', weight: 50, v0: 950, bc: 0.242, usage: 'Précision redoutable sur petits nuisibles et biche à l\'approche.', color: 'bg-emerald-500' },
+  { id: '222-rem-50-pp', caliber: '.222 Rem', model: 'Winchester Power-Point', weight: 50, v0: 950, bc: 0.176, usage: 'Standard polyvalent pour petit gibier.', color: 'bg-emerald-500' },
+
   // .243 Winchester
   { id: '243-win-100-pp', caliber: '.243 Win', model: 'Winchester Power-Point', weight: 100, v0: 900, bc: 0.356, usage: 'Approche biche et petit cerf, recul faible.', color: 'bg-yellow-600' },
   { id: '243-win-95-sst', caliber: '.243 Win', model: 'Hornady SST', weight: 95, v0: 970, bc: 0.355, usage: 'Expansion rapide, tir tendu.', color: 'bg-yellow-600' },
@@ -52,59 +56,38 @@ const BALLISTIC_DATABASE: MunitionData[] = [
   // .270 Winchester
   { id: '270-win-130-sst', caliber: '.270 Win', model: 'Hornady SST', weight: 130, v0: 930, bc: 0.460, usage: 'Expansion rapide pour la savane.', color: 'bg-orange-500' },
   { id: '270-win-130-ds', caliber: '.270 Win', model: 'Winchester Deer Season', weight: 130, v0: 930, bc: 0.392, usage: 'Choc immédiat sur cervidés.', color: 'bg-orange-500' },
-  { id: '270-win-130-tc', caliber: '.270 Win', model: 'Federal Trophy Copper', weight: 130, v0: 930, bc: 0.459, usage: 'Sans plomb, pénétration maximale.', color: 'bg-orange-500' },
   { id: '270-win-150-ab', caliber: '.270 Win', model: 'Nosler AccuBond', weight: 150, v0: 870, bc: 0.500, usage: 'Pénétration profonde, gros cerf.', color: 'bg-orange-500' },
-  { id: '270-win-150-np', caliber: '.270 Win', model: 'Nosler Partition', weight: 150, v0: 870, bc: 0.465, usage: 'Référence pour gros gibier.', color: 'bg-orange-500' },
   
+  // .270 WSM
+  { id: '270-wsm-130-bst', caliber: '.270 WSM', model: 'Winchester Ballistic Silvertip', weight: 130, v0: 990, bc: 0.433, usage: 'Magnum ultra-rapide, trajectoire extrêmement tendue.', color: 'bg-orange-700' },
+  { id: '270-wsm-150-fus', caliber: '.270 WSM', model: 'Federal Fusion', weight: 150, v0: 940, bc: 0.470, usage: 'Puissance Magnum pour gros cervidés.', color: 'bg-orange-700' },
+
   // .308 Winchester
   { id: '308-win-150-pp', caliber: '.308 Win', model: 'Winchester Power-Point', weight: 150, v0: 860, bc: 0.294, usage: 'Standard polyvalent, brousse.', color: 'bg-blue-500' },
   { id: '308-win-150-sst', caliber: '.308 Win', model: 'Hornady SST', weight: 150, v0: 860, bc: 0.415, usage: 'Vitesse et expansion rapide.', color: 'bg-blue-500' },
-  { id: '308-win-165-gk', caliber: '.308 Win', model: 'Sierra GameKing', weight: 165, v0: 820, bc: 0.446, usage: 'Précision exceptionnelle.', color: 'bg-blue-500' },
   { id: '308-win-180-np', caliber: '.308 Win', model: 'Nosler Partition', weight: 180, v0: 790, bc: 0.474, usage: 'Puissance d\'arrêt, gros spécimens.', color: 'bg-blue-500' },
-  { id: '308-win-180-shh', caliber: '.308 Win', model: 'Sako Hammerhead', weight: 180, v0: 820, bc: 0.410, usage: 'Balle lourde, cerf et cochon.', color: 'bg-blue-500' },
 
   // .30-06 Springfield
-  { id: '30-06-150-sst', caliber: '.30-06', model: 'Hornady SST', weight: 150, v0: 910, bc: 0.415, usage: 'Vitesse élevée pour tir tendu.', color: 'bg-green-600' },
   { id: '30-06-180-cl', caliber: '.30-06', model: 'Remington Core-Lokt', weight: 180, v0: 820, bc: 0.383, usage: 'La référence brousse depuis 1939.', color: 'bg-green-600' },
   { id: '30-06-180-oryx', caliber: '.30-06', model: 'Norma Oryx', weight: 180, v0: 820, bc: 0.354, usage: 'Balle soudée, pénétration maximale.', color: 'bg-green-600' },
-  { id: '30-06-178-ph', caliber: '.30-06', model: 'Hornady Precision Hunter', weight: 178, v0: 840, bc: 0.552, usage: 'Trajectoire tendue, tir lointain.', color: 'bg-green-600' },
-  { id: '30-06-200-np', caliber: '.30-06', model: 'Nosler Partition', weight: 200, v0: 780, bc: 0.481, usage: 'Stop tout ce qui bouge.', color: 'bg-green-600' },
 
   // 7mm-08 Remington
   { id: '7mm08-140-eldx', caliber: '7mm-08 Rem', model: 'Hornady ELD-X', weight: 143, v0: 850, bc: 0.623, usage: 'Précision chirurgicale longue distance.', color: 'bg-indigo-600' },
-  { id: '7mm08-140-ttsx', caliber: '7mm-08 Rem', model: 'Barnes TTSX', weight: 140, v0: 850, bc: 0.412, usage: 'Monolithique, pas de plomb.', color: 'bg-indigo-600' },
-  { id: '7mm08-140-fus', caliber: '7mm-08 Rem', model: 'Federal Fusion', weight: 140, v0: 850, bc: 0.410, usage: 'Efficacité prouvée sur cerf.', color: 'bg-indigo-600' },
 
-  // --- CATEGORIES MAGNUM ---
   // 7mm Rem Mag
   { id: '7mm-rm-162-eldx', caliber: '7mm Rem Mag', model: 'Hornady ELD-X', weight: 162, v0: 896, bc: 0.631, usage: 'Magnum polyvalent, tir longue distance.', color: 'bg-rose-700' },
-  { id: '7mm-rm-150-tc', caliber: '7mm Rem Mag', model: 'Federal Trophy Copper', weight: 150, v0: 930, bc: 0.450, usage: 'Vitesse et pénétration sans plomb.', color: 'bg-rose-700' },
 
   // .300 Win Mag
   { id: '300-wm-180-pp', caliber: '.300 Win Mag', model: 'Winchester Power-Point', weight: 180, v0: 900, bc: 0.382, usage: 'Puissance d\'arrêt massive.', color: 'bg-red-800' },
-  { id: '300-wm-200-eldx', caliber: '.300 Win Mag', model: 'Hornady ELD-X', weight: 200, v0: 870, bc: 0.626, usage: 'Le roi de la savane à longue distance.', color: 'bg-red-800' },
-  { id: '300-wm-180-np', caliber: '.300 Win Mag', model: 'Nosler Partition', weight: 180, v0: 900, bc: 0.474, usage: 'Référence mondiale pour gros gibier.', color: 'bg-red-800' },
 
-  // .338 Win Mag
-  { id: '338-wm-210-np', caliber: '.338 Win Mag', model: 'Nosler Partition', weight: 210, v0: 860, bc: 0.400, usage: 'Pour les spécimens les plus massifs.', color: 'bg-stone-800' },
-
-  // Calibre 12
+  // Calibres Lisses
   { id: '12-brenneke', caliber: 'Calibre 12', model: 'Balle Brenneke', weight: 28, v0: 430, bc: 0.075, usage: 'Référence pour le gros cochon.', color: 'bg-red-600' },
-  { id: '12-sauvestre', caliber: 'Calibre 12', model: 'Balle Sauvestre', weight: 26, v0: 480, bc: 0.120, usage: 'Flèche haute vitesse, tir précis.', color: 'bg-red-600' },
-  { id: '12-buck-9', caliber: 'Calibre 12', model: 'Chevrotine 9 grains', weight: 31, v0: 400, bc: 0.050, usage: 'Battue en fourré dense.', color: 'bg-red-600' },
-  { id: '12-lead-4', caliber: 'Calibre 12', model: 'Plomb n°4', weight: 35, v0: 390, bc: 0.030, usage: 'Notou et Pigeon vert.', color: 'bg-red-600' },
-
-  // Calibre 16
   { id: '16-brenneke', caliber: 'Calibre 16', model: 'Balle Brenneke', weight: 21, v0: 415, bc: 0.060, usage: 'Ancien standard, recul modéré.', color: 'bg-orange-800' },
-  { id: '16-lead-4', caliber: 'Calibre 16', model: 'Plomb n°4', weight: 28, v0: 380, bc: 0.025, usage: 'Plume en forêt.', color: 'bg-orange-800' },
-
-  // Calibre 20
   { id: '20-brenneke', caliber: 'Calibre 20', model: 'Balle Brenneke', weight: 18, v0: 425, bc: 0.055, usage: 'Idéal pour fusils légers, très précis.', color: 'bg-yellow-800' },
-  { id: '20-lead-4', caliber: 'Calibre 20', model: 'Plomb n°4', weight: 24, v0: 390, bc: 0.025, usage: 'Plume et petit gibier.', color: 'bg-yellow-800' },
+  { id: '410-brenneke', caliber: 'Calibre .410', model: 'Balle Brenneke', weight: 7, v0: 530, bc: 0.065, usage: 'Petit calibre pour le cochon à courte distance ou nuisibles.', color: 'bg-slate-700' },
 
   // 22mm
   { id: '22mm-lr-40', caliber: '22mm', model: '.22 LR Standard', weight: 40, v0: 330, bc: 0.125, usage: 'Petits nuisibles et tir de loisir.', color: 'bg-zinc-500' },
-  { id: '22mm-wmr-40', caliber: '22mm', model: '.22 WMR (Magnum)', weight: 40, v0: 580, bc: 0.110, usage: 'Portée accrue pour petits nuisibles.', color: 'bg-zinc-500' },
 ];
 
 const CALIBERS = Array.from(new Set(BALLISTIC_DATABASE.map(m => m.caliber)));
@@ -115,36 +98,30 @@ export function ShootingTableCard() {
   const [selectedWeight, setSelectedWeight] = useState<number>(0);
   const [zeroDistance, setZeroDistance] = useState('100');
 
-  // Filtrer les munitions par calibre
   const munitionsForCaliber = useMemo(() => 
     BALLISTIC_DATABASE.filter(m => m.caliber === selectedCaliber)
   , [selectedCaliber]);
 
-  // Modèles uniques pour ce calibre
   const availableModels = useMemo(() => 
     Array.from(new Set(munitionsForCaliber.map(m => m.model)))
   , [munitionsForCaliber]);
 
-  // Mise à jour automatique du modèle lors du changement de calibre
   useEffect(() => {
     if (availableModels.length > 0) {
       setSelectedModel(availableModels[0]);
     }
   }, [availableModels]);
 
-  // Poids disponibles pour ce modèle
   const availableWeights = useMemo(() => 
     munitionsForCaliber.filter(m => m.model === selectedModel).map(m => m.weight)
   , [munitionsForCaliber, selectedModel]);
 
-  // Mise à jour automatique du poids lors du changement de modèle
   useEffect(() => {
     if (availableWeights.length > 0) {
       setSelectedWeight(availableWeights[0]);
     }
   }, [availableWeights]);
 
-  // Munition finale sélectionnée
   const selectedMunition = useMemo(() => {
     const found = munitionsForCaliber.find(m => m.model === selectedModel && m.weight === selectedWeight);
     return found || munitionsForCaliber[0] || BALLISTIC_DATABASE[0];
