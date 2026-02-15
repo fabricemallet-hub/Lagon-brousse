@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -11,13 +12,17 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, ImageIcon, X, Info, Pencil, Save, AlertCircle, LogOut, HelpCircle, Copy, Check, UserCircle, ShieldCheck, BrainCircuit, MapPin } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, ImageIcon, X, Info, Pencil, Save, AlertCircle, LogOut, HelpCircle, Copy, Check, UserCircle, ShieldCheck, BrainCircuit, MapPin, ChevronDown, Globe } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { signOut } from 'firebase/auth';
 import { useAuth } from '@/firebase';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { locations } from '@/lib/locations';
 
 export default function ProDashboard() {
   const { user, isUserLoading } = useUser();
@@ -68,6 +73,11 @@ export default function ProDashboard() {
   const [isCalculatingReach, setIsCalculatingReach] = useState(false);
   const [reachError, setReachError] = useState(false);
 
+  // --- CIBLAGE COMMUNES ---
+  const [targetAllCommunes, setTargetAllCommunes] = useState(false);
+  const [selectedTargetCommunes, setSelectedTargetCommunes] = useState<string[]>([]);
+  const allCommuneNames = useMemo(() => Object.keys(locations).sort(), []);
+
   // --- FORM STATES ---
   const [editingPromoId, setEditingPromoId] = useState<string | null>(null);
   const [promoTitle, setPromoTitle] = useState('');
@@ -80,14 +90,19 @@ export default function ProDashboard() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasCopiedUid, setHasCopiedUid] = useState(false);
 
-  // Initialize target category from business categories
+  // Initialize target category and communes from business
   useEffect(() => {
-    if (business && (business.categories || []).length > 0) {
-      const defaultCat = business.categories[0];
-      if (!targetCategory) setTargetCategory(defaultCat);
-      if (!promoCategory) setPromoCategory(defaultCat);
+    if (business) {
+      if ((business.categories || []).length > 0) {
+        const defaultCat = business.categories[0];
+        if (!targetCategory) setTargetCategory(defaultCat);
+        if (!promoCategory) setPromoCategory(defaultCat);
+      }
+      if (selectedTargetCommunes.length === 0) {
+        setSelectedTargetCommunes([business.commune]);
+      }
     }
-  }, [business, targetCategory, promoCategory]);
+  }, [business, targetCategory, promoCategory, selectedTargetCommunes.length]);
 
   useEffect(() => {
     if (!firestore || !business || isUserLoading || !user) return;
@@ -98,24 +113,37 @@ export default function ProDashboard() {
       try {
         const usersRef = collection(firestore, 'users');
         
-        // 1. Total users in commune
-        const qCommune = query(
-          usersRef, 
-          where('lastSelectedLocation', '==', business.commune)
-        );
-        const snapCommune = await getCountFromServer(qCommune);
-        setTotalCommuneUsers(snapCommune.data().count);
+        let qTotal;
+        let qTarget;
 
-        // 2. Targeted reach by category
-        if (targetCategory) {
-          const qTarget = query(
+        if (targetAllCommunes) {
+          qTotal = query(usersRef);
+          qTarget = query(usersRef, where('favoriteCategory', '==', targetCategory));
+        } else if (selectedTargetCommunes.length > 0) {
+          // Firestore 'in' limitation: max 30 values.
+          const communesToQuery = selectedTargetCommunes.slice(0, 30);
+          qTotal = query(
             usersRef, 
-            where('lastSelectedLocation', '==', business.commune),
+            where('lastSelectedLocation', 'in', communesToQuery)
+          );
+          qTarget = query(
+            usersRef, 
+            where('lastSelectedLocation', 'in', communesToQuery),
             where('favoriteCategory', '==', targetCategory)
           );
-          const snapTarget = await getCountFromServer(qTarget);
-          setTargetCount(snapTarget.data().count);
+        } else {
+          setTotalCommuneUsers(0);
+          setTargetCount(0);
+          setIsCalculatingReach(false);
+          return;
         }
+
+        const snapTotal = await getCountFromServer(qTotal);
+        const snapTarget = await getCountFromServer(qTarget);
+        
+        setTotalCommuneUsers(snapTotal.data().count);
+        setTargetCount(snapTarget.data().count);
+
       } catch (e: any) {
         console.warn("Reach calculation restricted", e);
         setReachError(true);
@@ -126,7 +154,7 @@ export default function ProDashboard() {
       }
     };
     calculateReach();
-  }, [firestore, business, targetCategory, isUserLoading, user]);
+  }, [firestore, business, targetCategory, isUserLoading, user, targetAllCommunes, selectedTargetCommunes]);
 
   const handleCopyUid = () => {
     if (!user?.uid) return;
@@ -237,8 +265,8 @@ export default function ProDashboard() {
         businessId: business.id,
         businessName: business.name,
         title: `${business.name} : ${promoTitle || 'Nouvelle offre !'}`,
-        message: promoDescription || `Découvrez nos offres à ${business.commune} en ${targetCategory}.`,
-        targetCommune: business.commune,
+        message: promoDescription || `Découvrez nos offres en ${targetCategory}.`,
+        targetCommune: targetAllCommunes ? "TOUTES" : selectedTargetCommunes.join(', '),
         targetCategory: targetCategory,
         reach: targetCount,
         cost: targetCount * 10,
@@ -250,6 +278,12 @@ export default function ProDashboard() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const toggleTargetCommune = (name: string) => {
+    setSelectedTargetCommunes(prev => 
+      prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
+    );
   };
 
   if (isUserLoading || isProfileLoading || isBusinessLoading) return <div className="p-8"><Skeleton className="h-64 w-full" /></div>;
@@ -422,6 +456,49 @@ export default function ProDashboard() {
                                 </Select>
                             </div>
 
+                            <div className="space-y-1">
+                                <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Zones de diffusion</Label>
+                                <div className="flex items-center gap-2 mb-2 p-2 bg-white rounded-lg border">
+                                    <Checkbox 
+                                        id="target-all" 
+                                        checked={targetAllCommunes} 
+                                        onCheckedChange={(v) => setTargetAllCommunes(!!v)}
+                                    />
+                                    <label htmlFor="target-all" className="text-[10px] font-black uppercase text-primary cursor-pointer">Toutes les communes (NC & Tahiti)</label>
+                                </div>
+
+                                {!targetAllCommunes && (
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button variant="outline" className="w-full h-10 justify-between font-bold text-xs border-2 bg-white">
+                                                <span className="truncate">
+                                                    {selectedTargetCommunes.length === 0 ? "Aucune commune" : 
+                                                     selectedTargetCommunes.length === 1 ? selectedTargetCommunes[0] : 
+                                                     `${selectedTargetCommunes.length} communes sélectionnées`}
+                                                </span>
+                                                <ChevronDown className="size-4 opacity-50" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[280px] p-0" align="start">
+                                            <ScrollArea className="h-72 p-4">
+                                                <div className="space-y-2">
+                                                    {allCommuneNames.map((name) => (
+                                                        <div key={name} className="flex items-center space-x-2">
+                                                            <Checkbox 
+                                                                id={`commune-${name}`} 
+                                                                checked={selectedTargetCommunes.includes(name)}
+                                                                onCheckedChange={() => toggleTargetCommune(name)}
+                                                            />
+                                                            <label htmlFor={`commune-${name}`} className="text-xs font-medium cursor-pointer">{name}</label>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </ScrollArea>
+                                        </PopoverContent>
+                                    </Popover>
+                                )}
+                            </div>
+
                             <div className="flex flex-col gap-3">
                                 <div className="flex items-center justify-between p-4 bg-background rounded-xl shadow-sm border-2">
                                     <div className="flex items-center gap-3">
@@ -433,14 +510,20 @@ export default function ProDashboard() {
                                             </p>
                                         </div>
                                     </div>
-                                    <Badge variant="secondary" className="text-[8px] font-black uppercase">{business.commune}</Badge>
+                                    {targetAllCommunes ? (
+                                        <Badge variant="outline" className="text-[8px] font-black uppercase border-primary text-primary">Global</Badge>
+                                    ) : (
+                                        <Badge variant="secondary" className="text-[8px] font-black uppercase">{selectedTargetCommunes.length} Zones</Badge>
+                                    )}
                                 </div>
 
                                 <div className="flex items-center justify-between p-4 bg-white/50 rounded-xl shadow-sm border-2 border-dashed">
                                     <div className="flex items-center gap-3">
                                         <MapPin className="size-5 text-slate-400" />
                                         <div>
-                                            <p className="text-[9px] font-black uppercase text-muted-foreground leading-none mb-1">Utilisateurs Actifs sur {business.commune}</p>
+                                            <p className="text-[9px] font-black uppercase text-muted-foreground leading-none mb-1">
+                                                Utilisateurs Actifs {targetAllCommunes ? "sur le réseau" : `sur ${selectedTargetCommunes.length} zones`}
+                                            </p>
                                             <p className="text-lg font-black leading-none">
                                                 {isCalculatingReach ? <RefreshCw className="size-3 animate-spin" /> : `${totalCommuneUsers ?? '0'}`}
                                             </p>
@@ -460,7 +543,7 @@ export default function ProDashboard() {
 
                             <Button 
                                 onClick={handleDiffuse} 
-                                disabled={isSaving || !targetCount || reachError} 
+                                disabled={isSaving || !targetCount || reachError || (!targetAllCommunes && selectedTargetCommunes.length === 0)} 
                                 className="w-full h-14 bg-accent hover:bg-accent/90 text-white font-black uppercase tracking-widest shadow-lg gap-2"
                             >
                                 <Megaphone className="size-5" /> Lancer la campagne
