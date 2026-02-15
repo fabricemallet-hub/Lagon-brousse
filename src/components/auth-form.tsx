@@ -34,7 +34,7 @@ import {
 } from 'firebase/auth';
 import { doc, collection, addDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { ForgotPasswordDialog } from './forgot-password-dialog';
-import { Eye, EyeOff, Ticket, MapPin, ScrollText, Globe, Bell, Mail, Smartphone, Phone, Home } from 'lucide-react';
+import { Eye, EyeOff, Ticket, MapPin, ScrollText, Globe, Bell, Mail, Smartphone, Phone, Home, Briefcase, User as UserIcon } from 'lucide-react';
 import { redeemAccessToken } from '@/lib/token-utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -43,6 +43,7 @@ import type { CgvSettings, Region } from '@/lib/types';
 import { locationsByRegion, regions } from '@/lib/locations';
 import { addMonths } from 'date-fns';
 import { Label } from './ui/label';
+import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 
 type AuthFormProps = {
   mode: 'login' | 'signup';
@@ -63,6 +64,8 @@ const signupSchema = z.object({
   password: z.string().min(6, { message: 'Le mot de passe doit contenir au moins 6 caractères.' }),
   region: z.enum(['CALEDONIE', 'TAHITI']),
   commune: z.string().min(1, { message: 'Veuillez choisir votre commune.' }),
+  accountType: z.enum(['client', 'professional']),
+  ridet: z.string().optional(),
   phoneCountryCode: z.string().min(1),
   phoneNumber: z.string().min(6, { message: 'Numéro de mobile obligatoire (min. 6 chiffres).' }),
   landline: z.string().optional(),
@@ -74,6 +77,14 @@ const signupSchema = z.object({
   subscribedCategories: z.array(z.string()).default(['Pêche', 'Chasse', 'Jardinage']),
   allowsPromoEmails: z.boolean().default(true),
   allowsPromoPush: z.boolean().default(true),
+}).superRefine((data, ctx) => {
+  if (data.accountType === 'professional' && (!data.ridet || data.ridet.trim() === "")) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Le numéro RIDET est obligatoire pour les professionnels.",
+      path: ['ridet'],
+    });
+  }
 });
 
 
@@ -95,6 +106,8 @@ export function AuthForm({ mode }: AuthFormProps) {
       password: '',
       region: 'CALEDONIE',
       commune: 'Nouméa',
+      accountType: 'client',
+      ridet: '',
       phoneCountryCode: '+687',
       phoneNumber: '',
       landline: '',
@@ -109,6 +122,8 @@ export function AuthForm({ mode }: AuthFormProps) {
   });
 
   const selectedRegion = form.watch('region') as Region;
+  const accountType = form.watch('accountType');
+
   const availableLocations = useMemo(() => {
     return Object.keys(locationsByRegion[selectedRegion] || {}).sort();
   }, [selectedRegion]);
@@ -189,23 +204,26 @@ export function AuthForm({ mode }: AuthFormProps) {
 
           // Enregistrement de la commune et région choisie
           const userDocRef = doc(firestore, 'users', user.uid);
+          const isPro = signupValues.accountType === 'professional';
+          
           await setDoc(userDocRef, {
             id: user.uid,
             email: emailLower,
             displayName: signupValues.displayName,
-            role: 'client',
-            subscriptionStatus: 'trial',
+            role: isPro ? 'professional' : 'client',
+            subscriptionStatus: isPro ? 'professional' : 'trial',
             selectedRegion: signupValues.region,
             lastSelectedLocation: signupValues.commune,
             phoneCountryCode: signupValues.phoneCountryCode,
             phoneNumber: signupValues.phoneNumber,
             landline: signupValues.landline || '',
             address: signupValues.address || '',
+            ridet: isPro ? signupValues.ridet : null,
             subscribedCategories: signupValues.subscribedCategories,
             allowsPromoEmails: signupValues.allowsPromoEmails,
             allowsPromoPush: signupValues.allowsPromoPush,
             subscriptionStartDate: new Date().toISOString(),
-            subscriptionExpiryDate: addMonths(new Date(), 3).toISOString()
+            subscriptionExpiryDate: addMonths(new Date(), isPro ? 12 : 3).toISOString()
           });
 
           if (cgvData) {
@@ -251,14 +269,75 @@ export function AuthForm({ mode }: AuthFormProps) {
       <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col space-y-4">
         {mode === 'signup' && (
           <>
+            <div className="p-4 bg-primary/5 border-2 rounded-2xl space-y-4 animate-in fade-in">
+              <div className="flex items-center gap-2 border-b border-dashed border-primary/20 pb-2">
+                <Briefcase className="size-4 text-primary" />
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-800">Type de compte</h3>
+              </div>
+              
+              <FormField
+                control={form.control}
+                name="accountType"
+                render={({ field }) => (
+                  <FormItem className="space-y-3">
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                        className="grid grid-cols-2 gap-4"
+                      >
+                        <div>
+                          <RadioGroupItem value="client" id="type-client" className="peer sr-only" />
+                          <Label
+                            htmlFor="type-client"
+                            className="flex flex-col items-center justify-between rounded-xl border-2 border-muted bg-white p-4 hover:bg-muted/50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 transition-all cursor-pointer"
+                          >
+                            <UserIcon className="mb-2 size-6 text-muted-foreground peer-data-[state=checked]:text-primary" />
+                            <span className="text-[10px] font-black uppercase">Utilisateur</span>
+                          </Label>
+                        </div>
+                        <div>
+                          <RadioGroupItem value="professional" id="type-pro" className="peer sr-only" />
+                          <Label
+                            htmlFor="type-pro"
+                            className="flex flex-col items-center justify-between rounded-xl border-2 border-muted bg-white p-4 hover:bg-muted/50 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 transition-all cursor-pointer"
+                          >
+                            <Briefcase className="mb-2 size-6 text-muted-foreground peer-data-[state=checked]:text-primary" />
+                            <span className="text-[10px] font-black uppercase">Professionnel</span>
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {accountType === 'professional' && (
+                <FormField
+                  control={form.control}
+                  name="ridet"
+                  render={({ field }) => (
+                    <FormItem className="animate-in zoom-in-95 duration-200">
+                      <FormLabel className="text-[10px] font-black uppercase text-primary">Numéro RIDET (Obligatoire)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="0 000 000.000" {...field} className="h-12 border-2 font-black tracking-widest uppercase" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+            </div>
+
             <FormField
               control={form.control}
               name="displayName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nom d'utilisateur</FormLabel>
+                  <FormLabel>{accountType === 'professional' ? "Nom de l'entreprise" : "Nom d'utilisateur"}</FormLabel>
                   <FormControl>
-                    <Input placeholder="Votre nom" {...field} autoComplete="name" />
+                    <Input placeholder={accountType === 'professional' ? "Ex: Etablissements Martin" : "Votre nom"} {...field} autoComplete="name" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

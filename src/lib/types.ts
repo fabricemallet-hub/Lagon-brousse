@@ -75,6 +75,8 @@ export interface UserAccount {
   landline?: string;
   address?: string;
   contactLocation?: { latitude: number; longitude: number };
+  // Champs administratifs
+  ridet?: string;
 }
 
 export interface Business {
