@@ -22,7 +22,9 @@ import {
   Sunrise,
   Sunset,
   Info,
-  Package
+  Package,
+  Crosshair,
+  Users
 } from 'lucide-react';
 import { ShootingTableCard } from '@/components/ui/shooting-table-card';
 import { GunRackManager } from '@/components/gun-rack-manager';
@@ -87,10 +89,36 @@ export default function ChassePage() {
       </Card>
 
       <Tabs defaultValue="shooting" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 h-12 mb-6 border-2">
-          <TabsTrigger value="shooting" className="font-black uppercase text-[10px]">Tir & Balistique</TabsTrigger>
-          <TabsTrigger value="forecast" className="font-black uppercase text-[10px]">Prévisions</TabsTrigger>
-          <TabsTrigger value="group" className="font-black uppercase text-[10px]">Groupe</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 gap-2 h-auto mb-8 bg-transparent p-0 border-none">
+          <TabsTrigger 
+            value="shooting" 
+            className="group flex flex-col items-center justify-center gap-2 py-4 rounded-[2rem] border-2 transition-all data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:border-slate-900 data-[state=active]:shadow-xl data-[state=inactive]:bg-white data-[state=inactive]:border-slate-100 active:scale-95"
+          >
+            <div className="p-2 rounded-xl bg-slate-100 text-slate-600 group-data-[state=active]:bg-white/20 group-data-[state=active]:text-white transition-colors">
+              <Crosshair className="size-5" />
+            </div>
+            <span className="font-black uppercase text-[9px] tracking-widest leading-none">Balistique</span>
+          </TabsTrigger>
+          
+          <TabsTrigger 
+            value="forecast" 
+            className="group flex flex-col items-center justify-center gap-2 py-4 rounded-[2rem] border-2 transition-all data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:border-orange-600 data-[state=active]:shadow-xl data-[state=inactive]:bg-white data-[state=inactive]:border-orange-50 active:scale-95"
+          >
+            <div className="p-2 rounded-xl bg-orange-50 text-orange-600 group-data-[state=active]:bg-white/20 group-data-[state=active]:text-white transition-colors">
+              <Wind className="size-5" />
+            </div>
+            <span className="font-black uppercase text-[9px] tracking-widest leading-none">Météo</span>
+          </TabsTrigger>
+
+          <TabsTrigger 
+            value="group" 
+            className="group flex flex-col items-center justify-center gap-2 py-4 rounded-[2rem] border-2 transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:border-blue-600 data-[state=active]:shadow-xl data-[state=inactive]:bg-white data-[state=inactive]:border-blue-50 active:scale-95"
+          >
+            <div className="p-2 rounded-xl bg-blue-50 text-blue-600 group-data-[state=active]:bg-white/20 group-data-[state=active]:text-white transition-colors">
+              <Users className="size-5" />
+            </div>
+            <span className="font-black uppercase text-[9px] tracking-widest leading-none">Session</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="shooting" className="space-y-8 animate-in fade-in duration-300">
