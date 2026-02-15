@@ -38,28 +38,42 @@ type MunitionData = {
 
 const BALLISTIC_DATABASE: MunitionData[] = [
   // .270 Winchester
-  { id: '270-win-130-sst', caliber: '.270 Win', model: 'Hornady SST', weight: 130, v0: 930, bc: 0.460, usage: 'Expansion rapide pour la savane.', color: 'bg-orange-500' },
-  { id: '270-win-150-ab', caliber: '.270 Win', model: 'Nosler AccuBond', weight: 150, v0: 870, bc: 0.500, usage: 'Pénétration profonde, gros cerf.', color: 'bg-orange-500' },
-  { id: '270-win-130-ds', caliber: '.270 Win', model: 'Winchester Deer Season', weight: 130, v0: 930, bc: 0.392, usage: 'Choc immédiat sur cervidés.', color: 'bg-orange-500' },
+  { id: '270-win-130-sst', caliber: '.270 Win', model: 'Hornady SST (130 gr)', weight: 130, v0: 930, bc: 0.460, usage: 'Expansion rapide pour la savane.', color: 'bg-orange-500' },
+  { id: '270-win-130-ds', caliber: '.270 Win', model: 'Winchester Deer Season (130 gr)', weight: 130, v0: 930, bc: 0.392, usage: 'Choc immédiat sur cervidés.', color: 'bg-orange-500' },
+  { id: '270-win-130-tc', caliber: '.270 Win', model: 'Federal Trophy Copper (130 gr)', weight: 130, v0: 930, bc: 0.459, usage: 'Sans plomb, pénétration maximale.', color: 'bg-orange-500' },
+  { id: '270-win-150-ab', caliber: '.270 Win', model: 'Nosler AccuBond (150 gr)', weight: 150, v0: 870, bc: 0.500, usage: 'Pénétration profonde, gros cerf.', color: 'bg-orange-500' },
+  { id: '270-win-150-np', caliber: '.270 Win', model: 'Nosler Partition (150 gr)', weight: 150, v0: 870, bc: 0.465, usage: 'Référence pour gros gibier.', color: 'bg-orange-500' },
   
   // .25-06 Remington
-  { id: '25-06-100-cl', caliber: '.25-06 Rem', model: 'Remington Core-Lokt', weight: 100, v0: 980, bc: 0.323, usage: 'Polyvalent, biche et approche.', color: 'bg-cyan-500' },
-  { id: '25-06-115-bt', caliber: '.25-06 Rem', model: 'Nosler Ballistic Tip', weight: 115, v0: 910, bc: 0.453, usage: 'Précision laser longue distance.', color: 'bg-cyan-500' },
+  { id: '25-06-100-cl', caliber: '.25-06 Rem', model: 'Remington Core-Lokt (100 gr)', weight: 100, v0: 980, bc: 0.323, usage: 'Polyvalent, biche et approche.', color: 'bg-cyan-500' },
+  { id: '25-06-115-bt', caliber: '.25-06 Rem', model: 'Nosler Ballistic Tip (115 gr)', weight: 115, v0: 910, bc: 0.453, usage: 'Précision laser longue distance.', color: 'bg-cyan-500' },
+  { id: '25-06-120-fus', caliber: '.25-06 Rem', model: 'Federal Fusion (120 gr)', weight: 120, v0: 910, bc: 0.468, usage: 'Balle soudée, excellente rétention.', color: 'bg-cyan-500' },
 
   // .308 Winchester
-  { id: '308-win-150-pp', caliber: '.308 Win', model: 'Winchester Power-Point', weight: 150, v0: 860, bc: 0.294, usage: 'Standard polyvalent, brousse.', color: 'bg-blue-500' },
-  { id: '308-win-180-np', caliber: '.308 Win', model: 'Nosler Partition', weight: 180, v0: 790, bc: 0.474, usage: 'Puissance d\'arrêt, gros spécimens.', color: 'bg-blue-500' },
-  { id: '308-win-180-shh', caliber: '.308 Win', model: 'Sako Hammerhead', weight: 180, v0: 820, bc: 0.410, usage: 'Balle lourde, cerf et cochon.', color: 'bg-blue-500' },
+  { id: '308-win-150-pp', caliber: '.308 Win', model: 'Winchester Power-Point (150 gr)', weight: 150, v0: 860, bc: 0.294, usage: 'Standard polyvalent, brousse.', color: 'bg-blue-500' },
+  { id: '308-win-150-sst', caliber: '.308 Win', model: 'Hornady SST (150 gr)', weight: 150, v0: 860, bc: 0.415, usage: 'Vitesse et expansion rapide.', color: 'bg-blue-500' },
+  { id: '308-win-165-gk', caliber: '.308 Win', model: 'Sierra GameKing (165 gr)', weight: 165, v0: 820, bc: 0.446, usage: 'Précision exceptionnelle.', color: 'bg-blue-500' },
+  { id: '308-win-180-np', caliber: '.308 Win', model: 'Nosler Partition (180 gr)', weight: 180, v0: 790, bc: 0.474, usage: 'Puissance d\'arrêt, gros spécimens.', color: 'bg-blue-500' },
+  { id: '308-win-180-shh', caliber: '.308 Win', model: 'Sako Hammerhead (180 gr)', weight: 180, v0: 820, bc: 0.410, usage: 'Balle lourde, cerf et cochon.', color: 'bg-blue-500' },
 
   // .30-06 Springfield
-  { id: '30-06-180-cl', caliber: '.30-06', model: 'Remington Core-Lokt', weight: 180, v0: 820, bc: 0.383, usage: 'Référence historique, gros gibier.', color: 'bg-green-600' },
-  { id: '30-06-180-oryx', caliber: '.30-06', model: 'Norma Oryx', weight: 180, v0: 820, bc: 0.354, usage: 'Balle soudée, pénétration maximale.', color: 'bg-green-600' },
-  { id: '30-06-178-ph', caliber: '.30-06', model: 'Hornady Precision Hunter', weight: 178, v0: 840, bc: 0.552, usage: 'Trajectoire tendue, tir lointain.', color: 'bg-green-600' },
+  { id: '30-06-150-sst', caliber: '.30-06', model: 'Hornady SST (150 gr)', weight: 150, v0: 910, bc: 0.415, usage: 'Vitesse élevée pour tir tendu.', color: 'bg-green-600' },
+  { id: '30-06-180-cl', caliber: '.30-06', model: 'Remington Core-Lokt (180 gr)', weight: 180, v0: 820, bc: 0.383, usage: 'La référence brousse depuis 1939.', color: 'bg-green-600' },
+  { id: '30-06-180-oryx', caliber: '.30-06', model: 'Norma Oryx (180 gr)', weight: 180, v0: 820, bc: 0.354, usage: 'Balle soudée, pénétration maximale.', color: 'bg-green-600' },
+  { id: '30-06-178-ph', caliber: '.30-06', model: 'Hornady Precision Hunter (178 gr)', weight: 178, v0: 840, bc: 0.552, usage: 'Trajectoire tendue, tir lointain.', color: 'bg-green-600' },
+  { id: '30-06-200-np', caliber: '.30-06', model: 'Nosler Partition (200 gr)', weight: 200, v0: 780, bc: 0.481, usage: 'Stop tout ce qui bouge.', color: 'bg-green-600' },
+
+  // 7mm-08 Remington
+  { id: '7mm08-140-eldx', caliber: '7mm-08 Rem', model: 'Hornady ELD-X (143 gr)', weight: 143, v0: 850, bc: 0.623, usage: 'Précision chirurgicale longue distance.', color: 'bg-purple-600' },
+  { id: '7mm08-140-ttsx', caliber: '7mm-08 Rem', model: 'Barnes TTSX (140 gr)', weight: 140, v0: 850, bc: 0.412, usage: 'Monolithique, pas de plomb.', color: 'bg-purple-600' },
+  { id: '7mm08-140-fus', caliber: '7mm-08 Rem', model: 'Federal Fusion (140 gr)', weight: 140, v0: 850, bc: 0.410, usage: 'Efficacité prouvée sur cerf.', color: 'bg-purple-600' },
 
   // Calibre 12
-  { id: '12-brenneke', caliber: 'Calibre 12', model: 'Balle Brenneke', weight: 432, v0: 430, bc: 0.075, usage: 'Référence pour le gros cochon.', color: 'bg-red-600' },
-  { id: '12-sauvestre', caliber: 'Calibre 12', model: 'Balle Sauvestre', weight: 401, v0: 480, bc: 0.120, usage: 'Flèche haute vitesse, tir précis.', color: 'bg-red-600' },
-  { id: '12-chevrotine-9', caliber: 'Calibre 12', model: 'Chevrotine 9 grains', weight: 480, v0: 400, bc: 0.050, usage: 'Battue en fourré dense.', color: 'bg-red-600' },
+  { id: '12-brenneke', caliber: 'Calibre 12', model: 'Balle Brenneke (432 gr)', weight: 432, v0: 430, bc: 0.075, usage: 'Référence pour le gros cochon.', color: 'bg-red-600' },
+  { id: '12-sauvestre', caliber: 'Calibre 12', model: 'Balle Sauvestre (401 gr)', weight: 401, v0: 480, bc: 0.120, usage: 'Flèche haute vitesse, tir précis.', color: 'bg-red-600' },
+  { id: '12-buck-9', caliber: 'Calibre 12', model: 'Chevrotine 9 grains (480 gr)', weight: 480, v0: 400, bc: 0.050, usage: 'Battue en fourré dense.', color: 'bg-red-600' },
+  { id: '12-lead-4', caliber: 'Calibre 12', model: 'Plomb n°4 (Plume)', weight: 540, v0: 390, bc: 0.030, usage: 'Notou et Pigeon vert.', color: 'bg-red-600' },
+  { id: '12-lead-2', caliber: 'Calibre 12', model: 'Plomb n°2 (Gros oiseaux)', weight: 540, v0: 390, bc: 0.035, usage: 'Roussette ou gros oiseaux.', color: 'bg-red-600' },
 ];
 
 const CALIBERS = Array.from(new Set(BALLISTIC_DATABASE.map(m => m.caliber)));
@@ -68,7 +82,6 @@ export function ShootingTableCard() {
   const [selectedCaliber, setSelectedCaliber] = useState(CALIBERS[0]);
   const [selectedMunitionId, setSelectedMunitionId] = useState(BALLISTIC_DATABASE.find(m => m.caliber === CALIBERS[0])?.id || '');
   const [zeroDistance, setZeroDistance] = useState('100');
-  const [windDirection, setWindDirection] = useState<WindDirection>('E');
 
   const availableMunitions = useMemo(() => 
     BALLISTIC_DATABASE.filter(m => m.caliber === selectedCaliber)
@@ -87,7 +100,7 @@ export function ShootingTableCard() {
 
   const calculateBallistics = (dist: number) => {
     const z = parseFloat(zeroDistance) || 100;
-    const windKmh = 15; // Fixed wind as per request
+    const windKmh = 15;
     const g = 9.81;
     const { v0, bc } = selectedMunition;
 
@@ -146,7 +159,6 @@ export function ShootingTableCard() {
       </CardHeader>
       
       <CardContent className="p-6 space-y-6">
-        {/* Formulaire Compact */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-5 bg-muted/20 rounded-3xl border-2 border-dashed border-primary/10">
             <div className="space-y-1.5">
                 <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Calibre</Label>
@@ -161,7 +173,7 @@ export function ShootingTableCard() {
             </div>
 
             <div className="space-y-1.5">
-                <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Type de Cartouche</Label>
+                <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Munition & Ogive (Poids)</Label>
                 <Select value={selectedMunitionId} onValueChange={setSelectedMunitionId}>
                     <SelectTrigger className="h-10 border-2 font-bold text-xs bg-white">
                         <SelectValue />
@@ -197,7 +209,7 @@ export function ShootingTableCard() {
                     <div className="flex gap-4">
                         <div className="text-center">
                             <p className="text-[8px] font-black uppercase opacity-40">Poids</p>
-                            <p className="font-black text-xs">{selectedMunition.weight} gr</p>
+                            <p className="font-black text-xs">{selectedMunition.weight} {selectedMunition.caliber === 'Calibre 12' ? 'gr' : 'gr'}</p>
                         </div>
                         <div className="text-center border-l pl-4">
                             <p className="text-[8px] font-black uppercase opacity-40">Coef (BC)</p>
@@ -212,7 +224,6 @@ export function ShootingTableCard() {
             </div>
         </div>
 
-        {/* Tableau des Résultats */}
         <div className="space-y-4">
             <div className="flex items-center justify-between px-1">
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
