@@ -10,7 +10,7 @@ export interface UserAccount {
   role: UserRole;
   businessId?: string;
   vesselNickname?: string;
-  subscriptionStatus: 'active' | 'inactive' | 'trial' | 'admin' | 'professional';
+  subscriptionStatus: 'active' | 'inactive' | 'trial' | 'admin' | 'professional' | 'limited';
   subscriptionExpiryDate?: string;
   lastSelectedLocation?: string;
   favoriteCategory?: 'Pêche' | 'Chasse' | 'Jardinage';
@@ -408,4 +408,22 @@ export interface HuntingSession {
   organizerId: string;
   createdAt: any;
   expiresAt: any;
+}
+
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  content: string;
+  createdAt: any;
+}
+
+export interface Conversation {
+  id: string;
+  userId: string;
+  userEmail: string;
+  userDisplayName: string;
+  lastMessageContent: string;
+  lastMessageAt: any;
+  isReadByAdmin: boolean;
+  isReadByUser: boolean;
 }

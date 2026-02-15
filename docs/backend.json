@@ -8,11 +8,13 @@
         "id": { "type": "string" },
         "email": { "type": "string", "format": "email" },
         "displayName": { "type": "string" },
-        "role": { "type": "string", "enum": ["client", "professional", "admin"] },
-        "subscriptionStatus": { "type": "string", "enum": ["active", "inactive", "trial", "admin"] },
+        "role": { "type": "string", "enum": ["client", "professional", "admin"], "description": "Rôle de l'utilisateur déterminant ses permissions." },
+        "subscriptionStatus": { "type": "string", "enum": ["active", "inactive", "trial", "admin", "professional"] },
         "businessId": { "type": "string", "description": "ID du commerce associé pour les pros" },
         "lastSelectedLocation": { "type": "string" },
-        "favoriteCategory": { "type": "string", "enum": ["Pêche", "Chasse", "Jardinage"] }
+        "favoriteCategory": { "type": "string", "enum": ["Pêche", "Chasse", "Jardinage"] },
+        "notificationsEnabled": { "type": "boolean" },
+        "cgvVersionSeen": { "type": "integer" }
       },
       "required": ["id", "email", "role"]
     },
@@ -25,12 +27,12 @@
         "ownerId": { "type": "string" },
         "name": { "type": "string" },
         "commune": { "type": "string" },
-        "category": { "type": "string", "enum": ["Pêche", "Chasse", "Jardinage"] },
+        "categories": { "type": "array", "items": { "type": "string" } },
         "logoUrl": { "type": "string" },
         "description": { "type": "string" },
         "createdAt": { "type": "object" }
       },
-      "required": ["ownerId", "name", "commune", "category"]
+      "required": ["ownerId", "name", "commune"]
     },
     "Promotion": {
       "title": "Promotion",
@@ -44,59 +46,25 @@
         "imageUrl": { "type": "string" },
         "createdAt": { "type": "object" }
       }
-    },
-    "Campaign": {
-      "title": "Campaign",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "businessId": { "type": "string" },
-        "targetCommune": { "type": "string" },
-        "targetCategory": { "type": "string" },
-        "reach": { "type": "integer" },
-        "cost": { "type": "number" },
-        "status": { "type": "string", "enum": ["pending", "sent"] },
-        "createdAt": { "type": "object" }
-      }
     }
   },
   "auth": {
     "providers": ["password"]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/users/{userId}",
-        "definition": {
-          "entityName": "User",
-          "schema": { "$ref": "#/backend/entities/User" },
-          "description": "Profils utilisateurs incluant les rôles"
-        }
+    "structure": {
+      "/users/{userId}": {
+        "schema": { "$ref": "#/backend/entities/User" },
+        "description": "Profils utilisateurs incluant les rôles"
       },
-      {
-        "path": "/businesses/{businessId}",
-        "definition": {
-          "entityName": "Business",
-          "schema": { "$ref": "#/backend/entities/Business" },
-          "description": "Commerces professionnels"
-        }
+      "/businesses/{businessId}": {
+        "schema": { "$ref": "#/backend/entities/Business" },
+        "description": "Commerces professionnels"
       },
-      {
-        "path": "/businesses/{businessId}/promotions/{promoId}",
-        "definition": {
-          "entityName": "Promotion",
-          "schema": { "$ref": "#/backend/entities/Promotion" },
-          "description": "Promotions par commerce"
-        }
-      },
-      {
-        "path": "/campaigns/{campaignId}",
-        "definition": {
-          "entityName": "Campaign",
-          "schema": { "$ref": "#/backend/entities/Campaign" },
-          "description": "Campagnes de notifications et facturation"
-        }
+      "/businesses/{businessId}/promotions/{promoId}": {
+        "schema": { "$ref": "#/backend/entities/Promotion" },
+        "description": "Promotions par commerce"
       }
-    ]
+    }
   }
 }

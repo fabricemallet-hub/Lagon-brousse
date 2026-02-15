@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -39,7 +40,9 @@ import {
   X,
   Volume2,
   Play,
-  Store
+  Store,
+  UserCog,
+  Lock
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -128,13 +131,14 @@ export default function AdminPage() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 md:grid-cols-8 mb-6 h-auto bg-muted/50 border-2 rounded-2xl p-1.5 shadow-sm gap-1">
+        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-4 md:grid-cols-9 mb-6 h-auto bg-muted/50 border-2 rounded-2xl p-1.5 shadow-sm gap-1">
           <TabsTrigger value="stats" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Vue d'ensemble</TabsTrigger>
           <TabsTrigger value="users" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Utilisateurs</TabsTrigger>
+          <TabsTrigger value="permissions" className="text-[9px] font-black uppercase py-2.5 rounded-xl bg-primary/10 text-primary">Permissions</TabsTrigger>
           <TabsTrigger value="businesses" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Commerces</TabsTrigger>
-          <TabsTrigger value="design" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Design & Splash</TabsTrigger>
-          <TabsTrigger value="notifications" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Notifications</TabsTrigger>
-          <TabsTrigger value="fish" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Guide Poissons</TabsTrigger>
+          <TabsTrigger value="design" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Design</TabsTrigger>
+          <TabsTrigger value="notifications" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Notifs</TabsTrigger>
+          <TabsTrigger value="fish" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Poissons</TabsTrigger>
           <TabsTrigger value="acces" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Accès</TabsTrigger>
           <TabsTrigger value="support" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Support</TabsTrigger>
         </TabsList>
@@ -150,6 +154,10 @@ export default function AdminPage() {
 
         <TabsContent value="users" className="space-y-6">
           <UsersManager users={users} isUsersLoading={isUsersLoading} />
+        </TabsContent>
+
+        <TabsContent value="permissions" className="space-y-6">
+          <PermissionsManager users={users} />
         </TabsContent>
 
         <TabsContent value="businesses" className="space-y-6">
@@ -188,6 +196,127 @@ export default function AdminPage() {
       </Tabs>
     </div>
   );
+}
+
+function PermissionsManager({ users }: { users: UserAccount[] | null }) {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [search, setSearch] = useState('');
+    const [isUpdating, setIsUpdating] = useState<string | null>(null);
+
+    const filteredUsers = useMemo(() => {
+        if (!users) return [];
+        return users.filter(u => 
+            u.email.toLowerCase().includes(search.toLowerCase()) || 
+            u.displayName.toLowerCase().includes(search.toLowerCase())
+        ).slice(0, 50);
+    }, [users, search]);
+
+    const handleRoleChange = (userId: string, newRole: string) => {
+        if (!firestore) return;
+        setIsUpdating(userId);
+        
+        const userRef = doc(firestore, 'users', userId);
+        const updateData = { role: newRole };
+
+        updateDoc(userRef, updateData)
+            .then(() => {
+                toast({ title: "Rôle mis à jour", description: `L'utilisateur est désormais ${newRole}.` });
+            })
+            .catch((error) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: userRef.path,
+                    operation: 'update',
+                    requestResourceData: updateData
+                }));
+            })
+            .finally(() => setIsUpdating(null));
+    };
+
+    return (
+        <Card className="border-2 shadow-lg overflow-hidden">
+            <CardHeader className="bg-primary/5 border-b">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <CardTitle className="text-xl font-black uppercase flex items-center gap-2 text-primary">
+                            <UserCog className="size-6" /> Gestion des Rôles & Permissions
+                        </CardTitle>
+                        <CardDescription className="text-[10px] font-bold uppercase opacity-60">
+                            Modifiez dynamiquement les droits d'accès des utilisateurs.
+                        </CardDescription>
+                    </div>
+                    <div className="relative w-full sm:w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                        <Input 
+                            placeholder="Chercher par nom ou email..." 
+                            value={search} 
+                            onChange={e => setSearch(e.target.value)}
+                            className="pl-10 h-10 border-2 font-bold text-xs"
+                        />
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent className="p-0">
+                <Table>
+                    <TableHeader>
+                        <TableRow className="bg-muted/30">
+                            <TableHead className="text-[10px] font-black uppercase h-10 px-4">Utilisateur</TableHead>
+                            <TableHead className="text-[10px] font-black uppercase h-10">Rôle Actuel</TableHead>
+                            <TableHead className="text-right text-[10px] font-black uppercase h-10 px-4">Attribuer Rôle</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {filteredUsers.map(u => (
+                            <TableRow key={u.id} className="hover:bg-muted/10 transition-colors">
+                                <TableCell className="px-4 py-3">
+                                    <div className="flex flex-col">
+                                        <span className="font-black text-xs uppercase">{u.displayName}</span>
+                                        <span className="text-[9px] font-bold opacity-40 lowercase">{u.email}</span>
+                                    </div>
+                                </TableCell>
+                                <TableCell>
+                                    <Badge 
+                                        variant={u.role === 'admin' ? 'default' : u.role === 'professional' ? 'outline' : 'secondary'} 
+                                        className={cn(
+                                            "text-[8px] font-black uppercase h-5",
+                                            u.role === 'professional' && "border-primary text-primary"
+                                        )}
+                                    >
+                                        {u.role || 'client'}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell className="text-right px-4">
+                                    <div className="flex justify-end items-center gap-3">
+                                        {isUpdating === u.id && <RefreshCw className="size-3 animate-spin text-primary" />}
+                                        <Select 
+                                            defaultValue={u.role || 'client'} 
+                                            onValueChange={(val) => handleRoleChange(u.id, val)}
+                                            disabled={isUpdating === u.id}
+                                        >
+                                            <SelectTrigger className="w-32 h-8 text-[9px] font-black uppercase border-2">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="client" className="text-[9px] font-black uppercase">Client</SelectItem>
+                                                <SelectItem value="professional" className="text-[9px] font-black uppercase">Professionnel</SelectItem>
+                                                <SelectItem value="admin" className="text-[9px] font-black uppercase text-red-600">Administrateur</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+                {filteredUsers.length === 0 && (
+                    <div className="p-12 text-center opacity-30 flex flex-col items-center gap-3">
+                        <Users className="size-12" />
+                        <p className="text-xs font-black uppercase tracking-widest">Aucun utilisateur trouvé</p>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
 }
 
 function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | null }) {

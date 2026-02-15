@@ -1,3 +1,4 @@
+
 'use client';
 
 import { usePathname } from 'next/navigation';
@@ -28,7 +29,7 @@ export function SidebarNav() {
 
   // Détection robuste et instantanée des rôles
   const roles = useMemo(() => {
-    if (!user) return { isAdmin: false, isPro: false };
+    if (!user) return { isAdmin: false, isPro: false, isClient: true };
     
     // Identifiants de confiance absolus (Administrateurs)
     const masterAdminUids = [
@@ -47,36 +48,27 @@ export function SidebarNav() {
       'kledostyle@outlook.com'
     ];
 
-    // Détection immédiate par UID/Email technique
-    const isMaster = masterAdminUids.includes(user.uid) || 
-                    (user.email && masterAdminEmails.includes(user.email.toLowerCase()));
-
     // Détection Admin
-    const isAdmin = isMaster || 
-                    userProfile?.subscriptionStatus === 'admin' || 
+    const isAdmin = masterAdminUids.includes(user.uid) || 
+                    (user.email && masterAdminEmails.includes(user.email.toLowerCase())) ||
                     userProfile?.role === 'admin';
 
-    // Détection Pro (Strictement pour les pros ou les admins)
-    const isPro = isAdmin || 
-                  userProfile?.subscriptionStatus === 'professional' || 
-                  userProfile?.role === 'professional';
+    // Détection Pro
+    const isPro = isAdmin || userProfile?.role === 'professional';
     
-    return { isAdmin, isPro };
+    return { isAdmin, isPro, isClient: !isAdmin && !isPro };
   }, [user, userProfile]);
 
   return (
     <div className="flex flex-col h-full">
       <SidebarMenu className="flex-grow">
         {navLinks.map((link) => {
-          // 1. Filtrage Admin Only (Strict)
+          // Filtrage dynamique basé sur les rôles
           if (link.adminOnly && !roles.isAdmin) return null;
-
-          // 2. Filtrage Pro Only
           if (link.proOnly && !roles.isPro) return null;
           
-          // 3. Masquage du contact pour l'admin
-          if (link.href === '/contact' && roles.isAdmin) return null;
-          if (link.href === '/contact' && !user) return null;
+          // Masquage du contact pour l'admin et les non-connectés
+          if (link.href === '/contact' && (roles.isAdmin || !user)) return null;
           
           return (
             <SidebarMenuItem key={link.href}>
@@ -97,7 +89,7 @@ export function SidebarNav() {
       
       <div className="px-4 py-4 mt-auto border-t border-sidebar-border bg-sidebar group-data-[collapsible=icon]:hidden">
         <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40">
-          Version 2.4.0
+          Rôle : {roles.isAdmin ? 'Administrateur' : roles.isPro ? 'Professionnel' : 'Client'}
         </p>
       </div>
     </div>

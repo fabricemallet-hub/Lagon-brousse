@@ -1,3 +1,4 @@
+
 'use client';
 import { doc, getDoc, setDoc, Firestore } from 'firebase/firestore';
 import { User } from 'firebase/auth';
@@ -45,11 +46,10 @@ export async function ensureUserDocument(
       const currentData = docSnap.data() as UserAccount;
       
       // SYNCHRONISATION DE SÉCURITÉ FORCÉE POUR LES ADMINS
-      if (isMasterAdmin && (currentData.subscriptionStatus !== 'admin' || currentData.role !== 'admin')) {
+      if (isMasterAdmin && (currentData.role !== 'admin')) {
           console.log(`L&B DEBUG SYNC: Restauration Admin pour [${email || user.uid}]...`);
           setDoc(userDocRef, { 
             ...currentData, 
-            subscriptionStatus: 'admin',
             role: 'admin',
             id: user.uid,
             email: email || currentData.email
