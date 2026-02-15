@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -50,7 +49,9 @@ import {
   Clock,
   Send,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Calendar,
+  XCircle
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -59,7 +60,7 @@ import { format, addDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import Link from 'next/link';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
 import { locations } from '@/lib/locations';
 
@@ -153,14 +154,12 @@ export default function AdminPage() {
               <StatsCard title="Messages" value={(conversations?.filter(c => !c.isReadByAdmin).length || 0) + (tickets?.filter(t => t.statut === 'ouvert').length || 0)} icon={MessageSquare} color="text-green-600" />
             </div>
 
-            {/* QUICK VIEW FOR MESSAGES & TICKETS ON LANDING */}
             <div className="mt-8 space-y-4">
                 <h3 className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
                     <Zap className="size-4 text-primary" /> Demandes en attente
                 </h3>
                 
                 <div className="flex flex-col gap-3">
-                    {/* Conversations non lues */}
                     {conversations?.filter(c => !c.isReadByAdmin).slice(0, 3).map(c => (
                         <Link key={c.id} href={`/admin/messages/${c.id}`} className="p-4 border-2 border-primary bg-primary/5 rounded-2xl flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-left-2 transition-all active:scale-[0.98]">
                             <div className="min-w-0 flex-1">
@@ -174,7 +173,6 @@ export default function AdminPage() {
                         </Link>
                     ))}
 
-                    {/* Tickets ouverts */}
                     {tickets?.filter(t => t.statut === 'ouvert').slice(0, 3).map(t => (
                         <div key={t.id} onClick={() => setActiveTab('support')} className="p-4 border-2 border-orange-200 bg-orange-50/10 rounded-2xl flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-left-2 cursor-pointer transition-all active:scale-[0.98]">
                             <div className="min-w-0 flex-1">
@@ -642,8 +640,42 @@ function PermissionsManager({ users }: { users: UserAccount[] | null }) {
 }
 
 function UsersManager({ users }: { users: UserAccount[] | null }) {
+    const firestore = useFirestore();
+    const { toast } = useToast();
     const [search, setSearch] = useState('');
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+
+    const [status, setStatus] = useState<UserAccount['subscriptionStatus']>('limited');
+    const [expiry, setExpiry] = useState('');
+
     const filtered = users?.filter(u => u.email.toLowerCase().includes(search.toLowerCase()) || u.displayName.toLowerCase().includes(search.toLowerCase())).slice(0, 10) || [];
+
+    const handleEditUser = (u: UserAccount) => {
+        setEditingUser(u);
+        setStatus(u.subscriptionStatus);
+        setExpiry(u.subscriptionExpiryDate ? u.subscriptionExpiryDate.split('T')[0] : '');
+        setIsEditDialogOpen(true);
+    };
+
+    const handleSaveUser = async () => {
+        if (!firestore || !editingUser) return;
+        setIsSaving(true);
+        try {
+            const updateData: any = {
+                subscriptionStatus: status,
+                subscriptionExpiryDate: expiry ? new Date(expiry).toISOString() : null
+            };
+            await updateDoc(doc(firestore, 'users', editingUser.id), updateData);
+            toast({ title: "Compte mis à jour !" });
+            setIsEditDialogOpen(false);
+        } catch (e) {
+            toast({ variant: 'destructive', title: "Erreur" });
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     return (
         <Card className="border-2 shadow-sm overflow-hidden rounded-2xl">
@@ -656,13 +688,51 @@ function UsersManager({ users }: { users: UserAccount[] | null }) {
                             <span className="font-black uppercase text-xs truncate text-slate-800">{u.displayName}</span>
                             <span className="text-[10px] font-bold opacity-40 truncate">{u.email}</span>
                         </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                            <Badge variant="secondary" className="text-[8px] font-black uppercase py-1 px-2">{u.subscriptionStatus}</Badge>
-                            <button onClick={() => { navigator.clipboard.writeText(u.id); }} className="p-3 bg-muted/20 hover:bg-muted rounded-xl transition-colors"><Copy className="size-4 opacity-40" /></button>
+                        <div className="flex items-center gap-2 shrink-0">
+                            <Badge variant={u.subscriptionStatus === 'active' || u.subscriptionStatus === 'admin' ? 'default' : 'secondary'} className="text-[8px] font-black uppercase py-1 px-2">{u.subscriptionStatus}</Badge>
+                            <Button variant="ghost" size="icon" className="size-10 border-2 rounded-xl" onClick={() => handleEditUser(u)}><Pencil className="size-4 opacity-60" /></Button>
+                            <button onClick={() => { navigator.clipboard.writeText(u.id); toast({ title: "ID Copié" }); }} className="p-3 bg-muted/20 hover:bg-muted rounded-xl transition-colors"><Copy className="size-4 opacity-40" /></button>
                         </div>
                     </div>
                 ))}
             </CardContent>
+
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                <DialogContent className="max-w-md rounded-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="font-black uppercase tracking-tight">Gérer le compte</DialogTitle>
+                        <DialogDescription className="text-xs font-bold uppercase truncate">{editingUser?.email}</DialogDescription>
+                    </DialogHeader>
+                    <div className="py-6 space-y-5">
+                        <div className="space-y-1.5">
+                            <Label className="text-[10px] font-black uppercase opacity-60">Statut de l'abonnement</Label>
+                            <Select value={status} onValueChange={(v: any) => setStatus(v)}>
+                                <SelectTrigger className="h-14 border-2 font-black uppercase text-sm"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="active" className="font-black uppercase text-xs">ABONNÉ (ACTIVE)</SelectItem>
+                                    <SelectItem value="trial" className="font-black uppercase text-xs">ESSAI (TRIAL)</SelectItem>
+                                    <SelectItem value="professional" className="font-black uppercase text-xs">PRO (PARTENAIRE)</SelectItem>
+                                    <SelectItem value="limited" className="font-black uppercase text-xs">LIMITÉ (EXPIRED)</SelectItem>
+                                    <SelectItem value="admin" className="font-black uppercase text-xs text-red-600">ADMIN (MASTER)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-[10px] font-black uppercase opacity-60">Date de fin d'activation</Label>
+                            <div className="relative">
+                                <Input type="date" value={expiry} onChange={e => setExpiry(e.target.value)} className="h-14 border-2 font-black text-lg pl-12" />
+                                <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
+                            </div>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button onClick={handleSaveUser} disabled={isSaving} className="w-full h-14 font-black uppercase tracking-widest shadow-xl">
+                            {isSaving ? <RefreshCw className="size-5 animate-spin mr-2" /> : <Save className="size-5 mr-2" />}
+                            Appliquer les changements
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </Card>
     );
 }
@@ -923,6 +993,23 @@ function TicketAdminCard({ ticket }: { ticket: SupportTicket }) {
         }
     };
 
+    const handleCloseOnly = async () => {
+        if (!firestore) return;
+        setIsSaving(true);
+        try {
+            await updateDoc(doc(firestore, 'cms_support', 'tickets', 'items', ticket.id), {
+                statut: 'ferme',
+                respondedAt: serverTimestamp()
+            });
+            toast({ title: "Ticket clôturé (archivé)" });
+            setIsExpanded(false);
+        } catch (e) {
+            toast({ variant: 'destructive', title: "Erreur" });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     return (
         <Card className={cn("overflow-hidden border-2 transition-all", ticket.statut === 'ouvert' ? "border-orange-200 bg-orange-50/10" : "bg-white opacity-70")}>
             <CardHeader className="p-4 cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
@@ -949,14 +1036,24 @@ function TicketAdminCard({ ticket }: { ticket: SupportTicket }) {
                             placeholder="Saisissez la réponse..." 
                             className="min-h-[100px] border-2 text-xs font-medium"
                         />
-                        <Button 
-                            className="w-full h-12 font-black uppercase tracking-widest gap-2 shadow-lg" 
-                            onClick={handleReply} 
-                            disabled={isSaving || !response.trim()}
-                        >
-                            {isSaving ? <RefreshCw className="size-4 animate-spin" /> : <Send className="size-4" />}
-                            Répondre & Fermer
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button 
+                                variant="outline"
+                                className="flex-1 h-12 font-black uppercase text-[10px] border-2 text-destructive border-destructive/20" 
+                                onClick={handleCloseOnly} 
+                                disabled={isSaving}
+                            >
+                                <XCircle className="size-4 mr-2" /> Clôturer
+                            </Button>
+                            <Button 
+                                className="flex-[2] h-12 font-black uppercase tracking-widest gap-2 shadow-lg" 
+                                onClick={handleReply} 
+                                disabled={isSaving || !response.trim()}
+                            >
+                                {isSaving ? <RefreshCw className="size-4 animate-spin" /> : <Send className="size-4" />}
+                                Répondre & Fermer
+                            </Button>
+                        </div>
                     </div>
                 )}
 
