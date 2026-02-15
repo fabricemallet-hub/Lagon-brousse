@@ -1000,9 +1000,8 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             <Dialog open={isSpotDialogOpen} onOpenChange={(open) => { if (!open) setSpotToEdit(null); setIsSpotDialogOpen(open); }}>
                 <DialogContent className="max-h-[95vh] flex flex-col p-0 overflow-hidden sm:max-w-lg">
                     <DialogHeader className="p-6 pb-2 shrink-0 border-b">
-                        <div className="flex items-center justify-between w-full pr-8">
-                            <DialogTitle className="font-black uppercase tracking-tight">{dialogMode === 'add' ? 'Nouveau spot' : 'Modifier le spot'}</DialogTitle>
-                        </div>
+                        <DialogTitle className="font-black uppercase tracking-tight">{dialogMode === 'add' ? 'Nouveau spot' : 'Modifier le spot'}</DialogTitle>
+                        <DialogDescription className="sr-only">Formulaire de gestion des coins de pêche personnels.</DialogDescription>
                     </DialogHeader>
                     
                     <div className="flex-grow overflow-y-auto min-h-0 touch-pan-y scrollbar-hide">
@@ -1068,9 +1067,8 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             <Dialog open={isAnalysisDialogOpen} onOpenChange={setIsAnalysisDialogOpen}>
                 <DialogContent className="max-w-md rounded-2xl max-h-[95vh] flex flex-col p-0 overflow-hidden">
                     <DialogHeader className="p-6 pb-2 shrink-0 border-b">
-                        <div className="flex items-center justify-between w-full pr-8">
-                            <DialogTitle className="flex items-center gap-2 font-black uppercase"><BrainCircuit className="text-primary" /> Analyse de l'IA</DialogTitle>
-                        </div>
+                        <DialogTitle className="flex items-center gap-2 font-black uppercase"><BrainCircuit className="text-primary" /> Analyse de l'IA</DialogTitle>
+                        <DialogDescription className="text-[10px] font-bold uppercase">Prédictions de succès basées sur l'historique lunaire.</DialogDescription>
                     </DialogHeader>
                     <div className="flex-grow overflow-y-auto min-h-0 touch-pan-y scrollbar-hide">
                         <div className="p-6 py-4 space-y-4 pb-32">
@@ -1103,12 +1101,8 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
             <Dialog open={isRecommendDialogOpen} onOpenChange={setIsRecommendDialogOpen}>
                 <DialogContent className="max-w-md rounded-2xl max-h-[95vh] flex flex-col p-0 overflow-hidden">
                     <DialogHeader className="p-6 pb-2 shrink-0 border-b">
-                        <div className="flex items-center justify-between w-full pr-8">
-                            <div>
-                                <DialogTitle className="flex items-center gap-2 font-black uppercase text-base sm:text-lg"><BrainCircuit className="text-primary" /> Meilleur spot immédiat</DialogTitle>
-                                <DialogDescription className="text-[9px] sm:text-[10px] uppercase font-bold">Basé sur GPS, marée et lune</DialogDescription>
-                            </div>
-                        </div>
+                        <DialogTitle className="flex items-center gap-2 font-black uppercase text-base sm:text-lg"><BrainCircuit className="text-primary" /> Meilleur spot immédiat</DialogTitle>
+                        <DialogDescription className="text-[9px] sm:text-[10px] uppercase font-bold">Basé sur GPS, marée et lune</DialogDescription>
                     </DialogHeader>
                     
                     <div className="flex-grow overflow-y-auto min-h-0 touch-pan-y scrollbar-hide">

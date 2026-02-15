@@ -434,6 +434,7 @@ export default function SemisPage() {
             <DialogTitle className="flex items-center gap-2 font-black uppercase tracking-tighter">
               <Sprout className="text-primary shrink-0" /> Planifier : {selectedVeg === 'CUSTOM' ? customVeg : selectedVeg}
             </DialogTitle>
+            <DialogDescription className="text-[10px] font-bold uppercase">Analyse IA de la compatibilité lunaire et conseils de culture.</DialogDescription>
           </DialogHeader>
 
           <div className="flex-grow overflow-y-auto min-h-0 touch-pan-y scrollbar-hide bg-slate-50/50">

@@ -1,4 +1,3 @@
-
 'use client';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, getDoc, writeBatch, serverTimestamp, updateDoc } from 'firebase/firestore';
@@ -30,7 +29,6 @@ import { PushNotificationManager } from '@/components/push-notification-manager'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -763,6 +761,7 @@ export default function ComptePage() {
                 <DialogContent className="max-w-xs rounded-2xl overflow-hidden p-0">
                   <DialogHeader className="p-6 bg-slate-50 border-b">
                     <DialogTitle className="font-black uppercase tracking-tighter text-center">Soutenir le projet</DialogTitle>
+                    <DialogDescription className="text-center text-[10px] uppercase font-bold">Contribution financière pour maintenir l'application en ligne.</DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 p-6">
                     {ribData?.details && (

@@ -369,6 +369,9 @@ export default function ShoppingPage() {
             {selectedProductForDetail && (
                 <>
                     <DialogHeader className="p-0 relative shrink-0">
+                        <DialogTitle className="sr-only">{selectedProductForDetail.title}</DialogTitle>
+                        <DialogDescription className="sr-only">Détails de l'offre publicitaire du magasin {selectedProductForDetail.business?.name}</DialogDescription>
+                        
                         <button 
                             onClick={() => setSelectedProductForDetail(null)}
                             className="absolute top-4 right-4 z-20 p-2 bg-black/20 hover:bg-black/40 rounded-full text-white backdrop-blur-md transition-colors shadow-lg"

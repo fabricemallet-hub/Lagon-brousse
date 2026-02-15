@@ -166,6 +166,7 @@ export function WeatherForecast({
     if (isClient && isToday && scrollRef.current) {
         if (hasCenteredForHour.current !== currentHour) {
             const container = scrollRef.current;
+            // Use requestAnimationFrame to avoid synchronous forced reflow in the main thread
             const frameId = requestAnimationFrame(() => {
                 const element = container.querySelector(`[data-hour="${currentHour}"]`) as HTMLElement;
                 if (element) {
