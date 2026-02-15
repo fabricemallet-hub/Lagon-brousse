@@ -79,6 +79,8 @@ import {
   query,
   orderBy
 } from 'firebase/firestore';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 import type { WithId } from '@/firebase';
 import type { HuntingSession, SessionParticipant, UserAccount, SoundLibraryEntry } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -314,11 +316,17 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     setUserLocation(null);
     if (!user || !previousSessionId || !firestore) return;
     setIsSessionLoading(true);
-    try {
-        await deleteDoc(doc(firestore, 'hunting_sessions', previousSessionId, 'participants', user.uid));
-        toast({ title: 'Vous avez quitté la session.' });
-    } catch (e) { console.error(e); } finally { setIsSessionLoading(false); }
-  }, [user, session, firestore, toast]);
+    
+    const participantRef = doc(firestore, 'hunting_sessions', previousSessionId, 'participants', user.uid);
+    deleteDoc(participantRef)
+      .catch(async (err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: participantRef.path,
+          operation: 'delete'
+        }));
+      })
+      .finally(() => setIsSessionLoading(false));
+  }, [user, session, firestore]);
 
   const startTracking = useCallback(() => {
     if (!user || !firestore || !navigator.geolocation || !session?.id) return;
@@ -339,7 +347,14 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                 const b: any = await (navigator as any).getBattery();
                 batt = { level: b.level, charging: b.charging };
             }
-            updateDoc(ref, { location: { latitude, longitude }, battery: batt, updatedAt: serverTimestamp() }).catch(() => {});
+            const updatePayload = { location: { latitude, longitude }, battery: batt, updatedAt: serverTimestamp() };
+            updateDoc(ref, updatePayload).catch(async (err) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: ref.path,
+                    operation: 'update',
+                    requestResourceData: updatePayload
+                }));
+            });
         },
         (err) => console.error(err),
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -354,36 +369,76 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
   const handleCreateSession = async () => {
     if (!user || !firestore) return;
     setIsSessionLoading(true);
-    try {
-        const code = createCode.trim() ? createCode.trim().toUpperCase() : `${sessionType === 'chasse' ? 'CH' : 'PE'}-${Math.floor(1000 + Math.random() * 9000)}`;
-        const expiresAt = new Date();
-        expiresAt.setHours(expiresAt.getHours() + 24);
-        const data = { organizerId: user.uid, sessionType, createdAt: serverTimestamp(), expiresAt: Timestamp.fromDate(expiresAt) };
-        await setDoc(doc(firestore, 'hunting_sessions', code), data);
-        await setDoc(doc(firestore, 'hunting_sessions', code, 'participants', user.uid), { 
-            id: user.uid, displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor, baseStatus: '', isGibierEnVue: false, updatedAt: serverTimestamp() 
-        });
-        setSession({ id: code, ...data } as any);
-        setIsParticipating(true);
-        fetchMySessions();
-        toast({ title: 'Session créée !', description: `Code : ${code}` });
-    } catch (e: any) { toast({ variant: 'destructive', title: 'Erreur', description: e.message }); } finally { setIsSessionLoading(false); }
+    const code = createCode.trim() ? createCode.trim().toUpperCase() : `${sessionType === 'chasse' ? 'CH' : 'PE'}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 24);
+    const sessionData = { organizerId: user.uid, sessionType, createdAt: serverTimestamp(), expiresAt: Timestamp.fromDate(expiresAt) };
+    
+    const sessionRef = doc(firestore, 'hunting_sessions', code);
+    setDoc(sessionRef, sessionData)
+      .catch(async (err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: sessionRef.path,
+          operation: 'create',
+          requestResourceData: sessionData
+        }));
+      });
+
+    const participantData = { 
+        id: user.uid, displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor, baseStatus: '', isGibierEnVue: false, updatedAt: serverTimestamp() 
+    };
+    const participantRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
+    setDoc(participantRef, participantData)
+      .catch(async (err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: participantRef.path,
+          operation: 'create',
+          requestResourceData: participantData
+        }));
+      });
+
+    setSession({ id: code, ...sessionData } as any);
+    setIsParticipating(true);
+    fetchMySessions();
+    setIsSessionLoading(false);
+    toast({ title: 'Session créée !', description: `Code : ${code}` });
   };
   
   const handleJoinSession = async () => {
     if (!user || !firestore || !joinCode) return;
     setIsSessionLoading(true);
+    const sessionId = joinCode.toUpperCase();
+    
     try {
-      const sessionId = joinCode.toUpperCase();
       const snap = await getDoc(doc(firestore, 'hunting_sessions', sessionId));
-      if (!snap.exists()) throw new Error('Session non trouvée.');
-      await setDoc(doc(firestore, 'hunting_sessions', sessionId, 'participants', user.uid), { 
+      if (!snap.exists()) {
+        toast({ variant: 'destructive', title: 'Erreur', description: 'Session non trouvée.' });
+        setIsSessionLoading(false);
+        return;
+      }
+
+      const participantData = { 
           id: user.uid, displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor, baseStatus: '', isGibierEnVue: false, updatedAt: serverTimestamp() 
-      }, { merge: true });
+      };
+      const participantRef = doc(firestore, 'hunting_sessions', sessionId, 'participants', user.uid);
+      
+      setDoc(participantRef, participantData, { merge: true })
+        .catch(async (err) => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: participantRef.path,
+            operation: 'write',
+            requestResourceData: participantData
+          }));
+        });
+
       setSession({ id: snap.id, ...snap.data() } as any);
       setIsParticipating(true);
       toast({ title: 'Session rejointe' });
-    } catch (e: any) { toast({ variant: 'destructive', title: 'Erreur', description: e.message }); } finally { setIsSessionLoading(false); }
+    } catch (e: any) { 
+      toast({ variant: 'destructive', title: 'Erreur', description: e.message }); 
+    } finally { 
+      setIsSessionLoading(false); 
+    }
   };
 
   const handleToggleGps = () => {
@@ -417,9 +472,18 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
         const batch = writeBatch(firestore);
         snap.forEach(d => batch.delete(d.ref));
         batch.delete(doc(firestore, 'hunting_sessions', sessionToDelete));
-        await batch.commit();
-        await fetchMySessions();
-        toast({ title: 'Session supprimée' });
+        
+        batch.commit()
+          .then(() => {
+            fetchMySessions();
+            toast({ title: 'Session supprimée' });
+          })
+          .catch(async (err) => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+              path: `hunting_sessions/${sessionToDelete}`,
+              operation: 'delete'
+            }));
+          });
     } catch (e) { console.error(e); } finally { setSessionToDelete(null); }
   };
 
@@ -428,7 +492,16 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     const ref = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
     const me = participants?.find(p => p.id === user.uid);
     const newVal = me?.baseStatus === st ? '' : st;
-    await updateDoc(ref, { baseStatus: newVal });
+    
+    updateDoc(ref, { baseStatus: newVal })
+      .catch(async (err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: ref.path,
+          operation: 'update',
+          requestResourceData: { baseStatus: newVal }
+        }));
+      });
+
     if (newVal) { playStatusSound(st); toast({ title: `Statut : ${st}` }); }
   };
 
@@ -437,7 +510,16 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     const ref = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
     const me = participants?.find(p => p.id === user.uid);
     const newVal = !me?.isGibierEnVue;
-    await updateDoc(ref, { isGibierEnVue: newVal });
+    
+    updateDoc(ref, { isGibierEnVue: newVal })
+      .catch(async (err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: ref.path,
+          operation: 'update',
+          requestResourceData: { isGibierEnVue: newVal }
+        }));
+      });
+
     if (newVal) playStatusSound('gibier');
     toast({ title: newVal ? labels.alertDesc : "Alerte levée", variant: newVal ? "destructive" : "default" });
   };
@@ -447,7 +529,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     setIsSavingPrefs(true);
     try {
         const currentVesselPrefs = userProfile?.vesselPrefs || {};
-        const prefs = { 
+        const prefsPayload = { 
           huntingNickname: nickname, 
           mapIcon: selectedIcon, 
           mapColor: selectedColor,
@@ -458,13 +540,28 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
             huntingSoundEnabled: isSoundEnabled
           }
         };
-        await updateDoc(doc(firestore, 'users', user.uid), prefs);
-        if (session && isParticipating) {
-          await updateDoc(doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid), {
-            displayName: nickname,
-            mapIcon: selectedIcon,
-            mapColor: selectedColor
+        
+        const userRef = doc(firestore, 'users', user.uid);
+        updateDoc(userRef, prefsPayload)
+          .catch(async (err) => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+              path: userRef.path,
+              operation: 'update',
+              requestResourceData: prefsPayload
+            }));
           });
+
+        if (session && isParticipating) {
+          const participantRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
+          const updateData = { displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor };
+          updateDoc(participantRef, updateData)
+            .catch(async (err) => {
+              errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: participantRef.path,
+                operation: 'update',
+                requestResourceData: updateData
+              }));
+            });
         }
         toast({ title: 'Préférences sauvegardées !' });
         setPrefsSection(undefined); 
