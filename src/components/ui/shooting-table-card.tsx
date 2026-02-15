@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
   Target, 
   ArrowUp, 
@@ -42,7 +43,6 @@ const BALLISTIC_DATABASE: MunitionData[] = [
 const CALIBERS = Array.from(new Set(BALLISTIC_DATABASE.map(m => m.caliber)));
 
 export function ShootingTableCard() {
-  // States
   const [selectedCaliber, setSelectedCaliber] = useState(CALIBERS[0]);
   const [selectedMunitionId, setSelectedMunitionId] = useState(BALLISTIC_DATABASE.find(m => m.caliber === CALIBERS[0])?.id || '');
   const [distance, setDistance] = useState('200');
@@ -50,12 +50,10 @@ export function ShootingTableCard() {
   const [windSpeed, setWindSpeed] = useState('10');
   const [windDirection, setWindDirection] = useState<WindDirection>('E');
 
-  // Filtered munitions based on caliber
   const availableMunitions = useMemo(() => 
     BALLISTIC_DATABASE.filter(m => m.caliber === selectedCaliber)
   , [selectedCaliber]);
 
-  // Sync munition selection when caliber changes
   useEffect(() => {
     const stillValid = availableMunitions.find(m => m.id === selectedMunitionId);
     if (!stillValid && availableMunitions.length > 0) {
@@ -67,7 +65,6 @@ export function ShootingTableCard() {
     BALLISTIC_DATABASE.find(m => m.id === selectedMunitionId) || BALLISTIC_DATABASE[0]
   , [selectedMunitionId]);
 
-  // Ballistics Logic: Simplified G1 Trajectory Simulation
   const results = useMemo(() => {
     const d = parseFloat(distance);
     const z = parseFloat(zeroDistance);
@@ -78,9 +75,7 @@ export function ShootingTableCard() {
     const g = 9.81;
     const { v0, bc } = selectedMunition;
 
-    // Helper: calculate gravity drop in cm
     const calculateDropAt = (dist: number) => {
-        // v_avg approximation based on BC
         const vAvg = v0 * (1 - (0.00008 * dist) / bc);
         const time = dist / vAvg;
         return 0.5 * g * Math.pow(time, 2) * 100; 
@@ -89,24 +84,19 @@ export function ShootingTableCard() {
     const dropAtTarget = calculateDropAt(d);
     const dropAtZero = calculateDropAt(z);
 
-    // Line of sight geometric correction (standard scope height 4.5cm)
     const scopeHeight = 4.5; 
     const targetCorrection = dropAtTarget - (dropAtZero + scopeHeight) * (d / z) + scopeHeight;
 
-    // Wind drift (Didion/Litz Formula)
     const vAvgTarget = v0 * (1 - (0.00008 * d) / bc);
     const timeTarget = d / vAvgTarget;
-    const windMps = w * 0.514444; // Knots to m/s
+    const windMps = w * 0.514444; 
     const isCrossWind = ['E', 'W'].includes(windDirection);
     
     let windDrift = 0;
     if (isCrossWind) {
-        // Drift = crosswind * (time - distance / v0)
         windDrift = windMps * (timeTarget - d / v0) * 100;
     }
 
-    // 1 click = 1cm at 100m (MRAD 0.1)
-    // Clicks = total_cm / (dist / 100)
     const distFactor = d / 100;
 
     return {
@@ -143,9 +133,7 @@ export function ShootingTableCard() {
       </CardHeader>
       
       <CardContent className="p-6 space-y-8">
-        {/* INPUTS GRID */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* CONFIG MUNITION */}
             <div className="space-y-5 p-5 bg-muted/20 rounded-3xl border-2 border-dashed border-primary/10">
                 <div className="flex items-center gap-2 text-primary">
                     <Settings2 className="size-4" />
@@ -200,7 +188,6 @@ export function ShootingTableCard() {
                 </div>
             </div>
 
-            {/* CONFIG ENVIRONNEMENT */}
             <div className="space-y-5 p-5 bg-muted/20 rounded-3xl border-2 border-dashed border-accent/10">
                 <div className="flex items-center gap-2 text-accent">
                     <Wind className="size-4" />
@@ -248,7 +235,6 @@ export function ShootingTableCard() {
             </div>
         </div>
 
-        {/* RESULTS GRID */}
         {results ? (
             <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
                 <div className="flex items-center gap-2 px-1 mb-4 text-[10px] font-black uppercase text-muted-foreground tracking-widest border-b border-dashed pb-2">
@@ -256,7 +242,6 @@ export function ShootingTableCard() {
                 </div>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    {/* DROP CARD */}
                     <div className="bg-white border-2 border-primary/20 rounded-3xl p-6 shadow-xl relative overflow-hidden group hover:border-primary/40 transition-all">
                         <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
                             <ArrowUp className="size-20 text-primary" />
@@ -280,7 +265,6 @@ export function ShootingTableCard() {
                         </div>
                     </div>
 
-                    {/* WIND CARD */}
                     <div className={cn(
                         "rounded-3xl p-6 shadow-xl relative overflow-hidden border-2 transition-all group",
                         results.driftCm !== 0 ? "bg-white border-accent/20 hover:border-accent/40" : "bg-muted/10 opacity-40 grayscale border-transparent"
