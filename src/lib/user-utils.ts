@@ -1,4 +1,3 @@
-
 'use client';
 import { doc, getDoc, setDoc, Firestore } from 'firebase/firestore';
 import { User } from 'firebase/auth';
@@ -20,8 +19,8 @@ export async function ensureUserDocument(
   const userDocRef = doc(firestore, 'users', user.uid);
   const email = user.email?.toLowerCase() || '';
   
-  // UNIQUE COMPTE ADMIN AUTORISÉ
-  const isMasterAdmin = (email === 'f.mallet81@outlook.com' || user.uid === 't8nPnZLcTiaLJSKMuLzib3C5nPn1');
+  // UNIQUE COMPTE ADMIN AUTORISÉ (UID de f.mallet81@outlook.com)
+  const isMasterAdmin = (user.uid === 't8nPnZLcTiaLJSKMuLzib3C5nPn1');
 
   try {
     const docSnap = await getDoc(userDocRef);

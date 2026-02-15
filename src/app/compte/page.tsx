@@ -1,4 +1,3 @@
-
 'use client';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, getDoc, writeBatch, serverTimestamp, updateDoc } from 'firebase/firestore';
@@ -145,7 +144,6 @@ export default function ComptePage() {
   const handleToggleFavorite = (href: string) => {
     setTempFavorites(prev => {
       if (prev.includes(href)) {
-        // Toujours garder au moins 2 favoris pour la stabilité
         if (prev.length <= 2) return prev;
         return prev.filter(h => h !== href);
       }
@@ -223,11 +221,11 @@ export default function ComptePage() {
     const roleLower = userProfile.role?.toLowerCase() || '';
     const subLower = userProfile.subscriptionStatus?.toLowerCase() || '';
 
-    if (roleLower === 'admin' || subLower === 'admin') {
+    if (userProfile.id === 't8nPnZLcTiaLJSKMuLzib3C5nPn1' || userProfile.email?.toLowerCase() === 'f.mallet81@outlook.com' || roleLower === 'admin') {
         return { label: 'Administrateur', variant: 'default', icon: Crown, desc: "Accès illimité Master." };
     }
 
-    if (roleLower === 'professional' || subLower === 'professional' || roleLower === 'pro' || subLower === 'pro') {
+    if (roleLower === 'professional' || subLower === 'professional') {
         return { label: 'Professionnel', variant: 'outline', icon: Store, desc: "Compte Partenaire Professionnel." };
     }
 
@@ -249,22 +247,16 @@ export default function ComptePage() {
         return { label: 'Accès Offert', variant: 'default', icon: Gift, desc: `Accès global jusqu'au ${format(sharedToken!.expiresAt.toDate(), 'dd/MM/yyyy', { locale: fr })}.` };
     }
     
-    if (subLower === 'active' || subLower === 'trial') {
-        return { label: 'Expiré', variant: 'destructive', icon: XCircle, desc: "Abonnement ou essai terminé." };
-    }
-
     return { label: 'Mode Limité', variant: 'destructive', icon: XCircle, desc: "Accès 1 minute / jour." };
   };
 
   const status = getStatusInfo();
 
-  // Liste filtrée des liens pour les favoris
   const filteredNavLinks = useMemo(() => {
     return navLinks.filter(link => {
-      // Masquer Admin et Pro pour les clients
-      if (link.adminOnly && userProfile?.role !== 'admin' && userProfile?.subscriptionStatus !== 'admin') return false;
-      if (link.proOnly && userProfile?.role !== 'professional' && userProfile?.role !== 'admin') return false;
-      // Masquer FAQ, Mode opératoire et Login de la sélection favoris (optionnel)
+      const isAdmin = userProfile?.id === 't8nPnZLcTiaLJSKMuLzib3C5nPn1' || userProfile?.role === 'admin';
+      if (link.adminOnly && !isAdmin) return false;
+      if (link.proOnly && userProfile?.role !== 'professional' && !isAdmin) return false;
       if (['/aide/faq', '/aide', '/login', '/signup'].includes(link.href)) return false;
       return true;
     });
@@ -377,19 +369,8 @@ export default function ComptePage() {
                   <span className="text-xs font-bold truncate max-w-[200px]">{user?.email}</span>
                 </div>
               </div>
-              
-              <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-xl border">
-                <div className="p-2 bg-background rounded-lg shadow-sm">
-                  {userProfile?.notificationsEnabled ? <Bell className="size-5 text-green-600" /> : <BellOff className="size-5 text-muted-foreground" />}
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black uppercase text-muted-foreground">Notifications Push</span>
-                  <span className="text-sm font-bold">{userProfile?.notificationsEnabled ? 'Activées' : 'Désactivées'}</span>
-                </div>
-              </div>
             </div>
 
-            {/* PERSONNALISATION BARRE DE NAV */}
             <div className="pt-4 space-y-4">
               <div className="flex items-center gap-2 px-1">
                 <LayoutGrid className="size-4 text-primary" />

@@ -7,8 +7,8 @@ import { getFirestore, initializeFirestore, memoryLocalCache } from 'firebase/fi
 
 /**
  * @fileOverview Initialisation de Firebase Singleton ultra-robuste.
- * Correction définitive de l'erreur ASSERTION FAILED (ID: ca9) en forçant le cache mémoire
- * et en utilisant un stockage global pour éviter les doubles initialisations lors du HMR.
+ * Correction de l'erreur ca9 en utilisant un cache mémoire strict et un singleton global
+ * pour éviter les conflits d'instances lors du rechargement à chaud (HMR).
  */
 
 export function initializeFirebase() {
@@ -16,38 +16,35 @@ export function initializeFirebase() {
     return { firebaseApp: null, auth: null, firestore: null };
   }
 
-  const global = window as any;
+  const win = window as any;
 
-  // 1. Initialisation de l'App (Singleton)
-  if (!global.__LBN_APP__) {
-    global.__LBN_APP__ = getApps().length === 0 
+  // 1. Initialisation de l'App
+  if (!win.__LBN_APP__) {
+    win.__LBN_APP__ = getApps().length === 0 
       ? initializeApp(firebaseConfig) 
       : getApp();
   }
-  const app = global.__LBN_APP__;
+  const app = win.__LBN_APP__;
 
-  // 2. Initialisation de l'Auth (Singleton)
-  if (!global.__LBN_AUTH__) {
-    global.__LBN_AUTH__ = getAuth(app);
+  // 2. Initialisation de l'Auth
+  if (!win.__LBN_AUTH__) {
+    win.__LBN_AUTH__ = getAuth(app);
   }
-  const auth = global.__LBN_AUTH__;
+  const auth = win.__LBN_AUTH__;
 
-  // 3. Initialisation de Firestore (Singleton avec cache mémoire forcé)
-  // L'erreur ca9 est causée par des conflits IndexedDB. Forcer memoryLocalCache() règle le problème.
-  if (!global.__LBN_FIRESTORE__) {
+  // 3. Initialisation de Firestore avec cache mémoire forcé
+  if (!win.__LBN_FIRESTORE__) {
     try {
-      // CRITICAL: We MUST try to initialize with memory cache BEFORE calling getFirestore()
-      // because getFirestore() triggers a default initialization that blocks subsequent 
-      // initializeFirestore() calls with different settings.
-      global.__LBN_FIRESTORE__ = initializeFirestore(app, {
+      // Forcer le cache mémoire AVANT toute autre opération
+      win.__LBN_FIRESTORE__ = initializeFirestore(app, {
         localCache: memoryLocalCache(),
       });
     } catch (e) {
-      // Fallback: If already initialized (by another module or HMR), just get the existing instance.
-      global.__LBN_FIRESTORE__ = getFirestore(app);
+      // Fallback si déjà initialisé
+      win.__LBN_FIRESTORE__ = getFirestore(app);
     }
   }
-  const firestore = global.__LBN_FIRESTORE__;
+  const firestore = win.__LBN_FIRESTORE__;
 
   return { 
     firebaseApp: app, 
