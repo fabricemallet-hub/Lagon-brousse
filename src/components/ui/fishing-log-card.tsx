@@ -635,7 +635,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                 <div className="grid grid-cols-1 gap-2">
                     <Button 
                         variant="secondary" 
-                        className="w-full font-black uppercase h-14 text-sm tracking-tight shadow-md border-2 border-primary/20 gap-3"
+                        className="w-full font-black uppercase h-14 text-xs sm:text-sm leading-tight tracking-tight shadow-md border-2 border-primary/20 gap-3 px-4"
                         onClick={handleRecommendSpotNow}
                         disabled={isAnalyzing}
                     >
@@ -649,7 +649,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                         <div className="flex items-center gap-2">
                             <Button 
                                 variant="outline" 
-                                className="flex-1 font-bold h-12 uppercase text-[10px] tracking-widest border-2" 
+                                className="flex-1 font-bold h-12 uppercase text-[10px] leading-tight tracking-widest border-2 px-2" 
                                 onClick={handleAnalyzeNext7Days}
                                 disabled={selectedSpotIds.length === 0 || isAnalyzing}
                             >
