@@ -175,7 +175,16 @@ export default function MeteoLivePage() {
         <Info className="size-4 text-amber-600" />
         <AlertTitle className="text-xs font-black uppercase tracking-wider mb-1">Avis de sécurité</AlertTitle>
         <AlertDescription className="text-[10px] leading-relaxed font-medium">
-          Cette application <strong>ne remplace pas</strong> le site officiel {selectedRegion === 'CALEDONIE' ? 'meteo.nc' : 'meteo.pf'}. Restez attentifs aux conditions locales avant toute sortie en mer.
+          Cette application <strong>ne remplace pas</strong> le site officiel{" "}
+          <a 
+            href={selectedRegion === 'CALEDONIE' ? 'https://www.meteo.nc/' : 'https://meteo.pf/fr'} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="underline font-black hover:text-primary transition-colors"
+          >
+            {selectedRegion === 'CALEDONIE' ? 'meteo.nc' : 'meteo.pf'}
+          </a>
+          . Restez attentifs aux conditions locales avant toute sortie en mer.
         </AlertDescription>
       </Alert>
 
