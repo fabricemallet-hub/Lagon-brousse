@@ -22,6 +22,18 @@ export interface BallisticsPrefs {
   customTargetDist?: string;
 }
 
+export interface Weapon {
+  id: string;
+  userId: string;
+  customName: string;
+  brand: string;
+  caliber: string;
+  munitionId: string;
+  weight: number;
+  zeroDistance: string;
+  createdAt: any;
+}
+
 export interface UserAccount {
   id: string;
   email: string;
@@ -50,6 +62,9 @@ export interface UserAccount {
   emergencyContact?: string;
   vesselSmsMessage?: string;
   favoriteNavLinks?: string[];
+  huntingNickname_v2?: string;
+  mapIcon_v2?: string;
+  mapColor_v2?: string;
 }
 
 export interface Business {
