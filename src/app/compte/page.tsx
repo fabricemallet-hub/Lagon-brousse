@@ -42,6 +42,8 @@ import { useLocation } from '@/context/location-context';
 import { Switch } from '@/components/ui/switch';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -142,29 +144,46 @@ export default function ComptePage() {
     }
   };
 
-  const handleUpdateName = async () => {
+  const handleUpdateName = () => {
     if (!user || !firestore || !newName.trim()) return;
     setIsSavingName(true);
-    try {
-      await updateProfile(user, { displayName: newName.trim() });
-      await updateDoc(doc(firestore, 'users', user.uid), {
-        displayName: newName.trim()
-      });
-      
-      // Also update business name if pro
-      if (userProfile?.businessId) {
-        await updateDoc(doc(firestore, 'businesses', userProfile.businessId), {
-          name: newName.trim()
+    
+    const userUpdates = { displayName: newName.trim() };
+    const userRef = doc(firestore, 'users', user.uid);
+
+    // Update Auth Profile
+    updateProfile(user, userUpdates).catch(err => console.error("Auth profile update error:", err));
+
+    // Update User Document
+    updateDoc(userRef, userUpdates)
+      .then(() => {
+        // Also update business name if pro
+        if (userProfile?.businessId) {
+          const bizRef = doc(firestore, 'businesses', userProfile.businessId);
+          updateDoc(bizRef, { name: newName.trim() })
+            .catch(async (serverError) => {
+              const permissionError = new FirestorePermissionError({
+                path: bizRef.path,
+                operation: 'update',
+                requestResourceData: { name: newName.trim() },
+              });
+              errorEmitter.emit('permission-error', permissionError);
+            });
+        }
+        
+        toast({ title: userProfile?.role === 'professional' ? "Nom du magasin mis à jour !" : "Nom mis à jour !" });
+        setIsEditingName(false);
+        setIsSavingName(false);
+      })
+      .catch(async (serverError) => {
+        setIsSavingName(false);
+        const permissionError = new FirestorePermissionError({
+          path: userRef.path,
+          operation: 'update',
+          requestResourceData: userUpdates,
         });
-      }
-      
-      toast({ title: userProfile?.role === 'professional' ? "Nom du magasin mis à jour !" : "Nom mis à jour !" });
-      setIsEditingName(false);
-    } catch (e) {
-      toast({ variant: 'destructive', title: "Erreur lors de la mise à jour" });
-    } finally {
-      setIsSavingName(false);
-    }
+        errorEmitter.emit('permission-error', permissionError);
+      });
   };
 
   const handleLocateMe = () => {
@@ -183,53 +202,88 @@ export default function ComptePage() {
     }
   };
 
-  const handleSaveContact = async () => {
+  const handleSaveContact = () => {
     if (!user || !firestore) return;
     setIsSavingContact(true);
-    try {
-        await updateDoc(doc(firestore, 'users', user.uid), {
-            phoneNumber: tempPhone,
-            landline: tempLandline,
-            address: tempAddress,
-            contactLocation: tempLocation
-        });
+    const userRef = doc(firestore, 'users', user.uid);
+    const updates = {
+        phoneNumber: tempPhone,
+        landline: tempLandline,
+        address: tempAddress,
+        contactLocation: tempLocation
+    };
+
+    updateDoc(userRef, updates)
+      .then(() => {
         toast({ title: "Coordonnées enregistrées !" });
         setIsEditingContact(false);
-    } catch (e) {
-        toast({ variant: 'destructive', title: "Erreur" });
-    } finally {
         setIsSavingContact(false);
-    }
+      })
+      .catch(async (serverError) => {
+        setIsSavingContact(false);
+        const permissionError = new FirestorePermissionError({
+          path: userRef.path,
+          operation: 'update',
+          requestResourceData: updates,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      });
   };
 
   const handleUpdateLocation = async (newLoc: string) => {
     if (!user || !firestore) return;
-    try {
-      await updateDoc(doc(firestore, 'users', user.uid), {
-        lastSelectedLocation: newLoc
+    const userRef = doc(firestore, 'users', user.uid);
+    updateDoc(userRef, { lastSelectedLocation: newLoc })
+      .then(() => {
+        toast({ title: "Localité mise à jour", description: `Votre commune favorite est désormais ${newLoc}.` });
+      })
+      .catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: userRef.path,
+          operation: 'update',
+          requestResourceData: { lastSelectedLocation: newLoc },
+        });
+        errorEmitter.emit('permission-error', permissionError);
       });
-      toast({ title: "Localité mise à jour", description: `Votre commune favorite est désormais ${newLoc}.` });
-    } catch (e) {
-      toast({ variant: 'destructive', title: "Erreur", description: "Impossible de mettre à jour la commune." });
-    }
   };
 
-  const handleTogglePreferenceCategory = async (cat: string) => {
+  const handleTogglePreferenceCategory = (cat: string) => {
     if (!user || !firestore || !userProfile) return;
     const current = userProfile.subscribedCategories || [];
     const updated = current.includes(cat) ? current.filter(c => c !== cat) : [...current, cat];
-    try {
-      await updateDoc(doc(firestore, 'users', user.uid), { subscribedCategories: updated });
-      toast({ title: "Intérêts mis à jour" });
-    } catch (e) {}
+    const userRef = doc(firestore, 'users', user.uid);
+    
+    updateDoc(userRef, { subscribedCategories: updated })
+      .then(() => {
+        toast({ title: "Intérêts mis à jour" });
+      })
+      .catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: userRef.path,
+          operation: 'update',
+          requestResourceData: { subscribedCategories: updated },
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      });
   };
 
-  const handleTogglePreferenceChannel = async (field: 'allowsPromoEmails' | 'allowsPromoPush') => {
+  const handleTogglePreferenceChannel = (field: 'allowsPromoEmails' | 'allowsPromoPush') => {
     if (!user || !firestore || !userProfile) return;
-    try {
-      await updateDoc(doc(firestore, 'users', user.uid), { [field]: !userProfile[field] });
-      toast({ title: "Canaux de notification mis à jour" });
-    } catch (e) {}
+    const userRef = doc(firestore, 'users', user.uid);
+    const newVal = !userProfile[field];
+    
+    updateDoc(userRef, { [field]: newVal })
+      .then(() => {
+        toast({ title: "Canaux de notification mis à jour" });
+      })
+      .catch(async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: userRef.path,
+          operation: 'update',
+          requestResourceData: { [field]: newVal },
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      });
   };
 
   const handleToggleFavorite = (href: string) => {
@@ -246,19 +300,25 @@ export default function ComptePage() {
     });
   };
 
-  const handleSaveFavorites = async () => {
+  const handleSaveFavorites = () => {
     if (!user || !firestore) return;
     setIsSavingFavorites(true);
-    try {
-      await updateDoc(doc(firestore, 'users', user.uid), {
-        favoriteNavLinks: tempFavorites
+    const userRef = doc(firestore, 'users', user.uid);
+    
+    updateDoc(userRef, { favoriteNavLinks: tempFavorites })
+      .then(() => {
+        toast({ title: "Raccourcis mis à jour !", description: "Votre barre de navigation a été personnalisée." });
+        setIsSavingFavorites(false);
+      })
+      .catch(async (serverError) => {
+        setIsSavingFavorites(false);
+        const permissionError = new FirestorePermissionError({
+          path: userRef.path,
+          operation: 'update',
+          requestResourceData: { favoriteNavLinks: tempFavorites },
+        });
+        errorEmitter.emit('permission-error', permissionError);
       });
-      toast({ title: "Raccourcis mis à jour !", description: "Votre barre de navigation a été personnalisée." });
-    } catch (e) {
-      toast({ variant: 'destructive', title: "Erreur", description: "Échec de l'enregistrement des favoris." });
-    } finally {
-      setIsSavingFavorites(false);
-    }
   };
 
   const handleSubscribe = () => {
