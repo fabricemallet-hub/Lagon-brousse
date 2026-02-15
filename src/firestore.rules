@@ -4,6 +4,15 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // --- 1. PRIORITÉ ABSOLUE : MASTER ADMIN (BYPASS TOTAL) ---
+    // Votre UID et votre email Master passent avant TOUTES les autres règles.
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null && (
+        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || 
+        request.auth.token.email.toLower() == "f.mallet81@outlook.com"
+      );
+    }
+
     // --- FONCTIONS DE BASE ---
     function isSignedIn() {
       return request.auth != null;
@@ -26,11 +35,10 @@ service cloud.firestore {
         ] ||
         getUserRole() == "admin" ||
         (request.auth.token.email != null && 
-         request.auth.token.email.lower() in [
+         request.auth.token.email.toLower() in [
            "f.mallet81@outlook.com",
            "fabrice.mallet@gmail.com",
            "f.mallet81@gmail.com",
-           "f.mallet81@outlook.com",
            "kledostyle@outlook.com"
          ])
       );
@@ -40,17 +48,11 @@ service cloud.firestore {
       return isSignedIn() && (getUserRole() == "professional" || isAdmin());
     }
 
-    // --- 1. ACCÈS TOTAL ADMIN MASTER (GOD MODE) ---
-    // Cette règle autorise TOUT pour l'administrateur principal
-    match /{allPaths=**} {
-      allow read, write: if isSignedIn() && (
-        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || 
-        (request.auth.token.email != null && request.auth.token.email.lower() == "f.mallet81@outlook.com") ||
-        isAdmin()
-      );
+    // --- 2. UTILISATEURS & REACH ---
+    match /users {
+      allow list: if isSignedIn();
     }
 
-    // --- 2. USERS & PROFILES ---
     match /users/{userId} {
       allow read: if isSignedIn(); 
       allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
@@ -63,11 +65,11 @@ service cloud.firestore {
     // --- 3. COMMERCES & PROMOTIONS ---
     match /businesses/{businessId} {
       allow get, list: if true;
-      allow write: if isProfessional() && (resource == null || resource.data.ownerId == request.auth.uid || isAdmin());
+      allow write: if isProfessional();
       
       match /promotions/{promoId} {
         allow read: if true;
-        allow write: if isProfessional() || isAdmin();
+        allow write: if isProfessional();
       }
     }
 
@@ -95,6 +97,7 @@ service cloud.firestore {
     match /hunting_sessions/{id} { allow read, write: if isSignedIn(); match /{allPaths=**} { allow read, write: if isSignedIn(); } }
     match /vessels/{id} { allow read, write: if isSignedIn(); match /{allPaths=**} { allow read, write: if isSignedIn(); } }
     match /spot_shares/{id} { allow read, write: if isSignedIn(); }
+    
     match /campaigns/{campaignId} { 
       allow create: if isProfessional();
       allow read: if (isProfessional() && resource.data.ownerId == request.auth.uid) || isAdmin();
