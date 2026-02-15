@@ -79,7 +79,7 @@ export default function ComptePage() {
   const [tempFavorites, setTempFavorites] = useState<string[]>([]);
   const [isSavingFavorites, setIsSavingFavorites] = useState(false);
 
-  const userProfileRef = useMemoFirebase(() => {
+  const userDocRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return doc(firestore, 'users', user.uid);
   }, [user, firestore]);
