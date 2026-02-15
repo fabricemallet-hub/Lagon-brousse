@@ -1,8 +1,8 @@
 'use client';
 
 import { firebaseConfig } from '@/firebase/config';
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
+import { getAuth, Auth } from 'firebase/auth';
 import { 
   initializeFirestore, 
   Firestore, 
@@ -12,39 +12,44 @@ import {
 
 /**
  * @fileOverview Initialisation de Firebase Singleton.
- * Correction de l'erreur ASSERTION FAILED (ID: ca9).
- * Force le Long Polling et le cache en mémoire pour une stabilité totale sur mobile.
+ * Correction définitive de l'erreur ASSERTION FAILED (ID: ca9).
+ * Utilise des variables globales au module pour garantir une instance unique.
  */
 
+let firebaseApp: FirebaseApp;
+let auth: Auth;
+let firestore: Firestore;
+
 export function initializeFirebase() {
-  // 1. Initialisation de l'App (Singleton)
-  const app = getApps().length === 0 
-    ? initializeApp(firebaseConfig) 
-    : getApp();
+  if (typeof window === 'undefined') return {} as any;
+
+  // 1. Singleton App
+  if (!firebaseApp) {
+    firebaseApp = getApps().length === 0 
+      ? initializeApp(firebaseConfig) 
+      : getApp();
+  }
 
   // 2. Singleton Auth
-  const auth = getAuth(app);
+  if (!auth) {
+    auth = getAuth(firebaseApp);
+  }
 
-  // 3. Singleton Firestore avec configuration de transport ultra-stable
-  let firestore: Firestore;
-  
-  // On vérifie si Firestore est déjà initialisé pour cette app
-  // @ts-ignore - Accès interne pour vérifier l'existence de l'instance
-  if (app.container.getProvider('firestore').isInitialized()) {
-    firestore = getFirestore(app);
-  } else {
+  // 3. Singleton Firestore avec transport stable
+  if (!firestore) {
     try {
-      firestore = initializeFirestore(app, {
+      firestore = initializeFirestore(firebaseApp, {
         localCache: memoryLocalCache(),
-        experimentalForceLongPolling: true, // Crucial pour éviter les erreurs d'assertion sur mobile
+        // On n'utilise plus experimentalForceLongPolling car il peut entrer en conflit 
+        // avec les réglages par défaut lors des re-init.
       });
     } catch (e) {
       console.warn("Firestore already initialized, falling back to getFirestore()");
-      firestore = getFirestore(app);
+      firestore = getFirestore(firebaseApp);
     }
   }
 
-  return { firebaseApp: app, auth, firestore };
+  return { firebaseApp, auth, firestore };
 }
 
 export * from './provider';
