@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -33,6 +34,9 @@ import {
   Save
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
+import type { UserAccount, BallisticsPrefs } from '@/lib/types';
 
 type MunitionData = {
   id: string;
@@ -141,6 +145,16 @@ const CHOKES = [
 const SHOT_DISTANCES = [10, 20, 30, 40];
 
 export function ShootingTableCard() {
+  const { user } = useUser();
+  const firestore = useFirestore();
+  const { toast } = useToast();
+
+  const userDocRef = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [user, firestore]);
+  const { data: userProfile } = useDoc<UserAccount>(userDocRef);
+
   const [selectedCaliber, setSelectedCaliber] = useState(CALIBERS[0]);
   const [selectedModel, setSelectedModel] = useState('');
   const [selectedWeight, setSelectedWeight] = useState<number>(0);
@@ -158,6 +172,61 @@ export function ShootingTableCard() {
   const [manualWeight, setManualWeight] = useState('150');
   const [manualV0, setManualV0] = useState('860');
   const [manualBC, setManualBC] = useState('0.400');
+
+  const isInitialSyncDone = useRef(false);
+
+  // Sync state from profile
+  useEffect(() => {
+    if (userProfile?.ballisticsPrefs && !isInitialSyncDone.current) {
+      const prefs = userProfile.ballisticsPrefs;
+      setSelectedCaliber(prefs.caliber || CALIBERS[0]);
+      setSelectedModel(prefs.model || '');
+      setSelectedWeight(prefs.weight || 0);
+      setZeroDistance(prefs.zeroDistance || '100');
+      setWindKmh(prefs.windKmh || '10');
+      setWindAngle(prefs.windAngle || '90');
+      setHasSilencer(prefs.hasSilencer ?? false);
+      setHasMuzzleBrake(prefs.hasMuzzleBrake ?? false);
+      setSelectedChoke(prefs.choke || CHOKES[2].label);
+      setShotDistance(prefs.shotDistance || 20);
+      setManualWeight(prefs.manualWeight || '150');
+      setManualV0(prefs.manualV0 || '860');
+      setManualBC(prefs.manualBC || '0.400');
+      isInitialSyncDone.current = true;
+    }
+  }, [userProfile]);
+
+  // Persist settings to Firestore
+  useEffect(() => {
+    if (!user || !firestore || !isInitialSyncDone.current) return;
+
+    const timer = setTimeout(() => {
+      const prefs: BallisticsPrefs = {
+        caliber: selectedCaliber,
+        model: selectedModel,
+        weight: selectedWeight,
+        zeroDistance,
+        windKmh,
+        windAngle,
+        hasSilencer,
+        hasMuzzleBrake,
+        choke: selectedChoke,
+        shotDistance,
+        manualWeight,
+        manualV0,
+        manualBC
+      };
+      updateDoc(doc(firestore, 'users', user.uid), { ballisticsPrefs: prefs })
+        .catch(err => console.warn("Failed to auto-save ballistics prefs", err));
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [
+    selectedCaliber, selectedModel, selectedWeight, zeroDistance, 
+    windKmh, windAngle, hasSilencer, hasMuzzleBrake, 
+    selectedChoke, shotDistance, manualWeight, manualV0, manualBC,
+    user, firestore
+  ]);
 
   const munitionsForCaliber = useMemo(() => 
     BALLISTIC_DATABASE.filter(m => m.caliber === selectedCaliber)

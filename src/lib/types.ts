@@ -5,6 +5,22 @@ export type UserRole = 'client' | 'professional' | 'admin';
 
 export type Region = 'CALEDONIE' | 'TAHITI';
 
+export interface BallisticsPrefs {
+  caliber: string;
+  model: string;
+  weight: number;
+  zeroDistance: string;
+  windKmh: string;
+  windAngle: string;
+  hasSilencer: boolean;
+  hasMuzzleBrake: boolean;
+  choke: string;
+  shotDistance: number;
+  manualWeight: string;
+  manualV0: string;
+  manualBC: string;
+}
+
 export interface UserAccount {
   id: string;
   email: string;
@@ -22,6 +38,7 @@ export interface UserAccount {
   mapIcon?: string;
   mapColor?: string;
   vesselPrefs?: any;
+  ballisticsPrefs?: BallisticsPrefs;
   subscriptionStartDate?: string;
   cgvAcceptedAt?: string;
   cgvVersionSeen?: number;
