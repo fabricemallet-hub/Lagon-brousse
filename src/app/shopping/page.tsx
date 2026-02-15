@@ -32,7 +32,8 @@ import {
     ExternalLink,
     X,
     Globe,
-    ImageIcon
+    ImageIcon,
+    ChevronLeft
 } from 'lucide-react';
 import { locations, locationsByRegion, regions } from '@/lib/locations';
 import { cn } from '@/lib/utils';
@@ -62,10 +63,18 @@ export default function ShoppingPage() {
   
   const { data: allPromotions, isLoading: isPromosLoading, error: promosError } = useCollection<Promotion>(promosRef);
 
+  // --- DETAIL VIEW STATE ---
+  const [selectedProductForDetail, setSelectedProductForDetail] = useState<Promotion & { business?: Business } | null>(null);
+  const [activeImageIdx, setActiveImageIdx] = useState(0);
+
   // --- CONTACT DIALOG STATE ---
   const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
   const [selectedBusinessContact, setSelectedBusinessContact] = useState<Business | null>(null);
   const [isLoadingContact, setIsLoadingContact] = useState(false);
+
+  useEffect(() => {
+    if (selectedProductForDetail) setActiveImageIdx(0);
+  }, [selectedProductForDetail]);
 
   const handleOpenContact = async (businessId: string) => {
     setIsLoadingContact(true);
@@ -332,7 +341,12 @@ export default function ShoppingPage() {
         ) : filteredProducts.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {filteredProducts.map((item) => (
-                    <ProductCard key={item.id} product={item} onContact={handleOpenContact} />
+                    <ProductCard 
+                        key={item.id} 
+                        product={item} 
+                        onContact={handleOpenContact} 
+                        onViewDetail={() => setSelectedProductForDetail(item)}
+                    />
                 ))}
             </div>
         ) : (
@@ -348,6 +362,129 @@ export default function ShoppingPage() {
             </div>
         )}
       </div>
+
+      {/* MODAL DÉTAIL PRODUIT */}
+      <Dialog open={!!selectedProductForDetail} onOpenChange={(open) => !open && setSelectedProductForDetail(null)}>
+        <DialogContent className="max-w-2xl w-[95vw] rounded-3xl p-0 overflow-hidden border-none shadow-2xl max-h-[95vh] flex flex-col">
+            {selectedProductForDetail && (
+                <>
+                    <DialogHeader className="p-0 relative shrink-0">
+                        <button 
+                            onClick={() => setSelectedProductForDetail(null)}
+                            className="absolute top-4 right-4 z-20 p-2 bg-black/20 hover:bg-black/40 rounded-full text-white backdrop-blur-md transition-colors shadow-lg"
+                        >
+                            <X className="size-5" />
+                        </button>
+                        
+                        <div className="aspect-video sm:aspect-[16/9] bg-muted relative overflow-hidden">
+                            {selectedProductForDetail.images && selectedProductForDetail.images.length > 0 ? (
+                                <>
+                                    <img 
+                                        src={selectedProductForDetail.images[activeImageIdx]} 
+                                        className="w-full h-full object-cover animate-in fade-in duration-500" 
+                                        alt={selectedProductForDetail.title} 
+                                    />
+                                    {selectedProductForDetail.images.length > 1 && (
+                                        <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 px-4">
+                                            {selectedProductForDetail.images.map((_, idx) => (
+                                                <button 
+                                                    key={idx} 
+                                                    onClick={() => setActiveImageIdx(idx)}
+                                                    className={cn(
+                                                        "size-2 rounded-full transition-all shadow-md",
+                                                        activeImageIdx === idx ? "bg-primary w-6" : "bg-white/60 hover:bg-white"
+                                                    )}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground/30">
+                                    <ImageIcon className="size-16" />
+                                    <span className="font-black uppercase text-[10px] mt-2">Aucun visuel</span>
+                                </div>
+                            )}
+                            <div className="absolute top-4 left-4 flex flex-col gap-2">
+                                <Badge className={cn(
+                                    "font-black text-[10px] uppercase border-none shadow-lg px-3 h-7",
+                                    selectedProductForDetail.promoType === 'Promo' ? "bg-red-600 animate-pulse" : "bg-primary"
+                                )}>
+                                    {selectedProductForDetail.promoType}
+                                </Badge>
+                                <Badge variant="outline" className="bg-white/90 backdrop-blur-md border-none text-slate-800 font-black text-[9px] uppercase shadow-lg">
+                                    {selectedProductForDetail.category}
+                                </Badge>
+                            </div>
+                        </div>
+                    </DialogHeader>
+
+                    <div className="flex-1 overflow-y-auto bg-white p-6 space-y-6 scrollbar-hide">
+                        <div className="space-y-2">
+                            <h2 className="text-2xl font-black uppercase tracking-tighter leading-tight text-slate-800">
+                                {selectedProductForDetail.title}
+                            </h2>
+                            <div className="flex items-center gap-2 text-primary">
+                                <Store className="size-4" />
+                                <span className="text-xs font-black uppercase">{selectedProductForDetail.business?.name}</span>
+                                <span className="text-slate-300">•</span>
+                                <MapPin className="size-3" />
+                                <span className="text-[10px] font-bold uppercase">{selectedProductForDetail.business?.commune}</span>
+                            </div>
+                        </div>
+
+                        <div className="p-5 bg-muted/10 rounded-2xl border-2 border-dashed border-primary/10 flex items-center justify-between">
+                            <div className="space-y-1">
+                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-none">Prix de vente</p>
+                                <div className="flex items-baseline gap-2">
+                                    <span className={cn(
+                                        "text-4xl font-black tracking-tighter",
+                                        selectedProductForDetail.promoType === 'Promo' ? "text-red-600" : "text-primary"
+                                    )}>
+                                        {selectedProductForDetail.price}
+                                    </span>
+                                    <span className="text-xs font-black uppercase opacity-60">FCFP</span>
+                                </div>
+                            </div>
+                            
+                            {selectedProductForDetail.promoType === 'Promo' && selectedProductForDetail.originalPrice && (
+                                <div className="text-right flex flex-col items-end gap-1">
+                                    <span className="text-sm text-muted-foreground line-through font-bold">{selectedProductForDetail.originalPrice} F</span>
+                                    {selectedProductForDetail.discountPercentage && (
+                                        <Badge className="bg-red-600 text-white font-black text-sm px-2 py-1 rounded-lg shadow-lg border-none">
+                                            -{Math.round(selectedProductForDetail.discountPercentage)}%
+                                        </Badge>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="space-y-3">
+                            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                                <FileText className="size-3" /> Description de l'offre
+                            </h3>
+                            <p className="text-sm font-medium leading-relaxed text-slate-600 whitespace-pre-wrap italic">
+                                {selectedProductForDetail.description || "Aucun détail complémentaire fourni pour cet article."}
+                            </p>
+                        </div>
+                    </div>
+
+                    <DialogFooter className="p-4 bg-slate-50 border-t flex flex-col gap-2 shrink-0">
+                        <Button 
+                            className="w-full h-14 font-black uppercase tracking-widest shadow-xl gap-2 text-base"
+                            onClick={() => {
+                                const id = selectedProductForDetail.businessId;
+                                setSelectedProductForDetail(null);
+                                handleOpenContact(id);
+                            }}
+                        >
+                            Contacter le magasin <ChevronRight className="size-5" />
+                        </Button>
+                    </DialogFooter>
+                </>
+            )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
         <DialogContent className="max-w-md w-[95vw] rounded-3xl p-0 overflow-hidden border-none shadow-2xl">
@@ -420,15 +557,26 @@ export default function ShoppingPage() {
   );
 }
 
-function ProductCard({ product, onContact }: { product: Promotion & { business?: Business }, onContact: (id: string) => void }) {
+function ProductCard({ 
+    product, 
+    onContact, 
+    onViewDetail 
+}: { 
+    product: Promotion & { business?: Business }, 
+    onContact: (id: string) => void,
+    onViewDetail: () => void 
+}) {
     const isPromo = product.promoType === 'Promo';
     const images = product.images || (product.imageUrl ? [product.imageUrl] : []);
     
     return (
-        <Card className={cn(
-            "overflow-hidden border-2 shadow-sm flex flex-col group transition-all hover:border-primary/40",
-            isPromo && "border-red-100 bg-red-50/10"
-        )}>
+        <Card 
+            className={cn(
+                "overflow-hidden border-2 shadow-sm flex flex-col group transition-all hover:border-primary/40 cursor-pointer active:scale-[0.98]",
+                isPromo && "border-red-100 bg-red-50/10"
+            )}
+            onClick={onViewDetail}
+        >
             <div className="px-3 py-2 bg-muted/20 border-b flex items-center justify-between">
                 <div className="flex items-center gap-2 min-w-0">
                     <div className="size-6 rounded-lg bg-white flex items-center justify-center border shadow-sm shrink-0">
@@ -503,7 +651,7 @@ function ProductCard({ product, onContact }: { product: Promotion & { business?:
                 </div>
             </div>
             
-            <div className="p-2 border-t bg-muted/10">
+            <div className="p-2 border-t bg-muted/10" onClick={(e) => e.stopPropagation()}>
                 <Button 
                     variant="ghost" 
                     className="w-full h-10 text-[9px] font-black uppercase text-primary gap-2 hover:bg-primary/5 active:scale-95 transition-transform"
