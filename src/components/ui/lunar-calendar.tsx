@@ -44,13 +44,16 @@ import {
   Maximize2,
   Moon,
   Fish,
-  Waves
+  Waves,
+  Star,
+  Clock
 } from 'lucide-react';
 import { Button } from './button';
 import { cn, getRegionalNow } from '@/lib/utils';
 import { useCalendarView } from '@/context/calendar-view-context';
 import type { Tide } from '@/lib/types';
 import { CrabIcon, LobsterIcon } from '../icons';
+import { Badge } from './badge';
 
 export const MoonPhaseIcon = ({
   phase,
@@ -341,18 +344,18 @@ export function LunarCalendar() {
       </div>
 
       <Dialog open={!!detailedDay} onOpenChange={(isOpen) => !isOpen && setDetailedDay(null)}>
-        <DialogContent className="w-[95vw] sm:max-w-lg rounded-2xl">
-          <DialogHeader>
+        <DialogContent className="w-[95vw] sm:max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto p-0">
+          <DialogHeader className="p-6 pb-4 border-b sticky top-0 bg-background z-10">
             <DialogTitle className="text-xl font-black uppercase tracking-tight text-slate-800">
               {detailedDay ? format(detailedDay, 'eeee d MMMM', { locale: fr }) : ''}
             </DialogTitle>
             <DialogDescription className="text-xs font-bold uppercase opacity-60">
-              Détails tactiques de la journée • {selectedRegion}
+              Fiche Tactique Journalière • {selectedRegion}
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
+          <div className="p-6">
             {detailedDay && detailedDayData && (
-              <div className="space-y-4">
+              <div className="space-y-8">
                 {calendarView === 'champs' ? (
                   <div className="p-4 bg-primary/5 rounded-xl border border-primary/10">
                     <p className="text-sm font-medium leading-relaxed">
@@ -360,50 +363,121 @@ export function LunarCalendar() {
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {detailedDayData.pelagicInfo?.inSeason && (
-                      <div className="p-3 bg-primary/10 border-2 border-primary/20 rounded-xl flex items-start gap-3 text-primary">
-                        <Fish className="size-5 shrink-0 mt-0.5" />
-                        <p className="text-xs font-bold leading-tight">{detailedDayData.pelagicInfo.message}</p>
+                  <div className="space-y-8">
+                    {/* SECTION 1: MARÉES DU JOUR */}
+                    <div className="space-y-3">
+                      <h3 className="text-[10px] font-black uppercase text-primary tracking-widest px-1 flex items-center gap-2">
+                        <Waves className="size-3" /> Marées du jour
+                      </h3>
+                      <div className="bg-blue-50/50 border rounded-2xl p-4">
+                        <div className="flex justify-between text-[9px] font-black uppercase text-muted-foreground/60 mb-2 px-2">
+                          <span>Heure</span>
+                          <span>Hauteur</span>
+                        </div>
+                        <div className="space-y-1">
+                          {detailedDayData.tides
+                            .sort((a, b) => {
+                              const timeA = a.time.split(':').map(Number).reduce((h, m) => h * 60 + m);
+                              const timeB = b.time.split(':').map(Number).reduce((h, m) => h * 60 + m);
+                              return timeA - timeB;
+                            })
+                            .map((tide, i) => (
+                              <div key={i} className="flex justify-between items-center py-2 px-2 border-b border-blue-100/50 last:border-0">
+                                <span className="font-black text-primary text-sm">{tide.time}</span>
+                                <span className="font-black text-slate-800 text-sm">{tide.height.toFixed(2)}m</span>
+                              </div>
+                            ))}
+                        </div>
                       </div>
-                    )}
-                    <div className="p-4 bg-blue-50 border-2 border-blue-100 rounded-xl space-y-2 shadow-sm">
-                      <p className="text-[10px] font-black uppercase text-blue-600 flex items-center gap-2 tracking-widest">
-                        <CrabIcon className="size-3" /> État des Crustacés
-                      </p>
-                      <p className="text-xs font-bold text-slate-800 leading-relaxed italic">
-                        "{detailedDayData.crabAndLobster.crabMessage}"
-                      </p>
-                      <p className="text-xs font-bold text-slate-800 leading-relaxed italic">
-                        "{detailedDayData.crabAndLobster.lobsterMessage}"
-                      </p>
+                    </div>
+
+                    {/* SECTION 2: CRUSTACÉS & MOLLUSQUES */}
+                    <div className="space-y-3">
+                      <h3 className="text-[10px] font-black uppercase text-primary tracking-widest px-1 flex items-center gap-2">
+                        <CrabIcon className="size-3" /> Crustacés & Mollusques
+                      </h3>
+                      <div className="grid gap-2">
+                        <div className="flex items-center justify-between p-3 bg-white border-2 rounded-2xl shadow-sm">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-red-50 rounded-xl"><CrabIcon className="size-5 text-red-500" /></div>
+                            <div>
+                              <p className="font-black text-xs uppercase">Crabe</p>
+                              <p className="text-[9px] font-medium text-muted-foreground leading-tight">{detailedDayData.crabAndLobster.crabMessage}</p>
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="text-[8px] font-black uppercase border-primary/20 text-primary h-5 px-1.5">{detailedDayData.crabAndLobster.crabStatus}</Badge>
+                        </div>
+                        <div className="flex items-center justify-between p-3 bg-white border-2 rounded-2xl shadow-sm">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-50 rounded-xl"><LobsterIcon className="size-5 text-blue-500" /></div>
+                            <div>
+                              <p className="font-black text-xs uppercase">Langouste</p>
+                              <p className="text-[9px] font-medium text-muted-foreground leading-tight">{detailedDayData.crabAndLobster.lobsterMessage}</p>
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="text-[8px] font-black uppercase border-primary/20 text-primary h-5 px-1.5">{detailedDayData.crabAndLobster.lobsterActivity}</Badge>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SECTION 3: PRÉVISIONS PAR ESPÈCES */}
+                    <div className="space-y-6">
+                      <h3 className="text-[10px] font-black uppercase text-primary tracking-widest px-1 flex items-center gap-2">
+                        <Fish className="size-3" /> Prévisions par espèces
+                      </h3>
+                      {detailedDayData.fishing.map((slot, sIdx) => (
+                        <div key={sIdx} className="space-y-3">
+                          <div className="flex items-center gap-2 text-[9px] font-black uppercase text-muted-foreground/60 px-1 border-l-2 border-primary/20 ml-1 pl-2">
+                            <Clock className="size-3" /> {slot.timeOfDay}
+                          </div>
+                          <div className="grid gap-3">
+                            {slot.fish.map((f, fIdx) => (
+                              <div key={fIdx} className="bg-white border-2 rounded-2xl p-4 shadow-sm space-y-3">
+                                <div className="flex justify-between items-start">
+                                  <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-primary/5 rounded-xl"><Fish className="size-5 text-primary" /></div>
+                                    <div>
+                                      <h4 className="font-black text-sm uppercase leading-none">{f.name}</h4>
+                                      <span className="text-[8px] font-bold text-muted-foreground uppercase">{f.location}</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-col items-end gap-0.5">
+                                    <div className="flex gap-0.5">
+                                      {[...Array(5)].map((_, i) => (
+                                        <Star key={i} className={cn("size-3", i < Math.floor(f.rating / 2) ? "fill-yellow-400 text-yellow-400" : "text-slate-200")} />
+                                      ))}
+                                    </div>
+                                    <span className="text-[9px] font-black opacity-40">{f.rating}/10</span>
+                                  </div>
+                                </div>
+                                <div className="grid gap-2 pt-3 border-t border-dashed">
+                                  <div className="flex gap-2">
+                                    <span className="text-[8px] font-black uppercase text-muted-foreground min-w-[75px]">Activité:</span>
+                                    <span className="text-[10px] font-medium leading-relaxed">{f.advice.activity}</span>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <span className="text-[8px] font-black uppercase text-muted-foreground min-w-[75px]">Profondeur:</span>
+                                    <span className="text-[10px] font-black text-primary uppercase">{f.advice.depth}</span>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <span className="text-[8px] font-black uppercase text-muted-foreground min-w-[75px]">Spot:</span>
+                                    <span className="text-[10px] font-medium leading-relaxed italic">"{f.advice.location_specific}"</span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
-                
-                <div className="space-y-2">
-                  <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Prochaines Marées</p>
-                  {detailedDayData.tides.map((tide, i) => (
-                    <div key={i} className={cn(
-                      "flex justify-between items-center p-3 border rounded-lg",
-                      tide.type === 'haute' ? "bg-primary/5 border-primary/10" : "bg-destructive/5 border-destructive/10"
-                    )}>
-                      <span className={cn("text-[10px] font-black uppercase", tide.type === 'haute' ? "text-primary" : "text-destructive")}>
-                        {tide.type === 'haute' ? 'Pleine Mer' : 'Basse Mer'}
-                      </span>
-                      <div className="flex items-center gap-4">
-                        <span className="text-sm font-black">{tide.time}</span>
-                        <span className={cn("text-sm font-black", tide.type === 'haute' ? "text-primary" : "text-destructive")}>{tide.height.toFixed(2)}m</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="p-4 border-t bg-muted/10">
             <DialogClose asChild>
-              <Button variant="outline" className="w-full h-12 font-black uppercase">Compris</Button>
+              <Button variant="outline" className="w-full h-12 font-black uppercase shadow-sm">Compris</Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>
