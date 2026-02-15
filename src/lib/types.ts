@@ -71,6 +71,7 @@ export interface UserAccount {
   fcmToken?: string;
   // Nouveaux champs de contact
   phoneNumber?: string;
+  phoneCountryCode?: string;
   landline?: string;
   address?: string;
   contactLocation?: { latitude: number; longitude: number };
@@ -87,6 +88,7 @@ export interface Business {
   createdAt: any;
   // Nouveaux champs de contact pour les pros
   phoneNumber?: string;
+  phoneCountryCode?: string;
   landline?: string;
   address?: string;
   location?: { latitude: number; longitude: number };

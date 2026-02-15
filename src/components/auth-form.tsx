@@ -63,7 +63,8 @@ const signupSchema = z.object({
   password: z.string().min(6, { message: 'Le mot de passe doit contenir au moins 6 caractères.' }),
   region: z.enum(['CALEDONIE', 'TAHITI']),
   commune: z.string().min(1, { message: 'Veuillez choisir votre commune.' }),
-  phoneNumber: z.string().optional(),
+  phoneCountryCode: z.string().min(1),
+  phoneNumber: z.string().min(6, { message: 'Numéro de mobile obligatoire (min. 6 chiffres).' }),
   landline: z.string().optional(),
   address: z.string().optional(),
   token: z.string().optional(),
@@ -94,6 +95,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       password: '',
       region: 'CALEDONIE',
       commune: 'Nouméa',
+      phoneCountryCode: '+687',
       phoneNumber: '',
       landline: '',
       address: '',
@@ -115,6 +117,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   useEffect(() => {
     if (mode === 'signup' && selectedRegion) {
       form.setValue('commune', availableLocations[0]);
+      form.setValue('phoneCountryCode', selectedRegion === 'CALEDONIE' ? '+687' : '+689');
     }
   }, [selectedRegion, availableLocations, form, mode]);
 
@@ -194,7 +197,8 @@ export function AuthForm({ mode }: AuthFormProps) {
             subscriptionStatus: 'trial',
             selectedRegion: signupValues.region,
             lastSelectedLocation: signupValues.commune,
-            phoneNumber: signupValues.phoneNumber || '',
+            phoneCountryCode: signupValues.phoneCountryCode,
+            phoneNumber: signupValues.phoneNumber,
             landline: signupValues.landline || '',
             address: signupValues.address || '',
             subscribedCategories: signupValues.subscribedCategories,
@@ -307,51 +311,77 @@ export function AuthForm({ mode }: AuthFormProps) {
               />
             </div>
 
-            <div className="p-4 bg-muted/10 border-2 border-dashed rounded-2xl space-y-4 animate-in fade-in">
+            <div className="p-4 bg-muted/10 border-2 rounded-2xl space-y-4 animate-in fade-in">
               <div className="flex items-center gap-2 border-b border-dashed pb-2">
                 <Phone className="size-4 text-primary" />
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-800">Coordonnées (Optionnel)</h3>
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-800">Coordonnées</h3>
               </div>
               
-              <div className="grid grid-cols-2 gap-3">
-                <FormField
-                  control={form.control}
-                  name="phoneNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-[10px]">Mobile</FormLabel>
-                      <FormControl>
-                        <Input type="tel" placeholder="Mobile" {...field} className="h-10 border-2" />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="landline"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-[10px]">Fixe</FormLabel>
-                      <FormControl>
-                        <Input type="tel" placeholder="Fixe" {...field} className="h-10 border-2" />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
+              <div className="space-y-3">
+                <div className="grid grid-cols-3 gap-2">
+                  <FormField
+                    control={form.control}
+                    name="phoneCountryCode"
+                    render={({ field }) => (
+                      <FormItem className="col-span-1">
+                        <FormLabel className="text-[10px] font-black uppercase">Code</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="h-10 border-2 font-black text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="+687" className="text-xs font-black">+687 (NC)</SelectItem>
+                            <SelectItem value="+689" className="text-xs font-black">+689 (PF)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="phoneNumber"
+                    render={({ field }) => (
+                      <FormItem className="col-span-2">
+                        <FormLabel className="text-[10px] font-black uppercase">Mobile (Obligatoire)</FormLabel>
+                        <FormControl>
+                          <Input type="tel" placeholder="00 00 00" {...field} className="h-10 border-2 font-black" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-              <FormField
-                control={form.control}
-                name="address"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-[10px]">Adresse physique</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ex: 12 rue des Flamboyants" {...field} className="h-10 border-2" />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
+                <div className="pt-2 space-y-3 border-t border-dashed">
+                  <p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest italic">Informations optionnelles :</p>
+                  <FormField
+                    control={form.control}
+                    name="landline"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px]">Téléphone Fixe</FormLabel>
+                        <FormControl>
+                          <Input type="tel" placeholder="Fixe" {...field} className="h-10 border-2" />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="address"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px]">Adresse physique</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Ex: 12 rue des Flamboyants" {...field} className="h-10 border-2" />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
             </div>
           </>
         )}
