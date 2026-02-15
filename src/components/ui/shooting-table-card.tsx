@@ -93,16 +93,22 @@ const BALLISTIC_DATABASE: MunitionData[] = [
   // 9.3x62
   { id: '93x62-285-oryx', caliber: '9.3x62', model: 'Norma Oryx', weight: 285, v0: 720, bc: 0.330, usage: 'Le calibre stoppeur par excellence. Énergie massive pour le gros cerf et le cochon en brousse.', color: 'bg-amber-900' },
 
-  // Calibres Lisses
-  { id: '12-b-28', caliber: 'Calibre 12', model: 'Balle Brenneke', weight: 28, v0: 430, bc: 0.075, usage: 'Référence pour le gros cochon en battue.', color: 'bg-red-600' },
-  { id: '12-b-31', caliber: 'Calibre 12', model: 'Balle Brenneke', weight: 31, v0: 415, bc: 0.080, usage: 'Plus lourde pour traverser les fourrés.', color: 'bg-red-600' },
-  { id: '12-b-39', caliber: 'Calibre 12', model: 'Balle Brenneke (Magnum)', weight: 39, v0: 440, bc: 0.090, usage: 'Puissance d\'arrêt maximale en Magnum.', color: 'bg-red-600' },
-  { id: '12-s-26', caliber: 'Calibre 12', model: 'Balle Sauvestre (Flèche)', weight: 26, v0: 480, bc: 0.120, usage: 'Balle sous-calibrée à haute vitesse. Précision remarquable jusqu\'à 100m.', color: 'bg-red-600' },
-  { id: '16-b-21', caliber: 'Calibre 16', model: 'Balle Brenneke', weight: 21, v0: 415, bc: 0.060, usage: 'Ancien standard, recul modéré.', color: 'bg-orange-800' },
-  { id: '20-b-18', caliber: 'Calibre 20', model: 'Balle Brenneke', weight: 18, v0: 425, bc: 0.055, usage: 'Idéal pour fusils légers, très précis.', color: 'bg-yellow-800' },
-  { id: '410-b-7', caliber: 'Calibre .410', model: 'Balle Brenneke', weight: 7, v0: 530, bc: 0.065, usage: 'Petit calibre pour le cochon à courte distance.', color: 'bg-slate-700' },
+  // Calibres Lisses - CALIBRE 12 (Slugs / Balles)
+  { id: '12-sauv-26', caliber: 'Calibre 12', model: 'Balle Sauvestre (Flèche)', weight: 26, v0: 480, bc: 0.120, usage: 'Balle flèche sous-calibrée. Précision remarquable et trajectoire tendue jusqu\'à 100m.', color: 'bg-red-600' },
+  { id: '12-brenn-31', caliber: 'Calibre 12', model: 'Balle Brenneke Classique', weight: 31, v0: 415, bc: 0.080, usage: 'La référence brousse pour le gros cochon. Puissance d\'arrêt et pénétration garanties.', color: 'bg-red-600' },
+  { id: '12-brenn-mag-39', caliber: 'Calibre 12', model: 'Balle Brenneke Magnum', weight: 39, v0: 440, bc: 0.090, usage: 'Puissance d\'arrêt maximale pour fusils chambrés 76mm. Idéal pour stopper net un gros spécimen.', color: 'bg-red-600' },
+  { id: '12-brenn-s-28', caliber: 'Calibre 12', model: 'Balle Brenneke "S"', weight: 28, v0: 430, bc: 0.075, usage: 'Version standard plus rapide avec un recul maîtrisé. Excellent pour le tir vif.', color: 'bg-red-600' },
+  
+  // Calibre 16
+  { id: '16-brenn-21', caliber: 'Calibre 16', model: 'Balle Brenneke', weight: 21, v0: 415, bc: 0.060, usage: 'Efficacité classique pour fusils de calibre 16.', color: 'bg-orange-800' },
+  
+  // Calibre 20
+  { id: '20-brenn-18', caliber: 'Calibre 20', model: 'Balle Brenneke', weight: 18, v0: 425, bc: 0.055, usage: 'Idéal pour fusils légers, offre une précision surprenante à courte distance.', color: 'bg-yellow-800' },
+  
+  // Calibre .410
+  { id: '410-brenn-7', caliber: 'Calibre .410', model: 'Balle Brenneke', weight: 7, v0: 530, bc: 0.065, usage: 'Petit calibre de brousse pour nuisibles ou cochon à très courte distance.', color: 'bg-slate-700' },
 
-  // 22mm
+  // 22mm (Tir de loisir / Nuisibles)
   { id: '22mm-lr-40', caliber: '22mm', model: '.22 LR Standard', weight: 40, v0: 330, bc: 0.125, usage: 'Petits nuisibles et tir de loisir.', color: 'bg-zinc-500' },
   { id: '22mm-wmr-40', caliber: '22mm', model: '.22 WMR (Magnum)', weight: 40, v0: 570, bc: 0.145, usage: 'Vitesse élevée pour renard et nuisibles.', color: 'bg-zinc-500' },
 ];
@@ -212,7 +218,7 @@ export function ShootingTableCard() {
     const vAvgTarget = v0 * (1 - (0.00008 * dist) / bc);
     const timeTarget = dist / vAvgTarget;
     
-    // Composante latérale du vent (Full crosswind à 90°)
+    // Composante latérale du vent
     const angleRad = (wAng * Math.PI) / 180;
     const crosswindMps = (wSpeed / 3.6) * Math.sin(angleRad);
     
@@ -224,11 +230,9 @@ export function ShootingTableCard() {
     return {
         dist,
         dropCm: parseFloat(Math.abs(correctionCm).toFixed(1)),
-        // Si correctionCm > 0, la balle est en dessous de la ligne de visée -> on monte la lunette
         clicks: Math.abs(Math.round(correctionCm / distFactor)),
         elevationDir: correctionCm > 0 ? 'HAUT' : 'BAS',
         driftCm: parseFloat(Math.abs(windDriftCm).toFixed(1)),
-        // Si windDriftCm > 0 (vent de droite), la balle part à gauche -> on clique à droite
         driftClicks: Math.abs(Math.round(windDriftCm / distFactor)),
         driftDir: windDriftCm > 0 ? 'DROITE' : 'GAUCHE'
     };
@@ -236,6 +240,7 @@ export function ShootingTableCard() {
 
   const resultsTable = useMemo(() => {
     if (selectedMunition.caliber.startsWith('Calibre')) {
+        // Distances courtes pour les fusils lisses
         return [calculateBallistics(50), calculateBallistics(75), calculateBallistics(100)];
     }
     if (selectedMunition.caliber === '22mm') {
@@ -334,7 +339,6 @@ export function ShootingTableCard() {
                 />
             </div>
 
-            {/* SECTION VENT */}
             <div className="space-y-1.5">
                 <Label className="text-[9px] font-black uppercase text-blue-600 ml-1">Force du Vent (km/h)</Label>
                 <div className="relative">
@@ -472,7 +476,7 @@ export function ShootingTableCard() {
                 Avis de Sécurité
             </AlertTitle>
             <AlertDescription className="text-[9px] leading-relaxed italic text-slate-300 font-medium">
-                Simulation théorique G1. Les calculs de dérive sont donnés pour une force de vent constante sur toute la trajectoire. Vérifiez toujours votre réglage sur cible avant de chasser.
+                Simulation théorique G1. Pour les fusils lisses, la précision chute drastiquement au-delà de 75m. Vérifiez toujours votre réglage sur cible avant de chasser.
             </AlertDescription>
         </Alert>
       </CardContent>
