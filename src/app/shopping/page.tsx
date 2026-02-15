@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, collectionGroup, query, orderBy, doc, getDoc } from 'firebase/firestore';
+import { collection, collectionGroup, query, orderBy, doc, getDoc, deleteDoc } from 'firebase/firestore';
 import type { Promotion, Business, UserAccount, Region } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -39,15 +39,18 @@ import {
     Globe,
     ImageIcon,
     ChevronLeft,
-    FileText
+    FileText,
+    Trash2
 } from 'lucide-react';
 import { locations, locationsByRegion, regions } from '@/lib/locations';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
 
 export default function ShoppingPage() {
   const { user } = useUser();
   const firestore = useFirestore();
+  const { toast } = useToast();
 
   // --- DATA FETCHING ---
   const userProfileRef = useMemoFirebase(() => {
@@ -142,6 +145,24 @@ export default function ShoppingPage() {
   const userRegion = profile?.selectedRegion || 'CALEDONIE';
   const userCommune = profile?.lastSelectedLocation || 'Nouméa';
 
+  // --- MODERATION ---
+  const isAdmin = useMemo(() => {
+    if (!user) return false;
+    return (user.email?.toLowerCase() === 'f.mallet81@outlook.com' || user.uid === 't8nPnZLcTiaLJSKMuLzib3C5nPn1') || profile?.role === 'admin' || profile?.subscriptionStatus === 'admin';
+  }, [user, profile]);
+
+  const handleDeleteProduct = async (id: string, businessId: string) => {
+    if (!firestore || !isAdmin) return;
+    if (!window.confirm("Supprimer cette annonce définitivement ? Cette action est irréversible.")) return;
+    
+    try {
+        await deleteDoc(doc(firestore, 'businesses', businessId, 'promotions', id));
+        toast({ title: "Annonce supprimée avec succès" });
+    } catch (e) {
+        toast({ variant: "destructive", title: "Erreur suppression", description: "Vérifiez vos droits administrateur." });
+    }
+  };
+
   // --- LOGIQUE DE FILTRAGE ---
   const filteredProducts = useMemo(() => {
     if (!allPromotions) return [];
@@ -218,11 +239,6 @@ export default function ShoppingPage() {
   };
 
   const isLoading = isBusinessesLoading || isPromosLoading;
-  
-  const isAdmin = useMemo(() => {
-    if (!user) return false;
-    return (user.email?.toLowerCase() === 'f.mallet81@outlook.com' || user.uid === 't8nPnZLcTiaLJSKMuLzib3C5nPn1') || profile?.role === 'admin' || profile?.subscriptionStatus === 'admin';
-  }, [user, profile]);
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-20">
@@ -370,6 +386,8 @@ export default function ShoppingPage() {
                         product={item} 
                         onContact={handleOpenContact} 
                         onViewDetail={() => setSelectedProductForDetail(item)}
+                        onDelete={handleDeleteProduct}
+                        isAdmin={isAdmin}
                     />
                 ))}
             </div>
@@ -513,6 +531,20 @@ export default function ShoppingPage() {
                         >
                             Contacter le magasin <ChevronRight className="size-5" />
                         </Button>
+                        {isAdmin && (
+                            <Button 
+                                variant="ghost"
+                                className="w-full text-destructive font-black uppercase text-[10px]"
+                                onClick={() => {
+                                    const pid = selectedProductForDetail.id;
+                                    const bid = selectedProductForDetail.businessId;
+                                    setSelectedProductForDetail(null);
+                                    handleDeleteProduct(pid, bid);
+                                }}
+                            >
+                                <Trash2 className="size-3 mr-2" /> Supprimer cette annonce (Admin)
+                            </Button>
+                        )}
                     </DialogFooter>
                 </>
             )}
@@ -593,11 +625,15 @@ export default function ShoppingPage() {
 function ProductCard({ 
     product, 
     onContact, 
-    onViewDetail 
+    onViewDetail,
+    onDelete,
+    isAdmin
 }: { 
     product: Promotion & { business?: Business }, 
     onContact: (id: string) => void,
-    onViewDetail: () => void 
+    onViewDetail: () => void,
+    onDelete: (id: string, businessId: string) => void,
+    isAdmin: boolean
 }) {
     const isPromo = product.promoType === 'Promo';
     const images = product.images || (product.imageUrl ? [product.imageUrl] : []);
@@ -619,9 +655,24 @@ function ProductCard({
                         {product.business?.name || "Magasin NC"}
                     </span>
                 </div>
-                <div className="flex items-center gap-1 text-[8px] font-bold text-muted-foreground shrink-0 bg-white/50 px-1.5 py-0.5 rounded border">
-                    <MapPin className="size-2 text-primary" />
-                    {product.business?.commune || "NC"}
+                <div className="flex items-center gap-2">
+                    {isAdmin && (
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="size-6 text-destructive hover:bg-destructive/10"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onDelete(product.id, product.businessId);
+                            }}
+                        >
+                            <Trash2 className="size-3" />
+                        </Button>
+                    )}
+                    <div className="flex items-center gap-1 text-[8px] font-bold text-muted-foreground shrink-0 bg-white/50 px-1.5 py-0.5 rounded border">
+                        <MapPin className="size-2 text-primary" />
+                        {product.business?.commune || "NC"}
+                    </div>
                 </div>
             </div>
 
