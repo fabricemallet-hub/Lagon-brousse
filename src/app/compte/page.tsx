@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, isBefore, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { 
-  Crown, Star, XCircle, Ticket, Gift, LogOut, Mail, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink, Copy, Check, MapPin, RefreshCw, Store, Zap, Pencil, LayoutGrid, Heart, Save, Globe, Smartphone, Phone, Home, Map as MapIcon, Target
+  Crown, Star, XCircle, Ticket, Gift, LogOut, Mail, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink, Copy, Check, MapPin, RefreshCw, Store, Zap, Pencil, LayoutGrid, Heart, Save, Globe, Smartphone, Phone, Home, Map as MapIcon, Target, LocateFixed, Expand, Shrink
 } from 'lucide-react';
 import {
   Select,
@@ -72,13 +72,14 @@ export default function ComptePage() {
   const [tempAddress, setTempAddress] = useState('');
   const [tempLocation, setTempLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isSavingContact, setIsSavingContact] = useState(false);
+  const [isMapExpanded, setIsMapExpanded] = useState(false);
   const [map, setMap] = useState<google.maps.Map | null>(null);
 
   // Favorites state
   const [tempFavorites, setTempFavorites] = useState<string[]>([]);
   const [isSavingFavorites, setIsSavingFavorites] = useState(false);
 
-  const userDocRef = useMemoFirebase(() => {
+  const userProfileRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return doc(firestore, 'users', user.uid);
   }, [user, firestore]);
@@ -149,6 +150,22 @@ export default function ComptePage() {
       toast({ variant: 'destructive', title: "Erreur lors de la mise à jour du nom" });
     } finally {
       setIsSavingName(false);
+    }
+  };
+
+  const handleLocateMe = () => {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((pos) => {
+            const newLoc = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+            setTempLocation(newLoc);
+            if (map) {
+                map.panTo({ lat: newLoc.latitude, lng: newLoc.longitude });
+                map.setZoom(17);
+            }
+            toast({ title: "Position détectée" });
+        }, () => {
+            toast({ variant: "destructive", title: "Erreur GPS", description: "Impossible de vous localiser." });
+        });
     }
   };
 
@@ -432,12 +449,12 @@ export default function ComptePage() {
                         <DialogTrigger asChild>
                             <Button variant="ghost" size="sm" className="h-6 text-[8px] font-black uppercase text-primary border border-primary/20">Modifier</Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-md w-[95vw] rounded-2xl max-h-[90vh] overflow-y-auto">
-                            <DialogHeader>
+                        <DialogContent className="max-w-md w-[95vw] rounded-2xl max-h-[90vh] overflow-y-auto p-0">
+                            <DialogHeader className="p-6 bg-slate-50 border-b">
                                 <DialogTitle className="font-black uppercase tracking-tight">Mes Coordonnées</DialogTitle>
                                 <DialogDescription className="text-[10px] font-bold uppercase">Informations de contact pour le Shopping</DialogDescription>
                             </DialogHeader>
-                            <div className="py-4 space-y-4">
+                            <div className="p-6 space-y-5 pb-32">
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1">
                                         <Label className="text-[9px] font-black uppercase opacity-60">Mobile</Label>
@@ -452,18 +469,29 @@ export default function ComptePage() {
                                     <Label className="text-[9px] font-black uppercase opacity-60">Adresse physique</Label>
                                     <Input value={tempAddress} onChange={e => setTempAddress(e.target.value)} placeholder="Rue, quartier..." className="font-bold border-2" />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label className="text-[9px] font-black uppercase opacity-60 flex items-center gap-2">
-                                        <MapIcon className="size-3" /> Point GPS Boutique
-                                    </Label>
-                                    <div className="h-48 rounded-xl overflow-hidden border-2 relative">
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between px-1">
+                                        <Label className="text-[9px] font-black uppercase opacity-60 flex items-center gap-2">
+                                            <MapIcon className="size-3" /> Point GPS Boutique
+                                        </Label>
+                                        <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            className="h-6 text-[8px] font-black uppercase text-primary border border-primary/10 gap-1 bg-white"
+                                            onClick={handleLocateMe}
+                                        >
+                                            <LocateFixed className="size-3" /> Ma position actuelle
+                                        </Button>
+                                    </div>
+                                    <div className={cn("rounded-xl overflow-hidden border-2 relative transition-all duration-300", isMapExpanded ? "h-80" : "h-48")}>
                                         {isMapLoaded ? (
                                             <GoogleMap
                                                 mapContainerClassName="w-full h-full"
                                                 center={tempLocation ? { lat: tempLocation.latitude, lng: tempLocation.longitude } : INITIAL_CENTER}
-                                                zoom={tempLocation ? 15 : 8}
+                                                zoom={tempLocation ? 17 : 8}
                                                 onClick={(e) => { if (e.latLng) setTempLocation({ latitude: e.latLng.lat(), longitude: e.latLng.lng() }); }}
-                                                options={{ disableDefaultUI: true, mapTypeId: 'satellite' }}
+                                                onLoad={setMap}
+                                                options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
                                             >
                                                 {tempLocation && (
                                                     <OverlayView position={{ lat: tempLocation.latitude, lng: tempLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
@@ -474,7 +502,18 @@ export default function ComptePage() {
                                                 )}
                                             </GoogleMap>
                                         ) : <Skeleton className="h-full w-full" />}
-                                        <div className="absolute bottom-2 left-2 right-2 bg-black/60 backdrop-blur-md p-1.5 rounded-lg text-[8px] text-white text-center font-bold uppercase">
+                                        
+                                        <div className="absolute top-2 right-2 flex flex-col gap-2">
+                                            <Button 
+                                                size="icon" 
+                                                className="bg-white/90 backdrop-blur-md border shadow-lg h-8 w-8 text-primary hover:bg-white"
+                                                onClick={() => setIsMapExpanded(!isMapExpanded)}
+                                            >
+                                                {isMapExpanded ? <Shrink className="size-4" /> : <Expand className="size-4" />}
+                                            </Button>
+                                        </div>
+
+                                        <div className="absolute bottom-2 left-2 right-2 bg-black/60 backdrop-blur-md p-1.5 rounded-lg text-[8px] text-white text-center font-bold uppercase pointer-events-none">
                                             Cliquez sur la carte pour définir votre position
                                         </div>
                                     </div>
@@ -485,10 +524,10 @@ export default function ComptePage() {
                                     )}
                                 </div>
                             </div>
-                            <DialogFooter>
-                                <Button onClick={handleSaveContact} disabled={isSavingContact} className="w-full h-12 font-black uppercase tracking-widest">
-                                    {isSavingContact ? <RefreshCw className="size-4 animate-spin mr-2" /> : <Save className="size-4 mr-2" />}
-                                    Sauvegarder
+                            <DialogFooter className="p-4 bg-white border-t sticky bottom-0 z-20">
+                                <Button onClick={handleSaveContact} disabled={isSavingContact} className="w-full h-14 font-black uppercase tracking-widest shadow-xl">
+                                    {isSavingContact ? <RefreshCw className="size-5 animate-spin mr-2" /> : <Save className="size-5 mr-2" />}
+                                    Sauvegarder mes coordonnées
                                 </Button>
                             </DialogFooter>
                         </DialogContent>
