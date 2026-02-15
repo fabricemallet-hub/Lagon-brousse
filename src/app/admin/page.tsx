@@ -18,41 +18,42 @@ import {
   Zap, 
   Ticket, 
   Sparkles,
-  Search,
-  UserCog,
-  MessageSquare,
-  Users as UsersIcon,
-  Settings,
-  Bell,
-  Plus,
-  Save,
-  Smartphone,
-  Fish,
-  Pencil,
-  BrainCircuit,
-  X,
-  Store,
-  Link as LinkIcon,
-  Check,
-  RefreshCw,
-  Landmark,
-  ChevronRight,
-  UserCircle,
-  Copy,
-  Volume2,
-  Play,
-  Camera,
-  ImageIcon,
-  Clock,
-  Send,
-  CheckCircle2,
-  AlertCircle,
-  Calendar,
-  XCircle,
-  Maximize2,
-  ScrollText,
-  UserPlus,
-  Ruler
+  Search, 
+  UserCog, 
+  MessageSquare, 
+  Users as UsersIcon, 
+  Settings, 
+  Bell, 
+  Plus, 
+  Save, 
+  Smartphone, 
+  Fish, 
+  Pencil, 
+  BrainCircuit, 
+  X, 
+  Store, 
+  Link as LinkIcon, 
+  Check, 
+  RefreshCw, 
+  Landmark, 
+  ChevronRight, 
+  UserCircle, 
+  Copy, 
+  Volume2, 
+  Play, 
+  Camera, 
+  ImageIcon, 
+  Clock, 
+  Send, 
+  CheckCircle2, 
+  AlertCircle, 
+  Calendar, 
+  XCircle, 
+  Maximize2, 
+  ScrollText, 
+  UserPlus, 
+  Ruler,
+  Download
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -274,6 +275,23 @@ function SoundLibraryManager() {
     const [url, setUrl] = useState('');
     const [categories, setCategories] = useState<string[]>(['General']);
     const [isSaving, setIsSaving] = useState(false);
+    const audioInputRef = useRef<HTMLInputElement>(null);
+
+    const handleAudioFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (file.size > 800 * 1024) { 
+            toast({ variant: 'destructive', title: "Fichier trop lourd", description: "Max 800Ko recommandé." });
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            setUrl(event.target?.result as string);
+            if (!label) setLabel(file.name.split('.')[0]);
+            toast({ title: "Fichier audio prêt !" });
+        };
+        reader.readAsDataURL(file);
+    };
 
     const soundsRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'sound_library'), orderBy('label', 'asc')) : null, [firestore]);
     const { data: sounds } = useCollection<SoundLibraryEntry>(soundsRef);
@@ -314,7 +332,16 @@ function SoundLibraryManager() {
                 <div className="grid gap-4 p-5 bg-muted/10 rounded-2xl border-2 border-dashed">
                     <div className="space-y-4">
                         <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Nom du son</Label><Input value={label} onChange={e => setLabel(e.target.value)} placeholder="Ex: Alerte, Bip..." className="h-12 border-2 font-bold" /></div>
-                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">URL MP3</Label><Input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://..." className="h-12 border-2 text-xs font-mono" /></div>
+                        <div className="space-y-1.5">
+                            <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Fichier MP3 ou URL</Label>
+                            <div className="flex gap-2">
+                                <Input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://..." className="h-12 border-2 text-[10px] font-mono flex-1 bg-white" />
+                                <Button variant="outline" className="h-12 w-12 border-2 shrink-0 bg-white" onClick={() => audioInputRef.current?.click()}>
+                                    <Smartphone className="size-5" />
+                                </Button>
+                                <input type="file" accept="audio/*" ref={audioInputRef} className="hidden" onChange={handleAudioFileChange} />
+                            </div>
+                        </div>
                         <div className="space-y-2"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Catégories</Label>
                             <div className="flex flex-wrap gap-2">
                                 {['Vessel', 'Hunting', 'General'].map(cat => (
@@ -338,6 +365,11 @@ function SoundLibraryManager() {
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0">
                                     <Button variant="ghost" size="icon" className="h-10 w-10 border rounded-xl" onClick={() => { const a = new Audio(s.url); a.play(); }}><Play className="size-4" /></Button>
+                                    <Button variant="ghost" size="icon" className="h-10 w-10 border rounded-xl text-primary/60 hover:text-primary" asChild>
+                                        <a href={s.url} download={`${s.label}.mp3`} target="_blank" rel="noopener noreferrer">
+                                            <Download className="size-4" />
+                                        </a>
+                                    </Button>
                                     <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive/40 hover:text-destructive border rounded-xl" onClick={() => handleDelete(s.id)}><Trash2 className="size-4" /></Button>
                                 </div>
                             </div>
@@ -932,7 +964,7 @@ function TokenManager({ tokens }: { tokens: AccessToken[] | null }) {
                     <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Jetons actifs ({tokens?.length || 0})</p>
                     <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
                         {tokens?.slice(0, 20).map(t => (
-                            <div key={t.id} className="p-4 flex items-center justify-between border-2 rounded-2xl bg-white shadow-sm">
+                            <div key={t.id} className="p-4 flex items-center justify-between border-2 rounded-xl bg-white shadow-sm">
                                 <div className="flex flex-col">
                                     <code className="font-black text-primary text-xs select-all tracking-wider">{t.id}</code>
                                     <span className="text-[9px] font-bold uppercase opacity-40 mt-1">{t.durationMonths} mois d'accès</span>
