@@ -68,6 +68,7 @@ export function useDoc<T = any>(
           setError(contextualError);
           
           // --- SILENCE SYSTEM & CONFIG PATHS ---
+          // Prevent standard 403 screen for internal config documents
           const silentPaths = [
             'shared_access_tokens',
             'access_tokens',
