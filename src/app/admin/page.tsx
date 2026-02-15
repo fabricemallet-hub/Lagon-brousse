@@ -51,7 +51,8 @@ import {
   Calendar,
   XCircle,
   Maximize2,
-  ScrollText
+  ScrollText,
+  UserPlus
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -359,8 +360,17 @@ function BusinessManager({ businesses, users }: { businesses: Business[] | null,
     const [commune, setCommune] = useState('Nouméa');
     const [ownerId, setOwnerId] = useState('');
     const [categories, setCategories] = useState<string[]>([]);
+    
+    // États pour la recherche d'utilisateur par email
+    const [userSearch, setUserSearch] = useState('');
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
 
     const availableCats = ["Pêche", "Chasse", "Jardinage"];
+
+    const filteredUsers = useMemo(() => {
+        if (!users || userSearch.length < 2) return [];
+        return users.filter(u => u.email.toLowerCase().includes(userSearch.toLowerCase())).slice(0, 5);
+    }, [users, userSearch]);
 
     const handleSave = async () => {
         if (!firestore || !name || !ownerId) return;
@@ -386,7 +396,7 @@ function BusinessManager({ businesses, users }: { businesses: Business[] | null,
                             <CardDescription className="text-[10px] font-bold uppercase mt-1">Liez un commerce via UID.</CardDescription>
                         </div>
                     </div>
-                    <Button onClick={() => { setEditingBusiness(null); setName(''); setOwnerId(''); setCategories([]); setIsDialogOpen(true); }} className="w-full font-black uppercase h-14 tracking-widest shadow-md"><Plus className="size-5 mr-2" /> Créer / Lier une boutique</Button>
+                    <Button onClick={() => { setEditingBusiness(null); setName(''); setOwnerId(''); setCategories([]); setUserSearch(''); setIsDialogOpen(true); }} className="w-full font-black uppercase h-14 tracking-widest shadow-md"><Plus className="size-5 mr-2" /> Créer / Lier une boutique</Button>
                 </div>
             </CardHeader>
             <CardContent className="p-3 space-y-3">
@@ -400,7 +410,7 @@ function BusinessManager({ businesses, users }: { businesses: Business[] | null,
                             </div>
                         </div>
                         <div className="flex gap-2 border-t pt-3">
-                            <Button variant="outline" className="flex-1 h-12 font-black uppercase text-[10px] border-2" onClick={() => { setEditingBusiness(b); setName(b.name); setCommune(b.commune); setOwnerId(b.ownerId); setCategories(b.categories || []); setIsDialogOpen(true); }}><Pencil className="size-4 mr-2" /> Modifier</Button>
+                            <Button variant="outline" className="flex-1 h-12 font-black uppercase text-[10px] border-2" onClick={() => { setEditingBusiness(b); setName(b.name); setCommune(b.commune); setOwnerId(b.ownerId); setCategories(b.categories || []); setUserSearch(''); setIsDialogOpen(true); }}><Pencil className="size-4 mr-2" /> Modifier</Button>
                             <Button variant="ghost" className="h-12 px-4 text-destructive border-2 border-destructive/10" onClick={() => deleteDoc(doc(firestore!, 'businesses', b.id))}><Trash2 className="size-4" /></Button>
                         </div>
                     </div>
@@ -415,15 +425,65 @@ function BusinessManager({ businesses, users }: { businesses: Business[] | null,
                         </DialogTitle>
                     </DialogHeader>
                     <div className="p-6 space-y-5">
-                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">Nom du magasin</Label><Input value={name} onChange={e => setName(e.target.value)} className="h-14 border-2 font-black text-lg" /></div>
-                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">UID Utilisateur Pro</Label><Input value={ownerId} onChange={e => setOwnerId(e.target.value)} placeholder="Coller l'UID..." className="h-14 border-2 font-mono text-sm" /></div>
-                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">Commune</Label>
+                        {/* Recherche par email */}
+                        <div className="space-y-1.5 relative">
+                            <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Recherche rapide (Email)</Label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                                <Input 
+                                    placeholder="Chercher par email..." 
+                                    value={userSearch} 
+                                    onChange={e => {
+                                        setUserSearch(e.target.value);
+                                        setIsSearchOpen(e.target.value.length >= 2);
+                                    }}
+                                    className="h-12 pl-9 border-2 font-bold text-xs" 
+                                />
+                            </div>
+                            
+                            {isSearchOpen && filteredUsers.length > 0 && (
+                                <div className="absolute z-50 w-full mt-1 bg-white border-2 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2">
+                                    {filteredUsers.map(u => (
+                                        <div 
+                                            key={u.id} 
+                                            className="p-3 hover:bg-primary/5 cursor-pointer border-b last:border-0 flex items-center justify-between"
+                                            onClick={() => {
+                                                setOwnerId(u.id);
+                                                setName(u.displayName);
+                                                setUserSearch(u.email);
+                                                setIsSearchOpen(false);
+                                                toast({ title: "Utilisateur sélectionné" });
+                                            }}
+                                        >
+                                            <div className="flex flex-col min-w-0">
+                                                <span className="font-black text-[10px] uppercase truncate">{u.displayName}</span>
+                                                <span className="text-[9px] font-bold text-muted-foreground truncate">{u.email}</span>
+                                            </div>
+                                            <UserPlus className="size-4 text-primary shrink-0 ml-2" />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label className="text-[10px] font-black uppercase ml-1">Nom du magasin</Label>
+                            <Input value={name} onChange={e => setName(e.target.value)} className="h-14 border-2 font-black text-lg" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-[10px] font-black uppercase ml-1">UID Utilisateur Pro</Label>
+                            <Input value={ownerId} onChange={e => setOwnerId(e.target.value)} placeholder="UID sélectionné automatiquement..." className="h-14 border-2 font-mono text-xs bg-muted/30" readOnly={ownerId.length > 0} />
+                            {ownerId && <Button variant="ghost" className="h-6 text-[8px] font-black uppercase text-destructive p-0" onClick={() => { setOwnerId(''); setUserSearch(''); }}>Effacer la liaison</Button>}
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-[10px] font-black uppercase ml-1">Commune</Label>
                             <Select value={commune} onValueChange={setCommune}>
                                 <SelectTrigger className="h-14 border-2 font-bold text-base"><SelectValue /></SelectTrigger>
                                 <SelectContent className="max-h-64">{Object.keys(locations).sort().map(loc => <SelectItem key={loc} value={loc}>{loc}</SelectItem>)}</SelectContent>
                             </Select>
                         </div>
-                        <div className="space-y-2"><Label className="text-[10px] font-black uppercase ml-1">Rayons autorisés</Label>
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-black uppercase ml-1">Rayons autorisés</Label>
                             <div className="flex flex-wrap gap-2">
                                 {availableCats.map(cat => (
                                     <Badge key={cat} variant={categories.includes(cat) ? "default" : "outline"} className="cursor-pointer font-black uppercase text-[10px] py-3 px-4 h-auto border-2 transition-all" onClick={() => setCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat])}>{cat}</Badge>
@@ -431,7 +491,11 @@ function BusinessManager({ businesses, users }: { businesses: Business[] | null,
                             </div>
                         </div>
                     </div>
-                    <DialogFooter className="p-4 bg-muted/10 border-t"><Button onClick={handleSave} disabled={isSaving} className="w-full h-16 font-black uppercase tracking-widest shadow-xl text-base">{isSaving ? "Traitement..." : "Valider Liaison"}</Button></DialogFooter>
+                    <DialogFooter className="p-4 bg-muted/10 border-t">
+                        <Button onClick={handleSave} disabled={isSaving || !ownerId || !name} className="w-full h-16 font-black uppercase tracking-widest shadow-xl text-base">
+                            {isSaving ? "Traitement..." : "Valider Liaison"}
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </Card>
