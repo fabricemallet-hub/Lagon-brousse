@@ -307,15 +307,15 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     }
   };
 
-  const handleLeaveSession = useCallback(async () => {
+  const handleLeaveSession = useCallback(() => {
     if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
     const previousSessionId = session?.id;
     setSession(null);
     setIsParticipating(false);
     setIsGpsActive(false);
     setUserLocation(null);
+    
     if (!user || !previousSessionId || !firestore) return;
-    setIsSessionLoading(true);
     
     const participantRef = doc(firestore, 'hunting_sessions', previousSessionId, 'participants', user.uid);
     deleteDoc(participantRef)
@@ -324,8 +324,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
           path: participantRef.path,
           operation: 'delete'
         }));
-      })
-      .finally(() => setIsSessionLoading(false));
+      });
   }, [user, session, firestore]);
 
   const startTracking = useCallback(() => {
@@ -366,51 +365,54 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     return () => { if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current); };
   }, [isParticipating, session, isGpsActive, startTracking]);
 
-  const handleCreateSession = async () => {
+  const handleCreateSession = () => {
     if (!user || !firestore) return;
     setIsSessionLoading(true);
     const code = createCode.trim() ? createCode.trim().toUpperCase() : `${sessionType === 'chasse' ? 'CH' : 'PE'}-${Math.floor(1000 + Math.random() * 9000)}`;
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 24);
-    const sessionData = { organizerId: user.uid, sessionType, createdAt: serverTimestamp(), expiresAt: Timestamp.fromDate(expiresAt) };
     
+    const sessionData = { organizerId: user.uid, sessionType, createdAt: serverTimestamp(), expiresAt: Timestamp.fromDate(expiresAt) };
     const sessionRef = doc(firestore, 'hunting_sessions', code);
+    
     setDoc(sessionRef, sessionData)
+      .then(() => {
+        const participantData = { 
+            id: user.uid, displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor, baseStatus: '', isGibierEnVue: false, updatedAt: serverTimestamp() 
+        };
+        const participantRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
+        setDoc(participantRef, participantData)
+          .catch(async (err) => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+              path: participantRef.path,
+              operation: 'create',
+              requestResourceData: participantData
+            }));
+          });
+
+        setSession({ id: code, ...sessionData } as any);
+        setIsParticipating(true);
+        fetchMySessions();
+        setIsSessionLoading(false);
+        toast({ title: 'Session créée !', description: `Code : ${code}` });
+      })
       .catch(async (err) => {
+        setIsSessionLoading(false);
         errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: sessionRef.path,
           operation: 'create',
           requestResourceData: sessionData
         }));
       });
-
-    const participantData = { 
-        id: user.uid, displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor, baseStatus: '', isGibierEnVue: false, updatedAt: serverTimestamp() 
-    };
-    const participantRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
-    setDoc(participantRef, participantData)
-      .catch(async (err) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: participantRef.path,
-          operation: 'create',
-          requestResourceData: participantData
-        }));
-      });
-
-    setSession({ id: code, ...sessionData } as any);
-    setIsParticipating(true);
-    fetchMySessions();
-    setIsSessionLoading(false);
-    toast({ title: 'Session créée !', description: `Code : ${code}` });
   };
   
-  const handleJoinSession = async () => {
+  const handleJoinSession = () => {
     if (!user || !firestore || !joinCode) return;
     setIsSessionLoading(true);
     const sessionId = joinCode.toUpperCase();
+    const sessionRef = doc(firestore, 'hunting_sessions', sessionId);
     
-    try {
-      const snap = await getDoc(doc(firestore, 'hunting_sessions', sessionId));
+    getDoc(sessionRef).then(snap => {
       if (!snap.exists()) {
         toast({ variant: 'destructive', title: 'Erreur', description: 'Session non trouvée.' });
         setIsSessionLoading(false);
@@ -423,22 +425,24 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
       const participantRef = doc(firestore, 'hunting_sessions', sessionId, 'participants', user.uid);
       
       setDoc(participantRef, participantData, { merge: true })
+        .then(() => {
+          setSession({ id: snap.id, ...snap.data() } as any);
+          setIsParticipating(true);
+          toast({ title: 'Session rejointe' });
+          setIsSessionLoading(false);
+        })
         .catch(async (err) => {
+          setIsSessionLoading(false);
           errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: participantRef.path,
             operation: 'write',
             requestResourceData: participantData
           }));
         });
-
-      setSession({ id: snap.id, ...snap.data() } as any);
-      setIsParticipating(true);
-      toast({ title: 'Session rejointe' });
-    } catch (e: any) { 
-      toast({ variant: 'destructive', title: 'Erreur', description: e.message }); 
-    } finally { 
-      setIsSessionLoading(false); 
-    }
+    }).catch(e => {
+        setIsSessionLoading(false);
+        toast({ variant: 'destructive', title: 'Erreur accès' });
+    });
   };
 
   const handleToggleGps = () => {
@@ -487,7 +491,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     } catch (e) { console.error(e); } finally { setSessionToDelete(null); }
   };
 
-  const updateTacticalStatus = async (st: string) => {
+  const updateTacticalStatus = (st: string) => {
     if (!user || !firestore || !session) return;
     const ref = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
     const me = participants?.find(p => p.id === user.uid);
@@ -505,7 +509,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     if (newVal) { playStatusSound(st); toast({ title: `Statut : ${st}` }); }
   };
 
-  const toggleGibierEnVue = async () => {
+  const toggleGibierEnVue = () => {
     if (!user || !firestore || !session) return;
     const ref = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
     const me = participants?.find(p => p.id === user.uid);
@@ -524,33 +528,25 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     toast({ title: newVal ? labels.alertDesc : "Alerte levée", variant: newVal ? "destructive" : "default" });
   };
 
-  const handleSavePreferences = async () => {
+  const handleSavePreferences = () => {
     if (!user || !firestore || !nickname) return;
     setIsSavingPrefs(true);
-    try {
-        const currentVesselPrefs = userProfile?.vesselPrefs || {};
-        const prefsPayload = { 
-          huntingNickname: nickname, 
-          mapIcon: selectedIcon, 
-          mapColor: selectedColor,
-          vesselPrefs: {
-            ...currentVesselPrefs,
-            huntingSoundSettings: soundSettings,
-            huntingVolume: soundVolume,
-            huntingSoundEnabled: isSoundEnabled
-          }
-        };
-        
-        const userRef = doc(firestore, 'users', user.uid);
-        updateDoc(userRef, prefsPayload)
-          .catch(async (err) => {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({
-              path: userRef.path,
-              operation: 'update',
-              requestResourceData: prefsPayload
-            }));
-          });
-
+    const currentVesselPrefs = userProfile?.vesselPrefs || {};
+    const prefsPayload = { 
+      huntingNickname: nickname, 
+      mapIcon: selectedIcon, 
+      mapColor: selectedColor,
+      vesselPrefs: {
+        ...currentVesselPrefs,
+        huntingSoundSettings: soundSettings,
+        huntingVolume: soundVolume,
+        huntingSoundEnabled: isSoundEnabled
+      }
+    };
+    
+    const userRef = doc(firestore, 'users', user.uid);
+    updateDoc(userRef, prefsPayload)
+      .then(() => {
         if (session && isParticipating) {
           const participantRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
           const updateData = { displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor };
@@ -565,7 +561,16 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
         }
         toast({ title: 'Préférences sauvegardées !' });
         setPrefsSection(undefined); 
-    } catch (e) { console.error(e); } finally { setIsSavingPrefs(false); }
+        setIsSavingPrefs(false);
+      })
+      .catch(async (err) => {
+        setIsSavingPrefs(false);
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: userRef.path,
+          operation: 'update',
+          requestResourceData: prefsPayload
+        }));
+      });
   };
 
   if (session) {
@@ -588,7 +593,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                         defaultCenter={INITIAL_CENTER}
                         defaultZoom={16}
                         onLoad={setMap}
-                        options={{ disableDefaultUI: true, zoomControl: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
+                        options={{ disableDefaultUI: true, zoomControl: true, mapTypeControl: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
                     >
                         {userLocation && (
                             <OverlayView position={{ lat: userLocation.latitude, lng: userLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>

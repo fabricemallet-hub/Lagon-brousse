@@ -7,7 +7,6 @@ service cloud.firestore {
     // ======================================================
     // 1. PRIORITÉ ABSOLUE : MASTER ADMIN (GOD MODE)
     // ======================================================
-    // Bypass total pour l'administrateur suprême UNIQUE
     match /{allPaths=**} {
       allow read, write: if request.auth != null && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
@@ -46,27 +45,54 @@ service cloud.firestore {
     // 3. RÈGLES PAR COLLECTION
     // ======================================================
 
-    // Catalogue Shopping (Public en lecture)
+    // Catalogue Shopping
     match /{path=**}/promotions/{promoId} {
       allow read: if true;
       allow write: if isProfessional();
     }
 
-    // Profils Utilisateurs
+    // Profils Utilisateurs & Sécurité Navires
     match /users/{userId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      
+      match /vessels_safety/{vesselId} {
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      }
+      match /sowings/{sowingId} {
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      }
+      match /garden_plants/{plantId} {
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      }
+      match /weapons/{weaponId} {
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      }
+      match /fishing_spots/{spotId} {
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      }
     }
 
     // Commerces
     match /businesses/{businessId} {
       allow get, list: if true;
       allow create, delete: if isAdmin();
-      // Autorise le propriétaire ou l'email spécifique kledostyle à mettre à jour son commerce
-      allow update: if isAdmin() || (isSignedIn() && (
-        resource.data.ownerId == request.auth.uid ||
-        (request.auth.token.email != null && request.auth.token.email.lower() == "kledostyle@outlook.com")
-      ));
+      allow update: if isAdmin() || (isSignedIn() && resource.data.ownerId == request.auth.uid);
+    }
+
+    // Boat Tracker (GPS Sharing)
+    match /vessels/{vesselId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Sessions de Groupe (Chasse & Pêche)
+    match /hunting_sessions/{sessionId} {
+      allow read, create, update: if isSignedIn();
+      allow delete: if isSignedIn() && (resource.data.organizerId == request.auth.uid || isAdmin());
+
+      match /participants/{participantId} {
+        allow read, write: if isSignedIn();
+      }
     }
 
     // Données Publiques
@@ -82,7 +108,7 @@ service cloud.firestore {
     }
     match /sound_library/{id} { allow read: if true; }
 
-    // Support (Messagerie & Tickets)
+    // Messagerie
     match /conversations/{convId} {
       allow read, write: if isSignedIn() && (request.auth.uid == convId || isAdmin());
       match /messages/{msgId} {
@@ -95,28 +121,10 @@ service cloud.firestore {
       allow read, write: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
-    // Jetons & Accès
+    // Accès
     match /access_tokens/{id} { allow read, write: if isAdmin(); }
     match /shared_access_tokens/{id} { allow read, write: if isAdmin(); }
     
-    // Sessions de Groupe (Chasse & Pêche)
-    match /hunting_sessions/{sessionId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn() && (
-        resource.data.organizerId == request.auth.uid || 
-        isAdmin()
-      );
-
-      match /participants/{participantId} {
-        allow read: if isSignedIn();
-        allow write: if isSignedIn();
-      }
-    }
-
-    // Autres Fonctionnalités Terroir
-    match /vessels/{id} { allow read, write: if isSignedIn(); }
     match /spot_shares/{id} { allow read, write: if isSignedIn(); }
     match /campaigns/{campaignId} { allow read, write: if isProfessional() || isAdmin(); }
   }

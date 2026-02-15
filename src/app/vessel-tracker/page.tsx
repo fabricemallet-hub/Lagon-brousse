@@ -58,8 +58,10 @@ import { fr } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
-const INITIAL_CENTER = { lat: -22.27, lng: 166.45 };
+const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 const IMMOBILITY_THRESHOLD_METERS = 20; 
 const EMPTY_IDS: string[] = [];
 
@@ -313,35 +315,57 @@ export default function VesselTrackerPage() {
             if (data.status) lastSentStatusRef.current = data.status;
         }
 
-        setDoc(doc(firestore, 'vessels', sharingId), updatePayload, { merge: true }).catch(() => {});
+        const vesselRef = doc(firestore, 'vessels', sharingId);
+        setDoc(vesselRef, updatePayload, { merge: true })
+          .catch(async (err) => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+              path: vesselRef.path,
+              operation: 'write',
+              requestResourceData: updatePayload
+            }));
+          });
     };
     update();
   }, [user, firestore, isSharing, sharingId, vesselNickname, isPositionHidden]);
 
-  const handleSaveVessel = async () => {
+  const handleSaveVessel = () => {
     if (!user || !firestore) return;
     const cleanId = (vesselIdToFollow || customSharingId).trim().toUpperCase();
-    try {
-        await updateDoc(doc(firestore, 'users', user.uid), {
-            savedVesselIds: cleanId ? arrayUnion(cleanId) : savedVesselIds,
-            lastVesselId: cleanId || customSharingId,
-            vesselNickname: vesselNickname
-        });
+    const userRef = doc(firestore, 'users', user.uid);
+    const updates = {
+        savedVesselIds: cleanId ? arrayUnion(cleanId) : savedVesselIds,
+        lastVesselId: cleanId || customSharingId,
+        vesselNickname: vesselNickname
+    };
+
+    updateDoc(userRef, updates)
+      .then(() => {
         if (vesselIdToFollow) setVesselIdToFollow('');
         toast({ title: "ID enregistré" });
-    } catch (e) {
-        toast({ variant: 'destructive', title: "Erreur sauvegarde" });
-    }
+      })
+      .catch(async (err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: userRef.path,
+          operation: 'update',
+          requestResourceData: updates
+        }));
+      });
   };
 
-  const handleRemoveSavedVessel = async (id: string) => {
+  const handleRemoveSavedVessel = (id: string) => {
     if (!user || !firestore) return;
-    try {
-        await updateDoc(doc(firestore, 'users', user.uid), {
-            savedVesselIds: arrayRemove(id)
-        });
-        toast({ title: "Navire retiré" });
-    } catch (e) {}
+    const userRef = doc(firestore, 'users', user.uid);
+    updateDoc(userRef, {
+        savedVesselIds: arrayRemove(id)
+    })
+    .then(() => toast({ title: "Navire retiré" }))
+    .catch(async (err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: userRef.path,
+          operation: 'update',
+          requestResourceData: { savedVesselIds: arrayRemove(id) }
+        }));
+    });
   };
 
   const handleManualStatus = (st: VesselStatus['status'], label?: string) => {
@@ -354,7 +378,7 @@ export default function VesselTrackerPage() {
     toast({ title: label || (st === 'emergency' ? 'ALERTE ASSISTANCE' : 'Statut mis à jour') });
   };
 
-  const handleBirdsSignal = async (targetId?: string) => {
+  const handleBirdsSignal = (targetId?: string) => {
     const vesselId = targetId || sharingId;
     if (!vesselId || !user || !firestore) return;
     if (!currentPosRef.current) {
@@ -370,67 +394,106 @@ export default function VesselTrackerPage() {
         lng: currentPosRef.current.lng,
         time: timeLabel
     };
-    try {
-        const vesselRef = doc(firestore, 'vessels', vesselId);
-        await updateDoc(vesselRef, {
-            huntingMarkers: arrayUnion(newMarker),
-            status: 'moving',
-            eventLabel: mode === 'sender' ? `CHASSE - OISEAUX À ${timeLabel}` : `CHASSE (SIGNAL B) À ${timeLabel}`,
-            statusChangedAt: serverTimestamp()
-        });
-        toast({ title: "Point de CHASSE marqué" });
-    } catch (e) {
-        toast({ variant: "destructive", title: "Erreur" });
-    }
+    
+    const vesselRef = doc(firestore, 'vessels', vesselId);
+    const updatePayload = {
+        huntingMarkers: arrayUnion(newMarker),
+        status: 'moving',
+        eventLabel: mode === 'sender' ? `CHASSE - OISEAUX À ${timeLabel}` : `CHASSE (SIGNAL B) À ${timeLabel}`,
+        statusChangedAt: serverTimestamp()
+    };
+
+    updateDoc(vesselRef, updatePayload)
+      .then(() => toast({ title: "Point de CHASSE marqué" }))
+      .catch(async (err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: vesselRef.path,
+          operation: 'update',
+          requestResourceData: updatePayload
+        }));
+      });
   };
 
-  const handleStopSharing = async () => {
+  const handleStopSharing = () => {
     if (!user || !firestore) return;
     setIsSharing(false);
     setIsReceiverGpsActive(false);
-    await setDoc(doc(firestore, 'vessels', sharingId), { isSharing: false, lastActive: serverTimestamp() }, { merge: true });
-    if (watchIdRef.current) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
-    setCurrentPos(null);
-    currentPosRef.current = null;
-    currentAccuracyRef.current = null;
-    anchorPosRef.current = null;
-    lastSentStatusRef.current = null;
-    isFirstFixRef.current = true;
-    toast({ title: "Partage arrêté" });
+    const vesselRef = doc(firestore, 'vessels', sharingId);
+    setDoc(vesselRef, { isSharing: false, lastActive: serverTimestamp() }, { merge: true })
+      .then(() => {
+        if (watchIdRef.current) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
+        setCurrentPos(null);
+        currentPosRef.current = null;
+        currentAccuracyRef.current = null;
+        anchorPosRef.current = null;
+        lastSentStatusRef.current = null;
+        isFirstFixRef.current = true;
+        toast({ title: "Partage arrêté" });
+      })
+      .catch(async (err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: vesselRef.path,
+          operation: 'write',
+          requestResourceData: { isSharing: false, lastActive: serverTimestamp() }
+        }));
+      });
   };
 
-  const handleClearHistory = async () => {
+  const handleClearHistory = () => {
     setHistory([]);
     processedEventKeysRef.current.clear();
     if (typeof window !== 'undefined') localStorage.removeItem('lb_vessel_history_v4');
     if (!firestore || !user) return;
-    try {
-        if (isSharing) {
-            await updateDoc(doc(firestore, 'vessels', sharingId), { 
-              historyClearedAt: serverTimestamp(), 
-              huntingMarkers: [] 
-            });
+    
+    if (isSharing) {
+        const vesselRef = doc(firestore, 'vessels', sharingId);
+        updateDoc(vesselRef, { 
+          historyClearedAt: serverTimestamp(), 
+          huntingMarkers: [] 
+        })
+        .then(() => {
             lastClearTimesRef.current[sharingId] = Date.now();
             if (typeof window !== 'undefined') localStorage.setItem('lb_vessel_clear_times_v4', JSON.stringify(lastClearTimesRef.current));
-        }
-        toast({ title: "Journal réinitialisé" });
-    } catch (e) {}
-  };
-
-  const handleSaveSmsSettings = async () => {
-    if (!user || !firestore) return;
-    try {
-        await updateDoc(doc(firestore, 'users', user.uid), {
-            emergencyContact, vesselSmsMessage, isEmergencyEnabled, isCustomMessageEnabled
+            toast({ title: "Journal réinitialisé" });
+        })
+        .catch(async (err) => {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+              path: vesselRef.path,
+              operation: 'update'
+            }));
         });
-        toast({ title: "Réglages SMS sauvés" });
-    } catch (e) {}
+    }
   };
 
-  const saveVesselPrefs = async (newPrefs: typeof vesselPrefs) => {
+  const handleSaveSmsSettings = () => {
+    if (!user || !firestore) return;
+    const userRef = doc(firestore, 'users', user.uid);
+    const updates = {
+        emergencyContact, vesselSmsMessage, isEmergencyEnabled, isCustomMessageEnabled
+    };
+    updateDoc(userRef, updates)
+      .then(() => toast({ title: "Réglages SMS sauvés" }))
+      .catch(async (err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: userRef.path,
+          operation: 'update',
+          requestResourceData: updates
+        }));
+      });
+  };
+
+  const saveVesselPrefs = (newPrefs: typeof vesselPrefs) => {
     if (!user || !firestore) return;
     setVesselPrefs(newPrefs);
-    await updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: newPrefs }).catch(() => {});
+    const userRef = doc(firestore, 'users', user.uid);
+    updateDoc(userRef, { vesselPrefs: newPrefs })
+      .catch(async (err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: userRef.path,
+          operation: 'update',
+          requestResourceData: { vesselPrefs: newPrefs }
+        }));
+      });
   };
 
   const handleToggleHidePosition = useCallback(() => {
