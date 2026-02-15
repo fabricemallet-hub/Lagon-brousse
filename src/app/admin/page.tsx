@@ -648,6 +648,8 @@ function FishGuideManager() {
                         <div className="space-y-4">
                             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">Nom Local</Label><Input value={name} onChange={e => setName(e.target.value)} className="h-14 border-2 font-black text-lg" /></div>
                             
+                            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">Nom Scientifique</Label><Input value={scientificName} onChange={e => setScientificName(e.target.value)} className="h-12 border-2 font-bold italic" /></div>
+
                             <div className="flex flex-col gap-3 p-4 bg-muted/10 rounded-2xl border-2 border-dashed">
                                 <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Photo de l'espèce</Label>
                                 <div className="flex items-center gap-4">
