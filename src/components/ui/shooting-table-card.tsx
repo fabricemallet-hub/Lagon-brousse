@@ -33,11 +33,31 @@ type MunitionData = {
 };
 
 const BALLISTIC_DATABASE: MunitionData[] = [
-  { id: '308-win-150', caliber: '.308 Win', model: 'Winchester Power-Point', weight: 150, v0: 860, bc: 0.294, color: 'bg-blue-500' },
-  { id: '308-win-180', caliber: '.308 Win', model: 'Nosler Partition', weight: 180, v0: 790, bc: 0.474, color: 'bg-blue-700' },
-  { id: '30-06-180', caliber: '.30-06', model: 'Remington Core-Lokt', weight: 180, v0: 820, bc: 0.383, color: 'bg-green-600' },
-  { id: '270-win-130', caliber: '.270 Win', model: 'Hornady SST', weight: 130, v0: 930, bc: 0.460, color: 'bg-orange-500' },
-  { id: '7mm-08-140', caliber: '7mm-08', model: 'Nosler Ballistic Tip', weight: 140, v0: 850, bc: 0.485, color: 'bg-purple-500' },
+  // .270 Winchester
+  { id: '270-win-130-sst', caliber: '.270 Win', model: 'Hornady SST', weight: 130, v0: 930, bc: 0.460, color: 'bg-orange-500' },
+  { id: '270-win-150-xp', caliber: '.270 Win', model: 'Winchester Deer Season XP', weight: 150, v0: 870, bc: 0.392, color: 'bg-orange-500' },
+  { id: '270-win-150-tc', caliber: '.270 Win', model: 'Federal Trophy Copper', weight: 150, v0: 860, bc: 0.503, color: 'bg-orange-500' },
+  
+  // .25-06 Remington
+  { id: '25-06-100-cl', caliber: '.25-06 Rem', model: 'Remington Core-Lokt', weight: 100, v0: 980, bc: 0.323, color: 'bg-cyan-500' },
+  { id: '25-06-120-bt', caliber: '.25-06 Rem', model: 'Nosler Ballistic Tip', weight: 120, v0: 910, bc: 0.473, color: 'bg-cyan-500' },
+
+  // .308 Winchester
+  { id: '308-win-150-pp', caliber: '.308 Win', model: 'Winchester Power-Point', weight: 150, v0: 860, bc: 0.294, color: 'bg-blue-500' },
+  { id: '308-win-165-shh', caliber: '.308 Win', model: 'Sako Super Hammerhead', weight: 165, v0: 820, bc: 0.410, color: 'bg-blue-500' },
+  { id: '308-win-180-np', caliber: '.308 Win', model: 'Nosler Partition', weight: 180, v0: 790, bc: 0.474, color: 'bg-blue-500' },
+
+  // .30-06 Springfield
+  { id: '30-06-150-club', caliber: '.30-06', model: 'Remington Core-Lokt Ultra Bonded', weight: 150, v0: 890, bc: 0.338, color: 'bg-green-600' },
+  { id: '30-06-180-norma', caliber: '.30-06', model: 'Norma Oryx', weight: 180, v0: 820, bc: 0.354, color: 'bg-green-600' },
+
+  // 7mm-08 Remington
+  { id: '7mm-08-140-ph', caliber: '7mm-08', model: 'Hornady Precision Hunter (ELD-X)', weight: 140, v0: 850, bc: 0.545, color: 'bg-purple-500' },
+  { id: '7mm-08-140-tts', caliber: '7mm-08', model: 'Barnes TTSX', weight: 140, v0: 870, bc: 0.412, color: 'bg-purple-500' },
+
+  // Calibre 12
+  { id: '12-brenneke', caliber: 'Calibre 12', model: 'Brenneke (Slug)', weight: 486, v0: 430, bc: 0.075, color: 'bg-red-600' },
+  { id: '12-sauvestre', caliber: 'Calibre 12', model: 'Sauvestre (Flèche)', weight: 401, v0: 480, bc: 0.120, color: 'bg-red-600' },
 ];
 
 const CALIBERS = Array.from(new Set(BALLISTIC_DATABASE.map(m => m.caliber)));
@@ -76,6 +96,7 @@ export function ShootingTableCard() {
     const { v0, bc } = selectedMunition;
 
     const calculateDropAt = (dist: number) => {
+        // Simple drag model simulation
         const vAvg = v0 * (1 - (0.00008 * dist) / bc);
         const time = dist / vAvg;
         return 0.5 * g * Math.pow(time, 2) * 100; 
@@ -84,12 +105,12 @@ export function ShootingTableCard() {
     const dropAtTarget = calculateDropAt(d);
     const dropAtZero = calculateDropAt(z);
 
-    const scopeHeight = 4.5; 
+    const scopeHeight = 4.5; // Average scope height in cm
     const targetCorrection = dropAtTarget - (dropAtZero + scopeHeight) * (d / z) + scopeHeight;
 
     const vAvgTarget = v0 * (1 - (0.00008 * d) / bc);
     const timeTarget = d / vAvgTarget;
-    const windMps = w * 0.514444; 
+    const windMps = w * 0.514444; // Knots to m/s
     const isCrossWind = ['E', 'W'].includes(windDirection);
     
     let windDrift = 0;
