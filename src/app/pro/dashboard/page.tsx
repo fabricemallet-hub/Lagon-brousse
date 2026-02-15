@@ -50,7 +50,7 @@ export default function ProDashboard() {
 
   useEffect(() => {
     if (!isUserLoading && profile && !isProfileLoading) {
-        const isMaster = (user?.email && ['f.mallet81@outlook.com', 'kledostyle@outlook.com'].includes(user.email.toLowerCase()));
+        const isMaster = (user?.email && ['f.mallet81@outlook.com', 'kledostyle@outlook.com', 'f.mallet81@gmail.com'].includes(user.email.toLowerCase()));
         const isPro = isMaster || profile.role === 'professional' || profile.role === 'admin' || profile.subscriptionStatus === 'professional' || profile.subscriptionStatus === 'admin';
         if (!isPro) router.replace('/compte');
     }
@@ -82,7 +82,12 @@ export default function ProDashboard() {
   const [selectedChannels, setSelectedChannels] = useState<string[]>(['PUSH', 'MAIL']);
   const [targetScope, setTargetScope] = useState<TargetScope>('SPECIFIC');
   const [selectedTargetCommunes, setSelectedTargetCommunes] = useState<string[]>([]);
+  const [communeSearch, setCommuneSearch] = useState('');
+  
   const allCommuneNames = useMemo(() => Object.keys(locations).sort(), []);
+  const filteredCommuneList = useMemo(() => {
+    return allCommuneNames.filter(name => name.toLowerCase().includes(communeSearch.toLowerCase()));
+  }, [allCommuneNames, communeSearch]);
 
   const [editingPromoId, setEditingPromoId] = useState<string | null>(null);
   const [promoTitle, setPromoTitle] = useState('');
@@ -104,7 +109,7 @@ export default function ProDashboard() {
       }
       if (selectedTargetCommunes.length === 0) setSelectedTargetCommunes([business.commune]);
     }
-  }, [business, targetCategory, promoCategory, selectedTargetCommunes.length]);
+  }, [business]);
 
   useEffect(() => {
     if (!firestore || !business || isUserLoading || !user) return;
@@ -146,20 +151,25 @@ export default function ProDashboard() {
         setIsCalculatingReach(false);
       }
     };
-    calculateReach();
+    
+    const timer = setTimeout(calculateReach, 500);
+    return () => clearTimeout(timer);
   }, [firestore, business, targetCategory, isUserLoading, user, targetScope, selectedTargetCommunes]);
 
   const totalCalculatedCost = useMemo(() => {
     if (!pricing || baseTargetCount === null || selectedPromoIds.length === 0) return 0;
     
     const articleCount = selectedPromoIds.length;
-    let variableCost = (baseTargetCount * pricing.unitPricePerUser); // Coût de base campagne
+    let baseCampaignCost = pricing.fixedPrice; 
+    let costPerArticle = 0;
     
-    if (selectedChannels.includes('SMS') && smsTargetCount !== null) variableCost += (smsTargetCount * (pricing.priceSMS || 0));
-    if (selectedChannels.includes('PUSH') && pushTargetCount !== null) variableCost += (pushTargetCount * (pricing.pricePush || 0));
-    if (selectedChannels.includes('MAIL') && mailTargetCount !== null) variableCost += (mailTargetCount * (pricing.priceMail || 0));
+    costPerArticle += (baseTargetCount * pricing.unitPricePerUser);
+    
+    if (selectedChannels.includes('SMS') && smsTargetCount !== null) costPerArticle += (smsTargetCount * (pricing.priceSMS || 0));
+    if (selectedChannels.includes('PUSH') && pushTargetCount !== null) costPerArticle += (pushTargetCount * (pricing.pricePush || 0));
+    if (selectedChannels.includes('MAIL') && mailTargetCount !== null) costPerArticle += (mailTargetCount * (pricing.priceMail || 0));
 
-    return Math.ceil(pricing.fixedPrice + (variableCost * articleCount));
+    return Math.ceil(baseCampaignCost + (costPerArticle * articleCount));
   }, [pricing, baseTargetCount, smsTargetCount, pushTargetCount, mailTargetCount, selectedChannels, selectedPromoIds]);
 
   const handleCopyUid = () => {
@@ -199,6 +209,7 @@ export default function ProDashboard() {
       if (editingPromoId) await updateDoc(doc(firestore, 'businesses', business.id, 'promotions', editingPromoId), promoData);
       else { promoData.createdAt = serverTimestamp(); await addDoc(collection(firestore, 'businesses', business.id, 'promotions'), promoData); }
       resetForm();
+      toast({ title: "Article enregistré !" });
     } finally { setIsSaving(false); }
   };
 
@@ -210,6 +221,14 @@ export default function ProDashboard() {
     setPromoType(promo.promoType); window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleDeletePromotion = async (id: string) => {
+    if (!firestore || !business) return;
+    try {
+        await deleteDoc(doc(firestore, 'businesses', business.id, 'promotions', id));
+        toast({ title: "Article supprimé" });
+    } catch (e) {}
+  };
+
   const handleDiffuse = async () => {
     if (!firestore || !business || baseTargetCount === null || selectedPromoIds.length === 0) return;
     setIsSaving(true);
@@ -219,10 +238,10 @@ export default function ProDashboard() {
         ownerId: user!.uid, businessId: business.id, businessName: business.name,
         title: `${business.name} : ${selectedPromos.length} offres !`,
         message: `Offres : ${selectedPromos.map(p => p.title).join(', ')}.`,
-        targetCommune: targetScope === 'ALL' ? 'GLOBAL' : selectedTargetCommunes.join(', '),
+        targetCommune: targetScope === 'ALL' ? 'GLOBAL' : (targetScope === 'SPECIFIC' ? selectedTargetCommunes.join(', ') : targetScope),
         targetCategory, reach: baseTargetCount, cost: totalCalculatedCost, status: 'pending', createdAt: serverTimestamp(), selectedChannels
       });
-      toast({ title: "Demande envoyée" });
+      toast({ title: "Campagne envoyée pour validation !" });
     } finally { setIsSaving(false); }
   };
 
@@ -247,27 +266,27 @@ export default function ProDashboard() {
         <div className="flex flex-col items-center justify-center min-h-[40vh] gap-4 text-center">
             <Store className="size-16 text-muted-foreground" />
             <h2 className="text-xl font-black uppercase">Compte non relié</h2>
-            <p className="text-sm opacity-60">Transmettez votre UID à l'admin.</p>
+            <p className="text-sm opacity-60">Transmettez votre UID à l'admin pour activer votre boutique.</p>
         </div>
       ) : (
         <>
           <Card className={cn("border-2 shadow-xl overflow-hidden", editingPromoId ? "border-accent" : "border-primary")}>
             <CardHeader className={cn(editingPromoId ? "bg-accent" : "bg-primary", "text-white")}>
-              <CardTitle className="text-2xl font-black uppercase tracking-tighter">{editingPromoId ? "Modifier l'article" : business.name}</CardTitle>
-              <CardDescription className="text-white/80 font-bold uppercase text-[10px]">Gestion du catalogue et des campagnes</CardDescription>
+              <CardTitle className="text-2xl font-black uppercase tracking-tighter">{editingPromoId ? "Modifier l'article" : "Gestion Boutique"}</CardTitle>
+              <CardDescription className="text-white/80 font-bold uppercase text-[10px]">Catalogue & Campagnes publicitaires</CardDescription>
             </CardHeader>
             <CardContent className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-4">
                   <h3 className="text-sm font-black uppercase flex items-center gap-2 border-b pb-2"><ShoppingBag className="size-4" /> {editingPromoId ? "Mise à jour" : "Nouveau Produit"}</h3>
                   <div className="space-y-3">
-                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60">Titre</Label><Input value={promoTitle} onChange={e => setPromoTitle(e.target.value)} className="font-bold border-2" /></div>
-                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60">Rayon</Label><Select value={promoCategory} onValueChange={setPromoCategory}><SelectTrigger className="border-2 font-black uppercase text-xs"><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs uppercase">{cat}</SelectItem>)}</SelectContent></Select></div>
+                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Titre</Label><Input value={promoTitle} onChange={e => setPromoTitle(e.target.value)} className="font-bold border-2" /></div>
+                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Rayon</Label><Select value={promoCategory} onValueChange={setPromoCategory}><SelectTrigger className="border-2 font-black uppercase text-xs"><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs uppercase">{cat}</SelectItem>)}</SelectContent></Select></div>
                     <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60">Prix (F)</Label><Input type="number" value={promoPrice} onChange={e => setPromoPrice(e.target.value)} className="font-bold border-2" /></div>
-                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60">Prix Barré</Label><Input type="number" value={originalPrice} onChange={e => setOriginalPrice(e.target.value)} className="border-2" /></div>
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Prix (F)</Label><Input type="number" value={promoPrice} onChange={e => setPromoPrice(e.target.value)} className="font-bold border-2" /></div>
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Prix Barré</Label><Input type="number" value={originalPrice} onChange={e => setOriginalPrice(e.target.value)} className="border-2" /></div>
                     </div>
-                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60">Description</Label><Textarea value={promoDescription} onChange={e => setPromoDescription(e.target.value)} className="font-medium border-2 min-h-[80px]" /></div>
+                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Description</Label><Textarea value={promoDescription} onChange={e => setPromoDescription(e.target.value)} className="font-medium border-2 min-h-[80px]" /></div>
                     <div className="space-y-2">
                         <Label className="text-[10px] font-black uppercase opacity-60">Photos (Max 4)</Label>
                         <div className="grid grid-cols-4 gap-2">
@@ -280,7 +299,7 @@ export default function ProDashboard() {
                     </div>
                     <div className="flex gap-2 pt-2">
                         {editingPromoId && <Button variant="ghost" onClick={resetForm} className="flex-1 border-2">Annuler</Button>}
-                        <Button onClick={handleSavePromotion} disabled={isSaving || !promoTitle} className="flex-[2] h-12 font-black uppercase shadow-lg">Sauvegarder</Button>
+                        <Button onClick={handleSavePromotion} disabled={isSaving || !promoTitle} className="flex-[2] h-12 font-black uppercase shadow-lg">Sauvegarder l'article</Button>
                     </div>
                   </div>
                 </div>
@@ -288,31 +307,95 @@ export default function ProDashboard() {
                 <div className="bg-muted/30 p-6 rounded-2xl border-2 border-dashed space-y-6">
                     <h3 className="text-sm font-black uppercase flex items-center gap-2 text-accent"><Megaphone className="size-4" /> Ciblage & Audiences</h3>
                     <div className="space-y-4">
-                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60">Catégorie Cible</Label><Select value={targetCategory} onValueChange={setTargetCategory}><SelectTrigger className="h-10 border-2 bg-background font-black text-xs"><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs">{cat}</SelectItem>)}</SelectContent></Select></div>
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Rayon cible</Label><Select value={targetCategory} onValueChange={setTargetCategory}><SelectTrigger className="h-10 border-2 bg-background font-black text-xs"><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs">{cat}</SelectItem>)}</SelectContent></Select></div>
                         
-                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60">Portée</Label><Select value={targetScope} onValueChange={(v: any) => setTargetScope(v)}><SelectTrigger className="h-10 border-2 bg-background font-black text-xs"><Globe className="size-3 mr-2" /><SelectValue /></SelectTrigger><SelectContent><SelectItem value="SPECIFIC">Communes spécifiques</SelectItem><SelectItem value="CALEDONIE">Nouvelle-Calédonie</SelectItem><SelectItem value="TAHITI">Tahiti</SelectItem><SelectItem value="ALL">Tout le réseau</SelectItem></SelectContent></Select></div>
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Portée géographique</Label><Select value={targetScope} onValueChange={(v: any) => setTargetScope(v)}><SelectTrigger className="h-10 border-2 bg-background font-black text-xs"><Globe className="size-3 mr-2 text-primary" /><SelectValue /></SelectTrigger><SelectContent><SelectItem value="SPECIFIC">Communes spécifiques</SelectItem><SelectItem value="CALEDONIE">Nouvelle-Calédonie</SelectItem><SelectItem value="TAHITI">Tahiti</SelectItem><SelectItem value="ALL">Tout le réseau</SelectItem></SelectContent></Select></div>
 
-                        {/* AFFICHAGE DES AUDIENCES PAR CANAL */}
+                        {targetScope === 'SPECIFIC' && (
+                            <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">
+                                <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Sélection des communes (Max 30)</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className="w-full h-10 border-2 bg-background justify-between font-bold text-xs">
+                                            <div className="flex items-center gap-2 truncate">
+                                                <MapPin className="size-3 text-primary" />
+                                                {selectedTargetCommunes.length === 0 ? "Aucune commune" : 
+                                                 selectedTargetCommunes.length === 1 ? selectedTargetCommunes[0] :
+                                                 `${selectedTargetCommunes.length} communes`}
+                                            </div>
+                                            <ChevronDown className="size-3 opacity-50" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[300px] p-0" align="start">
+                                        <DialogHeader className="sr-only">
+                                            <DialogTitle>Sélecteur de communes</DialogTitle>
+                                            <DialogDescription>Choisissez les zones à cibler pour votre campagne</DialogDescription>
+                                        </DialogHeader>
+                                        <div className="p-2 border-b">
+                                            <Input 
+                                                placeholder="Filtrer..." 
+                                                className="h-8 text-xs" 
+                                                value={communeSearch}
+                                                onChange={(e) => setCommuneSearch(e.target.value)}
+                                            />
+                                        </div>
+                                        <ScrollArea className="h-[250px]">
+                                            <div className="p-2 space-y-1">
+                                                {filteredCommuneList.map(name => (
+                                                    <div key={name} className="flex items-center space-x-2 p-1.5 hover:bg-muted rounded cursor-pointer transition-colors" onClick={() => {
+                                                        setSelectedTargetCommunes(prev => 
+                                                            prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name].slice(0, 30)
+                                                        );
+                                                    }}>
+                                                        <Checkbox checked={selectedTargetCommunes.includes(name)} />
+                                                        <span className="text-xs font-bold uppercase">{name}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </ScrollArea>
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                        )}
+
                         <div className="space-y-2">
-                            <p className="text-[10px] font-black uppercase text-muted-foreground ml-1">Audiences Potentielles :</p>
+                            <p className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">Audiences Réelles :</p>
                             <div className="grid grid-cols-1 gap-2">
                                 <div className={cn("p-3 rounded-xl border-2 flex items-center justify-between transition-all", selectedChannels.includes('PUSH') ? "bg-primary/10 border-primary/30" : "bg-background opacity-50")}>
-                                    <div className="flex items-center gap-2"><Zap className="size-4 text-primary" /><span className="text-[10px] font-black uppercase">Push Notifications</span></div>
-                                    <span className="font-black text-xs">{isCalculatingReach ? "..." : pushTargetCount ?? 0} clients</span>
+                                    <div className="flex items-center gap-2">
+                                        <Zap className="size-4 text-primary" />
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] font-black uppercase leading-none">Push Notifications</span>
+                                            <span className="text-[8px] font-bold opacity-60 uppercase">Clients actifs</span>
+                                        </div>
+                                    </div>
+                                    <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-primary"/> : `${pushTargetCount ?? 0} clients`}</span>
                                 </div>
                                 <div className={cn("p-3 rounded-xl border-2 flex items-center justify-between transition-all", selectedChannels.includes('MAIL') ? "bg-green-50 border-green-200" : "bg-background opacity-50")}>
-                                    <div className="flex items-center gap-2"><Mail className="size-4 text-green-600" /><span className="text-[10px] font-black uppercase">Newsletter Email</span></div>
-                                    <span className="font-black text-xs">{isCalculatingReach ? "..." : mailTargetCount ?? 0} clients</span>
+                                    <div className="flex items-center gap-2">
+                                        <Mail className="size-4 text-green-600" />
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] font-black uppercase leading-none">Newsletter Email</span>
+                                            <span className="text-[8px] font-bold opacity-60 uppercase">Opt-in valide</span>
+                                        </div>
+                                    </div>
+                                    <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-green-600"/> : `${mailTargetCount ?? 0} clients`}</span>
                                 </div>
                                 <div className={cn("p-3 rounded-xl border-2 flex items-center justify-between transition-all", selectedChannels.includes('SMS') ? "bg-blue-50 border-blue-200" : "bg-background opacity-50")}>
-                                    <div className="flex items-center gap-2"><Smartphone className="size-4 text-blue-600" /><span className="text-[10px] font-black uppercase">Alerte SMS</span></div>
-                                    <span className="font-black text-xs">{isCalculatingReach ? "..." : smsTargetCount ?? 0} clients</span>
+                                    <div className="flex items-center gap-2">
+                                        <Smartphone className="size-4 text-blue-600" />
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] font-black uppercase leading-none">Alerte SMS</span>
+                                            <span className="text-[8px] font-bold opacity-60 uppercase">Mobile renseigné</span>
+                                        </div>
+                                    </div>
+                                    <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-blue-600"/> : `${smsTargetCount ?? 0} clients`}</span>
                                 </div>
                             </div>
+                            {reachError && <p className="text-[8px] font-bold text-red-500 text-center uppercase animate-pulse">Erreur de calcul. Sélectionnez une zone.</p>}
                         </div>
 
-                        {/* CANAUX DE DIFFUSION */}
-                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60">Canaux sélectionnés</Label>
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Canaux souhaités</Label>
                             <div className="flex flex-wrap gap-2">
                                 {[{ id: 'SMS', label: 'SMS' }, { id: 'PUSH', label: 'Push' }, { id: 'MAIL', label: 'Email' }].map(ch => (
                                     <Badge key={ch.id} variant={selectedChannels.includes(ch.id) ? "default" : "outline"} className="cursor-pointer font-black uppercase h-8 px-3 border-2" onClick={() => setSelectedChannels(prev => prev.includes(ch.id) ? prev.filter(c => c !== ch.id) : [...prev, ch.id])}>{ch.label}</Badge>
@@ -320,17 +403,16 @@ export default function ProDashboard() {
                             </div>
                         </div>
 
-                        {/* FACTURATION CAMPAGNE MISE À JOUR */}
                         {pricing && selectedPromoIds.length > 0 && !isCalculatingReach && (
                             <div className="p-4 bg-primary/5 border-2 border-primary/20 rounded-2xl space-y-3 animate-in fade-in">
-                                <p className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2"><DollarSign className="size-3" /> Devis détaillé (x{selectedPromoIds.length} art.)</p>
+                                <p className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2"><DollarSign className="size-3" /> Devis (x{selectedPromoIds.length} article{selectedPromoIds.length > 1 ? 's' : ''})</p>
                                 <div className="space-y-1.5 text-[11px] font-bold text-slate-600">
-                                    <div className="flex justify-between"><span className="opacity-60">Frais fixes (Unique)</span><span>{pricing.fixedPrice} F</span></div>
-                                    <div className="flex justify-between"><span className="opacity-60">Base ({baseTargetCount} x {pricing.unitPricePerUser}F)</span><span>{Math.round((baseTargetCount || 0) * pricing.unitPricePerUser * selectedPromoIds.length)} F</span></div>
-                                    {selectedChannels.includes('SMS') && <div className="flex justify-between text-blue-600"><span>SMS ({smsTargetCount} x {pricing.priceSMS}F)</span><span>{Math.round((smsTargetCount || 0) * (pricing.priceSMS || 0) * selectedPromoIds.length)} F</span></div>}
-                                    {selectedChannels.includes('PUSH') && <div className="flex justify-between text-primary"><span>Push ({pushTargetCount} x {pricing.pricePush}F)</span><span>{Math.round((pushTargetCount || 0) * (pricing.pricePush || 0) * selectedPromoIds.length)} F</span></div>}
-                                    {selectedChannels.includes('MAIL') && <div className="flex justify-between text-green-600"><span>Email ({mailTargetCount} x {pricing.priceMail}F)</span><span>{Math.round((mailTargetCount || 0) * (pricing.priceMail || 0) * selectedPromoIds.length)} F</span></div>}
-                                    <div className="flex justify-between items-center bg-primary/10 p-3 rounded-xl border border-primary/20 mt-3"><span className="text-[10px] font-black uppercase text-primary">Total à régler</span><span className="text-xl text-primary font-black">{totalCalculatedCost} FCFP</span></div>
+                                    <div className="flex justify-between"><span className="opacity-60">Frais fixes (Campagne)</span><span>{pricing.fixedPrice} F</span></div>
+                                    <div className="flex justify-between border-t border-dashed pt-1 mt-1"><span className="opacity-60">Base Reach ({baseTargetCount} x {pricing.unitPricePerUser}F)</span><span>{Math.round((baseTargetCount || 0) * pricing.unitPricePerUser * selectedPromoIds.length)} F</span></div>
+                                    {selectedChannels.includes('SMS') && <div className="flex justify-between text-blue-600"><span>Canal SMS ({smsTargetCount} x {pricing.priceSMS}F)</span><span>{Math.round((smsTargetCount || 0) * (pricing.priceSMS || 0) * selectedPromoIds.length)} F</span></div>}
+                                    {selectedChannels.includes('PUSH') && <div className="flex justify-between text-primary"><span>Canal Push ({pushTargetCount} x {pricing.pricePush}F)</span><span>{Math.round((pushTargetCount || 0) * (pricing.pricePush || 0) * selectedPromoIds.length)} F</span></div>}
+                                    {selectedChannels.includes('MAIL') && <div className="flex justify-between text-green-600"><span>Canal Email ({mailTargetCount} x {pricing.priceMail}F)</span><span>{Math.round((mailTargetCount || 0) * (pricing.priceMail || 0) * selectedPromoIds.length)} F</span></div>}
+                                    <div className="flex justify-between items-center bg-primary/10 p-3 rounded-xl border border-primary/20 mt-3"><span className="text-[10px] font-black uppercase text-primary">Total estimé</span><span className="text-xl text-primary font-black">{totalCalculatedCost} FCFP</span></div>
                                 </div>
                             </div>
                         )}
@@ -343,12 +425,15 @@ export default function ProDashboard() {
           </Card>
 
           <div className="space-y-4">
-            <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground px-1">Vos articles ({promotions?.length || 0})</h3>
+            <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground px-1 flex items-center justify-between">
+                <span>Vos articles ({promotions?.length || 0})</span>
+                <span className="text-[10px] text-primary">{selectedPromoIds.length} sélectionné{selectedPromoIds.length > 1 ? 's' : ''}</span>
+            </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {promotions?.map(promo => (
+                {isPromosLoading ? [1,2].map(i => <Skeleton key={i} className="h-32 w-full rounded-2xl" />) : promotions?.map(promo => (
                     <Card key={promo.id} className={cn("overflow-hidden border-2 shadow-sm flex h-32 transition-all cursor-pointer", selectedPromoIds.includes(promo.id) ? "border-primary ring-2 ring-primary/10" : "hover:border-primary/30")} onClick={() => setSelectedPromoIds(prev => prev.includes(promo.id) ? prev.filter(pid => pid !== promo.id) : [...prev, promo.id])}>
                         <div className="w-8 bg-muted/30 border-r flex items-center justify-center shrink-0"><Checkbox checked={selectedPromoIds.includes(promo.id)} onCheckedChange={() => {}} /></div>
-                        <div className="w-24 bg-muted/20 shrink-0 relative overflow-hidden flex items-center justify-center border-r">{promo.imageUrl ? <img src={promo.imageUrl} className="w-full h-full object-cover" /> : <ImageIcon className="size-6 opacity-20" />}</div>
+                        <div className="w-24 bg-muted/20 shrink-0 relative overflow-hidden flex items-center justify-center border-r">{promo.imageUrl ? <img src={promo.imageUrl} className="w-full h-full object-cover" alt="" /> : <ImageIcon className="size-6 opacity-20" />}</div>
                         <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
                             <div className="space-y-1"><h4 className="font-black uppercase text-xs truncate">{promo.title}</h4><p className="text-[9px] text-muted-foreground line-clamp-2 italic">{promo.description || "Pas de description."}</p></div>
                             <div className="flex items-center justify-between"><Badge variant="outline" className="text-[7px] h-4 font-black uppercase border-primary/20 text-primary">{promo.price} F</Badge>
