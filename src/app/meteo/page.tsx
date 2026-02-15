@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 import { getWeatherSummary } from '@/ai/flows/weather-summary-flow';
 import type { WeatherSummaryOutput } from '@/ai/schemas';
 import { useLocation } from '@/context/location-context';
-import { locations as locationsMap } from '@/lib/locations';
+import { locationsByRegion } from '@/lib/locations';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 // Helper: Calculate distance between two points (Haversine)
@@ -102,33 +102,40 @@ export default function MeteoLivePage() {
   const communes = useMemo(() => {
     if (!rawCommunes) return [];
 
+    // Filter by selected region first
+    const regionalLocations = locationsByRegion[selectedRegion] || {};
+    const filteredByRegion = rawCommunes.filter(c => regionalLocations[c.id] !== undefined);
+
     const isLoyaltyOrBelep = (id: string) => {
         const normalized = id.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         const special = ['belep', 'lifou', 'mare', 'ouvea'];
         return special.includes(normalized);
     };
 
-    const selectedCoords = locationsMap[selectedLocation];
+    const selectedCoords = regionalLocations[selectedLocation];
 
-    const filtered = rawCommunes.filter(c => 
+    const searchFiltered = filteredByRegion.filter(c => 
       c.id.toLowerCase().includes(search.toLowerCase())
     );
 
-    return [...filtered].sort((a, b) => {
+    return [...searchFiltered].sort((a, b) => {
       if (a.id === selectedLocation) return -1;
       if (b.id === selectedLocation) return 1;
 
-      const aSpecial = isLoyaltyOrBelep(a.id);
-      const bSpecial = isLoyaltyOrBelep(b.id);
-      
-      if (aSpecial && !bSpecial) return 1;
-      if (!aSpecial && bSpecial) return -1;
-      if (aSpecial && bSpecial) return a.id.localeCompare(b.id);
+      // Special handling for NC Loyalty/Belep (Move to end if not searching)
+      if (selectedRegion === 'CALEDONIE' && !search) {
+          const aSpecial = isLoyaltyOrBelep(a.id);
+          const bSpecial = isLoyaltyOrBelep(b.id);
+          
+          if (aSpecial && !bSpecial) return 1;
+          if (!aSpecial && bSpecial) return -1;
+          if (aSpecial && bSpecial) return a.id.localeCompare(b.id);
+      }
 
       if (!selectedCoords) return a.id.localeCompare(b.id);
 
-      const posA = locationsMap[a.id];
-      const posB = locationsMap[b.id];
+      const posA = regionalLocations[a.id];
+      const posB = regionalLocations[b.id];
 
       if (!posA || !posB) return a.id.localeCompare(b.id);
 
@@ -137,7 +144,7 @@ export default function MeteoLivePage() {
 
       return distA - distB;
     });
-  }, [rawCommunes, selectedLocation, search]);
+  }, [rawCommunes, selectedLocation, selectedRegion, search]);
 
   if (selectedCommuneId) {
     const liveData = rawCommunes?.find(c => c.id === selectedCommuneId);
@@ -159,7 +166,7 @@ export default function MeteoLivePage() {
             <Sun className="text-primary size-7" /> Météo Live
           </CardTitle>
           <CardDescription className="text-xs font-medium">
-            Données en direct de vos stations météo.
+            Données en direct de vos stations météo à {selectedRegion}.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -168,7 +175,7 @@ export default function MeteoLivePage() {
         <Info className="size-4 text-amber-600" />
         <AlertTitle className="text-xs font-black uppercase tracking-wider mb-1">Avis de sécurité</AlertTitle>
         <AlertDescription className="text-[10px] leading-relaxed font-medium">
-          Cette application <strong>ne remplace pas</strong> le site officiel <a href="https://www.meteo.nc/" target="_blank" rel="noopener noreferrer" className="underline inline-flex items-center gap-0.5 font-bold">meteo.nc <ExternalLink className="size-2" /></a>. Restez attentifs aux conditions locales avant toute sortie en mer.
+          Cette application <strong>ne remplace pas</strong> le site officiel {selectedRegion === 'CALEDONIE' ? 'meteo.nc' : 'meteo.pf'}. Restez attentifs aux conditions locales avant toute sortie en mer.
         </AlertDescription>
       </Alert>
 
@@ -254,7 +261,7 @@ export default function MeteoLivePage() {
       ) : (
         <div className="text-center py-16 px-4 border-4 border-dashed rounded-3xl flex flex-col items-center gap-4 opacity-40">
           <Sun className="size-12" />
-          <p className="font-black uppercase tracking-widest text-xs">Aucune commune trouvée</p>
+          <p className="font-black uppercase tracking-widest text-xs">Aucune donnée live disponible pour {selectedRegion}</p>
         </div>
       )}
     </div>
@@ -284,14 +291,12 @@ function ForecastView({ communeId, liveData, onBack, now }: { communeId: string,
                     forecasts: dbForecasts.map((d, index) => {
                         const dateObj = new Date(d.date.replace(/-/g, '/'));
                         
-                        // Estimation réaliste de l'UV max en NC (pic à 14 en été, 6 en hiver)
-                        // On utilise la donnée live pour aujourd'hui si dispo
+                        // Estimation réaliste de l'UV max (pic à 14 en été, 6 en hiver)
                         let uvMax = 0;
                         if (index === 0 && liveData?.uv) {
                             uvMax = liveData.uv;
                         } else {
                             const month = dateObj.getMonth();
-                            // Courbe simple : pic en Jan (0) à 14, min en Juil (6) à 6
                             uvMax = Math.round(10 + 4 * Math.cos((month * Math.PI) / 6));
                         }
 
@@ -330,7 +335,7 @@ function ForecastView({ communeId, liveData, onBack, now }: { communeId: string,
             <Alert className="bg-muted/50 border-2 py-3">
               <ShieldAlert className="size-4 text-muted-foreground" />
               <AlertDescription className="text-[10px] leading-relaxed italic text-muted-foreground font-medium">
-                Information : Consultez toujours <a href="https://www.meteo.nc/" target="_blank" rel="noopener noreferrer" className="underline font-bold">Météo NC</a> avant toute activité à risque.
+                Information : Consultez toujours les sources officielles locales avant toute activité à risque.
               </AlertDescription>
             </Alert>
 
