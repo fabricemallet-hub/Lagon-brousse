@@ -669,9 +669,8 @@ export default function VesselTrackerPage() {
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
       {activeWatchAlarm && (
-        <div className="fixed top-12 left-0 right-0 z-[200] p-4 bg-red-600 animate-pulse text-white shadow-2xl flex flex-col items-center gap-2">
-            <p className="font-black text-center uppercase tracking-tighter text-lg">ALERTE : IMMOBILITÉ PROLONGÉE !</p>
-            <Button variant="outline" className="bg-white text-red-600 font-black h-12 uppercase w-full border-none shadow-xl" onClick={stopWatchAlarm}>ARRÊTER L'ALARME DE VEILLE</Button>
+        <div className="fixed top-12 left-0 right-0 h-10 bg-red-600 animate-pulse text-white flex items-center justify-center text-xs font-black z-[100] shadow-xl">
+            ALERTE : IMMOBILITÉ PROLONGÉE ! <Button variant="ghost" size="sm" className="ml-2 h-6 px-2 border border-white/20 text-[8px] font-black" onClick={stopWatchAlarm}>STOP</Button>
         </div>
       )}
 
@@ -737,17 +736,52 @@ export default function VesselTrackerPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
+                    {/* ID du navire (Design "Partager ma position") */}
+                    <div className="p-4 border-2 rounded-2xl bg-primary/5 border-primary/10 space-y-3">
+                        <Label className="text-sm font-black uppercase">ID du navire (Partage)</Label>
+                        <div className="flex gap-2">
+                            <Input 
+                                placeholder="ID EX: BATEAU-1" 
+                                value={customSharingId} 
+                                onChange={e => setCustomSharingId(e.target.value)} 
+                                className="font-black text-center h-12 border-2 uppercase tracking-widest flex-grow bg-white" 
+                            />
+                            <Button 
+                                variant="outline" 
+                                size="icon" 
+                                className="h-12 w-12 border-2 shrink-0 bg-white shadow-sm" 
+                                onClick={handleSaveVessel}
+                            >
+                                <Save className="size-4 text-primary" />
+                            </Button>
+                        </div>
+                    </div>
+
                     <div className="flex items-center justify-between p-4 border-2 rounded-2xl bg-primary/5 border-primary/10">
-                        <div className="space-y-0.5"><Label className="text-sm font-black uppercase">Partager ma position</Label></div>
+                        <div className="space-y-0.5"><Label className="text-sm font-black uppercase">Partager ma position</Label><p className="text-[9px] font-bold text-muted-foreground uppercase">Flux direct vers récepteur</p></div>
                         <Switch checked={isSharing} onCheckedChange={(val) => { if (val) setIsSharing(true); else handleStopSharing(); }} />
                     </div>
+                    
                     <Accordion type="single" collapsible className="w-full">
                         <AccordionItem value="sender-prefs" className="border-none">
-                            <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl"><Settings className="size-4 text-primary" /><span className="text-[10px] font-black uppercase">Identité & Surnom</span></AccordionTrigger>
+                            <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
+                                <Settings className="size-4 text-primary" />
+                                <span className="text-[10px] font-black uppercase">Réglages du profil</span>
+                            </AccordionTrigger>
                             <AccordionContent className="pt-4 space-y-4">
-                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">ID du navire</Label><div className="flex gap-2"><Input placeholder="ID EX: BATEAU-1" value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest flex-grow" /><Button variant="outline" size="icon" className="h-12 w-12 border-2 shrink-0" onClick={handleSaveVessel}><Save className="size-4" /></Button></div></div>
-                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Surnom Tracker</Label><Input placeholder="EX: CAPITAINE NEMO" value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} className="font-bold text-center h-12 border-2 uppercase flex-grow w-full" /></div>
-                                <Button variant={wakeLock ? "secondary" : "outline"} className="w-full h-12 font-black uppercase text-[10px] tracking-widest border-2 gap-2" onClick={toggleWakeLock}><Zap className={cn("size-4", wakeLock && "fill-primary")} />{wakeLock ? "MODE ÉVEIL ACTIF" : "ACTIVER MODE ÉVEIL"}</Button>
+                                <div className="space-y-1">
+                                    <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Surnom Tracker</Label>
+                                    <Input 
+                                        placeholder="EX: CAPITAINE NEMO" 
+                                        value={vesselNickname} 
+                                        onChange={e => setVesselNickname(e.target.value)} 
+                                        className="font-bold text-center h-12 border-2 uppercase flex-grow w-full" 
+                                    />
+                                </div>
+                                <Button variant={wakeLock ? "secondary" : "outline"} className="w-full h-12 font-black uppercase text-[10px] tracking-widest border-2 gap-2" onClick={toggleWakeLock}>
+                                    <Zap className={cn("size-4", wakeLock && "fill-primary")} />
+                                    {wakeLock ? "MODE ÉVEIL ACTIF" : "ACTIVER MODE ÉVEIL"}
+                                </Button>
                             </AccordionContent>
                         </AccordionItem>
                         <AccordionItem value="sms-settings" className="border-none mt-2">
