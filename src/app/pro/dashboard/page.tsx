@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -339,7 +338,7 @@ export default function ProDashboard() {
                     <div className="p-2 bg-primary text-white rounded-lg shadow-sm"><UserCircle className="size-6" /></div>
                     <div>
                         <p className="font-black text-xl uppercase leading-none mb-1 text-slate-800">
-                          {profile?.displayName || user?.displayName || 'Utilisateur Pro'}
+                          {business?.name || profile?.displayName || user?.displayName || 'Utilisateur Pro'}
                         </p>
                         <div className="flex flex-col">
                             <p className="text-[9px] font-black uppercase text-primary/60">Identifiant de partage (UID)</p>
