@@ -110,6 +110,15 @@ const DayCell = React.memo(({
     return Math.max(...data.fishing.flatMap(slot => slot.fish.map(f => f.rating)));
   }, [data.fishing]);
 
+  // Détection de l'activité pélagique (Tazard, Wahoo, Thon)
+  const hasHighPelagicActivity = useMemo(() => {
+    if (!data.pelagicInfo?.inSeason) return false;
+    const pelagicNames = ['Wahoo', 'Tazard', 'Thon Jaune'];
+    return data.fishing.some(slot => 
+      slot.fish.some(f => pelagicNames.includes(f.name) && f.rating >= 8)
+    );
+  }, [data.fishing, data.pelagicInfo]);
+
   const { zodiac, isGoodForCuttings, isGoodForPruning, isGoodForMowing } = data.farming;
   const GardeningIcon = { Fruits: Spade, Racines: Carrot, Fleurs: Flower, Feuilles: Leaf }[zodiac];
 
@@ -138,14 +147,23 @@ const DayCell = React.memo(({
         <div className="flex-grow flex flex-col justify-center items-center gap-0.5 pt-1">
           {/* Notation par nombre de poissons */}
           <div className="flex items-center justify-center gap-0.5 h-4 mb-1">
-            {maxFishRating >= 5 && (
-              <Fish className={cn("size-3 text-primary", maxFishRating >= 9 && "fill-primary animate-pulse")} />
-            )}
-            {maxFishRating >= 7 && (
-              <Fish className={cn("size-3 text-primary", maxFishRating >= 9 && "fill-primary animate-pulse")} />
-            )}
-            {maxFishRating >= 9 && (
-              <Fish className={cn("size-3 text-primary fill-primary animate-pulse")} />
+            <div className="flex gap-0.5">
+                {maxFishRating >= 5 && (
+                <Fish className={cn("size-3 text-primary", maxFishRating >= 9 && "fill-primary")} />
+                )}
+                {maxFishRating >= 7 && (
+                <Fish className={cn("size-3 text-primary", maxFishRating >= 9 && "fill-primary")} />
+                )}
+                {maxFishRating >= 9 && (
+                <Fish className={cn("size-3 text-primary fill-primary animate-pulse")} />
+                )}
+            </div>
+            
+            {/* Indicateur Pélagiques (Orange) */}
+            {hasHighPelagicActivity && (
+                <div className="border-l border-primary/20 ml-1 pl-1">
+                    <Fish className="size-3 text-orange-500 fill-orange-500 drop-shadow-sm" />
+                </div>
             )}
           </div>
 

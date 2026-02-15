@@ -94,8 +94,8 @@ export default function CalendrierPage() {
                     <span className="text-xs font-black uppercase">Bonne activité (7-8/10)</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Fish className="size-3.5 text-primary opacity-60" />
-                    <span className="text-xs font-black uppercase text-muted-foreground">Activité modérée (5-6/10)</span>
+                    <Fish className="size-3.5 text-orange-500 fill-orange-500" />
+                    <span className="text-xs font-black uppercase text-orange-600">Pélagiques actifs (Saison + Marée)</span>
                   </div>
                 </div>
               </div>
