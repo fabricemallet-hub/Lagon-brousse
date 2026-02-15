@@ -61,6 +61,16 @@ import { fr } from 'date-fns/locale';
 import Link from 'next/link';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from '@/components/ui/alert-dialog';
 import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
 import { locations } from '@/lib/locations';
 
@@ -647,6 +657,10 @@ function UsersManager({ users }: { users: UserAccount[] | null }) {
     const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
     const [isSaving, setIsSaving] = useState(false);
 
+    // États pour la suppression
+    const [userToDelete, setUserToDelete] = useState<UserAccount | null>(null);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
     const [status, setStatus] = useState<UserAccount['subscriptionStatus']>('limited');
     const [expiry, setExpiry] = useState('');
 
@@ -677,6 +691,18 @@ function UsersManager({ users }: { users: UserAccount[] | null }) {
         }
     };
 
+    const handleDeleteUser = async () => {
+        if (!firestore || !userToDelete) return;
+        try {
+            await deleteDoc(doc(firestore, 'users', userToDelete.id));
+            toast({ title: "Compte supprimé" });
+            setIsDeleteDialogOpen(false);
+            setUserToDelete(null);
+        } catch (e) {
+            toast({ variant: 'destructive', title: "Erreur suppression" });
+        }
+    };
+
     return (
         <Card className="border-2 shadow-sm overflow-hidden rounded-2xl">
             <CardHeader className="p-5 bg-muted/5 border-b"><CardTitle className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2"><UsersIcon className="size-4" /> Liste des Comptes</CardTitle></CardHeader>
@@ -691,6 +717,7 @@ function UsersManager({ users }: { users: UserAccount[] | null }) {
                         <div className="flex items-center gap-2 shrink-0">
                             <Badge variant={u.subscriptionStatus === 'active' || u.subscriptionStatus === 'admin' ? 'default' : 'secondary'} className="text-[8px] font-black uppercase py-1 px-2">{u.subscriptionStatus}</Badge>
                             <Button variant="ghost" size="icon" className="size-10 border-2 rounded-xl" onClick={() => handleEditUser(u)}><Pencil className="size-4 opacity-60" /></Button>
+                            <Button variant="ghost" size="icon" className="size-10 border-2 rounded-xl text-destructive/40 hover:text-destructive" onClick={() => { setUserToDelete(u); setIsDeleteDialogOpen(true); }}><Trash2 className="size-4" /></Button>
                             <button onClick={() => { navigator.clipboard.writeText(u.id); toast({ title: "ID Copié" }); }} className="p-3 bg-muted/20 hover:bg-muted rounded-xl transition-colors"><Copy className="size-4 opacity-40" /></button>
                         </div>
                     </div>
@@ -733,6 +760,24 @@ function UsersManager({ users }: { users: UserAccount[] | null }) {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <AlertDialogContent className="rounded-3xl border-none shadow-2xl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="font-black uppercase tracking-tight text-destructive flex items-center gap-2">
+                            <AlertCircle className="size-5" /> Supprimer le compte ?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="text-xs font-bold uppercase leading-relaxed">
+                            Êtes-vous sûr de vouloir supprimer le profil de <span className="text-slate-900 font-black">{userToDelete?.email}</span> ? 
+                            Cette action supprimera ses données Firestore mais pas son compte d'authentification Firebase.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="gap-2">
+                        <AlertDialogCancel className="h-12 font-black uppercase text-[10px] border-2">Annuler</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteUser} className="h-12 font-black uppercase text-[10px] bg-destructive hover:bg-destructive/90">Supprimer définitivement</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Card>
     );
 }
