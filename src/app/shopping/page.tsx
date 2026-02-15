@@ -2,9 +2,9 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { useUser, useFirestore, useCollection, useMemoFirebase, useDoc } from '@/firebase';
+import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, collectionGroup, query, orderBy, doc, getDoc } from 'firebase/firestore';
-import type { Promotion, Business, UserAccount } from '@/lib/types';
+import type { Promotion, Business, UserAccount, Region } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -30,9 +30,10 @@ import {
     Home, 
     Navigation, 
     ExternalLink,
-    X
+    X,
+    Globe
 } from 'lucide-react';
-import { locations } from '@/lib/locations';
+import { locations, locationsByRegion, regions } from '@/lib/locations';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
@@ -98,11 +99,13 @@ export default function ShoppingPage() {
 
   // --- FILTERS STATE ---
   const [search, setSearch] = useState('');
+  const [filterRegion, setFilterRegion] = useState<string>('USER_DEFAULT');
   const [filterCommune, setFilterCommune] = useState<string>('USER_DEFAULT');
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
   const [filterBusiness, setFilterBusiness] = useState<string>('ALL');
   const [filterType, setFilterType] = useState<string>('ALL');
 
+  const userRegion = profile?.selectedRegion || 'CALEDONIE';
   const userCommune = profile?.lastSelectedLocation || 'Nouméa';
 
   // --- LOGIQUE DE FILTRAGE ---
@@ -110,6 +113,9 @@ export default function ShoppingPage() {
     if (!allPromotions) return [];
 
     const businessMap = new Map(businesses?.map(b => [b.id, b]) || []);
+
+    const currentFRegion = filterRegion === 'USER_DEFAULT' ? userRegion : filterRegion;
+    const currentFCommune = filterCommune === 'USER_DEFAULT' ? userCommune : filterCommune;
 
     return allPromotions
       .map(promo => ({
@@ -122,8 +128,22 @@ export default function ShoppingPage() {
                              (item.description?.toLowerCase() || '').includes(search.toLowerCase());
         if (!matchesSearch) return false;
 
-        if (filterCommune !== 'USER_DEFAULT' && filterCommune !== 'ALL') {
-            if (item.business && item.business.commune !== filterCommune) return false;
+        // Filtre Région
+        if (currentFRegion !== 'ALL') {
+            const itemCommune = item.business?.commune;
+            if (itemCommune) {
+                // Déterminer la région du produit basée sur la commune
+                const isTahiti = Object.keys(locationsByRegion['TAHITI']).includes(itemCommune);
+                const itemRegion = isTahiti ? 'TAHITI' : 'CALEDONIE';
+                if (itemRegion !== currentFRegion) return false;
+            } else {
+                return false; 
+            }
+        }
+
+        // Filtre Commune
+        if (currentFCommune !== 'ALL') {
+            if (item.business && item.business.commune !== currentFCommune) return false;
             if (!item.business) return false; 
         }
 
@@ -134,6 +154,7 @@ export default function ShoppingPage() {
         return true;
       })
       .sort((a, b) => {
+        // Priorité à la commune de l'utilisateur si on est en mode USER_DEFAULT
         if (filterCommune === 'USER_DEFAULT') {
             const aInCommune = a.business?.commune === userCommune;
             const bInCommune = b.business?.commune === userCommune;
@@ -145,10 +166,17 @@ export default function ShoppingPage() {
         const timeB = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
         return timeB - timeA;
       });
-  }, [allPromotions, businesses, search, filterCommune, filterCategory, filterBusiness, filterType, userCommune]);
+  }, [allPromotions, businesses, search, filterRegion, filterCommune, filterCategory, filterBusiness, filterType, userRegion, userCommune]);
+
+  const availableCommunes = useMemo(() => {
+    const currentFRegion = filterRegion === 'USER_DEFAULT' ? userRegion : filterRegion;
+    if (currentFRegion === 'ALL') return Object.keys(locations).sort();
+    return Object.keys(locationsByRegion[currentFRegion as Region] || {}).sort();
+  }, [filterRegion, userRegion]);
 
   const resetFilters = () => {
     setSearch('');
+    setFilterRegion('USER_DEFAULT');
     setFilterCommune('USER_DEFAULT');
     setFilterCategory('ALL');
     setFilterBusiness('ALL');
@@ -181,7 +209,7 @@ export default function ShoppingPage() {
           placeholder="Chercher un produit (ex: Moulinet, terreau...)" 
           value={search} 
           onChange={(e) => setSearch(e.target.value)} 
-          className="pl-12 h-14 border-2 shadow-sm font-bold text-base bg-white" 
+          className="pl-12 h-14 border-2 shadow-sm font-black text-base bg-white" 
         />
       </div>
 
@@ -196,16 +224,34 @@ export default function ShoppingPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
+                <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Région</Label>
+                <Select value={filterRegion} onValueChange={(v) => { setFilterRegion(v); setFilterCommune('ALL'); }}>
+                    <SelectTrigger className="h-10 border-2 bg-white font-black uppercase text-xs">
+                        <Globe className="size-3 mr-2 text-primary" />
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="USER_DEFAULT" className="font-black text-xs text-primary uppercase italic">Mise en avant : {userRegion}</SelectItem>
+                        <SelectItem value="ALL" className="font-black text-xs uppercase">Toutes les régions</SelectItem>
+                        {regions.map(reg => (
+                            <SelectItem key={reg} value={reg} className="font-black text-xs uppercase">{reg}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+
+            <div className="space-y-1">
                 <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Commune</Label>
                 <Select value={filterCommune} onValueChange={setFilterCommune}>
                     <SelectTrigger className="h-10 border-2 bg-white font-bold text-xs">
-                        <SelectValue placeholder="Toutes les communes" />
+                        <MapPin className="size-3 mr-2 text-primary" />
+                        <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="max-h-64">
-                        <SelectItem value="USER_DEFAULT" className="font-black text-xs text-primary uppercase">Mise en avant : {userCommune}</SelectItem>
+                        <SelectItem value="USER_DEFAULT" className="font-black text-xs text-primary uppercase italic">Mise en avant : {userCommune}</SelectItem>
                         <SelectItem value="ALL" className="font-bold text-xs">Toutes les communes</SelectItem>
-                        {Object.keys(locations).sort().map(loc => (
-                            <SelectItem key={loc} value={loc} className="text-xs">{loc}</SelectItem>
+                        {availableCommunes.map(loc => (
+                            <SelectItem key={loc} value={loc} className="text-xs font-bold">{loc}</SelectItem>
                         ))}
                     </SelectContent>
                 </Select>
@@ -220,7 +266,7 @@ export default function ShoppingPage() {
                     <SelectContent className="max-h-64">
                         <SelectItem value="ALL" className="font-bold text-xs">Tous les magasins</SelectItem>
                         {businesses?.map(b => (
-                            <SelectItem key={b.id} value={b.id} className="text-xs">{b.name} ({b.commune})</SelectItem>
+                            <SelectItem key={b.id} value={b.id} className="text-xs font-bold">{b.name} ({b.commune})</SelectItem>
                         ))}
                     </SelectContent>
                 </Select>
