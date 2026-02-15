@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, setDoc, addDoc, deleteDoc, serverTimestamp, Timestamp, updateDoc, writeBatch, where, getCountFromServer } from 'firebase/firestore';
+import { collection, query, orderBy, doc, setDoc, addDoc, deleteDoc, serverTimestamp, Timestamp, updateDoc, writeBatch, where, getCountFromServer, getDoc } from 'firebase/firestore';
 import type { UserAccount, Business, Conversation, AccessToken, SharedAccessToken, SplashScreenSettings, CgvSettings, RibSettings, SystemNotification, FishSpeciesInfo, SoundLibraryEntry, SupportTicket } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -379,7 +379,7 @@ function BusinessManager({ businesses, users }: { businesses: Business[] | null,
     };
 
     return (
-        <Card className="border-2 shadow-lg overflow-hidden rounded-2xl">
+        <Card className="border-2 shadow-lg rounded-2xl overflow-hidden">
             <CardHeader className="p-5 border-b bg-muted/5">
                 <div className="flex flex-col gap-4">
                     <div className="flex items-center justify-between">
@@ -657,7 +657,6 @@ function UsersManager({ users }: { users: UserAccount[] | null }) {
     const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
     const [isSaving, setIsSaving] = useState(false);
 
-    // États pour la suppression
     const [userToDelete, setUserToDelete] = useState<UserAccount | null>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
@@ -713,6 +712,11 @@ function UsersManager({ users }: { users: UserAccount[] | null }) {
                         <div className="flex flex-col min-w-0 pr-2">
                             <span className="font-black uppercase text-xs truncate text-slate-800">{u.displayName}</span>
                             <span className="text-[10px] font-bold opacity-40 truncate">{u.email}</span>
+                            {u.subscriptionExpiryDate && (u.subscriptionStatus === 'active' || u.subscriptionStatus === 'trial') && (
+                                <span className="text-[8px] font-black uppercase text-primary mt-0.5">
+                                    Expire le {format(new Date(u.subscriptionExpiryDate), 'dd/MM/yyyy')}
+                                </span>
+                            )}
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                             <Badge variant={u.subscriptionStatus === 'active' || u.subscriptionStatus === 'admin' ? 'default' : 'secondary'} className="text-[8px] font-black uppercase py-1 px-2">{u.subscriptionStatus}</Badge>
