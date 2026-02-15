@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from './alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { 
   Target, 
@@ -92,8 +92,19 @@ const BALLISTIC_DATABASE: MunitionData[] = [
   { id: '12-brenneke', caliber: 'Calibre 12', model: 'Balle Brenneke', weight: 28, v0: 430, bc: 0.075, usage: 'Référence pour le gros cochon.', color: 'bg-red-600' },
   { id: '12-sauvestre', caliber: 'Calibre 12', model: 'Balle Sauvestre', weight: 26, v0: 480, bc: 0.120, usage: 'Flèche haute vitesse, tir précis.', color: 'bg-red-600' },
   { id: '12-buck-9', caliber: 'Calibre 12', model: 'Chevrotine 9 grains', weight: 31, v0: 400, bc: 0.050, usage: 'Battue en fourré dense.', color: 'bg-red-600' },
-  { id: '12-lead-4', caliber: 'Calibre 12', model: 'Plomb n°4 (Plume)', weight: 35, v0: 390, bc: 0.030, usage: 'Notou et Pigeon vert.', color: 'bg-red-600' },
-  { id: '12-lead-2', caliber: 'Calibre 12', model: 'Plomb n°2 (Gros oiseaux)', weight: 35, v0: 390, bc: 0.035, usage: 'Roussette ou gros oiseaux.', color: 'bg-red-600' },
+  { id: '12-lead-4', caliber: 'Calibre 12', model: 'Plomb n°4', weight: 35, v0: 390, bc: 0.030, usage: 'Notou et Pigeon vert.', color: 'bg-red-600' },
+
+  // Calibre 16
+  { id: '16-brenneke', caliber: 'Calibre 16', model: 'Balle Brenneke', weight: 21, v0: 415, bc: 0.060, usage: 'Ancien standard, recul modéré.', color: 'bg-orange-800' },
+  { id: '16-lead-4', caliber: 'Calibre 16', model: 'Plomb n°4', weight: 28, v0: 380, bc: 0.025, usage: 'Plume en forêt.', color: 'bg-orange-800' },
+
+  // Calibre 20
+  { id: '20-brenneke', caliber: 'Calibre 20', model: 'Balle Brenneke', weight: 18, v0: 425, bc: 0.055, usage: 'Idéal pour fusils légers, très précis.', color: 'bg-yellow-800' },
+  { id: '20-lead-4', caliber: 'Calibre 20', model: 'Plomb n°4', weight: 24, v0: 390, bc: 0.025, usage: 'Plume et petit gibier.', color: 'bg-yellow-800' },
+
+  // 22mm
+  { id: '22mm-lr-40', caliber: '22mm', model: '.22 LR Standard', weight: 40, v0: 330, bc: 0.125, usage: 'Petits nuisibles et tir de loisir.', color: 'bg-zinc-500' },
+  { id: '22mm-wmr-40', caliber: '22mm', model: '.22 WMR (Magnum)', weight: 40, v0: 580, bc: 0.110, usage: 'Portée accrue pour petits nuisibles.', color: 'bg-zinc-500' },
 ];
 
 const CALIBERS = Array.from(new Set(BALLISTIC_DATABASE.map(m => m.caliber)));
@@ -173,14 +184,17 @@ export function ShootingTableCard() {
   };
 
   const resultsTable = useMemo(() => {
-    const distances = [100, 200, 300];
-    if (selectedMunition.caliber === 'Calibre 12') {
+    if (selectedMunition.caliber.startsWith('Calibre')) {
         return [calculateBallistics(50), calculateBallistics(75), calculateBallistics(100)];
     }
+    if (selectedMunition.caliber === '22mm') {
+        return [calculateBallistics(25), calculateBallistics(50), calculateBallistics(100)];
+    }
+    const distances = [100, 200, 300];
     return distances.map(d => calculateBallistics(d));
   }, [selectedMunition, zeroDistance, calculateBallistics]);
 
-  const weightUnit = selectedMunition.caliber === 'Calibre 12' ? 'g' : 'gr';
+  const weightUnit = selectedMunition.caliber.startsWith('Calibre') ? 'g' : 'gr';
 
   return (
     <Card className="border-2 shadow-xl overflow-hidden rounded-2xl">
