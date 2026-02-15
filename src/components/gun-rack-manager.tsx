@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, addDoc, serverTimestamp, deleteDoc, doc, query, orderBy, updateDoc } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -41,6 +41,16 @@ export function GunRackManager() {
   const { data: weapons, isLoading } = useCollection<Weapon>(weaponsRef);
 
   const munitionsForCaliber = BALLISTIC_DATABASE.filter(m => m.caliber === caliber);
+
+  // Auto-fill weight when munition is selected
+  useEffect(() => {
+    if (munitionId) {
+      const munition = BALLISTIC_DATABASE.find(m => m.id === munitionId);
+      if (munition) {
+        setWeight(munition.weight.toString());
+      }
+    }
+  }, [munitionId]);
 
   const resetForm = () => {
     setCustomName('');
@@ -108,6 +118,8 @@ export function GunRackManager() {
 
   if (!user) return null;
 
+  const weightUnit = caliber.startsWith('Calibre') || caliber.includes('.410') ? 'g' : 'gr';
+
   return (
     <div className="space-y-6">
       <Card className="border-2 border-dashed border-primary/20 bg-primary/5 rounded-2xl overflow-hidden shadow-sm">
@@ -155,6 +167,10 @@ export function GunRackManager() {
                 </Select>
               </div>
               <div className="space-y-1.5">
+                <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Poids ({weightUnit})</Label>
+                <Input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder={`Ex: ${weightUnit === 'g' ? '26' : '150'}`} className="h-11 border-2 font-black text-center" />
+              </div>
+              <div className="space-y-1.5">
                 <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Réglage Zéro (m)</Label>
                 <Input type="number" value={zeroDistance} onChange={e => setZeroDistance(e.target.value)} className="h-11 border-2 font-black text-center" />
               </div>
@@ -173,6 +189,7 @@ export function GunRackManager() {
         ) : weapons && weapons.length > 0 ? (
           weapons.map(w => {
             const munition = BALLISTIC_DATABASE.find(m => m.id === w.munitionId);
+            const weaponWeightUnit = w.caliber.startsWith('Calibre') || w.caliber.includes('.410') ? 'g' : 'gr';
             return (
               <Card key={w.id} className="overflow-hidden border-2 shadow-md hover:border-primary/30 transition-all group">
                 <CardHeader className="p-4 bg-muted/10 border-b flex flex-row items-center justify-between">
@@ -195,15 +212,15 @@ export function GunRackManager() {
                     <Badge variant="outline" className="font-black uppercase text-[9px] border-primary/20 text-primary">{w.caliber}</Badge>
                     <span className="text-[9px] font-black uppercase text-muted-foreground">Zéro: {w.zeroDistance}m</span>
                   </div>
-                  {munition && (
-                    <div className="p-2.5 bg-primary/5 rounded-xl border border-dashed border-primary/10 flex items-center gap-2">
-                      <div className={cn("size-2 rounded-full", munition.color)} />
+                  <div className="p-2.5 bg-primary/5 rounded-xl border border-dashed border-primary/10 flex items-center justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className={cn("size-2 rounded-full", munition?.color || "bg-slate-400")} />
                       <div className="min-w-0">
-                        <p className="text-[10px] font-black uppercase text-slate-700 truncate leading-none mb-1">{munition.model}</p>
-                        <p className="text-[8px] font-bold text-muted-foreground uppercase">{munition.weight}{w.caliber.includes('Calibre') ? 'g' : 'gr'} • BC: {munition.bc}</p>
+                        <p className="text-[10px] font-black uppercase text-slate-700 truncate leading-none mb-1">{munition?.model || "Munition personnalisée"}</p>
+                        <p className="text-[8px] font-bold text-muted-foreground uppercase">{w.weight}{weaponWeightUnit} {munition ? `• BC: ${munition.bc}` : ''}</p>
                       </div>
                     </div>
-                  )}
+                  </div>
                 </CardContent>
               </Card>
             );
