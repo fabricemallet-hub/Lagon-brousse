@@ -18,7 +18,35 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { LocationData, FishingSpot, SwellForecast, Tide, SpotShare } from '@/lib/types';
 import { getDataForDate, generateProceduralData } from '@/lib/data';
-import { Map, MapPin, Fish, Plus, Save, Trash2, BrainCircuit, BarChart, AlertCircle, Anchor, LocateFixed, Expand, Shrink, ChevronDown, Pencil, History, Navigation, Map as MapIcon, RefreshCw, X, Share2, Send, Info, Search, Filter, ArrowDownWideArrow } from 'lucide-react';
+import { 
+    Map, 
+    MapPin, 
+    Fish, 
+    Plus, 
+    Save, 
+    Trash2, 
+    BrainCircuit, 
+    BarChart, 
+    AlertCircle, 
+    Anchor, 
+    LocateFixed, 
+    Expand, 
+    Shrink, 
+    ChevronDown, 
+    Pencil, 
+    History, 
+    Navigation, 
+    Map as MapIcon, 
+    RefreshCw, 
+    X, 
+    Share2, 
+    Send, 
+    Info, 
+    Search, 
+    Filter, 
+    ArrowDownAz,
+    Check
+} from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from './alert';
 import { useLocation } from '@/context/location-context';
@@ -765,7 +793,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                         setSortByDistance(!sortByDistance);
                                     }}
                                 >
-                                    {sortByDistance ? <Check className="size-4" /> : <ArrowDownWideArrow className="size-4" />}
+                                    {sortByDistance ? <Check className="size-4" /> : <ArrowDownAz className="size-4" />}
                                     {sortByDistance ? "Trié par distance (Plus proches)" : "Trier par distance (Plus proches)"}
                                 </Button>
                             </div>
