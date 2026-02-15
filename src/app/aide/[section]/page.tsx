@@ -158,20 +158,26 @@ const sectionContent: Record<string, {
     ]
   },
   'chasse': {
-    title: 'Chasse au Cerf',
+    title: 'Chasse & Tactique',
     icon: Crosshair,
     color: 'bg-orange-600',
-    role: "Optimisez vos sorties en brousse grâce l'analyse du vent et au suivi de groupe en temps réel.",
+    role: "Optimisez vos sorties en brousse grâce à l'analyse du vent, au suivi de groupe et désormais à un calculateur balistique complet pour carabines et fusils lisses.",
     steps: [
       "Consultez la période biologique (Brame, Chute des bois) pour adapter votre stratégie.",
       "Utilisez la carte du vent pour visualiser d'où vient l'air par rapport au relief.",
-      "La 'Table de Tir' vous aide à estimer la correction de visée en fonction de la distance et du vent.",
+      "Table de Tir : Sélectionnez votre calibre, le modèle d'ogive et le grammage précis (Grains ou Grammes).",
+      "Réglages Optiques : Indiquez votre distance de zérotage pour obtenir le nombre de clics exacts à appliquer sur vos tourelles.",
+      "Compensation Vent : Saisissez la force et direction du vent pour corriger la dérive latérale en temps réel.",
+      "Accessoires : Activez le mode 'Silencieux' pour recalculer la poussée prolongée (+2% V0) et la stabilité au vent.",
+      "Simulateur de Gerbe : Pour les fusils lisses (12, 16, 20), visualisez le diamètre d'impact selon le Choke et la distance.",
       "Session de Groupe : Partagez votre position GPS en temps réel avec vos partenaires au-dessus de la carte satellite via un code unique.",
       "Alertes Tactiques : Signalez 'Gibier en vue' d'un clic. Une alerte visuelle et sonore préviendra immédiatement vos coéquipiers."
     ],
     tips: [
-      "En période de Brame, les cerfs sont plus actifs mais aussi plus vigilants.",
-      "Personnalisez votre icône et votre couleur dans les paramètres pour être identifié au premier coup d'œil."
+      "Le silencieux augmente légèrement la vitesse car il agit comme un prolongement du canon pour les gaz.",
+      "Simulateur de Gerbe : Au-delà de 40m au plomb n°6, la dispersion est trop forte pour un prélèvement éthique.",
+      "Mode Expert : Utilisez le modèle 'PERSONNALISÉ' pour saisir manuellement vos propres données de rechargement.",
+      "1 Clic = 1cm à 100m. Le tableau vous donne le sens de rotation (HAUT/BAS, DROITE/GAUCHE) pour chaque distance."
     ]
   },
   'champs': {
@@ -201,7 +207,7 @@ const sectionContent: Record<string, {
       "Calcul de Fiche IA : L'IA définit le type de plante et génère les conseils d'arrosage et d'exposition spécifiques à la NC.",
       "Validation Lunaire : L'IA vérifie votre date de semis. Si elle est mauvaise, elle vous donne la date idéale précise sur les 30 prochains jours.",
       "Planification : Obtenez les dates estimées de récolte et les périodes de repiquage en pleine terre.",
-      "Top Semis : Consultez la liste 'Idéal pour aujourd'hui' basée sur l'influence lunaire actuelle."
+      "Top Semis : Consultez la liste 'Idéal pour aujourd'hui' basée on l'influence lunaire actuelle."
     ],
     tips: [
       "L'IA suggère systématiquement des variétés résistantes à la chaleur calédonienne (ex: Tomate Heatmaster).",
