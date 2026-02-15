@@ -156,7 +156,7 @@ export default function MeteoLivePage() {
       <Card className="border-none shadow-none bg-transparent">
         <CardHeader className="px-0">
           <CardTitle className="text-2xl font-black tracking-tight flex items-center gap-2">
-            <Sun className="text-primary size-7" /> Météo NC Live
+            <Sun className="text-primary size-7" /> Météo Live
           </CardTitle>
           <CardDescription className="text-xs font-medium">
             Données en direct de vos stations météo.
