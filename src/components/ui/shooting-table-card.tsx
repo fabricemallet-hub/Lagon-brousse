@@ -28,7 +28,8 @@ import {
   Focus,
   Bird,
   Volume2,
-  Waves
+  Waves,
+  ShieldAlert
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -106,11 +107,13 @@ const BALLISTIC_DATABASE: MunitionData[] = [
   { id: '20-plomb-6', caliber: 'Calibre 20', model: 'Plomb n°6', weight: 24, v0: 390, bc: 0.015, usage: 'Excellent pour la plume, recul très faible.', color: 'bg-yellow-800', type: 'shot' },
 
   // Calibre .410
-  { id: '410-brenn-7', caliber: 'Calibre .410', model: 'Balle Brenneke', weight: 7, v0: 450, bc: 0.050, usage: 'Petit calibre pour nuisibles ou tir de précision à courte distance.', color: 'bg-stone-500', type: 'slug' },
-  { id: '410-plomb-4', caliber: 'Calibre .410', model: 'Plomb n°4', weight: 12, v0: 370, bc: 0.019, usage: 'Petit gibier à plumes, roussette à courte distance.', color: 'bg-stone-500', type: 'shot' },
-  { id: '410-plomb-6', caliber: 'Calibre .410', model: 'Plomb n°6', weight: 12, v0: 370, bc: 0.015, usage: 'Tourterelles, petits oiseaux, tir de jardin.', color: 'bg-stone-500', type: 'shot' },
-  { id: '410-plomb-7.5', caliber: 'Calibre .410', model: 'Plomb n°7.5', weight: 12, v0: 370, bc: 0.012, usage: 'Nuisibles, merles calédoniens, entraînement.', color: 'bg-stone-500', type: 'shot' },
-  { id: '410-plomb-9', caliber: 'Calibre .410', model: 'Plomb n°9', weight: 12, v0: 370, bc: 0.010, usage: 'Tir de très près, nuisibles légers.', color: 'bg-stone-500', type: 'shot' },
+  { id: '410-slug-75', caliber: 'Calibre .410', model: 'Balle Slug (Brenneke)', weight: 7.5, v0: 530, bc: 0.055, usage: 'Excellent pour la régulation des petits cochons ou jeune cerf à courte distance (<50m).', color: 'bg-stone-500', type: 'slug' },
+  { id: '410-pdx1', caliber: 'Calibre .410', model: 'Winchester PDX1 (Défense)', weight: 19, v0: 350, bc: 0.040, usage: 'Hybride : 3 disques + 12 billes. Très impressionnant pour stopper un nuisible de près.', color: 'bg-stone-500', type: 'slug' },
+  { id: '410-000buck', caliber: 'Calibre .410', model: 'Chevrotine 000 Buck', weight: 15, v0: 340, bc: 0.045, usage: '3 à 5 billes de 9mm. Pour le cochon au fourré à très courte distance (<15m).', color: 'bg-stone-500', type: 'buckshot' },
+  { id: '410-plomb-4', caliber: 'Calibre .410', model: 'Plomb n°4', weight: 12, v0: 370, bc: 0.019, usage: 'Pigeon vert ou Collier blanc à courte distance. Gerbe serrée.', color: 'bg-stone-500', type: 'shot' },
+  { id: '410-plomb-6', caliber: 'Calibre .410', model: 'Plomb n°6', weight: 12, v0: 370, bc: 0.015, usage: 'Le standard pour Tourterelles et petits oiseaux. Précision requise.', color: 'bg-stone-500', type: 'shot' },
+  { id: '410-plomb-7.5', caliber: 'Calibre .410', model: 'Plomb n°7.5', weight: 12, v0: 350, bc: 0.012, usage: 'Spécial Merles calédoniens et Tourterelles. Très discret.', color: 'bg-stone-500', type: 'shot' },
+  { id: '410-plomb-9', caliber: 'Calibre .410', model: 'Plomb n°9', weight: 12, v0: 350, bc: 0.010, usage: 'Tir de jardin et petits nuisibles. Discrétion maximale.', color: 'bg-stone-500', type: 'shot' },
 
   // 22mm
   { id: '22mm-lr-40', caliber: '22mm', model: '.22 LR Standard', weight: 40, v0: 330, bc: 0.125, usage: 'Petits nuisibles et tir de loisir.', color: 'bg-zinc-500', type: 'bullet' },
@@ -214,9 +217,10 @@ export function ShootingTableCard() {
     const wAng = parseFloat(windAngle) || 0;
     const g = 9.81;
     
-    // Impact du silencieux sur la V0 (+2%)
+    // Le .410 exploite mieux le silencieux (+3% V0 au lieu de +2%)
     const baseV0 = selectedMunition.v0;
-    const v0 = hasSilencer ? baseV0 * 1.02 : baseV0;
+    const silencerBonus = (selectedCaliber === 'Calibre .410' && hasSilencer) ? 1.03 : (hasSilencer ? 1.02 : 1.0);
+    const v0 = baseV0 * silencerBonus;
     const { bc } = selectedMunition;
 
     if (v0 <= 0 || bc <= 0) return { dist, dropCm: 0, clicks: 0, driftCm: 0, driftClicks: 0, elevationDir: 'HAUT', driftDir: 'DROITE' };
@@ -252,35 +256,44 @@ export function ShootingTableCard() {
         driftClicks: Math.abs(Math.round(windDriftCm / distFactor)),
         driftDir: windDriftCm > 0 ? 'DROITE' : 'GAUCHE'
     };
-  }, [selectedMunition, zeroDistance, windKmh, windAngle, hasSilencer]);
+  }, [selectedMunition, selectedCaliber, zeroDistance, windKmh, windAngle, hasSilencer]);
 
   const resultsTable = useMemo(() => {
-    if (selectedMunition.caliber.startsWith('Calibre')) {
+    if (selectedCaliber === 'Calibre .410') {
+        if (selectedMunition.type === 'shot' || selectedMunition.type === 'buckshot') return [calculateBallistics(10), calculateBallistics(20), calculateBallistics(30)];
+        return [calculateBallistics(25), calculateBallistics(50), calculateBallistics(75)];
+    }
+    if (selectedCaliber.startsWith('Calibre')) {
         return [calculateBallistics(50), calculateBallistics(75), calculateBallistics(100)];
     }
-    if (selectedMunition.caliber === '22mm') {
+    if (selectedCaliber === '22mm') {
         return [calculateBallistics(25), calculateBallistics(50), calculateBallistics(100)];
     }
     return [100, 200, 300].map(d => calculateBallistics(d));
-  }, [selectedMunition, calculateBallistics]);
+  }, [selectedCaliber, selectedMunition.type, calculateBallistics]);
 
   const patternDiameter = useMemo(() => {
     const choke = CHOKES.find(c => c.label === selectedChoke) || CHOKES[2];
-    return Math.round(shotDistance * choke.factor);
-  }, [selectedChoke, shotDistance]);
+    // Le .410 a une gerbe naturellement plus serrée
+    const caliberFactor = selectedCaliber === 'Calibre .410' ? 0.85 : 1.0;
+    return Math.round(shotDistance * choke.factor * caliberFactor);
+  }, [selectedChoke, shotDistance, selectedCaliber]);
 
   const patternWarning = useMemo(() => {
     if (!isPatternMode) return null;
     const plombNum = parseInt(selectedMunition.model.match(/\d+/)?.[0] || '0');
     
-    if (shotDistance >= 40 && (plombNum >= 6 || selectedMunition.type === 'shot')) {
-        return "Attention : Gerbe trop large. Risque de blesser le gibier sans le prélever à cette distance.";
+    // Le .410 perd son efficacité plus tôt au plomb
+    const maxDist = selectedCaliber === 'Calibre .410' ? 25 : 40;
+
+    if (shotDistance >= maxDist && (plombNum >= 6 || selectedMunition.type === 'shot')) {
+        return `Attention : Gerbe trop large pour ce calibre. Risque de blesser le gibier sans le prélever à cette distance (> ${maxDist}m).`;
     }
     if (selectedMunition.type === 'buckshot' && shotDistance > 25) {
         return "Danger : La chevrotine perd son efficacité d'arrêt très rapidement au-delà de 25m.";
     }
     return null;
-  }, [isPatternMode, selectedMunition, shotDistance]);
+  }, [isPatternMode, selectedMunition, shotDistance, selectedCaliber]);
 
   const weightUnit = selectedMunition.caliber.startsWith('Calibre') ? 'g' : 'gr';
 
@@ -300,9 +313,16 @@ export function ShootingTableCard() {
                       </CardDescription>
                   </div>
               </div>
-              <Badge className={cn("font-black uppercase text-[10px] px-3 h-7 border-none shadow-md", selectedMunition.color)}>
-                  {selectedMunition.caliber}
-              </Badge>
+              <div className="flex flex-col items-end gap-1">
+                <Badge className={cn("font-black uppercase text-[10px] px-3 h-7 border-none shadow-md", selectedMunition.color)}>
+                    {selectedMunition.caliber}
+                </Badge>
+                {selectedCaliber === 'Calibre .410' && hasSilencer && (
+                    <Badge variant="outline" className="text-[8px] h-4 border-green-500 text-green-400 font-black uppercase animate-pulse">
+                        Bruit -60% (Roi du Silencieux)
+                    </Badge>
+                )}
+              </div>
           </div>
         </CardHeader>
         
@@ -406,7 +426,11 @@ export function ShootingTableCard() {
                                 </div>
                                 <div className="text-center border-l pl-4">
                                     <p className="text-[8px] font-black uppercase opacity-40">V0</p>
-                                    <p className="font-black text-xs">{hasSilencer ? Math.round(selectedMunition.v0 * 1.02) : selectedMunition.v0} m/s</p>
+                                    <p className="font-black text-xs">
+                                        {hasSilencer 
+                                            ? Math.round(selectedMunition.v0 * (selectedCaliber === 'Calibre .410' ? 1.03 : 1.02)) 
+                                            : selectedMunition.v0} m/s
+                                    </p>
                                 </div>
                             </>
                           )}
@@ -423,7 +447,9 @@ export function ShootingTableCard() {
                         <div className="p-2 bg-primary/10 rounded-lg text-primary"><Volume2 className="size-4" /></div>
                         <div className="flex flex-col">
                             <span className="text-[10px] font-black uppercase">Silencieux</span>
-                            <span className="text-[8px] font-bold text-muted-foreground uppercase">+2% V0 | -5% Dérive</span>
+                            <span className="text-[8px] font-bold text-muted-foreground uppercase">
+                                {selectedCaliber === 'Calibre .410' ? '+3% V0 | -60% Bruit' : '+2% V0 | -5% Dérive'}
+                            </span>
                         </div>
                     </div>
                     <Switch checked={hasSilencer} onCheckedChange={setHasSilencer} />
@@ -500,7 +526,7 @@ export function ShootingTableCard() {
                         {selectedMunition.model.toLowerCase().includes('plomb') ? (
                             <>
                                 <Bird className="size-10 text-slate-800 opacity-80" />
-                                <span className="text-[8px] font-black uppercase mt-1 bg-white/80 px-1 rounded">NOTOU</span>
+                                <span className="text-[8px] font-black uppercase mt-1 bg-white/80 px-1 rounded">GIBIER PLUME</span>
                             </>
                         ) : (
                             <>
@@ -579,13 +605,13 @@ export function ShootingTableCard() {
 
           <Alert className="bg-slate-900 text-white border-none rounded-2xl p-4 shadow-xl relative overflow-hidden">
               <div className="absolute top-0 right-0 p-4 opacity-10">
-                  <AlertCircle className="size-10 text-primary" />
+                  <ShieldAlert className="size-10 text-primary" />
               </div>
               <AlertTitle className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2 mb-1">
-                  Avis de Sécurité
+                  Sécurité & Balistique
               </AlertTitle>
               <AlertDescription className="text-[9px] leading-relaxed italic text-slate-300 font-medium">
-                  Simulation théorique G1 {isPatternMode ? '(Gerbe)' : '(Balle)'}. Les conditions réelles (altitude, humidité) peuvent varier. Vérifiez toujours votre réglage sur cible avant de chasser.
+                  Simulation théorique G1. Les conditions réelles (altitude, humidité) influent sur la précision. {selectedCaliber === 'Calibre .410' ? 'Le .410 demande une grande précision due à sa faible charge.' : 'Vérifiez toujours votre réglage sur cible avant de chasser.'}
               </AlertDescription>
           </Alert>
         </CardContent>
