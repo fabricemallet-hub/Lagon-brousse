@@ -3,8 +3,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, doc, setDoc, addDoc, deleteDoc, serverTimestamp, Timestamp, updateDoc, increment } from 'firebase/firestore';
-import type { UserAccount, Business, Conversation, AccessToken, SharedAccessToken, SplashScreenSettings, CgvSettings, RibSettings, SystemNotification } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import type { UserAccount, Business, Conversation, AccessToken, SharedAccessToken, SplashScreenSettings, CgvSettings, RibSettings, SystemNotification, FishSpeciesInfo } from '@/lib/types';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,7 +34,15 @@ import {
   FileText,
   Landmark,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  Fish,
+  Pencil,
+  BrainCircuit,
+  ImageIcon,
+  X,
+  AlertTriangle,
+  Target,
+  ChefHat
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -45,6 +53,8 @@ import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 import Link from 'next/link';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
 
 export default function AdminPage() {
   const { user, isUserLoading } = useUser();
@@ -101,19 +111,19 @@ export default function AdminPage() {
             <ShieldCheck className="size-48" />
         </div>
         <CardHeader className="py-8 relative z-10">
-          <CardTitle className="font-black uppercase tracking-tighter text-3xl">Administration Master</CardTitle>
+          <CardTitle className="font-black uppercase tracking-tighter text-3xl">Tableau de Bord Administrateur</CardTitle>
           <CardDescription className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">{user?.email}</CardDescription>
         </CardHeader>
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 mb-6 h-auto bg-muted/50 border-2 rounded-2xl p-1.5 shadow-sm gap-1">
-          <TabsTrigger value="stats" className="text-[10px] font-black uppercase py-3 rounded-xl">Stats</TabsTrigger>
-          <TabsTrigger value="permissions" className="text-[10px] font-black uppercase py-3 rounded-xl">Rôles</TabsTrigger>
-          <TabsTrigger value="acces" className="text-[10px] font-black uppercase py-3 rounded-xl">Jetons</TabsTrigger>
-          <TabsTrigger value="users" className="text-[10px] font-black uppercase py-3 rounded-xl">Comptes</TabsTrigger>
+          <TabsTrigger value="stats" className="text-[10px] font-black uppercase py-3 rounded-xl">Vue d'ensemble</TabsTrigger>
+          <TabsTrigger value="users" className="text-[10px] font-black uppercase py-3 rounded-xl">Utilisateurs</TabsTrigger>
+          <TabsTrigger value="design" className="text-[10px] font-black uppercase py-3 rounded-xl">Design & Splash</TabsTrigger>
+          <TabsTrigger value="fish" className="text-[10px] font-black uppercase py-3 rounded-xl">Guide Poissons</TabsTrigger>
+          <TabsTrigger value="acces" className="text-[10px] font-black uppercase py-3 rounded-xl">Accès</TabsTrigger>
           <TabsTrigger value="support" className="text-[10px] font-black uppercase py-3 rounded-xl">Support</TabsTrigger>
-          <TabsTrigger value="settings" className="text-[10px] font-black uppercase py-3 rounded-xl">Réglages</TabsTrigger>
         </TabsList>
 
         <TabsContent value="stats">
@@ -121,12 +131,25 @@ export default function AdminPage() {
             <Card className="border-2 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase opacity-40">Utilisateurs</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{users?.length || 0}</div></CardContent></Card>
             <Card className="border-2 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-primary">Abonnés</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{users?.filter(u => u.subscriptionStatus === 'active' || u.subscriptionStatus === 'admin').length || 0}</div></CardContent></Card>
             <Card className="border-2 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-accent">Commerces</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{businesses?.length || 0}</div></CardContent></Card>
-            <Card className="border-2 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-green-600">Conversations</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{conversations?.length || 0}</div></CardContent></Card>
+            <Card className="border-2 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-green-600">Support</CardTitle></CardHeader><CardContent><div className="text-2xl font-black">{conversations?.length || 0}</div></CardContent></Card>
           </div>
         </TabsContent>
 
-        <TabsContent value="permissions"><PermissionsManager users={users} /></TabsContent>
+        <TabsContent value="users">
+            <div className="grid grid-cols-1 gap-6">
+                <PermissionsManager users={users} />
+                <UsersManager users={users} />
+            </div>
+        </TabsContent>
         
+        <TabsContent value="design">
+            <AppSettingsManager />
+        </TabsContent>
+
+        <TabsContent value="fish">
+            <FishGuideManager />
+        </TabsContent>
+
         <TabsContent value="acces">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <GlobalAccessManager globalGift={globalGift} />
@@ -134,12 +157,226 @@ export default function AdminPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="users"><UsersManager users={users} /></TabsContent>
         <TabsContent value="support"><SupportManager conversations={conversations} /></TabsContent>
-        <TabsContent value="settings"><AppSettingsManager /></TabsContent>
       </Tabs>
     </div>
   );
+}
+
+function FishGuideManager() {
+    const firestore = useFirestore();
+    const { toast } = useToast();
+    const [search, setSearch] = useState('');
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [editingFish, setEditingFish] = useState<FishSpeciesInfo | null>(null);
+
+    // Form States
+    const [name, setName] = useState('');
+    const [scientificName, setScientificName] = useState('');
+    const [category, setCategory] = useState<'Lagon' | 'Large' | 'Recif'>('Lagon');
+    const [gratteRiskSmall, setGratteRiskSmall] = useState('0');
+    const [gratteRiskMedium, setGratteRiskMedium] = useState('0');
+    const [gratteRiskLarge, setGratteRiskLarge] = useState('0');
+    const [lengthSmall, setLengthSmall] = useState('< 30cm');
+    const [lengthMedium, setLengthMedium] = useState('30-60cm');
+    const [lengthLarge, setLengthLarge] = useState('> 60cm');
+    const [fishingAdvice, setFishingAdvice] = useState('');
+    const [culinaryAdvice, setCulinaryAdvice] = useState('');
+    const [imageUrl, setImageUrl] = useState('');
+
+    const fishRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'fish_species'), orderBy('name', 'asc')) : null, [firestore]);
+    const { data: species, isLoading } = useCollection<FishSpeciesInfo>(fishRef);
+
+    const filtered = species?.filter(f => f.name.toLowerCase().includes(search.toLowerCase()) || f.scientificName.toLowerCase().includes(search.toLowerCase())) || [];
+
+    const resetForm = () => {
+        setEditingFish(null);
+        setName('');
+        setScientificName('');
+        setCategory('Lagon');
+        setGratteRiskSmall('0');
+        setGratteRiskMedium('0');
+        setGratteRiskLarge('0');
+        setLengthSmall('< 30cm');
+        setLengthMedium('30-60cm');
+        setLengthLarge('> 60cm');
+        setFishingAdvice('');
+        setCulinaryAdvice('');
+        setImageUrl('');
+    };
+
+    const handleOpenAdd = () => {
+        resetForm();
+        setIsDialogOpen(true);
+    };
+
+    const handleEdit = (fish: FishSpeciesInfo) => {
+        setEditingFish(fish);
+        setName(fish.name);
+        setScientificName(fish.scientificName);
+        setCategory(fish.category);
+        setGratteRiskSmall(fish.gratteRiskSmall?.toString() || '0');
+        setGratteRiskMedium(fish.gratteRiskMedium?.toString() || '0');
+        setGratteRiskLarge(fish.gratteRiskLarge?.toString() || '0');
+        setLengthSmall(fish.lengthSmall || '< 30cm');
+        setLengthMedium(fish.lengthMedium || '30-60cm');
+        setLengthLarge(fish.lengthLarge || '> 60cm');
+        setFishingAdvice(fish.fishingAdvice || '');
+        setCulinaryAdvice(fish.culinaryAdvice || '');
+        setImageUrl(fish.imageUrl || '');
+        setIsDialogOpen(true);
+    };
+
+    const handleGenerateIA = async () => {
+        if (!name) { toast({ variant: 'destructive', title: "Nom requis", description: "Saisissez au moins le nom commun." }); return; }
+        setIsGenerating(true);
+        try {
+            const info = await generateFishInfo({ name, scientificName });
+            setScientificName(info.scientificName);
+            setCategory(info.category);
+            setGratteRiskSmall(info.gratteRiskSmall.toString());
+            setGratteRiskMedium(info.gratteRiskMedium.toString());
+            setGratteRiskLarge(info.gratteRiskLarge.toString());
+            setLengthSmall(info.lengthSmall);
+            setLengthMedium(info.lengthMedium);
+            setLengthLarge(info.lengthLarge);
+            setFishingAdvice(info.fishingAdvice);
+            setCulinaryAdvice(info.culinaryAdvice);
+            toast({ title: "Fiche générée par l'IA !" });
+        } catch (e) {
+            toast({ variant: 'destructive', title: "Erreur IA" });
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    const handleSave = () => {
+        if (!firestore || !name) return;
+        setIsSaving(true);
+        const data: any = {
+            name, scientificName, category,
+            gratteRiskSmall: parseInt(gratteRiskSmall),
+            gratteRiskMedium: parseInt(gratteRiskMedium),
+            gratteRiskLarge: parseInt(gratteRiskLarge),
+            gratteRisk: parseInt(gratteRiskMedium), // legacy compatibility
+            lengthSmall, lengthMedium, lengthLarge,
+            fishingAdvice, culinaryAdvice, imageUrl,
+            updatedAt: serverTimestamp()
+        };
+
+        const docRef = editingFish 
+            ? doc(firestore, 'fish_species', editingFish.id)
+            : doc(collection(firestore, 'fish_species'));
+
+        setDoc(docRef, data, { merge: true })
+            .then(() => {
+                toast({ title: editingFish ? "Fiche mise à jour" : "Poisson ajouté" });
+                setIsDialogOpen(false);
+                setIsSaving(false);
+            })
+            .catch(error => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'write',
+                    requestResourceData: data
+                }));
+                setIsSaving(false);
+            });
+    };
+
+    const handleDelete = (id: string) => {
+        if (!firestore) return;
+        deleteDoc(doc(firestore, 'fish_species', id));
+    };
+
+    return (
+        <Card className="border-2 shadow-lg">
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle className="text-xl font-black uppercase flex items-center gap-2"><Fish className="size-6 text-primary" /> Guide Poissons</CardTitle>
+                    <CardDescription className="text-[10px] font-bold uppercase">Gérez les espèces affichées dans l'application.</CardDescription>
+                </div>
+                <div className="flex gap-2">
+                    <div className="relative w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                        <Input placeholder="Chercher..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 h-10 border-2 font-bold text-xs" />
+                    </div>
+                    <Button onClick={handleOpenAdd} className="h-10 font-black uppercase text-[10px] gap-2"><Plus className="size-4" /> Ajouter</Button>
+                </div>
+            </CardHeader>
+            <CardContent className="p-0 border-t">
+                {isLoading ? <div className="p-8"><Skeleton className="h-32 w-full" /></div> : (
+                    <div className="divide-y">
+                        {filtered.map(f => (
+                            <div key={f.id} className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors">
+                                <div className="flex items-center gap-4">
+                                    <div className="size-16 rounded-xl bg-muted overflow-hidden border shrink-0 flex items-center justify-center">
+                                        {f.imageUrl ? <img src={f.imageUrl} className="w-full h-full object-cover" /> : <Fish className="size-8 opacity-20" />}
+                                    </div>
+                                    <div>
+                                        <h4 className="font-black uppercase text-sm">{f.name}</h4>
+                                        <p className="text-[10px] italic opacity-60">{f.scientificName}</p>
+                                        <Badge variant="secondary" className="mt-1 text-[8px] font-black uppercase h-4">{f.category}</Badge>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button variant="ghost" size="icon" className="size-9 border-2" onClick={() => handleEdit(f)}><Pencil className="size-4" /></Button>
+                                    <Button variant="ghost" size="icon" className="size-9 text-destructive border-2" onClick={() => handleDelete(f.id)}><Trash2 className="size-4" /></Button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </CardContent>
+
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="font-black uppercase tracking-tight flex items-center gap-2">
+                            {editingFish ? <Pencil className="size-5" /> : <Plus className="size-5" />} 
+                            {editingFish ? "Modifier" : "Ajouter un poisson"}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                        <div className="space-y-4">
+                            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase">Nom commun (NC)</Label><Input value={name} onChange={e => setName(e.target.value)} className="h-11 border-2 font-black" placeholder="Ex: Bec de cane" /></div>
+                            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase">Nom Scientifique</Label><Input value={scientificName} onChange={e => setScientificName(e.target.value)} className="h-11 border-2 font-bold italic" placeholder="Ex: Lethrinus nebulosus" /></div>
+                            <Button onClick={handleGenerateIA} disabled={isGenerating} variant="secondary" className="w-full h-11 font-black uppercase text-[10px] gap-2 border-2"><BrainCircuit className={cn("size-4", isGenerating && "animate-pulse")} /> {isGenerating ? "Analyse..." : "Générer via IA (Gemini)"}</Button>
+                            
+                            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase">Habitat</Label>
+                                <Select value={category} onValueChange={(v: any) => setCategory(v)}>
+                                    <SelectTrigger className="h-11 border-2 font-black text-[10px] uppercase"><SelectValue /></SelectTrigger>
+                                    <SelectContent><SelectItem value="Lagon">Lagon</SelectItem><SelectItem value="Recif">Récif</SelectItem><SelectItem value="Large">Large</SelectItem></SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase">URL Photo (Optionnel)</Label><Input value={imageUrl} onChange={e => setImageUrl(e.target.value)} className="h-11 border-2 text-xs" /></div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="p-4 bg-muted/20 rounded-xl border-2 border-dashed space-y-4">
+                                <p className="text-[10px] font-black uppercase text-center opacity-40">Risques de Gratte (%)</p>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <div className="space-y-1"><Label className="text-[8px] font-black uppercase">Petit</Label><Input type="number" value={gratteRiskSmall} onChange={e => setGratteRiskSmall(e.target.value)} className="h-9 border-2 font-bold" /></div>
+                                    <div className="space-y-1"><Label className="text-[8px] font-black uppercase">Moyen</Label><Input type="number" value={gratteRiskMedium} onChange={e => setGratteRiskMedium(e.target.value)} className="h-9 border-2 font-bold" /></div>
+                                    <div className="space-y-1"><Label className="text-[8px] font-black uppercase">Grand</Label><Input type="number" value={gratteRiskLarge} onChange={e => setGratteRiskLarge(e.target.value)} className="h-9 border-2 font-bold" /></div>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <Input value={lengthSmall} onChange={e => setLengthSmall(e.target.value)} className="h-8 text-[8px] font-black" />
+                                    <Input value={lengthMedium} onChange={e => setLengthMedium(e.target.value)} className="h-8 text-[8px] font-black" />
+                                    <Input value={lengthLarge} onChange={e => setLengthLarge(e.target.value)} className="h-8 text-[8px] font-black" />
+                                </div>
+                            </div>
+                            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase flex items-center gap-2"><Target className="size-3" /> Pêche</Label><Textarea value={fishingAdvice} onChange={e => setFishingAdvice(e.target.value)} className="text-xs min-h-[80px]" /></div>
+                            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase flex items-center gap-2"><ChefHat className="size-3" /> Cuisine</Label><Textarea value={culinaryAdvice} onChange={e => setCulinaryAdvice(e.target.value)} className="text-xs min-h-[80px]" /></div>
+                        </div>
+                    </div>
+                    <DialogFooter><Button onClick={handleSave} disabled={isSaving} className="w-full h-14 font-black uppercase tracking-widest shadow-lg">{isSaving ? "Enregistrement..." : "Sauvegarder la fiche"}</Button></DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </Card>
+    );
 }
 
 function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | null }) {
