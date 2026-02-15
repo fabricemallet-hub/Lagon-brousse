@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from './alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Switch } from '@/components/ui/switch';
 import { 
   Target, 
   ArrowUp, 
@@ -25,7 +26,9 @@ import {
   ArrowDown,
   Scaling,
   Focus,
-  Bird
+  Bird,
+  Volume2,
+  Waves
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -141,6 +144,10 @@ export function ShootingTableCard() {
   const [windKmh, setWindKmh] = useState('10');
   const [windAngle, setWindAngle] = useState('90'); 
 
+  // Accessoires
+  const [hasSilencer, setHasSilencer] = useState(false);
+  const [hasMuzzleBrake, setHasMuzzleBrake] = useState(false);
+
   const [selectedChoke, setSelectedChoke] = useState(CHOKES[2].label);
   const [shotDistance, setShotDistance] = useState(20);
 
@@ -202,7 +209,11 @@ export function ShootingTableCard() {
     const wSpeed = parseFloat(windKmh) || 0;
     const wAng = parseFloat(windAngle) || 0;
     const g = 9.81;
-    const { v0, bc } = selectedMunition;
+    
+    // Impact du silencieux sur la V0 (+2%)
+    const baseV0 = selectedMunition.v0;
+    const v0 = hasSilencer ? baseV0 * 1.02 : baseV0;
+    const { bc } = selectedMunition;
 
     if (v0 <= 0 || bc <= 0) return { dist, dropCm: 0, clicks: 0, driftCm: 0, driftClicks: 0, elevationDir: 'HAUT', driftDir: 'DROITE' };
 
@@ -220,7 +231,11 @@ export function ShootingTableCard() {
     const vAvgTarget = v0 * (1 - (0.00008 * dist) / bc);
     const timeTarget = dist / vAvgTarget;
     const angleRad = (wAng * Math.PI) / 180;
-    const crosswindMps = (wSpeed / 3.6) * Math.sin(angleRad);
+    
+    // Le silencieux réduit légèrement la dérive car la balle est souvent mieux stabilisée
+    const windDriftFactor = hasSilencer ? 0.95 : 1.0;
+    const crosswindMps = (wSpeed / 3.6) * Math.sin(angleRad) * windDriftFactor;
+    
     const windDriftCm = crosswindMps * (timeTarget - dist / v0) * 100;
     const distFactor = dist / 100;
 
@@ -233,7 +248,7 @@ export function ShootingTableCard() {
         driftClicks: Math.abs(Math.round(windDriftCm / distFactor)),
         driftDir: windDriftCm > 0 ? 'DROITE' : 'GAUCHE'
     };
-  }, [selectedMunition, zeroDistance, windKmh, windAngle]);
+  }, [selectedMunition, zeroDistance, windKmh, windAngle, hasSilencer]);
 
   const resultsTable = useMemo(() => {
     if (selectedMunition.caliber.startsWith('Calibre')) {
@@ -387,7 +402,7 @@ export function ShootingTableCard() {
                                 </div>
                                 <div className="text-center border-l pl-4">
                                     <p className="text-[8px] font-black uppercase opacity-40">V0</p>
-                                    <p className="font-black text-xs">{selectedMunition.v0} m/s</p>
+                                    <p className="font-black text-xs">{hasSilencer ? Math.round(selectedMunition.v0 * 1.02) : selectedMunition.v0} m/s</p>
                                 </div>
                             </>
                           )}
@@ -395,6 +410,39 @@ export function ShootingTableCard() {
                   </div>
               </div>
           </div>
+
+          {/* ACCESSOIRES DE CANON */}
+          {!isPatternMode && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-primary/5 rounded-2xl border-2 border-primary/10">
+                <div className="flex items-center justify-between p-3 bg-white rounded-xl border-2 shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-lg text-primary"><Volume2 className="size-4" /></div>
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-black uppercase">Silencieux</span>
+                            <span className="text-[8px] font-bold text-muted-foreground uppercase">+2% V0 | -5% Dérive</span>
+                        </div>
+                    </div>
+                    <Switch checked={hasSilencer} onCheckedChange={setHasSilencer} />
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-white rounded-xl border-2 shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-accent/10 rounded-lg text-accent"><Waves className="size-4" /></div>
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-black uppercase">Frein de bouche</span>
+                            <span className="text-[8px] font-bold text-muted-foreground uppercase">Réduit le recul</span>
+                        </div>
+                    </div>
+                    <Switch checked={hasMuzzleBrake} onCheckedChange={setHasMuzzleBrake} />
+                </div>
+
+                {hasMuzzleBrake && (
+                    <div className="sm:col-span-2 px-2 py-1 flex items-center gap-2 text-[9px] font-bold text-accent italic animate-in fade-in slide-in-from-left-2">
+                        <Zap className="size-3" /> Note : Améliore la rapidité du second tir (stabilité du canon accrue).
+                    </div>
+                )}
+            </div>
+          )}
 
           {isPatternMode ? (
             <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
