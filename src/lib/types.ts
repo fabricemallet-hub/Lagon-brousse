@@ -50,6 +50,7 @@ export interface UserAccount {
   subscribedCategories?: string[];
   allowsPromoEmails?: boolean;
   allowsPromoPush?: boolean;
+  allowsPromoSMS?: boolean;
   notificationsEnabled?: boolean;
   mapIcon?: string;
   mapColor?: string;

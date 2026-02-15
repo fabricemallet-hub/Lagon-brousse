@@ -49,7 +49,6 @@ type AuthFormProps = {
   mode: 'login' | 'signup';
 };
 
-// Schéma pour la connexion
 const loginSchema = z.object({
   email: z.string().email({ message: 'Veuillez entrer une adresse email valide.' }),
   password: z.string().min(6, { message: 'Le mot de passe doit contenir au moins 6 caractères.' }),
@@ -57,7 +56,6 @@ const loginSchema = z.object({
   rememberMe: z.boolean().optional(),
 });
 
-// Schéma pour l'inscription
 const signupSchema = z.object({
   displayName: z.string().min(3, { message: 'Le nom doit contenir au moins 3 caractères.' }),
   email: z.string().email({ message: 'Veuillez entrer une adresse email valide.' }),
@@ -77,6 +75,7 @@ const signupSchema = z.object({
   subscribedCategories: z.array(z.string()).default(['Pêche', 'Chasse', 'Jardinage']),
   allowsPromoEmails: z.boolean().default(true),
   allowsPromoPush: z.boolean().default(true),
+  allowsPromoSMS: z.boolean().default(true),
 }).superRefine((data, ctx) => {
   if (data.accountType === 'professional' && (!data.ridet || data.ridet.trim() === "")) {
     ctx.addIssue({
@@ -86,7 +85,6 @@ const signupSchema = z.object({
     });
   }
 });
-
 
 export function AuthForm({ mode }: AuthFormProps) {
   const auth = useAuth();
@@ -118,6 +116,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       subscribedCategories: ['Pêche', 'Chasse', 'Jardinage'],
       allowsPromoEmails: true,
       allowsPromoPush: true,
+      allowsPromoSMS: true,
     },
   });
 
@@ -128,7 +127,6 @@ export function AuthForm({ mode }: AuthFormProps) {
     return Object.keys(locationsByRegion[selectedRegion] || {}).sort();
   }, [selectedRegion]);
 
-  // Reset commune when region changes
   useEffect(() => {
     if (mode === 'signup' && selectedRegion) {
       form.setValue('commune', availableLocations[0]);
@@ -202,7 +200,6 @@ export function AuthForm({ mode }: AuthFormProps) {
               displayName: signupValues.displayName
           });
 
-          // Enregistrement de la commune et région choisie
           const userDocRef = doc(firestore, 'users', user.uid);
           const isPro = signupValues.accountType === 'professional';
           
@@ -222,6 +219,7 @@ export function AuthForm({ mode }: AuthFormProps) {
             subscribedCategories: signupValues.subscribedCategories,
             allowsPromoEmails: signupValues.allowsPromoEmails,
             allowsPromoPush: signupValues.allowsPromoPush,
+            allowsPromoSMS: signupValues.allowsPromoSMS,
             subscriptionStartDate: new Date().toISOString(),
             subscriptionExpiryDate: addMonths(new Date(), isPro ? 12 : 3).toISOString()
           });
@@ -574,6 +572,16 @@ export function AuthForm({ mode }: AuthFormProps) {
                   />
                   <label htmlFor="allow-push" className="text-xs font-bold flex items-center gap-2 cursor-pointer">
                     <Smartphone className="size-3 text-primary" /> Notifications sur mobile
+                  </label>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <Checkbox 
+                    id="allow-sms" 
+                    checked={form.watch('allowsPromoSMS')}
+                    onCheckedChange={(checked) => form.setValue('allowsPromoSMS', !!checked)}
+                  />
+                  <label htmlFor="allow-sms" className="text-xs font-bold flex items-center gap-2 cursor-pointer">
+                    <Smartphone className="size-3 text-primary" /> Alertes SMS
                   </label>
                 </div>
               </div>

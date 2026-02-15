@@ -1,3 +1,4 @@
+
 'use client';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, getDoc, writeBatch, serverTimestamp, updateDoc } from 'firebase/firestore';
@@ -87,7 +88,6 @@ export default function ComptePage() {
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
-  // Fetch business name for pro accounts
   const businessDataRef = useMemoFirebase(() => {
     if (!firestore || !userProfile?.businessId) return null;
     return doc(firestore, 'businesses', userProfile.businessId);
@@ -151,13 +151,10 @@ export default function ComptePage() {
     const userUpdates = { displayName: newName.trim() };
     const userRef = doc(firestore, 'users', user.uid);
 
-    // Update Auth Profile
     updateProfile(user, userUpdates).catch(err => console.error("Auth profile update error:", err));
 
-    // Update User Document
     updateDoc(userRef, userUpdates)
       .then(() => {
-        // Also update business name if pro
         if (userProfile?.businessId) {
           const bizRef = doc(firestore, 'businesses', userProfile.businessId);
           updateDoc(bizRef, { name: newName.trim() })
@@ -267,7 +264,7 @@ export default function ComptePage() {
       });
   };
 
-  const handleTogglePreferenceChannel = (field: 'allowsPromoEmails' | 'allowsPromoPush') => {
+  const handleTogglePreferenceChannel = (field: 'allowsPromoEmails' | 'allowsPromoPush' | 'allowsPromoSMS') => {
     if (!user || !firestore || !userProfile) return;
     const userRef = doc(firestore, 'users', user.uid);
     const newVal = !userProfile[field];
@@ -517,7 +514,6 @@ export default function ComptePage() {
                 </div>
               </div>
 
-              {/* COORDONNÉES DE CONTACT */}
               <Card className="border-2 border-primary/10 bg-muted/5 shadow-inner">
                 <CardHeader className="p-4 pb-2 flex-row justify-between items-center">
                     <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
@@ -643,7 +639,6 @@ export default function ComptePage() {
               </div>
             </div>
 
-            {/* ABONNEMENTS & NOTIFICATIONS PROMOS */}
             <Card className="border-2 border-dashed border-primary/20 bg-muted/5">
               <CardHeader className="p-4 pb-2">
                 <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
@@ -687,6 +682,16 @@ export default function ComptePage() {
                       <Switch 
                         checked={userProfile?.allowsPromoPush ?? true} 
                         onCheckedChange={() => handleTogglePreferenceChannel('allowsPromoPush')}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <Smartphone className="size-3 text-primary" />
+                        <span className="text-xs font-bold">Alertes SMS</span>
+                      </div>
+                      <Switch 
+                        checked={userProfile?.allowsPromoSMS ?? true} 
+                        onCheckedChange={() => handleTogglePreferenceChannel('allowsPromoSMS')}
                       />
                     </div>
                   </div>
