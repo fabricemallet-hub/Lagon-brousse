@@ -44,7 +44,9 @@ import {
   ZoomOut,
   Maximize2,
   Moon,
-  X
+  X,
+  Fish,
+  Waves
 } from 'lucide-react';
 import { Button } from './button';
 import { cn } from '@/lib/utils';
@@ -239,6 +241,11 @@ export function LunarCalendar() {
     return () => clearTimeout(timer);
   }, [displayDate]);
 
+  const detailedDayData = useMemo(() => {
+    if (!detailedDay) return null;
+    return getDataForDate(selectedLocation, detailedDay);
+  }, [selectedLocation, detailedDay]);
+
   return (
     <div className="flex flex-col items-start py-2 w-full">
       <div className="sticky top-0 mb-4 px-1 w-full shrink-0 z-30 bg-background/95 backdrop-blur-md pb-2 border-b-2 border-primary/10">
@@ -324,16 +331,39 @@ export function LunarCalendar() {
             <DialogDescription className="text-xs font-bold uppercase opacity-60">Détails tactiques de la journée</DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            {detailedDay && (
+            {detailedDay && detailedDayData && (
               <div className="space-y-4">
-                <div className="p-4 bg-primary/5 rounded-xl border border-primary/10">
-                  <p className="text-sm font-medium leading-relaxed">
-                    {getDataForDate(selectedLocation, detailedDay).farming.recommendation}
-                  </p>
-                </div>
+                {calendarView === 'champs' ? (
+                  <div className="p-4 bg-primary/5 rounded-xl border border-primary/10">
+                    <p className="text-sm font-medium leading-relaxed">
+                      {detailedDayData.farming.recommendation}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {detailedDayData.pelagicInfo?.inSeason && (
+                      <div className="p-3 bg-primary/10 border-2 border-primary/20 rounded-xl flex items-start gap-3 text-primary">
+                        <Fish className="size-5 shrink-0 mt-0.5" />
+                        <p className="text-xs font-bold leading-tight">{detailedDayData.pelagicInfo.message}</p>
+                      </div>
+                    )}
+                    <div className="p-4 bg-blue-50 border-2 border-blue-100 rounded-xl space-y-2 shadow-sm">
+                      <p className="text-[10px] font-black uppercase text-blue-600 flex items-center gap-2 tracking-widest">
+                        <CrabIcon className="size-3" /> État des Crustacés
+                      </p>
+                      <p className="text-xs font-bold text-slate-800 leading-relaxed italic">
+                        "{detailedDayData.crabAndLobster.crabMessage}"
+                      </p>
+                      <p className="text-xs font-bold text-slate-800 leading-relaxed italic">
+                        "{detailedDayData.crabAndLobster.lobsterMessage}"
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="space-y-2">
                   <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Prochaines Marées</p>
-                  {getDataForDate(selectedLocation, detailedDay).tides.map((tide, i) => (
+                  {detailedDayData.tides.map((tide, i) => (
                     <div key={i} className={cn(
                       "flex justify-between items-center p-3 border rounded-lg",
                       tide.type === 'haute' ? "bg-primary/5 border-primary/10" : "bg-destructive/5 border-destructive/10"
