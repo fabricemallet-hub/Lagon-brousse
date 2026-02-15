@@ -62,8 +62,20 @@ const BALLISTIC_DATABASE: MunitionData[] = [
   { id: '65-cm-143-eldx', caliber: '6.5 Creedmoor', model: 'Hornady ELD-X', weight: 143, v0: 823, bc: 0.625, usage: 'Précision chirurgicale', color: 'bg-teal-600', type: 'bullet' },
 
   // .270 Winchester
-  { id: '270-win-130-ds', caliber: '.270 Win', model: 'Winchester Deer Season', weight: 130, v0: 930, bc: 0.392, usage: 'Savane (arrêt net)', color: 'bg-orange-500', type: 'bullet' },
-  { id: '270-win-155-ta', caliber: '.270 Win', model: 'Federal Terminal Ascent', weight: 155, v0: 870, bc: 0.586, usage: 'Très gros cerfs', color: 'bg-orange-500', type: 'bullet' },
+  { id: '270-win-130-sst', caliber: '.270 Win', model: 'Hornady SST', weight: 130, v0: 930, bc: 0.460, usage: 'Expansion violente (Savane)', color: 'bg-orange-500', type: 'bullet' },
+  { id: '270-win-140-ab', caliber: '.270 Win', model: 'Nosler AccuBond', weight: 140, v0: 880, bc: 0.496, usage: 'Polyvalent Cerf Rusa', color: 'bg-orange-500', type: 'bullet' },
+  { id: '270-win-150-pt', caliber: '.270 Win', model: 'Nosler Partition', weight: 150, v0: 850, bc: 0.465, usage: 'Gros Cerf / Pénétration', color: 'bg-orange-500', type: 'bullet' },
+  { id: '270-win-110-ttsx', caliber: '.270 Win', model: 'Barnes TTSX', weight: 110, v0: 1000, bc: 0.323, usage: 'Vitesse pure / Sans plomb', color: 'bg-orange-500', type: 'bullet' },
+  { id: '270-win-145-eldx', caliber: '.270 Win', model: 'ELD-X (Precision)', weight: 145, v0: 870, bc: 0.536, usage: 'Tir de précision (> 300m)', color: 'bg-orange-500', type: 'bullet' },
+  { id: '270-win-subso', caliber: '.270 Win', model: 'Subsonic Custom', weight: 150, v0: 320, bc: 0.450, usage: 'Tir discret (80-100m max)', color: 'bg-orange-900', type: 'bullet' },
+
+  // .270 Winchester Short Magnum (WSM)
+  { id: '270-wsm-130-sst', caliber: '.270 WSM', model: 'Hornady SST', weight: 130, v0: 1000, bc: 0.460, usage: 'Vitesse Magnum / Savane', color: 'bg-orange-700', type: 'bullet' },
+  { id: '270-wsm-140-ab', caliber: '.270 WSM', model: 'Nosler AccuBond', weight: 140, v0: 960, bc: 0.496, usage: 'Puissance Magnum Polyvalente', color: 'bg-orange-700', type: 'bullet' },
+  { id: '270-wsm-150-pt', caliber: '.270 WSM', model: 'Nosler Partition', weight: 150, v0: 930, bc: 0.465, usage: 'Gros gibier / Pénétration Max', color: 'bg-orange-700', type: 'bullet' },
+  { id: '270-wsm-110-ttsx', caliber: '.270 WSM', model: 'Barnes TTSX', weight: 110, v0: 1060, bc: 0.323, usage: 'Vitesse extrême / Sans plomb', color: 'bg-orange-700', type: 'bullet' },
+  { id: '270-wsm-145-eldx', caliber: '.270 WSM', model: 'ELD-X (Precision)', weight: 145, v0: 950, bc: 0.536, usage: 'Tir de précision Magnum', color: 'bg-orange-700', type: 'bullet' },
+  { id: '270-wsm-subso', caliber: '.270 WSM', model: 'Subsonic Custom', weight: 160, v0: 325, bc: 0.480, usage: 'Tir discret Magnum (Proche)', color: 'bg-orange-950', type: 'bullet' },
 
   // 7mm-08
   { id: '7mm-08-120-ttsx', caliber: '7mm-08', model: 'Barnes TTSX (Sans plomb)', weight: 120, v0: 915, bc: 0.373, usage: 'Vitesse / Pénétration', color: 'bg-indigo-600', type: 'bullet' },
@@ -195,6 +207,7 @@ export function ShootingTableCard() {
   }, [munitionsForCaliber, selectedModel, selectedWeight, isCustomMode, manualWeight, manualV0, manualBC, selectedCaliber]);
 
   const isPatternMode = selectedMunition.type === 'shot' || selectedMunition.type === 'buckshot';
+  const isSubsonic = selectedMunition.model.toLowerCase().includes('subsonic');
 
   const calculateBallistics = useCallback((dist: number) => {
     const z = parseFloat(zeroDistance) || 100;
@@ -210,6 +223,7 @@ export function ShootingTableCard() {
     if (v0 <= 0 || bc <= 0) return { dist, dropCm: 0, clicks: 0, driftCm: 0, driftClicks: 0, elevationDir: 'HAUT', driftDir: 'DROITE' };
 
     const calculateDropAt = (d: number) => {
+        // Simple drag model for calculation purposes
         const vAvg = v0 * (1 - (0.00008 * d) / bc);
         const time = d / vAvg;
         return 0.5 * g * Math.pow(time, 2) * 100; 
@@ -273,7 +287,7 @@ export function ShootingTableCard() {
     return null;
   }, [isPatternMode, selectedMunition, shotDistance, selectedCaliber]);
 
-  const weightUnit = selectedMunition.caliber.startsWith('Calibre') ? 'g' : 'gr';
+  const weightUnit = selectedMunition.caliber.startsWith('Calibre') || selectedCaliber.includes('.410') ? 'g' : 'gr';
 
   return (
     <div className="space-y-6">
@@ -298,6 +312,11 @@ export function ShootingTableCard() {
                 {selectedCaliber.includes('.410') && hasSilencer && (
                     <Badge variant="outline" className="text-[8px] h-4 border-green-500 text-green-400 font-black uppercase animate-pulse">
                         Bruit -60% (Roi du Silencieux)
+                    </Badge>
+                )}
+                {isSubsonic && (
+                    <Badge variant="outline" className="text-[8px] h-4 border-blue-400 text-blue-400 font-black uppercase animate-pulse">
+                        Mode Subsonique (Tir Discret)
                     </Badge>
                 )}
               </div>
@@ -416,6 +435,16 @@ export function ShootingTableCard() {
                   </div>
               </div>
           </div>
+
+          {isSubsonic && (
+            <Alert className="bg-blue-50 border-blue-200 border-2 animate-pulse">
+                <AlertTriangle className="size-4 text-blue-600" />
+                <AlertTitle className="text-xs font-black uppercase text-blue-800">Avertissement Subsonique</AlertTitle>
+                <AlertDescription className="text-[10px] font-bold text-blue-700 leading-tight">
+                    Portée limitée à 100m. Chute de balle massive. Vérifiez vos clics de réglage ci-dessous.
+                </AlertDescription>
+            </Alert>
+          )}
 
           {!isPatternMode && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-primary/5 rounded-2xl border-2 border-primary/10">
