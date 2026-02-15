@@ -70,7 +70,7 @@ const availableColors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', 
 const fishingTypes = [
   { id: 'Dérive', bgColor: 'bg-blue-600', label: 'Dérive' },
   { id: 'Mouillage', bgColor: 'bg-emerald-600', label: 'Mouillage' },
-  { id: 'Pêche à la ligne', bgColor: 'bg-amber-500', label: 'Ligne' },
+  { id: 'Pêche à la ligne', bgColor: 'bg-amber-50', label: 'Ligne' },
   { id: 'Pêche au lancer', bgColor: 'bg-purple-600', label: 'Lancer' },
   { id: 'Traine', bgColor: 'bg-rose-600', label: 'Traîne' },
 ];
@@ -894,6 +894,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                         <p><strong>Conditions :</strong> {spot.context.airTemperature}°C, {spot.context.windSpeed} nds {spot.context.windDirection}</p>
                                                         <p><strong>Lune :</strong> {spot.context.moonPhase}</p>
                                                         <p><strong>Marée :</strong> {spot.context.tideMovement} ({spot.context.tideHeight.toFixed(2)}m)</p>
+                                                        <p><strong>Courant :</strong> {spot.context.tideCurrent}</p>
                                                         {spot.context.closestLowTide && <p><strong>Basse Mer :</strong> {spot.context.closestLowTide.time} ({spot.context.closestLowTide.height.toFixed(2)}m)</p>}
                                                         {spot.context.closestHighTide && <p><strong>Pleine Mer :</strong> {spot.context.closestHighTide.time} ({spot.context.closestHighTide.height.toFixed(2)}m)</p>}
                                                 </div>
