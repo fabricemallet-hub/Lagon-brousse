@@ -107,6 +107,10 @@ const BALLISTIC_DATABASE: MunitionData[] = [
 
   // Calibre .410
   { id: '410-brenn-7', caliber: 'Calibre .410', model: 'Balle Brenneke', weight: 7, v0: 450, bc: 0.050, usage: 'Petit calibre pour nuisibles ou tir de précision à courte distance.', color: 'bg-stone-500', type: 'slug' },
+  { id: '410-plomb-4', caliber: 'Calibre .410', model: 'Plomb n°4', weight: 12, v0: 370, bc: 0.019, usage: 'Petit gibier à plumes, roussette à courte distance.', color: 'bg-stone-500', type: 'shot' },
+  { id: '410-plomb-6', caliber: 'Calibre .410', model: 'Plomb n°6', weight: 12, v0: 370, bc: 0.015, usage: 'Tourterelles, petits oiseaux, tir de jardin.', color: 'bg-stone-500', type: 'shot' },
+  { id: '410-plomb-7.5', caliber: 'Calibre .410', model: 'Plomb n°7.5', weight: 12, v0: 370, bc: 0.012, usage: 'Nuisibles, merles calédoniens, entraînement.', color: 'bg-stone-500', type: 'shot' },
+  { id: '410-plomb-9', caliber: 'Calibre .410', model: 'Plomb n°9', weight: 12, v0: 370, bc: 0.010, usage: 'Tir de très près, nuisibles légers.', color: 'bg-stone-500', type: 'shot' },
 
   // 22mm
   { id: '22mm-lr-40', caliber: '22mm', model: '.22 LR Standard', weight: 40, v0: 330, bc: 0.125, usage: 'Petits nuisibles et tir de loisir.', color: 'bg-zinc-500', type: 'bullet' },
@@ -278,7 +282,7 @@ export function ShootingTableCard() {
     return null;
   }, [isPatternMode, selectedMunition, shotDistance]);
 
-  const weightUnit = (selectedMunition.caliber.startsWith('Calibre') && selectedMunition.caliber !== 'Calibre .410') ? 'g' : 'gr';
+  const weightUnit = selectedMunition.caliber.startsWith('Calibre') ? 'g' : 'gr';
 
   return (
     <div className="space-y-6">
