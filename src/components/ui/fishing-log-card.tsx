@@ -45,7 +45,8 @@ import {
     Search, 
     Filter, 
     ArrowDownAz,
-    Check
+    Check,
+    Zap
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from './alert';
@@ -56,6 +57,7 @@ import type { FishingAnalysisOutput, RecommendBestSpotOutput } from '@/ai/schema
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { useGoogleMaps } from '@/context/google-maps-context';
+import { locations } from '@/lib/locations';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -81,6 +83,22 @@ const PulsingDot = () => (
       <div className="size-5 rounded-full bg-blue-500 border-2 border-white relative"></div>
     </div>
 );
+
+/**
+ * Calcule la commune la plus proche pour un point donné.
+ */
+const getClosestCommune = (lat: number, lng: number) => {
+    let closestName = 'Inconnue';
+    let minDistance = Infinity;
+    Object.entries(locations).forEach(([name, coords]) => {
+        const dist = getDistance(lat, lng, coords.lat, coords.lon);
+        if (dist < minDistance) {
+            minDistance = dist;
+            closestName = name;
+        }
+    });
+    return closestName;
+};
 
 export function FishingLogCard({ data: locationData }: { data: LocationData }) {
     const { user } = useUser();
@@ -831,6 +849,8 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                 >
                                 {filteredAndSortedSpots.map(spot => {
                                     const dist = userLocation ? Math.round(getDistance(userLocation.lat, userLocation.lng, spot.location.latitude, spot.location.longitude)) : null;
+                                    const closestCommune = getClosestCommune(spot.location.latitude, spot.location.longitude);
+                                    
                                     return (
                                         <AccordionPrimitive.Item 
                                                 ref={(el) => (spotRefs.current[spot.id] = el)}
@@ -864,7 +884,7 @@ export function FishingLogCard({ data: locationData }: { data: LocationData }) {
                                                                     </div>
                                                                     <div className="flex flex-wrap items-center gap-2 mt-1">
                                                                         <p className="text-[9px] font-bold text-muted-foreground/60 uppercase shrink-0">
-                                                                            {spot.createdAt ? format(spot.createdAt.toDate(), 'd MMM yyyy', { locale: fr }) : '...'}
+                                                                            {closestCommune} • {spot.createdAt ? format(spot.createdAt.toDate(), 'd MMM yyyy', { locale: fr }) : '...'}
                                                                         </p>
                                                                         {spot.fishingTypes?.map(typeId => {
                                                                             const typeInfo = fishingTypes.find(t => t.id === typeId);
