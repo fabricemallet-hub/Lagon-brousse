@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, doc, query, where, serverTimestamp, addDoc, setDoc, getDocs, orderBy, deleteDoc, updateDoc, getCountFromServer } from 'firebase/firestore';
-import type { UserAccount, Business, Promotion, Campaign } from '@/lib/types';
+import type { UserAccount, Business, Promotion, Campaign, CampaignPricingSettings } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,6 +42,13 @@ export default function ProDashboard() {
     return doc(firestore, 'users', user.uid);
   }, [user, firestore]);
   const { data: profile, isLoading: isProfileLoading } = useDoc<UserAccount>(userProfileRef);
+
+  // --- PRICING DATA ---
+  const pricingRef = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return doc(firestore, 'app_settings', 'campaign_pricing');
+  }, [firestore]);
+  const { data: pricing } = useDoc<CampaignPricingSettings>(pricingRef);
 
   // SÉCURITÉ : REDIRECTION SI NON PRO/ADMIN
   useEffect(() => {
@@ -166,6 +173,11 @@ export default function ProDashboard() {
     calculateReach();
   }, [firestore, business, targetCategory, isUserLoading, user, targetScope, selectedTargetCommunes]);
 
+  const totalCalculatedCost = useMemo(() => {
+    if (!pricing || targetCount === null) return 0;
+    return pricing.fixedPrice + (targetCount * pricing.unitPricePerUser);
+  }, [pricing, targetCount]);
+
   const handleCopyUid = () => {
     if (!user?.uid) return;
     navigator.clipboard.writeText(user.uid);
@@ -284,12 +296,12 @@ export default function ProDashboard() {
         targetCommune: targetLabel,
         targetCategory: targetCategory,
         reach: targetCount,
-        cost: targetCount * 10,
+        cost: totalCalculatedCost,
         status: 'pending',
         createdAt: serverTimestamp()
       };
       await addDoc(collection(firestore, 'campaigns'), campaignData);
-      toast({ title: "Demande de diffusion envoyée" });
+      toast({ title: "Demande de diffusion envoyée", description: "Facturation en cours de validation." });
     } finally {
       setIsSaving(false);
     }
@@ -550,6 +562,29 @@ export default function ProDashboard() {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* FACTURATION CAMPAGNE */}
+                            {targetCount !== null && targetCount > 0 && pricing && (
+                                <div className="p-4 bg-primary/5 border-2 border-primary/20 rounded-2xl space-y-3 animate-in fade-in zoom-in-95">
+                                    <p className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
+                                        <DollarSign className="size-3" /> Détails de la facturation
+                                    </p>
+                                    <div className="space-y-1 text-xs font-bold text-slate-600">
+                                        <div className="flex justify-between">
+                                            <span>Frais fixes de lancement</span>
+                                            <span>{pricing.fixedPrice} F</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span>Coût unitaire ({pricing.unitPricePerUser}F x {targetCount} users)</span>
+                                            <span>{pricing.unitPricePerUser * targetCount} F</span>
+                                        </div>
+                                        <div className="flex justify-between pt-2 border-t border-primary/10 text-primary font-black">
+                                            <span className="uppercase">Total à régler</span>
+                                            <span className="text-lg">{totalCalculatedCost} FCFP</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             
                             {reachError && (
                                 <div className="p-3 bg-red-50 border-2 border-red-200 rounded-xl space-y-2">

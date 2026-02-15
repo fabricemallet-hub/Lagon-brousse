@@ -393,6 +393,12 @@ export interface RibSettings {
   updatedAt: any;
 }
 
+export interface CampaignPricingSettings {
+  fixedPrice: number;
+  unitPricePerUser: number;
+  updatedAt: any;
+}
+
 export interface CgvAcceptance {
   id: string;
   userId: string;

@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, doc, setDoc, addDoc, deleteDoc, serverTimestamp, Timestamp, updateDoc, writeBatch, where, getCountFromServer, getDoc, collectionGroup } from 'firebase/firestore';
-import type { UserAccount, Business, Conversation, AccessToken, SharedAccessToken, SplashScreenSettings, CgvSettings, RibSettings, SystemNotification, FishSpeciesInfo, SoundLibraryEntry, SupportTicket, FishingSpot, Region } from '@/lib/types';
+import type { UserAccount, Business, Conversation, AccessToken, SharedAccessToken, SplashScreenSettings, CgvSettings, RibSettings, SystemNotification, FishSpeciesInfo, SoundLibraryEntry, SupportTicket, FishingSpot, Region, CampaignPricingSettings } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -63,7 +64,8 @@ import {
   Globe,
   Filter,
   Info,
-  PlayCircle
+  PlayCircle,
+  DollarSign
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -1202,7 +1204,7 @@ function UsersManager({ users }: { users: UserAccount[] | null }) {
 function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | null }) {
     const firestore = useFirestore();
     const { toast } = useToast();
-    const [duration, setDuration] = useState('7');
+    const [duration, setDuration] = useState('1');
     const [isSaving, setIsSaving] = useState(false);
 
     const handleActivate = () => {
@@ -1397,15 +1399,20 @@ function AppSettingsManager() {
     const { data: rib } = useDoc<RibSettings>(ribRef);
     const cgvRef = useMemoFirebase(() => firestore ? doc(firestore, 'app_settings', 'cgv') : null, [firestore]);
     const { data: cgv } = useDoc<CgvSettings>(cgvRef);
+    const pricingRef = useMemoFirebase(() => firestore ? doc(firestore, 'app_settings', 'campaign_pricing') : null, [firestore]);
+    const { data: pricing } = useDoc<CampaignPricingSettings>(pricingRef);
 
     const [splashText, setSplashText] = useState('');
     const [splashBgColor, setSplashBgColor] = useState('#3b82f6');
     const [ribDetails, setRibDetails] = useState('');
     const [cgvContent, setCgvContent] = useState('');
+    const [fixedPrice, setFixedPrice] = useState('0');
+    const [unitPrice, setUnitPrice] = useState('0');
 
     useEffect(() => { if (splash) { setSplashText(splash.splashText || ''); setSplashBgColor(splash.splashBgColor || '#3b82f6'); } }, [splash]);
     useEffect(() => { if (rib) setRibDetails(rib.details || ''); }, [rib]);
     useEffect(() => { if (cgv) setCgvContent(cgv.content || ''); }, [cgv]);
+    useEffect(() => { if (pricing) { setFixedPrice(pricing.fixedPrice.toString()); setUnitPrice(pricing.unitPricePerUser.toString()); } }, [pricing]);
 
     return (
         <div className="flex flex-col gap-6">
@@ -1419,6 +1426,30 @@ function AppSettingsManager() {
                     <Button onClick={() => updateDoc(doc(firestore!, 'app_settings', 'splash'), { splashText, splashBgColor }).then(() => toast({ title: "Splash mis à jour" }))} className="w-full h-16 font-black uppercase shadow-xl text-base tracking-widest gap-3"><Save className="size-6" /> Sauver Design</Button>
                 </CardContent>
             </Card>
+
+            <Card className="border-2 shadow-lg rounded-2xl overflow-hidden">
+                <CardHeader className="p-5 bg-muted/5 border-b">
+                    <CardTitle className="text-lg font-black uppercase flex items-center gap-2">
+                        <DollarSign className="size-5 text-primary" /> Tarification Pub
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="p-5 space-y-5">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                            <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Prix Fixe (F)</Label>
+                            <Input type="number" value={fixedPrice} onChange={e => setFixedPrice(e.target.value)} className="h-14 border-2 font-black text-lg" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Prix Unitaire / User (F)</Label>
+                            <Input type="number" value={unitPrice} onChange={e => setUnitPrice(e.target.value)} className="h-14 border-2 font-black text-lg" />
+                        </div>
+                    </div>
+                    <Button onClick={() => setDoc(doc(firestore!, 'app_settings', 'campaign_pricing'), { fixedPrice: parseFloat(fixedPrice) || 0, unitPricePerUser: parseFloat(unitPrice) || 0, updatedAt: serverTimestamp() }, { merge: true }).then(() => toast({ title: "Tarifs publicitaires sauvés" }))} className="w-full h-16 font-black uppercase shadow-xl text-base tracking-widest gap-3">
+                        <Save className="size-6" /> Sauver Tarification
+                    </Button>
+                </CardContent>
+            </Card>
+
             <Card className="border-2 shadow-lg rounded-2xl overflow-hidden">
                 <CardHeader className="p-5 bg-muted/5 border-b"><CardTitle className="text-lg font-black uppercase flex items-center gap-2"><Landmark className="size-5 text-primary" /> Coordonnées RIB</CardTitle></CardHeader>
                 <CardContent className="p-5 space-y-5">
