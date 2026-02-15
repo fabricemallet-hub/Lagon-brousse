@@ -65,7 +65,8 @@ import {
   Filter,
   Info,
   PlayCircle,
-  DollarSign
+  DollarSign,
+  Mail
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -1248,12 +1249,18 @@ function CampaignPricingManager() {
 
     const [fixedPrice, setFixedPrice] = useState('0');
     const [unitPrice, setUnitPrice] = useState('0');
+    const [priceSMS, setPriceSMS] = useState('0');
+    const [pricePush, setPricePush] = useState('0');
+    const [priceMail, setPriceMail] = useState('0');
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         if (pricing) {
             setFixedPrice(pricing.fixedPrice.toString());
             setUnitPrice(pricing.unitPricePerUser.toString());
+            setPriceSMS(pricing.priceSMS?.toString() || '0');
+            setPricePush(pricing.pricePush?.toString() || '0');
+            setPriceMail(pricing.priceMail?.toString() || '0');
         }
     }, [pricing]);
 
@@ -1264,6 +1271,9 @@ function CampaignPricingManager() {
             await setDoc(doc(firestore, 'app_settings', 'campaign_pricing'), {
                 fixedPrice: parseFloat(fixedPrice) || 0,
                 unitPricePerUser: parseFloat(unitPrice) || 0,
+                priceSMS: parseFloat(priceSMS) || 0,
+                pricePush: parseFloat(pricePush) || 0,
+                priceMail: parseFloat(priceMail) || 0,
                 updatedAt: serverTimestamp()
             }, { merge: true });
             toast({ title: "Tarifs publicitaires mis à jour !" });
@@ -1278,9 +1288,9 @@ function CampaignPricingManager() {
         <Card className="border-2 shadow-lg rounded-2xl overflow-hidden">
             <CardHeader className="p-5 bg-muted/5 border-b">
                 <CardTitle className="text-lg font-black uppercase flex items-center gap-2">
-                    <DollarSign className="size-5 text-primary" /> Tarification Pub (Reach)
+                    <DollarSign className="size-5 text-primary" /> Tarification Pub (Canaux)
                 </CardTitle>
-                <CardDescription className="text-[10px] font-bold uppercase mt-1">Configurez le coût des campagnes pour les PROS.</CardDescription>
+                <CardDescription className="text-[10px] font-bold uppercase mt-1">Configurez les coûts des campagnes par canal de diffusion.</CardDescription>
             </CardHeader>
             <CardContent className="p-5 space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1289,10 +1299,26 @@ function CampaignPricingManager() {
                         <Input type="number" value={fixedPrice} onChange={e => setFixedPrice(e.target.value)} className="h-14 border-2 font-black text-lg" />
                     </div>
                     <div className="space-y-1.5">
-                        <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Prix par Utilisateur (F)</Label>
+                        <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Prix de Base par Utilisateur (F)</Label>
                         <Input type="number" value={unitPrice} onChange={e => setUnitPrice(e.target.value)} className="h-14 border-2 font-black text-lg" />
                     </div>
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-dashed pt-4">
+                    <div className="space-y-1.5">
+                        <Label className="text-[10px] font-black uppercase text-blue-600 ml-1 flex items-center gap-1"><Smartphone className="size-3"/> Tarif SMS (F)</Label>
+                        <Input type="number" value={priceSMS} onChange={e => setPriceSMS(e.target.value)} className="h-14 border-2 border-blue-100 font-black text-lg" />
+                    </div>
+                    <div className="space-y-1.5">
+                        <Label className="text-[10px] font-black uppercase text-primary ml-1 flex items-center gap-1"><Zap className="size-3"/> Tarif Push (F)</Label>
+                        <Input type="number" value={pricePush} onChange={e => setPricePush(e.target.value)} className="h-14 border-2 border-primary/20 font-black text-lg" />
+                    </div>
+                    <div className="space-y-1.5">
+                        <Label className="text-[10px] font-black uppercase text-green-600 ml-1 flex items-center gap-1"><Mail className="size-3"/> Tarif Email (F)</Label>
+                        <Input type="number" value={priceMail} onChange={e => setPriceMail(e.target.value)} className="h-14 border-2 border-green-100 font-black text-lg" />
+                    </div>
+                </div>
+
                 <Button onClick={handleSave} disabled={isSaving} className="w-full h-16 font-black uppercase shadow-xl text-base tracking-widest gap-3">
                     {isSaving ? <RefreshCw className="size-6 animate-spin" /> : <Save className="size-6" />} 
                     Sauver la tarification

@@ -120,6 +120,7 @@ export interface Campaign {
   cost: number;
   status: 'pending' | 'sent';
   createdAt: any;
+  selectedChannels?: string[];
 }
 
 export interface WindForecast {
@@ -407,6 +408,9 @@ export interface RibSettings {
 export interface CampaignPricingSettings {
   fixedPrice: number;
   unitPricePerUser: number;
+  priceSMS?: number;
+  pricePush?: number;
+  priceMail?: number;
   updatedAt: any;
 }
 

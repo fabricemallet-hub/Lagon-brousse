@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -11,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, ImageIcon, X, Info, Pencil, Save, AlertCircle, LogOut, HelpCircle, Copy, Check, UserCircle, ShieldCheck, BrainCircuit, MapPin, ChevronDown, Globe } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, ImageIcon, X, Info, Pencil, Save, AlertCircle, LogOut, HelpCircle, Copy, Check, UserCircle, ShieldCheck, BrainCircuit, MapPin, ChevronDown, Globe, Smartphone, Mail, Zap } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -82,6 +83,9 @@ export default function ProDashboard() {
   const [totalCommuneUsers, setTotalCommuneUsers] = useState<number | null>(null);
   const [isCalculatingReach, setIsCalculatingReach] = useState(false);
   const [reachError, setReachError] = useState(false);
+
+  // --- DIFFUSION CHANNELS ---
+  const [selectedChannels, setSelectedChannels] = useState<string[]>(['PUSH', 'MAIL']);
 
   // --- CIBLAGE GEOGRAPHIQUE ---
   const [targetScope, setTargetScope] = useState<TargetScope>('SPECIFIC');
@@ -174,8 +178,14 @@ export default function ProDashboard() {
 
   const totalCalculatedCost = useMemo(() => {
     if (!pricing || targetCount === null) return 0;
-    return pricing.fixedPrice + (targetCount * pricing.unitPricePerUser);
-  }, [pricing, targetCount]);
+    
+    let unitSum = pricing.unitPricePerUser || 0;
+    if (selectedChannels.includes('SMS')) unitSum += (pricing.priceSMS || 0);
+    if (selectedChannels.includes('PUSH')) unitSum += (pricing.pricePush || 0);
+    if (selectedChannels.includes('MAIL')) unitSum += (pricing.priceMail || 0);
+
+    return pricing.fixedPrice + (targetCount * unitSum);
+  }, [pricing, targetCount, selectedChannels]);
 
   const handleCopyUid = () => {
     if (!user?.uid) return;
@@ -311,7 +321,8 @@ export default function ProDashboard() {
         reach: targetCount,
         cost: totalCalculatedCost,
         status: 'pending',
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        selectedChannels: selectedChannels
       };
       await addDoc(collection(firestore, 'campaigns'), campaignData);
       toast({ title: "Demande de diffusion envoyée", description: "Facturation en cours de validation." });
@@ -520,6 +531,30 @@ export default function ProDashboard() {
                             </div>
 
                             <div className="space-y-1">
+                                <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Canaux de diffusion</Label>
+                                <div className="flex flex-wrap gap-2">
+                                    {[
+                                        { id: 'SMS', label: 'SMS', icon: Smartphone, color: 'text-blue-600' },
+                                        { id: 'PUSH', label: 'Push', icon: Zap, color: 'text-primary' },
+                                        { id: 'MAIL', label: 'Email', icon: Mail, color: 'text-green-600' }
+                                    ].map(ch => (
+                                        <div 
+                                            key={ch.id} 
+                                            onClick={() => setSelectedChannels(prev => prev.includes(ch.id) ? prev.filter(c => c !== ch.id) : [...prev, ch.id])}
+                                            className={cn(
+                                                "flex items-center gap-2 px-3 py-2 rounded-xl border-2 cursor-pointer transition-all active:scale-95",
+                                                selectedChannels.includes(ch.id) ? "bg-white border-primary shadow-sm" : "bg-muted/10 border-transparent opacity-50"
+                                            )}
+                                        >
+                                            <ch.icon className={cn("size-3", selectedChannels.includes(ch.id) ? ch.color : "")} />
+                                            <span className="text-[10px] font-black uppercase">{ch.label}</span>
+                                            {selectedChannels.includes(ch.id) && <Check className="size-3 text-primary" />}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="space-y-1">
                                 <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Portée du ciblage</Label>
                                 <Select value={targetScope} onValueChange={(v: TargetScope) => setTargetScope(v)}>
                                     <SelectTrigger className="h-10 border-2 bg-background font-black uppercase text-[10px]">
@@ -583,20 +618,6 @@ export default function ProDashboard() {
                                         {targetScope === 'ALL' ? 'Global' : targetScope === 'CALEDONIE' ? 'NC' : targetScope === 'TAHITI' ? 'Tahiti' : 'Ciblé'}
                                     </Badge>
                                 </div>
-
-                                <div className="flex items-center justify-between p-4 bg-white/50 rounded-xl shadow-sm border-2 border-dashed">
-                                    <div className="flex items-center gap-3">
-                                        <MapPin className="size-5 text-slate-400" />
-                                        <div>
-                                            <p className="text-[9px] font-black uppercase text-muted-foreground leading-none mb-1">
-                                                Utilisateurs Actifs {targetScope === 'ALL' ? "sur le réseau" : targetScope === 'CALEDONIE' ? "en Calédonie" : targetScope === 'TAHITI' ? "à Tahiti" : "sur les zones cibles"}
-                                            </p>
-                                            <p className="text-lg font-black leading-none">
-                                                {isCalculatingReach ? <RefreshCw className="size-3 animate-spin" /> : `${totalCommuneUsers ?? '0'}`}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
                             </div>
 
                             {/* FACTURATION CAMPAGNE */}
@@ -605,16 +626,36 @@ export default function ProDashboard() {
                                     <p className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
                                         <DollarSign className="size-3" /> Détails de la facturation
                                     </p>
-                                    <div className="space-y-1 text-xs font-bold text-slate-600">
+                                    <div className="space-y-1.5 text-[11px] font-bold text-slate-600">
                                         <div className="flex justify-between">
-                                            <span>Frais fixes de lancement</span>
+                                            <span className="opacity-60">Frais fixes de lancement</span>
                                             <span>{pricing.fixedPrice} F</span>
                                         </div>
-                                        <div className="flex justify-between">
-                                            <span>Coût unitaire ({pricing.unitPricePerUser}F x {targetCount} users)</span>
+                                        
+                                        <div className="flex justify-between border-t border-dashed pt-1 mt-1">
+                                            <span className="opacity-60">Base ({pricing.unitPricePerUser}F x {targetCount})</span>
                                             <span>{pricing.unitPricePerUser * targetCount} F</span>
                                         </div>
-                                        <div className="flex justify-between pt-2 border-t border-primary/10 text-primary font-black">
+                                        {selectedChannels.includes('SMS') && (
+                                            <div className="flex justify-between text-blue-600">
+                                                <span className="flex items-center gap-1"><Smartphone className="size-2"/> SMS ({pricing.priceSMS}F x {targetCount})</span>
+                                                <span>{(pricing.priceSMS || 0) * targetCount} F</span>
+                                            </div>
+                                        )}
+                                        {selectedChannels.includes('PUSH') && (
+                                            <div className="flex justify-between text-primary">
+                                                <span className="flex items-center gap-1"><Zap className="size-2"/> Push ({pricing.pricePush}F x {targetCount})</span>
+                                                <span>{(pricing.pricePush || 0) * targetCount} F</span>
+                                            </div>
+                                        )}
+                                        {selectedChannels.includes('MAIL') && (
+                                            <div className="flex justify-between text-green-600">
+                                                <span className="flex items-center gap-1"><Mail className="size-2"/> Email ({pricing.priceMail}F x {targetCount})</span>
+                                                <span>{(pricing.priceMail || 0) * targetCount} F</span>
+                                            </div>
+                                        )}
+
+                                        <div className="flex justify-between pt-2 border-t-2 border-primary/20 text-primary font-black">
                                             <span className="uppercase">Total à régler</span>
                                             <span className="text-lg">{totalCalculatedCost} FCFP</span>
                                         </div>
@@ -633,7 +674,7 @@ export default function ProDashboard() {
 
                             <Button 
                                 onClick={handleDiffuse} 
-                                disabled={isSaving || !targetCount || reachError || (targetScope === 'SPECIFIC' && selectedTargetCommunes.length === 0)} 
+                                disabled={isSaving || !targetCount || reachError || selectedChannels.length === 0 || (targetScope === 'SPECIFIC' && selectedTargetCommunes.length === 0)} 
                                 className="w-full h-14 bg-accent hover:bg-accent/90 text-white font-black uppercase tracking-widest shadow-lg gap-2"
                             >
                                 <Megaphone className="size-5" /> Lancer la campagne
