@@ -33,6 +33,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { locationsByRegion, regions } from '@/lib/locations';
 import { navLinks } from '@/lib/nav-links';
