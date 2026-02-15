@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -33,7 +32,8 @@ import {
     X,
     Globe,
     ImageIcon,
-    ChevronLeft
+    ChevronLeft,
+    FileText
 } from 'lucide-react';
 import { locations, locationsByRegion, regions } from '@/lib/locations';
 import { cn } from '@/lib/utils';
