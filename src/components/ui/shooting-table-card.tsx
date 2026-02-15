@@ -48,59 +48,61 @@ type MunitionData = {
 
 const BALLISTIC_DATABASE: MunitionData[] = [
   // .222 Remington
-  { id: '222-rem-50-vmax', caliber: '.222 Rem', model: 'Hornady V-MAX', weight: 50, v0: 960, bc: 0.242, usage: 'Nuisibles / Précision', color: 'bg-emerald-500', type: 'bullet' },
+  { id: '222-rem-40-vmax', caliber: '.222 Rem', model: 'Hornady V-MAX', weight: 40, v0: 1100, bc: 0.200, usage: 'Nuisibles (très rapide)', color: 'bg-emerald-500', type: 'bullet' },
+  { id: '222-rem-55-nbt', caliber: '.222 Rem', model: 'Nosler Ballistic Tip', weight: 55, v0: 980, bc: 0.267, usage: 'Précision / Tir biche', color: 'bg-emerald-500', type: 'bullet' },
   
   // .243 Winchester
-  { id: '243-win-100-gk', caliber: '.243 Win', model: 'Sierra GameKing', weight: 100, v0: 900, bc: 0.430, usage: 'Biche / Jeune Cerf', color: 'bg-yellow-600', type: 'bullet' },
+  { id: '243-win-80-superx', caliber: '.243 Win', model: 'Winchester Super-X', weight: 80, v0: 1020, bc: 0.276, usage: 'Tir de plaine (tendu)', color: 'bg-yellow-600', type: 'bullet' },
+  { id: '243-win-100-gk', caliber: '.243 Win', model: 'Sierra GameKing', weight: 100, v0: 900, bc: 0.430, usage: 'Cerf Rusa moyen', color: 'bg-yellow-600', type: 'bullet' },
 
   // .25-06 Remington
-  { id: '25-06-rem-120-cl', caliber: '.25-06 Rem', model: 'Remington Core-Lokt', weight: 120, v0: 910, bc: 0.391, usage: 'Plaine / Savane', color: 'bg-cyan-500', type: 'bullet' },
+  { id: '25-06-rem-117-sst', caliber: '.25-06 Rem', model: 'Hornady SST', weight: 117, v0: 910, bc: 0.443, usage: 'Polyvalent longue dist.', color: 'bg-cyan-500', type: 'bullet' },
 
   // 6.5 Creedmoor
-  { id: '65-cm-140-eldm', caliber: '6.5 Creedmoor', model: 'Hornady ELD-Match', weight: 140, v0: 820, bc: 0.646, usage: 'Longue distance', color: 'bg-teal-600', type: 'bullet' },
+  { id: '65-cm-143-eldx', caliber: '6.5 Creedmoor', model: 'Hornady ELD-X', weight: 143, v0: 823, bc: 0.625, usage: 'Précision chirurgicale', color: 'bg-teal-600', type: 'bullet' },
 
   // .270 Winchester
-  { id: '270-win-130-sst', caliber: '.270 Win', model: 'Hornady SST', weight: 130, v0: 930, bc: 0.460, usage: 'Cerf Rusa (Savane)', color: 'bg-orange-500', type: 'bullet' },
-
-  // .308 Winchester
-  { id: '308-win-150-pp', caliber: '.308 Win', model: 'Winchester Power-Point', weight: 150, v0: 860, bc: 0.294, usage: 'Polyvalent Brousse', color: 'bg-blue-500', type: 'bullet' },
-  { id: '308-win-180-partition', caliber: '.308 Win', model: 'Nosler Partition', weight: 180, v0: 790, bc: 0.474, usage: 'Gros Cerf / Cochon', color: 'bg-blue-500', type: 'bullet' },
+  { id: '270-win-130-ds', caliber: '.270 Win', model: 'Winchester Deer Season', weight: 130, v0: 930, bc: 0.392, usage: 'Savane (arrêt net)', color: 'bg-orange-500', type: 'bullet' },
+  { id: '270-win-155-ta', caliber: '.270 Win', model: 'Federal Terminal Ascent', weight: 155, v0: 870, bc: 0.586, usage: 'Très gros cerfs', color: 'bg-orange-500', type: 'bullet' },
 
   // 7mm-08
-  { id: '7mm-08-140-ab', caliber: '7mm-08', model: 'Nosler AccuBond', weight: 140, v0: 850, bc: 0.485, usage: 'Approche / Montagne', color: 'bg-indigo-600', type: 'bullet' },
+  { id: '7mm-08-120-ttsx', caliber: '7mm-08', model: 'Barnes TTSX (Sans plomb)', weight: 120, v0: 915, bc: 0.373, usage: 'Vitesse / Pénétration', color: 'bg-indigo-600', type: 'bullet' },
+  { id: '7mm-08-150-ph', caliber: '7mm-08', model: 'Hornady Precision Hunter', weight: 150, v0: 845, bc: 0.574, usage: 'Tir de montagne / crêtes', color: 'bg-indigo-600', type: 'bullet' },
+
+  // .308 Winchester
+  { id: '308-win-150-pp', caliber: '.308 Win', model: 'Win. Power-Point', weight: 150, v0: 860, bc: 0.294, usage: 'Standard Brousse', color: 'bg-blue-500', type: 'bullet' },
+  { id: '308-win-165-sst', caliber: '.308 Win', model: 'Hornady SST', weight: 165, v0: 840, bc: 0.447, usage: 'Équilibre Vitesse/Poids', color: 'bg-blue-500', type: 'bullet' },
+  { id: '308-win-180-partition', caliber: '.308 Win', model: 'Nosler Partition', weight: 180, v0: 790, bc: 0.474, usage: 'Cochon / Cerf massif', color: 'bg-blue-500', type: 'bullet' },
 
   // .30-06 Sprg
-  { id: '30-06-180-shh', caliber: '.30-06 Sprg', model: 'Sako Hammerhead', weight: 180, v0: 820, bc: 0.383, usage: 'Arrêt net (Cochon)', color: 'bg-green-600', type: 'bullet' },
+  { id: '30-06-150-cl', caliber: '.30-06 Sprg', model: 'Remington Core-Lokt', weight: 150, v0: 880, bc: 0.314, usage: 'Tir rapide en forêt', color: 'bg-green-600', type: 'bullet' },
+  { id: '30-06-180-shh', caliber: '.30-06 Sprg', model: 'Sako Hammerhead', weight: 180, v0: 820, bc: 0.383, usage: 'Arrêt net (classique)', color: 'bg-green-600', type: 'bullet' },
+  { id: '30-06-200-oryx', caliber: '.30-06 Sprg', model: 'Norma Oryx (Lourde)', weight: 200, v0: 780, bc: 0.400, usage: 'Chasse en battue dense', color: 'bg-green-600', type: 'bullet' },
 
   // 7mm Rem Mag
-  { id: '7mm-rm-150-tc', caliber: '7mm Rem Mag', model: 'Federal Trophy Copper', weight: 150, v0: 940, bc: 0.490, usage: 'Très longue distance', color: 'bg-rose-700', type: 'bullet' },
+  { id: '7mm-rm-160-ab', caliber: '7mm Rem Mag', model: 'Nosler AccuBond', weight: 160, v0: 900, bc: 0.531, usage: 'Très longue distance', color: 'bg-rose-700', type: 'bullet' },
 
   // .300 Win Mag
-  { id: '300-wm-200-eldx', caliber: '.300 Win Mag', model: 'Hornady ELD-X', weight: 200, v0: 870, bc: 0.626, usage: 'Gros gibier / Énergie', color: 'bg-red-800', type: 'bullet' },
+  { id: '300-wm-150-xp', caliber: '.300 Win Mag', model: 'Winchester XP', weight: 150, v0: 990, bc: 0.387, usage: 'Vitesse fulgurante', color: 'bg-red-800', type: 'bullet' },
+  { id: '300-wm-200-eldx', caliber: '.300 Win Mag', model: 'Hornady ELD-X', weight: 200, v0: 870, bc: 0.626, usage: 'Puissance maximale', color: 'bg-red-800', type: 'bullet' },
+  { id: '300-wm-215-hybrid', caliber: '.300 Win Mag', model: 'Berger Hybrid', weight: 215, v0: 850, bc: 0.691, usage: 'Tir de précision extrême', color: 'bg-red-800', type: 'bullet' },
 
-  // Calibre 12
+  // --- Calibres Lisses ---
   { id: '12-bfs-26', caliber: 'Calibre 12', model: 'Balle Sauvestre (BFS)', weight: 26, v0: 500, bc: 0.170, usage: 'Battue (0-80m)', color: 'bg-red-600', type: 'slug' },
   { id: '12-brenn-31', caliber: 'Calibre 12', model: 'Balle Brenneke', weight: 31.5, v0: 430, bc: 0.120, usage: 'Forêt dense (0-50m)', color: 'bg-red-600', type: 'slug' },
-  { id: '12-plomb-4', caliber: 'Calibre 12', model: 'Plomb n°4', weight: 36, v0: 400, bc: 0.019, usage: 'Gros canards, roussette, nuisibles.', color: 'bg-red-600', type: 'shot' },
+  { id: '12-plomb-4', caliber: 'Calibre 12', model: 'Plomb n°4', weight: 36, v0: 400, bc: 0.015, usage: 'Gros canards, roussette, nuisibles.', color: 'bg-red-600', type: 'shot' },
   { id: '12-plomb-6', caliber: 'Calibre 12', model: 'Plomb n°6', weight: 36, v0: 400, bc: 0.015, usage: 'Notou, Pigeon vert, Collier blanc.', color: 'bg-red-600', type: 'shot' },
   { id: '12-chev-9', caliber: 'Calibre 12', model: 'Chevrotine 9 grains', weight: 32, v0: 400, bc: 0.045, usage: 'Cochon au fourré à très courte distance.', color: 'bg-red-600', type: 'buckshot' },
 
-  // Calibre 16
   { id: '16-slug-24', caliber: 'Calibre 16', model: 'Balle Type Slug', weight: 24.5, v0: 400, bc: 0.100, usage: 'Tradition / Forêt', color: 'bg-orange-800', type: 'slug' },
   { id: '16-plomb-6', caliber: 'Calibre 16', model: 'Plomb n°6', weight: 28, v0: 390, bc: 0.015, usage: 'Efficace pour Notou et Pigeon vert.', color: 'bg-orange-800', type: 'shot' },
 
-  // Calibre 20
   { id: '20-win-22', caliber: 'Calibre 20', model: 'Balle Winchester', weight: 22.5, v0: 420, bc: 0.110, usage: 'Léger / Précis', color: 'bg-yellow-800', type: 'slug' },
   { id: '20-plomb-6', caliber: 'Calibre 20', model: 'Plomb n°6', weight: 24, v0: 390, bc: 0.015, usage: 'Excellent pour la plume, recul très faible.', color: 'bg-yellow-800', type: 'shot' },
 
-  // Calibre .410
   { id: '410-brenn-7.5', caliber: 'Calibre .410', model: 'Balle Brenneke', weight: 7.5, v0: 530, bc: 0.090, usage: 'Jeune Cerf / Cochon', color: 'bg-stone-500', type: 'slug' },
-  { id: '410-pdx1', caliber: 'Calibre .410', model: 'Winchester PDX1 (Défense)', weight: 19, v0: 350, bc: 0.040, usage: 'Hybride : 3 disques + 12 billes. Très impressionnant de près.', color: 'bg-stone-500', type: 'slug' },
-  { id: '410-plomb-6', caliber: 'Calibre .410', model: 'Plomb n°6', weight: 12, v0: 370, bc: 0.015, usage: 'Tourterelles et petits oiseaux. Précision requise.', color: 'bg-stone-500', type: 'shot' },
-  { id: '410-plomb-7.5', caliber: 'Calibre .410', model: 'Plomb n°7.5', weight: 12, v0: 350, bc: 0.012, usage: 'Spécial Merles calédoniens et Tourterelles.', color: 'bg-stone-500', type: 'shot' },
-
-  // 22mm
-  { id: '22mm-lr-40', caliber: '22mm', model: '.22 LR Standard', weight: 40, v0: 330, bc: 0.125, usage: 'Petits nuisibles et tir de loisir.', color: 'bg-zinc-500', type: 'bullet' },
+  { id: '410-pdx1', caliber: 'Calibre .410', model: 'Winchester PDX1 (Défense)', weight: 19, v0: 350, bc: 0.040, usage: 'Hybride : 3 disques + 12 billes.', color: 'bg-stone-500', type: 'slug' },
+  { id: '410-plomb-6', caliber: 'Calibre .410', model: 'Plomb n°6', weight: 12, v0: 370, bc: 0.015, usage: 'Tourterelles et petits oiseaux.', color: 'bg-stone-500', type: 'shot' },
 ];
 
 const CALIBERS = Array.from(new Set(BALLISTIC_DATABASE.map(m => m.caliber)));
@@ -201,7 +203,7 @@ export function ShootingTableCard() {
     const g = 9.81;
     
     const baseV0 = selectedMunition.v0;
-    const silencerBonus = (selectedCaliber === 'Calibre .410' && hasSilencer) ? 1.03 : (hasSilencer ? 1.02 : 1.0);
+    const silencerBonus = (selectedCaliber.includes('.410') && hasSilencer) ? 1.03 : (hasSilencer ? 1.02 : 1.0);
     const v0 = baseV0 * silencerBonus;
     const { bc } = selectedMunition;
 
@@ -240,7 +242,7 @@ export function ShootingTableCard() {
   }, [selectedMunition, selectedCaliber, zeroDistance, windKmh, windAngle, hasSilencer]);
 
   const resultsTable = useMemo(() => {
-    if (selectedCaliber === 'Calibre .410') {
+    if (selectedCaliber.includes('.410')) {
         if (selectedMunition.type === 'shot' || selectedMunition.type === 'buckshot') return [calculateBallistics(10), calculateBallistics(20), calculateBallistics(30)];
         return [calculateBallistics(25), calculateBallistics(50), calculateBallistics(75)];
     }
@@ -255,13 +257,13 @@ export function ShootingTableCard() {
 
   const patternDiameter = useMemo(() => {
     const choke = CHOKES.find(c => c.label === selectedChoke) || CHOKES[2];
-    const caliberFactor = selectedCaliber === 'Calibre .410' ? 0.85 : 1.0;
+    const caliberFactor = selectedCaliber.includes('.410') ? 0.85 : 1.0;
     return Math.round(shotDistance * choke.factor * caliberFactor);
   }, [selectedChoke, shotDistance, selectedCaliber]);
 
   const patternWarning = useMemo(() => {
     if (!isPatternMode) return null;
-    const maxDist = selectedCaliber === 'Calibre .410' ? 25 : 40;
+    const maxDist = selectedCaliber.includes('.410') ? 25 : 40;
     if (shotDistance >= maxDist) {
         return `Attention : Gerbe trop large pour ce calibre. Risque de blesser le gibier sans le prélever à cette distance (> ${maxDist}m).`;
     }
@@ -293,7 +295,7 @@ export function ShootingTableCard() {
                 <Badge className={cn("font-black uppercase text-[10px] px-3 h-7 border-none shadow-md", selectedMunition.color)}>
                     {selectedMunition.caliber}
                 </Badge>
-                {selectedCaliber === 'Calibre .410' && hasSilencer && (
+                {selectedCaliber.includes('.410') && hasSilencer && (
                     <Badge variant="outline" className="text-[8px] h-4 border-green-500 text-green-400 font-black uppercase animate-pulse">
                         Bruit -60% (Roi du Silencieux)
                     </Badge>
@@ -308,12 +310,12 @@ export function ShootingTableCard() {
                   <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Calibre</Label>
                   <Select value={selectedCaliber} onValueChange={setSelectedCaliber}>
                       <SelectTrigger className="h-10 border-2 font-black uppercase text-xs bg-white shadow-sm"><SelectValue /></SelectTrigger>
-                      <SelectContent>{CALIBERS.map(c => <SelectItem key={c} value={c} className="font-black text-xs uppercase">{c}</SelectItem>)}</SelectContent>
+                      <SelectContent>{CALIBERS.map(c => <SelectItem key={c} value={c} className="font-black uppercase text-xs">{c}</SelectItem>)}</SelectContent>
                   </Select>
               </div>
 
               <div className="space-y-1.5">
-                  <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Modèle d'ogive / Plomb</Label>
+                  <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Modèle d'ogive / Marque</Label>
                   <Select value={selectedModel} onValueChange={setSelectedModel}>
                       <SelectTrigger className="h-10 border-2 font-bold text-xs bg-white shadow-sm"><SelectValue /></SelectTrigger>
                       <SelectContent>{availableModels.map(m => <SelectItem key={m} value={m} className={cn("text-xs", m === "PERSONNALISÉ" && "text-primary font-black")}>{m}</SelectItem>)}</SelectContent>
@@ -386,7 +388,7 @@ export function ShootingTableCard() {
               <div className="md:col-span-4 pt-2 border-t border-dashed border-primary/10">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="space-y-1">
-                          <p className="text-[10px] font-black uppercase text-primary flex items-center gap-2"><Zap className="size-3" /> Usage recommandé</p>
+                          <p className="text-[10px] font-black uppercase text-primary flex items-center gap-2"><Zap className="size-3" /> Usage spécifique</p>
                           <p className="text-xs font-medium text-slate-600 italic">"{selectedMunition.usage}"</p>
                       </div>
                       <div className="flex gap-4">
@@ -404,7 +406,7 @@ export function ShootingTableCard() {
                                     <p className="text-[8px] font-black uppercase opacity-40">V0</p>
                                     <p className="font-black text-xs">
                                         {hasSilencer 
-                                            ? Math.round(selectedMunition.v0 * (selectedCaliber === 'Calibre .410' ? 1.03 : 1.02)) 
+                                            ? Math.round(selectedMunition.v0 * (selectedCaliber.includes('.410') ? 1.03 : 1.02)) 
                                             : selectedMunition.v0} m/s
                                     </p>
                                 </div>
@@ -423,7 +425,7 @@ export function ShootingTableCard() {
                         <div className="flex flex-col">
                             <span className="text-[10px] font-black uppercase">Silencieux</span>
                             <span className="text-[8px] font-bold text-muted-foreground uppercase">
-                                {selectedCaliber === 'Calibre .410' ? '+3% V0 | -60% Bruit' : '+2% V0 | -5% Dérive'}
+                                {selectedCaliber.includes('.410') ? '+3% V0 | -60% Bruit' : '+2% V0 | -5% Dérive'}
                             </span>
                         </div>
                     </div>
@@ -435,7 +437,7 @@ export function ShootingTableCard() {
                         <div className="p-2 bg-accent/10 rounded-lg text-accent"><Waves className="size-4" /></div>
                         <div className="flex flex-col">
                             <span className="text-[10px] font-black uppercase">Frein de bouche</span>
-                            <span className="text-[8px] font-bold text-muted-foreground uppercase">Réduit le recul</span>
+                            <span className="text-[8px] font-bold text-muted-foreground uppercase">Réduit le relèvement</span>
                         </div>
                     </div>
                     <Switch checked={hasMuzzleBrake} onCheckedChange={setHasMuzzleBrake} />
@@ -586,7 +588,7 @@ export function ShootingTableCard() {
                   Sécurité & Balistique
               </AlertTitle>
               <AlertDescription className="text-[9px] leading-relaxed italic text-slate-300 font-medium">
-                  Simulation théorique G1. Les conditions réelles (altitude, humidité) influent sur la précision. {selectedCaliber === 'Calibre .410' ? 'Le .410 demande une grande précision due à sa faible charge.' : 'Vérifiez toujours votre réglage sur cible avant de chasser.'}
+                  Simulation théorique G1. Les conditions réelles (altitude, humidité) influent sur la précision. {selectedCaliber.includes('.410') ? 'Le .410 demande une grande précision due à sa faible charge.' : 'Vérifiez toujours votre réglage sur cible avant de chasser.'}
               </AlertDescription>
           </Alert>
         </CardContent>
