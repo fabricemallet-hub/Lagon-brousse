@@ -759,7 +759,7 @@ function UsersManager({ users }: { users: UserAccount[] | null }) {
                     </div>
                     <DialogFooter>
                         <Button onClick={handleSaveUser} disabled={isSaving} className="w-full h-14 font-black uppercase tracking-widest shadow-xl">
-                            {isSaving ? <RefreshCw className="size-5 animate-spin mr-2" /> : <Save className="size-5 mr-2" />}
+                            {isSaving ? <RefreshCw className="size-5 animate-spin mr-2" /> : <Save className="size-5" />}
                             Appliquer les changements
                         </Button>
                     </DialogFooter>
