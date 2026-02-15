@@ -62,7 +62,8 @@ import {
   Anchor,
   Globe,
   Filter,
-  Info
+  Info,
+  PlayCircle
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -1239,7 +1240,7 @@ function TokenManager({ tokens }: { tokens: AccessToken[] | null }) {
 
     const generateToken = () => {
         if (!firestore) return; setIsGenerating(true);
-        const id = `LBN-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+        const id = `LBN-679064713235-web:93b38bd7feda744b24a7e6-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
         setDoc(doc(firestore, 'access_tokens', id), { id, status: 'active', durationMonths: parseInt(duration), createdAt: serverTimestamp() }).then(() => { toast({ title: "Jeton généré !" }); setIsGenerating(false); }).catch(() => setIsGenerating(false));
     };
 
@@ -1278,9 +1279,52 @@ function SystemNotificationsManager() {
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
     const [type, setType] = useState<'info' | 'warning' | 'error' | 'success'>('info');
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
 
     const notifsRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'system_notifications'), orderBy('createdAt', 'desc')) : null, [firestore]);
     const { data: notifications } = useCollection<SystemNotification>(notifsRef);
+
+    const handleSave = async () => {
+        if (!firestore || !title || !content) return;
+        setIsSaving(true);
+        try {
+            const data = { title, content, type, updatedAt: serverTimestamp() };
+            if (editingId) {
+                await updateDoc(doc(firestore, 'system_notifications', editingId), data);
+                toast({ title: "Alerte mise à jour !" });
+            } else {
+                await addDoc(collection(firestore, 'system_notifications'), { ...data, isActive: true, createdAt: serverTimestamp() });
+                toast({ title: "Alerte diffusée !" });
+            }
+            resetForm();
+        } catch (e) {
+            toast({ variant: 'destructive', title: "Erreur" });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const resetForm = () => {
+        setTitle('');
+        setContent('');
+        setType('info');
+        setEditingId(null);
+    };
+
+    const handleEdit = (n: SystemNotification) => {
+        setTitle(n.title);
+        setContent(n.content);
+        setType(n.type);
+        setEditingId(n.id);
+        toast({ title: "Mode édition", description: "Modifiez l'alerte ci-dessus." });
+    };
+
+    const handleToggleActive = async (id: string, currentStatus: boolean) => {
+        if (!firestore) return;
+        await updateDoc(doc(firestore, 'system_notifications', id), { isActive: !currentStatus });
+        toast({ title: !currentStatus ? "Alerte réactivée" : "Alerte mise en pause" });
+    };
 
     return (
         <Card className="border-2 shadow-lg overflow-hidden rounded-2xl">
@@ -1293,27 +1337,47 @@ function SystemNotificationsManager() {
                     </AlertDescription>
                 </Alert>
 
-                <div className="grid gap-5 p-5 bg-muted/10 rounded-[2rem] border-2 border-dashed">
+                <div className={cn("grid gap-5 p-5 bg-muted/10 rounded-[2rem] border-2 border-dashed", editingId && "border-accent bg-accent/5")}>
                     <div className="space-y-4">
                         <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Titre de l'alerte</Label><Input value={title} onChange={e => setTitle(e.target.value)} className="h-14 border-2 font-black text-base uppercase" /></div>
                         <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Niveau / Couleur</Label><Select value={type} onValueChange={(v: any) => setType(v)}><SelectTrigger className="h-14 border-2 font-black text-sm uppercase bg-white"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="info" className="font-black uppercase text-xs text-blue-600">Information (Bleu)</SelectItem><SelectItem value="warning" className="font-black uppercase text-xs text-orange-600">Vigilance (Jaune)</SelectItem><SelectItem value="error" className="font-black uppercase text-xs text-red-600">Urgent (Rouge)</SelectItem><SelectItem value="success" className="font-black uppercase text-xs text-green-600">Succès (Vert)</SelectItem></SelectContent></Select></div>
                         <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Message</Label><Textarea value={content} onChange={e => setContent(e.target.value)} placeholder="Détails du message..." className="border-2 min-h-[100px] font-medium text-sm" /></div>
                     </div>
-                    <Button onClick={() => addDoc(collection(firestore!, 'system_notifications'), { title, content, type, isActive: true, createdAt: serverTimestamp() }).then(() => { setTitle(''); setContent(''); toast({ title: "Diffusé !" }); })} className="w-full h-16 font-black uppercase shadow-xl text-base tracking-widest gap-3"><Plus className="size-6" /> Diffuser l'alerte</Button>
+                    <div className="flex gap-2">
+                        {editingId && <Button variant="outline" onClick={resetForm} className="h-16 font-black uppercase border-2">Annuler</Button>}
+                        <Button onClick={handleSave} disabled={isSaving || !title || !content} className="flex-1 h-16 font-black uppercase shadow-xl text-base tracking-widest gap-3">
+                            {isSaving ? <RefreshCw className="size-6 animate-spin" /> : editingId ? <Save className="size-6" /> : <Plus className="size-6" />} 
+                            {editingId ? "Mettre à jour" : "Diffuser l'alerte"}
+                        </Button>
+                    </div>
                 </div>
                 <div className="space-y-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Historique des diffusions</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Historique des diffusions ({notifications?.length || 0})</p>
                     <div className="flex flex-col gap-2">
                         {notifications?.map(n => (
-                            <div key={n.id} className="p-4 flex items-center justify-between border-2 rounded-2xl bg-white shadow-sm">
+                            <div key={n.id} className={cn("p-4 flex items-center justify-between border-2 rounded-2xl bg-white shadow-sm", !n.isActive && "opacity-60 border-dashed")}>
                                 <div className="flex items-center gap-4 min-w-0 flex-1">
                                     <div className={cn("size-3 rounded-full shrink-0 shadow-sm", n.type === 'error' ? 'bg-red-500' : n.type === 'warning' ? 'bg-orange-500' : n.type === 'success' ? 'bg-green-500' : 'bg-blue-500')} />
                                     <div className="flex flex-col min-w-0">
                                         <span className="font-black uppercase text-xs truncate text-slate-800">{n.title}</span>
-                                        {n.isActive && <span className="text-[8px] font-black text-green-600 uppercase">En ligne sur l'accueil</span>}
+                                        {n.isActive ? (
+                                            <span className="text-[8px] font-black text-green-600 uppercase flex items-center gap-1"><Zap className="size-2 fill-green-600"/> En ligne sur l'accueil</span>
+                                        ) : (
+                                            <span className="text-[8px] font-black text-muted-foreground uppercase">Hors-ligne (Stoppé)</span>
+                                        )}
                                     </div>
                                 </div>
-                                <Button variant="ghost" size="icon" className="text-destructive/40 hover:text-destructive size-10 rounded-xl" onClick={() => deleteDoc(doc(firestore!, 'system_notifications', n.id))}><Trash2 className="size-5" /></Button>
+                                <div className="flex items-center gap-1">
+                                    <Button variant="ghost" size="icon" className={cn("size-10 rounded-xl border", n.isActive ? "text-orange-600 border-orange-100" : "text-green-600 border-green-100")} onClick={() => handleToggleActive(n.id, n.isActive)} title={n.isActive ? "Pause" : "Démarrer"}>
+                                        {n.isActive ? <XCircle className="size-5" /> : <PlayCircle className="size-5" />}
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="size-10 border border-slate-100 rounded-xl" onClick={() => handleEdit(n)} title="Modifier">
+                                        <Pencil className="size-4" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="text-destructive/40 hover:text-destructive size-10 border border-red-50 rounded-xl" onClick={() => deleteDoc(doc(firestore!, 'system_notifications', n.id))}>
+                                        <Trash2 className="size-5" />
+                                    </Button>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -1501,14 +1565,12 @@ function TicketAdminCard({ ticket }: { ticket: SupportTicket }) {
                 {isExpanded && (
                     <div className="space-y-3 animate-in slide-in-from-top-2 pt-2 border-t border-dashed">
                         <Label className="text-[9px] font-black uppercase text-primary">Votre réponse d'expert</Label>
-                        <TableContent>
-                            <Textarea 
-                                value={response} 
-                                onChange={setResponse} 
-                                placeholder="Saisissez la réponse..." 
-                                className="min-h-[100px] border-2 text-xs font-medium"
-                            />
-                        </TableContent>
+                        <Textarea 
+                            value={response} 
+                            onChange={e => setResponse(e.target.value)} 
+                            placeholder="Saisissez la réponse..." 
+                            className="min-h-[100px] border-2 text-xs font-medium"
+                        />
                         <div className="flex gap-2">
                             <Button 
                                 variant="outline"
