@@ -12,45 +12,22 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { locations } from '@/lib/locations';
-import { Checkbox } from '@/components/ui/checkbox';
 import { 
-  MessageSquare, 
   ShieldCheck, 
-  Users, 
-  KeyRound, 
-  Fish, 
-  Plus, 
-  Trash2, 
   RefreshCw, 
-  Save, 
+  Trash2, 
   Zap, 
   Ticket, 
-  BrainCircuit, 
-  Smartphone,
-  Megaphone,
   Sparkles,
   Search,
-  FileText,
-  Camera,
-  Pencil,
-  X,
-  Volume2,
-  Play,
-  Store,
-  UserCog,
-  Lock
+  UserCog
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import Link from 'next/link';
-import { format, addMonths, addDays, isBefore } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
 
@@ -92,27 +69,6 @@ export default function AdminPage() {
   const tokensRef = useMemoFirebase(() => (firestore && isAdmin) ? query(collection(firestore, 'access_tokens'), orderBy('createdAt', 'desc')) : null, [firestore, isAdmin]);
   const { data: tokens } = useCollection<AccessToken>(tokensRef);
 
-  const fishRef = useMemoFirebase(() => (firestore && isAdmin) ? query(collection(firestore, 'fish_species'), orderBy('name', 'asc')) : null, [firestore, isAdmin]);
-  const { data: fishSpecies } = useCollection<FishSpeciesInfo>(fishRef);
-
-  const sysNotifsRef = useMemoFirebase(() => (firestore && isAdmin) ? query(collection(firestore, 'system_notifications'), orderBy('createdAt', 'desc')) : null, [firestore, isAdmin]);
-  const { data: sysNotifs } = useCollection<SystemNotification>(sysNotifsRef);
-
-  const campaignsRef = useMemoFirebase(() => (firestore && isAdmin) ? query(collection(firestore, 'campaigns'), orderBy('createdAt', 'desc')) : null, [firestore, isAdmin]);
-  const { data: campaigns } = useCollection<Campaign>(campaignsRef);
-
-  const soundsRef = useMemoFirebase(() => (firestore && isAdmin) ? query(collection(firestore, 'sound_library'), orderBy('label', 'asc')) : null, [firestore, isAdmin]);
-  const { data: sounds } = useCollection<SoundLibraryEntry>(soundsRef);
-
-  const splashRef = useMemoFirebase(() => (firestore && isAdmin) ? doc(firestore, 'app_settings', 'splash') : null, [firestore, isAdmin]);
-  const { data: splashSettings } = useDoc<SplashScreenSettings>(splashRef);
-
-  const cgvRef = useMemoFirebase(() => (firestore && isAdmin) ? doc(firestore, 'app_settings', 'cgv') : null, [firestore, isAdmin]);
-  const { data: cgvData } = useDoc<CgvSettings>(cgvRef);
-
-  const ribRef = useMemoFirebase(() => (firestore && isAdmin) ? doc(firestore, 'app_settings', 'rib') : null, [firestore, isAdmin]);
-  const { data: ribData } = useDoc<RibSettings>(ribRef);
-
   const sharedTokenRef = useMemoFirebase(() => (firestore && isAdmin) ? doc(firestore, 'shared_access_tokens', 'GLOBAL') : null, [firestore, isAdmin]);
   const { data: globalGift } = useDoc<SharedAccessToken>(sharedTokenRef);
 
@@ -136,16 +92,12 @@ export default function AdminPage() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-4 md:grid-cols-9 mb-6 h-auto bg-muted/50 border-2 rounded-2xl p-1.5 shadow-sm gap-1">
-          <TabsTrigger value="stats" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Stats</TabsTrigger>
-          <TabsTrigger value="users" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Comptes</TabsTrigger>
-          <TabsTrigger value="permissions" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Rôles</TabsTrigger>
-          <TabsTrigger value="businesses" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Commerces</TabsTrigger>
-          <TabsTrigger value="design" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Design</TabsTrigger>
-          <TabsTrigger value="notifications" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Notifs</TabsTrigger>
-          <TabsTrigger value="fish" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Fish</TabsTrigger>
-          <TabsTrigger value="acces" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Jetons</TabsTrigger>
-          <TabsTrigger value="support" className="text-[9px] font-black uppercase py-2.5 rounded-xl">Support</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-4 md:grid-cols-5 mb-6 h-auto bg-muted/50 border-2 rounded-2xl p-1.5 shadow-sm gap-1">
+          <TabsTrigger value="stats" className="text-[10px] font-black uppercase py-3 rounded-xl">Stats</TabsTrigger>
+          <TabsTrigger value="permissions" className="text-[10px] font-black uppercase py-3 rounded-xl">Rôles</TabsTrigger>
+          <TabsTrigger value="acces" className="text-[10px] font-black uppercase py-3 rounded-xl">Jetons</TabsTrigger>
+          <TabsTrigger value="users" className="text-[10px] font-black uppercase py-3 rounded-xl">Comptes</TabsTrigger>
+          <TabsTrigger value="support" className="text-[10px] font-black uppercase py-3 rounded-xl">Support</TabsTrigger>
         </TabsList>
 
         <TabsContent value="stats">
@@ -157,30 +109,21 @@ export default function AdminPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="users"><UsersManager users={users} isUsersLoading={isUsersLoading} /></TabsContent>
         <TabsContent value="permissions"><PermissionsManager users={users} /></TabsContent>
-        <TabsContent value="businesses"><BusinessesManager businesses={businesses} users={users} /></TabsContent>
-        <TabsContent value="design">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <SplashManager initialSettings={splashSettings} />
-            <CgvRibManager cgvData={cgvData} ribData={ribData} />
-          </div>
-        </TabsContent>
-        <TabsContent value="notifications">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <SystemNotificationsManager notifications={sysNotifs} />
-            <SoundLibraryManager sounds={sounds} />
-          </div>
-          <div className="mt-6"><CampaignsManager campaigns={campaigns} /></div>
-        </TabsContent>
-        <TabsContent value="fish"><FishManager species={fishSpecies} /></TabsContent>
+        
         <TabsContent value="acces">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <GlobalAccessManager globalGift={globalGift} />
             <TokenManager tokens={tokens} />
           </div>
         </TabsContent>
-        <TabsContent value="support"><SupportConversationsManager conversations={conversations} /></TabsContent>
+
+        <TabsContent value="users">
+            <Card><CardHeader><CardTitle>Liste des Comptes</CardTitle></CardHeader><CardContent><p className="text-sm italic opacity-50">Gestion complète via l'onglet Rôles.</p></CardContent></Card>
+        </TabsContent>
+        <TabsContent value="support">
+            <Card><CardHeader><CardTitle>Support Technique</CardTitle></CardHeader><CardContent><p className="text-sm italic opacity-50">Accès via la messagerie directe.</p></CardContent></Card>
+        </TabsContent>
       </Tabs>
     </div>
   );
@@ -200,15 +143,18 @@ function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | n
         const data = { expiresAt: expiry, updatedAt: serverTimestamp() };
         
         setDoc(docRef, data, { merge: true })
-            .then(() => toast({ title: "Accès Global activé !" }))
+            .then(() => {
+                toast({ title: "Accès Global activé !" });
+                setIsSaving(false);
+            })
             .catch((error) => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: docRef.path,
                     operation: 'write',
                     requestResourceData: data,
                 }));
-            })
-            .finally(() => setIsSaving(false));
+                setIsSaving(false);
+            });
     };
 
     const handleStop = () => {
@@ -218,18 +164,26 @@ function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | n
         const data = { expiresAt: Timestamp.fromDate(new Date(0)), updatedAt: serverTimestamp() };
         
         setDoc(docRef, data, { merge: true })
-            .then(() => toast({ title: "Accès Global coupé" }))
+            .then(() => {
+                toast({ title: "Accès Global coupé" });
+                setIsSaving(false);
+            })
             .catch((error) => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: docRef.path,
                     operation: 'write',
                     requestResourceData: data,
                 }));
-            })
-            .finally(() => setIsSaving(false));
+                setIsSaving(false);
+            });
     };
 
-    const isGlobalActive = globalGift && globalGift.expiresAt && isBefore(new Date(), globalGift.expiresAt.toDate());
+    const isGlobalActive = globalGift && globalGift.expiresAt && isBeforeNow(globalGift.expiresAt);
+
+    function isBeforeNow(ts: any) {
+        const date = ts.toDate ? ts.toDate() : new Date(ts.seconds * 1000);
+        return date.getTime() > Date.now();
+    }
 
     return (
         <Card className="border-2 shadow-lg">
@@ -238,7 +192,9 @@ function GlobalAccessManager({ globalGift }: { globalGift: SharedAccessToken | n
                 <div className={cn("p-4 rounded-2xl border-2 flex items-center justify-between", isGlobalActive ? "bg-green-50 border-green-200" : "bg-muted/30 border-dashed")}>
                     <div className="flex flex-col">
                         <span className="text-[10px] font-black uppercase opacity-60">Statut</span>
-                        <p className={cn("text-sm font-black", isGlobalActive ? "text-green-600" : "text-muted-foreground")}>{isGlobalActive ? `ACTIF JUSQU'AU ${format(globalGift!.expiresAt.toDate(), 'dd/MM HH:mm')}` : 'INACTIF'}</p>
+                        <p className={cn("text-sm font-black", isGlobalActive ? "text-green-600" : "text-muted-foreground")}>
+                            {isGlobalActive ? `ACTIF JUSQU'AU ${format(globalGift!.expiresAt.toDate(), 'dd/MM HH:mm')}` : 'INACTIF'}
+                        </p>
                     </div>
                     {isGlobalActive && <Button variant="destructive" size="sm" onClick={handleStop} disabled={isSaving} className="h-8 font-black uppercase text-[10px]">Couper</Button>}
                 </div>
@@ -270,15 +226,18 @@ function TokenManager({ tokens }: { tokens: AccessToken[] | null }) {
         const data = { id, status: 'active', durationMonths: parseInt(duration), createdAt: serverTimestamp() };
 
         setDoc(docRef, data)
-            .then(() => toast({ title: "Jeton généré !" }))
+            .then(() => {
+                toast({ title: "Jeton généré !" });
+                setIsGenerating(false);
+            })
             .catch((error) => {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({
                     path: docRef.path,
                     operation: 'write',
                     requestResourceData: data,
                 }));
-            })
-            .finally(() => setIsGenerating(false));
+                setIsGenerating(false);
+            });
     };
 
     return (
@@ -302,7 +261,16 @@ function TokenManager({ tokens }: { tokens: AccessToken[] | null }) {
                                 <TableRow key={t.id}>
                                     <TableCell className="px-3 py-2 font-mono text-[10px] font-black">{t.id}</TableCell>
                                     <TableCell className="text-[10px] font-bold">{t.durationMonths} m</TableCell>
-                                    <TableCell className="text-right px-3"><Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(firestore!, 'access_tokens', t.id))} className="size-7 text-destructive"><Trash2 className="size-3" /></Button></TableCell>
+                                    <TableCell className="text-right px-3">
+                                        <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            onClick={() => deleteDoc(doc(firestore!, 'access_tokens', t.id))} 
+                                            className="size-7 text-destructive"
+                                        >
+                                            <Trash2 className="size-3" />
+                                        </Button>
+                                    </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -330,11 +298,24 @@ function PermissionsManager({ users }: { users: UserAccount[] | null }) {
     const handleRoleChange = (userId: string, newRole: string) => {
         if (!firestore) return;
         setIsUpdating(userId);
-        const updateData = { role: newRole, subscriptionStatus: newRole === 'admin' ? 'admin' : (newRole === 'professional' ? 'professional' : 'trial') };
+        const updateData = { 
+            role: newRole, 
+            subscriptionStatus: newRole === 'admin' ? 'admin' : (newRole === 'professional' ? 'professional' : 'trial') 
+        };
+        
         updateDoc(doc(firestore, 'users', userId), updateData)
-            .then(() => toast({ title: "Permissions mises à jour" }))
-            .catch(() => toast({ variant: 'destructive', title: "Erreur" }))
-            .finally(() => setIsUpdating(null));
+            .then(() => {
+                toast({ title: "Permissions mises à jour" });
+                setIsUpdating(null);
+            })
+            .catch((error) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: `/users/${userId}`,
+                    operation: 'update',
+                    requestResourceData: updateData,
+                }));
+                setIsUpdating(null);
+            });
     };
 
     return (
@@ -372,13 +353,3 @@ function PermissionsManager({ users }: { users: UserAccount[] | null }) {
         </Card>
     );
 }
-
-function BusinessesManager({ businesses, users }: { businesses: Business[] | null, users: UserAccount[] | null }) { return null; }
-function SystemNotificationsManager({ notifications }: { notifications: SystemNotification[] | null }) { return null; }
-function SoundLibraryManager({ sounds }: { sounds: SoundLibraryEntry[] | null }) { return null; }
-function CampaignsManager({ campaigns }: { campaigns: Campaign[] | null }) { return null; }
-function UsersManager({ users, isUsersLoading }: { users: UserAccount[] | null, isUsersLoading: boolean }) { return null; }
-function SplashManager({ initialSettings }: { initialSettings: SplashScreenSettings | null }) { return null; }
-function CgvRibManager({ cgvData, ribData }: { cgvData: CgvSettings | null, ribData: RibSettings | null }) { return null; }
-function FishManager({ species }: { species: FishSpeciesInfo[] | null }) { return null; }
-function SupportConversationsManager({ conversations }: { conversations: Conversation[] | null }) { return null; }

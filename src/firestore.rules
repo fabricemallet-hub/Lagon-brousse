@@ -5,7 +5,7 @@ service cloud.firestore {
 
     // ======================================================
     // 1. PRIORITÉ ABSOLUE : MASTER ADMIN (GOD MODE)
-    // Cet accès court-circuite TOUTES les autres règles.
+    // Ce bloc est évalué en premier et autorise TOUT pour Fabrice Mallet.
     // ======================================================
     match /{allPaths=**} {
       allow read, write: if request.auth != null && (
@@ -17,36 +17,29 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 2. FONCTIONS DE SÉCURITÉ STANDARDS
+    // 2. FONCTIONS DE SÉCURITÉ
     // ======================================================
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-    }
-
     function isAdmin() {
+      // Un admin est soit un Master UID, soit un utilisateur avec role "admin" dans son document
       return isSignedIn() && (
-        request.auth.uid in [
-          "t8nPnZLcTiaLJSKMuLzib3C5nPn1",
-          "koKj5ObSGXYeO1PLKU5bgo8Yaky1",
-          "D1q2GPM95rZi38cvCzvsjcWQDaV2",
-          "K9cVYLVUk1NV99YV3anebkugpPp1",
-          "ipupi3Pg4RfrSEpFyT69BtlCdpi2",
-          "Irglq69MasYdNwBmUu8yKvw6h4G2"
-        ] || 
-        getUserRole() == "admin"
+        request.auth.uid in ["t8nPnZLcTiaLJSKMuLzib3C5nPn1", "koKj5ObSGXYeO1PLKU5bgo8Yaky1", "D1q2GPM95rZi38cvCzvsjcWQDaV2", "K9cVYLVUk1NV99YV3anebkugpPp1", "ipupi3Pg4RfrSEpFyT69BtlCdpi2", "Irglq69MasYdNwBmUu8yKvw6h4G2"] ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin"
       );
     }
 
     function isProfessional() {
-      return isSignedIn() && (getUserRole() == "professional" || isAdmin());
+      return isSignedIn() && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "professional" || 
+        isAdmin()
+      );
     }
 
     // ======================================================
-    // 3. RÈGLES PAR COLLECTION (POUR LES AUTRES UTILISATEURS)
+    // 3. RÈGLES PAR COLLECTION
     // ======================================================
 
     // Catalogue Shopping (Public)
@@ -70,7 +63,7 @@ service cloud.firestore {
       allow write: if isProfessional();
     }
 
-    // Données Publiques (Météo, Paramètres)
+    // Données Publiques
     match /app_settings/{id} { allow read: if true; }
     match /system_notifications/{id} { allow read: if true; }
     match /meteo_caledonie/{id} { 

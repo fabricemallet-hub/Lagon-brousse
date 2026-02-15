@@ -41,13 +41,19 @@ export async function ensureUserDocument(
 
     if (docSnap.exists()) {
       const currentData = docSnap.data() as UserAccount;
+      // Restauration automatique si le rôle Master a sauté
       if (isMasterAdmin && currentData.role !== 'admin') {
           console.log(`L&B Master Sync: Restauration des droits pour [${email}]...`);
-          setDoc(userDocRef, { ...currentData, role: 'admin', subscriptionStatus: 'admin' }, { merge: true });
+          setDoc(userDocRef, { 
+            ...currentData, 
+            role: 'admin', 
+            subscriptionStatus: 'admin' 
+          }, { merge: true });
       }
       return;
     }
 
+    // Création d'un nouveau profil
     const effectiveDisplayName = displayName || user.displayName || email.split('@')[0] || 'Utilisateur';
     const newUser: UserAccount = {
       id: user.uid,
