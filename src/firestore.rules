@@ -1,19 +1,19 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // --- 1. PRIORITÉ ABSOLUE : MASTER ADMIN (BYPASS TOTAL) ---
-    // Votre UID et votre email Master passent avant TOUTES les autres règles.
+    // Cette règle autorise TOUT pour l'administrateur principal.
+    // Placée au sommet pour court-circuiter toute autre restriction.
     match /{allPaths=**} {
       allow read, write: if request.auth != null && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" || 
-        request.auth.token.email.toLower() == "f.mallet81@outlook.com"
+        (request.auth.token.email != null && request.auth.token.email.toLower() == "f.mallet81@outlook.com")
       );
     }
 
-    // --- FONCTIONS DE BASE ---
+    // --- 2. FONCTIONS DE BASE ---
     function isSignedIn() {
       return request.auth != null;
     }
@@ -48,7 +48,13 @@ service cloud.firestore {
       return isSignedIn() && (getUserRole() == "professional" || isAdmin());
     }
 
-    // --- 2. UTILISATEURS & REACH ---
+    // --- 3. PRIORITÉ CATALOGUE SHOPPING ---
+    match /{path=**}/promotions/{promoId} {
+      allow read, get, list: if true;
+      allow write: if isProfessional();
+    }
+
+    // --- 4. UTILISATEURS & REACH ---
     match /users {
       allow list: if isSignedIn();
     }
@@ -62,7 +68,7 @@ service cloud.firestore {
       }
     }
 
-    // --- 3. COMMERCES & PROMOTIONS ---
+    // --- 5. COMMERCES & PROMOTIONS ---
     match /businesses/{businessId} {
       allow get, list: if true;
       allow write: if isProfessional();
@@ -73,7 +79,7 @@ service cloud.firestore {
       }
     }
 
-    // --- 4. ACCÈS PUBLICS ---
+    // --- 6. ACCÈS PUBLICS ---
     match /app_settings/{id} { allow read: if true; allow write: if isAdmin(); }
     match /system_notifications/{id} { allow read: if true; allow write: if isAdmin(); }
     match /meteo_caledonie/{id} { 
@@ -86,7 +92,7 @@ service cloud.firestore {
     }
     match /sound_library/{id} { allow read: if true; allow write: if isAdmin(); }
 
-    // --- 5. FONCTIONNALITÉS CONNECTÉES ---
+    // --- 7. FONCTIONNALITÉS CONNECTÉES ---
     match /cms_support/faq/items/{id} { allow get, list: if true; allow write: if isAdmin(); }
     match /cms_support/tickets/items/{id} {
       allow create: if isSignedIn();

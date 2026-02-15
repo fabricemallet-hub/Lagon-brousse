@@ -1,4 +1,3 @@
-
 'use client';
 
 import { usePathname } from 'next/navigation';
@@ -31,7 +30,7 @@ export function SidebarNav() {
   const roles = useMemo(() => {
     if (!user) return { isAdmin: false, isPro: false, isClient: true };
     
-    // Identifiants de confiance absolus (Administrateurs Master)
+    // Identifiants de confiance absolue (Administrateurs Master)
     const masterAdminUids = [
       't8nPnZLcTiaLJSKMuLzib3C5nPn1',
       'koKj5ObSGXYeO1PLKU5bgo8Yaky1',
