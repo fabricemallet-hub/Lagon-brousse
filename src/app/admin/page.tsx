@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, setDoc, addDoc, deleteDoc, serverTimestamp, Timestamp, updateDoc, writeBatch, where, getCountFromServer, getDoc } from 'firebase/firestore';
-import type { UserAccount, Business, Conversation, AccessToken, SharedAccessToken, SplashScreenSettings, CgvSettings, RibSettings, SystemNotification, FishSpeciesInfo, SoundLibraryEntry, SupportTicket } from '@/lib/types';
+import { collection, query, orderBy, doc, setDoc, addDoc, deleteDoc, serverTimestamp, Timestamp, updateDoc, writeBatch, where, getCountFromServer, getDoc, collectionGroup } from 'firebase/firestore';
+import type { UserAccount, Business, Conversation, AccessToken, SharedAccessToken, SplashScreenSettings, CgvSettings, RibSettings, SystemNotification, FishSpeciesInfo, SoundLibraryEntry, SupportTicket, FishingSpot } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,7 +53,13 @@ import {
   ScrollText, 
   UserPlus, 
   Ruler,
-  Download
+  Download,
+  Map as MapIcon,
+  MapPin,
+  LocateFixed,
+  Expand,
+  Shrink,
+  Anchor
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -75,6 +81,10 @@ import {
 } from '@/components/ui/alert-dialog';
 import { generateFishInfo } from '@/ai/flows/generate-fish-info-flow';
 import { locations } from '@/lib/locations';
+import { GoogleMap, OverlayView } from '@react-google-maps/api';
+import { useGoogleMaps } from '@/context/google-maps-context';
+
+const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
 export default function AdminPage() {
   const { user, isUserLoading } = useUser();
@@ -142,7 +152,8 @@ export default function AdminPage() {
               { id: 'notifications', label: 'Alertes' },
               { id: 'settings', label: 'Réglages' },
               { id: 'acces', label: 'Accès' },
-              { id: 'support', label: 'Support' }
+              { id: 'support', label: 'Support' },
+              { id: 'spots', label: 'Spots GPS' }
             ].map(tab => (
               <TabsTrigger 
                 key={tab.id} 
@@ -246,6 +257,10 @@ export default function AdminPage() {
                 isLoadingTickets={isTicketsLoading}
             />
           </TabsContent>
+
+          <TabsContent value="spots">
+            <GlobalSpotsManager users={users} />
+          </TabsContent>
         </div>
       </Tabs>
     </div>
@@ -266,6 +281,158 @@ function StatsCard({ title, value, icon: Icon, color }: { title: string, value: 
       </CardContent>
     </Card>
   );
+}
+
+function GlobalSpotsManager({ users }: { users: UserAccount[] | null }) {
+    const firestore = useFirestore();
+    const { isLoaded, loadError } = useGoogleMaps();
+    const [map, setMap] = useState<google.maps.Map | null>(null);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [searchUser, setSearchUser] = useState('');
+    const [selectedSpot, setSelectedSpot] = useState<FishingSpot | null>(null);
+
+    const spotsQuery = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return collectionGroup(firestore, 'fishing_spots');
+    }, [firestore]);
+
+    const { data: allSpots, isLoading } = useCollection<FishingSpot>(spotsQuery);
+
+    const userMap = useMemo(() => {
+        const m = new Map<string, UserAccount>();
+        users?.forEach(u => m.set(u.id, u));
+        return m;
+    }, [users]);
+
+    const filteredSpots = useMemo(() => {
+        if (!allSpots) return [];
+        if (!searchUser.trim()) return allSpots;
+        const s = searchUser.toLowerCase();
+        return allSpots.filter(spot => {
+            const owner = userMap.get(spot.userId);
+            return spot.name.toLowerCase().includes(s) || 
+                   owner?.email?.toLowerCase().includes(s) || 
+                   owner?.displayName?.toLowerCase().includes(s);
+        });
+    }, [allSpots, searchUser, userMap]);
+
+    if (loadError) return <Alert variant="destructive"><AlertTitle>Erreur Google Maps</AlertTitle></Alert>;
+    if (!isLoaded) return <Skeleton className="h-96 w-full" />;
+
+    return (
+        <Card className="border-2 shadow-lg rounded-2xl overflow-hidden">
+            <CardHeader className="p-5 border-b bg-muted/5">
+                <div className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle className="text-lg font-black uppercase flex items-center gap-2 text-primary"><MapIcon className="size-5" /> Cartographie des Points Utilisateurs</CardTitle>
+                            <CardDescription className="text-[10px] font-bold uppercase mt-1">Surveillance globale des coins de pêche enregistrés ({allSpots?.length || 0} points).</CardDescription>
+                        </div>
+                    </div>
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                        <Input 
+                            placeholder="Chercher par nom de spot, email ou nom d'utilisateur..." 
+                            value={searchUser} 
+                            onChange={e => setSearchUser(e.target.value)} 
+                            className="pl-10 h-12 border-2 font-bold text-xs" 
+                        />
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent className="p-0">
+                <div className={cn("relative w-full transition-all", isFullscreen ? "fixed inset-0 z-[100] h-screen w-screen" : "h-[500px]")}>
+                    <GoogleMap
+                        mapContainerClassName="w-full h-full"
+                        defaultCenter={INITIAL_CENTER}
+                        defaultZoom={7}
+                        onLoad={setMap}
+                        options={{ disableDefaultUI: false, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
+                    >
+                        {filteredSpots.map(spot => (
+                            <OverlayView 
+                                key={spot.id} 
+                                position={{ lat: spot.location.latitude, lng: spot.location.longitude }} 
+                                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                            >
+                                <div 
+                                    style={{ transform: 'translate(-50%, -100%)' }} 
+                                    className="flex flex-col items-center cursor-pointer group"
+                                    onClick={() => setSelectedSpot(spot)}
+                                >
+                                    <div className="px-2 py-1 bg-white/90 backdrop-blur-sm border-2 rounded text-[8px] font-black uppercase shadow-lg mb-1 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                        {spot.name}
+                                    </div>
+                                    <div className="p-1.5 rounded-full border-2 border-white shadow-xl" style={{ backgroundColor: spot.color || '#3b82f6' }}>
+                                        <Anchor className="size-3 text-white" />
+                                    </div>
+                                </div>
+                            </OverlayView>
+                        ))}
+                    </GoogleMap>
+                    
+                    <div className="absolute top-4 right-4 flex flex-col gap-2">
+                        <Button 
+                            size="icon" 
+                            className="bg-white/90 backdrop-blur-md border-2 shadow-xl hover:bg-white text-primary h-10 w-10"
+                            onClick={() => setIsFullscreen(!isFullscreen)}
+                        >
+                            {isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}
+                        </Button>
+                    </div>
+
+                    {selectedSpot && (
+                        <div className="absolute bottom-4 left-4 right-4 z-20 animate-in slide-in-from-bottom-4 duration-300">
+                            <Card className="border-2 border-primary shadow-2xl overflow-hidden">
+                                <CardHeader className="p-4 bg-primary text-white flex-row justify-between items-center space-y-0">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-white/20 rounded-lg"><Anchor className="size-5" /></div>
+                                        <div>
+                                            <CardTitle className="text-sm font-black uppercase leading-tight">{selectedSpot.name}</CardTitle>
+                                            <CardDescription className="text-white/70 font-bold uppercase text-[8px]">Propriétaire : {userMap.get(selectedSpot.userId)?.displayName || 'Utilisateur inconnu'}</CardDescription>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setSelectedSpot(null)} className="p-1 hover:bg-white/10 rounded-full"><X className="size-5" /></button>
+                                </CardHeader>
+                                <CardContent className="p-4 grid grid-cols-2 gap-4 bg-white">
+                                    <div className="space-y-2">
+                                        <div className="flex flex-col">
+                                            <span className="text-[8px] font-black uppercase text-muted-foreground">Email Utilisateur</span>
+                                            <span className="text-[10px] font-bold truncate">{userMap.get(selectedSpot.userId)?.email || selectedSpot.userId}</span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-[8px] font-black uppercase text-muted-foreground">Coordonnées GPS</span>
+                                            <span className="text-[10px] font-mono font-bold">{selectedSpot.location.latitude.toFixed(5)}, {selectedSpot.location.longitude.toFixed(5)}</span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2 border-l pl-4">
+                                        <div className="flex flex-col">
+                                            <span className="text-[8px] font-black uppercase text-muted-foreground">Marée & Lune</span>
+                                            <span className="text-[10px] font-bold">{selectedSpot.context?.tideMovement} | {selectedSpot.context?.moonPhase}</span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                            {selectedSpot.fishingTypes?.map(t => (
+                                                <Badge key={t} variant="outline" className="text-[7px] font-black uppercase h-4 border-primary/20 text-primary">{t}</Badge>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    {selectedSpot.notes && (
+                                        <div className="col-span-2 p-3 bg-muted/30 rounded-xl border border-dashed text-[10px] italic font-medium leading-relaxed">
+                                            "{selectedSpot.notes}"
+                                        </div>
+                                    )}
+                                </CardContent>
+                                <CardFooter className="p-2 border-t bg-slate-50 flex justify-between">
+                                    <span className="text-[8px] font-black uppercase opacity-40 italic">Enregistré le {selectedSpot.createdAt ? format(selectedSpot.createdAt.toDate(), 'dd/MM/yyyy HH:mm') : '...'}</span>
+                                    <Button size="sm" variant="ghost" className="h-6 text-[8px] font-black uppercase text-primary gap-1" onClick={() => { map?.panTo({ lat: selectedSpot.location.latitude, lng: selectedSpot.location.longitude }); map?.setZoom(17); }}>Recentrer sur ce point <ChevronRight className="size-2" /></Button>
+                                </CardFooter>
+                            </Card>
+                        </div>
+                    )}
+                </div>
+            </CardContent>
+        </Card>
+    );
 }
 
 function SoundLibraryManager() {
