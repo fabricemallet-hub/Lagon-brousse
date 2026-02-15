@@ -20,7 +20,8 @@ import {
   Spade, 
   Carrot, 
   Flower,
-  Zap
+  Zap,
+  Star
 } from 'lucide-react';
 import { CrabIcon, LobsterIcon } from '@/components/icons';
 import { cn } from '@/lib/utils';
@@ -70,7 +71,31 @@ export default function CalendrierPage() {
         </CardHeader>
         <CardContent className="p-4">
           {calendarView === 'peche' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in duration-500">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 animate-in fade-in duration-500">
+              <div className="space-y-3">
+                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Potentiel de Pêche (Indice IA)</p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex gap-0.5">
+                      <Fish className="size-3.5 text-primary fill-primary animate-pulse" />
+                      <Fish className="size-3.5 text-primary fill-primary animate-pulse" />
+                      <Fish className="size-3.5 text-primary fill-primary animate-pulse" />
+                    </div>
+                    <span className="text-xs font-black uppercase">Activité Exceptionnelle (9-10/10)</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex gap-0.5">
+                      <Fish className="size-3.5 text-primary" />
+                      <Fish className="size-3.5 text-primary" />
+                    </div>
+                    <span className="text-xs font-bold">Bonne activité (7-8/10)</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Fish className="size-3.5 text-primary opacity-60" />
+                    <span className="text-xs font-bold text-muted-foreground">Activité modérée (5-6/10)</span>
+                  </div>
+                </div>
+              </div>
               <div className="space-y-3">
                 <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Crustacés & Marées</p>
                 <div className="space-y-2">
@@ -85,23 +110,6 @@ export default function CalendrierPage() {
                   <div className="flex items-center gap-3">
                     <div className="p-1.5 bg-blue-100 rounded-lg"><LobsterIcon className="size-4 text-blue-600" /></div>
                     <span className="text-xs font-bold">Activité Langouste Élevée</span>
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Calcul des hauteurs</p>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <div className="px-2 py-0.5 bg-primary text-white text-[8px] font-black rounded">1.50m</div>
-                    <span className="text-xs font-bold">Grande Marée (Pic du cycle)</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-primary font-black text-[10px] px-1">1.40m</span>
-                    <span className="text-xs font-bold">Pleine mer standard</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-blue-800 font-black text-[10px] px-1">0.40m</span>
-                    <span className="text-xs font-bold">Basse mer</span>
                   </div>
                 </div>
               </div>

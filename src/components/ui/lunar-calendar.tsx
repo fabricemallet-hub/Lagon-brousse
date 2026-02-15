@@ -38,13 +38,10 @@ import {
   Leaf,
   Scissors,
   RefreshCw,
-  TrendingUp,
-  TrendingDown,
   ZoomIn,
   ZoomOut,
   Maximize2,
   Moon,
-  X,
   Fish,
   Waves
 } from 'lucide-react';
@@ -102,6 +99,11 @@ const DayCell = React.memo(({
     return [...data.tides].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
   }, [data.tides]);
 
+  // Calcul du score de pêche maximal pour la journée
+  const maxFishRating = useMemo(() => {
+    return Math.max(...data.fishing.flatMap(slot => slot.fish.map(f => f.rating)));
+  }, [data.fishing]);
+
   const { zodiac, isGoodForCuttings, isGoodForPruning, isGoodForMowing } = data.farming;
   const GardeningIcon = { Fruits: Spade, Racines: Carrot, Fleurs: Flower, Feuilles: Leaf }[zodiac];
 
@@ -128,7 +130,20 @@ const DayCell = React.memo(({
 
       {calendarView === 'peche' ? (
         <div className="flex-grow flex flex-col justify-center items-center gap-0.5 pt-1">
-          <div className="flex items-center justify-center gap-0.5 h-3 overflow-hidden flex-nowrap whitespace-nowrap w-full">
+          {/* Notation par nombre de poissons */}
+          <div className="flex items-center justify-center gap-0.5 h-4 mb-1">
+            {maxFishRating >= 5 && (
+              <Fish className={cn("size-3 text-primary", maxFishRating >= 9 && "fill-primary animate-pulse")} />
+            )}
+            {maxFishRating >= 7 && (
+              <Fish className={cn("size-3 text-primary", maxFishRating >= 9 && "fill-primary animate-pulse")} />
+            )}
+            {maxFishRating >= 9 && (
+              <Fish className={cn("size-3 text-primary fill-primary animate-pulse")} />
+            )}
+          </div>
+
+          <div className="flex items-center justify-center gap-0.5 h-3 overflow-hidden flex-nowrap whitespace-nowrap w-full border-t border-dashed border-primary/10 pt-1">
             {data.crabAndLobster.crabStatus === 'Plein' && <CrabIcon className="size-3.5 text-green-600 shrink-0" />}
             {data.crabAndLobster.crabStatus === 'Mout' && <CrabIcon className="size-3.5 text-destructive shrink-0" />}
             {data.crabAndLobster.lobsterActivity === 'Élevée' && <LobsterIcon className="size-3.5 text-blue-600 shrink-0" />}
@@ -177,7 +192,6 @@ export function LunarCalendar() {
   const [detailedDay, setDetailedDay] = useState<Date | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Zoom States
   const [zoom, setZoom] = useState(1);
   const [isPinching, setIsPinching] = useState(false);
   const initialDistRef = useRef<number | null>(null);
@@ -198,7 +212,6 @@ export function LunarCalendar() {
   const days = eachDayOfInterval({ start: startDate, end: endDate });
   const weekdays = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
-  // Pinch-to-zoom logic
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
       setIsPinching(true);
@@ -228,7 +241,6 @@ export function LunarCalendar() {
     setIsPinching(false);
   };
 
-  // Auto-scroll to today
   useEffect(() => {
     const timer = setTimeout(() => {
       if (scrollContainerRef.current) {
@@ -271,7 +283,6 @@ export function LunarCalendar() {
           style={{ 
             width: `${1000 * zoom}px`, 
             transform: `scale(${zoom})`,
-            // On laisse le conteneur parent overflow-x gérer le scroll horizontal
             marginBottom: `${(1 - zoom) * -100}%`
           }}
         >
@@ -294,7 +305,6 @@ export function LunarCalendar() {
         </div>
       </div>
 
-      {/* Zoom Floating Toolbar */}
       <div className="fixed bottom-24 right-4 z-40 flex flex-col gap-2">
         <Button 
           size="icon" 
