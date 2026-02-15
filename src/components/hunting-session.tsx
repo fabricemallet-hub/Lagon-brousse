@@ -332,7 +332,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
 
     watchIdRef.current = navigator.geolocation.watchPosition(
-        async (position) => {
+        (position) => {
             const { latitude, longitude } = position.coords;
             setUserLocation({ latitude, longitude });
             if (shouldPanOnNextFix.current && map) {
@@ -341,19 +341,24 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                 shouldPanOnNextFix.current = false;
             }
             const ref = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
-            let batt = null;
-            if ('getBattery' in navigator) {
-                const b: any = await (navigator as any).getBattery();
-                batt = { level: b.level, charging: b.charging };
-            }
-            const updatePayload = { location: { latitude, longitude }, battery: batt, updatedAt: serverTimestamp() };
-            updateDoc(ref, updatePayload).catch(async (err) => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({
-                    path: ref.path,
-                    operation: 'update',
-                    requestResourceData: updatePayload
-                }));
-            });
+            
+            // Get battery info asynchronously
+            const updateWithBattery = async () => {
+                let batt = null;
+                if ('getBattery' in navigator) {
+                    const b: any = await (navigator as any).getBattery();
+                    batt = { level: b.level, charging: b.charging };
+                }
+                const updatePayload = { location: { latitude, longitude }, battery: batt, updatedAt: serverTimestamp() };
+                updateDoc(ref, updatePayload).catch(async (err) => {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({
+                        path: ref.path,
+                        operation: 'update',
+                        requestResourceData: updatePayload
+                    }));
+                });
+            };
+            updateWithBattery();
         },
         (err) => console.error(err),
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -469,13 +474,16 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     }
   };
 
-  const handleDeleteSessionConfirmed = async () => {
+  const handleDeleteSessionConfirmed = () => {
     if (!firestore || !sessionToDelete) return;
-    try {
-        const snap = await getDocs(collection(firestore, 'hunting_sessions', sessionToDelete, 'participants'));
+    const sId = sessionToDelete;
+    setSessionToDelete(null);
+
+    getDocs(collection(firestore, 'hunting_sessions', sId, 'participants'))
+      .then(snap => {
         const batch = writeBatch(firestore);
         snap.forEach(d => batch.delete(d.ref));
-        batch.delete(doc(firestore, 'hunting_sessions', sessionToDelete));
+        batch.delete(doc(firestore, 'hunting_sessions', sId));
         
         batch.commit()
           .then(() => {
@@ -484,11 +492,12 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
           })
           .catch(async (err) => {
             errorEmitter.emit('permission-error', new FirestorePermissionError({
-              path: `hunting_sessions/${sessionToDelete}`,
+              path: `hunting_sessions/${sId}`,
               operation: 'delete'
             }));
           });
-    } catch (e) { console.error(e); } finally { setSessionToDelete(null); }
+      })
+      .catch(console.error);
   };
 
   const updateTacticalStatus = (st: string) => {
