@@ -52,7 +52,8 @@ import {
   XCircle,
   Maximize2,
   ScrollText,
-  UserPlus
+  UserPlus,
+  Ruler
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -518,6 +519,9 @@ function FishGuideManager() {
     const [gratteRiskSmall, setGratteRiskSmall] = useState('0');
     const [gratteRiskMedium, setGratteRiskMedium] = useState('0');
     const [gratteRiskLarge, setGratteRiskLarge] = useState('0');
+    const [lengthSmall, setLengthSmall] = useState('');
+    const [lengthMedium, setLengthMedium] = useState('');
+    const [lengthLarge, setLengthLarge] = useState('');
     const [fishingAdvice, setFishingAdvice] = useState('');
     const [culinaryAdvice, setCulinaryAdvice] = useState('');
     const [imageUrl, setImageUrl] = useState('');
@@ -548,6 +552,9 @@ function FishGuideManager() {
             gratteRiskSmall: parseInt(gratteRiskSmall), 
             gratteRiskMedium: parseInt(gratteRiskMedium), 
             gratteRiskLarge: parseInt(gratteRiskLarge), 
+            lengthSmall,
+            lengthMedium,
+            lengthLarge,
             fishingAdvice, 
             culinaryAdvice, 
             imageUrl,
@@ -581,6 +588,9 @@ function FishGuideManager() {
                         setGratteRiskSmall('0');
                         setGratteRiskMedium('0');
                         setGratteRiskLarge('0');
+                        setLengthSmall('');
+                        setLengthMedium('');
+                        setLengthLarge('');
                         setFishingAdvice('');
                         setCulinaryAdvice('');
                         setIsDialogOpen(true); 
@@ -617,6 +627,9 @@ function FishGuideManager() {
                                     setGratteRiskSmall(f.gratteRiskSmall?.toString() || '0'); 
                                     setGratteRiskMedium(f.gratteRiskMedium?.toString() || '0'); 
                                     setGratteRiskLarge(f.gratteRiskLarge?.toString() || '0'); 
+                                    setLengthSmall(f.lengthSmall || '');
+                                    setLengthMedium(f.lengthMedium || '');
+                                    setLengthLarge(f.lengthLarge || '');
                                     setFishingAdvice(f.fishingAdvice || ''); 
                                     setCulinaryAdvice(f.culinaryAdvice || ''); 
                                     setImageUrl(f.imageUrl || '');
@@ -660,14 +673,25 @@ function FishGuideManager() {
                                 </div>
                             </div>
 
-                            <Button onClick={async () => { setIsGenerating(true); try { const info = await generateFishInfo({ name, scientificName }); setScientificName(info.scientificName); setCategory(info.category); setGratteRiskSmall(info.gratteRiskSmall.toString()); setGratteRiskMedium(info.gratteRiskMedium.toString()); setGratteRiskLarge(info.gratteRiskLarge.toString()); setFishingAdvice(info.fishingAdvice); setCulinaryAdvice(info.culinaryAdvice); toast({ title: "Généré !" }); } finally { setIsGenerating(false); } }} disabled={isGenerating || !name} variant="secondary" className="w-full h-14 font-black uppercase text-xs gap-3 border-2 shadow-sm"><BrainCircuit className="size-5" /> Assistant IA (Générer fiche)</Button>
+                            <Button onClick={async () => { setIsGenerating(true); try { const info = await generateFishInfo({ name, scientificName }); setScientificName(info.scientificName); setCategory(info.category); setGratteRiskSmall(info.gratteRiskSmall.toString()); setGratteRiskMedium(info.gratteRiskMedium.toString()); setGratteRiskLarge(info.gratteRiskLarge.toString()); setLengthSmall(info.lengthSmall); setLengthMedium(info.lengthMedium); setLengthLarge(info.lengthLarge); setFishingAdvice(info.fishingAdvice); setCulinaryAdvice(info.culinaryAdvice); toast({ title: "Généré !" }); } finally { setIsGenerating(false); } }} disabled={isGenerating || !name} variant="secondary" className="w-full h-14 font-black uppercase text-xs gap-3 border-2 shadow-sm"><BrainCircuit className="size-5" /> Assistant IA (Générer fiche)</Button>
                         </div>
+                        
                         <div className="grid grid-cols-3 gap-2 p-5 bg-muted/20 rounded-2xl border-2 border-dashed">
                             <p className="col-span-3 text-[10px] font-black uppercase text-center opacity-50 tracking-widest mb-1">Risques de Gratte (%) : P / M / G</p>
                             <Input type="number" value={gratteRiskSmall} onChange={e => setGratteRiskSmall(e.target.value)} className="h-12 text-center font-black text-lg" />
                             <Input type="number" value={gratteRiskMedium} onChange={e => setGratteRiskMedium(e.target.value)} className="h-12 text-center font-black text-lg" />
                             <Input type="number" value={gratteRiskLarge} onChange={e => setGratteRiskLarge(e.target.value)} className="h-12 text-center font-black text-lg" />
                         </div>
+
+                        <div className="grid grid-cols-3 gap-2 p-5 bg-muted/20 rounded-2xl border-2 border-dashed">
+                            <p className="col-span-3 text-[10px] font-black uppercase text-center opacity-50 tracking-widest mb-1 flex items-center justify-center gap-2">
+                                <Ruler className="size-3" /> Tailles Estimées (ex: < 30cm) : P / M / G
+                            </p>
+                            <Input value={lengthSmall} onChange={e => setLengthSmall(e.target.value)} placeholder="Petit" className="h-12 text-center font-black text-sm" />
+                            <Input value={lengthMedium} onChange={e => setLengthMedium(e.target.value)} placeholder="Moyen" className="h-12 text-center font-black text-sm" />
+                            <Input value={lengthLarge} onChange={e => setLengthLarge(e.target.value)} placeholder="Grand" className="h-12 text-center font-black text-sm" />
+                        </div>
+
                         <div className="space-y-4">
                             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">Conseils Pêche</Label><Textarea value={fishingAdvice} onChange={e => setFishingAdvice(e.target.value)} className="min-h-[100px] border-2 font-medium" /></div>
                             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">Conseils Cuisine</Label><Textarea value={culinaryAdvice} onChange={e => setCulinaryAdvice(e.target.value)} className="min-h-[100px] border-2 font-medium" /></div>
