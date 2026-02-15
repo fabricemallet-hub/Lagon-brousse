@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -11,11 +12,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { Ship, Plus, Trash2, Clock, AlertTriangle, Check, ShieldCheck, X } from 'lucide-react';
+import { Ship, Plus, Trash2, Clock, AlertTriangle, Check, ShieldCheck, X, RefreshCw } from 'lucide-react';
 import { format, differenceInDays, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { UserVesselSafety, SafetyItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 export function VesselSafetyManager() {
   const { user } = useUser();
@@ -39,74 +42,92 @@ export function VesselSafetyManager() {
 
   const { data: vessels, isLoading } = useCollection<UserVesselSafety>(vesselsRef);
 
-  const handleAddVessel = async () => {
+  const handleAddVessel = () => {
     if (!user || !firestore || !newVesselName.trim()) return;
     setIsSaving(true);
-    try {
-      await addDoc(collection(firestore, 'users', user.uid, 'vessels_safety'), {
-        userId: user.uid,
-        vesselName: newVesselName.trim().toUpperCase(),
-        equipment: [],
-        createdAt: serverTimestamp()
+    const vesselData = {
+      userId: user.uid,
+      vesselName: newVesselName.trim().toUpperCase(),
+      equipment: [],
+      createdAt: serverTimestamp()
+    };
+    const colRef = collection(firestore, 'users', user.uid, 'vessels_safety');
+    
+    addDoc(colRef, vesselData)
+      .then(() => {
+        setNewVesselName('');
+        setIsAddingVessel(false);
+        toast({ title: "NAVIRE AJOUTÉ" });
+        setIsSaving(false);
+      })
+      .catch(async (e) => {
+        setIsSaving(false);
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: colRef.path,
+          operation: 'create',
+          requestResourceData: vesselData
+        }));
       });
-      setNewVesselName('');
-      setIsAddingVessel(false);
-      toast({ title: "NAVIRE AJOUTÉ" });
-    } catch (e) {
-      toast({ variant: 'destructive', title: "ERREUR" });
-    } finally {
-      setIsSaving(false);
-    }
   };
 
-  const handleRemoveVessel = async (vesselId: string) => {
+  const handleRemoveVessel = (vesselId: string) => {
     if (!user || !firestore) return;
-    try {
-      await deleteDoc(doc(firestore, 'users', user.uid, 'vessels_safety', vesselId));
-      toast({ title: "NAVIRE SUPPRIMÉ" });
-    } catch (e) {
-      toast({ variant: 'destructive', title: "ERREUR" });
-    }
+    const vesselRef = doc(firestore, 'users', user.uid, 'vessels_safety', vesselId);
+    deleteDoc(vesselRef)
+      .then(() => toast({ title: "NAVIRE SUPPRIMÉ" }))
+      .catch(async (err) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: vesselRef.path,
+          operation: 'delete'
+        }));
+      });
   };
 
-  const handleAddItem = async (vessel: UserVesselSafety) => {
+  const handleAddItem = (vessel: UserVesselSafety) => {
     if (!user || !firestore || !newItemLabel.trim() || !newItemExpiry) return;
     setIsSaving(true);
-    try {
-      const item: SafetyItem = {
-        id: Math.random().toString(36).substring(7),
-        type: newItemType,
-        label: newItemLabel.trim().toUpperCase(),
-        expiryDate: newItemExpiry
-      };
-      
-      const vesselRef = doc(firestore, 'users', user.uid, 'vessels_safety', vessel.id);
-      await updateDoc(vesselRef, {
-        equipment: arrayUnion(item)
-      });
-      
+    const item: SafetyItem = {
+      id: Math.random().toString(36).substring(7),
+      type: newItemType,
+      label: newItemLabel.trim().toUpperCase(),
+      expiryDate: newItemExpiry
+    };
+    
+    const vesselRef = doc(firestore, 'users', user.uid, 'vessels_safety', vessel.id);
+    updateDoc(vesselRef, {
+      equipment: arrayUnion(item)
+    })
+    .then(() => {
       setNewItemLabel('');
       setNewItemExpiry('');
       setActiveVesselId(null);
       toast({ title: "ÉQUIPEMENT AJOUTÉ" });
-    } catch (e) {
-      toast({ variant: 'destructive', title: "ERREUR" });
-    } finally {
       setIsSaving(false);
-    }
+    })
+    .catch(async (e) => {
+      setIsSaving(false);
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: vesselRef.path,
+        operation: 'update',
+        requestResourceData: { equipment: arrayUnion(item) }
+      }));
+    });
   };
 
-  const handleRemoveItem = async (vessel: UserVesselSafety, item: SafetyItem) => {
+  const handleRemoveItem = (vessel: UserVesselSafety, item: SafetyItem) => {
     if (!user || !firestore) return;
-    try {
-      const vesselRef = doc(firestore, 'users', user.uid, 'vessels_safety', vessel.id);
-      await updateDoc(vesselRef, {
-        equipment: arrayRemove(item)
-      });
-      toast({ title: "ÉQUIPEMENT RETIRÉ" });
-    } catch (e) {
-      toast({ variant: 'destructive', title: "ERREUR" });
-    }
+    const vesselRef = doc(firestore, 'users', user.uid, 'vessels_safety', vessel.id);
+    updateDoc(vesselRef, {
+      equipment: arrayRemove(item)
+    })
+    .then(() => toast({ title: "ÉQUIPEMENT RETIRÉ" }))
+    .catch(async (err) => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: vesselRef.path,
+        operation: 'update',
+        requestResourceData: { equipment: arrayRemove(item) }
+      }));
+    });
   };
 
   const getExpiryStatus = (expiryDateStr: string) => {
@@ -209,7 +230,9 @@ export function VesselSafetyManager() {
                       </div>
                       <div className="flex gap-2 pt-1">
                         <Button variant="outline" className="flex-1 h-10 font-black uppercase text-[9px] border-2" onClick={() => setActiveVesselId(null)}>Annuler</Button>
-                        <Button className="flex-[1.5] h-10 font-black uppercase text-[9px] shadow-md" onClick={() => handleAddItem(vessel)} disabled={isSaving || !newItemLabel || !newItemExpiry}>Enregistrer</Button>
+                        <Button className="flex-[1.5] h-10 font-black uppercase text-[9px] shadow-md" onClick={() => handleAddItem(vessel)} disabled={isSaving || !newItemLabel || !newItemExpiry}>
+                          {isSaving ? <RefreshCw className="size-3 animate-spin mr-2" /> : null} Enregistrer
+                        </Button>
                       </div>
                     </div>
                   ) : (
@@ -234,7 +257,7 @@ export function VesselSafetyManager() {
                 </div>
                 <div className="flex flex-col gap-2 pt-1">
                   <Button className="w-full h-12 font-black uppercase text-[10px] tracking-tight shadow-lg bg-primary hover:bg-primary/90" onClick={handleAddVessel} disabled={isSaving || !newVesselName}>
-                    Créer le profil navire
+                    {isSaving ? <RefreshCw className="size-4 animate-spin mr-2" /> : null} Créer le profil navire
                   </Button>
                   <Button variant="ghost" className="w-full h-10 font-black uppercase text-[9px] tracking-widest text-slate-400 hover:bg-slate-50" onClick={() => setIsAddingVessel(false)}>
                     Annuler l'ajout

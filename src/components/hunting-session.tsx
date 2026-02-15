@@ -292,7 +292,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
       return;
     }
     if (wakeLock) {
-      try { await wakeLock.release(); setWakeLock(null); toast({ title: "Mode éveil désactivé" }); } catch (e) { setWakeLock(null); }
+      try { wakeLock.release(); setWakeLock(null); toast({ title: "Mode éveil désactivé" }); } catch (e) { setWakeLock(null); }
     } else {
       try {
         const lock = await (navigator as any).wakeLock.request('screen');
