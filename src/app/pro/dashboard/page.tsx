@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -190,7 +189,8 @@ export default function ProDashboard() {
     const totalVariableCost = variableCostPerPromo * selectedPromoIds.length;
     
     // Fixed price is unique per campaign, not per article
-    return pricing.fixedPrice + totalVariableCost;
+    // Arrondi au franc supérieur
+    return Math.ceil(pricing.fixedPrice + totalVariableCost);
   }, [pricing, targetCount, selectedChannels, selectedPromoIds]);
 
   const handleCopyUid = () => {
