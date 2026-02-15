@@ -417,21 +417,33 @@ function FishGuideManager() {
                 </div>
             </CardHeader>
             <CardContent className="p-3 space-y-3">
-                {isLoading ? <Skeleton className="h-32 w-full rounded-2xl" /> : filtered.map(f => (
-                    <div key={f.id} className="flex flex-col p-4 border-2 rounded-2xl bg-white shadow-sm gap-4">
-                        <div className="flex flex-col min-w-0">
-                            <span className="font-black uppercase text-sm leading-tight text-slate-800">{f.name}</span>
-                            <div className="flex items-center gap-2 mt-2">
-                                <Badge variant="outline" className="text-[9px] font-black uppercase h-5 px-2 border-primary/20">{f.category}</Badge>
-                                <span className="text-[9px] italic font-bold opacity-40 truncate">{f.scientificName}</span>
+                {isLoading ? <Skeleton className="h-32 w-full rounded-2xl" /> : filtered.map(f => {
+                    const finalImageUrl = f.imageUrl || (f.imagePlaceholder ? `https://picsum.photos/seed/${f.imagePlaceholder}/400/400` : '');
+                    return (
+                        <div key={f.id} className="flex flex-col p-4 border-2 rounded-2xl bg-white shadow-sm gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className="size-16 rounded-xl bg-muted/20 flex items-center justify-center shrink-0 overflow-hidden border shadow-sm">
+                                    {finalImageUrl ? (
+                                        <img src={finalImageUrl} alt={f.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <Fish className="size-6 text-primary/40" />
+                                    )}
+                                </div>
+                                <div className="flex flex-col min-w-0 flex-1">
+                                    <span className="font-black uppercase text-sm leading-tight text-slate-800 truncate">{f.name}</span>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <Badge variant="outline" className="text-[9px] font-black uppercase h-5 px-2 border-primary/20">{f.category}</Badge>
+                                        <span className="text-[9px] italic font-bold opacity-40 truncate">{f.scientificName}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex gap-2 border-t pt-3">
+                                <Button variant="outline" className="flex-1 h-12 font-black uppercase text-[10px] border-2" onClick={() => { setEditingFish(f); setName(f.name); setScientificName(f.scientificName); setCategory(f.category); setGratteRiskSmall(f.gratteRiskSmall?.toString() || '0'); setGratteRiskMedium(f.gratteRiskMedium?.toString() || '0'); setGratteRiskLarge(f.gratteRiskLarge?.toString() || '0'); setFishingAdvice(f.fishingAdvice || ''); setCulinaryAdvice(f.culinaryAdvice || ''); setIsDialogOpen(true); }}><Pencil className="size-4 mr-2" /> Modifier</Button>
+                                <Button variant="ghost" className="h-12 px-4 text-destructive border-2 border-destructive/10" onClick={() => deleteDoc(doc(firestore!, 'fish_species', f.id))}><Trash2 className="size-4" /></Button>
                             </div>
                         </div>
-                        <div className="flex gap-2 border-t pt-3">
-                            <Button variant="outline" className="flex-1 h-12 font-black uppercase text-[10px] border-2" onClick={() => { setEditingFish(f); setName(f.name); setScientificName(f.scientificName); setCategory(f.category); setGratteRiskSmall(f.gratteRiskSmall?.toString() || '0'); setGratteRiskMedium(f.gratteRiskMedium?.toString() || '0'); setGratteRiskLarge(f.gratteRiskLarge?.toString() || '0'); setFishingAdvice(f.fishingAdvice || ''); setCulinaryAdvice(f.culinaryAdvice || ''); setIsDialogOpen(true); }}><Pencil className="size-4 mr-2" /> Modifier</Button>
-                            <Button variant="ghost" className="h-12 px-4 text-destructive border-2 border-destructive/10" onClick={() => deleteDoc(doc(firestore!, 'fish_species', f.id))}><Trash2 className="size-4" /></Button>
-                        </div>
-                    </div>
-                ))}
+                    );
+                })}
             </CardContent>
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
