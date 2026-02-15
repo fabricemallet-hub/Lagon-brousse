@@ -81,8 +81,8 @@ export default function ProDashboard() {
 
   // Initialize target category from business categories
   useEffect(() => {
-    if (business && (business.categories || [business.category]).length > 0) {
-      const defaultCat = (business.categories || [business.category])[0];
+    if (business && (business.categories || []).length > 0) {
+      const defaultCat = business.categories[0];
       if (!targetCategory) setTargetCategory(defaultCat);
       if (!promoCategory) setPromoCategory(defaultCat);
     }
@@ -104,6 +104,7 @@ export default function ProDashboard() {
         const snap = await getCountFromServer(q);
         setTargetCount(snap.data().count);
       } catch (e: any) {
+        console.warn("Reach calculation restricted", e);
         setReachError(true);
         setTargetCount(0);
       } finally {
@@ -185,8 +186,8 @@ export default function ProDashboard() {
     setPromoPrice('');
     setOriginalPrice('');
     setPromoImage('');
-    if (business && (business.categories || [business.category]).length > 0) {
-        setPromoCategory((business.categories || [business.category])[0]);
+    if (business && (business.categories || []).length > 0) {
+        setPromoCategory(business.categories[0]);
     }
   };
 
@@ -294,7 +295,7 @@ export default function ProDashboard() {
                   </CardDescription>
                 </div>
                 <div className="flex flex-wrap gap-1 justify-end max-w-[150px]">
-                    {(business.categories || [business.category]).map(cat => (
+                    {(business.categories || []).map(cat => (
                         <Badge key={cat} variant="outline" className="bg-white/10 text-white border-white/20 uppercase font-black text-[8px]">{cat}</Badge>
                     ))}
                 </div>
@@ -321,7 +322,7 @@ export default function ProDashboard() {
                             <SelectValue placeholder="Choisir..." />
                         </SelectTrigger>
                         <SelectContent>
-                            {(business.categories || [business.category]).map(cat => (
+                            {(business.categories || []).map(cat => (
                                 <SelectItem key={cat} value={cat} className="font-black text-xs uppercase">{cat}</SelectItem>
                             ))}
                         </SelectContent>
@@ -400,7 +401,7 @@ export default function ProDashboard() {
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {(business.categories || [business.category]).map(cat => (
+                                        {(business.categories || []).map(cat => (
                                             <SelectItem key={cat} value={cat} className="font-black uppercase text-[10px]">{cat}</SelectItem>
                                         ))}
                                     </SelectContent>

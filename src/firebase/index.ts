@@ -7,7 +7,8 @@ import { getFirestore, initializeFirestore, memoryLocalCache } from 'firebase/fi
 
 /**
  * @fileOverview Initialisation de Firebase Singleton ultra-robuste.
- * Correction définitive de l'erreur ASSERTION FAILED (ID: ca9) en forçant le cache mémoire.
+ * Correction définitive de l'erreur ASSERTION FAILED (ID: ca9) en forçant le cache mémoire
+ * et en utilisant un stockage global pour éviter les doubles initialisations lors du HMR.
  */
 
 export function initializeFirebase() {
@@ -32,15 +33,21 @@ export function initializeFirebase() {
   const auth = global.__LBN_AUTH__;
 
   // 3. Initialisation de Firestore (Singleton avec cache mémoire forcé)
-  // L'erreur ca9 est causée par IndexedDB. Forcer memoryLocalCache() règle le problème.
+  // L'erreur ca9 est causée par des conflits IndexedDB. Forcer memoryLocalCache() règle le problème.
   if (!global.__LBN_FIRESTORE__) {
     try {
-      global.__LBN_FIRESTORE__ = initializeFirestore(app, {
-        localCache: memoryLocalCache(),
-      });
-    } catch (e) {
-      // Fallback si déjà initialisé par un autre module
+      // On tente d'abord de récupérer une instance existante pour cet app
       global.__LBN_FIRESTORE__ = getFirestore(app);
+    } catch (e) {
+      // Si aucune instance, on l'initialise avec nos paramètres de sécurité
+      try {
+        global.__LBN_FIRESTORE__ = initializeFirestore(app, {
+          localCache: memoryLocalCache(),
+        });
+      } catch (err) {
+        // Fallback ultime
+        global.__LBN_FIRESTORE__ = getFirestore(app);
+      }
     }
   }
   const firestore = global.__LBN_FIRESTORE__;

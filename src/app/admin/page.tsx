@@ -49,7 +49,8 @@ import {
   AlertCircle,
   Calendar,
   XCircle,
-  Maximize2
+  Maximize2,
+  ScrollText
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -414,7 +415,7 @@ function BusinessManager({ businesses, users }: { businesses: Business[] | null,
                             <LinkIcon className="size-5 text-primary" /> {editingBusiness ? "Modifier Boutique" : "Lier un compte PRO"}
                         </DialogTitle>
                     </DialogHeader>
-                    <div className="p-6 space-y-5 overflow-y-auto max-h-[60vh] scrollbar-hide">
+                    <div className="p-6 space-y-5">
                         <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">Nom du magasin</Label><Input value={name} onChange={e => setName(e.target.value)} className="h-14 border-2 font-black text-lg" /></div>
                         <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">UID Utilisateur Pro</Label><Input value={ownerId} onChange={e => setOwnerId(e.target.value)} placeholder="Coller l'UID..." className="h-14 border-2 font-mono text-sm" /></div>
                         <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">Commune</Label>

@@ -68,13 +68,14 @@ export function useDoc<T = any>(
           setError(contextualError);
           
           // --- SILENCE SYSTEM & CONFIG PATHS ---
-          // Prevent standard 403 screen for internal config documents
+          // Prevent standard 403 screen for internal config or frequently accessed documents
           const silentPaths = [
             'shared_access_tokens',
             'access_tokens',
             'app_settings',
             'system_notifications',
-            'users'
+            'users',
+            'businesses'
           ];
           
           const isSilent = silentPaths.some(p => memoizedDocRef.path.toLowerCase().includes(p.toLowerCase()));
