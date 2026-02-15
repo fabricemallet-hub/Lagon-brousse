@@ -1,3 +1,4 @@
+
 'use client';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, getDoc, writeBatch, serverTimestamp, updateDoc } from 'firebase/firestore';
@@ -9,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, isBefore, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { 
-  Crown, Star, XCircle, Ticket, Gift, LogOut, Mail, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink, Copy, Check, MapPin, RefreshCw, Store, Zap, Pencil, LayoutGrid, Heart, Save, Globe
+  Crown, Star, XCircle, Ticket, Gift, LogOut, Mail, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink, Copy, Check, MapPin, RefreshCw, Store, Zap, Pencil, LayoutGrid, Heart, Save, Globe, Smartphone
 } from 'lucide-react';
 import {
   Select,
@@ -39,6 +40,7 @@ import { locationsByRegion, regions } from '@/lib/locations';
 import { navLinks } from '@/lib/nav-links';
 import { cn } from '@/lib/utils';
 import { useLocation } from '@/context/location-context';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function ComptePage() {
   const { user, isUserLoading } = useUser();
@@ -57,6 +59,9 @@ export default function ComptePage() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [newName, setNewName] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
+
+  // Preferences editing states
+  const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
   // Favorites state
   const [tempFavorites, setTempFavorites] = useState<string[]>([]);
@@ -139,6 +144,24 @@ export default function ComptePage() {
     } catch (e) {
       toast({ variant: 'destructive', title: "Erreur", description: "Impossible de mettre à jour la commune." });
     }
+  };
+
+  const handleTogglePreferenceCategory = async (cat: string) => {
+    if (!user || !firestore || !userProfile) return;
+    const current = userProfile.subscribedCategories || [];
+    const updated = current.includes(cat) ? current.filter(c => c !== cat) : [...current, cat];
+    try {
+      await updateDoc(doc(firestore, 'users', user.uid), { subscribedCategories: updated });
+      toast({ title: "Intérêts mis à jour" });
+    } catch (e) {}
+  };
+
+  const handleTogglePreferenceChannel = async (field: 'allowsPromoEmails' | 'allowsPromoPush') => {
+    if (!user || !firestore || !userProfile) return;
+    try {
+      await updateDoc(doc(firestore, 'users', user.uid), { [field]: !userProfile[field] });
+      toast({ title: "Canaux de notification mis à jour" });
+    } catch (e) {}
   };
 
   const handleToggleFavorite = (href: string) => {
@@ -352,7 +375,7 @@ export default function ComptePage() {
                       <SelectTrigger className="h-9 border-2 font-bold text-xs bg-white">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="max-h-64">
+                      <SelectContent className="max-h-80">
                         {availableLocations.map(loc => (
                           <SelectItem key={loc} value={loc}>{loc}</SelectItem>
                         ))}
@@ -370,6 +393,57 @@ export default function ComptePage() {
                 </div>
               </div>
             </div>
+
+            {/* ABONNEMENTS & NOTIFICATIONS PROMOS */}
+            <Card className="border-2 border-dashed border-primary/20 bg-muted/5">
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
+                  <Bell className="size-4 text-primary" /> Abonnements & Notifications
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 space-y-6">
+                <div className="space-y-3">
+                  <p className="text-[9px] font-black uppercase text-muted-foreground ml-1">Recevoir les offres par thématique :</p>
+                  <div className="grid grid-cols-1 gap-2.5">
+                    {['Pêche', 'Chasse', 'Jardinage'].map(cat => (
+                      <div key={cat} className="flex items-center justify-between p-2.5 bg-white rounded-xl border shadow-sm">
+                        <span className="text-xs font-bold">{cat}</span>
+                        <Switch 
+                          checked={userProfile?.subscribedCategories?.includes(cat)} 
+                          onCheckedChange={() => handleTogglePreferenceCategory(cat)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-2 space-y-3 border-t border-dashed">
+                  <p className="text-[9px] font-black uppercase text-muted-foreground ml-1">Canaux de diffusion :</p>
+                  <div className="grid grid-cols-1 gap-2.5">
+                    <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <Mail className="size-3 text-primary" />
+                        <span className="text-xs font-bold">Email (Nouveautés)</span>
+                      </div>
+                      <Switch 
+                        checked={userProfile?.allowsPromoEmails ?? true} 
+                        onCheckedChange={() => handleTogglePreferenceChannel('allowsPromoEmails')}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <Smartphone className="size-3 text-primary" />
+                        <span className="text-xs font-bold">Notifications Push</span>
+                      </div>
+                      <Switch 
+                        checked={userProfile?.allowsPromoPush ?? true} 
+                        onCheckedChange={() => handleTogglePreferenceChannel('allowsPromoPush')}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
             <div className="pt-4 space-y-4">
               <div className="flex items-center gap-2 px-1">

@@ -32,16 +32,17 @@ import {
   sendEmailVerification,
   AuthError,
 } from 'firebase/auth';
-import { doc, collection, addDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, collection, addDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { ForgotPasswordDialog } from './forgot-password-dialog';
-import { Eye, EyeOff, Ticket, MapPin, ScrollText, Globe } from 'lucide-react';
-import { ensureUserDocument } from '@/lib/user-utils';
+import { Eye, EyeOff, Ticket, MapPin, ScrollText, Globe, Bell, Mail, Smartphone } from 'lucide-react';
 import { redeemAccessToken } from '@/lib/token-utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { CgvSettings, Region } from '@/lib/types';
 import { locationsByRegion, regions } from '@/lib/locations';
+import { addMonths } from 'date-fns';
+import { Label } from './ui/label';
 
 type AuthFormProps = {
   mode: 'login' | 'signup';
@@ -66,6 +67,9 @@ const signupSchema = z.object({
   acceptCgv: z.boolean().refine(val => val === true, {
     message: "Vous devez accepter les conditions générales de vente."
   }),
+  subscribedCategories: z.array(z.string()).default(['Pêche', 'Chasse', 'Jardinage']),
+  allowsPromoEmails: z.boolean().default(true),
+  allowsPromoPush: z.boolean().default(true),
 });
 
 
@@ -90,6 +94,9 @@ export function AuthForm({ mode }: AuthFormProps) {
       token: '',
       rememberMe: false,
       acceptCgv: false,
+      subscribedCategories: ['Pêche', 'Chasse', 'Jardinage'],
+      allowsPromoEmails: true,
+      allowsPromoPush: true,
     },
   });
 
@@ -181,6 +188,9 @@ export function AuthForm({ mode }: AuthFormProps) {
             subscriptionStatus: 'trial',
             selectedRegion: signupValues.region,
             lastSelectedLocation: signupValues.commune,
+            subscribedCategories: signupValues.subscribedCategories,
+            allowsPromoEmails: signupValues.allowsPromoEmails,
+            allowsPromoPush: signupValues.allowsPromoPush,
             subscriptionStartDate: new Date().toISOString(),
             subscriptionExpiryDate: addMonths(new Date(), 3).toISOString()
           });
@@ -349,6 +359,61 @@ export function AuthForm({ mode }: AuthFormProps) {
               </FormItem>
             )}
           />
+        )}
+
+        {mode === 'signup' && (
+          <div className="p-4 bg-muted/20 border-2 rounded-2xl space-y-4 animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center gap-2 border-b border-dashed pb-2">
+              <Bell className="size-4 text-primary" />
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-800">Mes Intérêts & Notifications</h3>
+            </div>
+            
+            <div className="space-y-3">
+              <p className="text-[9px] font-bold uppercase text-muted-foreground">Catégories d'offres souhaitées :</p>
+              <div className="grid grid-cols-1 gap-2">
+                {['Pêche', 'Chasse', 'Jardinage'].map(cat => (
+                  <div key={cat} className="flex items-center space-x-3">
+                    <Checkbox 
+                      id={`cat-${cat}`} 
+                      checked={form.watch('subscribedCategories').includes(cat)}
+                      onCheckedChange={(checked) => {
+                        const current = form.getValues('subscribedCategories');
+                        if (checked) form.setValue('subscribedCategories', [...current, cat]);
+                        else form.setValue('subscribedCategories', current.filter(c => c !== cat));
+                      }}
+                    />
+                    <label htmlFor={`cat-${cat}`} className="text-xs font-bold cursor-pointer">{cat}</label>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-2 space-y-3 border-t border-dashed">
+              <p className="text-[9px] font-bold uppercase text-muted-foreground">Canaux de réception :</p>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center space-x-3">
+                  <Checkbox 
+                    id="allow-email" 
+                    checked={form.watch('allowsPromoEmails')}
+                    onCheckedChange={(checked) => form.setValue('allowsPromoEmails', !!checked)}
+                  />
+                  <label htmlFor="allow-email" className="text-xs font-bold flex items-center gap-2 cursor-pointer">
+                    <Mail className="size-3 text-primary" /> E-mails de nouveautés
+                  </label>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <Checkbox 
+                    id="allow-push" 
+                    checked={form.watch('allowsPromoPush')}
+                    onCheckedChange={(checked) => form.setValue('allowsPromoPush', !!checked)}
+                  />
+                  <label htmlFor="allow-push" className="text-xs font-bold flex items-center gap-2 cursor-pointer">
+                    <Smartphone className="size-3 text-primary" /> Notifications sur mobile
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
         
         <FormField

@@ -120,13 +120,13 @@ export default function ProDashboard() {
 
         if (targetScope === 'ALL') {
           qTotal = query(usersRef);
-          qTarget = query(usersRef, where('favoriteCategory', '==', targetCategory));
+          qTarget = query(usersRef, where('subscribedCategories', 'array-contains', targetCategory));
         } else if (targetScope === 'CALEDONIE') {
           qTotal = query(usersRef, where('selectedRegion', '==', 'CALEDONIE'));
-          qTarget = query(usersRef, where('selectedRegion', '==', 'CALEDONIE'), where('favoriteCategory', '==', targetCategory));
+          qTarget = query(usersRef, where('selectedRegion', '==', 'CALEDONIE'), where('subscribedCategories', 'array-contains', targetCategory));
         } else if (targetScope === 'TAHITI') {
           qTotal = query(usersRef, where('selectedRegion', '==', 'TAHITI'));
-          qTarget = query(usersRef, where('selectedRegion', '==', 'TAHITI'), where('favoriteCategory', '==', targetCategory));
+          qTarget = query(usersRef, where('selectedRegion', '==', 'TAHITI'), where('subscribedCategories', 'array-contains', targetCategory));
         } else if (selectedTargetCommunes.length > 0) {
           // Firestore 'in' limitation: max 30 values.
           const communesToQuery = selectedTargetCommunes.slice(0, 30);
@@ -137,7 +137,7 @@ export default function ProDashboard() {
           qTarget = query(
             usersRef, 
             where('lastSelectedLocation', 'in', communesToQuery),
-            where('favoriteCategory', '==', targetCategory)
+            where('subscribedCategories', 'array-contains', targetCategory)
           );
         } else {
           setTotalCommuneUsers(0);

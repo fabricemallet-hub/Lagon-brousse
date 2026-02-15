@@ -47,6 +47,9 @@ export interface UserAccount {
   selectedRegion?: Region;
   lastSelectedLocation?: string;
   favoriteCategory?: 'Pêche' | 'Chasse' | 'Jardinage';
+  subscribedCategories?: string[];
+  allowsPromoEmails?: boolean;
+  allowsPromoPush?: boolean;
   notificationsEnabled?: boolean;
   mapIcon?: string;
   mapColor?: string;
@@ -65,6 +68,7 @@ export interface UserAccount {
   huntingNickname_v2?: string;
   mapIcon_v2?: string;
   mapColor_v2?: string;
+  fcmToken?: string;
 }
 
 export interface Business {
