@@ -36,18 +36,15 @@ export function initializeFirebase() {
   // L'erreur ca9 est causée par des conflits IndexedDB. Forcer memoryLocalCache() règle le problème.
   if (!global.__LBN_FIRESTORE__) {
     try {
-      // On tente d'abord de récupérer une instance existante pour cet app
-      global.__LBN_FIRESTORE__ = getFirestore(app);
+      // CRITICAL: We MUST try to initialize with memory cache BEFORE calling getFirestore()
+      // because getFirestore() triggers a default initialization that blocks subsequent 
+      // initializeFirestore() calls with different settings.
+      global.__LBN_FIRESTORE__ = initializeFirestore(app, {
+        localCache: memoryLocalCache(),
+      });
     } catch (e) {
-      // Si aucune instance, on l'initialise avec nos paramètres de sécurité
-      try {
-        global.__LBN_FIRESTORE__ = initializeFirestore(app, {
-          localCache: memoryLocalCache(),
-        });
-      } catch (err) {
-        // Fallback ultime
-        global.__LBN_FIRESTORE__ = getFirestore(app);
-      }
+      // Fallback: If already initialized (by another module or HMR), just get the existing instance.
+      global.__LBN_FIRESTORE__ = getFirestore(app);
     }
   }
   const firestore = global.__LBN_FIRESTORE__;
