@@ -41,6 +41,7 @@ import { navLinks } from '@/lib/nav-links';
 import { cn } from '@/lib/utils';
 import { useLocation } from '@/context/location-context';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 
 export default function ComptePage() {
   const { user, isUserLoading } = useUser();
