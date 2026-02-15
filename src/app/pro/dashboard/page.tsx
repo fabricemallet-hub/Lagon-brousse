@@ -24,6 +24,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { locations } from '@/lib/locations';
 
+type TargetScope = 'SPECIFIC' | 'CALEDONIE' | 'TAHITI' | 'ALL';
+
 export default function ProDashboard() {
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
@@ -73,8 +75,8 @@ export default function ProDashboard() {
   const [isCalculatingReach, setIsCalculatingReach] = useState(false);
   const [reachError, setReachError] = useState(false);
 
-  // --- CIBLAGE COMMUNES ---
-  const [targetAllCommunes, setTargetAllCommunes] = useState(false);
+  // --- CIBLAGE GEOGRAPHIQUE ---
+  const [targetScope, setTargetScope] = useState<TargetScope>('SPECIFIC');
   const [selectedTargetCommunes, setSelectedTargetCommunes] = useState<string[]>([]);
   const allCommuneNames = useMemo(() => Object.keys(locations).sort(), []);
 
@@ -116,9 +118,15 @@ export default function ProDashboard() {
         let qTotal;
         let qTarget;
 
-        if (targetAllCommunes) {
+        if (targetScope === 'ALL') {
           qTotal = query(usersRef);
           qTarget = query(usersRef, where('favoriteCategory', '==', targetCategory));
+        } else if (targetScope === 'CALEDONIE') {
+          qTotal = query(usersRef, where('selectedRegion', '==', 'CALEDONIE'));
+          qTarget = query(usersRef, where('selectedRegion', '==', 'CALEDONIE'), where('favoriteCategory', '==', targetCategory));
+        } else if (targetScope === 'TAHITI') {
+          qTotal = query(usersRef, where('selectedRegion', '==', 'TAHITI'));
+          qTarget = query(usersRef, where('selectedRegion', '==', 'TAHITI'), where('favoriteCategory', '==', targetCategory));
         } else if (selectedTargetCommunes.length > 0) {
           // Firestore 'in' limitation: max 30 values.
           const communesToQuery = selectedTargetCommunes.slice(0, 30);
@@ -154,7 +162,7 @@ export default function ProDashboard() {
       }
     };
     calculateReach();
-  }, [firestore, business, targetCategory, isUserLoading, user, targetAllCommunes, selectedTargetCommunes]);
+  }, [firestore, business, targetCategory, isUserLoading, user, targetScope, selectedTargetCommunes]);
 
   const handleCopyUid = () => {
     if (!user?.uid) return;
@@ -259,6 +267,13 @@ export default function ProDashboard() {
   const handleDiffuse = async () => {
     if (!firestore || !business || targetCount === null || !targetCategory) return;
     setIsSaving(true);
+    
+    let targetLabel = "";
+    if (targetScope === 'ALL') targetLabel = "TOUT LE RÉSEAU (NC & TAHITI)";
+    else if (targetScope === 'CALEDONIE') targetLabel = "TOUTE LA NOUVELLE-CALÉDONIE";
+    else if (targetScope === 'TAHITI') targetLabel = "TOUTE LA POLYNÉSIE (TAHITI)";
+    else targetLabel = selectedTargetCommunes.join(', ');
+
     try {
       const campaignData: Omit<Campaign, 'id'> = {
         ownerId: user!.uid,
@@ -266,7 +281,7 @@ export default function ProDashboard() {
         businessName: business.name,
         title: `${business.name} : ${promoTitle || 'Nouvelle offre !'}`,
         message: promoDescription || `Découvrez nos offres en ${targetCategory}.`,
-        targetCommune: targetAllCommunes ? "TOUTES" : selectedTargetCommunes.join(', '),
+        targetCommune: targetLabel,
         targetCategory: targetCategory,
         reach: targetCount,
         cost: targetCount * 10,
@@ -457,45 +472,51 @@ export default function ProDashboard() {
                             </div>
 
                             <div className="space-y-1">
-                                <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Zones de diffusion</Label>
-                                <div className="flex items-center gap-2 mb-2 p-2 bg-white rounded-lg border">
-                                    <Checkbox 
-                                        id="target-all" 
-                                        checked={targetAllCommunes} 
-                                        onCheckedChange={(v) => setTargetAllCommunes(!!v)}
-                                    />
-                                    <label htmlFor="target-all" className="text-[10px] font-black uppercase text-primary cursor-pointer">Toutes les communes (NC & Tahiti)</label>
-                                </div>
+                                <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Portée du ciblage</Label>
+                                <Select value={targetScope} onValueChange={(v: TargetScope) => setTargetScope(v)}>
+                                    <SelectTrigger className="h-10 border-2 bg-background font-black uppercase text-[10px]">
+                                        <Globe className="size-3 mr-2 text-primary" />
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="SPECIFIC" className="text-[10px] font-black uppercase">Communes spécifiques</SelectItem>
+                                        <SelectItem value="CALEDONIE" className="text-[10px] font-black uppercase">Toute la Nouvelle-Calédonie</SelectItem>
+                                        <SelectItem value="TAHITI" className="text-[10px] font-black uppercase">Toute la Polynésie (Tahiti)</SelectItem>
+                                        <SelectItem value="ALL" className="text-[10px] font-black uppercase">Tout le réseau (NC & Tahiti)</SelectItem>
+                                    </SelectContent>
+                                </Select>
 
-                                {!targetAllCommunes && (
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                            <Button variant="outline" className="w-full h-10 justify-between font-bold text-xs border-2 bg-white">
-                                                <span className="truncate">
-                                                    {selectedTargetCommunes.length === 0 ? "Aucune commune" : 
-                                                     selectedTargetCommunes.length === 1 ? selectedTargetCommunes[0] : 
-                                                     `${selectedTargetCommunes.length} communes sélectionnées`}
-                                                </span>
-                                                <ChevronDown className="size-4 opacity-50" />
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-[280px] p-0" align="start">
-                                            <ScrollArea className="h-72 p-4">
-                                                <div className="space-y-2">
-                                                    {allCommuneNames.map((name) => (
-                                                        <div key={name} className="flex items-center space-x-2">
-                                                            <Checkbox 
-                                                                id={`commune-${name}`} 
-                                                                checked={selectedTargetCommunes.includes(name)}
-                                                                onCheckedChange={() => toggleTargetCommune(name)}
-                                                            />
-                                                            <label htmlFor={`commune-${name}`} className="text-xs font-medium cursor-pointer">{name}</label>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </ScrollArea>
-                                        </PopoverContent>
-                                    </Popover>
+                                {targetScope === 'SPECIFIC' && (
+                                    <div className="mt-2 animate-in fade-in slide-in-from-top-1">
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <Button variant="outline" className="w-full h-10 justify-between font-bold text-xs border-2 bg-white">
+                                                    <span className="truncate">
+                                                        {selectedTargetCommunes.length === 0 ? "Aucune commune" : 
+                                                        selectedTargetCommunes.length === 1 ? selectedTargetCommunes[0] : 
+                                                        `${selectedTargetCommunes.length} communes sélectionnées`}
+                                                    </span>
+                                                    <ChevronDown className="size-4 opacity-50" />
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-[280px] p-0" align="start">
+                                                <ScrollArea className="h-72 p-4">
+                                                    <div className="space-y-2">
+                                                        {allCommuneNames.map((name) => (
+                                                            <div key={name} className="flex items-center space-x-2">
+                                                                <Checkbox 
+                                                                    id={`commune-${name}`} 
+                                                                    checked={selectedTargetCommunes.includes(name)}
+                                                                    onCheckedChange={() => toggleTargetCommune(name)}
+                                                                />
+                                                                <label htmlFor={`commune-${name}`} className="text-xs font-medium cursor-pointer">{name}</label>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </ScrollArea>
+                                            </PopoverContent>
+                                        </Popover>
+                                    </div>
                                 )}
                             </div>
 
@@ -510,11 +531,9 @@ export default function ProDashboard() {
                                             </p>
                                         </div>
                                     </div>
-                                    {targetAllCommunes ? (
-                                        <Badge variant="outline" className="text-[8px] font-black uppercase border-primary text-primary">Global</Badge>
-                                    ) : (
-                                        <Badge variant="secondary" className="text-[8px] font-black uppercase">{selectedTargetCommunes.length} Zones</Badge>
-                                    )}
+                                    <Badge variant="outline" className="text-[8px] font-black uppercase border-primary text-primary">
+                                        {targetScope === 'ALL' ? 'Global' : targetScope === 'CALEDONIE' ? 'NC' : targetScope === 'TAHITI' ? 'Tahiti' : 'Ciblé'}
+                                    </Badge>
                                 </div>
 
                                 <div className="flex items-center justify-between p-4 bg-white/50 rounded-xl shadow-sm border-2 border-dashed">
@@ -522,7 +541,7 @@ export default function ProDashboard() {
                                         <MapPin className="size-5 text-slate-400" />
                                         <div>
                                             <p className="text-[9px] font-black uppercase text-muted-foreground leading-none mb-1">
-                                                Utilisateurs Actifs {targetAllCommunes ? "sur le réseau" : `sur ${selectedTargetCommunes.length} zones`}
+                                                Utilisateurs Actifs {targetScope === 'ALL' ? "sur le réseau" : targetScope === 'CALEDONIE' ? "en Calédonie" : targetScope === 'TAHITI' ? "à Tahiti" : "sur les zones cibles"}
                                             </p>
                                             <p className="text-lg font-black leading-none">
                                                 {isCalculatingReach ? <RefreshCw className="size-3 animate-spin" /> : `${totalCommuneUsers ?? '0'}`}
@@ -543,7 +562,7 @@ export default function ProDashboard() {
 
                             <Button 
                                 onClick={handleDiffuse} 
-                                disabled={isSaving || !targetCount || reachError || (!targetAllCommunes && selectedTargetCommunes.length === 0)} 
+                                disabled={isSaving || !targetCount || reachError || (targetScope === 'SPECIFIC' && selectedTargetCommunes.length === 0)} 
                                 className="w-full h-14 bg-accent hover:bg-accent/90 text-white font-black uppercase tracking-widest shadow-lg gap-2"
                             >
                                 <Megaphone className="size-5" /> Lancer la campagne
