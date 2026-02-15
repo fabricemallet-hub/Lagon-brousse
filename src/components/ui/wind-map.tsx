@@ -1,8 +1,10 @@
+
 'use client';
 
 import { ArrowUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { WindDirection } from '@/lib/types';
+import { useLocation } from '@/context/location-context';
 
 const directionToRotation: Record<WindDirection, number> = {
   N: 0,
@@ -38,6 +40,22 @@ const NewCaledoniaMap = () => (
     </svg>
 );
 
+const TahitiMap = () => (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 200 200"
+      className="w-full h-full"
+      fill="currentColor"
+    >
+        {/* Tahiti Nui (Le gros rond) */}
+        <path d="M110,100 c0,25-20,45-45,45 s-45-20-45-45 s20-45,45-45 s45,20,45,45 Z" />
+        {/* Tahiti Iti (La petite presqu'île) */}
+        <path d="M110,100 c20,0,40,15,40,35 s-15,35-35,35 s-35-15-35-35 Z" />
+        {/* Moorea (À gauche) */}
+        <path d="M30,85 L55,105 L25,115 Z" />
+    </svg>
+);
+
 
 export const WindMap = ({
   direction,
@@ -46,11 +64,13 @@ export const WindMap = ({
   direction: WindDirection;
   className?: string;
 }) => {
+  const { selectedRegion } = useLocation();
   const rotation = directionToRotation[direction] || 0;
+  
   return (
     <div className={cn('relative w-24 h-48', className)}>
       <div className="absolute inset-0 text-muted-foreground/30">
-        <NewCaledoniaMap />
+        {selectedRegion === 'TAHITI' ? <TahitiMap /> : <NewCaledoniaMap />}
       </div>
       <div className="absolute inset-0 flex items-center justify-center">
         <ArrowUp
