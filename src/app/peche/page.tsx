@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -127,9 +128,14 @@ export default function PechePage() {
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <h4 className="font-black uppercase text-xs tracking-tight">Langouste</h4>
+                  <div className="flex gap-1">
                     <Badge variant={crabAndLobster.lobsterActivity === 'Élevée' ? 'default' : 'secondary'} className="text-[9px] font-black h-5 uppercase">
-                    {crabAndLobster.lobsterActivity}
-                  </Badge>
+                      {crabAndLobster.lobsterActivity}
+                    </Badge>
+                    <Badge variant="outline" className="text-[9px] font-black h-5 uppercase border-primary/30 text-primary">
+                      {crabAndLobster.lobsterActivity === 'Élevée' ? 'Intérieur' : 'Extérieur'}
+                    </Badge>
+                  </div>
                 </div>
                 <p className="text-[11px] font-medium text-muted-foreground leading-relaxed">{crabAndLobster.lobsterMessage}</p>
               </div>

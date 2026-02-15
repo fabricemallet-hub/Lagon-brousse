@@ -329,12 +329,18 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   if (isQuarterMoon) {
     locationData.crabAndLobster.crabStatus = 'Mout';
     locationData.crabAndLobster.crabMessage = "Mortes-eaux (Quartier) : Période de mue des crabes (mouts).";
+    locationData.crabAndLobster.lobsterActivity = 'Faible';
+    locationData.crabAndLobster.lobsterMessage = "Les langouste sont calées dans les trous du récif extérieur (en dehors).";
   } else if (isFullOrNew) {
     locationData.crabAndLobster.crabStatus = 'Plein';
     locationData.crabAndLobster.crabMessage = "Vives-eaux : Les crabes sont actifs et bien pleins.";
+    locationData.crabAndLobster.lobsterActivity = 'Élevée';
+    locationData.crabAndLobster.lobsterMessage = "Vives-eaux : Elles montent sur le platier (intérieur) la nuit. Idéal au phare.";
   } else {
     locationData.crabAndLobster.crabStatus = 'Vide';
     locationData.crabAndLobster.crabMessage = "Phase de remplissage après la mue.";
+    locationData.crabAndLobster.lobsterActivity = 'Moyenne';
+    locationData.crabAndLobster.lobsterMessage = "Activité régulière en bordure de récif.";
   }
 
   locationData.weather.wind.forEach((forecast: WindForecast, index: number) => {
