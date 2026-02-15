@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, ImageIcon, X, Info, Pencil, Save, AlertCircle, LogOut, HelpCircle, Copy, Check, UserCircle, ShieldCheck, BrainCircuit } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, ImageIcon, X, Info, Pencil, Save, AlertCircle, LogOut, HelpCircle, Copy, Check, UserCircle, ShieldCheck, BrainCircuit, MapPin } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -64,6 +64,7 @@ export default function ProDashboard() {
   // --- REACH CALCULATION ---
   const [targetCategory, setTargetCategory] = useState<string>('');
   const [targetCount, setTargetCount] = useState<number | null>(null);
+  const [totalCommuneUsers, setTotalCommuneUsers] = useState<number | null>(null);
   const [isCalculatingReach, setIsCalculatingReach] = useState(false);
   const [reachError, setReachError] = useState(false);
 
@@ -89,24 +90,37 @@ export default function ProDashboard() {
   }, [business, targetCategory, promoCategory]);
 
   useEffect(() => {
-    if (!firestore || !business || !targetCategory || isUserLoading || !user) return;
+    if (!firestore || !business || isUserLoading || !user) return;
     
     const calculateReach = async () => {
       setIsCalculatingReach(true);
       setReachError(false);
       try {
         const usersRef = collection(firestore, 'users');
-        const q = query(
+        
+        // 1. Total users in commune
+        const qCommune = query(
           usersRef, 
-          where('lastSelectedLocation', '==', business.commune),
-          where('favoriteCategory', '==', targetCategory)
+          where('lastSelectedLocation', '==', business.commune)
         );
-        const snap = await getCountFromServer(q);
-        setTargetCount(snap.data().count);
+        const snapCommune = await getCountFromServer(qCommune);
+        setTotalCommuneUsers(snapCommune.data().count);
+
+        // 2. Targeted reach by category
+        if (targetCategory) {
+          const qTarget = query(
+            usersRef, 
+            where('lastSelectedLocation', '==', business.commune),
+            where('favoriteCategory', '==', targetCategory)
+          );
+          const snapTarget = await getCountFromServer(qTarget);
+          setTargetCount(snapTarget.data().count);
+        }
       } catch (e: any) {
         console.warn("Reach calculation restricted", e);
         setReachError(true);
         setTargetCount(0);
+        setTotalCommuneUsers(0);
       } finally {
         setIsCalculatingReach(false);
       }
@@ -408,17 +422,31 @@ export default function ProDashboard() {
                                 </Select>
                             </div>
 
-                            <div className="flex items-center justify-between p-4 bg-background rounded-xl shadow-sm border-2">
-                                <div className="flex items-center gap-3">
-                                    <Users className="size-5 text-primary" />
-                                    <div>
-                                        <p className="text-[9px] font-black uppercase text-muted-foreground leading-none mb-1">Audience Potentielle</p>
-                                        <p className="text-xl font-black leading-none">
-                                            {isCalculatingReach ? <RefreshCw className="size-4 animate-spin text-primary" /> : `${targetCount ?? '0'}`}
-                                        </p>
+                            <div className="flex flex-col gap-3">
+                                <div className="flex items-center justify-between p-4 bg-background rounded-xl shadow-sm border-2">
+                                    <div className="flex items-center gap-3">
+                                        <Users className="size-5 text-primary" />
+                                        <div>
+                                            <p className="text-[9px] font-black uppercase text-muted-foreground leading-none mb-1">Audience Potentielle ({targetCategory})</p>
+                                            <p className="text-xl font-black leading-none">
+                                                {isCalculatingReach ? <RefreshCw className="size-4 animate-spin text-primary" /> : `${targetCount ?? '0'}`}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <Badge variant="secondary" className="text-[8px] font-black uppercase">{business.commune}</Badge>
+                                </div>
+
+                                <div className="flex items-center justify-between p-4 bg-white/50 rounded-xl shadow-sm border-2 border-dashed">
+                                    <div className="flex items-center gap-3">
+                                        <MapPin className="size-5 text-slate-400" />
+                                        <div>
+                                            <p className="text-[9px] font-black uppercase text-muted-foreground leading-none mb-1">Utilisateurs Actifs sur {business.commune}</p>
+                                            <p className="text-lg font-black leading-none">
+                                                {isCalculatingReach ? <RefreshCw className="size-3 animate-spin" /> : `${totalCommuneUsers ?? '0'}`}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
-                                <Badge variant="secondary" className="text-[8px] font-black uppercase">{business.commune}</Badge>
                             </div>
                             
                             {reachError && (
