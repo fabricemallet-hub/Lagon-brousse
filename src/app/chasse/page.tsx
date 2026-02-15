@@ -204,7 +204,7 @@ export default function ChassePage() {
         </TabsContent>
 
         <TabsContent value="group" className="animate-in fade-in duration-300">
-          <HuntingSessionCard />
+          <HuntingSessionCard sessionType="chasse" />
         </TabsContent>
       </Tabs>
     </div>

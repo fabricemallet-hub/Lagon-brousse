@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -99,7 +100,12 @@ service cloud.firestore {
     match /shared_access_tokens/{id} { allow read, write: if isAdmin(); }
     
     // Fonctionnalités Terroir
-    match /hunting_sessions/{id} { allow read, write: if isSignedIn(); }
+    match /hunting_sessions/{id} { 
+      allow read, write: if isSignedIn(); 
+      match /participants/{participantId} {
+        allow read, write: if isSignedIn();
+      }
+    }
     match /vessels/{id} { allow read, write: if isSignedIn(); }
     match /spot_shares/{id} { allow read, write: if isSignedIn(); }
     match /campaigns/{campaignId} { allow read, write: if isProfessional() || isAdmin(); }

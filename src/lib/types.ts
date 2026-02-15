@@ -475,6 +475,7 @@ export interface SessionParticipant {
 export interface HuntingSession {
   id: string;
   organizerId: string;
+  sessionType?: 'chasse' | 'peche';
   createdAt: any;
   expiresAt: any;
 }

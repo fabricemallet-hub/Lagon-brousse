@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
@@ -53,7 +54,9 @@ import {
   Volume2,
   Play,
   X,
-  RefreshCw
+  RefreshCw,
+  Anchor,
+  Fish
 } from 'lucide-react';
 import {
   useUser,
@@ -96,7 +99,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const INITIAL_CENTER = { lat: -21.45, lng: 165.5 };
-const iconMap = { Navigation, UserIcon, Crosshair, Footprints, Mountain, MapPin };
+const iconMap = { Navigation, UserIcon, Crosshair, Footprints, Mountain, MapPin, Anchor, Fish };
 
 const BatteryIcon = React.memo(({ level, charging }: { level: number; charging: boolean }) => {
   const props = { className: 'w-4 h-4 inline-block' };
@@ -115,7 +118,11 @@ const PulsingDot = React.memo(() => (
 ));
 PulsingDot.displayName = 'PulsingDot';
 
-function HuntingSessionContent() {
+interface HuntingSessionProps {
+  sessionType?: 'chasse' | 'peche';
+}
+
+function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) {
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -133,8 +140,8 @@ function HuntingSessionContent() {
   const shouldPanOnNextFix = useRef(false);
 
   const [nickname, setNickname] = useState('');
-  const [selectedIcon, setSelectedIcon] = useState('Navigation');
-  const [selectedColor, setSelectedColor] = useState('#3b82f6');
+  const [selectedIcon, setSelectedIcon] = useState(sessionType === 'chasse' ? 'Navigation' : 'Anchor');
+  const [selectedColor, setSelectedColor] = useState(sessionType === 'chasse' ? '#f97316' : '#3b82f6');
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const [soundVolume, setSoundVolume] = useState(0.8);
   const [soundSettings, setSoundSettings] = useState({
@@ -153,6 +160,31 @@ function HuntingSessionContent() {
   const prevParticipantsRef = useRef<SessionParticipant[] | null>(null);
   const hasLoadedInitialPrefs = useRef(false);
 
+  const labels = useMemo(() => {
+    if (sessionType === 'peche') {
+      return {
+        title: "Session de Pêche",
+        status1: "Au Mouillage",
+        status2: "En Dérive",
+        alertBtn: "SIGNALER POISSON",
+        alertTitle: "POISSON SIGNALÉ !",
+        alertDesc: "Poisson repéré !",
+        icon1: Anchor,
+        icon2: RefreshCw
+      };
+    }
+    return {
+      title: "Session de Chasse",
+      status1: "En Position",
+      status2: "En Battue",
+      alertBtn: "SIGNALER GIBIER",
+      alertTitle: "GIBIER SIGNALÉ !",
+      alertDesc: "Gibier en vue !",
+      icon1: MapPin,
+      icon2: Footprints
+    };
+  }, [sessionType]);
+
   const soundsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
@@ -166,24 +198,11 @@ function HuntingSessionContent() {
     ).map(s => ({ id: s.id, label: s.label, url: s.url }));
   }, [dbSounds]);
 
-  const userDocRef = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return doc(firestore, 'users', user.uid);
-  }, [user, firestore]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
-
-  const participantsCollectionRef = useMemoFirebase(() => {
-    if (!firestore || !session || !isParticipating) return null;
-    return collection(firestore, 'hunting_sessions', session.id, 'participants');
-  }, [firestore, session, isParticipating]);
-
-  const { data: participants } = useCollection<SessionParticipant>(participantsCollectionRef);
-
   const playStatusSound = useCallback((status: string) => {
     if (!isSoundEnabled) return;
     let sId = '';
-    if (status === 'En position') sId = soundSettings.position;
-    else if (status === 'Battue en cours') sId = soundSettings.battue;
+    if (status === labels.status1) sId = soundSettings.position;
+    else if (status === labels.status2) sId = soundSettings.battue;
     else if (status === 'gibier') sId = soundSettings.gibier;
 
     const sound = availableSounds.find(s => s.id === sId || s.label === sId);
@@ -192,7 +211,7 @@ function HuntingSessionContent() {
         audio.volume = soundVolume;
         audio.play().catch(() => {});
     }
-  }, [isSoundEnabled, soundSettings, soundVolume, availableSounds]);
+  }, [isSoundEnabled, soundSettings, soundVolume, availableSounds, labels]);
 
   useEffect(() => {
     if (!participants || !user) return;
@@ -205,14 +224,14 @@ function HuntingSessionContent() {
       const prev = prevParticipantsRef.current?.find(old => old.id === p.id);
       if (p.isGibierEnVue && !prev?.isGibierEnVue) {
         playStatusSound('gibier');
-        toast({ title: "GIBIER SIGNALÉ !", description: `Par ${p.displayName}`, variant: "destructive" });
+        toast({ title: labels.alertTitle, description: `Par ${p.displayName}`, variant: "destructive" });
       }
       if (p.baseStatus !== prev?.baseStatus && p.baseStatus) {
         playStatusSound(p.baseStatus);
       }
     });
     prevParticipantsRef.current = participants;
-  }, [participants, user, playStatusSound, toast]);
+  }, [participants, user, playStatusSound, toast, labels]);
 
   const fetchMySessions = useCallback(async () => {
     if (!firestore || !user?.uid) return;
@@ -222,7 +241,7 @@ function HuntingSessionContent() {
       const querySnapshot = await getDocs(q);
       const sessions = querySnapshot.docs
         .map(doc => ({ ...doc.data(), id: doc.id } as WithId<HuntingSession>))
-        .filter(s => s.organizerId === user.uid);
+        .filter(s => s.organizerId === user.uid && (s.sessionType || 'chasse') === sessionType);
       sessions.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
       setMySessions(sessions.slice(0, 5));
     } catch (e) {
@@ -230,15 +249,15 @@ function HuntingSessionContent() {
     } finally {
       setAreMySessionsLoading(false);
     }
-  }, [firestore, user?.uid]);
+  }, [firestore, user?.uid, sessionType]);
 
   useEffect(() => { fetchMySessions(); }, [fetchMySessions]);
   
   useEffect(() => {
     if (userProfile && !hasLoadedInitialPrefs.current) {
       setNickname(userProfile.huntingNickname || userProfile.displayName || user?.displayName || user?.email?.split('@')[0] || '');
-      setSelectedIcon(userProfile.mapIcon || 'Navigation');
-      setSelectedColor(userProfile.mapColor || '#3b82f6');
+      setSelectedIcon(userProfile.mapIcon || (sessionType === 'chasse' ? 'Navigation' : 'Anchor'));
+      setSelectedColor(userProfile.mapColor || (sessionType === 'chasse' ? '#f97316' : '#3b82f6'));
       
       const savedVesselPrefs = userProfile.vesselPrefs;
       if (savedVesselPrefs?.huntingSoundSettings) {
@@ -248,7 +267,7 @@ function HuntingSessionContent() {
       }
       hasLoadedInitialPrefs.current = true;
     }
-  }, [userProfile, user]);
+  }, [userProfile, user, sessionType]);
   
   const { isLoaded, loadError } = useGoogleMaps();
 
@@ -323,10 +342,10 @@ function HuntingSessionContent() {
     if (!user || !firestore) return;
     setIsSessionLoading(true);
     try {
-        const code = createCode.trim() ? createCode.trim().toUpperCase() : `CH-${Math.floor(1000 + Math.random() * 9000)}`;
+        const code = createCode.trim() ? createCode.trim().toUpperCase() : `${sessionType === 'chasse' ? 'CH' : 'PE'}-${Math.floor(1000 + Math.random() * 9000)}`;
         const expiresAt = new Date();
         expiresAt.setHours(expiresAt.getHours() + 24);
-        const data = { organizerId: user.uid, createdAt: serverTimestamp(), expiresAt: Timestamp.fromDate(expiresAt) };
+        const data = { organizerId: user.uid, sessionType, createdAt: serverTimestamp(), expiresAt: Timestamp.fromDate(expiresAt) };
         await setDoc(doc(firestore, 'hunting_sessions', code), data);
         await setDoc(doc(firestore, 'hunting_sessions', code, 'participants', user.uid), { 
             id: user.uid, displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor, baseStatus: '', isGibierEnVue: false, updatedAt: serverTimestamp() 
@@ -407,7 +426,7 @@ function HuntingSessionContent() {
     const newVal = !me?.isGibierEnVue;
     await updateDoc(ref, { isGibierEnVue: newVal });
     if (newVal) playStatusSound('gibier');
-    toast({ title: newVal ? "Gibier signalé !" : "Alerte levée", variant: newVal ? "destructive" : "default" });
+    toast({ title: newVal ? labels.alertDesc : "Alerte levée", variant: newVal ? "destructive" : "default" });
   };
 
   const handleSavePreferences = async () => {
@@ -473,9 +492,9 @@ function HuntingSessionContent() {
                                         "px-2 py-1 rounded text-[11px] font-black text-white shadow-lg border transition-all whitespace-nowrap", 
                                         p.isGibierEnVue 
                                             ? "bg-red-600 animate-bounce border-red-400" 
-                                            : p.baseStatus === 'En position' 
+                                            : p.baseStatus === labels.status1 
                                                 ? "bg-blue-600 border-blue-400" 
-                                                : p.baseStatus === 'Battue en cours' 
+                                                : p.baseStatus === labels.status2 
                                                     ? "bg-indigo-600 border-indigo-400" 
                                                     : "bg-slate-900/80 backdrop-blur-md border-white/20"
                                     )}>
@@ -489,9 +508,9 @@ function HuntingSessionContent() {
                                         style={{ 
                                             backgroundColor: p.isGibierEnVue 
                                                 ? '#ef4444' 
-                                                : p.baseStatus === 'En position' 
+                                                : p.baseStatus === labels.status1 
                                                     ? '#2563eb' 
-                                                    : p.baseStatus === 'Battue en cours' 
+                                                    : p.baseStatus === labels.status2 
                                                         ? '#4f46e5' 
                                                         : (p.mapColor || '#3b82f6') 
                                         }}
@@ -510,7 +529,7 @@ function HuntingSessionContent() {
                             isGpsActive ? "bg-primary text-white border-primary" : "bg-background/80 backdrop-blur-sm"
                         )}
                     >
-                        <span className="text-[9px] font-black uppercase tracking-tighter">ACTIVER MON GPS + RECENTRER</span>
+                        <span className="text-[9px] font-black uppercase tracking-tighter">GPS + RECENTRER</span>
                         <LocateFixed className="size-5" />
                     </Button>
                 </div>
@@ -527,9 +546,9 @@ function HuntingSessionContent() {
                 )}
 
                 <div className="grid grid-cols-2 gap-2">
-                    <Button variant={me?.baseStatus === 'En position' ? 'default' : 'outline'} className="h-12 font-bold" onClick={() => updateTacticalStatus('En position')}><MapPin className="mr-2 size-4" /> En Position</Button>
-                    <Button variant={me?.baseStatus === 'Battue en cours' ? 'default' : 'outline'} className="h-12 font-bold" onClick={() => updateTacticalStatus('Battue en cours')}><Footprints className="mr-2 size-4" /> En Battue</Button>
-                    <Button variant={me?.isGibierEnVue ? 'destructive' : 'secondary'} className={cn("col-span-2 h-14 text-lg font-black shadow-lg", me?.isGibierEnVue && "animate-pulse")} onClick={toggleGibierEnVue}><Target className="mr-2 size-6" /> {me?.isGibierEnVue ? 'GIBIER SIGNALÉ !' : 'SIGNALER GIBIER'}</Button>
+                    <Button variant={me?.baseStatus === labels.status1 ? 'default' : 'outline'} className="h-12 font-bold" onClick={() => updateTacticalStatus(labels.status1)}><labels.icon1 className="mr-2 size-4" /> {labels.status1}</Button>
+                    <Button variant={me?.baseStatus === labels.status2 ? 'default' : 'outline'} className="h-12 font-bold" onClick={() => updateTacticalStatus(labels.status2)}><labels.icon2 className="mr-2 size-4" /> {labels.status2}</Button>
+                    <Button variant={me?.isGibierEnVue ? 'destructive' : 'secondary'} className={cn("col-span-2 h-14 text-lg font-black shadow-lg", me?.isGibierEnVue && "animate-pulse")} onClick={toggleGibierEnVue}><Target className="mr-2 size-6" /> {me?.isGibierEnVue ? labels.alertTitle : labels.alertBtn}</Button>
                 </div>
 
                 {!isFullscreen && (
@@ -540,8 +559,8 @@ function HuntingSessionContent() {
                                 <AccordionContent className="space-y-4 pt-2 px-1">
                                     <div className="space-y-4 rounded-lg border p-4 bg-muted/30">
                                         <div className="space-y-1.5">
-                                          <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Mon Surnom Chasse</Label>
-                                          <Input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="Surnom Chasse..." />
+                                          <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Mon Surnom</Label>
+                                          <Input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="Surnom..." />
                                         </div>
                                         
                                         <Button variant={wakeLock ? "secondary" : "outline"} size="sm" className="w-full h-11 border-2" onClick={toggleWakeLock}><Zap className="size-4 mr-2" />{wakeLock ? "ÉVEIL ACTIF" : "MAINTENIR ÉCRAN"}</Button>
@@ -569,9 +588,9 @@ function HuntingSessionContent() {
 
                                             <div className="grid gap-3">
                                               {[
-                                                { key: 'position', label: 'En position' },
-                                                { key: 'battue', label: 'Battue' },
-                                                { key: 'gibier', label: 'Gibier' }
+                                                { key: 'position', label: labels.status1 },
+                                                { key: 'battue', label: labels.status2 },
+                                                { key: 'gibier', label: 'Gibier / Poisson' }
                                               ].map(item => (
                                                 <div key={item.key} className="flex items-center justify-between gap-4">
                                                   <span className="text-[10px] font-bold uppercase flex-1">{item.label}</span>
@@ -627,7 +646,7 @@ function HuntingSessionContent() {
                                                     "text-[9px] font-black uppercase ml-4.5 mt-0.5 px-1.5 rounded w-fit leading-tight",
                                                     p.isGibierEnVue ? "text-red-600 bg-red-100" : "text-primary bg-primary/5"
                                                 )}>
-                                                    {p.isGibierEnVue ? 'GIBIER EN VUE !' : p.baseStatus}
+                                                    {p.isGibierEnVue ? (sessionType === 'chasse' ? 'GIBIER EN VUE !' : 'POISSON SIGNALÉ !') : p.baseStatus}
                                                 </span>
                                             )}
                                         </div>
@@ -654,10 +673,10 @@ function HuntingSessionContent() {
 
   return (
     <div className="space-y-6">
-        <Card><CardHeader><CardTitle className="flex items-center gap-2"><Users className="size-5 text-primary" /> Session de Chasse</CardTitle></CardHeader>
+        <Card><CardHeader><CardTitle className="flex items-center gap-2"><Users className="size-5 text-primary" /> {labels.title}</CardTitle></CardHeader>
             <CardContent>
                 <Tabs defaultValue="join"><TabsList className="grid w-full grid-cols-2"><TabsTrigger value="join">Rejoindre</TabsTrigger><TabsTrigger value="create">Créer</TabsTrigger></TabsList>
-                    <TabsContent value="join" className="space-y-4 pt-4"><Input placeholder="Code CH-XXXX" value={joinCode} onChange={e => setJoinCode(e.target.value)} className="text-center font-mono text-lg uppercase h-12" /><Button onClick={handleJoinSession} className="w-full h-12 text-lg font-bold" disabled={isSessionLoading}>Rejoindre le groupe</Button></TabsContent>
+                    <TabsContent value="join" className="space-y-4 pt-4"><Input placeholder="Code EX: CH-XXXX" value={joinCode} onChange={e => setJoinCode(e.target.value)} className="text-center font-mono text-lg uppercase h-12" /><Button onClick={handleJoinSession} className="w-full h-12 text-lg font-bold" disabled={isSessionLoading}>Rejoindre le groupe</Button></TabsContent>
                     <TabsContent value="create" className="space-y-4 pt-4"><Input placeholder="Code perso (optionnel)" value={createCode} onChange={e => setCreateCode(e.target.value)} className="text-center font-mono text-lg uppercase h-12" /><Button onClick={handleCreateSession} className="w-full h-12 text-lg font-bold" disabled={isSessionLoading}>Créer une session</Button></TabsContent>
                 </Tabs>
             </CardContent>
@@ -669,9 +688,9 @@ function HuntingSessionContent() {
   );
 }
 
-export function HuntingSessionCard() {
+export function HuntingSessionCard({ sessionType = 'chasse' }: HuntingSessionProps) {
   const { user, isUserLoading } = useUser();
   if (isUserLoading) return <Skeleton className="h-48 w-full" />;
   if (!user) return <Card><CardHeader><CardTitle className="flex items-center gap-2"><AlertCircle className="text-destructive" /> Connexion requise</CardTitle></CardHeader><CardContent><Button asChild className="w-full"><Link href="/login">Se connecter</Link></Button></CardContent></Card>;
-  return <HuntingSessionContent />;
+  return <HuntingSessionContent sessionType={sessionType} />;
 }
