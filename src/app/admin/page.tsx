@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, doc, setDoc, addDoc, deleteDoc, serverTimestamp, Timestamp, updateDoc, writeBatch } from 'firebase/firestore';
 import type { UserAccount, Business, Conversation, AccessToken, SharedAccessToken, SplashScreenSettings, CgvSettings, RibSettings, SystemNotification, FishSpeciesInfo, SoundLibraryEntry } from '@/lib/types';
@@ -44,7 +44,9 @@ import {
   Copy,
   Mail,
   Volume2,
-  Play
+  Play,
+  Camera,
+  ImageIcon
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -95,7 +97,6 @@ export default function AdminPage() {
 
   return (
     <div className="w-full space-y-4 pb-32 px-1">
-      {/* HEADER COMPACT MOBILE */}
       <Card className="border-none shadow-lg bg-slate-900 text-white overflow-hidden relative rounded-2xl">
         <div className="absolute right-0 top-0 opacity-10 -translate-y-2 translate-x-2">
             <ShieldCheck className="size-20" />
@@ -107,7 +108,6 @@ export default function AdminPage() {
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        {/* TAB LIST SCROLLABLE HORIZONTALE */}
         <div className="sticky top-[64px] z-30 bg-background/95 backdrop-blur-md -mx-1 px-2 py-3 border-b-2 border-primary/10 mb-4 overflow-x-auto scrollbar-hide">
           <TabsList className="flex w-max bg-transparent p-0 gap-2 h-auto justify-start">
             {[
@@ -379,6 +379,7 @@ function FishGuideManager() {
     const [isSaving, setIsSaving] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [editingFish, setEditingFish] = useState<FishSpeciesInfo | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const [name, setName] = useState('');
     const [scientificName, setScientificName] = useState('');
@@ -388,18 +389,45 @@ function FishGuideManager() {
     const [gratteRiskLarge, setGratteRiskLarge] = useState('0');
     const [fishingAdvice, setFishingAdvice] = useState('');
     const [culinaryAdvice, setCulinaryAdvice] = useState('');
+    const [imageUrl, setImageUrl] = useState('');
 
     const fishRef = useMemoFirebase(() => firestore ? query(collection(firestore, 'fish_species'), orderBy('name', 'asc')) : null, [firestore]);
     const { data: species, isLoading } = useCollection<FishSpeciesInfo>(fishRef);
 
     const filtered = species?.filter(f => f.name.toLowerCase().includes(search.toLowerCase())) || [];
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            setImageUrl(event.target?.result as string);
+            toast({ title: "Photo chargée" });
+        };
+        reader.readAsDataURL(file);
+    };
+
     const handleSave = () => {
         if (!firestore || !name) return;
         setIsSaving(true);
-        const data = { name, scientificName, category, gratteRiskSmall: parseInt(gratteRiskSmall), gratteRiskMedium: parseInt(gratteRiskMedium), gratteRiskLarge: parseInt(gratteRiskLarge), fishingAdvice, culinaryAdvice, updatedAt: serverTimestamp() };
+        const data = { 
+            name, 
+            scientificName, 
+            category, 
+            gratteRiskSmall: parseInt(gratteRiskSmall), 
+            gratteRiskMedium: parseInt(gratteRiskMedium), 
+            gratteRiskLarge: parseInt(gratteRiskLarge), 
+            fishingAdvice, 
+            culinaryAdvice, 
+            imageUrl,
+            updatedAt: serverTimestamp() 
+        };
         const docRef = editingFish ? doc(firestore, 'fish_species', editingFish.id) : doc(collection(firestore, 'fish_species'));
-        setDoc(docRef, data, { merge: true }).then(() => { toast({ title: "Fiche sauvée" }); setIsDialogOpen(false); setIsSaving(false); }).catch(() => setIsSaving(false));
+        setDoc(docRef, data, { merge: true }).then(() => { 
+            toast({ title: "Fiche sauvée" }); 
+            setIsDialogOpen(false); 
+            setIsSaving(false); 
+        }).catch(() => setIsSaving(false));
     };
 
     return (
@@ -413,7 +441,19 @@ function FishGuideManager() {
                         </div>
                     </div>
                     <div className="relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" /><Input placeholder="Chercher un poisson..." value={search} onChange={e => setSearch(e.target.value)} className="pl-12 h-14 border-2 font-bold text-base" /></div>
-                    <Button onClick={() => { setEditingFish(null); setName(''); setScientificName(''); setIsDialogOpen(true); }} className="w-full h-14 font-black uppercase tracking-widest shadow-md"><Plus className="size-5 mr-2" /> Nouvelle espèce</Button>
+                    <Button onClick={() => { 
+                        setEditingFish(null); 
+                        setName(''); 
+                        setScientificName(''); 
+                        setImageUrl('');
+                        setCategory('Lagon');
+                        setGratteRiskSmall('0');
+                        setGratteRiskMedium('0');
+                        setGratteRiskLarge('0');
+                        setFishingAdvice('');
+                        setCulinaryAdvice('');
+                        setIsDialogOpen(true); 
+                    }} className="w-full h-14 font-black uppercase tracking-widest shadow-md"><Plus className="size-5 mr-2" /> Nouvelle espèce</Button>
                 </div>
             </CardHeader>
             <CardContent className="p-3 space-y-3">
@@ -438,7 +478,19 @@ function FishGuideManager() {
                                 </div>
                             </div>
                             <div className="flex gap-2 border-t pt-3">
-                                <Button variant="outline" className="flex-1 h-12 font-black uppercase text-[10px] border-2" onClick={() => { setEditingFish(f); setName(f.name); setScientificName(f.scientificName); setCategory(f.category); setGratteRiskSmall(f.gratteRiskSmall?.toString() || '0'); setGratteRiskMedium(f.gratteRiskMedium?.toString() || '0'); setGratteRiskLarge(f.gratteRiskLarge?.toString() || '0'); setFishingAdvice(f.fishingAdvice || ''); setCulinaryAdvice(f.culinaryAdvice || ''); setIsDialogOpen(true); }}><Pencil className="size-4 mr-2" /> Modifier</Button>
+                                <Button variant="outline" className="flex-1 h-12 font-black uppercase text-[10px] border-2" onClick={() => { 
+                                    setEditingFish(f); 
+                                    setName(f.name); 
+                                    setScientificName(f.scientificName); 
+                                    setCategory(f.category); 
+                                    setGratteRiskSmall(f.gratteRiskSmall?.toString() || '0'); 
+                                    setGratteRiskMedium(f.gratteRiskMedium?.toString() || '0'); 
+                                    setGratteRiskLarge(f.gratteRiskLarge?.toString() || '0'); 
+                                    setFishingAdvice(f.fishingAdvice || ''); 
+                                    setCulinaryAdvice(f.culinaryAdvice || ''); 
+                                    setImageUrl(f.imageUrl || '');
+                                    setIsDialogOpen(true); 
+                                }}><Pencil className="size-4 mr-2" /> Modifier</Button>
                                 <Button variant="ghost" className="h-12 px-4 text-destructive border-2 border-destructive/10" onClick={() => deleteDoc(doc(firestore!, 'fish_species', f.id))}><Trash2 className="size-4" /></Button>
                             </div>
                         </div>
@@ -452,6 +504,31 @@ function FishGuideManager() {
                     <div className="p-6 space-y-6">
                         <div className="space-y-4">
                             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">Nom Local</Label><Input value={name} onChange={e => setName(e.target.value)} className="h-14 border-2 font-black text-lg" /></div>
+                            
+                            <div className="flex flex-col gap-3 p-4 bg-muted/10 rounded-2xl border-2 border-dashed">
+                                <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Photo de l'espèce</Label>
+                                <div className="flex items-center gap-4">
+                                    <div className="size-24 rounded-xl bg-white border-2 flex items-center justify-center overflow-hidden shrink-0">
+                                        {imageUrl ? (
+                                            <img src={imageUrl} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <ImageIcon className="size-8 opacity-20" />
+                                        )}
+                                    </div>
+                                    <div className="flex-1 space-y-2">
+                                        <Button variant="outline" className="w-full h-12 border-2 font-black uppercase text-[10px] gap-2" onClick={() => fileInputRef.current?.click()}>
+                                            <Camera className="size-4" /> Charger photo
+                                        </Button>
+                                        <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
+                                        {imageUrl && (
+                                            <Button variant="ghost" className="w-full h-8 text-[9px] font-black uppercase text-destructive" onClick={() => setImageUrl('')}>
+                                                <X className="size-3 mr-1" /> Supprimer
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
                             <Button onClick={async () => { setIsGenerating(true); try { const info = await generateFishInfo({ name, scientificName }); setScientificName(info.scientificName); setCategory(info.category); setGratteRiskSmall(info.gratteRiskSmall.toString()); setGratteRiskMedium(info.gratteRiskMedium.toString()); setGratteRiskLarge(info.gratteRiskLarge.toString()); setFishingAdvice(info.fishingAdvice); setCulinaryAdvice(info.culinaryAdvice); toast({ title: "Généré !" }); } finally { setIsGenerating(false); } }} disabled={isGenerating || !name} variant="secondary" className="w-full h-14 font-black uppercase text-xs gap-3 border-2 shadow-sm"><BrainCircuit className="size-5" /> Assistant IA (Générer fiche)</Button>
                         </div>
                         <div className="grid grid-cols-3 gap-2 p-5 bg-muted/20 rounded-2xl border-2 border-dashed">
