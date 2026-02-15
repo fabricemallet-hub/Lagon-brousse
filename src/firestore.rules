@@ -103,21 +103,13 @@ service cloud.firestore {
     // ======================================================
     
     // Sessions de Groupe (Chasse & Pêche)
-    // Autorise la lecture/écriture récursive pour tous les membres connectés
-    match /hunting_sessions/{sessionId} {
+    match /hunting_sessions/{allPaths=**} {
       allow read, write: if isSignedIn();
-      match /{allPaths=**} {
-        allow read, write: if isSignedIn();
-      }
     }
 
     // Boat Tracker (Partage GPS)
-    // Autorise la lecture/écriture récursive pour tous les membres connectés
-    match /vessels/{vesselId} {
+    match /vessels/{allPaths=**} {
       allow read, write: if isSignedIn();
-      match /{allPaths=**} {
-        allow read, write: if isSignedIn();
-      }
     }
 
     // Campagnes publicitaires
