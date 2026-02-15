@@ -37,6 +37,18 @@ type MunitionData = {
 };
 
 const BALLISTIC_DATABASE: MunitionData[] = [
+  // .243 Winchester
+  { id: '243-win-100-pp', caliber: '.243 Win', model: 'Winchester Power-Point (100 gr)', weight: 100, v0: 900, bc: 0.356, usage: 'Approche biche et petit cerf, recul faible.', color: 'bg-yellow-600' },
+  { id: '243-win-95-sst', caliber: '.243 Win', model: 'Hornady SST (95 gr)', weight: 95, v0: 970, bc: 0.355, usage: 'Expansion rapide, tir tendu.', color: 'bg-yellow-600' },
+
+  // .25-06 Remington
+  { id: '25-06-100-cl', caliber: '.25-06 Rem', model: 'Remington Core-Lokt (100 gr)', weight: 100, v0: 980, bc: 0.323, usage: 'Polyvalent, biche et approche.', color: 'bg-cyan-500' },
+  { id: '25-06-115-bt', caliber: '.25-06 Rem', model: 'Nosler Ballistic Tip (115 gr)', weight: 115, v0: 910, bc: 0.453, usage: 'Précision laser longue distance.', color: 'bg-cyan-500' },
+  { id: '25-06-120-fus', caliber: '.25-06 Rem', model: 'Federal Fusion (120 gr)', weight: 120, v0: 910, bc: 0.468, usage: 'Balle soudée, excellente rétention.', color: 'bg-cyan-500' },
+
+  // 6.5 Creedmoor
+  { id: '65-cm-143-eldx', caliber: '6.5 Creedmoor', model: 'Hornady ELD-X (143 gr)', weight: 143, v0: 820, bc: 0.625, usage: 'Précision extrême à longue distance.', color: 'bg-teal-600' },
+
   // .270 Winchester
   { id: '270-win-130-sst', caliber: '.270 Win', model: 'Hornady SST (130 gr)', weight: 130, v0: 930, bc: 0.460, usage: 'Expansion rapide pour la savane.', color: 'bg-orange-500' },
   { id: '270-win-130-ds', caliber: '.270 Win', model: 'Winchester Deer Season (130 gr)', weight: 130, v0: 930, bc: 0.392, usage: 'Choc immédiat sur cervidés.', color: 'bg-orange-500' },
@@ -44,11 +56,6 @@ const BALLISTIC_DATABASE: MunitionData[] = [
   { id: '270-win-150-ab', caliber: '.270 Win', model: 'Nosler AccuBond (150 gr)', weight: 150, v0: 870, bc: 0.500, usage: 'Pénétration profonde, gros cerf.', color: 'bg-orange-500' },
   { id: '270-win-150-np', caliber: '.270 Win', model: 'Nosler Partition (150 gr)', weight: 150, v0: 870, bc: 0.465, usage: 'Référence pour gros gibier.', color: 'bg-orange-500' },
   
-  // .25-06 Remington
-  { id: '25-06-100-cl', caliber: '.25-06 Rem', model: 'Remington Core-Lokt (100 gr)', weight: 100, v0: 980, bc: 0.323, usage: 'Polyvalent, biche et approche.', color: 'bg-cyan-500' },
-  { id: '25-06-115-bt', caliber: '.25-06 Rem', model: 'Nosler Ballistic Tip (115 gr)', weight: 115, v0: 910, bc: 0.453, usage: 'Précision laser longue distance.', color: 'bg-cyan-500' },
-  { id: '25-06-120-fus', caliber: '.25-06 Rem', model: 'Federal Fusion (120 gr)', weight: 120, v0: 910, bc: 0.468, usage: 'Balle soudée, excellente rétention.', color: 'bg-cyan-500' },
-
   // .308 Winchester
   { id: '308-win-150-pp', caliber: '.308 Win', model: 'Winchester Power-Point (150 gr)', weight: 150, v0: 860, bc: 0.294, usage: 'Standard polyvalent, brousse.', color: 'bg-blue-500' },
   { id: '308-win-150-sst', caliber: '.308 Win', model: 'Hornady SST (150 gr)', weight: 150, v0: 860, bc: 0.415, usage: 'Vitesse et expansion rapide.', color: 'bg-blue-500' },
@@ -64,9 +71,22 @@ const BALLISTIC_DATABASE: MunitionData[] = [
   { id: '30-06-200-np', caliber: '.30-06', model: 'Nosler Partition (200 gr)', weight: 200, v0: 780, bc: 0.481, usage: 'Stop tout ce qui bouge.', color: 'bg-green-600' },
 
   // 7mm-08 Remington
-  { id: '7mm08-140-eldx', caliber: '7mm-08 Rem', model: 'Hornady ELD-X (143 gr)', weight: 143, v0: 850, bc: 0.623, usage: 'Précision chirurgicale longue distance.', color: 'bg-purple-600' },
-  { id: '7mm08-140-ttsx', caliber: '7mm-08 Rem', model: 'Barnes TTSX (140 gr)', weight: 140, v0: 850, bc: 0.412, usage: 'Monolithique, pas de plomb.', color: 'bg-purple-600' },
-  { id: '7mm08-140-fus', caliber: '7mm-08 Rem', model: 'Federal Fusion (140 gr)', weight: 140, v0: 850, bc: 0.410, usage: 'Efficacité prouvée sur cerf.', color: 'bg-purple-600' },
+  { id: '7mm08-140-eldx', caliber: '7mm-08 Rem', model: 'Hornady ELD-X (143 gr)', weight: 143, v0: 850, bc: 0.623, usage: 'Précision chirurgicale longue distance.', color: 'bg-indigo-600' },
+  { id: '7mm08-140-ttsx', caliber: '7mm-08 Rem', model: 'Barnes TTSX (140 gr)', weight: 140, v0: 850, bc: 0.412, usage: 'Monolithique, pas de plomb.', color: 'bg-indigo-600' },
+  { id: '7mm08-140-fus', caliber: '7mm-08 Rem', model: 'Federal Fusion (140 gr)', weight: 140, v0: 850, bc: 0.410, usage: 'Efficacité prouvée sur cerf.', color: 'bg-indigo-600' },
+
+  // --- CATEGORIES MAGNUM ---
+  // 7mm Rem Mag
+  { id: '7mm-rm-162-eldx', caliber: '7mm Rem Mag', model: 'Hornady ELD-X (162 gr)', weight: 162, v0: 896, bc: 0.631, usage: 'Magnum polyvalent, tir longue distance.', color: 'bg-rose-700' },
+  { id: '7mm-rm-150-tc', caliber: '7mm Rem Mag', model: 'Federal Trophy Copper (150 gr)', weight: 150, v0: 930, bc: 0.450, usage: 'Vitesse et pénétration sans plomb.', color: 'bg-rose-700' },
+
+  // .300 Win Mag
+  { id: '300-wm-180-pp', caliber: '.300 Win Mag', model: 'Winchester Power-Point (180 gr)', weight: 180, v0: 900, bc: 0.382, usage: 'Puissance d\'arrêt massive.', color: 'bg-red-800' },
+  { id: '300-wm-200-eldx', caliber: '.300 Win Mag', model: 'Hornady ELD-X (200 gr)', weight: 200, v0: 870, bc: 0.626, usage: 'Le roi de la savane à longue distance.', color: 'bg-red-800' },
+  { id: '300-wm-180-np', caliber: '.300 Win Mag', model: 'Nosler Partition (180 gr)', weight: 180, v0: 900, bc: 0.474, usage: 'Référence mondiale pour gros gibier.', color: 'bg-red-800' },
+
+  // .338 Win Mag
+  { id: '338-wm-210-np', caliber: '.338 Win Mag', model: 'Nosler Partition (210 gr)', weight: 210, v0: 860, bc: 0.400, usage: 'Pour les spécimens les plus massifs.', color: 'bg-stone-800' },
 
   // Calibre 12
   { id: '12-brenneke', caliber: 'Calibre 12', model: 'Balle Brenneke (432 gr)', weight: 432, v0: 430, bc: 0.075, usage: 'Référence pour le gros cochon.', color: 'bg-red-600' },
@@ -209,7 +229,7 @@ export function ShootingTableCard() {
                     <div className="flex gap-4">
                         <div className="text-center">
                             <p className="text-[8px] font-black uppercase opacity-40">Poids</p>
-                            <p className="font-black text-xs">{selectedMunition.weight} {selectedMunition.caliber === 'Calibre 12' ? 'gr' : 'gr'}</p>
+                            <p className="font-black text-xs">{selectedMunition.weight} gr</p>
                         </div>
                         <div className="text-center border-l pl-4">
                             <p className="text-[8px] font-black uppercase opacity-40">Coef (BC)</p>
