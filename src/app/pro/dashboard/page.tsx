@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Plus, 
@@ -31,6 +33,7 @@ import {
   Target,
   Send,
   ChevronRight,
+  ChevronDown,
   Smartphone,
   Mail,
   Zap,
@@ -46,6 +49,7 @@ import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 import { analyzeProduct } from '@/ai/flows/analyze-product-flow';
 import { generateCampaignMessages } from '@/ai/flows/generate-campaign-messages-flow';
 import type { AnalyzeProductOutput, GenerateCampaignOutput } from '@/ai/schemas';
@@ -58,7 +62,6 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Checkbox } from '@/components/ui/checkbox';
 import { locationsByRegion, regions } from '@/lib/locations';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -125,7 +128,7 @@ export default function ProDashboard() {
 
   // --- CIBLAGE & REACH STATE ---
   const [campTargetRegion, setCampTargetRegion] = useState<string>('USER_DEFAULT');
-  const [campTargetCommune, setCampTargetCommune] = useState<string>('ALL');
+  const [campTargetCommunes, setCampTargetCommunes] = useState<string[]>([]);
   const [campChannels, setCampChannels] = useState<string[]>(['PUSH']);
   const [reachCount, setReachCount] = useState(0);
   const [isCalculatingReach, setIsCalculatingReach] = useState(false);
@@ -148,6 +151,13 @@ export default function ProDashboard() {
   const [aiProductResult, setAiProductResult] = useState<AnalyzeProductOutput | null>(null);
 
   const userRegion = profile?.selectedRegion || 'CALEDONIE';
+  const userCommune = profile?.lastSelectedLocation || 'Nouméa';
+
+  useEffect(() => {
+    if (userCommune && campTargetCommunes.length === 0) {
+        setCampTargetCommunes([userCommune]);
+    }
+  }, [userCommune]);
 
   const handleCopyUid = () => {
     if (user?.uid) {
@@ -232,9 +242,11 @@ export default function ProDashboard() {
         
         const targetRegion = campTargetRegion === 'USER_DEFAULT' ? userRegion : campTargetRegion;
         if (targetRegion !== 'ALL') constraints.push(where('selectedRegion', '==', targetRegion));
-        if (campTargetCommune !== 'ALL') constraints.push(where('lastSelectedLocation', '==', campTargetCommune));
         
-        // On cible les utilisateurs qui s'intéressent aux thématiques du magasin
+        if (campTargetCommunes.length > 0) {
+            constraints.push(where('lastSelectedLocation', 'in', campTargetCommunes.slice(0, 30)));
+        }
+        
         if (business?.categories?.length) {
             constraints.push(where('subscribedCategories', 'array-contains-any', business.categories));
         }
@@ -253,7 +265,7 @@ export default function ProDashboard() {
     if (activeTab === 'campaigns' || isCampWizardOpen) {
         calculateReach();
     }
-  }, [campTargetRegion, campTargetCommune, activeTab, isCampWizardOpen, business]);
+  }, [campTargetRegion, campTargetCommunes, activeTab, isCampWizardOpen, business]);
 
   const handleStartCampaignWizard = () => {
     if (selectedProductIds.length === 0) {
@@ -322,6 +334,7 @@ export default function ProDashboard() {
         mailSubject: selectedMail?.subject || null,
         mailBody: selectedMail?.body || null,
         promotedPromoIds: selectedProductIds,
+        targetCommunes: campTargetCommunes,
         createdAt: serverTimestamp()
     };
 
@@ -545,7 +558,7 @@ export default function ProDashboard() {
                                 <div className="grid grid-cols-1 gap-3">
                                     <div className="space-y-1.5">
                                         <p className="text-[9px] font-bold uppercase opacity-40 ml-1">Région cible</p>
-                                        <Select value={campTargetRegion} onValueChange={setCampTargetRegion}>
+                                        <Select value={campTargetRegion} onValueChange={(v) => { setCampTargetRegion(v); setCampTargetCommunes([]); }}>
                                             <SelectTrigger className="h-12 border-2 bg-slate-50"><Globe className="size-4 mr-2 text-primary"/><SelectValue /></SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="USER_DEFAULT" className="font-bold text-xs uppercase">Focus : {userRegion}</SelectItem>
@@ -555,16 +568,69 @@ export default function ProDashboard() {
                                         </Select>
                                     </div>
                                     <div className="space-y-1.5">
-                                        <p className="text-[9px] font-bold uppercase opacity-40 ml-1">Commune (Optionnel)</p>
-                                        <Select value={campTargetCommune} onValueChange={setCampTargetCommune}>
-                                            <SelectTrigger className="h-12 border-2 bg-slate-50"><MapPin className="size-4 mr-2 text-primary"/><SelectValue /></SelectTrigger>
-                                            <SelectContent className="max-h-60">
-                                                <SelectItem value="ALL" className="font-bold text-xs uppercase">Toutes les communes</SelectItem>
-                                                {Object.keys(locationsByRegion[campTargetRegion === 'USER_DEFAULT' ? userRegion : (campTargetRegion as Region)] || {}).sort().map(loc => (
-                                                    <SelectItem key={loc} value={loc} className="font-bold text-xs uppercase">{loc}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                        <p className="text-[9px] font-bold uppercase opacity-40 ml-1">Communes cibles (Multi-choix)</p>
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <Button variant="outline" className="w-full h-12 border-2 bg-slate-50 justify-between font-bold text-xs uppercase px-3 text-left">
+                                                    <div className="flex items-center truncate mr-2">
+                                                        <MapPin className="size-4 mr-2 text-primary shrink-0"/>
+                                                        <span className="truncate">
+                                                            {campTargetCommunes.length === 0 
+                                                                ? "Toutes les communes" 
+                                                                : campTargetCommunes.length === 1 
+                                                                    ? campTargetCommunes[0] 
+                                                                    : `${campTargetCommunes.length} communes sélectionnées`}
+                                                        </span>
+                                                    </div>
+                                                    <ChevronDown className="size-4 opacity-50 shrink-0" />
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-[300px] p-0" align="start">
+                                                <div className="p-2 border-b bg-muted/20">
+                                                    <div className="flex items-center justify-between px-2 py-1">
+                                                        <span className="text-[10px] font-black uppercase text-muted-foreground">Sélectionner</span>
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="sm" 
+                                                            className="h-6 text-[8px] font-black uppercase text-primary"
+                                                            onClick={() => setCampTargetCommunes([])}
+                                                        >
+                                                            Effacer tout
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                                <ScrollArea className="h-64">
+                                                    <div className="p-2 space-y-1">
+                                                        {Object.keys(locationsByRegion[campTargetRegion === 'USER_DEFAULT' ? userRegion : (campTargetRegion as Region)] || {}).sort().map(loc => (
+                                                            <div 
+                                                                key={loc} 
+                                                                className="flex items-center space-x-3 p-2 hover:bg-muted/50 rounded-lg cursor-pointer transition-colors"
+                                                                onClick={() => {
+                                                                    setCampTargetCommunes(prev => 
+                                                                        prev.includes(loc) ? prev.filter(c => c !== loc) : [...prev, loc].slice(0, 30)
+                                                                    );
+                                                                }}
+                                                            >
+                                                                <Checkbox 
+                                                                    id={`reach-commune-${loc}`} 
+                                                                    checked={campTargetCommunes.includes(loc)}
+                                                                    onCheckedChange={() => {}} 
+                                                                />
+                                                                <label htmlFor={`reach-commune-${loc}`} className={cn(
+                                                                    "text-xs font-bold uppercase cursor-pointer flex-1",
+                                                                    loc === userCommune && "text-primary"
+                                                                )}>
+                                                                    {loc} {loc === userCommune && "(Ma commune)"}
+                                                                </label>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </ScrollArea>
+                                            </PopoverContent>
+                                        </Popover>
+                                        <p className="text-[8px] font-bold text-muted-foreground italic px-1">
+                                            Choisir en priorité la commune du compte utilisateur. possibilité de choisir plusieurs communes (max 30).
+                                        </p>
                                     </div>
                                 </div>
                             </div>

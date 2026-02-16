@@ -131,7 +131,7 @@ export interface Campaign {
   businessName: string;
   title: string;
   message: string;
-  targetCommune: string;
+  targetCommunes: string[];
   targetCategory: string;
   reach: number;
   cost: number;
