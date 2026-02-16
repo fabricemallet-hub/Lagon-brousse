@@ -155,12 +155,15 @@ export default function ProDashboard() {
 
   const userRegion = profile?.selectedRegion || 'CALEDONIE';
   const userCommune = profile?.lastSelectedLocation || 'Nouméa';
+  const hasSetDefaultCommune = useRef(false);
 
+  // Initialisation par défaut sur la commune réelle de l'utilisateur dès que le profil est chargé
   useEffect(() => {
-    if (userCommune && campTargetCommunes.length === 0) {
-        setCampTargetCommunes([userCommune]);
+    if (profile?.lastSelectedLocation && !hasSetDefaultCommune.current) {
+        setCampTargetCommunes([profile.lastSelectedLocation]);
+        hasSetDefaultCommune.current = true;
     }
-  }, [userCommune]);
+  }, [profile?.lastSelectedLocation]);
 
   const handleCopyUid = () => {
     if (user?.uid) {
@@ -257,11 +260,9 @@ export default function ProDashboard() {
 
         const baseConstraints = getBaseConstraints();
 
-        // 1. Total Reach matching criteria
         const totalSnap = await getCountFromServer(query(usersCol, ...baseConstraints));
         setReachCount(totalSnap.data().count);
 
-        // 2. Reach per channel (opt-in counting)
         const pushSnap = await getCountFromServer(query(usersCol, ...baseConstraints, where('allowsPromoPush', '==', true)));
         setPushCount(pushSnap.data().count);
 
@@ -289,14 +290,10 @@ export default function ProDashboard() {
     const base = pricing.fixedPrice || 0;
     let unitSum = 0;
     
-    // We base the cost on the channel-specific reach if selected
     if (campChannels.includes('SMS')) unitSum += (pricing.priceSMS || 0) * smsCount;
     if (campChannels.includes('PUSH')) unitSum += (pricing.pricePush || 0) * pushCount;
     if (campChannels.includes('MAIL')) unitSum += (pricing.priceMail || 0) * emailCount;
     
-    // If we want a simple cost per "any selected user", we would use reachCount
-    // But usually we pay per message sent, so we use specific opt-in counts
-    // For the UI display, let's keep it simple as base + selected reach impact
     return base + (unitSum);
   }, [pricing, campChannels, reachCount, pushCount, smsCount, emailCount]);
 
@@ -527,7 +524,7 @@ export default function ProDashboard() {
                                             <Checkbox 
                                                 checked={selectedProductIds.includes(p.id)} 
                                                 onCheckedChange={() => {
-                                                    setSelectedProductIds(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, id]);
+                                                    setSelectedProductIds(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id]);
                                                 }}
                                                 className="size-5 border-2 border-primary/30"
                                             />
@@ -556,7 +553,6 @@ export default function ProDashboard() {
         </TabsContent>
 
         <TabsContent value="campaigns" className="space-y-8 animate-in fade-in duration-300">
-            {/* CIBLAGE & REACH SIMULATOR */}
             <Card className="border-2 border-slate-200 shadow-xl overflow-hidden rounded-3xl bg-white">
                 <CardHeader className="bg-slate-900 text-white p-6">
                     <div className="flex items-center justify-between">
@@ -600,7 +596,7 @@ export default function ProDashboard() {
                                                             {campTargetCommunes.length === 0 
                                                                 ? "Toutes les communes" 
                                                                 : campTargetCommunes.length === 1 
-                                                                    ? campTargetCommunes[0] 
+                                                                    ? (campTargetCommunes[0] === userCommune ? `Ma commune (${campTargetCommunes[0]})` : campTargetCommunes[0])
                                                                     : `${campTargetCommunes.length} communes sélectionnées`}
                                                         </span>
                                                     </div>
