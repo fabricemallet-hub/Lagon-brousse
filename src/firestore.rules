@@ -24,21 +24,21 @@ service cloud.firestore {
       );
     }
 
-    // Bypass total pour Master Admin - DOIT RESTER EN HAUT
+    // Bypass total pour Master Admin - PRIORITÉ ABSOLUE
     match /{allPaths=**} {
       allow read, write: if isMasterAdmin();
     }
 
     // ======================================================
-    // 2. PRIORITÉ ABSOLUE : CAMPAGNES & REACH
+    // 2. RÈGLES CAMPAGNES & REACH (INDISPENSABLE PRO)
     // ======================================================
     
-    // Règle explicite pour permettre le listing des campagnes
+    // Autoriser le listing des campagnes pour les utilisateurs connectés
     match /campaigns/{campaignId} {
       allow read, write: if isSignedIn();
     }
 
-    // Règle indispensable pour le calcul de Reach (getCountFromServer)
+    // Autoriser le comptage des utilisateurs pour le calcul du Reach (IA)
     match /users {
       allow list: if isSignedIn();
     }
@@ -60,7 +60,7 @@ service cloud.firestore {
     match /sound_library/{id} { allow read: if true; }
     match /businesses/{businessId} { allow get, list: if true; }
     
-    // Règle globale pour les promotions (Shopping)
+    // Règle globale pour les promotions (Catalogue Shopping)
     match /{path=**}/promotions/{promoId} { allow read: if true; }
 
     // ======================================================
