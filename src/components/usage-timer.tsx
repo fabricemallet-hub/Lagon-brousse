@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -16,6 +15,7 @@ export function UsageTimer({ status, auth, userId }: { status: string, auth: any
   const [timeLeft, setTimeLeft] = useState(USAGE_LIMIT_SECONDS);
   const router = useRouter();
   const timeLeftRef = useRef(USAGE_LIMIT_SECONDS);
+  const lastWriteTimeRef = useRef(0);
 
   useEffect(() => {
     if ((status !== 'limited' && status !== 'trial') || !auth || !userId) return;
@@ -44,15 +44,17 @@ export function UsageTimer({ status, auth, userId }: { status: string, auth: any
     const interval = setInterval(() => {
       timeLeftRef.current -= 1;
       const current = timeLeftRef.current;
+      const now = Date.now();
       
       // UI mise à jour seulement toutes les 5s ou si critique
       if (current % 5 === 0 || current <= 5) {
         setTimeLeft(current);
       }
       
-      // Stockage seulement toutes les 15s pour préserver les performances
-      if (current % 15 === 0 || current <= 0) {
+      // Stockage seulement toutes les 15s ou à la fin pour préserver les performances
+      if (now - lastWriteTimeRef.current > 15000 || current <= 0) {
         localStorage.setItem('usage_seconds', String(USAGE_LIMIT_SECONDS - current));
+        lastWriteTimeRef.current = now;
       }
 
       if (current <= 0) {

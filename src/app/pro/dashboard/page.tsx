@@ -12,27 +12,10 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { 
-  Megaphone, 
-  Plus, 
-  Trash2, 
-  ShoppingBag, 
-  Store, 
-  RefreshCw, 
-  ImageIcon, 
-  X, 
-  Pencil, 
-  UserCircle, 
-  BrainCircuit, 
-  MapPin, 
-  ChevronDown, 
-  Globe, 
-  Smartphone, 
-  Mail, 
-  Zap, 
-  Wand2,
-  Check,
-  CheckCircle2,
-  CreditCard
+  Megaphone, Plus, Trash2, ShoppingBag, Store, RefreshCw, 
+  ImageIcon, X, Pencil, UserCircle, BrainCircuit, MapPin, 
+  ChevronDown, Globe, Smartphone, Mail, Zap, Wand2,
+  Check, CheckCircle2, CreditCard, Copy
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -637,7 +620,7 @@ export default function ProDashboard() {
                 {campWizardStep === 'SELECTION' && <Button onClick={handleConfirmSelections} className="w-full h-12 font-black uppercase">Aperçu Final & Devis</Button>}
             </DialogFooter>
         </DialogContent>
-      </Dialog>
+        </Dialog>
     </div>
   );
 }

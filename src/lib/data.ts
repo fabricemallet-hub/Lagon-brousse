@@ -1,4 +1,3 @@
-
 import { LocationData, SwellForecast, Tide, WindDirection, WindForecast, HourlyForecast } from './types';
 import { format } from 'date-fns';
 
@@ -7,7 +6,6 @@ const proceduralCache = new Map<string, LocationData>();
 
 /**
  * STATIONS DE RÉFÉRENCE (Source: Météo NC / SHOM / Tahiti Tides)
- * Données moyennes annuelles pour définir les seuils automatiques.
  */
 const tideStations = {
   'Nouméa': {
@@ -92,62 +90,22 @@ const tideStations = {
   }
 };
 
-/**
- * MAPPING COMMUNE -> STATION
- */
 export const communeToTideStationMap: { [key: string]: string } = {
-  // --- NOUVELLE CALÉDONIE ---
-  'Bélep': 'Koumac', 
-  'Boulouparis': 'Nouméa', 
-  'Bourail': 'Bourail', 
-  'Canala': 'Thio',
-  'Dumbéa': 'Nouméa', 
-  'Farino': 'Bourail', 
-  'Hienghène': 'Hienghène', 
-  'Houaïlou': 'Thio',
-  "L'Île-des-Pins": 'Nouméa', 
-  'Kaala-Gomen': 'Koumac', 
-  'Koné': 'Koné', 
-  'Kouaoua': 'Thio',
-  'Koumac': 'Koumac', 
-  'La Foa': 'Bourail', 
-  'Le Mont-Dore': 'Nouméa', 
-  'Lifou': 'Ouvéa',
-  'Maré': 'Ouvéa', 
-  'Moindou': 'Bourail', 
-  'Nouméa': 'Nouméa', 
-  'Ouégoa': 'Koumac',
-  'Ouvéa': 'Ouvéa', 
-  'Païta': 'Nouméa', 
-  'Poindimié': 'Hienghène', 
-  'Ponérihouen': 'Hienghène',
-  'Pouébo': 'Hienghène', 
-  'Pouembout': 'Koné', 
-  'Poum': 'Koumac', 
-  'Poya': 'Koné',
-  'Sarraméa': 'Bourail', 
-  'Thio': 'Thio', 
-  'Voh': 'Koné', 
-  'Yaté': 'Nouméa',
-  // --- TAHITI ---
-  'Papeete': 'Papeete',
-  'Faaa': 'Papeete',
-  'Punaauia': 'Papeete',
-  'Pirae': 'Papeete',
-  'Mahina': 'Papeete',
-  'Paea': 'Papeete',
-  'Papara': 'Papeete',
-  'Taravao': 'Papeete',
-  'Teahupoo': 'Papeete',
-  'Mataiea': 'Papeete',
-  'Papeari': 'Papeete',
-  'Afareaitu (Moorea)': 'Papeete',
-  'Papetoai (Moorea)': 'Papeete',
-  'Haapiti (Moorea)': 'Papeete',
+  'Bélep': 'Koumac', 'Boulouparis': 'Nouméa', 'Bourail': 'Bourail', 'Canala': 'Thio',
+  'Dumbéa': 'Nouméa', 'Farino': 'Bourail', 'Hienghène': 'Hienghène', 'Houaïlou': 'Thio',
+  "L'Île-des-Pins": 'Nouméa', 'Kaala-Gomen': 'Koumac', 'Koné': 'Koné', 'Kouaoua': 'Thio',
+  'Koumac': 'Koumac', 'La Foa': 'Bourail', 'Le Mont-Dore': 'Nouméa', 'Lifou': 'Ouvéa',
+  'Maré': 'Ouvéa', 'Moindou': 'Bourail', 'Nouméa': 'Nouméa', 'Ouégoa': 'Koumac',
+  'Ouvéa': 'Ouvéa', 'Païta': 'Nouméa', 'Poindimié': 'Hienghène', 'Ponérihouen': 'Hienghène',
+  'Pouébo': 'Hienghène', 'Pouembout': 'Koné', 'Poum': 'Koumac', 'Poya': 'Koné',
+  'Sarraméa': 'Bourail', 'Thio': 'Thio', 'Voh': 'Koné', 'Yaté': 'Nouméa',
+  'Papeete': 'Papeete', 'Faaa': 'Papeete', 'Punaauia': 'Papeete', 'Pirae': 'Papeete',
+  'Mahina': 'Papeete', 'Paea': 'Papeete', 'Papara': 'Papeete', 'Taravao': 'Papeete',
+  'Teahupoo': 'Papeete', 'Mataiea': 'Papeete', 'Papeari': 'Papeete', 'Afareaitu (Moorea)': 'Papeete',
+  'Papetoai (Moorea)': 'Papeete', 'Haapiti (Moorea)': 'Papeete',
 };
 
-// Données de base par défaut
-const baseData: Omit<LocationData, 'tides' | 'tideStation' | 'tideThresholds'> = {
+const baseDataStatic = {
   weather: {
     wind: [
       { time: '03:00', speed: 0, speedLagon: 0, speedLarge: 0, speedLand: 0, direction: 'N', stability: 'Stable' },
@@ -210,9 +168,6 @@ const baseData: Omit<LocationData, 'tides' | 'tideStation' | 'tideThresholds'> =
   }
 };
 
-/**
- * GÉNÉRATEUR PROCÉDURAL PRINCIPAL
- */
 export function generateProceduralData(location: string, date: Date): LocationData {
   const dateKey = format(date, 'yyyy-MM-dd');
   const cacheKey = `${location}-${dateKey}`;
@@ -241,7 +196,6 @@ export function generateProceduralData(location: string, date: Date): LocationDa
   const knownNewMoon = new Date('2024-01-11T00:00:00Z');
   const daysSinceKnownNewMoon = (effectiveDate.getTime() - knownNewMoon.getTime()) / (1000 * 3600 * 24);
   const dayInCycle = daysSinceKnownNewMoon % 29.53;
-  
   const springFactor = 1 + 0.28 * Math.abs(Math.cos((dayInCycle / 29.53) * 2 * Math.PI));
 
   const tideStationName = communeToTideStationMap[location] || 'Nouméa';
@@ -252,9 +206,14 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     low: parseFloat((stationInfo.avgLow * 0.65).toFixed(2)),
   };
 
+  // Optimisation: Utilisation de spread pour éviter JSON.stringify dans une boucle de calendrier
   const locationData: LocationData = {
-      ...JSON.parse(JSON.stringify(baseData)),
-      tides: JSON.parse(JSON.stringify(stationInfo.tides)),
+      ...baseDataStatic,
+      weather: { ...baseDataStatic.weather },
+      farming: { ...baseDataStatic.farming },
+      fishing: baseDataStatic.fishing.map(s => ({ ...s, fish: s.fish.map(f => ({...f, advice: {...f.advice}})) })),
+      crabAndLobster: { ...baseDataStatic.crabAndLobster },
+      tides: stationInfo.tides.map(t => ({...t})),
       tideStation: tideStationName,
       tideThresholds: tideThresholds
   };
@@ -341,8 +300,7 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     locationData.crabAndLobster.lobsterMessage = "Activité régulière en bordure de récif.";
   }
 
-  // --- LOGIQUE POULPE (NC & TAHITI) ---
-  const isOctopusSeason = [5, 6, 7, 8, 9].includes(month); // Juin à Octobre
+  const isOctopusSeason = [5, 6, 7, 8, 9].includes(month);
   const hasVeryLowTide = locationData.tides.some(t => t.type === 'basse' && t.height <= 0.23);
   
   if (hasVeryLowTide) {
@@ -358,16 +316,18 @@ export function generateProceduralData(location: string, date: Date): LocationDa
     locationData.crabAndLobster.octopusMessage = "Peu de découvert : les poulpes restent profonds.";
   }
 
-  locationData.weather.wind.forEach((forecast: WindForecast, index: number) => {
+  locationData.weather.wind = locationData.weather.wind.map((w, index) => {
     const baseSpeed = 8 + Math.sin(dateSeed * 0.2 + locationSeed + index) * 5;
-    forecast.speedLagon = Math.max(0, Math.round(baseSpeed));
-    forecast.speedLarge = Math.max(0, Math.round(baseSpeed * 1.4)); 
-    forecast.speedLand = Math.max(0, Math.round(baseSpeed * 0.7)); 
-    forecast.speed = forecast.speedLagon; 
-
     const directions: WindDirection[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-    forecast.direction = directions[Math.floor(((dateSeed / 5) + locationSeed + index * 2) % directions.length)];
-    forecast.stability = (Math.sin(dateSeed + index) > 0) ? 'Stable' : 'Tournant';
+    return {
+        ...w,
+        speedLagon: Math.max(0, Math.round(baseSpeed)),
+        speedLarge: Math.max(0, Math.round(baseSpeed * 1.4)),
+        speedLand: Math.max(0, Math.round(baseSpeed * 0.7)),
+        speed: Math.max(0, Math.round(baseSpeed)),
+        direction: directions[Math.floor(((dateSeed / 5) + locationSeed + index * 2) % directions.length)],
+        stability: (Math.sin(dateSeed + index) > 0) ? 'Stable' : 'Tournant'
+    };
   });
 
   locationData.weather.swell = locationData.weather.wind.map((w, idx) => {
