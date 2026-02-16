@@ -1,10 +1,11 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // ======================================================
-    // 1. FONCTIONS DE SÉCURITÉ & MASTER ADMIN
+    // 1. FONCTIONS DE SÉCURITÉ
     // ======================================================
     
     function isSignedIn() {
@@ -14,7 +15,7 @@ service cloud.firestore {
     function isMasterAdmin() {
       return isSignedIn() && (
         request.auth.uid in ["t8nPnZLcTiaLJSKMuLzib3C5nPn1", "D1q2GPM95rZi38cvCzvsjcWQDaV2", "koKj5ObSGXYeO1PLKU5bgo8Yaky1"] ||
-        (request.auth.token.email != null && request.auth.token.email.lower() in [
+        (request.auth.token.keys().contains('email') && request.auth.token.email.lower() in [
           "f.mallet81@outlook.com",
           "f.mallet81@gmail.com",
           "fabrice.mallet@gmail.com",
@@ -24,27 +25,39 @@ service cloud.firestore {
       );
     }
 
-    // Bypass total pour Master Admin - PRIORITÉ ABSOLUE
+    // ======================================================
+    // 2. JETONS D'ACCÈS (PRIORITAIRE)
+    // ======================================================
+    
+    match /access_tokens/{tokenId} {
+      // Autoriser GET pour vérification publique (avant connexion)
+      allow get: if true;
+      // Autoriser LIST et UPDATE uniquement si connecté
+      allow list, update: if isSignedIn();
+    }
+
+    // ======================================================
+    // 3. BYPASS MASTER ADMIN
+    // ======================================================
+
     match /{allPaths=**} {
       allow read, write: if isMasterAdmin();
     }
 
     // ======================================================
-    // 2. RÈGLES CAMPAGNES & REACH (INDISPENSABLE PRO)
+    // 4. RÈGLES CAMPAGNES & REACH
     // ======================================================
     
-    // Autoriser le listing des campagnes pour les utilisateurs connectés
     match /campaigns/{campaignId} {
       allow read, write: if isSignedIn();
     }
 
-    // Autoriser le comptage des utilisateurs pour le calcul du Reach (IA)
     match /users {
       allow list: if isSignedIn();
     }
 
     // ======================================================
-    // 3. RÈGLES PUBLIQUES (LECTURE)
+    // 5. RÈGLES PUBLIQUES (LECTURE)
     // ======================================================
 
     match /app_settings/{document=**} { allow read: if true; }
@@ -59,12 +72,10 @@ service cloud.firestore {
     }
     match /sound_library/{id} { allow read: if true; }
     match /businesses/{businessId} { allow get, list: if true; }
-    
-    // Règle globale pour les promotions (Catalogue Shopping)
     match /{path=**}/promotions/{promoId} { allow read: if true; }
 
     // ======================================================
-    // 4. RÈGLES UTILISATEURS & PRIVÉES
+    // 6. RÈGLES UTILISATEURS & PRIVÉES
     // ======================================================
 
     match /users/{userId} {
@@ -85,13 +96,6 @@ service cloud.firestore {
     match /cms_support/tickets/items/{id} {
       allow create: if isSignedIn();
       allow read, write: if isSignedIn() && (resource.data.userId == request.auth.uid);
-    }
-
-    // Jeton d'accès : Autoriser GET pour vérification sans être connecté (Login/Signup)
-    match /access_tokens/{id} { 
-      allow get: if true;
-      allow list: if isSignedIn();
-      allow update: if isSignedIn();
     }
 
     match /shared_access_tokens/{id} { allow read: if true; }

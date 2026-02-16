@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "UserAccount": {
@@ -59,6 +60,20 @@
         "status": { "type": "string", "enum": ["pending", "sent", "draft"] }
       },
       "required": ["id", "businessId", "reach", "cost", "status"]
+    },
+    "AccessToken": {
+      "title": "AccessToken",
+      "type": "object",
+      "description": "Represents a premium access token.",
+      "properties": {
+        "id": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "redeemed"] },
+        "durationMonths": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "redeemedBy": { "type": "string" },
+        "redeemedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "status", "durationMonths"]
     }
   },
   "auth": {
@@ -96,6 +111,14 @@
           "entityName": "Campaign",
           "schema": { "$ref": "#/backend/entities/Campaign" },
           "description": "Direct marketing campaigns."
+        }
+      },
+      {
+        "path": "/access_tokens/{tokenId}",
+        "definition": {
+          "entityName": "AccessToken",
+          "schema": { "$ref": "#/backend/entities/AccessToken" },
+          "description": "Premium access tokens."
         }
       }
     ]
