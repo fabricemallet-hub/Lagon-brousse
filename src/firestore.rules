@@ -64,8 +64,11 @@ service cloud.firestore {
       
       match /promotions/{promoId} {
         allow read: if true;
-        // Autoriser le propriétaire du business à gérer les promos
-        allow write: if isSignedIn() && (isMasterAdmin() || get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerId == request.auth.uid);
+        // Règle simplifiée et robuste : l'utilisateur doit avoir ce businessId dans son profil
+        allow write: if isSignedIn() && (
+          isMasterAdmin() || 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId
+        );
       }
     }
     

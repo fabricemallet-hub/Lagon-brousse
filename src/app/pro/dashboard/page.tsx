@@ -303,9 +303,17 @@ export default function ProDashboard() {
     const discount = (originalPriceNum && originalPriceNum > priceNum) ? ((originalPriceNum - priceNum) / originalPriceNum) * 100 : null;
 
     const promoData: any = {
-      businessId: business.id, title: promoTitle, category: promoCategory, description: promoDescription,
-      price: priceNum, originalPrice: originalPriceNum, discountPercentage: discount, promoType,
-      imageUrl: promoImages[0] || '', images: promoImages, updatedAt: serverTimestamp(),
+      businessId: business.id, 
+      title: promoTitle, 
+      category: promoCategory, 
+      description: promoDescription,
+      price: priceNum, 
+      originalPrice: originalPriceNum, 
+      discountPercentage: discount, 
+      promoType,
+      imageUrl: promoImages[0] || '', 
+      images: promoImages, 
+      updatedAt: serverTimestamp(),
     };
 
     const targetDoc = editingPromoId 
@@ -315,8 +323,15 @@ export default function ProDashboard() {
     const operation = editingPromoId ? 'update' : 'create';
     if (!editingPromoId) promoData.createdAt = serverTimestamp();
 
+    // Utilisation du mode non-bloquant avec gestion d'erreur contextuelle
     setDoc(targetDoc, promoData, { merge: true })
+      .then(() => {
+        toast({ title: editingPromoId ? "Article mis à jour !" : "Article enregistré !" });
+        resetForm();
+        setIsSaving(false);
+      })
       .catch(async (err) => {
+        setIsSaving(false);
         const permissionError = new FirestorePermissionError({
           path: targetDoc.path,
           operation: operation as any,
@@ -324,10 +339,6 @@ export default function ProDashboard() {
         });
         errorEmitter.emit('permission-error', permissionError);
       });
-    
-    toast({ title: editingPromoId ? "Article mis à jour !" : "Article enregistré !" });
-    resetForm();
-    setIsSaving(false);
   };
 
   const resetForm = () => { 
@@ -367,6 +378,9 @@ export default function ProDashboard() {
     if (!firestore || !business) return;
     const promoRef = doc(firestore, 'businesses', business.id, 'promotions', id);
     deleteDoc(promoRef)
+      .then(() => {
+        toast({ title: "Article supprimé" });
+      })
       .catch(async (err) => {
         const permissionError = new FirestorePermissionError({
           path: promoRef.path,
@@ -374,7 +388,6 @@ export default function ProDashboard() {
         });
         errorEmitter.emit('permission-error', permissionError);
       });
-    toast({ title: "Article supprimé" });
   };
 
   const handleDiffuse = () => {
@@ -383,16 +396,28 @@ export default function ProDashboard() {
     
     const selectedPromos = promotions?.filter(p => selectedPromoIds.includes(p.id)) || [];
     const campaignData = {
-      ownerId: user!.uid, businessId: business.id, businessName: business.name,
+      ownerId: user!.uid, 
+      businessId: business.id, 
+      businessName: business.name,
       title: `${business.name} : ${selectedPromos.length} offres !`,
       message: `Offres : ${selectedPromos.map(p => p.title).join(', ')}.`,
       targetCommune: targetScope === 'ALL' ? 'GLOBAL' : (targetScope === 'SPECIFIC' ? selectedTargetCommunes.join(', ') : targetScope),
-      targetCategory, reach: baseTargetCount, cost: totalCalculatedCost, status: 'pending', createdAt: serverTimestamp(), selectedChannels
+      targetCategory, 
+      reach: baseTargetCount, 
+      cost: totalCalculatedCost, 
+      status: 'pending', 
+      createdAt: serverTimestamp(), 
+      selectedChannels
     };
 
     const campaignRef = collection(firestore, 'campaigns');
     addDoc(campaignRef, campaignData)
+      .then(() => {
+        toast({ title: "Campagne envoyée pour validation !" });
+        setIsSaving(false);
+      })
       .catch(async (err) => {
+        setIsSaving(false);
         const permissionError = new FirestorePermissionError({
           path: campaignRef.path,
           operation: 'create',
@@ -400,9 +425,6 @@ export default function ProDashboard() {
         });
         errorEmitter.emit('permission-error', permissionError);
       });
-    
-    toast({ title: "Campagne envoyée pour validation !" });
-    setIsSaving(false);
   };
 
   if (isUserLoading || isProfileLoading || isBusinessLoading) return <div className="p-8"><Skeleton className="h-64 w-full" /></div>;
@@ -543,7 +565,7 @@ export default function ProDashboard() {
 
                     <div className="flex gap-2 pt-2">
                         {editingPromoId && <Button variant="ghost" onClick={resetForm} className="flex-1 border-2">Annuler</Button>}
-                        <Button onClick={handleSavePromotion} disabled={isSaving || !promoTitle} className="flex-[2] h-12 font-black uppercase shadow-lg">Sauvegarder l'article</Button>
+                        <Button onClick={handleSavePromotion} disabled={isSaving || !promoTitle || !business} className="flex-[2] h-12 font-black uppercase shadow-lg">Sauvegarder l'article</Button>
                     </div>
                   </div>
                 </div>
