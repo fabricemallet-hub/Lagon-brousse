@@ -70,13 +70,11 @@ export interface UserAccount {
   mapIcon_v2?: string;
   mapColor_v2?: string;
   fcmToken?: string;
-  // Nouveaux champs de contact
   phoneNumber?: string;
   phoneCountryCode?: string;
   landline?: string;
   address?: string;
   contactLocation?: { latitude: number; longitude: number };
-  // Champs administratifs
   ridet?: string;
 }
 
@@ -89,7 +87,6 @@ export interface Business {
   logoUrl?: string;
   description?: string;
   createdAt: any;
-  // Nouveaux champs de contact pour les pros
   phoneNumber?: string;
   phoneCountryCode?: string;
   landline?: string;
@@ -460,6 +457,12 @@ export interface SystemNotification {
   createdAt: any;
 }
 
+export interface ShootingAngle {
+  center: number;
+  spread: number;
+  isActive: boolean;
+}
+
 export interface SessionParticipant {
   id: string;
   displayName: string;
@@ -471,6 +474,7 @@ export interface SessionParticipant {
   baseStatus?: string;
   isGibierEnVue?: boolean;
   accuracy?: number;
+  shootingAngle?: ShootingAngle;
 }
 
 export interface HuntingSession {

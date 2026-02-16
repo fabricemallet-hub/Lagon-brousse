@@ -1,3 +1,4 @@
+
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 
@@ -7,12 +8,9 @@ export function cn(...inputs: ClassValue[]) {
 
 /**
  * Retourne l'heure actuelle ajustée à la région (Fuseau horaire).
- * Utile pour synchroniser l'UI quand on bascule entre NC (UTC+11) et Tahiti (UTC-10).
  */
 export function getRegionalNow(region: string): Date {
   const tz = region === 'TAHITI' ? 'Pacific/Tahiti' : 'Pacific/Noumea';
-  // On utilise toLocaleString pour obtenir une chaîne de date dans le fuseau, 
-  // puis on recrée un objet Date pour manipuler les heures/jours facilement en UI.
   try {
     return new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
   } catch (e) {
@@ -68,7 +66,7 @@ export function getMeteoCondition(code: number | undefined): string {
  * Calcule la distance entre deux points GPS (Haversine).
  */
 export const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const R = 6371e3; // Rayon de la terre en mètres
+  const R = 6371e3;
   const φ1 = (lat1 * Math.PI) / 180;
   const φ2 = (lat2 * Math.PI) / 180;
   const Δφ = ((lat2 - lat1) * Math.PI) / 180;
@@ -76,4 +74,15 @@ export const getDistance = (lat1: number, lon1: number, lat2: number, lon2: numb
   const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
+};
+
+/**
+ * Calcule le gisement (bearing) entre deux points GPS.
+ */
+export const getBearing = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const y = Math.sin((lon2 - lon1) * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180));
+  const x = Math.cos(lat1 * (Math.PI / 180)) * Math.sin(lat2 * (Math.PI / 180)) -
+            Math.sin(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.cos((lon2 - lon1) * (Math.PI / 180));
+  let brng = Math.atan2(y, x) * (180 / Math.PI);
+  return (brng + 360) % 360;
 };
