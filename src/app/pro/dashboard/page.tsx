@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -318,7 +317,7 @@ export default function ProDashboard() {
         setAiAnalysisResult(result);
         setWizardStep('OPTIONS');
     } catch (e) {
-        toast({ variant: 'destructive', title: "Erreur IA", description: "L'analyse a échoué." });
+        toast({ variant: 'destructive', title: "Erreur IA", description: "L'Analyse vision a échoué." });
         setWizardStep('TONE');
     }
   };
@@ -815,7 +814,13 @@ export default function ProDashboard() {
                                     <h4 className="font-black uppercase text-xs truncate flex-1 leading-none">{promo.title}</h4>
                                     {promo.discountPercentage && <Badge variant="destructive" className="h-3.5 px-1 text-[7px] font-black">-{Math.round(promo.discountPercentage)}%</Badge>}
                                 </div>
-                                <p className="text-[9px] text-muted-foreground line-clamp-2 italic">{promo.description || "Pas de description."}</p>
+                                {promo.isOutOfStock ? (
+                                    <p className="text-[9px] font-black text-red-600 uppercase mt-1 leading-tight animate-pulse">
+                                        STOCK ÉPUISÉ - Arrivage prévu le {promo.nextArrival || "Prochainement"}
+                                    </p>
+                                ) : (
+                                    <p className="text-[9px] text-muted-foreground line-clamp-2 italic">{promo.description || "Pas de description."}</p>
+                                )}
                             </div>
                             <div className="flex items-center justify-between">
                                 <span className={cn(
@@ -1115,10 +1120,10 @@ export default function ProDashboard() {
                         <div className="space-y-6 pb-10">
                             <p className="text-[10px] font-black uppercase text-muted-foreground text-center">Édition manuelle des textes</p>
                             {selectedChannels.includes('SMS') && (
-                                <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">Texte SMS</Label><Textarea value={finalSms} onChange={e => setFinalSms(e.target.value)} className="border-2 font-medium" /></div>
+                                <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-blue-600 ml-1">Texte SMS</Label><Textarea value={finalSms} onChange={e => setFinalSms(e.target.value)} className="border-2 font-medium" /></div>
                             )}
                             {selectedChannels.includes('PUSH') && (
-                                <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">Texte Push</Label><Textarea value={finalPush} onChange={e => setFinalPush(e.target.value)} className="border-2 font-medium" /></div>
+                                <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-primary ml-1">Texte Push</Label><Textarea value={finalPush} onChange={e => setFinalPush(e.target.value)} className="border-2 font-medium" /></div>
                             )}
                             {selectedChannels.includes('MAIL') && (
                                 <div className="space-y-4">

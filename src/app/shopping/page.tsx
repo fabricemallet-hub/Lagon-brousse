@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -570,7 +569,7 @@ export default function ShoppingPage() {
                                 <AlertCircle className="size-4 text-red-600" />
                                 <AlertTitle className="text-xs font-black uppercase">Article indisponible</AlertTitle>
                                 <AlertDescription className="text-sm font-black text-red-700 mt-1">
-                                    STOCK ÉPUISÉ - Commande prévue le : {selectedProductForDetail.nextArrival || "Prochainement"}
+                                    STOCK ÉPUISÉ - Arrivage prévu le {selectedProductForDetail.nextArrival || "Prochainement"}
                                 </AlertDescription>
                             </Alert>
                         )}
@@ -812,7 +811,7 @@ function ProductCard({
                         
                         {isOutOfStock ? (
                             <p className="text-[10px] font-black text-red-600 uppercase mt-1 leading-tight animate-pulse">
-                                STOCK ÉPUISÉ - Commande prévue le : {product.nextArrival || "Prochainement"}
+                                STOCK ÉPUISÉ - Arrivage prévu le {product.nextArrival || "Prochainement"}
                             </p>
                         ) : (
                             <p className="text-[10px] text-muted-foreground leading-tight break-words italic line-clamp-3">
