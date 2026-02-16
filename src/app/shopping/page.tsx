@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, collectionGroup, query, orderBy, doc, getDoc, deleteDoc } from 'firebase/firestore';
 import type { Promotion, Business, UserAccount, Region } from '@/lib/types';
@@ -15,8 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { 
     Carousel, 
     CarouselContent, 
-    CarouselItem, 
-    type CarouselApi 
+    CarouselItem 
 } from '@/components/ui/carousel';
 import { 
     Search, 
@@ -24,19 +23,16 @@ import {
     Store, 
     MapPin, 
     Filter, 
-    ChevronRight, 
-    Smartphone, 
-    Home, 
     X,
     Globe,
     ImageIcon,
     Trash2,
-    Plus,
-    AlertCircle
+    AlertCircle,
+    Plus
 } from 'lucide-react';
 import { locations, locationsByRegion, regions } from '@/lib/locations';
 import { cn } from '@/lib/utils';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { 
   AlertDialog, 
   AlertDialogAction, 
@@ -48,7 +44,7 @@ import {
   AlertDialogTitle 
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function ShoppingPage() {
   const { user } = useUser();
@@ -72,16 +68,14 @@ export default function ShoppingPage() {
     return collectionGroup(firestore, 'promotions');
   }, [firestore]);
   
-  const { data: allPromotions, isLoading: isPromosLoading, error: promosError } = useCollection<Promotion>(promosRef);
+  const { data: allPromotions, isLoading: isPromosLoading } = useCollection<Promotion>(promosRef);
 
-  // --- FILTERS STATE ---
   const [search, setSearch] = useState('');
   const [filterRegion, setFilterRegion] = useState<string>('USER_DEFAULT');
   const [filterCommune, setFilterCommune] = useState<string>('USER_DEFAULT');
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
   const [filterType, setFilterType] = useState<string>('ALL');
 
-  // --- DETAIL VIEW STATE ---
   const [selectedProduct, setSelectedProduct] = useState<Promotion & { business?: Business } | null>(null);
   const [isContactOpen, setIsContactOpen] = useState(false);
   const [contactBusiness, setContactBusiness] = useState<Business | null>(null);
@@ -212,7 +206,7 @@ export default function ShoppingPage() {
       ) : filteredProducts.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {filteredProducts.map((p) => (
-                <Card key={p.id} className={cn("overflow-hidden border-2 shadow-sm flex flex-col cursor-pointer", p.promoType === 'Promo' && "border-red-100 bg-red-50/10", p.isOutOfStock && "opacity-75")} onClick={() => setSelectedProduct(p)}>
+                <Card key={p.id} className={cn("overflow-hidden border-2 shadow-sm flex flex-col cursor-pointer transition-all hover:border-primary/30", p.promoType === 'Promo' && "border-red-100 bg-red-50/10", p.isOutOfStock && "opacity-75")} onClick={() => setSelectedProduct(p)}>
                     <div className="px-3 py-2 bg-muted/20 border-b flex justify-between items-center"><div className="flex items-center gap-2 min-w-0"><Store className="size-3 text-primary" /><span className="text-[9px] font-black uppercase truncate">{p.business?.name}</span></div>{isAdmin && <Button variant="ghost" size="icon" className="size-6 text-destructive" onClick={(e) => { e.stopPropagation(); setProductToDelete({id: p.id, bid: p.businessId}); }}><Trash2 className="size-3" /></Button>}</div>
                     <div className="flex h-36 relative">
                         <div className="w-32 bg-white shrink-0 flex items-center justify-center border-r p-2">{p.imageUrl ? <img src={p.imageUrl} className="max-w-full max-h-full object-contain" alt="" /> : <ImageIcon className="size-8 opacity-10" />}<Badge className={cn("absolute top-1 left-1 font-black text-[8px] uppercase h-5", p.promoType === 'Promo' ? "bg-red-600" : "bg-primary")}>{p.promoType}</Badge></div>

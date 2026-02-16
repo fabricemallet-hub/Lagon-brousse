@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, doc, query, orderBy, serverTimestamp, addDoc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, query, orderBy, serverTimestamp, addDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import type { UserAccount, Business, Promotion } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,7 +33,6 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { allCommuneNames } from '@/lib/locations';
 import { analyzeProduct } from '@/ai/flows/analyze-product-flow';
 import type { AnalyzeProductOutput } from '@/ai/schemas';
 import {
@@ -44,7 +43,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 type WizardStep = 'IDLE' | 'TONE' | 'GENERATING' | 'OPTIONS' | 'STRATEGY';
 
@@ -61,7 +60,6 @@ export default function ProDashboard() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
-  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const userProfileRef = useMemoFirebase(() => {
@@ -324,7 +322,6 @@ export default function ProDashboard() {
       ) : (
         <Alert variant="destructive" className="bg-red-50 border-red-200">
             <AlertCircle className="size-5" />
-            <AlertTitle className="font-black uppercase">Compte PRO non configuré</AlertTitle>
             <AlertDescription className="text-sm font-medium">Veuillez transmettre votre UID à l'administrateur pour activer votre accès boutique.</AlertDescription>
         </Alert>
       )}

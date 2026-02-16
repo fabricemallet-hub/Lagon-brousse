@@ -48,7 +48,6 @@ export function useCollection<T = any>(
 
   useEffect(() => {
     let path: string = '';
-    let isGroup = false;
     
     try {
       if (memoizedTargetRefOrQuery) {
@@ -56,12 +55,8 @@ export function useCollection<T = any>(
           path = (memoizedTargetRefOrQuery as CollectionReference).path;
         } else {
           const internalQuery = memoizedTargetRefOrQuery as unknown as InternalQuery;
-          if (internalQuery._query?.collectionGroup) {
-              path = internalQuery._query.collectionGroup;
-              isGroup = true;
-          } else {
-              path = internalQuery._query?.path?.canonicalString() || 'query';
-          }
+          // Robust path detection for collectionGroup
+          path = internalQuery._query?.collectionGroup || internalQuery._query?.path?.canonicalString() || 'query';
         }
       }
     } catch (e) {
@@ -104,12 +99,9 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (err: FirestoreError) => {
-        const errorPath = isGroup ? `collectionGroup("${path}")` : path;
-        console.error(`[DEBUG] useCollection Error on "${errorPath}":`, err.message);
-
         const contextualError = new FirestorePermissionError({
           operation: 'list',
-          path: errorPath,
+          path: path,
         });
 
         setError(contextualError);
