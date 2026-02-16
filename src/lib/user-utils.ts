@@ -9,7 +9,6 @@ import { locationsByRegion } from './locations';
 /**
  * Synchronisation du profil utilisateur.
  * Sécurité Master : Force les droits administrateurs pour les comptes de confiance.
- * Garantit également les champs d'opt-in par défaut pour les calculs d'audience.
  */
 export async function ensureUserDocument(
   firestore: Firestore, 
@@ -22,7 +21,7 @@ export async function ensureUserDocument(
   const userDocRef = doc(firestore, 'users', user.uid);
   const email = user.email?.toLowerCase() || '';
   
-  // COMPTES ADMIN AUTORISÉS (Consolidés avec les règles de sécurité)
+  // LISTE CONSOLIDÉE DES ADMINS (Rules + Code)
   const masterUids = [
     't8nPnZLcTiaLJSKMuLzib3C5nPn1', 
     'D1q2GPM95rZi38cvCzvsjcWQDaV2', 
@@ -45,18 +44,18 @@ export async function ensureUserDocument(
       const currentData = docSnap.data() as UserAccount;
       const updates: any = {};
       
-      // 1. Verification de l'intégrité de l'ID interne
+      // 1. Verification de l'ID
       if (!currentData.id || currentData.id !== user.uid) {
           updates.id = user.uid;
       }
 
-      // 2. Restauration automatique du rôle Master
+      // 2. Restauration automatique du rôle Admin
       if (isMasterAdmin && (currentData.role !== 'admin' || currentData.subscriptionStatus !== 'admin')) {
           updates.role = 'admin';
           updates.subscriptionStatus = 'admin';
       }
 
-      // 3. Initialisation des champs d'audience si manquants
+      // 3. Initialisation des préférences si manquantes
       if (currentData.allowsPromoPush === undefined) updates.allowsPromoPush = true;
       if (currentData.allowsPromoEmails === undefined) updates.allowsPromoEmails = true;
       if (currentData.allowsPromoSMS === undefined) updates.allowsPromoSMS = true;
@@ -64,7 +63,7 @@ export async function ensureUserDocument(
           updates.subscribedCategories = ['Pêche', 'Chasse', 'Jardinage'];
       }
 
-      // 4. Backfill de la région si manquante
+      // 4. Backfill de la région
       if (!currentData.selectedRegion) {
           const currentLoc = currentData.lastSelectedLocation || 'Nouméa';
           const isTahiti = Object.keys(locationsByRegion['TAHITI']).includes(currentLoc);
@@ -103,6 +102,6 @@ export async function ensureUserDocument(
     
     await setDoc(userDocRef, newUser);
   } catch (error) {
-    console.error("L&B Master Sync Error:", error);
+    console.error("L&B Sync Error:", error);
   }
 }

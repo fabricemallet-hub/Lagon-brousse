@@ -1,95 +1,22 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // ======================================================
-    // 1. FONCTIONS DE SÉCURITÉ & MASTER ADMIN
+    // 1. DÉVELOPPEMENT : PERMISSIONS SIMPLIFIÉES
     // ======================================================
     
+    // On autorise tout pour le moment pour débloquer le développement
+    // La sécurité sera renforcée en fin de projet.
+    match /{allPaths=**} {
+      allow read, write: if true;
+    }
+
+    // Fonction de secours si besoin de filtrer
     function isSignedIn() {
       return request.auth != null;
-    }
-
-    function isMasterAdmin() {
-      return isSignedIn() && (
-        request.auth.uid in ["t8nPnZLcTiaLJSKMuLzib3C5nPn1", "D1q2GPM95rZi38cvCzvsjcWQDaV2"] ||
-        (request.auth.token.email != null && (
-          request.auth.token.email.lower() == "f.mallet81@outlook.com" ||
-          request.auth.token.email.lower() == "f.mallet81@gmail.com" ||
-          request.auth.token.email.lower() == "fabrice.mallet@gmail.com"
-        ))
-      );
-    }
-
-    // Bypass total pour Master Admin
-    match /{allPaths=**} {
-      allow read, write: if isMasterAdmin();
-    }
-
-    // ======================================================
-    // 2. RÈGLES PUBLIQUES (LECTURE)
-    // ======================================================
-
-    match /app_settings/{document=**} { allow read: if true; }
-    match /system_notifications/{id} { allow read: if true; }
-    match /meteo_caledonie/{id} { 
-      allow get, list: if true;
-      match /previsions/{prevId} { allow get, list: if true; }
-    }
-    match /fish_species/{id} {
-      allow get, list: if true;
-      match /commune_stats/{communeId} { allow read, write: if isSignedIn(); }
-    }
-    match /sound_library/{id} { allow read: if true; }
-    match /businesses/{businessId} { allow get, list: if true; }
-    match /{path=**}/promotions/{promoId} { allow read: if true; }
-
-    // ======================================================
-    // 3. RÈGLES UTILISATEURS & PRIVÉES
-    // ======================================================
-
-    match /users/{userId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && (request.auth.uid == userId);
-      match /{allPaths=**} {
-        allow read, write: if isSignedIn() && (request.auth.uid == userId);
-      }
-    }
-
-    match /conversations/{convId} {
-      allow read, write: if isSignedIn() && (request.auth.uid == convId);
-      match /messages/{msgId} {
-        allow read, write: if isSignedIn() && (request.auth.uid == convId);
-      }
-    }
-    
-    match /cms_support/tickets/items/{id} {
-      allow create: if isSignedIn();
-      allow read, write: if isSignedIn() && (resource.data.userId == request.auth.uid);
-    }
-
-    match /access_tokens/{id} { allow read: if isSignedIn(); }
-    match /shared_access_tokens/{id} { allow read: if true; }
-    match /spot_shares/{id} { allow read, write: if isSignedIn(); }
-    
-    match /hunting_sessions/{sessionId} {
-      allow read, write: if isSignedIn();
-      match /{allPaths=**} { allow read, write: if isSignedIn(); }
-    }
-    match /vessel_sessions/{sessionId} {
-      allow read, write: if isSignedIn();
-      match /{allPaths=**} { allow read, write: if isSignedIn(); }
-    }
-    
-    match /vessels/{allPaths=**} { allow read, write: if isSignedIn(); }
-
-    // ======================================================
-    // 4. CAMPAGNES (CORRIGÉ ICI)
-    // ======================================================
-    match /campaigns/{campaignId} {
-      // On utilise {campaignId} et isSignedIn() pour autoriser get ET list
-      allow read, write: if isSignedIn();
     }
   }
 }

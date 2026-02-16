@@ -26,21 +26,24 @@ export function BottomNav() {
   const roles = useMemo(() => {
     if (!user) return { isAdmin: false, isPro: false, isClient: true };
     
-    // UNIQUE COMPTE ADMIN AUTORISÉ
-    const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com', 'fabrice.mallet@gmail.com'];
-    const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'D1q2GPM95rZi38cvCzvsjcWQDaV2'];
-    const isAdmin = masterEmails.includes(user.email?.toLowerCase() || '') || masterUids.includes(user.uid) ||
+    // LISTE CONSOLIDÉE DES ADMINS
+    const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com', 'fabrice.mallet@gmail.com', 'kledostyle@hotmail.com', 'kledostyle@outlook.com'];
+    const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'D1q2GPM95rZi38cvCzvsjcWQDaV2', 'koKj5ObSGXYeO1PLKU5bgo8Yaky1'];
+    
+    const isAdmin = masterEmails.includes(user.email?.toLowerCase() || '') || 
+                    masterUids.includes(user.uid) || 
                     userProfile?.role === 'admin' || 
                     userProfile?.subscriptionStatus === 'admin';
 
-    const isPro = isAdmin || userProfile?.role === 'professional' || userProfile?.subscriptionStatus === 'professional';
+    const isPro = isAdmin || 
+                  userProfile?.role === 'professional' || 
+                  userProfile?.subscriptionStatus === 'professional';
     
     return { isAdmin, isPro, isClient: !isAdmin && !isPro };
   }, [user, userProfile]);
 
   // Configuration par défaut
   const defaultTabs = ['/', '/peche', '/vessel-tracker', '/chasse', '/champs', '/compte'];
-  
   const userFavorites = userProfile?.favoriteNavLinks;
   const mobileTabs = (userFavorites && userFavorites.length > 0) ? userFavorites : defaultTabs;
   
@@ -48,7 +51,6 @@ export function BottomNav() {
     const link = navLinks.find(l => l.href === href);
     if (!link) return null;
     
-    // Filtrage basé sur les rôles
     if (link.adminOnly && !roles.isAdmin) return null;
     if (link.proOnly && !roles.isPro) return null;
 

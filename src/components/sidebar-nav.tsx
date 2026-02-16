@@ -27,18 +27,19 @@ export function SidebarNav() {
 
   const { data: userProfile } = useDoc<UserAccount>(userDocRef);
 
-  // Détection robuste et instantanée des rôles pour le filtrage UI
+  // Détection robuste des rôles pour le filtrage
   const roles = useMemo(() => {
     if (!user) return { isAdmin: false, isPro: false, isClient: true };
     
-    // UNIQUE COMPTE ADMIN AUTORISÉ
-    const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com', 'fabrice.mallet@gmail.com'];
-    const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'D1q2GPM95rZi38cvCzvsjcWQDaV2'];
-    const isAdmin = masterEmails.includes(user.email?.toLowerCase() || '') || masterUids.includes(user.uid) ||
+    // LISTE CONSOLIDÉE DES ADMINS
+    const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com', 'fabrice.mallet@gmail.com', 'kledostyle@hotmail.com', 'kledostyle@outlook.com'];
+    const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'D1q2GPM95rZi38cvCzvsjcWQDaV2', 'koKj5ObSGXYeO1PLKU5bgo8Yaky1'];
+    
+    const isAdmin = masterEmails.includes(user.email?.toLowerCase() || '') || 
+                    masterUids.includes(user.uid) || 
                     userProfile?.role === 'admin' || 
                     userProfile?.subscriptionStatus === 'admin';
 
-    // Détection Pro : Admin OU rôle 'professional' dans Firestore
     const isPro = isAdmin || 
                   userProfile?.role === 'professional' || 
                   userProfile?.subscriptionStatus === 'professional';
@@ -51,19 +52,8 @@ export function SidebarNav() {
       <SidebarMenu className="flex-grow">
         {navLinks.map((link) => {
           // FILTRAGE DYNAMIQUE BASÉ SUR LES RÔLES
-          
-          // 1. Restriction ADMIN : Masquer pour Clients et Professionnels (si non-admin)
-          if (link.href === '/admin' || link.adminOnly) {
-            if (!roles.isAdmin) return null;
-          }
-          
-          // 2. Restriction PRO : Masquer pour les Clients
-          if (link.href === '/pro/dashboard' || link.proOnly) {
-            if (!roles.isPro) return null;
-          }
-          
-          // 3. Masquage du contact pour l'admin (reçoit les messages via l'onglet support)
-          if (link.href === '/contact' && roles.isAdmin) return null;
+          if (link.adminOnly && !roles.isAdmin) return null;
+          if (link.proOnly && !roles.isPro) return null;
           
           return (
             <SidebarMenuItem key={link.href}>
