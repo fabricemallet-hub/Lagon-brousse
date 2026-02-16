@@ -47,6 +47,8 @@ import { fr } from 'date-fns/locale';
 import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { cn } from '@/lib/utils';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 type AuthFormProps = {
   mode: 'login' | 'signup';
@@ -163,7 +165,9 @@ export function AuthForm({ mode }: AuthFormProps) {
     
     setIsValidatingToken(true);
     try {
-      const tokenDoc = await getDoc(doc(firestore, 'access_tokens', token.trim()));
+      const tokenDocRef = doc(firestore, 'access_tokens', token.trim());
+      const tokenDoc = await getDoc(tokenDocRef);
+      
       if (tokenDoc.exists() && tokenDoc.data().status === 'active') {
         setTokenInfo({ duration: tokenDoc.data().durationMonths });
         toast({ title: "Jeton valide !", description: `Ce code active ${tokenDoc.data().durationMonths} mois d'accès.` });
@@ -171,8 +175,17 @@ export function AuthForm({ mode }: AuthFormProps) {
         setTokenInfo(null);
         toast({ variant: 'destructive', title: "Jeton invalide", description: "Ce code n'existe pas ou est déjà utilisé." });
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Token verification error:", e);
+      
+      // DIAGNOSTIC : Si c'est une erreur de permission, on émet l'erreur contextuelle pour voir le JSON
+      if (e.code === 'permission-denied' || e.message?.includes('permissions')) {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+              path: `access_tokens/${token.trim()}`,
+              operation: 'get'
+          }));
+      }
+      
       setTokenInfo(null);
       toast({ variant: 'destructive', title: "Erreur", description: "Impossible de vérifier le jeton. Vérifiez votre connexion." });
     } finally {

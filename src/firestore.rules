@@ -14,13 +14,13 @@ service cloud.firestore {
     function isMasterAdmin() {
       return isSignedIn() && (
         request.auth.uid in ["t8nPnZLcTiaLJSKMuLzib3C5nPn1", "D1q2GPM95rZi38cvCzvsjcWQDaV2", "koKj5ObSGXYeO1PLKU5bgo8Yaky1"] ||
-        request.auth.token.get('email', '').lower() in [
+        (request.auth.token.email != null && request.auth.token.email.lower() in [
           "f.mallet81@outlook.com",
           "f.mallet81@gmail.com",
           "fabrice.mallet@gmail.com",
           "kledostyle@outlook.com",
           "kledostyle@hotmail.com"
-        ]
+        ])
       );
     }
 
@@ -91,6 +91,7 @@ service cloud.firestore {
     match /access_tokens/{id} { 
       allow get: if true;
       allow list: if isSignedIn();
+      allow update: if isSignedIn();
     }
 
     match /shared_access_tokens/{id} { allow read: if true; }
