@@ -607,7 +607,7 @@ export default function ProDashboard() {
                         <div className="space-y-3">
                             <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Descriptions proposées (Sélectionnez)</Label>
                             {aiProductResult.commercialDescriptions.map((desc, idx) => (
-                                <div key={idx} onClick={() => { setPromoDescription(desc); setAiProductStep('TONE'); setIsAiProductOpen(false); }} className="p-4 rounded-xl border-2 bg-white text-xs leading-relaxed font-medium italic hover:border-primary cursor-pointer transition-all border-slate-100 hover:shadow-md">
+                                <div key={idx} onClick={() => { setPromoDescription(desc); setAiProductStep('TONE'); setIsAiProductOpen(false); }} className="p-4 rounded-xl border-2 bg-white text-xs font-medium leading-relaxed italic hover:border-primary cursor-pointer transition-all border-slate-100 hover:shadow-md">
                                     "{desc}"
                                 </div>
                             ))}

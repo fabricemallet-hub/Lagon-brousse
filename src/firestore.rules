@@ -13,8 +13,7 @@ service cloud.firestore {
 
     function isMasterAdmin() {
       return isSignedIn() && (
-       request.auth.uid in ["t8nPnZLcTiaLJSKMuLzib3C5nPn1", "D1q2GPM95rZi38cvCzvsjcWQDaV2", "koKj5ObSGXYeO1PLKU5bgo8Yaky1"] ||
-        // Vérification par Email
+        request.auth.uid in ["t8nPnZLcTiaLJSKMuLzib3C5nPn1", "D1q2GPM95rZi38cvCzvsjcWQDaV2", "koKj5ObSGXYeO1PLKU5bgo8Yaky1"] ||
         (request.auth.token.email != null && (
           request.auth.token.email.lower() == "f.mallet81@outlook.com" ||
           request.auth.token.email.lower() == "f.mallet81@gmail.com" ||
@@ -31,7 +30,16 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 2. RÈGLES PUBLIQUES (LECTURE)
+    // 2. CAMPAGNES (URGENT FIX)
+    // ======================================================
+    
+    match /campaigns/{campaignId} {
+      // Autorisation simplifiée au maximum pour débloquer le listing
+      allow read, write: if request.auth != null;
+    }
+
+    // ======================================================
+    // 3. RÈGLES PUBLIQUES (LECTURE)
     // ======================================================
 
     match /app_settings/{document=**} { allow read: if true; }
@@ -49,7 +57,7 @@ service cloud.firestore {
     match /{path=**}/promotions/{promoId} { allow read: if true; }
 
     // ======================================================
-    // 3. RÈGLES UTILISATEURS & PRIVÉES
+    // 4. UTILISATEURS & PRIVÉES
     // ======================================================
 
     match /users/{userId} {
@@ -61,15 +69,15 @@ service cloud.firestore {
     }
 
     match /conversations/{convId} {
-      allow read, write: if isSignedIn() && (request.auth.uid == convId);
+      allow read, write: if isSignedIn() && (request.auth.uid == convId || isMasterAdmin());
       match /messages/{msgId} {
-        allow read, write: if isSignedIn() && (request.auth.uid == convId);
+        allow read, write: if isSignedIn() && (request.auth.uid == convId || isMasterAdmin());
       }
     }
     
     match /cms_support/tickets/items/{id} {
       allow create: if isSignedIn();
-      allow read, write: if isSignedIn() && (resource.data.userId == request.auth.uid);
+      allow read, write: if isSignedIn() && (resource.data.userId == request.auth.uid || isMasterAdmin());
     }
 
     match /access_tokens/{id} { allow read: if isSignedIn(); }
@@ -86,12 +94,5 @@ service cloud.firestore {
     }
     
     match /vessels/{allPaths=**} { allow read, write: if isSignedIn(); }
-
-    // ======================================================
-    // 4. CAMPAGNES
-    // ======================================================
-    match /campaigns/{campaignId} {
-      allow read, write: if isSignedIn();
-    }
   }
 }
