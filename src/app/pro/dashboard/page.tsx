@@ -707,7 +707,7 @@ export default function ProDashboard() {
 
                             <Card className="bg-primary/5 border-2 border-primary/20 rounded-3xl p-6 shadow-sm">
                                 <div className="flex items-center justify-between">
-                                    <div className="flex flex-col">
+                                    <div className="flex flex-col flex-1">
                                         <span className="text-[10px] font-black uppercase text-primary tracking-widest">Budget Estimé</span>
                                         <div className="flex items-baseline gap-1 mt-1">
                                             <span className="text-3xl font-black text-slate-800">{campaignCost.toLocaleString('fr-FR')}</span>
@@ -715,29 +715,41 @@ export default function ProDashboard() {
                                         </div>
                                         {/* Détail du devis instantané */}
                                         {pricing && (
-                                            <div className="mt-3 space-y-1 border-t border-primary/10 pt-2">
-                                                <p className="text-[8px] font-bold text-muted-foreground uppercase flex justify-between">
+                                            <div className="mt-3 space-y-1.5 border-t border-primary/10 pt-2">
+                                                <div className="text-[8px] font-bold text-muted-foreground uppercase flex justify-between">
                                                     <span>Frais fixes de lancement :</span>
                                                     <span>{pricing.fixedPrice || 0} F</span>
-                                                </p>
-                                                <p className="text-[8px] font-bold text-muted-foreground uppercase flex justify-between">
-                                                    <span>Base audience ({reachCount}) :</span>
+                                                </div>
+                                                
+                                                <div className="text-[8px] font-bold text-muted-foreground uppercase flex justify-between">
+                                                    <span>Base audience ({reachCount} pers. x {pricing.unitPricePerUser} F) :</span>
                                                     <span>{((pricing.unitPricePerUser || 0) * reachCount).toLocaleString('fr-FR')} F</span>
-                                                </p>
-                                                {campChannels.length > 0 && (
-                                                    <p className="text-[8px] font-black text-primary uppercase flex justify-between">
-                                                        <span>Canaux sélectionnés :</span>
-                                                        <span>
-                                                            {((campChannels.includes('SMS') ? (pricing.priceSMS || 0) * smsCount : 0) +
-                                                            (campChannels.includes('PUSH') ? (pricing.pricePush || 0) * pushCount : 0) +
-                                                            (campChannels.includes('MAIL') ? (pricing.priceMail || 0) * emailCount : 0)).toLocaleString('fr-FR')} F
-                                                        </span>
-                                                    </p>
+                                                </div>
+
+                                                {campChannels.includes('SMS') && (
+                                                    <div className="text-[8px] font-bold text-blue-600 uppercase flex justify-between">
+                                                        <span>Option SMS ({smsCount} SMS x {pricing.priceSMS} F) :</span>
+                                                        <span>{((pricing.priceSMS || 0) * smsCount).toLocaleString('fr-FR')} F</span>
+                                                    </div>
+                                                )}
+
+                                                {campChannels.includes('PUSH') && (
+                                                    <div className="text-[8px] font-bold text-primary uppercase flex justify-between">
+                                                        <span>Option PUSH ({pushCount} Push x {pricing.pricePush} F) :</span>
+                                                        <span>{((pricing.pricePush || 0) * pushCount).toLocaleString('fr-FR')} F</span>
+                                                    </div>
+                                                )}
+
+                                                {campChannels.includes('MAIL') && (
+                                                    <div className="text-[8px] font-bold text-green-600 uppercase flex justify-between">
+                                                        <span>Option MAIL ({emailCount} Mail x {pricing.priceMail} F) :</span>
+                                                        <span>{((pricing.priceMail || 0) * emailCount).toLocaleString('fr-FR')} F</span>
+                                                    </div>
                                                 )}
                                             </div>
                                         )}
                                     </div>
-                                    <div className="p-3 bg-white rounded-2xl shadow-sm border border-primary/10 self-start">
+                                    <div className="p-3 bg-white rounded-2xl shadow-sm border border-primary/10 self-start ml-4">
                                         <DollarSign className="size-6 text-primary" />
                                     </div>
                                 </div>
