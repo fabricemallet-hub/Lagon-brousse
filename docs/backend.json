@@ -80,47 +80,25 @@
     "providers": ["password", "anonymous"]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/users/{userId}",
-        "definition": {
-          "entityName": "UserAccount",
-          "schema": { "$ref": "#/backend/entities/UserAccount" },
-          "description": "Private user profiles."
-        }
-      },
-      {
-        "path": "/businesses/{businessId}",
-        "definition": {
-          "entityName": "Business",
-          "schema": { "$ref": "#/backend/entities/Business" },
-          "description": "Public business information."
-        }
-      },
-      {
-        "path": "/businesses/{businessId}/promotions/{promoId}",
-        "definition": {
-          "entityName": "Promotion",
-          "schema": { "$ref": "#/backend/entities/Promotion" },
-          "description": "Articles belonging to a business."
-        }
-      },
-      {
-        "path": "/campaigns/{campaignId}",
-        "definition": {
-          "entityName": "Campaign",
-          "schema": { "$ref": "#/backend/entities/Campaign" },
-          "description": "Direct marketing campaigns."
-        }
-      },
-      {
-        "path": "/access_tokens/{tokenId}",
-        "definition": {
-          "entityName": "AccessToken",
-          "schema": { "$ref": "#/backend/entities/AccessToken" },
-          "description": "Premium access tokens."
-        }
-      }
-    ]
+    "/users/{userId}": {
+      "schema": { "$ref": "#/backend/entities/UserAccount" },
+      "description": "Private user profiles."
+    },
+    "/businesses/{businessId}": {
+      "schema": { "$ref": "#/backend/entities/Business" },
+      "description": "Public business information."
+    },
+    "/businesses/{businessId}/promotions/{promoId}": {
+      "schema": { "$ref": "#/backend/entities/Promotion" },
+      "description": "Articles belonging to a business."
+    },
+    "/campaigns/{campaignId}": {
+      "schema": { "$ref": "#/backend/entities/Campaign" },
+      "description": "Direct marketing campaigns."
+    },
+    "/access_tokens/{tokenId}": {
+      "schema": { "$ref": "#/backend/entities/AccessToken" },
+      "description": "Premium access tokens."
+    }
   }
 }
