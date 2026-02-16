@@ -203,6 +203,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           const userDocRef = doc(firestore, 'users', user.uid);
           const isPro = signupValues.accountType === 'professional';
           
+          // CRITICAL: ID is explicitly set to match UID
           await setDoc(userDocRef, {
             id: user.uid,
             email: emailLower,

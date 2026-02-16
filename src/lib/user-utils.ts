@@ -31,11 +31,19 @@ export async function ensureUserDocument(
 
     if (docSnap.exists()) {
       const currentData = docSnap.data() as UserAccount;
+      
+      // Verification de l'intégrité de l'ID interne
+      if (!currentData.id || currentData.id !== user.uid) {
+          console.warn("L&B Sync: Correction de l'ID manquant ou erroné...");
+          setDoc(userDocRef, { id: user.uid }, { merge: true });
+      }
+
       // Restauration automatique si le rôle Master a sauté pour les admins réels
       if (isMasterAdmin && currentData.role !== 'admin') {
           console.log(`L&B Master Sync: Restauration des droits pour [${email}]...`);
           setDoc(userDocRef, { 
-            ...currentData, 
+            ...currentData,
+            id: user.uid,
             role: 'admin', 
             subscriptionStatus: 'admin' 
           }, { merge: true });
@@ -46,7 +54,7 @@ export async function ensureUserDocument(
     // Création d'un nouveau profil
     const effectiveDisplayName = displayName || user.displayName || email.split('@')[0] || 'Utilisateur';
     const newUser: UserAccount = {
-      id: user.uid,
+      id: user.uid, // CRITICAL: ID is explicitly set to match UID
       email: email,
       displayName: effectiveDisplayName,
       role: isMasterAdmin ? 'admin' : 'client',
@@ -59,7 +67,7 @@ export async function ensureUserDocument(
       newUser.subscriptionExpiryDate = addMonths(new Date(), 3).toISOString();
     }
     
-    setDoc(userDocRef, newUser);
+    await setDoc(userDocRef, newUser);
   } catch (error) {
     console.error("L&B Master Sync Error:", error);
   }
