@@ -122,7 +122,7 @@ export interface Promotion {
   images?: string[];
   createdAt: any;
   isOutOfStock?: boolean;
-  nextArrival?: string | null;
+  restockDate?: string | null;
 }
 
 export interface Campaign {
