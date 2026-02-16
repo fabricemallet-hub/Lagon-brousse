@@ -73,7 +73,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 type TargetScope = 'SPECIFIC' | 'CALEDONIE' | 'TAHITI' | 'ALL';
 type WizardStep = 'IDLE' | 'INFO' | 'TONE' | 'GENERATING' | 'OPTIONS' | 'STRATEGY';
@@ -268,6 +268,7 @@ export default function ProDashboard() {
         setSmsTargetCount(snapSms.data().count);
       } catch (e: any) {
         setReachError(true);
+        console.warn("Reach calculation error:", e);
       } finally {
         setIsCalculatingReach(false);
       }
@@ -518,7 +519,6 @@ export default function ProDashboard() {
       reach: baseTargetCount, 
       cost: totalCalculatedCost, 
       status: isDraft ? 'draft' : 'pending', 
-      createdAt: editingCampaignId ? undefined : serverTimestamp(), 
       selectedChannels,
       promotedPromoIds: selectedPromoIds,
       updatedAt: serverTimestamp()
@@ -527,6 +527,8 @@ export default function ProDashboard() {
     const campaignRef = editingCampaignId 
         ? doc(firestore, 'campaigns', editingCampaignId)
         : doc(collection(firestore, 'campaigns'));
+
+    if (!editingCampaignId) campaignData.createdAt = serverTimestamp();
 
     setDoc(campaignRef, campaignData, { merge: true })
       .then(() => {
@@ -568,9 +570,16 @@ export default function ProDashboard() {
 
   const handleDeleteCampaign = (id: string) => {
     if (!firestore) return;
-    deleteDoc(doc(firestore, 'campaigns', id))
+    const campaignRef = doc(firestore, 'campaigns', id);
+    deleteDoc(campaignRef)
         .then(() => toast({ title: "Brouillon supprimé" }))
-        .catch(() => toast({ variant: 'destructive', title: "Erreur suppression" }));
+        .catch(async (err) => {
+            const permissionError = new FirestorePermissionError({
+                path: campaignRef.path,
+                operation: 'delete'
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        });
   };
 
   if (isUserLoading || isProfileLoading || isBusinessLoading) return <div className="p-8"><Skeleton className="h-64 w-full" /></div>;
@@ -680,7 +689,7 @@ export default function ProDashboard() {
                             <div className="p-4 bg-red-50/50 border-2 border-dashed border-red-200 rounded-2xl space-y-4">
                                 <div className="flex items-center justify-between">
                                     <div className="space-y-0.5">
-                                        <Label className="text-[10px] font-black uppercase text-red-800">Stock vide</Label>
+                                        <Label className="text-xs font-black uppercase text-red-800">Stock vide</Label>
                                         <p className="text-[8px] font-bold text-red-600/60 uppercase italic">Marquer comme indisponible</p>
                                     </div>
                                     <Switch checked={isOutOfStock} onCheckedChange={setIsOutOfStock} />

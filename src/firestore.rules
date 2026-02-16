@@ -75,14 +75,19 @@ service cloud.firestore {
     match /{path=**}/promotions/{promoId} { allow read: if true; }
 
     // ======================================================
-    // 3. RÈGLES UTILISATEURS & PRIVÉES
+    // 3. RÈGLES PRIVÉES (CAMPAGNES, USERS, SESSIONS)
     // ======================================================
+
+    // Campagnes publicitaires et brouillons
+    match /campaigns/{campaignId} {
+      allow read, write: if isSignedIn();
+    }
 
     match /users/{userId} {
       // Un utilisateur peut voir son propre profil
-      // Un Admin ou un Pro peut lister les utilisateurs pour les calculs d'audience
       allow get: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
-      allow list: if isMasterAdmin() || isProfessional();
+      // Un Admin ou un Pro peut lister les utilisateurs pour les calculs d'audience
+      allow list: if isSignedIn() && (isMasterAdmin() || isProfessional());
       
       allow write: if isSignedIn() && (request.auth.uid == userId);
       
@@ -110,6 +115,5 @@ service cloud.firestore {
     // Sessions de Groupe & Tracker
     match /hunting_sessions/{allPaths=**} { allow read, write: if isSignedIn(); }
     match /vessels/{allPaths=**} { allow read, write: if isSignedIn(); }
-    match /campaigns/{id} { allow read, write: if isSignedIn(); }
   }
 }
