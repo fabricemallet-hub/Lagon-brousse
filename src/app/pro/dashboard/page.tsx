@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -11,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, ImageIcon, X, Info, Pencil, Save, AlertCircle, LogOut, HelpCircle, Copy, Check, UserCircle, ShieldCheck, BrainCircuit, MapPin, ChevronDown, Globe, Smartphone, Mail, Zap } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, ImageIcon, X, Info, Pencil, Save, AlertCircle, LogOut, HelpCircle, Copy, Check, UserCircle, ShieldCheck, BrainCircuit, MapPin, ChevronDown, Globe, Smartphone, Mail, Zap, Lightbulb } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { cn, getDistance } from '@/lib/utils';
@@ -20,6 +21,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { locations } from '@/lib/locations';
+import { analyzeProduct } from '@/ai/flows/analyze-product-flow';
+import type { AnalyzeProductOutput } from '@/ai/schemas';
 import {
   Dialog,
   DialogContent,
@@ -106,6 +109,11 @@ export default function ProDashboard() {
   const [promoType, setPromoType] = useState<'Promo' | 'Nouvel Arrivage'>('Promo');
   const [isSaving, setIsSaving] = useState(false);
   const [hasCopiedUid, setHasCopiedUid] = useState(false);
+
+  // AI Strategy States
+  const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
+  const [aiStrategy, setAiStrategy] = useState<AnalyzeProductOutput | null>(null);
+  const [isStrategyDialogOpen, setIsStrategyDialogOpen] = useState(false);
 
   useEffect(() => {
     if (manualDiscountInput && originalPrice) {
@@ -239,6 +247,30 @@ export default function ProDashboard() {
     });
   };
 
+  const handleGenerateAiDescription = async () => {
+    if (!promoTitle || promoImages.length === 0) {
+        toast({ variant: 'destructive', title: "Infos manquantes", description: "Veuillez saisir un titre et ajouter au moins une photo pour l'IA." });
+        return;
+    }
+    setIsAiAnalyzing(true);
+    try {
+        const result = await analyzeProduct({
+            title: promoTitle,
+            type: promoType,
+            category: promoCategory,
+            photos: promoImages
+        });
+        setPromoDescription(result.commercialDescription);
+        setAiStrategy(result);
+        setIsStrategyDialogOpen(true);
+        toast({ title: "Description générée !" });
+    } catch (e) {
+        toast({ variant: 'destructive', title: "Erreur IA", description: "L'analyse a échoué." });
+    } finally {
+        setIsAiAnalyzing(false);
+    }
+  };
+
   const handleSavePromotion = async () => {
     if (!firestore || !business || !promoTitle || !promoCategory) return;
     setIsSaving(true);
@@ -269,6 +301,7 @@ export default function ProDashboard() {
     setManualDiscountInput('');
     setPromoImages([]); 
     setPromoCategory('Pêche'); 
+    setAiStrategy(null);
   };
 
   const handleEditPromotion = (promo: Promotion) => {
@@ -285,6 +318,7 @@ export default function ProDashboard() {
     }
     setPromoImages(promo.images || [promo.imageUrl || '']);
     setPromoType(promo.promoType); 
+    setAiStrategy(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -345,7 +379,17 @@ export default function ProDashboard() {
             <CardContent className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-4">
-                  <h3 className="text-sm font-black uppercase flex items-center gap-2 border-b pb-2"><ShoppingBag className="size-4" /> {editingPromoId ? "Mise à jour" : "Nouveau Produit"}</h3>
+                  <div className="flex items-center justify-between border-b pb-2">
+                    <h3 className="text-sm font-black uppercase flex items-center gap-2"><ShoppingBag className="size-4" /> {editingPromoId ? "Mise à jour" : "Nouveau Produit"}</h3>
+                    <Select value={promoType} onValueChange={(v: any) => setPromoType(v)}>
+                        <SelectTrigger className="h-8 w-32 border-2 font-black uppercase text-[9px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Promo" className="text-[9px] font-black uppercase text-red-600">Promotion</SelectItem>
+                            <SelectItem value="Nouvel Arrivage" className="text-[9px] font-black uppercase text-primary">Nouveauté</SelectItem>
+                        </SelectContent>
+                    </Select>
+                  </div>
+                  
                   <div className="space-y-3">
                     <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Titre</Label><Input value={promoTitle} onChange={e => setPromoTitle(e.target.value)} className="font-bold border-2" /></div>
                     <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Rayon</Label><Select value={promoCategory} onValueChange={setPromoCategory}><SelectTrigger className="border-2 font-black uppercase text-xs"><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs uppercase">{cat}</SelectItem>)}</SelectContent></Select></div>
@@ -397,7 +441,6 @@ export default function ProDashboard() {
                         </div>
                     </div>
 
-                    <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Description</Label><Textarea value={promoDescription} onChange={e => setPromoDescription(e.target.value)} className="font-medium border-2 min-h-[80px]" /></div>
                     <div className="space-y-2">
                         <Label className="text-[10px] font-black uppercase opacity-60">Photos (Max 4)</Label>
                         <div className="grid grid-cols-4 gap-2">
@@ -426,6 +469,39 @@ export default function ProDashboard() {
                         <input type="file" accept="image/*" multiple ref={fileInputRef} className="hidden" onChange={handleFileChange} />
                         <input type="file" accept="image/*" capture="environment" ref={cameraInputRef} className="hidden" onChange={handleFileChange} />
                     </div>
+
+                    <div className="space-y-1.5 pt-2">
+                        <div className="flex justify-between items-center mb-1">
+                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Description commerciale</Label>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-7 text-[8px] font-black uppercase border-primary/30 text-primary bg-primary/5 gap-1.5"
+                                onClick={handleGenerateAiDescription}
+                                disabled={isAiAnalyzing || !promoTitle || promoImages.length === 0}
+                            >
+                                {isAiAnalyzing ? <RefreshCw className="size-2.5 animate-spin" /> : <BrainCircuit className="size-2.5" />}
+                                {isAiAnalyzing ? 'Analyse...' : 'Rédiger via IA (Analyse Photo)'}
+                            </Button>
+                        </div>
+                        <Textarea 
+                            value={promoDescription} 
+                            onChange={e => setPromoDescription(e.target.value)} 
+                            className="font-medium border-2 min-h-[100px] text-sm" 
+                            placeholder="Décrivez votre offre ou laissez l'IA le faire pour vous..."
+                        />
+                        {aiStrategy && (
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="w-full h-6 text-[8px] font-black uppercase text-accent mt-1 gap-1"
+                                onClick={() => setIsStrategyDialogOpen(true)}
+                            >
+                                <Lightbulb className="size-3" /> Voir les arguments de vente IA
+                            </Button>
+                        )}
+                    </div>
+
                     <div className="flex gap-2 pt-2">
                         {editingPromoId && <Button variant="ghost" onClick={resetForm} className="flex-1 border-2">Annuler</Button>}
                         <Button onClick={handleSavePromotion} disabled={isSaving || !promoTitle} className="flex-[2] h-12 font-black uppercase shadow-lg">Sauvegarder l'article</Button>
@@ -591,7 +667,7 @@ export default function ProDashboard() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {isPromosLoading ? [1,2].map(i => <Skeleton key={i} className="h-32 w-full rounded-2xl" />) : promotions?.map(promo => (
                     <Card key={promo.id} className={cn("overflow-hidden border-2 shadow-sm flex h-32 transition-all cursor-pointer", selectedPromoIds.includes(promo.id) ? "border-primary ring-2 ring-primary/10" : "hover:border-primary/30")} onClick={() => setSelectedPromoIds(prev => prev.includes(promo.id) ? prev.filter(pid => pid !== promo.id) : [...prev, promo.id])}>
-                        <div className="w-8 bg-muted/30 border-r flex items-center justify-center shrink-0"><Checkbox checked={selectedPromoIds.includes(promo.id)} onCheckedChange={() => {}} /></div>
+                        <div className="w-8 bg-muted/30 border-r flex items-center justify-center shrink-0" onClick={e => e.stopPropagation()}><Checkbox checked={selectedPromoIds.includes(promo.id)} onCheckedChange={() => setSelectedPromoIds(prev => prev.includes(promo.id) ? prev.filter(pid => pid !== promo.id) : [...prev, promo.id])} /></div>
                         <div className="w-24 bg-muted/20 shrink-0 relative overflow-hidden flex items-center justify-center border-r">{promo.imageUrl ? <img src={promo.imageUrl} className="w-full h-full object-cover" alt="" /> : <ImageIcon className="size-6 opacity-20" />}</div>
                         <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
                             <div className="space-y-1">
@@ -612,6 +688,60 @@ export default function ProDashboard() {
                 ))}
             </div>
           </div>
+
+          {/* Dialog for AI Strategy & Selling Points */}
+          <Dialog open={isStrategyDialogOpen} onOpenChange={setIsStrategyDialogOpen}>
+            <DialogContent className="max-w-md rounded-2xl p-0 overflow-hidden border-none shadow-2xl">
+                <DialogHeader className="p-6 bg-accent text-white border-b border-white/10">
+                    <DialogTitle className="font-black uppercase tracking-tighter flex items-center gap-3">
+                        <Lightbulb className="size-6 text-yellow-300" /> Stratégie de Vente IA
+                    </DialogTitle>
+                    <DialogDescription className="text-white/80 text-[10px] font-bold uppercase mt-1">
+                        Conseils d'expert pour booster votre article
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="p-6 space-y-6 bg-slate-50/50 max-h-[70vh] overflow-y-auto scrollbar-hide">
+                    {aiStrategy ? (
+                        <div className="space-y-6 animate-in fade-in zoom-in-95">
+                            <div className="space-y-3">
+                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                                    <Zap className="size-3 text-accent" /> Arguments de vente clés
+                                </p>
+                                <div className="grid gap-2">
+                                    {aiStrategy.sellingPoints.map((point, idx) => (
+                                        <div key={idx} className="flex items-start gap-3 p-3 bg-white rounded-xl border shadow-sm">
+                                            <div className="size-5 rounded-full bg-accent/10 text-accent flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">
+                                                {idx + 1}
+                                            </div>
+                                            <p className="text-xs font-bold text-slate-700 leading-snug">{point}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="p-4 bg-white border-2 border-dashed border-accent/20 rounded-2xl space-y-2 shadow-inner">
+                                <p className="text-[10px] font-black uppercase text-accent flex items-center gap-2">
+                                    <BrainCircuit className="size-3" /> Conseil de mise en avant
+                                </p>
+                                <p className="text-xs font-medium leading-relaxed italic text-slate-600">
+                                    "{aiStrategy.marketingAdvice}"
+                                </p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center py-10 gap-4 opacity-40">
+                            <RefreshCw className="size-8 animate-spin" />
+                            <p className="font-black uppercase text-[10px]">Génération en cours...</p>
+                        </div>
+                    )}
+                </div>
+                <DialogFooter className="p-4 bg-white border-t">
+                    <Button onClick={() => setIsStrategyDialogOpen(false)} className="w-full h-12 font-black uppercase tracking-widest shadow-lg">
+                        C'est noté !
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </>
       )}
     </div>

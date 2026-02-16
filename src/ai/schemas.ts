@@ -142,3 +142,19 @@ export const RecommendBestSpotOutputSchema = z.object({
   advice: z.string().describe("Specific tactical advice for this spot right now.")
 });
 export type RecommendBestSpotOutput = z.infer<typeof RecommendBestSpotOutputSchema>;
+
+// Analyze Product (Commercial Text & Strategy)
+export const AnalyzeProductInputSchema = z.object({
+  title: z.string().describe("Nom du produit."),
+  type: z.enum(['Promo', 'Nouvel Arrivage']).describe("Type d'offre."),
+  category: z.string().describe("Rayon du magasin."),
+  photos: z.array(z.string()).describe("Liste des photos en data URI."),
+});
+export type AnalyzeProductInput = z.infer<typeof AnalyzeProductInputSchema>;
+
+export const AnalyzeProductOutputSchema = z.object({
+  commercialDescription: z.string().describe("Texte de description optimisé pour la vente."),
+  sellingPoints: z.array(z.string()).describe("Liste d'arguments de vente pour le commerçant."),
+  marketingAdvice: z.string().describe("Conseil stratégique pour mettre en avant ce produit précisément."),
+});
+export type AnalyzeProductOutput = z.infer<typeof AnalyzeProductOutputSchema>;
