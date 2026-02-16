@@ -1,120 +1,143 @@
-
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ======================================================
-    // 1. PRIORITÉ ABSOLUE : MASTER ADMIN (GOD MODE)
-    // ======================================================
-    // Bypass total pour l'administrateur principal (Email & UID)
-    match /{allPaths=**} {
-      allow read, write: if request.auth != null && (
-        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
-        (request.auth.token.email != null && (
-          request.auth.token.email.lower() == "f.mallet81@outlook.com" ||
-          request.auth.token.email.lower() == "f.mallet81@gmail.com"
-        ))
-      );
-    }
+    /**
+     * CORE PHILOSOPHY
+     * This ruleset implements a hybrid security model: a strict User-Ownership model for private profiles 
+     * and a Public-Read model for environmental and geographical data (Communes). 
+     * 
+     * DATA STRUCTURE
+     * 1. Public Data: All environmental data (tides, weather, swell, etc.) is organized under /communes/{communeId}.
+     * 2. Private Data: User-specific settings and subscriptions are stored in /users/{userId}/profile.
+     * 
+     * KEY SECURITY DECISIONS
+     * - Public Data: Read access is open to all users to allow for wide availability of weather/tide info.
+     * - System-Managed Content: Since the Commune-related entities (Weather, Tides, etc.) represent 
+     *   system-provided data, write access is restricted. Developers should use a Service SDK or 
+     *   explicit Admin roles for updates.
+     * - Identity Verification: All private data access is strictly gated by the authenticated user's UID.
+     * 
+     * PROTOTYPING MODE
+     * This ruleset focuses on "Who" can access data (Authorization) rather than "What" the data looks like (Schema).
+     * It enforces relationship integrity (e.g., matching IDs) but permits flexible data shapes for rapid iteration.
+     */
 
-    // ======================================================
-    // 2. FONCTIONS DE SÉCURITÉ
-    // ======================================================
+    // --- Helper Functions ---
+
+    /** @description Checks if the request is from an authenticated user. */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isAdmin() {
-      return isSignedIn() && (
-        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin")
-      );
+    /** @description Checks if the authenticated user's UID matches the provided userId. */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    function isProfessional() {
-      return isSignedIn() && (
-        request.auth.uid in ["D1q2GPM95rZi38cvCzvsjcWQDaV2", "koKj5ObSGXYeO1PLKU5bgo8Yaky1"] ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "professional") || 
-        isAdmin()
-      );
+    /** @description Checks if the user is the owner and the document exists (for updates/deletes). */
+    function isExistingOwner(userId) {
+      return resource != null && isOwner(userId);
     }
 
-    // ======================================================
-    // 3. RÈGLES PAR COLLECTION
-    // ======================================================
+    // --- Collection Rules ---
 
-    // Catalogue Shopping & Promotions (Public en lecture)
-    match /{path=**}/promotions/{promoId} {
-      allow read: if true;
-      allow write: if isProfessional();
-    }
-
-    // Commerces
-    match /businesses/{businessId} {
+    /**
+     * @description Top-level geographical data for New Caledonia.
+     * @path /communes/{communeId}
+     * @allow (get) Any user can fetch a specific commune.
+     * @deny (create) Unauthenticated or unauthorized users cannot create communes.
+     * @principle Public read-only access for core reference data.
+     */
+    match /communes/{communeId} {
       allow get, list: if true;
-      allow write: if isAdmin() || (isSignedIn() && resource.data.ownerId == request.auth.uid);
-    }
+      
+      // CRITICAL: Cannot implement owner-only writes. The 'Commune' entity is missing an 'ownerId' or 'authorId' field.
+      allow create, update, delete: if false; // TODO: Add owner or admin validation once the schema is updated.
 
-    // Profils Utilisateurs
-    match /users/{userId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      match /{allPaths=**} {
-        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      /**
+       * @description Meteorological predictions for a specific commune and day.
+       * @path /communes/{communeId}/dailyWeather/{dailyWeatherId}
+       * @allow (list) Any user can browse daily weather for a commune.
+       * @deny (update) No public user can modify meteorological data.
+       * @principle Public consumption of system-provided environmental data.
+       */
+      match /dailyWeather/{dailyWeatherId} {
+        allow get, list: if true;
+        allow create, update, delete: if false; // TODO: Restrict to system/admin writers.
+      }
+
+      /**
+       * @description Predicted tide events (High/Low) and current strengths.
+       * @path /communes/{communeId}/tideObservations/{tideObservationId}
+       * @allow (get) Public access to tide schedules.
+       * @deny (delete) Users cannot delete tide records.
+       */
+      match /tideObservations/{tideObservationId} {
+        allow get, list: if true;
+        allow create, update, delete: if false; // TODO: Restrict to system/admin writers.
+      }
+
+      /**
+       * @description Detailed swell and wave height info for lagoon and reef.
+       * @path /communes/{communeId}/swellConditions/{swellConditionId}
+       * @allow (list) Public list of sea conditions.
+       * @deny (create) Direct client-side creation is blocked.
+       */
+      match /swellConditions/{swellConditionId} {
+        allow get, list: if true;
+        allow create, update, delete: if false; // TODO: Restrict to system/admin writers.
+      }
+
+      /**
+       * @description Sun/Moon times and lunar phases for agricultural/fishing use.
+       * @path /communes/{communeId}/dailyAstronomy/{dailyAstronomyId}
+       * @allow (get) Public access to astronomical data.
+       * @deny (update) Data is read-only for clients.
+       */
+      match /dailyAstronomy/{dailyAstronomyId} {
+        allow get, list: if true;
+        allow create, update, delete: if false; // TODO: Restrict to system/admin writers.
+      }
+
+      /**
+       * @description Fishing success scores and recommendations.
+       * @path /communes/{communeId}/fishingForecasts/{fishingForecastId}
+       * @allow (list) Public users can see if today is good for fishing.
+       */
+      match /fishingForecasts/{fishingForecastId} {
+        allow get, list: if true;
+        allow create, update, delete: if false; // TODO: Restrict to system/admin writers.
+      }
+
+      /**
+       * @description Traditional and lunar-based agricultural planting tips.
+       * @path /communes/{communeId}/agriculturalGuidance/{agriculturalGuidanceId}
+       * @allow (get) Any user can view agricultural advice.
+       */
+      match /agriculturalGuidance/{agriculturalGuidanceId} {
+        allow get, list: if true;
+        allow create, update, delete: if false; // TODO: Restrict to system/admin writers.
       }
     }
 
-    // Données Publiques
-    match /app_settings/{id} { allow read: if true; }
-    match /system_notifications/{id} { allow read: if true; }
-    match /meteo_caledonie/{id} { 
-      allow get, list: if true;
-      match /previsions/{prevId} { allow get, list: if true; }
-    }
-    match /fish_species/{id} {
-      allow get, list: if true;
-      match /commune_stats/{communeId} { allow read, write: if isSignedIn(); }
-    }
-    match /sound_library/{id} { allow read: if true; }
-
-    // Support (Messagerie & Tickets)
-    match /conversations/{convId} {
-      allow read, write: if isSignedIn() && (request.auth.uid == convId || isAdmin());
-      match /messages/{msgId} {
-        allow read, write: if isSignedIn() && (request.auth.uid == convId || isAdmin());
-      }
-    }
-    
-    match /cms_support/tickets/items/{id} {
-      allow create: if isSignedIn();
-      allow read, write: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-    }
-
-    // Jetons & Accès
-    match /access_tokens/{id} { allow read, write: if isAdmin(); }
-    match /shared_access_tokens/{id} { allow read, write: if isAdmin(); }
-    match /spot_shares/{id} { allow read, write: if isSignedIn(); }
-    
-    // ======================================================
-    // 4. FONCTIONNALITÉS TERROIR (ACCÈS RÉCURSIF GÉNÉRIQUE)
-    // ======================================================
-    
-    // Sessions de Groupe (Chasse & Pêche) - Autorise TOUTES les sous-collections (participants, etc.)
-    match /hunting_sessions/{allPaths=**} {
-      allow read, write: if isSignedIn();
-    }
-
-    // Boat Tracker (Partage GPS) - Autorise TOUTES les sous-collections (markers, etc.)
-    match /vessels/{allPaths=**} {
-      allow read, write: if isSignedIn();
-    }
-
-    // Campagnes publicitaires
-    match /campaigns/{id} { 
-      allow read, write: if isProfessional() || isAdmin(); 
+    /**
+     * @description User-specific settings, subscriptions, and favorites.
+     * @path /users/{userId}/profile
+     * @allow (create) User 'XYZ' can create their own profile if the doc ID is 'XYZ'.
+     * @deny (get) User 'ABC' cannot read User 'XYZ's profile.
+     * @principle Strict ownership for private data. Enforces ID consistency between path and document data.
+     */
+    match /users/{userId}/profile {
+      allow get, list: if isOwner(userId);
+      
+      // On create: Ensure the internal 'id' matches the auth UID and the path.
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      
+      // On update: Ensure the 'id' field remains immutable and user owns the doc.
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      
+      allow delete: if isExistingOwner(userId);
     }
   }
 }

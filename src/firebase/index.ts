@@ -1,55 +1,42 @@
 'use client';
 
 import { firebaseConfig } from '@/firebase/config';
-import { initializeApp, getApps, getApp } from 'firebase/app';
+import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, initializeFirestore, memoryLocalCache } from 'firebase/firestore';
+import { getFirestore } from 'firebase/firestore'
 
-/**
- * @fileOverview Initialisation de Firebase Singleton ultra-robuste.
- * Correction de l'erreur ca9 en utilisant un cache mémoire strict et un singleton global
- * pour éviter les conflits d'instances lors du rechargement à chaud (HMR).
- */
-
+// IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
-  if (typeof window === 'undefined') {
-    return { firebaseApp: null, auth: null, firestore: null };
-  }
-
-  const win = window as any;
-
-  // 1. Initialisation de l'App
-  if (!win.__LBN_APP__) {
-    win.__LBN_APP__ = getApps().length === 0 
-      ? initializeApp(firebaseConfig) 
-      : getApp();
-  }
-  const app = win.__LBN_APP__;
-
-  // 2. Initialisation de l'Auth
-  if (!win.__LBN_AUTH__) {
-    win.__LBN_AUTH__ = getAuth(app);
-  }
-  const auth = win.__LBN_AUTH__;
-
-  // 3. Initialisation de Firestore avec cache mémoire forcé
-  if (!win.__LBN_FIRESTORE__) {
+  if (!getApps().length) {
+    // Important! initializeApp() is called without any arguments because Firebase App Hosting
+    // integrates with the initializeApp() function to provide the environment variables needed to
+    // populate the FirebaseOptions in production. It is critical that we attempt to call initializeApp()
+    // without arguments.
+    let firebaseApp;
     try {
-      // Forcer le cache mémoire AVANT toute autre opération
-      win.__LBN_FIRESTORE__ = initializeFirestore(app, {
-        localCache: memoryLocalCache(),
-      });
+      // Attempt to initialize via Firebase App Hosting environment variables
+      firebaseApp = initializeApp();
     } catch (e) {
-      // Fallback si déjà initialisé
-      win.__LBN_FIRESTORE__ = getFirestore(app);
+      // Only warn in production because it's normal to use the firebaseConfig to initialize
+      // during development
+      if (process.env.NODE_ENV === "production") {
+        console.warn('Automatic initialization failed. Falling back to firebase config object.', e);
+      }
+      firebaseApp = initializeApp(firebaseConfig);
     }
-  }
-  const firestore = win.__LBN_FIRESTORE__;
 
-  return { 
-    firebaseApp: app, 
-    auth, 
-    firestore 
+    return getSdks(firebaseApp);
+  }
+
+  // If already initialized, return the SDKs with the already initialized App
+  return getSdks(getApp());
+}
+
+export function getSdks(firebaseApp: FirebaseApp) {
+  return {
+    firebaseApp,
+    auth: getAuth(firebaseApp),
+    firestore: getFirestore(firebaseApp)
   };
 }
 
@@ -58,5 +45,6 @@ export * from './client-provider';
 export * from './firestore/use-collection';
 export * from './firestore/use-doc';
 export * from './non-blocking-updates';
+export * from './non-blocking-login';
 export * from './errors';
 export * from './error-emitter';

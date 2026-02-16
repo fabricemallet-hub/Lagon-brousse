@@ -1,70 +1,539 @@
-
 {
   "entities": {
-    "User": {
-      "title": "User",
+    "Commune": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Commune",
       "type": "object",
+      "description": "Represents a geographical location (commune) in New Caledonia for which weather, tide, and agricultural data are provided.",
       "properties": {
-        "id": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
-        "displayName": { "type": "string" },
-        "role": { "type": "string", "enum": ["client", "professional", "admin"], "description": "Rôle de l'utilisateur déterminant ses permissions." },
-        "subscriptionStatus": { "type": "string", "enum": ["active", "inactive", "trial", "admin", "professional"] },
-        "businessId": { "type": "string", "description": "ID du commerce associé pour les pros" },
-        "lastSelectedLocation": { "type": "string" },
-        "favoriteCategory": { "type": "string", "enum": ["Pêche", "Chasse", "Jardinage"] },
-        "notificationsEnabled": { "type": "boolean" },
-        "cgvVersionSeen": { "type": "integer" }
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Commune entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the commune (e.g., 'Nouméa', 'Thio', 'Koné')."
+        },
+        "latitude": {
+          "type": "number",
+          "description": "The geographical latitude of the commune's reference point."
+        },
+        "longitude": {
+          "type": "number",
+          "description": "The geographical longitude of the commune's reference point."
+        },
+        "country": {
+          "type": "string",
+          "description": "The country where the commune is located, fixed to 'New Caledonia'."
+        },
+        "timezone": {
+          "type": "string",
+          "description": "The IANA timezone identifier for the commune (e.g., 'Pacific/Noumea')."
+        }
       },
-      "required": ["id", "email", "role"]
+      "required": [
+        "id",
+        "name",
+        "latitude",
+        "longitude",
+        "country",
+        "timezone"
+      ]
     },
-    "Business": {
-      "title": "Business",
+    "TideObservation": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "TideObservation",
       "type": "object",
-      "description": "Représente un commerce professionnel sur la plateforme.",
+      "description": "Stores predicted tide information for a specific commune and date/time.",
       "properties": {
-        "id": { "type": "string" },
-        "ownerId": { "type": "string" },
-        "name": { "type": "string" },
-        "commune": { "type": "string" },
-        "categories": { "type": "array", "items": { "type": "string" } },
-        "logoUrl": { "type": "string" },
-        "description": { "type": "string" },
-        "createdAt": { "type": "object" }
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the TideObservation entity."
+        },
+        "communeId": {
+          "type": "string",
+          "description": "Reference to the Commune for which this tide observation is made. (Relationship: Commune 1:N TideObservation)"
+        },
+        "dateTime": {
+          "type": "string",
+          "description": "The exact date and time of the tide event.",
+          "format": "date-time"
+        },
+        "height": {
+          "type": "number",
+          "description": "The predicted height of the tide in meters relative to a reference datum."
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of tide event, either 'High Tide' or 'Low Tide'."
+        },
+        "currentStrength": {
+          "type": "number",
+          "description": "An estimated strength of the tide current on a scale from 1 to 5, strongest at mid-tide."
+        }
       },
-      "required": ["ownerId", "name", "commune"]
+      "required": [
+        "id",
+        "communeId",
+        "dateTime",
+        "height",
+        "type",
+        "currentStrength"
+      ]
     },
-    "Promotion": {
-      "title": "Promotion",
+    "DailyWeather": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "DailyWeather",
       "type": "object",
+      "description": "Stores general meteorological predictions for a commune on a specific day.",
       "properties": {
-        "id": { "type": "string" },
-        "businessId": { "type": "string" },
-        "title": { "type": "string" },
-        "price": { "type": "number" },
-        "promoType": { "type": "string", "enum": ["Promo", "Nouvel Arrivage"] },
-        "imageUrl": { "type": "string" },
-        "createdAt": { "type": "object" }
-      }
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the DailyWeather entity."
+        },
+        "communeId": {
+          "type": "string",
+          "description": "Reference to the Commune for which this weather data is provided. (Relationship: Commune 1:N DailyWeather)"
+        },
+        "date": {
+          "type": "string",
+          "description": "The date for which the weather prediction applies.",
+          "format": "date"
+        },
+        "temperatureMax": {
+          "type": "number",
+          "description": "The maximum predicted temperature for the day in Celsius."
+        },
+        "temperatureMin": {
+          "type": "number",
+          "description": "The minimum predicted temperature for the day in Celsius."
+        },
+        "weatherCode": {
+          "type": "number",
+          "description": "A numerical code representing the overall weather condition (e.g., WMO weather code)."
+        },
+        "weatherDescription": {
+          "type": "string",
+          "description": "A human-readable description of the overall weather condition for the day."
+        },
+        "windSpeedAvg": {
+          "type": "number",
+          "description": "The average wind speed for the day in knots."
+        },
+        "windDirectionAvg": {
+          "type": "string",
+          "description": "The average wind direction for the day (e.g., 'N', 'SE')."
+        }
+      },
+      "required": [
+        "id",
+        "communeId",
+        "date",
+        "temperatureMax",
+        "temperatureMin",
+        "weatherCode",
+        "weatherDescription",
+        "windSpeedAvg",
+        "windDirectionAvg"
+      ]
+    },
+    "SwellCondition": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SwellCondition",
+      "type": "object",
+      "description": "Stores detailed swell information for a commune at a specific date/time, distinguishing between lagoon and outer reef conditions.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the SwellCondition entity."
+        },
+        "communeId": {
+          "type": "string",
+          "description": "Reference to the Commune for which this swell data is provided. (Relationship: Commune 1:N SwellCondition)"
+        },
+        "dateTime": {
+          "type": "string",
+          "description": "The timestamp for the swell data.",
+          "format": "date-time"
+        },
+        "swellHeightInnerLagoon": {
+          "type": "number",
+          "description": "The predicted swell height inside the lagoon in meters."
+        },
+        "swellPeriodInnerLagoon": {
+          "type": "number",
+          "description": "The predicted swell period (average time between successive wave crests) inside the lagoon in seconds."
+        },
+        "swellDirectionInnerLagoon": {
+          "type": "string",
+          "description": "The predicted primary direction of the swell inside the lagoon (e.g., 'NW', 'S')."
+        },
+        "swellHeightOuterReef": {
+          "type": "number",
+          "description": "The predicted swell height outside the reef in meters."
+        },
+        "swellPeriodOuterReef": {
+          "type": "number",
+          "description": "The predicted swell period (average time between successive wave crests) outside the reef in seconds."
+        },
+        "swellDirectionOuterReef": {
+          "type": "string",
+          "description": "The predicted primary direction of the swell outside the reef (e.g., 'NW', 'S')."
+        }
+      },
+      "required": [
+        "id",
+        "communeId",
+        "dateTime",
+        "swellHeightInnerLagoon",
+        "swellPeriodInnerLagoon",
+        "swellDirectionInnerLagoon",
+        "swellHeightOuterReef",
+        "swellPeriodOuterReef",
+        "swellDirectionOuterReef"
+      ]
+    },
+    "DailyAstronomy": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "DailyAstronomy",
+      "type": "object",
+      "description": "Stores astronomical data, including sun/moon rise/set times and moon phase, for a commune on a specific day.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the DailyAstronomy entity."
+        },
+        "communeId": {
+          "type": "string",
+          "description": "Reference to the Commune for which this astronomy data is provided. (Relationship: Commune 1:N DailyAstronomy)"
+        },
+        "date": {
+          "type": "string",
+          "description": "The date for which the astronomical data applies.",
+          "format": "date"
+        },
+        "sunriseTime": {
+          "type": "string",
+          "description": "The local time of sunrise for the commune on the given date.",
+          "format": "date-time"
+        },
+        "sunsetTime": {
+          "type": "string",
+          "description": "The local time of sunset for the commune on the given date.",
+          "format": "date-time"
+        },
+        "moonriseTime": {
+          "type": "string",
+          "description": "The local time of moonrise for the commune on the given date.",
+          "format": "date-time"
+        },
+        "moonsetTime": {
+          "type": "string",
+          "description": "The local time of moonset for the commune on the given date.",
+          "format": "date-time"
+        },
+        "moonPhase": {
+          "type": "string",
+          "description": "The primary phase of the moon (e.g., 'New Moon', 'Full Moon', 'Waxing Crescent')."
+        },
+        "moonIllumination": {
+          "type": "number",
+          "description": "The percentage of the moon's face illuminated (0-100)."
+        }
+      },
+      "required": [
+        "id",
+        "communeId",
+        "date",
+        "sunriseTime",
+        "sunsetTime",
+        "moonriseTime",
+        "moonsetTime",
+        "moonPhase",
+        "moonIllumination"
+      ]
+    },
+    "FishingForecast": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "FishingForecast",
+      "type": "object",
+      "description": "Stores the calculated fishing prediction and recommendations for a specific commune and date, based on various environmental factors.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the FishingForecast entity."
+        },
+        "communeId": {
+          "type": "string",
+          "description": "Reference to the Commune for which this fishing forecast is made. (Relationship: Commune 1:N FishingForecast)"
+        },
+        "date": {
+          "type": "string",
+          "description": "The date for which the fishing forecast applies.",
+          "format": "date"
+        },
+        "overallScore": {
+          "type": "number",
+          "description": "An overall fishing success score, typically from 0 to 100, indicating the likelihood of fish biting."
+        },
+        "isGoodDayForFishing": {
+          "type": "boolean",
+          "description": "A boolean flag indicating if the overall conditions suggest a good day for fishing."
+        },
+        "recommendationText": {
+          "type": "string",
+          "description": "A descriptive text providing a detailed explanation of the fishing prediction and tips."
+        }
+      },
+      "required": [
+        "id",
+        "communeId",
+        "date",
+        "overallScore",
+        "isGoodDayForFishing",
+        "recommendationText"
+      ]
+    },
+    "AgriculturalGuidance": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AgriculturalGuidance",
+      "type": "object",
+      "description": "Provides daily agricultural recommendations for a commune, based on lunar phases and traditional New Caledonian practices.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the AgriculturalGuidance entity."
+        },
+        "communeId": {
+          "type": "string",
+          "description": "Reference to the Commune for which this agricultural guidance is provided. (Relationship: Commune 1:N AgriculturalGuidance)"
+        },
+        "date": {
+          "type": "string",
+          "description": "The date for which the agricultural guidance applies.",
+          "format": "date"
+        },
+        "moonPhaseGuidance": {
+          "type": "string",
+          "description": "Recommendations based on the current moon phase (e.g., 'Ideal for cuttings and leafy greens during waxing moon')."
+        },
+        "zodiacGuidance": {
+          "type": "string",
+          "description": "Recommendations based on the moon's position in the zodiac (e.g., 'Today is a fruit day, plant your citrus.')."
+        },
+        "plantingRecommendations": {
+          "type": "array",
+          "description": "A list of plant types recommended for planting on this day (e.g., ['Leafy Greens', 'Root Vegetables', 'Fruits', 'Flowers']).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "activityRecommendations": {
+          "type": "array",
+          "description": "A list of agricultural activities recommended for this day (e.g., ['Planting', 'Pruning', 'Weeding', 'Cuttings']).",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "communeId",
+        "date",
+        "moonPhaseGuidance",
+        "zodiacGuidance",
+        "plantingRecommendations",
+        "activityRecommendations"
+      ]
+    },
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Stores user-specific information including subscription status and preferred communes.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserProfile entity."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address, used for authentication and subscription management.",
+          "format": "email"
+        },
+        "subscriptionStatus": {
+          "type": "string",
+          "description": "The current subscription status of the user (e.g., 'FreeTrial', 'Active', 'Expired')."
+        },
+        "subscriptionEndDate": {
+          "type": "string",
+          "description": "The date and time when the user's current subscription is set to expire.",
+          "format": "date-time"
+        },
+        "favoriteCommuneIds": {
+          "type": "array",
+          "description": "An array of IDs referencing the communes the user has marked as favorites. (Relationship: UserProfile N:N Commune)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "subscriptionStatus"
+      ]
     }
   },
   "auth": {
-    "providers": ["password"]
+    "providers": [
+      "password",
+      "anonymous"
+    ]
   },
   "firestore": {
-    "structure": {
-      "/users/{userId}": {
-        "schema": { "$ref": "#/backend/entities/User" },
-        "description": "Profils utilisateurs incluant les rôles"
+    "structure": [
+      {
+        "path": "/communes/{communeId}",
+        "definition": {
+          "entityName": "Commune",
+          "schema": {
+            "$ref": "#/backend/entities/Commune"
+          },
+          "description": "Top-level collection for geographical communes. Documents are publicly readable and serve as anchors for all related data. The document ID matches the 'id' field of the Commune entity."
+        }
       },
-      "/businesses/{businessId}": {
-        "schema": { "$ref": "#/backend/entities/Business" },
-        "description": "Commerces professionnels"
+      {
+        "path": "/communes/{communeId}/tideObservations/{tideObservationId}",
+        "definition": {
+          "entityName": "TideObservation",
+          "schema": {
+            "$ref": "#/backend/entities/TideObservation"
+          },
+          "description": "Subcollection containing predicted tide information for a specific commune and date/time. Each document is publicly readable. Includes the 'communeId' field for explicit reference and queryability.",
+          "params": [
+            {
+              "name": "communeId",
+              "description": "The unique identifier of the Commune."
+            },
+            {
+              "name": "tideObservationId",
+              "description": "The unique identifier for the TideObservation."
+            }
+          ]
+        }
       },
-      "/businesses/{businessId}/promotions/{promoId}": {
-        "schema": { "$ref": "#/backend/entities/Promotion" },
-        "description": "Promotions par commerce"
+      {
+        "path": "/communes/{communeId}/dailyWeather/{dailyWeatherId}",
+        "definition": {
+          "entityName": "DailyWeather",
+          "schema": {
+            "$ref": "#/backend/entities/DailyWeather"
+          },
+          "description": "Subcollection storing general meteorological predictions for a commune on a specific day. Each document is publicly readable. Includes the 'communeId' field for explicit reference and queryability.",
+          "params": [
+            {
+              "name": "communeId",
+              "description": "The unique identifier of the Commune."
+            },
+            {
+              "name": "dailyWeatherId",
+              "description": "The unique identifier for the DailyWeather entry."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/communes/{communeId}/swellConditions/{swellConditionId}",
+        "definition": {
+          "entityName": "SwellCondition",
+          "schema": {
+            "$ref": "#/backend/entities/SwellCondition"
+          },
+          "description": "Subcollection holding detailed swell information for a commune at a specific date/time. Each document is publicly readable. Includes the 'communeId' field for explicit reference and queryability.",
+          "params": [
+            {
+              "name": "communeId",
+              "description": "The unique identifier of the Commune."
+            },
+            {
+              "name": "swellConditionId",
+              "description": "The unique identifier for the SwellCondition entry."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/communes/{communeId}/dailyAstronomy/{dailyAstronomyId}",
+        "definition": {
+          "entityName": "DailyAstronomy",
+          "schema": {
+            "$ref": "#/backend/entities/DailyAstronomy"
+          },
+          "description": "Subcollection containing astronomical data (sun/moon rise/set, moon phase) for a commune on a specific day. Each document is publicly readable. Includes the 'communeId' field for explicit reference and queryability.",
+          "params": [
+            {
+              "name": "communeId",
+              "description": "The unique identifier of the Commune."
+            },
+            {
+              "name": "dailyAstronomyId",
+              "description": "The unique identifier for the DailyAstronomy entry."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/communes/{communeId}/fishingForecasts/{fishingForecastId}",
+        "definition": {
+          "entityName": "FishingForecast",
+          "schema": {
+            "$ref": "#/backend/entities/FishingForecast"
+          },
+          "description": "Subcollection storing calculated fishing predictions and recommendations for a specific commune and date. Each document is publicly readable. Includes the 'communeId' field for explicit reference and queryability.",
+          "params": [
+            {
+              "name": "communeId",
+              "description": "The unique identifier of the Commune."
+            },
+            {
+              "name": "fishingForecastId",
+              "description": "The unique identifier for the FishingForecast entry."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/communes/{communeId}/agriculturalGuidance/{agriculturalGuidanceId}",
+        "definition": {
+          "entityName": "AgriculturalGuidance",
+          "schema": {
+            "$ref": "#/backend/entities/AgriculturalGuidance"
+          },
+          "description": "Subcollection providing daily agricultural recommendations for a commune. Each document is publicly readable. Includes the 'communeId' field for explicit reference and queryability.",
+          "params": [
+            {
+              "name": "communeId",
+              "description": "The unique identifier of the Commune."
+            },
+            {
+              "name": "agriculturalGuidanceId",
+              "description": "The unique identifier for the AgriculturalGuidance entry."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/profile",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "User-specific profile information, including subscription status and favorite communes. Documents in this collection are private to the user, with `userId` matching `request.auth.uid`. The document ID for the profile will be the user's UID."
+        }
       }
-    }
+    ],
+    "reasoning": "The proposed Firestore structure prioritizes Authorization Independence and Structural Segregation to ensure clarity, scalability, and robust security rules. All public, commune-specific data (tides, weather, swell, astronomy, fishing forecasts, and agricultural guidance) is organized hierarchically under a top-level `/communes/{communeId}` collection. This ensures that all data related to a specific commune is co-located and has a uniform public read security posture. The `communeId` field is also included in each subdocument for explicit foreign key referencing and efficient querying.\n\n**Authorization Independence:**\n1.  **Public Data (`/communes/{communeId}` and its subcollections):** Access to `Commune` data and its nested information (tides, weather, etc.) is intended to be public. Since the parent `Commune` document is publicly readable, its subcollections do not inherit any *restrictive* authorization from it, nor do they rely on a `get()` call to the parent to determine access. The access posture is consistently public across this hierarchy. Any necessary filtering (e.g., by `date`) can be done via queries on fields within the documents themselves, without involving parent document reads.\n2.  **Private User Data (`/users/{userId}/profile`):** The `UserProfile` document's access is strictly controlled by its path. The `userId` in the path directly corresponds to `request.auth.uid`, making authorization completely independent of any other document. A user can only read/write their own profile, without needing to `get()` any other document to verify permissions.\n\n**QAPs (Rules are not Filters):**\n1.  **Public Data:** By placing all commune-related data directly within subcollections of `/communes/{communeId}`, we enable efficient and secure `list` operations. For example, to get all daily weather for a specific commune and date, a query like `db.collection('communes/{communeId}/dailyWeather').where('date', '==', 'YYYY-MM-DD')` can be directly evaluated by security rules. The rules simply verify that the user is allowed to read from this public collection, and the query itself handles the filtering. No rules are needed to 'filter out' unauthorized documents, as all documents in these collections share the same public access requirements.\n2.  **Private User Data:** For `/users/{userId}/profile`, the rule `allow read, write: if request.auth.uid == userId;` ensures that any `get()` or `list` operation on this specific path (which implicitly points to a single document) is secure. A user requesting `/users/ABC/profile` will only succeed if `request.auth.uid` is `ABC`. This directly maps the authentication context to the path, eliminating any need for rules to act as filters."
   }
 }
