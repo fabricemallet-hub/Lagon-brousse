@@ -1,4 +1,3 @@
-
 import type { Region } from './types';
 
 export const regions = ['CALEDONIE', 'TAHITI'] as const;
@@ -57,3 +56,4 @@ export const locationsByRegion: Record<Region, { [key: string]: { lat: number; l
 };
 
 export const locations = { ...locationsByRegion['CALEDONIE'], ...locationsByRegion['TAHITI'] };
+export const allCommuneNames = Object.keys(locations).sort();

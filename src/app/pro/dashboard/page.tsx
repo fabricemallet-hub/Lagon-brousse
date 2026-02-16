@@ -15,17 +15,12 @@ import {
   Megaphone, 
   Plus, 
   Trash2, 
-  Send, 
-  DollarSign, 
   ShoppingBag, 
   Store, 
-  Camera, 
   RefreshCw, 
-  Percent, 
   ImageIcon, 
   X, 
   Pencil, 
-  Save, 
   UserCircle, 
   BrainCircuit, 
   MapPin, 
@@ -34,10 +29,7 @@ import {
   Smartphone, 
   Mail, 
   Zap, 
-  ChevronRight,
-  ArrowLeft,
   Wand2,
-  Copy,
   Check,
   CheckCircle2,
   CreditCard
@@ -49,7 +41,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { locations } from '@/lib/locations';
+import { allCommuneNames } from '@/lib/locations';
 import { analyzeProduct } from '@/ai/flows/analyze-product-flow';
 import { generateCampaignMessages } from '@/ai/flows/generate-campaign-messages-flow';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -68,7 +60,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 
 type TargetScope = 'SPECIFIC' | 'CALEDONIE' | 'TAHITI' | 'ALL';
 type WizardStep = 'IDLE' | 'INFO' | 'TONE' | 'GENERATING' | 'OPTIONS' | 'STRATEGY';
-type CampaignWizardStep = 'IDLE' | 'TONE' | 'LENGTH' | 'GENERATING' | 'SELECTION' | 'PREVIEW' | 'EDIT';
+type CampaignWizardStep = 'IDLE' | 'TONE' | 'LENGTH' | 'GENERATING' | 'SELECTION' | 'PREVIEW';
 
 const MAIN_CATEGORIES = ["Pêche", "Chasse", "Jardinage"];
 const AVAILABLE_TONES = [
@@ -95,7 +87,6 @@ export default function ProDashboard() {
   const { toast } = useToast();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const userProfileRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -551,7 +542,7 @@ export default function ProDashboard() {
                             <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
                                 <div className="space-y-1">
                                     <h4 className={cn("font-black uppercase text-xs truncate leading-none", promo.isOutOfStock && "line-through decoration-red-600")}>{promo.title}</h4>
-                                    {promo.isOutOfStock ? <p className="text-[8px] font-black text-red-600 uppercase">Arrivage prévu : {promo.restockDate}</p> : <p className="text-[9px] text-muted-foreground line-clamp-2 italic">{promo.description}</p>}
+                                    {promo.isOutOfStock ? <p className="text-[8px] font-black text-red-600 uppercase">Arrivage prévu le {promo.restockDate}</p> : <p className="text-[9px] text-muted-foreground line-clamp-2 italic">{promo.description}</p>}
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <span className={cn("font-black text-sm", promo.isOutOfStock ? "line-through opacity-40" : (promo.promoType === 'Promo' ? "text-red-600" : "text-primary"))}>{(promo.price || 0).toLocaleString('fr-FR').replace(/\s/g, ' ')} <span className="text-[8px]">CFP</span></span>
