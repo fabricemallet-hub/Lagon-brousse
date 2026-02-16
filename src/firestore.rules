@@ -21,12 +21,25 @@ service cloud.firestore {
     }
 
     function isBusinessOwner(busId) {
-      return isSignedIn() && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == busId;
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return isSignedIn() && userDoc != null && userDoc.data.get('businessId', '') == busId;
     }
 
     // ======================================================
-    // 2. ACCÈS PRIORITAIRE ADMIN
+    // 2. RÈGLES DE GROUPE (Indépendantes de la hiérarchie)
+    // ======================================================
+    
+    // Indispensable pour collectionGroup("promotions") sur la page Shopping
+    match /{prefix=**}/promotions/{promoId} {
+      allow read: if true;
+    }
+
+    match /{prefix=**}/fishing_spots/{spotId} {
+      allow read: if isSignedIn();
+    }
+
+    // ======================================================
+    // 3. ACCÈS PRIORITAIRE ADMIN
     // ======================================================
 
     match /{allPaths=**} {
@@ -34,7 +47,7 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 3. COMMERCES & PROMOTIONS
+    // 4. COMMERCES & PROMOTIONS
     // ======================================================
 
     match /businesses/{businessId} {
@@ -47,17 +60,17 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 4. CAMPAGNES
+    // 5. CAMPAGNES
     // ======================================================
     
     match /campaigns/{campaignId} {
-      // Autoriser explicitement get et list pour les utilisateurs connectés
+      // Permission explicite list pour éviter les erreurs de permission lors des requêtes query()
       allow get, list: if isSignedIn();
       allow write: if isSignedIn();
     }
 
     // ======================================================
-    // 5. UTILISATEURS & PROFILS
+    // 6. UTILISATEURS & PROFILS
     // ======================================================
 
     match /users/{userId} {
@@ -70,7 +83,7 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 6. MESSAGERIE & DONNÉES SYSTÈME
+    // 7. MESSAGERIE & DONNÉES SYSTÈME
     // ======================================================
 
     match /conversations/{convId} {
@@ -85,7 +98,7 @@ service cloud.firestore {
     match /sound_library/{id} { allow read: if true; }
 
     // ======================================================
-    // 7. AUTRES COLLECTIONS
+    // 8. AUTRES COLLECTIONS
     // ======================================================
 
     match /hunting_sessions/{sessionId} { allow read, write: if isSignedIn(); }
@@ -98,15 +111,6 @@ service cloud.firestore {
     match /cms_support/tickets/items/{id} {
       allow create: if isSignedIn();
       allow read, write: if isSignedIn() && (resource.data.userId == request.auth.uid || isMasterAdmin());
-    }
-
-    // ======================================================
-    // 8. AUTORISATION COLLECTION GROUP (IMPORTANT)
-    // ======================================================
-    
-    // Cette règle permet à la requête collectionGroup("promotions") de fonctionner
-    match /{path=**}/promotions/{promoId} {
-      allow read: if true;
     }
 
   } // Fin documents

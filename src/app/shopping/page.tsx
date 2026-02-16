@@ -133,7 +133,7 @@ export default function ShoppingPage() {
     } catch (e) {
         toast({ variant: "destructive", title: "Erreur suppression" });
     } finally {
-        setProductToDelete(null);
+        productToDelete && setProductToDelete(null);
     }
   };
 
