@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -17,8 +16,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
 import { cn, getDistance } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
-import { signOut } from 'firebase/auth';
-import { useAuth } from '@/firebase';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -38,7 +35,6 @@ const MAIN_CATEGORIES = ["Pêche", "Chasse", "Jardinage"];
 
 export default function ProDashboard() {
   const { user, isUserLoading } = useUser();
-  const auth = useAuth();
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
@@ -139,7 +135,7 @@ export default function ProDashboard() {
       }
       if (selectedTargetCommunes.length === 0) setSelectedTargetCommunes([business.commune]);
     }
-  }, [business]);
+  }, [business, selectedTargetCommunes.length, targetCategory, promoCategory]);
 
   useEffect(() => {
     if (!firestore || !business || isUserLoading || !user) return;
@@ -421,9 +417,33 @@ export default function ProDashboard() {
                 <div className="bg-muted/30 p-6 rounded-2xl border-2 border-dashed space-y-6">
                     <h3 className="text-sm font-black uppercase flex items-center gap-2 text-accent"><Megaphone className="size-4" /> Ciblage & Audiences</h3>
                     <div className="space-y-4">
-                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Rayon cible</Label><Select value={targetCategory} onValueChange={setTargetCategory}><SelectTrigger className="h-10 border-2 bg-background font-black text-xs"><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs">{cat}</SelectItem>)}</SelectContent></Select></div>
+                        <div className="space-y-1">
+                            <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Rayon cible</Label>
+                            <Select value={targetCategory} onValueChange={setTargetCategory}>
+                                <SelectTrigger className="h-10 border-2 bg-background font-black text-xs">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs uppercase">{cat}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
                         
-                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Portée géographique</Label><Select value={targetScope} onValueChange={(v: any) => setTargetScope(v)}><SelectTrigger className="h-10 border-2 bg-background font-black text-xs"><Globe className="size-3 mr-2 text-primary" /><SelectValue /></SelectTrigger><SelectContent><SelectItem value="SPECIFIC">Communes spécifiques</SelectItem><SelectItem value="CALEDONIE">Nouvelle-Calédonie</SelectItem><SelectItem value="TAHITI">Tahiti</SelectItem><SelectItem value="ALL">Tout le réseau</SelectItem></SelectContent></Select></div>
+                        <div className="space-y-1">
+                            <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Portée géographique</Label>
+                            <Select value={targetScope} onValueChange={(v: any) => setTargetScope(v)}>
+                                <SelectTrigger className="h-10 border-2 bg-background font-black text-xs">
+                                    <Globe className="size-3 mr-2 text-primary" />
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="SPECIFIC">Communes spécifiques</SelectItem>
+                                    <SelectItem value="CALEDONIE">Nouvelle-Calédonie</SelectItem>
+                                    <SelectItem value="TAHITI">Tahiti</SelectItem>
+                                    <SelectItem value="ALL">Tout le réseau</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
 
                         {targetScope === 'SPECIFIC' && (
                             <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">

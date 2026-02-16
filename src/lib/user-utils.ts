@@ -1,9 +1,9 @@
-
 'use client';
 import { doc, getDoc, setDoc, Firestore } from 'firebase/firestore';
 import { User } from 'firebase/auth';
 import type { UserAccount } from '@/lib/types';
 import { addMonths } from 'date-fns';
+import { locationsByRegion } from './locations';
 
 /**
  * Synchronisation du profil utilisateur.
@@ -46,12 +46,18 @@ export async function ensureUserDocument(
       }
 
       // 3. Initialisation des champs d'audience si manquants (Opt-in par défaut pour migration)
-      // On force true pour garantir que les audiences ne soient pas à 0 à cause de champs non-définis
       if (currentData.allowsPromoPush === undefined) updates.allowsPromoPush = true;
       if (currentData.allowsPromoEmails === undefined) updates.allowsPromoEmails = true;
       if (currentData.allowsPromoSMS === undefined) updates.allowsPromoSMS = true;
       if (!currentData.subscribedCategories || currentData.subscribedCategories.length === 0) {
           updates.subscribedCategories = ['Pêche', 'Chasse', 'Jardinage'];
+      }
+
+      // 4. Backfill de la région si manquante (Crucial pour le ciblage Pro)
+      if (!currentData.selectedRegion) {
+          const currentLoc = currentData.lastSelectedLocation || 'Nouméa';
+          const isTahiti = Object.keys(locationsByRegion['TAHITI']).includes(currentLoc);
+          updates.selectedRegion = isTahiti ? 'TAHITI' : 'CALEDONIE';
       }
 
       if (Object.keys(updates).length > 0) {
@@ -62,14 +68,17 @@ export async function ensureUserDocument(
 
     // Création d'un nouveau profil avec les réglages d'audience par défaut
     const effectiveDisplayName = displayName || user.displayName || email.split('@')[0] || 'Utilisateur';
+    const initialLocation = commune || 'Nouméa';
+    const isTahiti = Object.keys(locationsByRegion['TAHITI']).includes(initialLocation);
+
     const newUser: UserAccount = {
       id: user.uid,
       email: email,
       displayName: effectiveDisplayName,
       role: isMasterAdmin ? 'admin' : 'client',
       subscriptionStatus: isMasterAdmin ? 'admin' : 'trial',
-      lastSelectedLocation: commune || 'Nouméa',
-      selectedRegion: 'CALEDONIE',
+      lastSelectedLocation: initialLocation,
+      selectedRegion: isTahiti ? 'TAHITI' : 'CALEDONIE',
       subscribedCategories: ['Pêche', 'Chasse', 'Jardinage'],
       allowsPromoEmails: true,
       allowsPromoPush: true,
