@@ -4,26 +4,27 @@ service cloud.firestore {
 
     /**
      * CORE PHILOSOPHY
-     * This ruleset implements a hybrid security model: a strict User-Ownership model for private profiles 
-     * and a Public-Read model for environmental and geographical data (Communes). 
+     * This ruleset implements a dual-layered security model for a New Caledonian agricultural and marine data platform. 
+     * 1. Public Domain Data: All environmental data (Weather, Tides, Swell, Astronomy, Fishing, Agriculture) 
+     *    associated with specific Communes is publicly readable to ensure broad access to vital information.
+     * 2. Strict User Privacy: User profiles and preferences are strictly isolated. A user-ownership model 
+     *    is enforced where only the authenticated owner can access or modify their personal data.
      * 
      * DATA STRUCTURE
-     * 1. Public Data: All environmental data (tides, weather, swell, etc.) is organized under /communes/{communeId}.
-     * 2. Private Data: User-specific settings and subscriptions are stored in /users/{userId}/profile.
+     * - /communes/{communeId}: Public top-level documents for geographical locations.
+     * - /communes/{communeId}/...: Public subcollections for time-series environmental data.
+     * - /users/{userId}/profile: Private user settings and subscription info.
      * 
      * KEY SECURITY DECISIONS
-     * - Public Data: Read access is open to all users to allow for wide availability of weather/tide info.
-     * - System-Managed Content: Since the Commune-related entities (Weather, Tides, etc.) represent 
-     *   system-provided data, write access is restricted. Developers should use a Service SDK or 
-     *   explicit Admin roles for updates.
-     * - Identity Verification: All private data access is strictly gated by the authenticated user's UID.
-     * 
-     * PROTOTYPING MODE
-     * This ruleset focuses on "Who" can access data (Authorization) rather than "What" the data looks like (Schema).
-     * It enforces relationship integrity (e.g., matching IDs) but permits flexible data shapes for rapid iteration.
+     * - Default Deny: All writes to environmental data are denied by default in these rules as the IR 
+     *   does not specify an 'ownerId' for these records, suggesting they are managed by administrative processes.
+     * - Path-to-Field Validation: For user profiles, we enforce that the document internal ID matches 
+     *   the path parameter and the authenticated UID to prevent data spoofing.
+     * - Prototyping Flexibility: Rules focus on 'who' can access data rather than 'what' the data looks like, 
+     *   allowing for rapid schema evolution.
      */
 
-    // --- Helper Functions ---
+    // --- Global Helper Functions ---
 
     /** @description Checks if the request is from an authenticated user. */
     function isSignedIn() {
@@ -37,107 +38,110 @@ service cloud.firestore {
 
     /** @description Checks if the user is the owner and the document exists (for updates/deletes). */
     function isExistingOwner(userId) {
-      return resource != null && isOwner(userId);
+      return isOwner(userId) && resource != null;
     }
 
     // --- Collection Rules ---
 
     /**
-     * @description Top-level geographical data for New Caledonia.
+     * @description Publicly readable geographical communes.
      * @path /communes/{communeId}
-     * @allow (get) Any user can fetch a specific commune.
-     * @deny (create) Unauthenticated or unauthorized users cannot create communes.
-     * @principle Public read-only access for core reference data.
+     * @allow (get, list) if true;
+     * @deny (create, update, delete) for all non-admin users.
+     * @principle Public access for reference data with restricted writes.
      */
     match /communes/{communeId} {
       allow get, list: if true;
-      
       // CRITICAL: Cannot implement owner-only writes. The 'Commune' entity is missing an 'ownerId' or 'authorId' field.
-      allow create, update, delete: if false; // TODO: Add owner or admin validation once the schema is updated.
+      allow create, update, delete: if false; // TODO: Add administrative or ownership validation once the schema is updated.
 
       /**
-       * @description Meteorological predictions for a specific commune and day.
-       * @path /communes/{communeId}/dailyWeather/{dailyWeatherId}
-       * @allow (list) Any user can browse daily weather for a commune.
-       * @deny (update) No public user can modify meteorological data.
-       * @principle Public consumption of system-provided environmental data.
-       */
-      match /dailyWeather/{dailyWeatherId} {
-        allow get, list: if true;
-        allow create, update, delete: if false; // TODO: Restrict to system/admin writers.
-      }
-
-      /**
-       * @description Predicted tide events (High/Low) and current strengths.
+       * @description Publicly readable tide predictions for a specific commune.
        * @path /communes/{communeId}/tideObservations/{tideObservationId}
-       * @allow (get) Public access to tide schedules.
-       * @deny (delete) Users cannot delete tide records.
+       * @allow (get, list) if true;
+       * @deny (create, update, delete) if false;
        */
       match /tideObservations/{tideObservationId} {
         allow get, list: if true;
-        allow create, update, delete: if false; // TODO: Restrict to system/admin writers.
+        // CRITICAL: Cannot implement owner-only writes. The 'TideObservation' entity is missing an 'ownerId'.
+        allow create, update, delete: if false; // TODO: Restrict to data-ingestion service accounts.
       }
 
       /**
-       * @description Detailed swell and wave height info for lagoon and reef.
+       * @description Publicly readable daily weather predictions for a specific commune.
+       * @path /communes/{communeId}/dailyWeather/{dailyWeatherId}
+       * @allow (get, list) if true;
+       * @deny (create, update, delete) if false;
+       */
+      match /dailyWeather/{dailyWeatherId} {
+        allow get, list: if true;
+        // CRITICAL: Cannot implement owner-only writes. The 'DailyWeather' entity is missing an 'ownerId'.
+        allow create, update, delete: if false; // TODO: Restrict to weather-api sync service.
+      }
+
+      /**
+       * @description Publicly readable swell and lagoon conditions.
        * @path /communes/{communeId}/swellConditions/{swellConditionId}
-       * @allow (list) Public list of sea conditions.
-       * @deny (create) Direct client-side creation is blocked.
+       * @allow (get, list) if true;
+       * @deny (create, update, delete) if false;
        */
       match /swellConditions/{swellConditionId} {
         allow get, list: if true;
-        allow create, update, delete: if false; // TODO: Restrict to system/admin writers.
+        // CRITICAL: Cannot implement owner-only writes. The 'SwellCondition' entity is missing an 'ownerId'.
+        allow create, update, delete: if false; // TODO: Restrict to marine-data sync service.
       }
 
       /**
-       * @description Sun/Moon times and lunar phases for agricultural/fishing use.
+       * @description Publicly readable solar and lunar data.
        * @path /communes/{communeId}/dailyAstronomy/{dailyAstronomyId}
-       * @allow (get) Public access to astronomical data.
-       * @deny (update) Data is read-only for clients.
+       * @allow (get, list) if true;
+       * @deny (create, update, delete) if false;
        */
       match /dailyAstronomy/{dailyAstronomyId} {
         allow get, list: if true;
-        allow create, update, delete: if false; // TODO: Restrict to system/admin writers.
+        // CRITICAL: Cannot implement owner-only writes. The 'DailyAstronomy' entity is missing an 'ownerId'.
+        allow create, update, delete: if false; // TODO: Restrict to astronomy-calculator service.
       }
 
       /**
-       * @description Fishing success scores and recommendations.
+       * @description Publicly readable calculated fishing scores and tips.
        * @path /communes/{communeId}/fishingForecasts/{fishingForecastId}
-       * @allow (list) Public users can see if today is good for fishing.
+       * @allow (get, list) if true;
+       * @deny (create, update, delete) if false;
        */
       match /fishingForecasts/{fishingForecastId} {
         allow get, list: if true;
-        allow create, update, delete: if false; // TODO: Restrict to system/admin writers.
+        // CRITICAL: Cannot implement owner-only writes. The 'FishingForecast' entity is missing an 'ownerId'.
+        allow create, update, delete: if false; // TODO: Restrict to forecast-engine service.
       }
 
       /**
-       * @description Traditional and lunar-based agricultural planting tips.
+       * @description Publicly readable lunar-based agricultural guidance.
        * @path /communes/{communeId}/agriculturalGuidance/{agriculturalGuidanceId}
-       * @allow (get) Any user can view agricultural advice.
+       * @allow (get, list) if true;
+       * @deny (create, update, delete) if false;
        */
       match /agriculturalGuidance/{agriculturalGuidanceId} {
         allow get, list: if true;
-        allow create, update, delete: if false; // TODO: Restrict to system/admin writers.
+        // CRITICAL: Cannot implement owner-only writes. The 'AgriculturalGuidance' entity is missing an 'ownerId'.
+        allow create, update, delete: if false; // TODO: Restrict to agricultural-content-manager.
       }
     }
 
     /**
-     * @description User-specific settings, subscriptions, and favorites.
+     * @description Private user profile containing subscription and favorites.
      * @path /users/{userId}/profile
-     * @allow (create) User 'XYZ' can create their own profile if the doc ID is 'XYZ'.
-     * @deny (get) User 'ABC' cannot read User 'XYZ's profile.
-     * @principle Strict ownership for private data. Enforces ID consistency between path and document data.
+     * @allow (get, list, delete) if the user is the owner of this path.
+     * @allow (create) if the user is the owner and the internal 'id' matches their UID.
+     * @allow (update) if the user is the owner and the internal 'id' is not modified.
+     * @deny (read, write) for any other authenticated or anonymous user.
+     * @principle Strict user-data ownership and relational integrity.
      */
     match /users/{userId}/profile {
       allow get, list: if isOwner(userId);
-      
-      // On create: Ensure the internal 'id' matches the auth UID and the path.
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      
-      // On update: Ensure the 'id' field remains immutable and user owns the doc.
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      
       allow delete: if isExistingOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
     }
   }
 }
