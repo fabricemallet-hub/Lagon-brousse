@@ -48,7 +48,7 @@ import {
   EyeOff
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
-import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
+import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -138,8 +138,6 @@ export default function VesselTrackerPage() {
   const lastBatteryLevelsRef = useRef<Record<string, number>>({});
   const lastClearTimesRef = useRef<Record<string, number>>({});
 
-  const [activeWatchAlarm, setActiveWatchAlarm] = useState<HTMLAudioElement | null>(null);
-
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
   const userDocRef = useMemoFirebase(() => {
@@ -182,14 +180,6 @@ export default function VesselTrackerPage() {
       audio.play().catch(() => {});
     }
   }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, availableSounds]);
-
-  const stopWatchAlarm = () => {
-    if (activeWatchAlarm) {
-        activeWatchAlarm.pause();
-        setActiveWatchAlarm(null);
-        toast({ title: "Alarme de veille arrêtée" });
-    }
-  };
 
   useEffect(() => {
     if (userProfile) {
@@ -257,6 +247,22 @@ export default function VesselTrackerPage() {
     updateVesselInFirestore({ status: st, eventLabel: label || null });
     if (st === 'moving' || st === 'emergency') { immobilityStartTime.current = null; anchorPosRef.current = null; }
     toast({ title: label || (st === 'emergency' ? 'ALERTE ASSISTANCE' : 'Statut mis à jour') });
+  };
+
+  const handleSignalBirds = () => {
+    if (!currentPosRef.current || !firestore) return;
+    const marker: HuntingMarker = {
+        id: Math.random().toString(36).substring(7),
+        lat: currentPosRef.current.lat,
+        lng: currentPosRef.current.lng,
+        time: new Date().toISOString()
+    };
+    updateVesselInFirestore({ 
+        huntingMarkers: arrayUnion(marker),
+        eventLabel: 'REGROUPEMENT D\'OISEAUX (CHASSE)' 
+    });
+    playVesselSound('birds');
+    toast({ title: "SIGNAL OISEAUX ENVOYÉ" });
   };
 
   const handleStopSharing = () => {
@@ -366,26 +372,52 @@ export default function VesselTrackerPage() {
                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
                     <div className={cn("p-6 rounded-2xl shadow-xl relative overflow-hidden border-2", vesselStatus === 'emergency' ? "bg-red-600 animate-pulse" : "bg-primary")}>
                         <Navigation className="absolute -right-4 -bottom-4 size-32 opacity-10 rotate-12" />
-                        <div className="text-white">
-                            <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2"><Zap className="size-3 fill-yellow-300" /> Partage actif</p>
-                            <h3 className="text-3xl font-black uppercase tracking-tighter">{sharingId}</h3>
-                            <p className="text-xs font-bold opacity-80 mt-1">{vesselNickname || 'Capitaine'}</p>
+                        <div className="text-white relative z-10">
+                            <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2"><Zap className="size-3 fill-yellow-300" /> Partage en cours</p>
+                            <h3 className="text-4xl font-black uppercase tracking-tighter">{sharingId}</h3>
+                            <p className="text-xs font-bold opacity-80 mt-1 italic">{vesselNickname || 'Capitaine'}</p>
+                        </div>
+                        <div className="mt-6 flex items-center gap-2 relative z-10">
+                            <Badge className="bg-white/20 border-white/30 text-white font-black uppercase text-[9px] h-6 px-3">ALERTE ACTIVE</Badge>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-white/70 flex items-center gap-1.5"><ShieldAlert className="size-3" /> ASSISTANCE</span>
                         </div>
                     </div>
 
                     <div className="bg-muted/20 p-4 rounded-2xl border-2 border-dashed space-y-3">
-                        <div className="flex items-center justify-between p-3 bg-background rounded-xl border">
-                            <Label className="text-xs font-black uppercase flex items-center gap-2">{isPositionHidden ? <EyeOff className="size-4 text-orange-600" /> : <Eye className="size-4 text-primary" />} Mode Fantôme</Label>
-                            <Switch checked={isPositionHidden} onCheckedChange={setIsPositionHidden} />
-                        </div>
-                        <Button variant="destructive" className="w-full h-14 font-black uppercase text-[10px] border-2 border-red-400 gap-3" onClick={() => handleManualStatus('emergency')} disabled={vesselStatus === 'emergency'}>DEMANDE ASSISTANCE</Button>
+                        <p className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest flex items-center gap-2"><Zap className="size-3" /> Signalisation manuelle</p>
+                        
+                        <Button variant="destructive" className="w-full h-14 font-black uppercase text-[10px] border-2 border-red-400 bg-red-500/20 text-red-700 gap-3 shadow-sm hover:bg-red-500/30 transition-all" onClick={() => handleManualStatus('emergency')} disabled={vesselStatus === 'emergency'}>
+                            <ShieldAlert className="size-5" /> DEMANDE ASSISTANCE (PROBLÈME)
+                        </Button>
+
+                        <Button 
+                            className="w-full h-14 font-black uppercase text-[10px] border-2 border-blue-200 bg-blue-50 text-blue-700 gap-3 shadow-sm hover:bg-blue-100 transition-all" 
+                            onClick={handleSignalBirds}
+                        >
+                            <Bird className="size-5" /> REGROUPEMENT D'OISEAUX (CHASSE)
+                        </Button>
+
                         <div className="grid grid-cols-2 gap-2">
-                            <Button variant="outline" className="h-12 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatus('returning')}><Navigation className="size-4 text-blue-600" /> Retour</Button>
-                            <Button variant="outline" className="h-12 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatus('landed')}><Home className="size-4 text-green-600" /> À terre</Button>
+                            <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatus('returning')}>
+                                <Navigation className="size-4 text-blue-600" /> Retour Maison
+                            </Button>
+                            <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatus('landed')}>
+                                <Home className="size-4 text-green-600" /> Home (À terre)
+                            </Button>
                         </div>
+                        
+                        <Button 
+                            variant="ghost" 
+                            className="w-full h-12 font-black uppercase text-[9px] border-2 border-dashed gap-2 text-orange-600 bg-white/50" 
+                            onClick={() => handleManualStatus('moving', 'ERREUR - REPRISE MODE AUTO')}
+                        >
+                            <RefreshCw className="size-4" /> ERREUR / REPRISE MODE NORMAL (AUTO)
+                        </Button>
                     </div>
 
-                    <Button variant="destructive" className="w-full h-16 text-xs font-black uppercase tracking-widest shadow-lg rounded-xl" onClick={handleStopSharing}>ARRÊTER LE PARTAGE</Button>
+                    <Button variant="secondary" className="w-full h-16 text-xs font-black uppercase tracking-widest shadow-lg rounded-xl gap-3 bg-primary text-white border-2 border-white/20" onClick={handleStopSharing}>
+                        <X className="size-5" /> Arrêter le partage / Quitter
+                    </Button>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -455,11 +487,20 @@ export default function VesselTrackerPage() {
                 {followedVessels?.map(vessel => vessel.isSharing && vessel.location && (
                     <OverlayView key={`vessel-render-${vessel.id}`} position={{ lat: vessel.location.latitude, lng: vessel.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                         <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
-                            <div className="px-2 py-1 rounded text-[10px] font-black bg-slate-900/90 text-white shadow-lg border border-white/20 whitespace-nowrap flex items-center gap-2">
+                            <div className={cn("px-2 py-1 rounded text-[10px] font-black text-white shadow-lg border whitespace-nowrap flex items-center gap-2", vessel.status === 'emergency' ? "bg-red-600 border-red-400" : "bg-slate-900/90 border-white/20")}>
                               <span>{vessel.displayName || vessel.id}</span>
+                              {vessel.status === 'emergency' && <span className="ml-1 animate-pulse text-[8px] border-l pl-2 border-white/30">URGENCE</span>}
                               <BatteryIconComp level={vessel.batteryLevel} charging={vessel.isCharging} />
                             </div>
                             <div className={cn("p-2 rounded-full border-2 border-white shadow-xl", vessel.status === 'moving' ? "bg-blue-600" : vessel.status === 'emergency' ? "bg-red-600 animate-pulse" : "bg-amber-600")}><Navigation className="size-5 text-white" /></div>
+                        </div>
+                    </OverlayView>
+                ))}
+                {followedVessels?.flatMap(v => v.huntingMarkers || []).map(m => (
+                    <OverlayView key={m.id} position={{ lat: m.lat, lng: m.lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                        <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
+                            <div className="px-2 py-1 rounded bg-blue-600 text-white text-[8px] font-black shadow-lg uppercase whitespace-nowrap">{format(new Date(m.time), 'HH:mm')}</div>
+                            <div className="p-1.5 bg-white rounded-full border-2 border-blue-600 shadow-md text-blue-600"><Bird className="size-3" /></div>
                         </div>
                     </OverlayView>
                 ))}
@@ -470,15 +511,19 @@ export default function VesselTrackerPage() {
                 )}
           </GoogleMap>
           <div className="absolute top-3 right-3 flex flex-col gap-2">
-            <Button onClick={handleRecenter} className="shadow-lg h-10 w-10 bg-background/90 backdrop-blur-md border-2 p-0"><LocateFixed className="size-5" /></Button>
-            <Button size="icon" className="shadow-lg h-10 w-10 bg-background/90 backdrop-blur-md border-2" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}</Button>
+            <Button onClick={handleRecenter} className="shadow-lg h-10 w-10 bg-background/90 backdrop-blur-md border-2 p-0"><LocateFixed className="size-5 text-primary" /></Button>
+            <Button size="icon" className="shadow-lg h-10 w-10 bg-background/90 backdrop-blur-md border-2" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-5 text-primary" /> : <Expand className="size-5 text-primary" />}</Button>
           </div>
         </div>
 
         <div className="bg-card p-4 flex flex-col gap-4 border-t-2">
             <div className="flex gap-2">
-                <Button variant="destructive" className="flex-1 h-14 font-black uppercase rounded-xl shadow-lg text-xs" onClick={() => sendEmergencySms('MAYDAY')}><ShieldAlert className="size-5 mr-2" /> MAYDAY</Button>
-                <Button variant="secondary" className="flex-1 h-14 font-black uppercase rounded-xl shadow-lg text-xs border-2" onClick={() => sendEmergencySms('PAN PAN')}><AlertTriangle className="size-5 mr-2 text-primary" /> PAN PAN</Button>
+                <Button variant="destructive" className="flex-1 h-14 font-black uppercase rounded-xl shadow-lg text-sm gap-2" onClick={() => sendEmergencySms('MAYDAY')}>
+                    <ShieldAlert className="size-5" /> MAYDAY
+                </Button>
+                <Button variant="secondary" className="flex-1 h-14 font-black uppercase rounded-xl shadow-lg text-sm border-2 border-primary/20 gap-2 text-primary" onClick={() => sendEmergencySms('PAN PAN')}>
+                    <AlertTriangle className="size-5" /> PAN PAN
+                </Button>
             </div>
             <Accordion type="single" collapsible className="w-full border rounded-xl bg-muted/10">
                 <AccordionItem value="history" className="border-none">
@@ -495,7 +540,7 @@ export default function VesselTrackerPage() {
                                 </div>
                                 {h.pos && <Button variant="outline" size="sm" className="h-8 text-[9px] font-black border-2" onClick={() => { map?.panTo(h.pos!); map?.setZoom(17); }}><MapPin className="size-3 text-primary" /> GPS</Button>}
                             </div>
-                        )) : <div className="text-center py-10 opacity-40 uppercase text-[10px] font-black">Journal vide</div>}
+                        )) : <div className="text-center py-10 opacity-40 uppercase text-[10px] font-black italic">pas d'affichage dans l'historique</div>}
                     </AccordionContent>
                 </AccordionItem>
             </Accordion>
