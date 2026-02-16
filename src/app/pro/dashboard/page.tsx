@@ -46,7 +46,11 @@ import {
   Tags,
   Percent,
   Receipt,
-  TrendingUp
+  TrendingUp,
+  Compass,
+  ZapOff,
+  Star,
+  Award
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -71,9 +75,13 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 const AVAILABLE_TONES = [
-    { id: 'Local (Caillou)', label: 'Local (Caillou)', desc: 'Parle au coeur des gens du pays' },
-    { id: 'Commercial', label: 'Commercial', desc: 'Dynamique et vendeur' },
-    { id: 'Humoristique', label: 'Humoristique', desc: 'Léger et complice' },
+    { id: 'Local (Caillou)', label: 'Local (Caillou)', desc: 'Parle au coeur des gens du pays', icon: Home },
+    { id: 'Commercial', label: 'Commercial', desc: 'Dynamique et vendeur', icon: Megaphone },
+    { id: 'Humoristique', label: 'Humoristique', desc: 'Léger et complice', icon: Sparkles },
+    { id: 'Technique', label: 'Pro / Technique', desc: 'Précis, expert et factuel', icon: Settings },
+    { id: 'Urgent', label: 'Promo / Urgent', desc: 'Insiste sur la rareté et l\'économie', icon: Zap },
+    { id: 'Prestige', label: 'Prestige / Luxe', desc: 'Haut de gamme et exclusif', icon: Award },
+    { id: 'Aventure', label: 'Aventure / Story', desc: 'Inspirant, pour passionnés', icon: Compass },
 ];
 
 const MONTHS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
@@ -488,7 +496,7 @@ export default function ProDashboard() {
                                 </CardTitle>
                                 {editingProductId && <p className="text-[8px] font-black uppercase opacity-70 mt-1">Mode édition actif</p>}
                             </div>
-                            <Badge variant="outline" className="text-white border-white/30 text-[8px] font-black uppercase">Rayon {promoCategory}</Badge>
+                            <Badge variant="outline" className="text-white border-white/30 text-[8px] font-black uppercase">Article Magasin</Badge>
                         </CardHeader>
                         <CardContent className="p-4 space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -597,6 +605,20 @@ export default function ProDashboard() {
                                 </div>
 
                                 <div className="space-y-4">
+                                    <div className="space-y-1">
+                                        <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Rayon (Catégorie)</Label>
+                                        <Select value={promoCategory} onValueChange={setPromoCategory}>
+                                            <SelectTrigger className="h-11 border-2 font-black uppercase text-xs">
+                                                <SelectValue placeholder="Choisir un rayon..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Pêche" className="font-black text-xs uppercase">PÊCHE</SelectItem>
+                                                <SelectItem value="Chasse" className="font-black text-xs uppercase">CHASSE</SelectItem>
+                                                <SelectItem value="Jardinage" className="font-black text-xs uppercase">JARDINAGE</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
                                     <div className="space-y-2">
                                         <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Photos</Label>
                                         <div className="grid grid-cols-4 gap-2">
@@ -637,7 +659,7 @@ export default function ProDashboard() {
                         <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground px-1 flex items-center gap-2">
                             <Store className="size-4" /> Mon Catalogue ({promotions?.length || 0})
                         </h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4">
                             {promotions?.map(p => {
                                 const hasTax = p.applyTax && p.taxRate;
                                 const ttcValue = hasTax ? Math.ceil(p.price * (1 + p.taxRate! / 100)) : p.price;
@@ -660,13 +682,16 @@ export default function ProDashboard() {
                                     <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
                                         <div className="flex justify-between items-start">
                                             <div className="min-w-0 flex-1">
-                                                <h4 className={cn("font-black uppercase text-xs truncate leading-none", p.isOutOfStock && "line-through opacity-50")}>{p.title}</h4>
+                                                <div className="flex items-center gap-2">
+                                                    <h4 className={cn("font-black uppercase text-xs truncate leading-none", p.isOutOfStock && "line-through opacity-50")}>{p.title}</h4>
+                                                    <Badge variant="outline" className="text-[7px] font-black uppercase h-3.5 px-1 border-primary/20 text-primary opacity-60">{p.category}</Badge>
+                                                </div>
                                                 <p className="text-[9px] text-muted-foreground line-clamp-2 italic mt-1">{p.description || "Pas de description"}</p>
                                             </div>
                                             <Checkbox 
                                                 checked={selectedProductIds.includes(p.id)} 
                                                 onCheckedChange={() => {
-                                                    setSelectedProductIds(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id]);
+                                                    setSelectedProductIds(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, id]);
                                                 }}
                                                 className="size-5 border-2 border-primary/30 ml-2"
                                             />
@@ -967,9 +992,14 @@ export default function ProDashboard() {
                         <Label className="text-[10px] font-black uppercase text-center block opacity-60">Choisissez le ton de rédaction</Label>
                         <div className="grid gap-3">
                             {AVAILABLE_TONES.map(t => (
-                                <div key={t.id} onClick={() => setAiProductTone(t.id)} className={cn("p-4 rounded-2xl border-2 cursor-pointer transition-all active:scale-95", aiProductTone === t.id ? "border-primary bg-primary/5 shadow-md" : "border-slate-100 hover:border-slate-200")}>
-                                    <p className="font-black uppercase text-xs">{t.label}</p>
-                                    <p className="text-[10px] font-bold text-muted-foreground uppercase">{t.desc}</p>
+                                <div key={t.id} onClick={() => setAiProductTone(t.id)} className={cn("p-4 rounded-2xl border-2 cursor-pointer transition-all active:scale-95 flex items-center gap-4", aiProductTone === t.id ? "border-primary bg-primary/5 shadow-md" : "border-slate-100 hover:border-slate-200")}>
+                                    <div className={cn("p-2 rounded-lg", aiProductTone === t.id ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>
+                                        <t.icon className="size-5" />
+                                    </div>
+                                    <div>
+                                        <p className="font-black uppercase text-xs">{t.label}</p>
+                                        <p className="text-[10px] font-bold text-muted-foreground uppercase">{t.desc}</p>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -1034,7 +1064,7 @@ export default function ProDashboard() {
                                 <div className="space-y-2">
                                     <p className="text-[9px] font-bold uppercase opacity-40">Ton souhaité</p>
                                     <div className="grid grid-cols-1 gap-2">
-                                        {AVAILABLE_TONES.map(t => (
+                                        {AVAILABLE_TONES.slice(0, 4).map(t => (
                                             <div key={t.id} onClick={() => setCampTone(t.id)} className={cn("p-3 rounded-xl border-2 text-[10px] font-black uppercase cursor-pointer text-center", campTone === t.id ? "bg-primary text-white border-primary" : "bg-slate-50 border-slate-100")}>
                                                 {t.label}
                                             </div>

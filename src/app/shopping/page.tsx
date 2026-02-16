@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -27,7 +28,8 @@ import {
     ImageIcon,
     Trash2,
     AlertCircle,
-    Plus
+    Plus,
+    LayoutGrid
 } from 'lucide-react';
 import { locations, locationsByRegion, regions } from '@/lib/locations';
 import { cn } from '@/lib/utils';
@@ -198,7 +200,7 @@ export default function ShoppingPage() {
       <Card className="border-2 shadow-md bg-muted/10">
         <CardContent className="p-4 space-y-4">
           <div className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2"><Filter className="size-3" /> Filtres</div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1">
                 <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Région</Label>
                 <Select value={filterRegion} onValueChange={setFilterRegion}>
@@ -218,6 +220,18 @@ export default function ShoppingPage() {
                         <SelectItem value="USER_DEFAULT">Focus : {userCommune}</SelectItem>
                         <SelectItem value="ALL">Tout</SelectItem>
                         {availableCommunes.map(loc => <SelectItem key={loc} value={loc}>{loc}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="space-y-1">
+                <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Rayon</Label>
+                <Select value={filterCategory} onValueChange={setFilterCategory}>
+                    <SelectTrigger className="h-10 border-2 bg-white font-black text-xs"><LayoutGrid className="size-3 mr-2" /><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="ALL">Tout</SelectItem>
+                        <SelectItem value="Pêche">Pêche</SelectItem>
+                        <SelectItem value="Chasse">Chasse</SelectItem>
+                        <SelectItem value="Jardinage">Jardinage</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
@@ -245,7 +259,10 @@ export default function ShoppingPage() {
                             )}
                         </div>
                         <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
-                            <h4 className={cn("font-black uppercase text-xs truncate", p.isOutOfStock && "line-through decoration-red-600")}>{p.title}</h4>
+                            <div className="flex items-start justify-between">
+                                <h4 className={cn("font-black uppercase text-xs truncate", p.isOutOfStock && "line-through decoration-red-600")}>{p.title}</h4>
+                                <Badge variant="outline" className="text-[7px] font-black uppercase h-3.5 px-1 border-primary/20 text-primary shrink-0 ml-1">{p.category}</Badge>
+                            </div>
                             <p className="text-[10px] text-muted-foreground line-clamp-2 italic">{p.description}</p>
                             <div className="mt-auto">
                                 {renderPrice(p)}
@@ -290,7 +307,10 @@ export default function ShoppingPage() {
                         )}
                     </div>
                     <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-white">
-                        <h2 className={cn("text-2xl font-black uppercase text-slate-800", selectedProduct.isOutOfStock && "line-through decoration-red-600")}>{selectedProduct.title}</h2>
+                        <div className="flex items-center justify-between">
+                            <h2 className={cn("text-2xl font-black uppercase text-slate-800", selectedProduct.isOutOfStock && "line-through decoration-red-600")}>{selectedProduct.title}</h2>
+                            <Badge variant="outline" className="font-black uppercase px-2 py-1 border-primary text-primary">{selectedProduct.category}</Badge>
+                        </div>
                         <div className="flex items-center gap-2 text-primary font-black uppercase text-xs"><Store className="size-4" />{selectedProduct.business?.name} <MapPin className="size-3" />{selectedProduct.business?.commune}</div>
                         {selectedProduct.isOutOfStock && <Alert variant="destructive" className="bg-red-50 border-red-200 border-2"><AlertCircle className="size-4" /><AlertDescription className="text-sm font-black text-red-700">RUPTURE - Retour le {selectedProduct.restockDate}</AlertDescription></Alert>}
                         
