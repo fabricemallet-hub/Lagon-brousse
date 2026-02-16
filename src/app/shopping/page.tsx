@@ -532,15 +532,15 @@ export default function ShoppingPage() {
                                         "text-4xl font-black tracking-tighter",
                                         selectedProductForDetail.promoType === 'Promo' ? "text-red-600" : "text-primary"
                                     )}>
-                                        {selectedProductForDetail.price}
+                                        {selectedProductForDetail.price.toLocaleString('fr-FR')}
                                     </span>
-                                    <span className="text-xs font-black uppercase opacity-60">FCFP</span>
+                                    <span className="text-xs font-black uppercase opacity-60">CFP</span>
                                 </div>
                             </div>
                             
                             {selectedProductForDetail.promoType === 'Promo' && selectedProductForDetail.originalPrice && (
                                 <div className="text-right flex flex-col items-end gap-1">
-                                    <span className="text-sm text-muted-foreground line-through font-bold">{selectedProductForDetail.originalPrice} F</span>
+                                    <span className="text-sm text-muted-foreground line-through font-bold">{selectedProductForDetail.originalPrice.toLocaleString('fr-FR')} F</span>
                                     {selectedProductForDetail.discountPercentage && (
                                         <Badge className="bg-red-600 text-white font-black text-sm px-2 py-1 rounded-lg shadow-lg border-none">
                                             -{Math.round(selectedProductForDetail.discountPercentage)}%
@@ -588,74 +588,6 @@ export default function ShoppingPage() {
                     </DialogFooter>
                 </>
             )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
-        <DialogContent className="max-w-md w-[95vw] rounded-3xl p-0 overflow-hidden border-none shadow-2xl">
-            <DialogHeader className="p-6 bg-primary text-white border-b relative">
-                <DialogTitle className="text-2xl font-black uppercase tracking-tighter pr-8 break-words">
-                    {selectedBusinessContact?.name || "Chargement..."}
-                </DialogTitle>
-                <DialogDescription className="text-white/70 font-bold uppercase text-[10px]">Coordonnées de l'établissement</DialogDescription>
-                <button onClick={() => setIsContactDialogOpen(false)} className="absolute top-4 right-4 text-white/40 hover:text-white"><X className="size-6" /></button>
-            </DialogHeader>
-            <div className="p-6 space-y-6 bg-slate-50">
-                {isLoadingContact ? (
-                    <div className="space-y-4">
-                        <Skeleton className="h-12 w-full" />
-                        <Skeleton className="h-12 w-full" />
-                        <Skeleton className="h-24 w-full" />
-                    </div>
-                ) : selectedBusinessContact ? (
-                    <div className="space-y-5 animate-in fade-in">
-                        <div className="grid grid-cols-1 gap-3">
-                            {selectedBusinessContact.phoneNumber && (
-                                <a href={`tel:${selectedBusinessContact.phoneNumber}`} className="flex items-center justify-between p-4 bg-white rounded-2xl border-2 shadow-sm active:scale-[0.98] transition-transform">
-                                    <div className="flex items-center gap-4">
-                                        <div className="p-2 bg-green-50 text-green-600 rounded-xl"><Smartphone className="size-5" /></div>
-                                        <div className="flex flex-col"><span className="text-[9px] font-black uppercase opacity-40">Mobile</span><span className="font-black text-lg">{selectedBusinessContact.phoneNumber}</span></div>
-                                    </div>
-                                    <ChevronRight className="size-5 opacity-20" />
-                                </a>
-                            )}
-                            {selectedBusinessContact.landline && (
-                                <a href={`tel:${selectedBusinessContact.landline}`} className="flex items-center justify-between p-4 bg-white rounded-2xl border-2 shadow-sm active:scale-[0.98] transition-transform">
-                                    <div className="flex items-center gap-4">
-                                        <div className="p-2 bg-blue-50 text-blue-600 rounded-xl"><Phone className="size-5" /></div>
-                                        <div className="flex flex-col"><span className="text-[9px] font-black uppercase opacity-40">Fixe</span><span className="font-black text-lg">{selectedBusinessContact.landline}</span></div>
-                                    </div>
-                                    <ChevronRight className="size-5 opacity-20" />
-                                </a>
-                            )}
-                        </div>
-
-                        <div className="p-4 bg-white rounded-2xl border-2 shadow-sm space-y-3">
-                            <div className="flex items-start gap-4">
-                                <div className="p-2 bg-primary/5 text-primary rounded-xl shrink-0"><Home className="size-5" /></div>
-                                <div className="space-y-1">
-                                    <span className="text-[9px] font-black uppercase opacity-40">Adresse physique</span>
-                                    <p className="text-sm font-bold leading-relaxed">{selectedBusinessContact.address || `Commune de ${selectedBusinessContact.commune}`}</p>
-                                </div>
-                            </div>
-                            
-                            {selectedBusinessContact.location && (
-                                <div className="pt-3 border-t border-dashed">
-                                    <Button 
-                                        className="w-full h-14 bg-slate-900 text-white font-black uppercase tracking-widest gap-3 shadow-lg rounded-xl"
-                                        onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${selectedBusinessContact.location!.latitude},${selectedBusinessContact.location!.longitude}`, '_blank')}
-                                    >
-                                        <Navigation className="size-5 text-primary" /> S'y rendre (GPS)
-                                    </Button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                ) : <p className="text-center text-xs font-bold opacity-40 uppercase py-10">Aucune information trouvée</p>}
-            </div>
-            <DialogFooter className="p-4 bg-white border-t">
-                <Button variant="outline" onClick={() => setIsContactDialogOpen(false)} className="w-full h-12 font-black uppercase text-[10px] tracking-widest border-2">Fermer la fiche</Button>
-            </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
@@ -753,13 +685,13 @@ function ProductCard({
                     <div className="flex items-end justify-between mt-3">
                         <div className="flex flex-col">
                             {isPromo && product.originalPrice && (
-                                <span className="text-[9px] text-muted-foreground line-through font-bold">{product.originalPrice} F</span>
+                                <span className="text-[9px] text-muted-foreground line-through font-bold">{product.originalPrice.toLocaleString('fr-FR')} F</span>
                             )}
                             <div className="flex items-baseline gap-1">
                                 <span className={cn("text-base font-black leading-none", isPromo ? "text-red-600" : "text-primary")}>
-                                    {product.price}
+                                    {product.price.toLocaleString('fr-FR')}
                                 </span>
-                                <span className="text-[9px] font-black uppercase opacity-60">FCFP</span>
+                                <span className="text-[9px] font-black uppercase opacity-60">CFP</span>
                             </div>
                         </div>
 
