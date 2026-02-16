@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -32,9 +31,9 @@ import {
   sendEmailVerification,
   AuthError,
 } from 'firebase/auth';
-import { doc, collection, addDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, collection, addDoc, serverTimestamp, setDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { ForgotPasswordDialog } from './forgot-password-dialog';
-import { Eye, EyeOff, Ticket, MapPin, ScrollText, Globe, Bell, Mail, Smartphone, Phone, Home, Briefcase, User as UserIcon, Zap } from 'lucide-react';
+import { Eye, EyeOff, Ticket, MapPin, ScrollText, Globe, Bell, Mail, Smartphone, Phone, Home, Briefcase, User as UserIcon, Zap, CheckCircle2, RefreshCw } from 'lucide-react';
 import { redeemAccessToken } from '@/lib/token-utils';
 import { ensureUserDocument } from '@/lib/user-utils';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -42,7 +41,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { CgvSettings, Region } from '@/lib/types';
 import { locationsByRegion, regions } from '@/lib/locations';
-import { addMonths } from 'date-fns';
+import { addMonths, format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 
@@ -94,6 +94,10 @@ export function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  
+  // State for token preview
+  const [tokenInfo, setTokenInfo] = useState<{ duration: number } | null>(null);
+  const [isValidatingToken, setIsValidatingToken] = useState(false);
 
   const formSchema = mode === 'signup' ? signupSchema : loginSchema;
 
@@ -151,6 +155,28 @@ export function AuthForm({ mode }: AuthFormProps) {
         }
     }
   }, [form, mode]);
+
+  const handleVerifyToken = async () => {
+    const token = form.getValues('token');
+    if (!token?.trim() || !firestore) return;
+    
+    setIsValidatingToken(true);
+    try {
+      const tokenDoc = await getDoc(doc(firestore, 'access_tokens', token.trim()));
+      if (tokenDoc.exists() && tokenDoc.data().status === 'active') {
+        setTokenInfo({ duration: tokenDoc.data().durationMonths });
+        toast({ title: "Jeton valide !", description: `Ce code active ${tokenDoc.data().durationMonths} mois d'accès.` });
+      } else {
+        setTokenInfo(null);
+        toast({ variant: 'destructive', title: "Jeton invalide", description: "Ce code n'existe pas ou est déjà utilisé." });
+      }
+    } catch (e) {
+      setTokenInfo(null);
+      toast({ variant: 'destructive', title: "Erreur", description: "Impossible de vérifier le jeton." });
+    } finally {
+      setIsValidatingToken(false);
+    }
+  };
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
@@ -273,9 +299,56 @@ export function AuthForm({ mode }: AuthFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col space-y-4">
+        {/* SECTION 1: JETON (EN PREMIER) */}
+        <div className="p-4 bg-primary/5 border-2 rounded-2xl space-y-3 animate-in fade-in">
+          <FormField
+            control={form.control}
+            name="token"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary">
+                  <Ticket className="size-3" /> Jeton d'accès Premium (Optionnel)
+                </FormLabel>
+                <FormControl>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input placeholder="LBN-XXXX-XXXX" {...field} autoComplete="off" className="pl-10 font-mono tracking-wider h-12 border-2 bg-white" />
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground"><Ticket className="h-5 w-5" /></div>
+                    </div>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      className="h-12 border-2 font-black uppercase text-[10px] shrink-0 bg-white"
+                      onClick={handleVerifyToken}
+                      disabled={isValidatingToken || !field.value}
+                    >
+                      {isValidatingToken ? <RefreshCw className="animate-spin size-4" /> : "Vérifier"}
+                    </Button>
+                  </div>
+                </FormControl>
+                {tokenInfo && (
+                  <div className="mt-3 p-3 bg-green-50 border-2 border-green-100 rounded-xl animate-in zoom-in-95">
+                    <p className="text-[10px] font-black uppercase text-green-700 flex items-center gap-2">
+                      <CheckCircle2 className="size-3" /> Jeton Valide
+                    </p>
+                    <p className="text-xs font-bold mt-1 text-green-900">
+                      Active {tokenInfo.duration} mois d'accès Premium.
+                    </p>
+                    <p className="text-[9px] font-bold text-green-600 uppercase mt-0.5">
+                      Fin d'activation : {format(addMonths(new Date(), tokenInfo.duration), 'dd MMMM yyyy', { locale: fr })}
+                    </p>
+                  </div>
+                )}
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* SECTION 2: IDENTITÉ (POUR INSCRIPTION) */}
         {mode === 'signup' && (
           <>
-            <div className="p-4 bg-primary/5 border-2 rounded-2xl space-y-4 animate-in fade-in">
+            <div className="p-4 bg-muted/10 border-2 rounded-2xl space-y-4 animate-in fade-in">
               <div className="flex items-center gap-2 border-b border-dashed border-primary/20 pb-2">
                 <Briefcase className="size-4 text-primary" />
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-800">Type de compte</h3>
@@ -327,7 +400,7 @@ export function AuthForm({ mode }: AuthFormProps) {
                     <FormItem className="animate-in zoom-in-95 duration-200">
                       <FormLabel className="text-[10px] font-black uppercase text-primary">Numéro RIDET (Obligatoire)</FormLabel>
                       <FormControl>
-                        <Input placeholder="0 000 000.000" {...field} className="h-12 border-2 font-black tracking-widest uppercase" />
+                        <Input placeholder="0 000 000.000" {...field} className="h-12 border-2 font-black tracking-widest uppercase bg-white" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -359,7 +432,7 @@ export function AuthForm({ mode }: AuthFormProps) {
                     <FormLabel className="flex items-center gap-1.5"><Globe className="size-3 text-primary" /> Région</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
-                        <SelectTrigger className="h-12 border-2 text-[10px] font-black uppercase">
+                        <SelectTrigger className="h-12 border-2 text-[10px] font-black uppercase bg-white">
                           <SelectValue />
                         </SelectTrigger>
                       </FormControl>
@@ -380,7 +453,7 @@ export function AuthForm({ mode }: AuthFormProps) {
                     <FormLabel className="flex items-center gap-1.5"><MapPin className="size-3 text-primary" /> Commune</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger className="h-12 border-2 text-xs font-bold">
+                        <SelectTrigger className="h-12 border-2 text-xs font-bold bg-white">
                           <SelectValue placeholder="Choisir..." />
                         </SelectTrigger>
                       </FormControl>
@@ -396,8 +469,8 @@ export function AuthForm({ mode }: AuthFormProps) {
               />
             </div>
 
-            <div className="p-4 bg-muted/10 border-2 rounded-2xl space-y-4 animate-in fade-in">
-              <div className="flex items-center gap-2 border-b border-dashed pb-2">
+            <div className="p-4 bg-muted/5 border-2 rounded-2xl space-y-4 animate-in fade-in">
+              <div className="flex items-center gap-2 border-b border-dashed border-primary/20 pb-2">
                 <Phone className="size-4 text-primary" />
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-800">Coordonnées</h3>
               </div>
@@ -412,7 +485,7 @@ export function AuthForm({ mode }: AuthFormProps) {
                         <FormLabel className="text-[10px] font-black uppercase">Code</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
-                            <SelectTrigger className="h-10 border-2 font-black text-xs">
+                            <SelectTrigger className="h-10 border-2 font-black text-xs bg-white">
                               <SelectValue />
                             </SelectTrigger>
                           </FormControl>
@@ -431,7 +504,7 @@ export function AuthForm({ mode }: AuthFormProps) {
                       <FormItem className="col-span-2">
                         <FormLabel className="text-[10px] font-black uppercase">Mobile (Obligatoire)</FormLabel>
                         <FormControl>
-                          <Input type="tel" placeholder="00 00 00" {...field} className="h-10 border-2 font-black" />
+                          <Input type="tel" placeholder="00 00 00" {...field} className="h-10 border-2 font-black bg-white" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -439,7 +512,7 @@ export function AuthForm({ mode }: AuthFormProps) {
                   />
                 </div>
 
-                <div className="pt-2 space-y-3 border-t border-dashed">
+                <div className="pt-2 space-y-3 border-t border-dashed border-primary/10">
                   <p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest italic">Informations optionnelles :</p>
                   <FormField
                     control={form.control}
@@ -448,7 +521,7 @@ export function AuthForm({ mode }: AuthFormProps) {
                       <FormItem>
                         <FormLabel className="text-[10px]">Téléphone Fixe</FormLabel>
                         <FormControl>
-                          <Input type="tel" placeholder="Fixe" {...field} className="h-10 border-2" />
+                          <Input type="tel" placeholder="Fixe" {...field} className="h-10 border-2 bg-white" />
                         </FormControl>
                       </FormItem>
                     )}
@@ -460,7 +533,7 @@ export function AuthForm({ mode }: AuthFormProps) {
                       <FormItem>
                         <FormLabel className="text-[10px]">Adresse physique</FormLabel>
                         <FormControl>
-                          <Input placeholder="Ex: 12 rue des Flamboyants" {...field} className="h-10 border-2" />
+                          <Input placeholder="Ex: 12 rue des Flamboyants" {...field} className="h-10 border-2 bg-white" />
                         </FormControl>
                       </FormItem>
                     )}
@@ -470,54 +543,59 @@ export function AuthForm({ mode }: AuthFormProps) {
             </div>
           </>
         )}
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Email</FormLabel>
-              <FormControl>
-                <Input placeholder="votre@email.com" {...field} autoComplete="email" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="password"
-          render={({ field }) => (
-            <FormItem>
-               <div className="flex items-center justify-between">
-                <FormLabel>Mot de passe</FormLabel>
-                {mode === 'login' && (
-                   <ForgotPasswordDialog>
-                      <button type="button" className="text-sm font-medium text-primary hover:underline -translate-y-px">
-                        Mot de passe oublié ?
-                      </button>
-                   </ForgotPasswordDialog>
-                )}
-              </div>
-              <FormControl>
-                <div className="relative">
-                  <Input 
-                    type={showPassword ? 'text' : 'password'} 
-                    placeholder="********" {...field} 
-                    autoComplete={mode === 'login' ? 'current-password' : 'new-password'} 
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground"
-                  >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
+
+        {/* SECTION 3: AUTH (EMAIL / PASSWORD) */}
+        <div className="space-y-4 animate-in fade-in">
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input placeholder="votre@email.com" {...field} autoComplete="email" className="h-12 border-2" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <div className="flex items-center justify-between">
+                  <FormLabel>Mot de passe</FormLabel>
+                  {mode === 'login' && (
+                    <ForgotPasswordDialog>
+                        <button type="button" className="text-sm font-medium text-primary hover:underline -translate-y-px">
+                          Mot de passe oublié ?
+                        </button>
+                    </ForgotPasswordDialog>
+                  )}
                 </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+                <FormControl>
+                  <div className="relative">
+                    <Input 
+                      type={showPassword ? 'text' : 'password'} 
+                      placeholder="********" {...field} 
+                      autoComplete={mode === 'login' ? 'current-password' : 'new-password'} 
+                      className="h-12 border-2"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground"
+                    >
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
         {mode === 'login' && (
           <FormField
@@ -526,15 +604,15 @@ export function AuthForm({ mode }: AuthFormProps) {
             render={({ field }) => (
               <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                 <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                <div className="space-y-1 leading-none"><FormLabel>Se souvenir de moi</FormLabel></div>
+                <div className="space-y-1 leading-none"><FormLabel className="text-xs font-bold">Se souvenir de moi</FormLabel></div>
               </FormItem>
             )}
           />
         )}
 
         {mode === 'signup' && (
-          <div className="p-4 bg-muted/20 border-2 rounded-2xl space-y-4 animate-in fade-in slide-in-from-top-2">
-            <div className="flex items-center gap-2 border-b border-dashed pb-2">
+          <div className="p-4 bg-muted/10 border-2 rounded-2xl space-y-4 animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center gap-2 border-b border-dashed border-primary/20 pb-2">
               <Bell className="size-4 text-primary" />
               <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-800">Mes Intérêts & Notifications</h3>
             </div>
@@ -559,7 +637,7 @@ export function AuthForm({ mode }: AuthFormProps) {
               </div>
             </div>
 
-            <div className="pt-2 space-y-3 border-t border-dashed">
+            <div className="pt-2 space-y-3 border-t border-dashed border-primary/10">
               <p className="text-[9px] font-bold uppercase text-muted-foreground">Canaux de réception :</p>
               <div className="flex flex-col gap-2">
                 <div className="flex items-center space-x-3">
@@ -596,34 +674,6 @@ export function AuthForm({ mode }: AuthFormProps) {
             </div>
           </div>
         )}
-        
-        <div className="p-4 bg-primary/5 border-2 rounded-2xl space-y-3 animate-in fade-in">
-          <FormField
-            control={form.control}
-            name="token"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary">
-                  <Ticket className="size-3" /> Jeton d'accès (Optionnel)
-                </FormLabel>
-                <FormControl>
-                  <div className="relative">
-                    <Input placeholder="LBN-XXXX-XXXX" {...field} autoComplete="off" className="pl-10 font-mono tracking-wider h-12 border-2" />
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground"><Ticket className="h-5 w-5" /></div>
-                  </div>
-                </FormControl>
-                <Button 
-                  type="submit" 
-                  variant="secondary" 
-                  className="w-full h-10 mt-2 font-black uppercase text-[10px] tracking-widest border-2 border-primary/20 gap-2 shadow-sm"
-                >
-                  <Zap className="size-3 text-primary fill-primary" /> Valider le jeton & Se connecter
-                </Button>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
 
         {mode === 'signup' && (
           <FormField
@@ -651,7 +701,7 @@ export function AuthForm({ mode }: AuthFormProps) {
                           </div>
                         </ScrollArea>
                         <DialogFooter className="p-4 border-t bg-muted/10">
-                          <DialogClose asChild><Button className="w-full font-black uppercase">Compris</Button></DialogClose>
+                          <DialogClose asChild><Button className="w-full font-black uppercase h-12">Compris</Button></DialogClose>
                         </DialogFooter>
                       </DialogContent>
                     </Dialog>
@@ -669,7 +719,7 @@ export function AuthForm({ mode }: AuthFormProps) {
             className="w-full h-14 font-black uppercase tracking-widest shadow-xl text-base" 
             disabled={isLoading || (mode === 'signup' && !form.getValues('acceptCgv'))}
           >
-            {isLoading ? "Chargement..." : (mode === 'login' ? 'Se connecter' : "S'inscrire")}
+            {isLoading ? <RefreshCw className="animate-spin mr-2 size-5" /> : (mode === 'login' ? 'Se connecter' : "S'inscrire")}
           </Button>
         </div>
       </form>
