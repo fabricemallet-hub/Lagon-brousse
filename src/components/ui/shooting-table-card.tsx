@@ -545,12 +545,12 @@ export function ShootingTableCard() {
             </div>
           ) : (
             <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
                     <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                         <Crosshair className="size-3 text-primary" /> Corrections (Zéroté à {zeroDistance}m)
                     </h3>
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                        <div className="flex flex-1 sm:flex-none items-center gap-2 bg-primary/10 border-2 border-primary/30 rounded-xl px-3 py-1.5 h-11 shadow-sm transition-all focus-within:ring-2 focus-within:ring-primary/20">
+                    <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
+                        <div className="flex items-center gap-2 bg-primary/10 border-2 border-primary/30 rounded-xl px-3 py-1.5 h-11 shadow-sm transition-all focus-within:ring-2 focus-within:ring-primary/20 w-full sm:w-auto justify-center">
                             <Label className="text-[10px] font-black uppercase text-primary whitespace-nowrap leading-none">Cible :</Label>
                             <div className="flex items-center gap-1">
                                 <Input 
@@ -563,11 +563,11 @@ export function ShootingTableCard() {
                                 <span className="text-[10px] font-black text-primary/60">m</span>
                             </div>
                         </div>
-                        <Badge variant="outline" className="hidden sm:flex text-[9px] font-black uppercase h-11 border-blue-200 text-blue-600 px-3 bg-white/50">1 clic = 1cm à 100m</Badge>
+                        <Badge variant="outline" className="text-[9px] font-black uppercase h-11 border-blue-200 text-blue-600 px-3 bg-white/50 w-full sm:w-auto justify-center">1 clic = 1cm à 100m</Badge>
                     </div>
                 </div>
 
-                <div className="hidden sm:block border-2 rounded-2xl overflow-hidden bg-white shadow-md">
+                <div className="hidden md:block border-2 rounded-2xl overflow-hidden bg-white shadow-md">
                     <Table>
                         <TableHeader className="bg-slate-50">
                             <TableRow className="hover:bg-transparent border-b-2">
@@ -600,7 +600,7 @@ export function ShootingTableCard() {
                     </Table>
                 </div>
 
-                <div className="sm:hidden space-y-3">
+                <div className="md:hidden space-y-3">
                     {resultsTable.map((res, idx) => (
                         <Card key={idx} className="border-2 shadow-sm overflow-hidden bg-white rounded-xl">
                             <div className="bg-slate-50 px-4 py-2 border-b flex justify-between items-center">
@@ -634,9 +634,6 @@ export function ShootingTableCard() {
                             </div>
                         </Card>
                     ))}
-                    <div className="flex justify-center pt-1">
-                        <Badge variant="outline" className="text-[8px] font-black uppercase border-blue-200 text-blue-600 px-3 bg-white/50 h-6">1 clic = 1cm à 100m</Badge>
-                    </div>
                 </div>
             </div>
           )}
