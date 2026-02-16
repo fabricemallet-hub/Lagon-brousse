@@ -17,7 +17,8 @@ import {
   ChevronRight,
   Sun,
   BrainCircuit,
-  Briefcase
+  Briefcase,
+  Shield
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -27,7 +28,8 @@ import type { UserAccount } from '@/lib/types';
 
 const helpSections = [
   { id: 'accueil', title: 'Accueil', desc: 'Météo et résumé du jour.', icon: Home, color: 'bg-blue-500' },
-  { id: 'pro-dashboard', title: 'Dashboard Pro', desc: 'Gestion boutique et publicité.', icon: Briefcase, color: 'bg-slate-900', proOnly: true },
+  { id: 'admin', title: 'Console Admin', desc: 'Gestion Master du réseau L&B.', icon: Shield, color: 'bg-slate-800', adminOnly: true },
+  { id: 'pro-dashboard', title: 'Dashboard Pro', desc: 'Gestion boutique et publicité IA.', icon: Briefcase, color: 'bg-slate-900', proOnly: true },
   { id: 'lagon', title: 'Lagon', desc: 'Vent, marées et houle.', icon: Waves, color: 'bg-cyan-500' },
   { id: 'meteo', title: 'Météo Live', desc: 'Stations en direct et prévisions J+7.', icon: Sun, color: 'bg-yellow-500' },
   { id: 'vessel-tracker', title: 'Boat Tracker', desc: 'Sécurité et partage GPS.', icon: Navigation, color: 'bg-blue-600' },
@@ -56,7 +58,8 @@ export default function AidePage() {
   const isAdmin = useMemo(() => {
     if (!user) return false;
     const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com', 'fabrice.mallet@gmail.com'];
-    return masterEmails.includes(user.email?.toLowerCase() || '') || userProfile?.role === 'admin';
+    const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'D1q2GPM95rZi38cvCzvsjcWQDaV2'];
+    return masterEmails.includes(user.email?.toLowerCase() || '') || masterUids.includes(user.uid) || userProfile?.role === 'admin';
   }, [user, userProfile]);
 
   const isPro = useMemo(() => {
@@ -64,8 +67,12 @@ export default function AidePage() {
   }, [isAdmin, userProfile]);
 
   const visibleSections = useMemo(() => {
-    return helpSections.filter(s => !s.proOnly || isPro);
-  }, [isPro]);
+    return helpSections.filter(s => {
+        if (s.adminOnly && !isAdmin) return false;
+        if (s.proOnly && !isPro) return false;
+        return true;
+    });
+  }, [isAdmin, isPro]);
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-20">

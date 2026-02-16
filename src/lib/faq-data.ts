@@ -21,6 +21,18 @@ export const INITIAL_FAQ_DATA = [
   { categorie: "General", ordre: 14, question: "L'heure affichée est-elle celle de NC ?", reponse: "Oui, l'application est configurée sur le fuseau GMT+11 (Nouméa)." },
   { categorie: "General", ordre: 15, question: "Peut-on utiliser l'app sur tablette ?", reponse: "Oui, l'interface est responsive et s'adapte aux grands écrans." },
 
+  // --- PRO (10) ---
+  { categorie: "PRO", ordre: 120, question: "Comment activer mon compte commerçant ?", reponse: "Vous devez d'abord créer un compte classique, puis transmettre votre UID (visible dans l'onglet Profil) à l'administrateur pour qu'il relie votre boutique." },
+  { categorie: "PRO", ordre: 121, question: "À quoi sert l'Assistant Magicien IA Produit ?", reponse: "Il utilise la vision artificielle pour analyser vos photos de produits. En un clic, il rédige une description attractive et génère une stratégie de vente (arguments clés et conseils marketing)." },
+  { categorie: "PRO", ordre: 122, question: "Comment fonctionne le Magicien de Campagne ?", reponse: "Une fois vos articles sélectionnés, l'IA rédige automatiquement 5 variantes de messages par canal (Email, SMS, Push). Elle adapte la longueur selon le format technique de chaque support." },
+  { categorie: "PRO", ordre: 123, question: "Pourquoi y a-t-il 3 choix de longueur dans les campagnes ?", reponse: "Vous pouvez choisir entre Court, Moyen ou Long. L'IA adapte alors le contenu : un mail 'Court' sera plus riche qu'un SMS 'Court' pour respecter les usages de chaque média." },
+  { categorie: "PRO", ordre: 124, question: "Comment est calculé le devis d'une campagne ?", reponse: "Le prix total = Frais fixes + (Nombre d'abonnés ciblés x Tarif par canal). Le 'Reach' affiche l'audience réelle atteignable selon vos rayons et votre zone géographique." },
+  { categorie: "PRO", ordre: 125, question: "Puis-je modifier les textes de l'IA ?", reponse: "Oui, l'étape finale du Magicien de Campagne vous permet d'éditer manuellement chaque message avant de procéder au paiement." },
+  { categorie: "PRO", ordre: 126, question: "Qu'est-ce qu'une campagne en brouillon ?", reponse: "C'est une campagne configurée mais non payée. Elle reste accessible dans votre historique pour un envoi ultérieur." },
+  { categorie: "PRO", ordre: 127, question: "Le ciblage par commune est-il précis ?", reponse: "Oui, vous pouvez choisir jusqu'à 30 communes spécifiques. Seuls les utilisateurs ayant ces communes en 'Favori' recevront l'alerte." },
+  { categorie: "PRO", ordre: 128, question: "Peut-on mettre plusieurs photos par produit ?", reponse: "Oui, vous pouvez charger jusqu'à 4 photos. L'IA les analysera toutes pour créer la meilleure description possible." },
+  { categorie: "PRO", ordre: 129, question: "Comment savoir si ma campagne est envoyée ?", reponse: "Après le paiement, votre campagne passe en statut 'En attente'. L'administrateur valide techniquement l'envoi sous 24h et vous recevez une notification." },
+
   // --- PECHE & FISH (25) ---
   { categorie: "Peche", ordre: 16, question: "Qu'est-ce qu'un indice de réussite 10/10 ?", reponse: "C'est une coïncidence parfaite entre vive-eau, phase lunaire optimale et créneau d'activité de l'espèce." },
   { categorie: "Peche", ordre: 17, question: "Comment fonctionne l'IA 'Jour Similaire' ?", reponse: "Elle compare la marée et la lune d'un succès passé pour trouver une date identique dans le futur." },
@@ -79,13 +91,6 @@ export const INITIAL_FAQ_DATA = [
   { categorie: "Boat Tracker", ordre: 110, question: "Qu'est-ce que l'Angle de Tir / Sécurité ?", reponse: "C'est une zone de surveillance visuelle (cône bleu clair) que vous définissez sur la carte. Si un autre point GPS entre dans cet angle, vous recevez une alerte sonore immédiate." },
   { categorie: "Boat Tracker", ordre: 111, question: "Comment régler la direction de l'angle ?", reponse: "Utilisez le curseur dans vos réglages : 0° est le centre, vous pouvez régler de -180° (gauche) à +180° (droite)." },
   { categorie: "Boat Tracker", ordre: 112, question: "Quelle est la portée maximale de l'angle ?", reponse: "Vous pouvez régler la portée jusqu'à 2000m (2 km). La détection ne s'active que si le coéquipier est à l'intérieur de cette distance." },
-
-  // --- PRO (5) ---
-  { categorie: "PRO", ordre: 120, question: "Comment devenir un compte partenaire PRO ?", reponse: "Ouvrez un ticket support ou contactez l'admin via la messagerie en fournissant votre numéro RIDET et le nom de votre établissement." },
-  { categorie: "PRO", ordre: 121, question: "Les campagnes publicitaires sont-elles payantes ?", reponse: "Oui. Un devis automatique est généré dans votre Dashboard Pro selon le nombre de clients ciblés et les canaux choisis (Push, Email, SMS)." },
-  { categorie: "PRO", ordre: 122, question: "À quoi sert l'Assistant Magicien IA ?", reponse: "Il analyse vos photos de produits pour rédiger automatiquement une annonce vendeuse. Il propose aussi des arguments de vente pour vos vendeurs en rayon." },
-  { categorie: "PRO", ordre: 123, question: "Puis-je cibler uniquement ma commune ?", reponse: "Oui, le Dashboard Pro permet de choisir entre un ciblage global (NC / Tahiti) ou une sélection de communes spécifiques autour de votre magasin." },
-  { categorie: "PRO", ordre: 124, question: "Quand ma campagne est-elle diffusée ?", reponse: "Une fois validée par le commerçant, la campagne passe en statut 'En attente'. L'administrateur valide alors l'envoi technique sous 24h." },
 
   // --- CHASSE (15) ---
   { categorie: "Chasse", ordre: 61, question: "Comment rejoindre une battue ?", reponse: "Entrez le code session (CH-XXXX) fourni par l'organisateur." },

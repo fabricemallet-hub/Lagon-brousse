@@ -31,7 +31,12 @@ import {
   Briefcase,
   ShoppingBag,
   Wand2,
-  Users
+  Users,
+  Shield,
+  DollarSign,
+  Smartphone,
+  Mail,
+  Bell
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -46,6 +51,24 @@ const sectionContent: Record<string, {
   tips: string[];
   links?: { label: string, url: string }[];
 }> = {
+  'admin': {
+    title: 'Console d\'Administration',
+    icon: Shield,
+    color: 'bg-slate-800',
+    role: "La console Master permet de piloter l'ensemble de l'écosystème L&B : utilisateurs, partenaires commerciaux, tarification et base de données scientifique.",
+    steps: [
+      "Gestion des Comptes : Modifiez les statuts d'abonnement et les dates d'expiration manuellement.",
+      "Liaison PRO : Pour activer un magasin, récupérez l'UID de l'utilisateur (dans son profil) et liez-le à un commerce via l'onglet 'Boutiques'.",
+      "Configuration Tarifs : Gérez les frais fixes et les coûts par utilisateur/canal pour les campagnes publicitaires dans l'onglet 'Tarifs'.",
+      "Alertes Globales : Diffusez des messages de maintenance ou de sécurité qui s'afficheront en haut de l'accueil de tous les utilisateurs.",
+      "Guide Poissons : Enrichissez le catalogue et utilisez l'IA pour générer automatiquement les fiches techniques (Ciguatera, biologie, cuisine).",
+      "Accès Premium : Gérez les jetons cadeaux et activez l'accès libre global pour des événements spéciaux."
+    ],
+    tips: [
+      "La liaison PRO via UID est indispensable pour que le commerçant voit son 'Dashboard Pro'.",
+      "Les tarifs de pub modifiés ici sont appliqués instantanément sur les devis des commerçants."
+    ]
+  },
   'accueil': {
     title: 'Accueil',
     icon: Home,
@@ -119,21 +142,22 @@ const sectionContent: Record<string, {
     ]
   },
   'pro-dashboard': {
-    title: 'Dashboard Pro & Pub',
+    title: 'Dashboard Pro & Publicité',
     icon: Briefcase,
     color: 'bg-slate-900',
-    role: "Le Dashboard Pro est l'outil de gestion exclusif pour nos partenaires commerçants. Il permet de dynamiser votre point de vente en diffusant des offres ciblées vers les utilisateurs de votre zone.",
+    role: "Le Dashboard Pro permet de dynamiser votre point de vente en diffusant des offres ciblées. Il intègre désormais des assistants IA pour vos rédactions et vos stratégies.",
     steps: [
-      "Gestion du Catalogue : Ajoutez vos produits en précisant s'il s'agit d'une 'Promotion' ou d'un 'Nouvel Arrivage'. Saisissez vos prix et remises.",
-      "Assistant Magicien IA : Ne perdez plus de temps à rédiger. L'IA analyse vos photos et propose 3 variantes de textes adaptées à votre ton (Local, Humour, Pro...).",
-      "Stratégie de Vente : Pour chaque article, l'IA génère des arguments de vente exclusifs et des conseils marketing pour maximiser vos chances de conversion.",
-      "Ciblage Précis : Visualisez en temps réel le nombre de clients atteignables selon vos rayons et votre zone (Communes choisies, Calédonie entière ou Tahiti).",
-      "Diffusion Multi-Canaux : Envoyez vos campagnes via Notifications Push, Emails ou SMS. Chaque campagne est soumise à validation admin pour garantir la qualité du réseau."
+      "Magicien IA Produit : Lors de l'ajout d'un article, utilisez l'Assistant Magicien. Donnez des infos sup, choisissez un ton (Local, Humour...) et l'IA analyse vos photos pour proposer 3 descriptions percutantes.",
+      "Stratégie de Vente : Après avoir choisi un texte, l'IA vous donne des arguments de vente et des conseils marketing spécifiques pour réussir sur le Caillou.",
+      "Magicien Campagne : Sélectionnez un ou plusieurs articles, cliquez sur 'Lancer la campagne'. L'IA générera alors 5 propositions de messages par canal (SMS, Push, Mail).",
+      "Longueur Adaptative : Choisissez entre Court, Moyen ou Long. L'IA adapte intelligemment la longueur selon le canal (ex: un 'court' pour un mail sera plus long qu'un SMS).",
+      "Ciblage & Devis : Choisissez vos communes ou régions. Le devis est calculé en temps réel selon la portée (Reach) de l'audience active.",
+      "Finalisation : Modifiez manuellement les textes générés si besoin, puis validez via le bouton 'PAIEMENT' pour envoyer la campagne à l'admin."
     ],
     tips: [
-      "Visuels : Une photo nette prise avec l'option 'Appareil' directe convertit 2 fois mieux qu'une image catalogue générique.",
-      "Ciblage : Privilégiez les 'Communes spécifiques' autour de votre magasin pour un trafic en boutique physique immédiat.",
-      "Ton Local : Utilisez le ton 'Local (Caillou)' pour créer un lien de confiance immédiat avec la communauté."
+      "Le ton 'Local (Caillou)' est idéal pour créer un lien de confiance immédiat avec les pêcheurs et chasseurs du pays.",
+      "Vérifiez toujours le 'Reach' (Audiences Réelles) avant de valider : cela vous indique combien de personnes recevront réellement votre alerte.",
+      "Vous pouvez sauvegarder une campagne en brouillon et l'envoyer plus tard."
     ]
   },
   'peche': {
