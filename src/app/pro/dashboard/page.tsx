@@ -44,7 +44,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { allCommuneNames } from '@/lib/locations';
 import { analyzeProduct } from '@/ai/flows/analyze-product-flow';
 import { generateCampaignMessages } from '@/ai/flows/generate-campaign-messages-flow';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { AnalyzeProductOutput, GenerateCampaignOutput } from '@/ai/schemas';
 import {
   Dialog,
@@ -201,7 +200,7 @@ export default function ProDashboard() {
       }
       if (selectedTargetCommunes.length === 0) setSelectedTargetCommunes([business.commune]);
     }
-  }, [business, selectedTargetCommunes.length, targetCategory, promoCategory]);
+  }, [business, targetCategory, promoCategory, selectedTargetCommunes.length]);
 
   useEffect(() => {
     if (!firestore || !business || isUserLoading || !user) return;
@@ -447,7 +446,7 @@ export default function ProDashboard() {
                             
                             <div className="space-y-3">
                                 <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Titre</Label><Input value={promoTitle} onChange={e => setPromoTitle(e.target.value)} className="font-bold border-2" /></div>
-                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Rayon</Label><Select value={promoCategory} onValueChange={setPromoCategory}><SelectTrigger className="border-2 font-black uppercase text-xs"><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs uppercase">{cat}</SelectItem>)}</SelectContent></Select></div>
+                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Rayon</Label><Select value={promoCategory} onValueChange={setPromoCategory}><SelectTrigger className="border-2 font-black uppercase text-xs bg-white"><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs uppercase">{cat}</SelectItem>)}</SelectContent></Select></div>
                                 
                                 <div className="grid grid-cols-2 gap-3 p-4 bg-muted/10 rounded-2xl border-2 border-dashed border-primary/5">
                                     <div className="space-y-1">
@@ -460,7 +459,7 @@ export default function ProDashboard() {
                                     </div>
                                     <div className="col-span-2 space-y-1">
                                         <Label className="text-[10px] font-black uppercase text-primary ml-1">Prix Final {calculatedDiscount && <Badge variant="destructive" className="h-4 px-1 text-[8px]">-{calculatedDiscount}%</Badge>}</Label>
-                                        <Input type="number" value={promoPrice} onChange={e => setPromoPrice(e.target.value)} className="font-black text-lg border-2 h-12" />
+                                        <Input type="number" value={promoPrice} onChange={e => setPromoPrice(e.target.value)} className="font-black text-lg border-2 h-12 bg-white" />
                                     </div>
                                 </div>
 
@@ -496,7 +495,7 @@ export default function ProDashboard() {
 
                                 <div className="space-y-1.5">
                                     <div className="flex justify-between items-center"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Description commerciale</Label><Button variant="outline" size="sm" className="h-7 text-[8px] font-black uppercase border-primary/30 text-primary gap-1.5" onClick={startAiWizard} disabled={!promoTitle || promoImages.length === 0}><Wand2 className="size-2.5" /> Magicien IA</Button></div>
-                                    <Textarea value={promoDescription} onChange={e => setPromoDescription(e.target.value)} className="font-medium border-2 min-h-[100px] text-sm" />
+                                    <Textarea value={promoDescription} onChange={e => setPromoDescription(e.target.value)} className="font-medium border-2 min-h-[100px] text-sm bg-white" />
                                 </div>
 
                                 <div className="flex gap-2">
@@ -512,7 +511,7 @@ export default function ProDashboard() {
                                 <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Rayon cible</Label><Select value={targetCategory} onValueChange={setTargetCategory}><SelectTrigger className="h-10 border-2 bg-background font-black text-xs"><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs uppercase">{cat}</SelectItem>)}</SelectContent></Select></div>
                                 <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Portée</Label><Select value={targetScope} onValueChange={(v: any) => setTargetScope(v)}><SelectTrigger className="h-10 border-2 bg-background font-black text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="SPECIFIC">Communes spécifiques</SelectItem><SelectItem value="CALEDONIE">Nouvelle-Calédonie</SelectItem><SelectItem value="TAHITI">Tahiti</SelectItem><SelectItem value="ALL">Tout le réseau</SelectItem></SelectContent></Select></div>
                                 {targetScope === 'SPECIFIC' && (
-                                    <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full h-10 border-2 bg-background justify-between font-bold text-xs"><div className="flex items-center gap-2 truncate"><MapPin className="size-3 text-primary" />{selectedTargetCommunes.length === 0 ? "Aucune commune" : `${selectedTargetCommunes.length} communes`}</div><ChevronDown className="size-3 opacity-50" /></Button></PopoverTrigger><PopoverContent className="w-[300px] p-0"><div className="p-2 border-b"><Input placeholder="Filtrer..." className="h-8 text-xs" value={communeSearch} onChange={(e) => setCommuneSearch(e.target.value)} /></div><ScrollArea className="h-[250px]"><div className="p-2 space-y-1">{allCommuneNames.filter(n => n.toLowerCase().includes(communeSearch.toLowerCase())).map(name => (<div key={name} className="flex items-center space-x-2 p-1.5 hover:bg-muted rounded cursor-pointer" onClick={() => setSelectedTargetCommunes(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name].slice(0, 30))}><Checkbox checked={selectedTargetCommunes.includes(name)} /><span className="text-xs font-bold uppercase">{name}</span></div>))}</div></ScrollArea></PopoverContent></Popover>
+                                    <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full h-10 border-2 bg-background justify-between font-bold text-xs"><div className="flex items-center gap-2 truncate"><MapPin className="size-3 text-primary" />{selectedTargetCommunes.length === 0 ? "Aucune commune" : `${selectedTargetCommunes.length} communes`}</div><ChevronDown className="size-3 opacity-50" /></Button></PopoverTrigger><PopoverContent className="w-[300px] p-0 z-[160]"><div className="p-2 border-b"><Input placeholder="Filtrer..." className="h-8 text-xs" value={communeSearch} onChange={(e) => setCommuneSearch(e.target.value)} /></div><ScrollArea className="h-[250px]"><div className="p-2 space-y-1">{allCommuneNames.filter(n => n.toLowerCase().includes(communeSearch.toLowerCase())).map(name => (<div key={name} className="flex items-center space-x-2 p-1.5 hover:bg-muted rounded cursor-pointer" onClick={() => setSelectedTargetCommunes(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name].slice(0, 30))}><Checkbox checked={selectedTargetCommunes.includes(name)} /><span className="text-xs font-bold uppercase">{name}</span></div>))}</div></ScrollArea></PopoverContent></Popover>
                                 )}
                                 <div className="space-y-2 p-3 rounded-xl border bg-background/50">
                                     <p className="text-[9px] font-black uppercase text-muted-foreground">Reach estimé : {isCalculatingReach ? '...' : (baseTargetCount ?? 0)} abonnés</p>
@@ -558,7 +557,7 @@ export default function ProDashboard() {
 
       {/* Assistant Product Wizard */}
       <Dialog open={wizardStep !== 'IDLE'} onOpenChange={(open) => !open && setWizardStep('IDLE')}>
-        <DialogContent className="max-w-md w-[95vw] rounded-3xl p-0 overflow-hidden border-none shadow-2xl flex flex-col max-h-[90vh]">
+        <DialogContent className="max-w-md w-[95vw] rounded-3xl p-0 overflow-hidden border-none shadow-2xl flex flex-col max-h-[90vh] z-[170]">
             <DialogHeader className="p-6 bg-slate-900 text-white border-b shrink-0">
                 <DialogTitle className="font-black uppercase tracking-tighter flex items-center gap-3"><Wand2 className="size-6 text-primary" /> Magicien IA</DialogTitle>
             </DialogHeader>
@@ -580,7 +579,7 @@ export default function ProDashboard() {
 
       {/* Assistant Campagne IA */}
       <Dialog open={campWizardStep !== 'IDLE'} onOpenChange={(open) => !open && setCampWizardStep('IDLE')}>
-        <DialogContent className="max-w-md w-[95vw] rounded-3xl p-0 overflow-hidden border-none shadow-2xl flex flex-col max-h-[90vh]">
+        <DialogContent className="max-w-md w-[95vw] rounded-3xl p-0 overflow-hidden border-none shadow-2xl flex flex-col max-h-[90vh] z-[170]">
             <DialogHeader className="p-6 bg-slate-900 text-white border-b shrink-0">
                 <DialogTitle className="font-black uppercase tracking-tighter flex items-center gap-3"><Megaphone className="size-6 text-accent" /> Campagne IA</DialogTitle>
             </DialogHeader>
@@ -588,13 +587,54 @@ export default function ProDashboard() {
                 {campWizardStep === 'TONE' && <div className="grid gap-2 animate-in fade-in">{AVAILABLE_TONES.map(t => (<div key={t.id} onClick={() => setCampTone(t.id)} className={cn("p-4 rounded-2xl border-2 transition-all cursor-pointer", campTone === t.id ? "bg-accent border-accent text-white" : "bg-white")}><p className="font-black uppercase text-[11px]">{t.label}</p></div>))}</div>}
                 {campWizardStep === 'LENGTH' && <div className="grid gap-2 animate-in fade-in">{CAMPAIGN_LENGTHS.map(l => (<div key={l.id} onClick={() => setCampLength(l.id as any)} className={cn("p-4 rounded-2xl border-2 transition-all cursor-pointer", campLength === l.id ? "bg-accent border-accent text-white" : "bg-white")}><p className="font-black uppercase text-[11px]">{l.label}</p></div>))}</div>}
                 {campWizardStep === 'GENERATING' && <div className="py-20 text-center"><RefreshCw className="size-16 text-accent animate-spin mx-auto" /></div>}
-                {campWizardStep === 'SELECTION' && campProps && <div className="space-y-6 pb-10">{selectedChannels.includes('SMS') && <div className="space-y-2"><p className="text-[10px] font-black uppercase text-blue-600">SMS</p>{campProps.smsPropositions?.map((t, i) => (<div key={i} onClick={() => setSelectedSmsIdx(i)} className={cn("p-3 rounded-xl border-2 text-xs cursor-pointer", selectedSmsIdx === i ? "bg-blue-50 border-blue-600" : "bg-white")}>"{t}"</div>))}</div>}</div>}
-                {campWizardStep === 'PREVIEW' && <div className="space-y-4 pb-10"><div className="p-4 bg-slate-50 border-2 border-dashed rounded-xl space-y-4"><div className="space-y-1"><p className="text-[10px] font-black uppercase opacity-40">Devis final</p><p className="text-xl font-black">{totalCalculatedCost} FCFP</p></div><Button onClick={handleFinalDiffuse} className="w-full h-14 bg-accent text-white font-black uppercase gap-2"><CreditCard className="size-5" /> PAIEMENT & ENVOI</Button></div></div>}
+                {campWizardStep === 'SELECTION' && campProps && (
+                    <div className="space-y-6 pb-10">
+                        {selectedChannels.includes('SMS') && (
+                            <div className="space-y-2">
+                                <p className="text-[10px] font-black uppercase text-blue-600 flex items-center gap-2"><Smartphone className="size-3" /> Propositions SMS</p>
+                                {campProps.smsPropositions?.map((t, i) => (<div key={i} onClick={() => setSelectedSmsIdx(i)} className={cn("p-3 rounded-xl border-2 text-xs cursor-pointer", selectedSmsIdx === i ? "bg-blue-50 border-blue-600" : "bg-white")}>"{t}"</div>))}
+                            </div>
+                        )}
+                        {selectedChannels.includes('PUSH') && (
+                            <div className="space-y-2">
+                                <p className="text-[10px] font-black uppercase text-primary flex items-center gap-2"><Zap className="size-3" /> Propositions Push</p>
+                                {campProps.pushPropositions?.map((t, i) => (<div key={i} onClick={() => setSelectedPushIdx(i)} className={cn("p-3 rounded-xl border-2 text-xs cursor-pointer", selectedPushIdx === i ? "bg-primary/5 border-primary" : "bg-white")}>"{t}"</div>))}
+                            </div>
+                        )}
+                        {selectedChannels.includes('MAIL') && (
+                            <div className="space-y-2">
+                                <p className="text-[10px] font-black uppercase text-green-600 flex items-center gap-2"><Mail className="size-3" /> Propositions Email</p>
+                                {campProps.mailPropositions?.map((t, i) => (
+                                    <div key={i} onClick={() => setSelectedMailIdx(i)} className={cn("p-3 rounded-xl border-2 text-xs cursor-pointer", selectedMailIdx === i ? "bg-green-50 border-green-600" : "bg-white")}>
+                                        <p className="font-black text-[10px] mb-1">OBJET : {t.subject}</p>
+                                        <p className="opacity-70 line-clamp-2">{t.body}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+                {campWizardStep === 'PREVIEW' && (
+                    <div className="space-y-4 pb-10">
+                        <div className="p-4 bg-slate-50 border-2 border-dashed rounded-xl space-y-4">
+                            <div className="space-y-1">
+                                <p className="text-[10px] font-black uppercase opacity-40">Devis final estimé</p>
+                                <div className="flex items-baseline gap-1">
+                                    <p className="text-3xl font-black text-primary">{totalCalculatedCost.toLocaleString('fr-FR').replace(/\s/g, ' ')}</p>
+                                    <span className="text-xs font-black opacity-60">FCFP</span>
+                                </div>
+                            </div>
+                            <Button onClick={handleFinalDiffuse} className="w-full h-14 bg-accent hover:bg-accent/90 text-white font-black uppercase gap-3 shadow-xl text-base tracking-widest border-2 border-white/20">
+                                <CreditCard className="size-6" /> PAIEMENT & ENVOI
+                            </Button>
+                        </div>
+                    </div>
+                )}
             </div>
             <DialogFooter className="p-4 bg-white border-t shrink-0 flex flex-col gap-2">
                 {campWizardStep === 'TONE' && <Button onClick={() => setCampWizardStep('LENGTH')} className="w-full h-12 font-black uppercase">Suivant</Button>}
-                {campWizardStep === 'LENGTH' && <Button onClick={processCampGeneration} className="w-full h-12 font-black uppercase">Générer</Button>}
-                {campWizardStep === 'SELECTION' && <Button onClick={handleConfirmSelections} className="w-full h-12 font-black uppercase">Aperçu Final</Button>}
+                {campWizardStep === 'LENGTH' && <Button onClick={processCampGeneration} className="w-full h-12 font-black uppercase">Générer les messages</Button>}
+                {campWizardStep === 'SELECTION' && <Button onClick={handleConfirmSelections} className="w-full h-12 font-black uppercase">Aperçu Final & Devis</Button>}
             </DialogFooter>
         </DialogContent>
       </Dialog>

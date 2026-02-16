@@ -1,4 +1,3 @@
-
 export type WindDirection = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
 
 export type UserRole = 'client' | 'professional' | 'admin';
