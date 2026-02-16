@@ -323,7 +323,6 @@ export default function ProDashboard() {
     const operation = editingPromoId ? 'update' : 'create';
     if (!editingPromoId) promoData.createdAt = serverTimestamp();
 
-    // Utilisation du mode non-bloquant avec gestion d'erreur contextuelle
     setDoc(targetDoc, promoData, { merge: true })
       .then(() => {
         toast({ title: editingPromoId ? "Article mis à jour !" : "Article enregistré !" });
