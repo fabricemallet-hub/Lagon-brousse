@@ -36,6 +36,7 @@ import { doc, collection, addDoc, serverTimestamp, setDoc, updateDoc } from 'fir
 import { ForgotPasswordDialog } from './forgot-password-dialog';
 import { Eye, EyeOff, Ticket, MapPin, ScrollText, Globe, Bell, Mail, Smartphone, Phone, Home, Briefcase, User as UserIcon } from 'lucide-react';
 import { redeemAccessToken } from '@/lib/token-utils';
+import { ensureUserDocument } from '@/lib/user-utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -177,10 +178,17 @@ export function AuthForm({ mode }: AuthFormProps) {
 
         const userCredential = await signInWithEmailAndPassword(auth, emailLower, loginValues.password);
 
-        if (userCredential.user && loginValues.token) {
-            const result = await redeemAccessToken(firestore, userCredential.user, loginValues.token);
-            if (result.success) {
-              toast({ title: 'Jeton validé !', description: result.message });
+        if (userCredential.user) {
+            // S'assurer que le document utilisateur existe avant de lier le jeton
+            await ensureUserDocument(firestore, userCredential.user);
+
+            if (loginValues.token && loginValues.token.trim()) {
+                const result = await redeemAccessToken(firestore, userCredential.user, loginValues.token.trim());
+                if (result.success) {
+                    toast({ title: 'Jeton validé !', description: result.message });
+                } else {
+                    toast({ variant: 'destructive', title: 'Erreur jeton', description: result.message });
+                }
             }
         }
         
@@ -203,7 +211,6 @@ export function AuthForm({ mode }: AuthFormProps) {
           const userDocRef = doc(firestore, 'users', user.uid);
           const isPro = signupValues.accountType === 'professional';
           
-          // CRITICAL: ID is explicitly set to match UID
           await setDoc(userDocRef, {
             id: user.uid,
             email: emailLower,
@@ -240,8 +247,8 @@ export function AuthForm({ mode }: AuthFormProps) {
             });
           }
 
-          if (signupValues.token) {
-            await redeemAccessToken(firestore, user, signupValues.token);
+          if (signupValues.token && signupValues.token.trim()) {
+            await redeemAccessToken(firestore, user, signupValues.token.trim());
           }
         }
         
