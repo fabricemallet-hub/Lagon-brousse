@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -285,16 +286,23 @@ export default function ProDashboard() {
     }
   }, [campTargetRegion, campTargetCommunes, activeTab, isCampWizardOpen, business]);
 
+  // DEVIS INSTANTANÉ basé sur les tarifs ADMIN
   const campaignCost = useMemo(() => {
     if (!pricing) return 0;
+    
+    // 1. Frais fixes de lancement
     const base = pricing.fixedPrice || 0;
-    let unitSum = 0;
     
-    if (campChannels.includes('SMS')) unitSum += (pricing.priceSMS || 0) * smsCount;
-    if (campChannels.includes('PUSH')) unitSum += (pricing.pricePush || 0) * pushCount;
-    if (campChannels.includes('MAIL')) unitSum += (pricing.priceMail || 0) * emailCount;
+    // 2. Coût de base par utilisateur (reach total)
+    const reachBaseCost = (pricing.unitPricePerUser || 0) * reachCount;
     
-    return base + (unitSum);
+    // 3. Coût par canal validé
+    let channelSum = 0;
+    if (campChannels.includes('SMS')) channelSum += (pricing.priceSMS || 0) * smsCount;
+    if (campChannels.includes('PUSH')) channelSum += (pricing.pricePush || 0) * pushCount;
+    if (campChannels.includes('MAIL')) channelSum += (pricing.priceMail || 0) * emailCount;
+    
+    return base + reachBaseCost + channelSum;
   }, [pricing, campChannels, reachCount, pushCount, smsCount, emailCount]);
 
   const handleStartCampaignWizard = () => {
@@ -705,8 +713,31 @@ export default function ProDashboard() {
                                             <span className="text-3xl font-black text-slate-800">{campaignCost.toLocaleString('fr-FR')}</span>
                                             <span className="text-sm font-black uppercase opacity-40">F</span>
                                         </div>
+                                        {/* Détail du devis instantané */}
+                                        {pricing && (
+                                            <div className="mt-3 space-y-1 border-t border-primary/10 pt-2">
+                                                <p className="text-[8px] font-bold text-muted-foreground uppercase flex justify-between">
+                                                    <span>Frais fixes de lancement :</span>
+                                                    <span>{pricing.fixedPrice || 0} F</span>
+                                                </p>
+                                                <p className="text-[8px] font-bold text-muted-foreground uppercase flex justify-between">
+                                                    <span>Base audience ({reachCount}) :</span>
+                                                    <span>{((pricing.unitPricePerUser || 0) * reachCount).toLocaleString('fr-FR')} F</span>
+                                                </p>
+                                                {campChannels.length > 0 && (
+                                                    <p className="text-[8px] font-black text-primary uppercase flex justify-between">
+                                                        <span>Canaux sélectionnés :</span>
+                                                        <span>
+                                                            {((campChannels.includes('SMS') ? (pricing.priceSMS || 0) * smsCount : 0) +
+                                                            (campChannels.includes('PUSH') ? (pricing.pricePush || 0) * pushCount : 0) +
+                                                            (campChannels.includes('MAIL') ? (pricing.priceMail || 0) * emailCount : 0)).toLocaleString('fr-FR')} F
+                                                        </span>
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
-                                    <div className="p-3 bg-white rounded-2xl shadow-sm border border-primary/10">
+                                    <div className="p-3 bg-white rounded-2xl shadow-sm border border-primary/10 self-start">
                                         <DollarSign className="size-6 text-primary" />
                                     </div>
                                 </div>
