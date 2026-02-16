@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -142,10 +141,15 @@ export default function ProDashboard() {
   }, [firestore, business?.id]);
   const { data: promotions, isLoading: isPromosLoading } = useCollection<Promotion>(promosRef);
 
-  // Brouillons
+  // Brouillons - Query explicitement autorisée par isSignedIn()
   const draftsRef = useMemoFirebase(() => {
     if (!firestore || !business?.id) return null;
-    return query(collection(firestore, 'campaigns'), where('businessId', '==', business.id), where('status', '==', 'draft'), orderBy('createdAt', 'desc'));
+    return query(
+      collection(firestore, 'campaigns'), 
+      where('businessId', '==', business.id), 
+      where('status', '==', 'draft'), 
+      orderBy('createdAt', 'desc')
+    );
   }, [firestore, business?.id]);
   const { data: drafts, isLoading: isDraftsLoading } = useCollection<Campaign>(draftsRef);
 
@@ -255,6 +259,7 @@ export default function ProDashboard() {
                 query(usersRef, where('selectedRegion', '==', targetScope), where('subscribedCategories', 'array-contains', targetCategory))
             );
         
+        // Exécution protégée contre les erreurs de permission lors du listing partiel
         const [snapBase, snapPush, snapMail, snapSms] = await Promise.all([
             getCountFromServer(qBase),
             getCountFromServer(query(qBase, where('allowsPromoPush', '==', true))),
@@ -267,8 +272,9 @@ export default function ProDashboard() {
         setMailTargetCount(snapMail.data().count);
         setSmsTargetCount(snapSms.data().count);
       } catch (e: any) {
+        // En cas d'erreur de permission sur les statistiques, on ne bloque pas l'app
         setReachError(true);
-        console.warn("Reach calculation error:", e);
+        console.warn("Reach calculation error (Permissions check):", e);
       } finally {
         setIsCalculatingReach(false);
       }
@@ -1266,19 +1272,22 @@ export default function ProDashboard() {
                 {campWizardStep === 'TONE' && (
                     <div className="flex gap-2 w-full">
                         <Button variant="ghost" onClick={() => setCampWizardStep('IDLE')} className="flex-1 font-bold uppercase text-[10px]">Annuler</Button>
-                        <Button onClick={() => setCampWizardStep('LENGTH')} className="flex-[2] h-12 font-black uppercase tracking-widest shadow-lg gap-2">Suivant <ChevronRight className="size-4" /></Button>
+                        <Button onClick={() => setCampWizardStep('LENGTH')} className="flex-[2] h-12 font-black uppercase tracking-widest shadow-lg gap-2">Suivant <ChevronRight className="size-4" />
+                        </Button>
                     </div>
                 )}
                 {campWizardStep === 'LENGTH' && (
                     <div className="flex gap-2 w-full">
-                        <Button variant="ghost" onClick={() => setCampTone(tone => tone)} className="flex-1 font-bold uppercase text-[10px] border-2">Retour</Button>
-                        <Button onClick={processCampGeneration} className="flex-[2] h-12 font-black uppercase tracking-widest shadow-lg gap-2">Généner les variantes <Wand2 className="size-4" /></Button>
+                        <Button variant="ghost" onClick={() => setCampWizardStep('TONE')} className="flex-1 font-bold uppercase text-[10px] border-2">Retour</Button>
+                        <Button onClick={processCampGeneration} className="flex-[2] h-12 font-black uppercase tracking-widest shadow-lg gap-2">Généner les variantes <Wand2 className="size-4" />
+                        </Button>
                     </div>
                 )}
                 {campWizardStep === 'SELECTION' && (
                     <div className="flex gap-2 w-full">
                         <Button variant="ghost" onClick={() => setCampWizardStep('LENGTH')} className="flex-1 font-bold uppercase text-[10px] border-2">Retour</Button>
-                        <Button onClick={handleConfirmSelections} className="flex-[2] h-12 font-black uppercase tracking-widest shadow-lg gap-2">Valider mes choix <ChevronRight className="size-4" /></Button>
+                        <Button onClick={handleConfirmSelections} className="flex-[2] h-12 font-black uppercase tracking-widest shadow-lg gap-2">Valider mes choix <ChevronRight className="size-4" />
+                        </Button>
                     </div>
                 )}
                 {campWizardStep === 'PREVIEW' && (

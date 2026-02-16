@@ -21,6 +21,7 @@ service cloud.firestore {
 
     function isBusinessOwner(busId) {
       return isSignedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == busId;
     }
 
@@ -46,11 +47,12 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 4. CAMPAGNES
+    // 4. CAMPAGNES (BROUILLONS ET HISTORIQUE)
     // ======================================================
     
     match /campaigns/{campaignId} {
-      allow read, write: if isSignedIn();
+      // Autorise la lecture (get/list) et l'écriture pour tout utilisateur connecté
+      allow get, list, create, update, delete: if isSignedIn();
     }
 
     // ======================================================
@@ -58,6 +60,7 @@ service cloud.firestore {
     // ======================================================
 
     match /users/{userId} {
+      // Autorise la lecture pour le calcul du Reach (list) et le profil personnel (get)
       allow read: if isSignedIn();
       allow write: if isSignedIn() && (request.auth.uid == userId);
       
@@ -72,7 +75,9 @@ service cloud.firestore {
 
     match /conversations/{convId} {
       allow read, write: if isSignedIn() && (request.auth.uid == convId || isMasterAdmin());
-      match /messages/{msgId} { allow read, write: if isSignedIn(); }
+      match /messages/{msgId} { 
+        allow read, write: if isSignedIn(); 
+      }
     }
 
     match /app_settings/{document=**} { allow read: if true; }
