@@ -3,9 +3,9 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, doc, query, orderBy, serverTimestamp, addDoc, setDoc, deleteDoc, where, getCountFromServer } from 'firebase/firestore';
+import { collection, doc, query, orderBy, serverTimestamp, addDoc, deleteDoc, where, getCountFromServer } from 'firebase/firestore';
 import type { UserAccount, Business, Promotion, Campaign, CampaignPricingSettings, Region } from '@/lib/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -61,6 +61,8 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import { locationsByRegion, regions } from '@/lib/locations';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 const AVAILABLE_TONES = [
     { id: 'Local (Caillou)', label: 'Local (Caillou)', desc: 'Parle au coeur des gens du pays' },
@@ -123,7 +125,7 @@ export default function ProDashboard() {
   const [hasCopiedUid, setHasCopiedUid] = useState(false);
 
   // --- CAMPAIGN MAGICIAN STATE ---
-  const [selectedProductIds, setSelectedSpotIds] = useState<string[]>([]);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [isCampWizardOpen, setIsCampWizardOpen] = useState(false);
   const [campStep, setCampStep] = useState<'SETUP' | 'GENERATING' | 'RESULTS' | 'DEVIS'>('SETUP');
   const [campTargetRegion, setCampTargetRegion] = useState<string>('USER_DEFAULT');
@@ -231,8 +233,6 @@ export default function ProDashboard() {
         if (targetRegion !== 'ALL') constraints.push(where('selectedRegion', '==', targetRegion));
         if (campTargetCommune !== 'ALL') constraints.push(where('lastSelectedLocation', '==', campTargetCommune));
         
-        // On cible ceux qui ont les intérêts correspondants au business (ou a l'article)
-        // Pour faire simple on cible les abonnés actifs qui aiment la catégorie du magasin
         if (business?.categories?.length) {
             constraints.push(where('subscribedCategories', 'array-contains-any', business.categories));
         }
@@ -279,7 +279,6 @@ export default function ProDashboard() {
         });
         setGeneratedMessages(result);
         
-        // Auto-select first proposals
         if (result.smsPropositions) setSelectedSms(result.smsPropositions[0]);
         if (result.pushPropositions) setSelectedPush(result.pushPropositions[0]);
         if (result.mailPropositions) setSelectedMail(result.mailPropositions[0]);
@@ -326,7 +325,7 @@ export default function ProDashboard() {
         await addDoc(collection(firestore, 'campaigns'), campaignData);
         toast({ title: "Campagne enregistrée !", description: "L'administrateur va valider l'envoi." });
         setIsCampWizardOpen(false);
-        setSelectedSpotIds([]);
+        setSelectedProductIds([]);
     } catch (e) {
         toast({ variant: "destructive", title: "Erreur validation" });
     } finally {
@@ -338,7 +337,6 @@ export default function ProDashboard() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-32 px-1">
-      {/* HEADER PRO */}
       <Card className="border-2 border-primary bg-primary/5 shadow-lg overflow-hidden">
         <CardContent className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -490,7 +488,7 @@ export default function ProDashboard() {
                                             <Checkbox 
                                                 checked={selectedProductIds.includes(p.id)} 
                                                 onCheckedChange={() => {
-                                                    setSelectedSpotIds(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id]);
+                                                    setSelectedProductIds(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id]);
                                                 }}
                                                 className="size-5 border-2 border-primary/30"
                                             />
@@ -781,7 +779,7 @@ export default function ProDashboard() {
                                 <Label className="flex items-center gap-2 font-black uppercase text-xs text-green-600"><Mail className="size-4" /> Variantes E-mail</Label>
                                 <div className="space-y-2">
                                     {generatedMessages.mailPropositions.map((mail, i) => (
-                                        <div key={i} onClick={() => setSelectedMail(mail)} className={cn("p-4 rounded-2xl border-2 cursor-pointer transition-all", selectedMail === mail ? "border-green-600 bg-green-50 shadow-md" : "bg-white border-slate-100")}>
+                                        <div key={i} onClick={() => setSelectedMail(mail)} className={cn("p-4 rounded-2xl border-2 cursor-pointer transition-all", selectedMail?.body === mail.body ? "border-green-600 bg-green-50 shadow-md" : "bg-white border-slate-100")}>
                                             <p className="text-[10px] font-black uppercase text-green-800 mb-1">OBJET : {mail.subject}</p>
                                             <p className="text-[11px] leading-relaxed text-slate-600 line-clamp-3">{mail.body}</p>
                                         </div>
