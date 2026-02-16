@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -179,7 +180,6 @@ export function AuthForm({ mode }: AuthFormProps) {
         const userCredential = await signInWithEmailAndPassword(auth, emailLower, loginValues.password);
 
         if (userCredential.user) {
-            // S'assurer que le document utilisateur existe avant de lier le jeton
             await ensureUserDocument(firestore, userCredential.user);
 
             if (loginValues.token && loginValues.token.trim()) {
@@ -612,15 +612,13 @@ export function AuthForm({ mode }: AuthFormProps) {
                     <div className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground"><Ticket className="h-5 w-5" /></div>
                   </div>
                 </FormControl>
-                {watchToken && watchToken.length > 3 && (
-                  <Button 
-                    type="submit" 
-                    variant="secondary" 
-                    className="w-full h-10 mt-2 font-black uppercase text-[10px] tracking-widest border-2 border-primary/20 gap-2 shadow-sm"
-                  >
-                    <Zap className="size-3 text-primary fill-primary" /> Valider le jeton & Se connecter
-                  </Button>
-                )}
+                <Button 
+                  type="submit" 
+                  variant="secondary" 
+                  className="w-full h-10 mt-2 font-black uppercase text-[10px] tracking-widest border-2 border-primary/20 gap-2 shadow-sm"
+                >
+                  <Zap className="size-3 text-primary fill-primary" /> Valider le jeton & Se connecter
+                </Button>
                 <FormMessage />
               </FormItem>
             )}

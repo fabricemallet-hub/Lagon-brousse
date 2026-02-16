@@ -1,3 +1,4 @@
+
 'use client';
 import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc, getDoc, writeBatch, serverTimestamp, updateDoc } from 'firebase/firestore';
@@ -9,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, isBefore, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { 
-  Crown, Star, XCircle, Ticket, Gift, LogOut, Mail, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink, Copy, Check, MapPin, RefreshCw, Store, Zap, Pencil, LayoutGrid, Heart, Save, Globe, Smartphone, Phone, Home, Map as MapIcon, Target, LocateFixed, Expand, Shrink, Calendar as CalendarIcon
+  Crown, Star, XCircle, Ticket, Gift, LogOut, Mail, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink, Copy, Check, MapPin, RefreshCw, Store, Zap, Pencil, LayoutGrid, Heart, Save, Globe, Smartphone, Phone, Home, Map as MapIcon, Target, LocateFixed, Expand, Shrink, Calendar as CalendarIcon, Info
 } from 'lucide-react';
 import {
   Select,
@@ -45,6 +46,7 @@ import { useGoogleMaps } from '@/context/google-maps-context';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { redeemAccessToken } from '@/lib/token-utils';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -62,12 +64,10 @@ export default function ComptePage() {
   const [hasCopied, setHasCopied] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // Name editing states
   const [isEditingName, setIsEditingName] = useState(false);
   const [newName, setNewName] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
 
-  // Contact details states
   const [isEditingContact, setIsEditingContact] = useState(false);
   const [tempPhone, setTempPhone] = useState('');
   const [tempLandline, setTempLandline] = useState('');
@@ -77,7 +77,6 @@ export default function ComptePage() {
   const [isMapExpanded, setIsMapExpanded] = useState(false);
   const [map, setMap] = useState<google.maps.Map | null>(null);
 
-  // Favorites state
   const [tempFavorites, setTempFavorites] = useState<string[]>([]);
   const [isSavingFavorites, setIsSavingFavorites] = useState(false);
 
@@ -157,29 +156,19 @@ export default function ComptePage() {
       .then(() => {
         if (userProfile?.businessId) {
           const bizRef = doc(firestore, 'businesses', userProfile.businessId);
-          updateDoc(bizRef, { name: newName.trim() })
-            .catch(async (serverError) => {
-              const permissionError = new FirestorePermissionError({
-                path: bizRef.path,
-                operation: 'update',
-                requestResourceData: { name: newName.trim() },
-              });
-              errorEmitter.emit('permission-error', permissionError);
-            });
+          updateDoc(bizRef, { name: newName.trim() });
         }
-        
         toast({ title: userProfile?.role === 'professional' ? "Nom du magasin mis à jour !" : "Nom mis à jour !" });
         setIsEditingName(false);
         setIsSavingName(false);
       })
       .catch(async (serverError) => {
         setIsSavingName(false);
-        const permissionError = new FirestorePermissionError({
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: userRef.path,
           operation: 'update',
           requestResourceData: userUpdates,
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        }));
       });
   };
 
@@ -218,12 +207,11 @@ export default function ComptePage() {
       })
       .catch(async (serverError) => {
         setIsSavingContact(false);
-        const permissionError = new FirestorePermissionError({
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: userRef.path,
           operation: 'update',
           requestResourceData: updates,
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        }));
       });
   };
 
@@ -235,12 +223,11 @@ export default function ComptePage() {
         toast({ title: "Localité mise à jour", description: `Votre commune favorite est désormais ${newLoc}.` });
       })
       .catch(async (serverError) => {
-        const permissionError = new FirestorePermissionError({
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: userRef.path,
           operation: 'update',
           requestResourceData: { lastSelectedLocation: newLoc },
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        }));
       });
   };
 
@@ -251,16 +238,13 @@ export default function ComptePage() {
     const userRef = doc(firestore, 'users', user.uid);
     
     updateDoc(userRef, { subscribedCategories: updated })
-      .then(() => {
-        toast({ title: "Intérêts mis à jour" });
-      })
+      .then(() => toast({ title: "Intérêts mis à jour" }))
       .catch(async (serverError) => {
-        const permissionError = new FirestorePermissionError({
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: userRef.path,
           operation: 'update',
           requestResourceData: { subscribedCategories: updated },
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        }));
       });
   };
 
@@ -270,16 +254,13 @@ export default function ComptePage() {
     const newVal = !userProfile[field];
     
     updateDoc(userRef, { [field]: newVal })
-      .then(() => {
-        toast({ title: "Canaux de notification mis à jour" });
-      })
+      .then(() => toast({ title: "Canaux de notification mis à jour" }))
       .catch(async (serverError) => {
-        const permissionError = new FirestorePermissionError({
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: userRef.path,
           operation: 'update',
           requestResourceData: { [field]: newVal },
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        }));
       });
   };
 
@@ -309,12 +290,11 @@ export default function ComptePage() {
       })
       .catch(async (serverError) => {
         setIsSavingFavorites(false);
-        const permissionError = new FirestorePermissionError({
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: userRef.path,
           operation: 'update',
           requestResourceData: { favoriteNavLinks: tempFavorites },
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        }));
       });
   };
 
@@ -469,7 +449,44 @@ export default function ComptePage() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3 p-4 bg-primary/5 rounded-xl border border-primary/10">
+              {/* SECTION JETON PREMIUM - REMONTÉE ICI POUR VISIBILITÉ */}
+              <Card className="border-2 border-primary/20 bg-primary/5 shadow-sm overflow-hidden">
+                  <CardHeader className="p-4 pb-2 bg-primary/10 border-b border-primary/10">
+                      <CardTitle className="text-sm font-black uppercase tracking-tighter flex items-center gap-2">
+                          <Ticket className="text-primary size-4" /> Activer un jeton Premium
+                      </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 space-y-4">
+                      {userProfile?.subscriptionExpiryDate && (
+                          <Alert className="bg-blue-600 text-white border-none py-3 shadow-lg">
+                              <CalendarIcon className="size-4 text-white" />
+                              <AlertTitle className="text-[10px] font-black uppercase tracking-widest">Abonnement Actif</AlertTitle>
+                              <AlertDescription className="text-xs font-bold">
+                                  Expire le {format(new Date(userProfile.subscriptionExpiryDate), 'dd MMMM yyyy', { locale: fr })}
+                              </AlertDescription>
+                          </Alert>
+                      )}
+                      
+                      <div className="flex flex-col gap-3">
+                          <div className="space-y-1">
+                              <Label htmlFor="token-input" className="text-[9px] font-black uppercase ml-1 opacity-60">Code Premium</Label>
+                              <Input 
+                                  id="token-input" 
+                                  placeholder="LBN-XXXX-XXXX" 
+                                  value={accessToken}
+                                  onChange={(e) => setAccessToken(e.target.value)}
+                                  className="h-12 font-black text-center tracking-[0.15em] text-base border-2 bg-white"
+                              />
+                          </div>
+                          <Button onClick={handleRedeemTokenAction} disabled={isRedeeming || !accessToken} className="w-full h-12 font-black uppercase tracking-widest shadow-xl gap-2">
+                              {isRedeeming ? <RefreshCw className="size-4 animate-spin" /> : <Zap className="size-4 fill-white" />}
+                              Valider mon jeton
+                          </Button>
+                      </div>
+                  </CardContent>
+              </Card>
+
+              <div className="flex flex-col gap-3 p-4 bg-muted/30 rounded-xl border">
                 <div className="flex items-center gap-4">
                   <div className="p-2 bg-background rounded-lg shadow-sm"><Globe className="size-5 text-primary" /></div>
                   <div className="flex flex-col flex-1">
@@ -791,40 +808,6 @@ export default function ComptePage() {
        </Card>
 
       <PushNotificationManager />
-
-      <Card className="w-full shadow-none border-2">
-          <CardHeader className="p-6 pb-2">
-              <CardTitle className="text-lg font-black uppercase tracking-tighter flex items-center gap-2">
-                  <Ticket className="text-primary" /> Activer un jeton Premium
-              </CardTitle>
-              <CardDescription className="text-[10px] font-bold uppercase">
-                  {userProfile?.subscriptionExpiryDate ? (
-                      <span className="flex items-center gap-1.5 text-primary">
-                          <CalendarIcon className="size-3" /> Date de fin d'activation : {format(new Date(userProfile.subscriptionExpiryDate), 'dd MMMM yyyy', { locale: fr })}
-                      </span>
-                  ) : (
-                      "Saisissez votre code pour activer l'accès illimité."
-                  )}
-              </CardDescription>
-          </CardHeader>
-          <CardContent className="p-6 pt-2 space-y-4">
-              <div className="flex flex-col gap-3">
-                  <div className="space-y-1">
-                      <Label htmlFor="token-input" className="text-[10px] font-black uppercase ml-1">Code Jeton</Label>
-                      <Input 
-                          id="token-input" 
-                          placeholder="LBN-XXXX-XXXX" 
-                          value={accessToken}
-                          onChange={(e) => setAccessToken(e.target.value)}
-                          className="h-14 font-black text-center tracking-[0.2em] text-lg border-2"
-                      />
-                  </div>
-                  <Button onClick={handleRedeemTokenAction} disabled={isRedeeming || !accessToken} className="w-full h-12 font-black uppercase tracking-widest shadow-xl">
-                      {isRedeeming ? 'Validation en cours...' : 'Valider mon jeton'}
-                  </Button>
-              </div>
-          </CardContent>
-      </Card>
     </div>
   );
 }
