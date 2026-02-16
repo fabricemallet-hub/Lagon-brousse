@@ -24,7 +24,6 @@ service cloud.firestore {
     }
 
     // Vérifie si l'utilisateur est le propriétaire de la boutique
-    // Ajout de exists() pour éviter les crashs de règles si le document user est manquant
     function isBusinessOwner(busId) {
       return isSignedIn() && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -35,12 +34,12 @@ service cloud.firestore {
     // 2. RÈGLES DE GROUPE (Indispensables pour collectionGroup)
     // ======================================================
     
-    // Autorise la lecture globale des promotions (Catalogue Shopping)
+    // Autorise la lecture globale des promotions pour la page Shopping
     match /{path=**}/promotions/{promoId} {
       allow read: if true;
     }
     
-    // Autorise la lecture globale des spots (Carte Admin)
+    // Autorise la lecture globale des spots pour la carte Admin
     match /{path=**}/fishing_spots/{spotId} {
       allow read: if isSignedIn();
     }
