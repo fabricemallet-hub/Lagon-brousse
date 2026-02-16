@@ -103,7 +103,9 @@ export function ShootingTableCard() {
   const isInitialSyncDone = useRef(false);
 
   // Logic to determine weight unit based on caliber
-  const weightUnit = selectedCaliber.startsWith('Calibre') || selectedCaliber.includes('.410') ? 'g' : 'gr';
+  const weightUnit = useMemo(() => {
+    return (selectedCaliber.startsWith('Calibre') || selectedCaliber.includes('.410')) ? 'g' : 'gr';
+  }, [selectedCaliber]);
 
   const handleLoadWeapon = (weaponId: string) => {
     const weapon = myWeapons?.find(w => w.id === weaponId);
@@ -365,7 +367,7 @@ export function ShootingTableCard() {
               </div>
 
               <div className="space-y-1.5">
-                  <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Jumelle</Label>
+                  <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Lunette (clic)</Label>
                   <Select value={clickValue} onValueChange={(v: any) => setClickValue(v)}>
                       <SelectTrigger className="h-10 border-2 font-black uppercase text-xs bg-white"><SelectValue /></SelectTrigger>
                       <SelectContent>
