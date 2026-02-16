@@ -32,7 +32,9 @@ export function SidebarNav() {
     if (!user) return { isAdmin: false, isPro: false, isClient: true };
     
     // UNIQUE COMPTE ADMIN AUTORISÉ
-    const isAdmin = (user.email?.toLowerCase() === 'f.mallet81@outlook.com' || user.uid === 't8nPnZLcTiaLJSKMuLzib3C5nPn1') ||
+    const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com', 'fabrice.mallet@gmail.com'];
+    const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'D1q2GPM95rZi38cvCzvsjcWQDaV2'];
+    const isAdmin = masterEmails.includes(user.email?.toLowerCase() || '') || masterUids.includes(user.uid) ||
                     userProfile?.role === 'admin' || 
                     userProfile?.subscriptionStatus === 'admin';
 

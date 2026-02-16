@@ -1,3 +1,4 @@
+
 'use client';
 import { doc, getDoc, setDoc, Firestore } from 'firebase/firestore';
 import { User } from 'firebase/auth';
@@ -20,8 +21,8 @@ export async function ensureUserDocument(
   const email = user.email?.toLowerCase() || '';
   
   // COMPTES ADMIN AUTORISÉS (Uniquement le propriétaire principal)
-  const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1'];
-  const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com'];
+  const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'D1q2GPM95rZi38cvCzvsjcWQDaV2'];
+  const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com', 'fabrice.mallet@gmail.com'];
   
   const isMasterAdmin = masterUids.includes(user.uid) || masterEmails.includes(email);
 

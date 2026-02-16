@@ -93,7 +93,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (!user) return 'limited';
 
     // UNIQUE COMPTE ADMIN AUTORISÉ
-    const isMaster = (user.email?.toLowerCase() === 'f.mallet81@outlook.com' || user.uid === 't8nPnZLcTiaLJSKMuLzib3C5nPn1');
+    const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com', 'fabrice.mallet@gmail.com'];
+    const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'D1q2GPM95rZi38cvCzvsjcWQDaV2'];
+    const isMaster = masterEmails.includes(user.email?.toLowerCase() || '') || masterUids.includes(user.uid);
 
     // PRIORITÉ 1 : ADMIN
     if (isMaster || userProfile?.subscriptionStatus === 'admin' || userProfile?.role === 'admin') {
@@ -174,7 +176,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (user && !user.isAnonymous && !user.emailVerified && !isAuthPage) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="min-screen bg-background flex items-center justify-center p-4">
         <Card className="max-w-md w-full border-2 shadow-2xl">
           <CardHeader className="text-center space-y-4">
             <div className="mx-auto size-20 rounded-full bg-primary/10 flex items-center justify-center border-4 border-background shadow-lg">

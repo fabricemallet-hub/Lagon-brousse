@@ -58,7 +58,9 @@ export default function ProDashboard() {
 
   useEffect(() => {
     if (!isUserLoading && profile && !isProfileLoading) {
-        const isMaster = (user?.email && ['f.mallet81@outlook.com', 'kledostyle@outlook.com', 'f.mallet81@gmail.com'].includes(user.email.toLowerCase()));
+        const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com', 'fabrice.mallet@gmail.com'];
+        const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'D1q2GPM95rZi38cvCzvsjcWQDaV2'];
+        const isMaster = masterEmails.includes(user?.email?.toLowerCase() || '') || masterUids.includes(user?.uid || '');
         const isPro = isMaster || profile.role === 'professional' || profile.role === 'admin' || profile.subscriptionStatus === 'professional' || profile.subscriptionStatus === 'admin';
         if (!isPro) router.replace('/compte');
     }
@@ -401,7 +403,7 @@ export default function ProDashboard() {
                 <div className="bg-muted/30 p-6 rounded-2xl border-2 border-dashed space-y-6">
                     <h3 className="text-sm font-black uppercase flex items-center gap-2 text-accent"><Megaphone className="size-4" /> Ciblage & Audiences</h3>
                     <div className="space-y-4">
-                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Rayon cible</Label><Select value={targetCategory} onValueChange={setTargetCategory}><SelectTrigger className="h-10 border-2 bg-background font-black text-xs"><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs">{cat}</SelectItem>)}</SelectContent></Select></div>
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Rayon cible</Label><Select value={targetCategory} onValueChange={setTargetCategory}><SelectTrigger className="h-10 border-2 bg-background font-black text-xs"><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs">{cat}</SelectItem>)}</SelectContent></Select></div>
                         
                         <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Portée géographique</Label><Select value={targetScope} onValueChange={(v: any) => setTargetScope(v)}><SelectTrigger className="h-10 border-2 bg-background font-black text-xs"><Globe className="size-3 mr-2 text-primary" /><SelectValue /></SelectTrigger><SelectContent><SelectItem value="SPECIFIC">Communes spécifiques</SelectItem><SelectItem value="CALEDONIE">Nouvelle-Calédonie</SelectItem><SelectItem value="TAHITI">Tahiti</SelectItem><SelectItem value="ALL">Tout le réseau</SelectItem></SelectContent></Select></div>
 

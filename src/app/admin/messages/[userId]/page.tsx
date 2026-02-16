@@ -35,7 +35,9 @@ export default function AdminMessagePage() {
   const isAdmin = useMemo(() => {
     if (!user) return false;
     // UNIQUE COMPTE ADMIN AUTORISÉ
-    return (user.email?.toLowerCase() === 'f.mallet81@outlook.com' || user.uid === 't8nPnZLcTiaLJSKMuLzib3C5nPn1') || adminProfile?.subscriptionStatus === 'admin' || adminProfile?.role === 'admin';
+    const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com', 'fabrice.mallet@gmail.com'];
+    const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'D1q2GPM95rZi38cvCzvsjcWQDaV2'];
+    return masterEmails.includes(user.email?.toLowerCase() || '') || masterUids.includes(user.uid) || adminProfile?.subscriptionStatus === 'admin' || adminProfile?.role === 'admin';
   }, [user, adminProfile]);
 
   const conversationId = params.userId as string;

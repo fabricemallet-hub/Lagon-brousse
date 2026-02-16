@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -148,7 +149,9 @@ export default function ShoppingPage() {
   // --- MODERATION ---
   const isAdmin = useMemo(() => {
     if (!user) return false;
-    return (user.email?.toLowerCase() === 'f.mallet81@outlook.com' || user.uid === 't8nPnZLcTiaLJSKMuLzib3C5nPn1') || profile?.role === 'admin' || profile?.subscriptionStatus === 'admin';
+    const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com', 'fabrice.mallet@gmail.com'];
+    const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'D1q2GPM95rZi38cvCzvsjcWQDaV2'];
+    return masterEmails.includes(user.email?.toLowerCase() || '') || masterUids.includes(user.uid) || profile?.role === 'admin' || profile?.subscriptionStatus === 'admin';
   }, [user, profile]);
 
   const handleDeleteProduct = async (id: string, businessId: string) => {

@@ -124,7 +124,9 @@ export default function AdminPage() {
   const isAdmin = useMemo(() => {
     if (!user) return false;
     // UNIQUE COMPTE ADMIN AUTORISÉ
-    return (user.email?.toLowerCase() === 'f.mallet81@outlook.com' || user.uid === 't8nPnZLcTiaLJSKMuLzib3C5nPn1');
+    const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com', 'fabrice.mallet@gmail.com'];
+    const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'D1q2GPM95rZi38cvCzvsjcWQDaV2'];
+    return masterEmails.includes(user.email?.toLowerCase() || '') || masterUids.includes(user.uid);
   }, [user]);
 
   const usersRef = useMemoFirebase(() => (firestore && isAdmin) ? collection(firestore, 'users') : null, [firestore, isAdmin]);
@@ -1549,7 +1551,7 @@ function SupportManager({
     const [subTab, setSubTab] = useState<'chats' | 'tickets'>('chats');
 
     return (
-        <Card className="border-2 shadow-lg overflow-hidden rounded-2xl">
+        <Card className="border-2 shadow-lg rounded-2xl overflow-hidden">
             <CardHeader className="p-5 bg-green-50 border-b flex flex-col gap-4">
                 <div className="flex items-center gap-2 text-green-800">
                     <MessageSquare className="size-5" /> 
