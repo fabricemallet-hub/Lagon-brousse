@@ -169,12 +169,6 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
   }, [user, firestore]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
-  const participantsQuery = useMemoFirebase(() => {
-    if (!firestore || !session?.id) return null;
-    return collection(firestore, 'hunting_sessions', session.id, 'participants');
-  }, [firestore, session?.id]);
-  const { data: participants } = useCollection<SessionParticipant>(participantsQuery);
-
   const labels = useMemo(() => {
     if (sessionType === 'peche') {
       return {
@@ -200,6 +194,12 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     };
   }, [sessionType]);
 
+  const participantsQuery = useMemoFirebase(() => {
+    if (!firestore || !session?.id) return null;
+    return collection(firestore, 'hunting_sessions', session.id, 'participants');
+  }, [firestore, session?.id]);
+  const { data: participants } = useCollection<SessionParticipant>(participantsQuery);
+
   const soundsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
@@ -213,12 +213,21 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     ).map(s => ({ id: s.id, label: s.label, url: s.url }));
   }, [dbSounds]);
 
-  const playStatusSound = useCallback((status: string) => {
+  const playStatusSound = useCallback((statusOrType: string) => {
     if (!isSoundEnabled) return;
+    
     let sId = '';
-    if (status === labels.status1) sId = soundSettings.position;
-    else if (status === labels.status2) sId = soundSettings.battue;
-    else if (status === 'gibier') sId = soundSettings.gibier;
+    const normalized = statusOrType.toLowerCase().trim();
+    const posLabelNorm = labels.status1.toLowerCase().trim();
+    const battueLabelNorm = labels.status2.toLowerCase().trim();
+
+    if (normalized === 'gibier') {
+      sId = soundSettings.gibier;
+    } else if (normalized === 'position' || normalized === posLabelNorm) {
+      sId = soundSettings.position;
+    } else if (normalized === 'battue' || normalized === battueLabelNorm) {
+      sId = soundSettings.battue;
+    }
 
     const sound = availableSounds.find(s => s.id === sId || s.label === sId);
     if (sound) {
@@ -504,7 +513,8 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     if (!user || !firestore || !session) return;
     const ref = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
     const me = participants?.find(p => p.id === user.uid);
-    const newVal = me?.baseStatus === st ? '' : st;
+    const isDeactivating = me?.baseStatus === st;
+    const newVal = isDeactivating ? '' : st;
     
     updateDoc(ref, { baseStatus: newVal })
       .catch(async (err) => {
@@ -515,7 +525,11 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
         } satisfies SecurityRuleContext));
       });
 
-    if (newVal) { playStatusSound(st); toast({ title: `Statut : ${st}` }); }
+    if (!isDeactivating) { 
+        const type = st === labels.status1 ? 'position' : 'battue';
+        playStatusSound(type); 
+        toast({ title: `Statut : ${st}` }); 
+    }
   };
 
   const toggleGibierEnVue = () => {
@@ -828,7 +842,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
 }
 
 export function HuntingSessionCard({ sessionType = 'chasse' }: HuntingSessionProps) {
-  const { user, isUserLoading } = useUser();
+  const { user, isUserLoading } = useUserHook();
   if (isUserLoading) return <Skeleton className="h-48 w-full" />;
   if (!user) return <Card><CardHeader><CardTitle className="flex items-center gap-2"><AlertCircle className="text-destructive" /> Connexion requise</CardTitle></CardHeader><CardContent><Button asChild className="w-full"><Link href="/login">Se connecter</Link></Button></CardContent></Card>;
   return <HuntingSessionContent sessionType={sessionType} />;
