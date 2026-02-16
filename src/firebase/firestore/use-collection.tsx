@@ -53,10 +53,19 @@ export function useCollection<T = any>(
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
   useEffect(() => {
-    // SECURITY GUARD: Wait for auth object to be initialized if a query is provided.
-    // This prevents "Missing or insufficient permissions" due to race conditions.
+    // Determine path for security check
+    const path: string | undefined = memoizedTargetRefOrQuery 
+      ? (memoizedTargetRefOrQuery.type === 'collection'
+          ? (memoizedTargetRefOrQuery as CollectionReference).path
+          : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString())
+      : undefined;
+
+    // PUBLIC DATA BARRIER: Only wait for auth if the collection is potentially private.
+    // system_notifications and meteo_caledonie are public.
+    const isPublic = path && (path.includes('system_notifications') || path.includes('meteo_caledonie') || path.includes('promotions'));
+    
     const auth = getAuth();
-    if (memoizedTargetRefOrQuery && !auth.currentUser) {
+    if (!isPublic && memoizedTargetRefOrQuery && !auth.currentUser) {
       return;
     }
 
@@ -82,14 +91,11 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (error: FirestoreError) => {
-        const path: string =
-          memoizedTargetRefOrQuery.type === 'collection'
-            ? (memoizedTargetRefOrQuery as CollectionReference).path
-            : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString()
+        const errorPath = path || '/';
 
         const contextualError = new FirestorePermissionError({
           operation: 'list',
-          path,
+          path: errorPath,
         })
 
         setError(contextualError)
