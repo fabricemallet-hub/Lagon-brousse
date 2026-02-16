@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
@@ -136,6 +137,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
   const [joinCode, setJoinCode] = useState('');
   const [createCode, setCreateCode] = useState('');
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number} | null>(null);
+  const [userAccuracy, setUserAccuracy] = useState<number | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const [isParticipating, setIsParticipating] = useState(false);
   const [isGpsActive, setIsGpsActive] = useState(false);
@@ -318,6 +320,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     setIsParticipating(false);
     setIsGpsActive(false);
     setUserLocation(null);
+    setUserAccuracy(null);
     
     if (!user || !previousSessionId || !firestore) return;
     
@@ -336,8 +339,11 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
 
     watchIdRef.current = navigator.geolocation.watchPosition(
         (position) => {
-            const { latitude, longitude } = position.coords;
+            const { latitude, longitude, accuracy } = position.coords;
+            const roundedAccuracy = Math.round(accuracy);
             setUserLocation({ latitude, longitude });
+            setUserAccuracy(roundedAccuracy);
+            
             if (shouldPanOnNextFix.current && map) {
                 map.panTo({ lat: latitude, lng: longitude });
                 map.setZoom(16);
@@ -351,7 +357,12 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                     const b: any = await (navigator as any).getBattery();
                     batt = { level: b.level, charging: b.charging };
                 }
-                const updatePayload = { location: { latitude, longitude }, battery: batt, updatedAt: serverTimestamp() };
+                const updatePayload = { 
+                    location: { latitude, longitude }, 
+                    battery: batt, 
+                    accuracy: roundedAccuracy,
+                    updatedAt: serverTimestamp() 
+                };
                 updateDoc(ref, updatePayload).catch(async (err) => {
                     errorEmitter.emit('permission-error', new FirestorePermissionError({
                         path: ref.path,
@@ -460,6 +471,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
         setIsGpsActive(false);
         if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
         setUserLocation(null);
+        setUserAccuracy(null);
         toast({ title: "GPS Désactivé" });
     }
   };
@@ -710,7 +722,10 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                                                                     {p.baseStatus && <span className="text-[8px] font-black text-primary uppercase">{p.baseStatus}</span>}
                                                                 </div>
                                                             </div>
-                                                            {p.battery && <div className="flex items-center gap-1 text-[9px] font-black opacity-60"><BatteryIcon level={p.battery.level} charging={p.battery.charging} /> {Math.round(p.battery.level * 100)}%</div>}
+                                                            <div className="flex items-center gap-3">
+                                                                {p.accuracy !== undefined && <span className="text-[8px] font-black text-white/40 uppercase">+/- {p.accuracy}m</span>}
+                                                                {p.battery && <div className="flex items-center gap-1 text-[9px] font-black opacity-60"><BatteryIcon level={p.battery.level} charging={p.battery.charging} /> {Math.round(p.battery.level * 100)}%</div>}
+                                                            </div>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -760,15 +775,18 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                                                     </span>
                                                 )}
                                             </div>
-                                            <div className="flex items-center gap-2 shrink-0 ml-4">
-                                                {p.battery && (
-                                                    <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-lg border-2 border-slate-100 text-[10px] font-black shadow-sm">
-                                                        <span className={cn(p.battery.level < 0.2 ? "text-red-600 animate-pulse" : "text-slate-500")}>
-                                                            {Math.round(p.battery.level * 100)}%
-                                                        </span>
-                                                        <BatteryIcon level={p.battery.level} charging={p.battery.charging} />
-                                                    </div>
-                                                )}
+                                            <div className="flex items-center gap-3 shrink-0 ml-4">
+                                                <div className="flex flex-col items-end gap-0.5">
+                                                    {p.accuracy !== undefined && <span className="text-[8px] font-black text-muted-foreground uppercase opacity-60">+/- {p.accuracy}m</span>}
+                                                    {p.battery && (
+                                                        <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-lg border-2 border-slate-100 text-[10px] font-black shadow-sm">
+                                                            <span className={cn(p.battery.level < 0.2 ? "text-red-600 animate-pulse" : "text-slate-500")}>
+                                                                {Math.round(p.battery.level * 100)}%
+                                                            </span>
+                                                            <BatteryIcon level={p.battery.level} charging={p.battery.charging} />
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     ))}

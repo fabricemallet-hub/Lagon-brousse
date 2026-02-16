@@ -470,6 +470,7 @@ export interface SessionParticipant {
   mapColor: string;
   baseStatus?: string;
   isGibierEnVue?: boolean;
+  accuracy?: number;
 }
 
 export interface HuntingSession {
