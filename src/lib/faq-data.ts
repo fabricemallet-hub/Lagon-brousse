@@ -7,7 +7,7 @@ export const INITIAL_FAQ_DATA = [
   // --- GENERAL (15) ---
   { categorie: "General", ordre: 1, question: "L'application remplace-t-elle les sources officielles ?", reponse: "Non. Pour votre sécurité, consultez toujours meteo.nc et les autorités maritimes (COSS). L'app est un assistant tactique." },
   { categorie: "General", ordre: 2, question: "Pourquoi la géolocalisation est-elle indispensable ?", reponse: "Elle permet de calculer les marées de la station la plus proche de VOUS, d'activer le Boat Tracker et de vous donner les risques de gratte locaux." },
-  { categorie: "General", ordre: 3, question: "Comment fonctionne le mode hors-ligne ?", reponse: "Les données consultées avec internet sont mises en cache (PWA). Le GPS fonctionne sans réseau, mais pas les mises à jour live." },
+  { categorie: "General", ordre: 3, question: "Comment fonctionne le mode hors-ligne ?", reponse: "Les données consultées avec internet sont mises en cache (PWA). Le GPS fonctionne sans réseau, mas pas les mises à jour live." },
   { categorie: "General", ordre: 4, question: "L'application consomme-t-elle beaucoup de batterie ?", reponse: "Le GPS en continu (Boat Tracker) est énergivore. Utilisez le 'Mode Éveil' uniquement quand nécessaire et prévoyez une batterie externe." },
   { categorie: "General", ordre: 5, question: "Quelle est la précision des marées ?", reponse: "Nous utilisons les constantes du SHOM ajustées par algorithme selon votre commune. La précision est de +/- 10 min." },
   { categorie: "General", ordre: 6, question: "Puis-je changer ma commune favorite ?", reponse: "Oui, via le sélecteur en haut de l'écran. Votre choix est mémorisé sur votre profil." },
@@ -15,7 +15,7 @@ export const INITIAL_FAQ_DATA = [
   { categorie: "General", ordre: 8, question: "Comment installer l'app sur mon iPhone ?", reponse: "Ouvrez Safari, appuyez sur 'Partager' puis 'Sur l'écran d'accueil'. C'est une PWA." },
   { categorie: "General", ordre: 9, question: "Comment installer l'app sur Android ?", reponse: "Via Chrome, appuyez sur les 3 points puis 'Installer l'application'." },
   { categorie: "General", ordre: 10, question: "Mes données GPS sont-elles privées ?", reponse: "Oui. Elles ne sont partagées QUE si vous activez volontairement le Boat Tracker ou une session de Chasse." },
-  { categorie: "General", ordre: 11, Wood: "L'app fonctionne-t-elle aux Îles Loyauté ?", reponse: "Oui, les stations de Lifou, Maré et Ouvéa sont intégrées." },
+  { categorie: "General", ordre: 11, question: "L'app fonctionne-t-elle aux Îles Loyauté ?", reponse: "Oui, les stations de Lifou, Maré et Ouvéa sont intégrées." },
   { categorie: "General", ordre: 12, question: "Qui a développé cette application ?", reponse: "Une équipe de passionnés du terroir calédonien, pour les gens du pays." },
   { categorie: "General", ordre: 13, question: "Comment signaler un bug ?", reponse: "Via l'onglet 'FAQ & Support', ouvrez un ticket technique." },
   { categorie: "General", ordre: 14, question: "L'heure affichée est-elle celle de NC ?", reponse: "Oui, l'application est configurée sur le fuseau GMT+11 (Nouméa)." },
@@ -80,6 +80,13 @@ export const INITIAL_FAQ_DATA = [
   { categorie: "Boat Tracker", ordre: 111, question: "Comment régler la direction de l'angle ?", reponse: "Utilisez le curseur dans vos réglages : 0° est le centre, vous pouvez régler de -180° (gauche) à +180° (droite)." },
   { categorie: "Boat Tracker", ordre: 112, question: "Quelle est la portée maximale de l'angle ?", reponse: "Vous pouvez régler la portée jusqu'à 2000m (2 km). La détection ne s'active que si le coéquipier est à l'intérieur de cette distance." },
 
+  // --- PRO (5) ---
+  { categorie: "PRO", ordre: 120, question: "Comment devenir un compte partenaire PRO ?", reponse: "Ouvrez un ticket support ou contactez l'admin via la messagerie en fournissant votre numéro RIDET et le nom de votre établissement." },
+  { categorie: "PRO", ordre: 121, question: "Les campagnes publicitaires sont-elles payantes ?", reponse: "Oui. Un devis automatique est généré dans votre Dashboard Pro selon le nombre de clients ciblés et les canaux choisis (Push, Email, SMS)." },
+  { categorie: "PRO", ordre: 122, question: "À quoi sert l'Assistant Magicien IA ?", reponse: "Il analyse vos photos de produits pour rédiger automatiquement une annonce vendeuse. Il propose aussi des arguments de vente pour vos vendeurs en rayon." },
+  { categorie: "PRO", ordre: 123, question: "Puis-je cibler uniquement ma commune ?", reponse: "Oui, le Dashboard Pro permet de choisir entre un ciblage global (NC / Tahiti) ou une sélection de communes spécifiques autour de votre magasin." },
+  { categorie: "PRO", ordre: 124, question: "Quand ma campagne est-elle diffusée ?", reponse: "Une fois validée par le commerçant, la campagne passe en statut 'En attente'. L'administrateur valide alors l'envoi technique sous 24h." },
+
   // --- CHASSE (15) ---
   { categorie: "Chasse", ordre: 61, question: "Comment rejoindre une battue ?", reponse: "Entrez le code session (CH-XXXX) fourni par l'organisateur." },
   { categorie: "Chasse", ordre: 62, question: "Pourquoi signaler 'Gibier en vue' ?", reponse: "Cela envoie une notification push et un son immédiat à tous vos partenaires." },
@@ -98,7 +105,7 @@ export const INITIAL_FAQ_DATA = [
   { categorie: "Chasse", ordre: 75, question: "Qui voit ma position en chasse ?", reponse: "Uniquement les personnes ayant rejoint votre code de session spécifique." },
   { categorie: "Chasse", ordre: 108, question: "Comment utiliser 'Mon Râtelier' ?", reponse: "Allez dans l'onglet Chasse > vignettes 'Balistique'. Enregistrez vos armes avec leur calibre et munition favorite. Dans la Table de Tir, utilisez le menu 'Charger une arme' pour remplir instantanément tous les paramètres techniques." },
   { categorie: "Chasse", ordre: 109, question: "Puis-je enregistrer plusieurs carabines ?", reponse: "Oui, vous pouvez créer un nombre illimité de fiches personnalisées. Chaque fiche mémorise ses réglages propres (Zéro, poids, munition)." },
-  { categorie: "Chasse", ordre: 113, question: "La détection de collision est-elle mutuelle ?", reponse: "Oui. Vous recevez une alerte si quelqu'un entre dans votre zone de tir, mais aussi si VOUS entrez dans la zone d'un coéquipier (si son angle est actif)." },
+  { categorie: "Chasse", ordre: 113, question: "La détection de collision est-elle mutuelle ?", reponse: "Oui. Vous recevez une alerte si quelqu'un entre dans votre zone de tir, mas aussi si VOUS entrez dans la zone d'un coéquipier (si son angle est actif)." },
   { categorie: "Chasse", ordre: 114, question: "Où voir la précision du GPS ?", reponse: "La précision s'affiche sous forme de badge (+/- Xm) dans la liste des participants de votre équipe." },
 
   // --- CHAMPS (15) ---

@@ -27,7 +27,11 @@ import {
   Compass,
   Zap,
   Target,
-  LocateFixed
+  LocateFixed,
+  Briefcase,
+  ShoppingBag,
+  Wand2,
+  Users
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -90,7 +94,7 @@ const sectionContent: Record<string, {
     ],
     tips: [
       "AVERTISSEMENT CRITIQUE : Cette application ne remplace PAS le site officiel de Météo Nouvelle-Calédonie (meteo.nc). Consultez-le toujours avant de prévoir une sortie en mer.",
-      "L'assistant IA vous aide à identifier la 'meilleure fenêtre' de la semaine pour vos activités, mais la décision finale et la sécurité vous incombent.",
+      "L'assistant IA vous aide à identifier la 'meilleure fenêtre' de la semaine pour vos activités, mas la décision finale et la sécurité vous incombent.",
       "La flèche du vent indique la provenance réelle de l'air : une flèche pointant vers le bas indique un vent de Nord."
     ]
   },
@@ -112,6 +116,24 @@ const sectionContent: Record<string, {
       "Surnom SMS : Votre surnom de navire (ex: [TITANIC]) est ajouté automatiquement au début du SMS pour une identification immédiate par les secours.",
       "Angle de Sécurité : Utilisez-le pour délimiter une zone de pêche ou une direction de surveillance. La portée s'adapte automatiquement au zoom de la carte.",
       "Batterie : Une alerte automatique retentit chez le récepteur si la batterie du navire descend sous les 20%."
+    ]
+  },
+  'pro-dashboard': {
+    title: 'Dashboard Pro & Pub',
+    icon: Briefcase,
+    color: 'bg-slate-900',
+    role: "Le Dashboard Pro est l'outil de gestion exclusif pour nos partenaires commerçants. Il permet de dynamiser votre point de vente en diffusant des offres ciblées vers les utilisateurs de votre zone.",
+    steps: [
+      "Gestion du Catalogue : Ajoutez vos produits en précisant s'il s'agit d'une 'Promotion' ou d'un 'Nouvel Arrivage'. Saisissez vos prix et remises.",
+      "Assistant Magicien IA : Ne perdez plus de temps à rédiger. L'IA analyse vos photos et propose 3 variantes de textes adaptées à votre ton (Local, Humour, Pro...).",
+      "Stratégie de Vente : Pour chaque article, l'IA génère des arguments de vente exclusifs et des conseils marketing pour maximiser vos chances de conversion.",
+      "Ciblage Précis : Visualisez en temps réel le nombre de clients atteignables selon vos rayons et votre zone (Communes choisies, Calédonie entière ou Tahiti).",
+      "Diffusion Multi-Canaux : Envoyez vos campagnes via Notifications Push, Emails ou SMS. Chaque campagne est soumise à validation admin pour garantir la qualité du réseau."
+    ],
+    tips: [
+      "Visuels : Une photo nette prise avec l'option 'Appareil' directe convertit 2 fois mieux qu'une image catalogue générique.",
+      "Ciblage : Privilégiez les 'Communes spécifiques' autour de votre magasin pour un trafic en boutique physique immédiat.",
+      "Ton Local : Utilisez le ton 'Local (Caillou)' pour créer un lien de confiance immédiat avec la communauté."
     ]
   },
   'peche': {

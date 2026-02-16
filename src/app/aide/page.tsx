@@ -1,6 +1,7 @@
 'use client';
 
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { useMemo } from 'react';
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { 
   Waves, 
   Fish, 
@@ -12,20 +13,21 @@ import {
   Navigation, 
   User,
   Home,
-  MessageSquare,
   BookOpen,
   ChevronRight,
   Sun,
-  HelpCircle,
-  LifeBuoy,
-  BrainCircuit
+  BrainCircuit,
+  Briefcase
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import type { UserAccount } from '@/lib/types';
 
 const helpSections = [
   { id: 'accueil', title: 'Accueil', desc: 'Météo et résumé du jour.', icon: Home, color: 'bg-blue-500' },
+  { id: 'pro-dashboard', title: 'Dashboard Pro', desc: 'Gestion boutique et publicité.', icon: Briefcase, color: 'bg-slate-900', proOnly: true },
   { id: 'lagon', title: 'Lagon', desc: 'Vent, marées et houle.', icon: Waves, color: 'bg-cyan-500' },
   { id: 'meteo', title: 'Météo Live', desc: 'Stations en direct et prévisions J+7.', icon: Sun, color: 'bg-yellow-500' },
   { id: 'vessel-tracker', title: 'Boat Tracker', desc: 'Sécurité et partage GPS.', icon: Navigation, color: 'bg-blue-600' },
@@ -41,6 +43,30 @@ const helpSections = [
 ];
 
 export default function AidePage() {
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const userDocRef = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [user, firestore]);
+
+  const { data: userProfile } = useDoc<UserAccount>(userDocRef);
+
+  const isAdmin = useMemo(() => {
+    if (!user) return false;
+    const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com', 'fabrice.mallet@gmail.com'];
+    return masterEmails.includes(user.email?.toLowerCase() || '') || userProfile?.role === 'admin';
+  }, [user, userProfile]);
+
+  const isPro = useMemo(() => {
+    return isAdmin || userProfile?.role === 'professional' || userProfile?.subscriptionStatus === 'professional';
+  }, [isAdmin, userProfile]);
+
+  const visibleSections = useMemo(() => {
+    return helpSections.filter(s => !s.proOnly || isPro);
+  }, [isPro]);
+
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-20">
       <div className="px-1">
@@ -54,7 +80,7 @@ export default function AidePage() {
 
       <div className="flex flex-col gap-3 w-full">
         <h2 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Guides détaillés</h2>
-        {helpSections.map((section) => (
+        {visibleSections.map((section) => (
           <Link href={`/aide/${section.id}`} key={section.id} className="block group">
             <Card className="hover:border-primary/50 transition-all active:scale-[0.98] border-2 shadow-sm overflow-hidden h-20">
               <div className="flex items-center h-full p-4 gap-4">

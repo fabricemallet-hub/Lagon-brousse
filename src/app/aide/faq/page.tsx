@@ -1,10 +1,9 @@
-
 'use client';
 
-import { useState } from 'react';
-import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { useState, useMemo } from 'react';
+import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
 import { collection, query, orderBy, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
-import type { FaqEntry } from '@/lib/types';
+import type { FaqEntry, UserAccount } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Input } from '@/components/ui/input';
@@ -19,7 +18,6 @@ import {
   Send, 
   RefreshCw, 
   TrendingUp, 
-  X,
   BookOpen,
   Home,
   Waves,
@@ -33,7 +31,8 @@ import {
   Calendar,
   Scale,
   User,
-  ChevronRight
+  ChevronRight,
+  Briefcase
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -44,10 +43,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
-const CATEGORIES = ["General", "Peche", "Boat Tracker", "Chasse", "Champs", "Compte"];
-
 const helpSections = [
   { id: 'accueil', title: 'Accueil', icon: Home, color: 'bg-blue-500' },
+  { id: 'pro-dashboard', title: 'Dashboard Pro', icon: Briefcase, color: 'bg-slate-900', proOnly: true },
   { id: 'lagon', title: 'Lagon', icon: Waves, color: 'bg-cyan-500' },
   { id: 'meteo', title: 'Météo Live', icon: Sun, color: 'bg-yellow-500' },
   { id: 'vessel-tracker', title: 'Boat Tracker', icon: Navigation, color: 'bg-blue-600' },
@@ -70,13 +68,29 @@ export default function FaqPage() {
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
-  // États pour le ticket direct
   const [isTicketOpen, setIsTicketOpen] = useState(false);
   const [sujet, setSujet] = useState('');
   const [description, setDescription] = useState('');
   const [isSending, setIsSending] = useState(false);
 
-  // Utilisation d'un tri unique pour éviter le besoin d'index composite complexe
+  const userProfileRef = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [user, firestore]);
+  const { data: userProfile } = useDoc<UserAccount>(userProfileRef);
+
+  const isPro = useMemo(() => {
+    if (!user) return false;
+    const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com', 'fabrice.mallet@gmail.com'];
+    return masterEmails.includes(user.email?.toLowerCase() || '') || userProfile?.role === 'admin' || userProfile?.role === 'professional' || userProfile?.subscriptionStatus === 'professional';
+  }, [user, userProfile]);
+
+  const CATEGORIES = useMemo(() => {
+    const cats = ["General", "Peche", "Boat Tracker", "Chasse", "Champs", "Compte"];
+    if (isPro) cats.push("PRO");
+    return cats;
+  }, [isPro]);
+
   const faqRef = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(
@@ -125,6 +139,10 @@ export default function FaqPage() {
     }
   };
 
+  const visibleSections = useMemo(() => {
+    return helpSections.filter(s => !s.proOnly || isPro);
+  }, [isPro]);
+
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-20">
       <div className="flex items-center gap-2">
@@ -132,7 +150,6 @@ export default function FaqPage() {
         <h1 className="text-2xl font-black uppercase tracking-tighter">FAQ &amp; Support</h1>
       </div>
 
-      {/* SECTION: MODES OPERATOIRES (USER GUIDES) */}
       <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
             <h2 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
@@ -143,7 +160,7 @@ export default function FaqPage() {
             </Link>
         </div>
         <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide px-1">
-            {helpSections.map(section => (
+            {visibleSections.map(section => (
                 <Link key={section.id} href={`/aide/${section.id}`} className="flex flex-col items-center gap-2 shrink-0 group">
                     <div className={cn(
                         "size-14 rounded-2xl flex items-center justify-center text-white shadow-md transition-all active:scale-95 group-hover:scale-105 border-2 border-white", 
