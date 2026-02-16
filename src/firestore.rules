@@ -14,9 +14,12 @@ service cloud.firestore {
 
     function isMasterAdmin() {
       return isSignedIn() && (
-        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
-        (request.auth.token.email != null && 
-         request.auth.token.email.lower() == "f.mallet81@outlook.com")
+        request.auth.uid in ["t8nPnZLcTiaLJSKMuLzib3C5nPn1", "D1q2GPM95rZi38cvCzvsjcWQDaV2"] ||
+        (request.auth.token.email != null && (
+          request.auth.token.email.lower() == "f.mallet81@outlook.com" ||
+          request.auth.token.email.lower() == "f.mallet81@gmail.com" ||
+          request.auth.token.email.lower() == "fabrice.mallet@gmail.com"
+        ))
       );
     }
 
@@ -26,20 +29,7 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 2. RÈGLES DE GROUPE (Indépendantes de la hiérarchie)
-    // ======================================================
-    
-    // Indispensable pour collectionGroup("promotions") sur la page Shopping
-    match /{prefix=**}/promotions/{promoId} {
-      allow read: if true;
-    }
-
-    match /{prefix=**}/fishing_spots/{spotId} {
-      allow read: if isSignedIn();
-    }
-
-    // ======================================================
-    // 3. ACCÈS PRIORITAIRE ADMIN
+    // 2. ACCÈS PRIORITAIRE ADMIN
     // ======================================================
 
     match /{allPaths=**} {
@@ -47,7 +37,7 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 4. COMMERCES & PROMOTIONS
+    // 3. COMMERCES & PROMOTIONS
     // ======================================================
 
     match /businesses/{businessId} {
@@ -60,17 +50,15 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 5. CAMPAGNES
+    // 4. CAMPAGNES
     // ======================================================
     
-    match /campaigns/{campaignId} {
-      // Permission explicite list pour éviter les erreurs de permission lors des requêtes query()
-      allow get, list: if isSignedIn();
-      allow write: if isSignedIn();
+    match /campaigns/{allPaths=**} {
+      allow read, write: if isSignedIn();
     }
 
     // ======================================================
-    // 6. UTILISATEURS & PROFILS
+    // 5. UTILISATEURS & PROFILS
     // ======================================================
 
     match /users/{userId} {
@@ -83,7 +71,7 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 7. MESSAGERIE & DONNÉES SYSTÈME
+    // 6. MESSAGERIE & DONNÉES SYSTÈME
     // ======================================================
 
     match /conversations/{convId} {
@@ -98,7 +86,7 @@ service cloud.firestore {
     match /sound_library/{id} { allow read: if true; }
 
     // ======================================================
-    // 8. AUTRES COLLECTIONS
+    // 7. AUTRES COLLECTIONS
     // ======================================================
 
     match /hunting_sessions/{sessionId} { allow read, write: if isSignedIn(); }
@@ -113,5 +101,13 @@ service cloud.firestore {
       allow read, write: if isSignedIn() && (resource.data.userId == request.auth.uid || isMasterAdmin());
     }
 
-  } // Fin documents
-} // Fin service
+    // ======================================================
+    // 8. AUTORISATION COLLECTION GROUP (IMPORTANT)
+    // ======================================================
+    
+    match /{path=**}/promotions/{promoId} {
+      allow read: if true;
+    }
+
+  }
+}

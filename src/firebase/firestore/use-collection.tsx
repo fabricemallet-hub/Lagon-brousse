@@ -55,7 +55,6 @@ export function useCollection<T = any>(
           path = (memoizedTargetRefOrQuery as CollectionReference).path;
         } else {
           const internalQuery = memoizedTargetRefOrQuery as unknown as InternalQuery;
-          // Robust path detection for collectionGroup
           path = internalQuery._query?.collectionGroup || internalQuery._query?.path?.canonicalString() || 'query';
         }
       }
