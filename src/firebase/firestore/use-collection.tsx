@@ -31,6 +31,7 @@ export interface UseCollectionResult<T> {
 */
 export interface InternalQuery extends Query<DocumentData> {
   _query: {
+    collectionGroup?: string;
     path: {
       canonicalString(): string;
       toString(): string;
@@ -60,10 +61,9 @@ export function useCollection<T = any>(
         if (memoizedTargetRefOrQuery.type === 'collection') {
           path = (memoizedTargetRefOrQuery as CollectionReference).path;
         } else {
-          // It's a query. For collectionGroup, canonicalString() provides the collection ID or internal path.
+          // It's a query. Check for collectionGroup
           const internalQuery = memoizedTargetRefOrQuery as unknown as InternalQuery;
-          // IMPORTANT: collectionGroup often returns an empty path or the ID.
-          path = internalQuery._query.path.canonicalString() || 'collectionGroup';
+          path = internalQuery._query.collectionGroup || internalQuery._query.path.canonicalString() || 'query';
         }
       }
     } catch (e) {
@@ -78,7 +78,7 @@ export function useCollection<T = any>(
       path.includes('app_settings') ||
       path.includes('fish_species') ||
       path.includes('sound_library') ||
-      path === 'collectionGroup'
+      path === 'promotions' // collectionGroup detection
     );
     
     const auth = getAuth();

@@ -42,7 +42,8 @@ import {
     ChevronLeft,
     FileText,
     Trash2,
-    Maximize2
+    Maximize2,
+    Plus
 } from 'lucide-react';
 import { locations, locationsByRegion, regions } from '@/lib/locations';
 import { cn } from '@/lib/utils';
@@ -66,7 +67,7 @@ export default function ShoppingPage() {
 
   // --- DEBUG LOGS ---
   useEffect(() => {
-    console.log("[DEBUG] ShoppingPage - Auth User:", user?.uid);
+    if (user) console.log("[DEBUG] ShoppingPage - Auth User Logged In:", user.uid);
   }, [user]);
 
   // --- DATA FETCHING ---
@@ -77,7 +78,7 @@ export default function ShoppingPage() {
   const { data: profile, isLoading: isProfileLoading } = useDoc<UserAccount>(userProfileRef);
 
   useEffect(() => {
-    if (profile) console.log("[DEBUG] ShoppingPage - User Profile Loaded:", profile.id, "Role:", profile.role);
+    if (profile) console.log("[DEBUG] ShoppingPage - Profile Ready:", profile.displayName, "Role:", profile.role);
   }, [profile]);
 
   const businessesRef = useMemoFirebase(() => {
@@ -88,15 +89,16 @@ export default function ShoppingPage() {
 
   const promosRef = useMemoFirebase(() => {
     if (!firestore) return null;
-    console.log("[DEBUG] ShoppingPage - Initiating collectionGroup('promotions')");
+    // La règle collectionGroup est sensible : on s'assure que firestore est prêt
+    console.log("[DEBUG] ShoppingPage - Triggering collectionGroup('promotions')");
     return collectionGroup(firestore, 'promotions');
   }, [firestore]);
   
   const { data: allPromotions, isLoading: isPromosLoading, error: promosError } = useCollection<Promotion>(promosRef);
 
   useEffect(() => {
-    if (allPromotions) console.log("[DEBUG] ShoppingPage - Promotions Loaded count:", allPromotions.length);
-    if (promosError) console.error("[DEBUG] ShoppingPage - Promotions Error:", promosError);
+    if (allPromotions) console.log("[DEBUG] ShoppingPage - Promotions successfully loaded:", allPromotions.length);
+    if (promosError) console.error("[DEBUG] ShoppingPage - Error loading promotions:", promosError);
   }, [allPromotions, promosError]);
 
   // --- DETAIL VIEW STATE ---
@@ -390,7 +392,7 @@ export default function ShoppingPage() {
                 <AlertTriangle className="size-4 text-red-600" />
                 <AlertTitle className="text-xs font-black uppercase">ERREUR DE PERMISSIONS</AlertTitle>
                 <AlertDescription className="text-[10px] font-bold leading-tight mt-1">
-                    Firestore bloque l'accès au catalogue global. Vérifiez les règles Master Admin.
+                    Le catalogue global nécessite une règle indexée sur toute la base. 
                 </AlertDescription>
             </Alert>
         )}

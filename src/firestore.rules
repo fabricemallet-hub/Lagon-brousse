@@ -4,7 +4,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ======================================================
-    // 1. FONCTIONS DE SÉCURITÉ
+    // 1. FONCTIONS DE SÉCURITÉ & MASTER ADMIN
     // ======================================================
     
     function isSignedIn() {
@@ -31,15 +31,15 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 2. RÈGLES DE GROUPE (Indispensables pour collectionGroup)
+    // 2. RÈGLES DE GROUPE (CRITIQUE : Doivent être globales)
     // ======================================================
     
-    // Autorise la lecture globale des promotions pour la page Shopping
+    // Autorise la lecture globale des promotions (collectionGroup) pour la page Shopping
     match /{path=**}/promotions/{promoId} {
       allow read: if true;
     }
     
-    // Autorise la lecture globale des spots pour la carte Admin
+    // Autorise la lecture globale des spots (collectionGroup) pour la carte Admin
     match /{path=**}/fishing_spots/{spotId} {
       allow read: if isSignedIn();
     }
@@ -50,7 +50,7 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 3. COMMERCES & PROMOTIONS
+    // 3. COMMERCES & PROMOTIONS (Accès direct)
     // ======================================================
 
     match /businesses/{businessId} {
@@ -99,10 +99,6 @@ service cloud.firestore {
     match /meteo_caledonie/{id} { 
       allow get, list: if true;
       match /previsions/{prevId} { allow get, list: if true; }
-    }
-    match /fish_species/{id} { 
-      allow get, list: if true; 
-      match /commune_stats/{communeId} { allow read, write: if isSignedIn(); }
     }
     match /fish_species/{id} { 
       allow get, list: if true; 
