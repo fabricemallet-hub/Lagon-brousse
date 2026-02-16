@@ -24,6 +24,7 @@ service cloud.firestore {
     }
 
     // Vérifie si l'utilisateur est le propriétaire de la boutique
+    // Ajout de exists() pour éviter les crashs de règles si le document user est manquant
     function isBusinessOwner(busId) {
       return isSignedIn() && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -34,26 +35,23 @@ service cloud.firestore {
     // 2. RÈGLES DE GROUPE (Indispensables pour collectionGroup)
     // ======================================================
     
-    // Autorise la lecture globale des promotions pour la page Shopping
+    // Autorise la lecture globale des promotions (Catalogue Shopping)
     match /{path=**}/promotions/{promoId} {
       allow read: if true;
     }
     
-    // Autorise la lecture globale des spots pour la carte Admin
+    // Autorise la lecture globale des spots (Carte Admin)
     match /{path=**}/fishing_spots/{spotId} {
       allow read: if isSignedIn();
     }
 
-    // ======================================================
-    // 3. ACCÈS PRIORITAIRE ADMIN
-    // ======================================================
-
+    // Bypass total pour Master Admin
     match /{allPaths=**} {
       allow read, write: if isMasterAdmin();
     }
 
     // ======================================================
-    // 4. COMMERCES & PROMOTIONS
+    // 3. COMMERCES & PROMOTIONS
     // ======================================================
 
     match /businesses/{businessId} {
@@ -66,15 +64,15 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 5. CAMPAGNES
+    // 4. CAMPAGNES
     // ======================================================
     
     match /campaigns/{campaignId} {
-      allow read, write: if isSignedIn();
+      allow get, list, write: if isSignedIn();
     }
 
     // ======================================================
-    // 6. UTILISATEURS & PROFILS
+    // 5. UTILISATEURS & PROFILS
     // ======================================================
 
     match /users/{userId} {
@@ -87,7 +85,7 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 7. MESSAGERIE & DONNÉES SYSTÈME
+    // 6. MESSAGERIE & DONNÉES SYSTÈME
     // ======================================================
 
     match /conversations/{convId} {
@@ -110,7 +108,7 @@ service cloud.firestore {
     match /sound_library/{id} { allow read: if true; }
 
     // ======================================================
-    // 8. AUTRES COLLECTIONS
+    // 7. AUTRES COLLECTIONS
     // ======================================================
 
     match /hunting_sessions/{sessionId} { allow read, write: if isSignedIn(); }
