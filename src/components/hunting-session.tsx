@@ -1,4 +1,3 @@
-
 'use client';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
@@ -94,7 +93,7 @@ import { cn, getDistance, getBearing } from '@/lib/utils';
 import { Skeleton } from './ui/skeleton';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
-import Link from 'next/link';
+import Link from 'next/navigation';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -127,11 +126,19 @@ const PulsingDot = React.memo(() => (
 PulsingDot.displayName = 'PulsingDot';
 
 const ShootingAngleWedge = React.memo(({ angle, spread, color, distance = 500, zoom = 16, lat = -21.3 }: { angle: number, spread: number, color: string, distance?: number, zoom?: number, lat?: number }) => {
-    // Calcul des pixels par mètre à la latitude et au zoom donnés
-    // Formule simplifiée : 156543.03392 * cos(lat * pi / 180) / pow(2, zoom)
     const metersPerPixel = 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom);
     const pixelRadius = distance / metersPerPixel;
-    const svgSize = Math.max(pixelRadius * 2 + 20, 40); // Taille minimale de 40px
+    const svgSize = Math.max(pixelRadius * 2 + 20, 40);
+
+    if (spread >= 360) {
+        return (
+            <div style={{ position: 'absolute', transform: 'translate(-50%, -50%)', pointerEvents: 'none', zIndex: 1, width: svgSize, height: svgSize }}>
+                <svg width={svgSize} height={svgSize}>
+                    <circle cx={svgSize/2} cy={svgSize/2} r={pixelRadius} fill={color} fillOpacity="0.2" stroke={color} strokeWidth="1" strokeOpacity="0.5" />
+                </svg>
+            </div>
+        );
+    }
 
     return (
         <div 
@@ -146,7 +153,7 @@ const ShootingAngleWedge = React.memo(({ angle, spread, color, distance = 500, z
         >
             <svg width={svgSize} height={svgSize} viewBox={`0 0 ${svgSize} ${svgSize}`}>
                 <path 
-                    d={`M ${svgSize/2},${svgSize/2} L ${svgSize/2 + pixelRadius * Math.sin((-spread/2) * Math.PI / 180)},${svgSize/2 - pixelRadius * Math.cos((-spread/2) * Math.PI / 180)} A ${pixelRadius},${pixelRadius} 0 0,1 ${svgSize/2 + pixelRadius * Math.sin((spread/2) * Math.PI / 180)},${svgSize/2 - pixelRadius * Math.cos((spread/2) * Math.PI / 180)} Z`} 
+                    d={`M ${svgSize/2},${svgSize/2} L ${svgSize/2 + pixelRadius * Math.sin((-spread/2) * Math.PI / 180)},${svgSize/2 - pixelRadius * Math.cos((-spread/2) * Math.PI / 180)} A ${pixelRadius},${pixelRadius} 0 ${spread > 180 ? 1 : 0},1 ${svgSize/2 + pixelRadius * Math.sin((spread/2) * Math.PI / 180)},${svgSize/2 - pixelRadius * Math.cos((spread/2) * Math.PI / 180)} Z`} 
                     fill={color} 
                     fillOpacity="0.2"
                     stroke={color}
@@ -306,6 +313,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     }
 
     const isWithinAngle = (bearing: number, center: number, spread: number) => {
+        if (spread >= 360) return true;
         let diff = Math.abs(bearing - center) % 360;
         if (diff > 180) diff = 360 - diff;
         return diff <= spread / 2;
@@ -315,7 +323,6 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     participants.forEach(p => {
         if (p.id === user.uid || !p.location) return;
         
-        // Vérifier d'abord la distance
         const dist = getDistance(
             userLocation.latitude, 
             userLocation.longitude, 
@@ -852,7 +859,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                                                                 <span>Ouverture</span>
                                                                 <span>{shootingSpread}°</span>
                                                             </div>
-                                                            <Slider value={[shootingSpread]} min={10} max={90} step={1} onValueChange={v => setShootingSpread(v[0])} />
+                                                            <Slider value={[shootingSpread]} min={10} max={360} step={1} onValueChange={v => setShootingSpread(v[0])} />
                                                         </div>
                                                         <div className="space-y-2">
                                                             <div className="flex justify-between text-[10px] text-white font-black uppercase">
@@ -934,7 +941,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                                         </div>
                                         <div className="space-y-2">
                                             <Label className="text-[9px] font-black uppercase opacity-60">Ouverture: {shootingSpread}°</Label>
-                                            <Slider value={[shootingSpread]} min={10} max={90} step={1} onValueChange={v => setShootingSpread(v[0])} />
+                                            <Slider value={[shootingSpread]} min={10} max={360} step={1} onValueChange={v => setShootingSpread(v[0])} />
                                         </div>
                                         <div className="space-y-2">
                                             <Label className="text-[9px] font-black uppercase opacity-60 flex items-center justify-between">
