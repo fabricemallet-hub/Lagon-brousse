@@ -78,12 +78,13 @@ import {
   collection,
   query,
   orderBy,
-  arrayUnion
+  arrayUnion,
+  where
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 import type { WithId } from '@/firebase';
-import type { HuntingSession, SessionParticipant, UserAccount, SoundLibraryEntry } from '@/lib/types';
+import type { HuntingSession, SessionParticipant, UserAccount, SoundLibraryEntry, VesselStatus } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { cn, getDistance } from '@/lib/utils';
 import { Skeleton } from './ui/skeleton';
@@ -96,6 +97,7 @@ import {
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
+  AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
