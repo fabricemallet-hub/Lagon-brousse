@@ -136,9 +136,14 @@ export interface Campaign {
   targetCategory: string;
   reach: number;
   cost: number;
-  status: 'pending' | 'sent';
+  status: 'pending' | 'sent' | 'draft';
   createdAt: any;
   selectedChannels?: string[];
+  smsContent?: string | null;
+  pushContent?: string | null;
+  mailSubject?: string | null;
+  mailBody?: string | null;
+  promotedPromoIds?: string[];
 }
 
 export interface WindForecast {
