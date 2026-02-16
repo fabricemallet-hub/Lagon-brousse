@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -33,7 +32,9 @@ import {
     RefreshCw,
     Send,
     Smartphone,
-    Home
+    Home,
+    Phone,
+    Mail
 } from 'lucide-react';
 import { locations, locationsByRegion, regions } from '@/lib/locations';
 import { cn } from '@/lib/utils';
@@ -157,8 +158,15 @@ export default function ShoppingPage() {
         if (snap.exists()) {
             const b = snap.data() as Business;
             const oSnap = await getDoc(doc(firestore, 'users', b.ownerId));
-            const o = oSnap.exists() ? oSnap.data() as UserAccount : {};
-            setContactBusiness({ ...b, phoneNumber: b.phoneNumber || o.phoneNumber, address: b.address || o.address });
+            const o = oSnap.exists() ? oSnap.data() as UserAccount : {} as UserAccount;
+            
+            setContactBusiness({ 
+                ...b, 
+                phoneNumber: b.phoneNumber || o.phoneNumber, 
+                address: b.address || o.address,
+                email: b.email || o.email,
+                location: b.location || o.contactLocation
+            });
             setIsContactOpen(true);
         }
     } catch (e) {}
@@ -441,8 +449,40 @@ export default function ShoppingPage() {
             <div className="p-6 space-y-4">
                 {contactBusiness && (
                     <div className="space-y-4">
-                        <Button asChild className="w-full h-14 font-black uppercase shadow-lg gap-3"><a href={`tel:${contactBusiness.phoneNumber}`}><Smartphone className="size-5" /> Appeler le mobile</a></Button>
-                        <div className="p-4 bg-muted/30 rounded-2xl border-2 border-dashed flex items-start gap-3"><Home className="size-4 text-primary" /><div><p className="text-[10px] font-black uppercase opacity-40">Adresse</p><p className="text-xs font-bold">{contactBusiness.address || "Non renseignée"}</p></div></div>
+                        {contactBusiness.phoneNumber && (
+                            <Button asChild className="w-full h-14 font-black uppercase shadow-lg gap-3">
+                                <a href={`tel:${contactBusiness.phoneNumber}`}><Phone className="size-5" /> Appeler le magasin</a>
+                            </Button>
+                        )}
+                        {contactBusiness.email && (
+                            <Button asChild variant="outline" className="w-full h-14 font-black uppercase border-2 gap-3">
+                                <a href={`mailto:${contactBusiness.email}`}><Mail className="size-5" /> Envoyer un e-mail</a>
+                            </Button>
+                        )}
+                        
+                        {(contactBusiness.address || contactBusiness.location) && (
+                            <div className="p-4 bg-muted/30 rounded-2xl border-2 border-dashed space-y-3">
+                                <div className="flex items-start gap-3">
+                                    <Home className="size-4 text-primary shrink-0 mt-0.5" />
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase opacity-40">Adresse</p>
+                                        <p className="text-xs font-bold">{contactBusiness.address || contactBusiness.commune}</p>
+                                    </div>
+                                </div>
+                                <Button asChild variant="secondary" className="w-full h-10 font-black uppercase text-[10px] gap-2">
+                                    <a 
+                                        href={contactBusiness.location 
+                                            ? `https://www.google.com/maps/search/?api=1&query=${contactBusiness.location.latitude},${contactBusiness.location.longitude}`
+                                            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(contactBusiness.address || contactBusiness.commune + ', Nouvelle-Calédonie')}`
+                                        } 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                    >
+                                        <MapPin className="size-3" /> Itinéraire Google Maps
+                                    </a>
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

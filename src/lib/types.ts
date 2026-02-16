@@ -109,6 +109,7 @@ export interface Business {
   defaultTaxRate?: number;
   defaultApplyTax?: boolean;
   defaultShowBothPrices?: boolean;
+  email?: string;
 }
 
 export interface Promotion {
