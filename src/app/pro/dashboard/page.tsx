@@ -39,6 +39,7 @@ export default function ProDashboard() {
   const { toast } = useToast();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const userProfileRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -403,9 +404,27 @@ export default function ProDashboard() {
                             {promoImages.map((img, idx) => (
                                 <div key={idx} className="relative aspect-square rounded-xl border-2 overflow-hidden bg-muted"><img src={img} className="w-full h-full object-cover" alt="" /><button onClick={() => setPromoImages(prev => prev.filter((_, i) => i !== idx))} className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1"><X className="size-3" /></button></div>
                             ))}
-                            {promoImages.length < 4 && <button onClick={() => fileInputRef.current?.click()} className="aspect-square rounded-xl border-2 border-dashed border-primary/20 flex items-center justify-center text-primary/40"><Plus className="size-5" /></button>}
+                            {promoImages.length < 4 && (
+                                <button 
+                                    onClick={() => fileInputRef.current?.click()} 
+                                    className="aspect-square rounded-xl border-2 border-dashed border-primary/20 flex flex-col items-center justify-center text-primary/40 hover:bg-primary/5 transition-colors gap-1"
+                                >
+                                    <Plus className="size-4" />
+                                    <span className="text-[7px] font-black uppercase">Galerie</span>
+                                </button>
+                            )}
+                            {promoImages.length < 4 && (
+                                <button 
+                                    onClick={() => cameraInputRef.current?.click()} 
+                                    className="aspect-square rounded-xl border-2 border-dashed border-primary/20 flex flex-col items-center justify-center text-primary/40 hover:bg-primary/5 transition-colors gap-1"
+                                >
+                                    <Camera className="size-4" />
+                                    <span className="text-[7px] font-black uppercase">Appareil</span>
+                                </button>
+                            )}
                         </div>
                         <input type="file" accept="image/*" multiple ref={fileInputRef} className="hidden" onChange={handleFileChange} />
+                        <input type="file" accept="image/*" capture="environment" ref={cameraInputRef} className="hidden" onChange={handleFileChange} />
                     </div>
                     <div className="flex gap-2 pt-2">
                         {editingPromoId && <Button variant="ghost" onClick={resetForm} className="flex-1 border-2">Annuler</Button>}
