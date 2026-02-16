@@ -137,7 +137,7 @@ const ShootingAngleWedge = React.memo(({ angle, spread, color, distance = 500, z
         return (
             <div style={{ position: 'absolute', transform: 'translate(-50%, -50%)', pointerEvents: 'none', zIndex: 1, width: svgSize, height: svgSize }}>
                 <svg width={svgSize} height={svgSize}>
-                    <circle cx={svgSize/2} cy={svgSize/2} r={pixelRadius} fill={color} fillOpacity="0.2" stroke={color} strokeWidth="1" strokeOpacity="0.5" />
+                    <circle cx={svgSize/2} cx={svgSize/2} r={pixelRadius} fill={color} fillOpacity="0.2" stroke={color} strokeWidth="1" strokeOpacity="0.5" />
                 </svg>
             </div>
         );
@@ -925,7 +925,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                                                                 <span>Direction</span>
                                                                 <span>{shootingAngle}°</span>
                                                             </div>
-                                                            <Slider value={[shootingAngle]} min={0} max={360} step={1} onValueChange={v => setShootingAngle(v[0])} />
+                                                            <Slider value={[shootingAngle]} min={-180} max={180} step={1} onValueChange={v => setShootingAngle(v[0])} />
                                                         </div>
                                                         <div className="space-y-2">
                                                             <div className="flex justify-between text-[10px] text-white font-black uppercase">
@@ -1016,7 +1016,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                         <div className="space-y-2">
                                             <Label className="text-[9px] font-black uppercase opacity-60">Direction: {shootingAngle}°</Label>
-                                            <Slider value={[shootingAngle]} min={0} max={360} step={1} onValueChange={v => setShootingAngle(v[0])} />
+                                            <Slider value={[shootingAngle]} min={-180} max={180} step={1} onValueChange={v => setShootingAngle(v[0])} />
                                         </div>
                                         <div className="space-y-2">
                                             <Label className="text-[9px] font-black uppercase opacity-60">Ouverture: {shootingSpread}°</Label>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -511,7 +510,7 @@ export default function VesselTrackerPage() {
                         <div className={cn("space-y-4", !isAngleActive && "opacity-40 pointer-events-none")}>
                             <div className="space-y-2">
                                 <Label className="text-[9px] font-black uppercase opacity-60">Direction: {shootingAngle}°</Label>
-                                <Slider value={[shootingAngle]} min={0} max={360} step={1} onValueChange={v => setShootingAngle(v[0])} />
+                                <Slider value={[shootingAngle]} min={-180} max={180} step={1} onValueChange={v => setShootingAngle(v[0])} />
                             </div>
                             <div className="space-y-2">
                                 <Label className="text-[9px] font-black uppercase opacity-60">Ouverture: {shootingSpread}°</Label>
