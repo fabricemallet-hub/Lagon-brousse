@@ -41,7 +41,8 @@ import {
     ImageIcon,
     ChevronLeft,
     FileText,
-    Trash2
+    Trash2,
+    Maximize2
 } from 'lucide-react';
 import { locations, locationsByRegion, regions } from '@/lib/locations';
 import { cn } from '@/lib/utils';
@@ -87,6 +88,9 @@ export default function ShoppingPage() {
   const [selectedProductForDetail, setSelectedProductForDetail] = useState<Promotion & { business?: Business } | null>(null);
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [api, setApi] = useState<CarouselApi>();
+
+  // --- LIGHTBOX STATE ---
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
 
   // --- CONTACT DIALOG STATE ---
   const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
@@ -438,6 +442,31 @@ export default function ShoppingPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* LIGHTBOX POUR ZOOM TACTILE */}
+      <Dialog open={!!fullscreenImage} onOpenChange={(open) => !open && setFullscreenImage(null)}>
+        <DialogContent className="max-w-[100vw] w-full h-[100dvh] p-0 bg-black/95 border-none rounded-none overflow-hidden flex flex-col z-[200]">
+            <div className="relative flex-1 flex items-center justify-center">
+                <button 
+                    onClick={() => setFullscreenImage(null)}
+                    className="absolute top-6 right-6 z-[210] p-3 bg-white/10 hover:bg-white/20 rounded-full text-white backdrop-blur-md transition-colors"
+                >
+                    <X className="size-6" />
+                </button>
+                {fullscreenImage && (
+                    <img 
+                        src={fullscreenImage} 
+                        className="max-w-full max-h-full object-contain animate-in zoom-in-95 duration-300" 
+                        alt="Zoom produit" 
+                    />
+                )}
+            </div>
+            <div className="p-6 bg-black/40 backdrop-blur-md text-white/60 text-center font-black uppercase text-[10px] tracking-[0.2em]">
+                Pincez pour zoomer
+            </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* VUE DÉTAILLÉE DU PRODUIT */}
       <Dialog open={!!selectedProductForDetail} onOpenChange={(open) => !open && setSelectedProductForDetail(null)}>
         <DialogContent className="max-w-2xl w-[95vw] rounded-3xl p-0 overflow-hidden border-none shadow-2xl max-h-[95vh] flex flex-col">
             {selectedProductForDetail && (
@@ -459,12 +488,20 @@ export default function ShoppingPage() {
                                     <CarouselContent className="h-full ml-0">
                                         {selectedProductForDetail.images.map((img, idx) => (
                                             <CarouselItem key={idx} className="h-full pl-0">
-                                                <div className="w-full h-full flex items-center justify-center bg-white p-4">
+                                                <div 
+                                                    className="w-full h-full flex items-center justify-center bg-white p-6 cursor-zoom-in"
+                                                    onClick={() => setFullscreenImage(img)}
+                                                >
                                                     <img 
                                                         src={img} 
                                                         className="max-w-full max-h-full object-contain" 
                                                         alt={`${selectedProductForDetail.title} - ${idx + 1}`} 
                                                     />
+                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                                        <div className="p-3 bg-white/90 rounded-full shadow-xl text-primary flex items-center gap-2 font-black uppercase text-[10px]">
+                                                            <Maximize2 className="size-4" /> Agrandir
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </CarouselItem>
                                         ))}
@@ -544,7 +581,7 @@ export default function ShoppingPage() {
                             )}
                         </div>
 
-                        <div className="space-y-3">
+                        <div className="space-y-3 pb-6">
                             <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
                                 <FileText className="size-3" /> Description de l'offre
                             </h3>
