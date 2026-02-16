@@ -3,8 +3,8 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, doc, query, where, serverTimestamp, addDoc, setDoc, orderBy, deleteDoc, updateDoc } from 'firebase/firestore';
-import type { UserAccount, Business, Promotion, CampaignPricingSettings } from '@/lib/types';
+import { collection, doc, query, orderBy, serverTimestamp, addDoc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import type { UserAccount, Business, Promotion } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,34 +13,20 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { 
-  Megaphone, 
   Plus, 
   Trash2, 
-  Send, 
-  DollarSign, 
-  ShoppingBag, 
+  Save, 
   Store, 
-  Camera, 
   RefreshCw, 
-  Percent, 
   ImageIcon, 
   X, 
   Pencil, 
-  Save, 
-  UserCircle, 
   BrainCircuit, 
-  MapPin, 
-  ChevronDown, 
-  Globe, 
-  Smartphone, 
-  Mail, 
-  Zap, 
-  ChevronRight,
+  Sparkles,
   Wand2,
   Check,
-  CheckCircle2,
-  CreditCard,
-  Copy
+  Copy,
+  AlertCircle
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -49,8 +35,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { allCommuneNames } from '@/lib/locations';
 import { analyzeProduct } from '@/ai/flows/analyze-product-flow';
-import { generateCampaignMessages } from '@/ai/flows/generate-campaign-messages-flow';
-import type { AnalyzeProductOutput, GenerateCampaignOutput } from '@/ai/schemas';
+import type { AnalyzeProductOutput } from '@/ai/schemas';
 import {
   Dialog,
   DialogContent,
@@ -59,20 +44,14 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-type WizardStep = 'IDLE' | 'INFO' | 'TONE' | 'GENERATING' | 'OPTIONS' | 'STRATEGY';
-type CampaignWizardStep = 'IDLE' | 'TONE' | 'LENGTH' | 'GENERATING' | 'SELECTION' | 'PREVIEW';
+type WizardStep = 'IDLE' | 'TONE' | 'GENERATING' | 'OPTIONS' | 'STRATEGY';
 
 const AVAILABLE_TONES = [
     { id: 'Local (Caillou)', label: 'Local (Caillou)', desc: 'Parle au coeur des gens' },
     { id: 'Commercial', label: 'Commercial', desc: 'Dynamique' },
     { id: 'Humoristique', label: 'Humoristique', desc: 'Léger' },
-];
-
-const CAMPAIGN_LENGTHS = [
-    { id: 'Short', label: 'Court', desc: 'Direct' },
-    { id: 'Medium', label: 'Moyen', desc: 'Équilibré' },
-    { id: 'Long', label: 'Long', desc: 'Détaillé' },
 ];
 
 const MONTHS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
@@ -103,18 +82,6 @@ export default function ProDashboard() {
   }, [firestore, business?.id]);
   const { data: promotions } = useCollection<Promotion>(promosRef);
 
-  // Magicien IA Produit States
-  const [wizardStep, setWizardStep] = useState<WizardStep>('IDLE');
-  const [aiAdditionalInfo, setAiAdditionalInfo] = useState('');
-  const [aiSelectedTone, setAiSelectedTone] = useState('Commercial');
-  const [aiAnalysisResult, setAiAnalysisResult] = useState<AnalyzeProductOutput | null>(null);
-  
-  // Magicien Campagne States
-  const [campWizardStep, setCampWizardStep] = useState<CampaignWizardStep>('IDLE');
-  const [campTone, setCampTone] = useState('Commercial');
-  const [campLength, setCampLength] = useState<'Short' | 'Medium' | 'Long'>('Medium');
-  const [campProps, setCampProps] = useState<GenerateCampaignOutput | null>(null);
-
   // Form States
   const [promoTitle, setPromoTitle] = useState('');
   const [promoCategory, setPromoCategory] = useState('Pêche');
@@ -127,6 +94,11 @@ export default function ProDashboard() {
   const [nextArrivalYear, setNextArrivalYear] = useState('2025');
   const [isSaving, setIsSaving] = useState(false);
   const [hasCopiedUid, setHasCopiedUid] = useState(false);
+
+  // Wizard States
+  const [wizardStep, setWizardStep] = useState<WizardStep>('IDLE');
+  const [aiSelectedTone, setAiSelectedTone] = useState('Commercial');
+  const [aiAnalysisResult, setAiAnalysisResult] = useState<AnalyzeProductOutput | null>(null);
 
   const handleCopyUid = () => {
     if (user?.uid) {
@@ -161,8 +133,7 @@ export default function ProDashboard() {
             category: promoCategory,
             photos: promoImages,
             price: parseFloat(promoPrice) || undefined,
-            tone: aiSelectedTone,
-            additionalInfo: aiAdditionalInfo
+            tone: aiSelectedTone
         });
         setAiAnalysisResult(result);
         setWizardStep('OPTIONS');
@@ -201,7 +172,7 @@ export default function ProDashboard() {
     }
   };
 
-  if (isUserLoading || !profile) return <div className="p-8"><Skeleton className="h-64 w-full" /></div>;
+  if (isUserLoading) return <div className="p-8"><Skeleton className="h-64 w-full" /></div>;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-32 px-1">
@@ -280,7 +251,7 @@ export default function ProDashboard() {
                             <div className="pt-4 border-t border-dashed">
                                 <Button onClick={handleSavePromotion} disabled={isSaving || !promoTitle} className="w-full h-14 font-black uppercase shadow-xl text-sm tracking-widest gap-2">
                                     {isSaving ? <RefreshCw className="size-5 animate-spin" /> : <Save className="size-5" />}
-                                    Enregistrer dans le rayon
+                                    Enregistrer l'article
                                 </Button>
                             </div>
                         </div>
@@ -320,16 +291,14 @@ export default function ProDashboard() {
             </Card>
 
             <div className="space-y-4">
-                <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground px-1 flex items-center gap-2">
-                    <ShoppingBag className="size-4" /> Articles en ligne ({promotions?.length || 0})
-                </h3>
+                <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground px-1">Articles en ligne ({promotions?.length || 0})</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {promotions?.map(p => (
                         <Card key={p.id} className="overflow-hidden border-2 shadow-sm flex h-32 hover:border-primary/30 transition-all group">
                             <div className="w-28 bg-muted/20 shrink-0 relative overflow-hidden flex items-center justify-center border-r">
                                 {p.imageUrl ? <img src={p.imageUrl} className="w-full h-full object-cover" alt="" /> : <ImageIcon className="size-8 opacity-10" />}
                                 {p.isOutOfStock && (
-                                    <div className="absolute inset-0 bg-red-600/60 backdrop-blur-sm flex flex-col items-center justify-center text-white p-1">
+                                    <div className="absolute inset-0 bg-red-600/60 backdrop-blur-sm flex flex-col items-center justify-center text-white p-1 text-center">
                                         <span className="text-[10px] font-black uppercase">Rupture</span>
                                         <span className="text-[7px] font-bold uppercase">{p.restockDate}</span>
                                     </div>
@@ -356,7 +325,7 @@ export default function ProDashboard() {
         <Alert variant="destructive" className="bg-red-50 border-red-200">
             <AlertCircle className="size-5" />
             <AlertTitle className="font-black uppercase">Compte PRO non configuré</AlertTitle>
-            <AlertDescription className="text-sm font-medium">Veuillez transmettre votre UID à l'administrateur pour activer votre accès commerçant.</AlertDescription>
+            <AlertDescription className="text-sm font-medium">Veuillez transmettre votre UID à l'administrateur pour activer votre accès boutique.</AlertDescription>
         </Alert>
       )}
 
@@ -393,15 +362,13 @@ export default function ProDashboard() {
 
                 {wizardStep === 'OPTIONS' && aiAnalysisResult && (
                     <div className="space-y-6">
+                        <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Descriptions proposées (Cliquez pour choisir)</Label>
                         <div className="space-y-3">
-                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Descriptions proposées (Cliquez pour choisir)</Label>
-                            <div className="space-y-3">
-                                {aiAnalysisResult.commercialDescriptions.map((desc, idx) => (
-                                    <div key={idx} onClick={() => { setPromoDescription(desc); setWizardStep('STRATEGY'); }} className="p-4 rounded-xl border-2 bg-white text-xs leading-relaxed font-medium italic hover:border-primary cursor-pointer transition-all">
-                                        "{desc}"
-                                    </div>
-                                ))}
-                            </div>
+                            {aiAnalysisResult.commercialDescriptions.map((desc, idx) => (
+                                <div key={idx} onClick={() => { setPromoDescription(desc); setWizardStep('STRATEGY'); }} className="p-4 rounded-xl border-2 bg-white text-xs leading-relaxed font-medium italic hover:border-primary cursor-pointer transition-all">
+                                    "{desc}"
+                                </div>
+                            ))}
                         </div>
                     </div>
                 )}

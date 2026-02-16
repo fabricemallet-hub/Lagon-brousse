@@ -5,17 +5,15 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ======================================================
-    // 1. RÈGLES DE GROUPE (COLLECTION GROUP)
-    // CRITIQUE : Doivent utiliser une variable autre que 'path'
+    // 1. RÈGLES DE GROUPE (COLLECTION GROUP) - PRIORITÉ MAXIMALE
+    // Indispensable pour collectionGroup('promotions') et collectionGroup('fishing_spots')
     // ======================================================
     
-    // Autorise la lecture globale du catalogue Shopping
-    match /{prefix=**}/promotions/{promoId} {
+    match /{path=**}/promotions/{promoId} {
       allow get, list: if true;
     }
     
-    // Autorise la lecture globale des points GPS pour la carte
-    match /{prefix=**}/fishing_spots/{spotId} {
+    match /{path=**}/fishing_spots/{spotId} {
       allow get, list: if request.auth != null;
     }
 
@@ -27,16 +25,15 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Liste blanche Master Admin (UIDs et Emails)
+    // Liste blanche Master Admin (Propriétaires du projet)
     function isMasterAdmin() {
       return isSignedIn() && (
-        request.auth.uid in ["t8nPnZLcTiaLJSKMuLzib3C5nPn1", "D1q2GPM95rZi38cvCzvsjcWQDaV2", "koKj5ObSGXYeO1PLKU5bgo8Yaky1"] ||
+        request.auth.uid in ["t8nPnZLcTiaLJSKMuLzib3C5nPn1", "D1q2GPM95rZi38cvCzvsjcWQDaV2"] ||
         (request.auth.token.email != null && (
           request.auth.token.email.lower() in [
             "f.mallet81@outlook.com", 
             "f.mallet81@gmail.com", 
-            "fabrice.mallet@gmail.com",
-            "kledostyle@outlook.com"
+            "fabrice.mallet@gmail.com"
           ]
         ))
       );
