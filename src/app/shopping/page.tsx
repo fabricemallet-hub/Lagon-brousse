@@ -467,11 +467,13 @@ export default function ShoppingPage() {
                                     <CarouselContent className="h-full ml-0">
                                         {selectedProductForDetail.images.map((img, idx) => (
                                             <CarouselItem key={idx} className="h-full pl-0">
-                                                <img 
-                                                    src={img} 
-                                                    className="w-full h-full object-cover" 
-                                                    alt={`${selectedProductForDetail.title} - ${idx + 1}`} 
-                                                />
+                                                <div className="w-full h-full flex items-center justify-center bg-slate-50">
+                                                    <img 
+                                                        src={img} 
+                                                        className="max-w-full max-h-full object-contain" 
+                                                        alt={`${selectedProductForDetail.title} - ${idx + 1}`} 
+                                                    />
+                                                </div>
                                             </CarouselItem>
                                         ))}
                                     </CarouselContent>
@@ -652,7 +654,7 @@ function ProductCard({
                 <div className="w-32 bg-muted/20 shrink-0 relative flex items-center justify-center border-r overflow-hidden">
                     {images.length > 0 ? (
                         <>
-                            <img src={images[0]} className="w-full h-full object-cover transition-transform group-hover:scale-105" alt={product.title} />
+                            <img src={images[0]} className="w-full h-full object-contain transition-transform group-hover:scale-105" alt={product.title} />
                             {images.length > 1 && (
                                 <div className="absolute bottom-1 right-1 bg-black/60 backdrop-blur-md text-white font-black text-[8px] px-1.5 py-0.5 rounded flex items-center gap-1 shadow-lg border border-white/10">
                                     <ImageIcon className="size-2" />
