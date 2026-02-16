@@ -445,6 +445,10 @@ export default function ShoppingPage() {
       {/* LIGHTBOX POUR ZOOM TACTILE */}
       <Dialog open={!!fullscreenImage} onOpenChange={(open) => !open && setFullscreenImage(null)}>
         <DialogContent className="max-w-[100vw] w-full h-[100dvh] p-0 bg-black/95 border-none rounded-none overflow-hidden flex flex-col z-[200]">
+            <DialogHeader className="sr-only">
+                <DialogTitle>Zoom produit</DialogTitle>
+                <DialogDescription>Agrandissement de la photo pour visualisation détaillée.</DialogDescription>
+            </DialogHeader>
             <div className="relative flex-1 flex items-center justify-center">
                 <button 
                     onClick={() => setFullscreenImage(null)}
@@ -563,7 +567,7 @@ export default function ShoppingPage() {
                                         "text-4xl font-black tracking-tighter",
                                         selectedProductForDetail.promoType === 'Promo' ? "text-red-600" : "text-primary"
                                     )}>
-                                        {selectedProductForDetail.price.toLocaleString('fr-FR').replace(/\s/g, ' ')}
+                                        {(selectedProductForDetail.price || 0).toLocaleString('fr-FR').replace(/\s/g, ' ')}
                                     </span>
                                     <span className="text-xs font-black uppercase opacity-60">CFP</span>
                                 </div>
@@ -793,7 +797,7 @@ function ProductCard({
                             )}
                             <div className="flex items-baseline gap-1">
                                 <span className={cn("text-base font-black leading-none", isPromo ? "text-red-600" : "text-primary")}>
-                                    {product.price.toLocaleString('fr-FR').replace(/\s/g, ' ')}
+                                    {(product.price || 0).toLocaleString('fr-FR').replace(/\s/g, ' ')}
                                 </span>
                                 <span className="text-[9px] font-black uppercase opacity-60">CFP</span>
                             </div>
