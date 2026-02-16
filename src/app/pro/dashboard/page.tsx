@@ -170,7 +170,6 @@ export default function ProDashboard() {
   const userCommune = profile?.lastSelectedLocation || 'Nouméa';
   const hasSetDefaultCommune = useRef(false);
 
-  // Initialisation par défaut sur la commune réelle de l'utilisateur dès que le profil est chargé
   useEffect(() => {
     if (profile?.lastSelectedLocation && !hasSetDefaultCommune.current) {
         setCampTargetCommunes([profile.lastSelectedLocation]);
@@ -178,7 +177,6 @@ export default function ProDashboard() {
     }
   }, [profile?.lastSelectedLocation]);
 
-  // Calcul automatique du prix remisé
   useEffect(() => {
     if (originalPrice && discountPercentage) {
         const base = parseFloat(originalPrice);
@@ -313,7 +311,6 @@ export default function ProDashboard() {
     }
   };
 
-  // --- CAMPAIGN & REACH LOGIC ---
   const calculateReach = async () => {
     if (!firestore) return;
     setIsCalculatingReach(true);
@@ -360,22 +357,14 @@ export default function ProDashboard() {
     }
   }, [campTargetRegion, campTargetCommunes, activeTab, isCampWizardOpen, business]);
 
-  // DEVIS INSTANTANÉ basé sur les tarifs ADMIN - Arrondi au franc supérieur
   const campaignCost = useMemo(() => {
     if (!pricing) return 0;
-    
-    // 1. Frais fixes de lancement
     const base = pricing.fixedPrice || 0;
-    
-    // 2. Coût de base par utilisateur (reach total)
     const reachBaseCost = (pricing.unitPricePerUser || 0) * reachCount;
-    
-    // 3. Coût par canal validé
     let channelSum = 0;
     if (campChannels.includes('SMS')) channelSum += (pricing.priceSMS || 0) * smsCount;
     if (campChannels.includes('PUSH')) channelSum += (pricing.pricePush || 0) * pushCount;
     if (campChannels.includes('MAIL')) channelSum += (pricing.priceMail || 0) * emailCount;
-    
     return Math.ceil(base + reachBaseCost + channelSum);
   }, [pricing, campChannels, reachCount, pushCount, smsCount, emailCount]);
 
@@ -406,11 +395,9 @@ export default function ProDashboard() {
             length: campLength
         });
         setGeneratedMessages(result);
-        
         if (result.smsPropositions) setSelectedSms(result.smsPropositions[0]);
         if (result.pushPropositions) setSelectedPush(result.pushPropositions[0]);
         if (result.mailPropositions) setSelectedMail(result.mailPropositions[0]);
-        
         setCampStep('RESULTS');
     } catch (e) {
         toast({ variant: "destructive", title: "Erreur IA Campagne" });
@@ -438,7 +425,6 @@ export default function ProDashboard() {
         targetCommunes: campTargetCommunes,
         createdAt: serverTimestamp()
     };
-
     try {
         await addDoc(collection(firestore, 'campaigns'), campaignData);
         toast({ title: "Campagne enregistrée !", description: "L'administrateur va valider l'envoi." });
@@ -630,14 +616,17 @@ export default function ProDashboard() {
                                         <input type="file" accept="image/*" multiple ref={fileInputRef} className="hidden" onChange={handleFileChange} />
                                     </div>
 
-                                    <div className="space-y-2">
-                                        <div className="flex items-center justify-between px-1">
-                                            <Label className="text-[10px] font-black uppercase opacity-60">Description commerciale</Label>
-                                            <Button variant="ghost" className="h-6 text-[8px] font-black uppercase text-primary gap-1" onClick={handleStartAiProduct}>
-                                                <Wand2 className="size-2.5" /> Magicien IA
-                                            </Button>
-                                        </div>
+                                    <div className="space-y-2 flex flex-col">
+                                        <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Description commerciale</Label>
                                         <Textarea value={promoDescription} onChange={e => setPromoDescription(e.target.value)} placeholder="Décrivez l'offre..." className="h-48 border-2 text-sm leading-relaxed" />
+                                        <Button 
+                                            variant="secondary" 
+                                            className="w-full h-12 font-black uppercase text-xs tracking-widest border-2 border-primary/20 gap-2 shadow-sm transition-all active:scale-[0.98] hover:bg-primary/5" 
+                                            onClick={handleStartAiProduct}
+                                        >
+                                            <BrainCircuit className="size-5 text-primary" /> 
+                                            Assistant Magicien IA (Rédaction)
+                                        </Button>
                                     </div>
                                 </div>
                             </div>
@@ -870,33 +859,28 @@ export default function ProDashboard() {
                                             <span className="text-3xl font-black text-slate-800">{(campaignCost || 0).toLocaleString('fr-FR')}</span>
                                             <span className="text-sm font-black uppercase opacity-40">F</span>
                                         </div>
-                                        {/* Détail du devis instantané */}
                                         {pricing && (
                                             <div className="mt-3 space-y-1.5 border-t border-primary/10 pt-2">
                                                 <div className="text-[8px] font-bold text-muted-foreground uppercase flex justify-between">
                                                     <span>Frais fixes de lancement :</span>
                                                     <span>{pricing.fixedPrice || 0} F</span>
                                                 </div>
-                                                
                                                 <div className="text-[8px] font-bold text-muted-foreground uppercase flex justify-between">
                                                     <span>Base audience ({reachCount} x {pricing.unitPricePerUser}F) :</span>
                                                     <span>{((pricing.unitPricePerUser || 0) * reachCount).toLocaleString('fr-FR')} F</span>
                                                 </div>
-
                                                 {campChannels.includes('SMS') && (
                                                     <div className="text-[8px] font-bold text-blue-600 uppercase flex justify-between">
                                                         <span>Option SMS ({smsCount} x {pricing.priceSMS}F) :</span>
                                                         <span>{((pricing.priceSMS || 0) * smsCount).toLocaleString('fr-FR')} F</span>
                                                     </div>
                                                 )}
-
                                                 {campChannels.includes('PUSH') && (
                                                     <div className="text-[8px] font-bold text-primary uppercase flex justify-between">
                                                         <span>Option PUSH ({pushCount} x {pricing.pricePush}F) :</span>
                                                         <span>{((pricing.pricePush || 0) * pushCount).toLocaleString('fr-FR')} F</span>
                                                     </div>
                                                 )}
-
                                                 {campChannels.includes('MAIL') && (
                                                     <div className="text-[8px] font-bold text-green-600 uppercase flex justify-between">
                                                         <span>Option MAIL ({emailCount} x {pricing.priceMail}F) :</span>
@@ -970,7 +954,6 @@ export default function ProDashboard() {
         </TabsContent>
       </Tabs>
 
-      {/* --- IA PRODUCT DIALOG --- */}
       <Dialog open={isAiProductOpen} onOpenChange={setIsAiProductOpen}>
         <DialogContent className="max-w-md rounded-3xl p-0 overflow-hidden border-none shadow-2xl">
             <DialogHeader className="p-6 bg-slate-50 border-b">
@@ -993,7 +976,6 @@ export default function ProDashboard() {
                         <Button className="w-full h-14 font-black uppercase tracking-widest mt-4" onClick={runAiProductAnalysis}>Analyser & Rédiger</Button>
                     </div>
                 )}
-
                 {aiProductStep === 'GENERATING' && (
                     <div className="py-12 flex flex-col items-center justify-center gap-4 text-center">
                         <div className="relative">
@@ -1006,7 +988,6 @@ export default function ProDashboard() {
                         </div>
                     </div>
                 )}
-
                 {aiProductStep === 'RESULTS' && aiProductResult && (
                     <div className="space-y-6">
                         <div className="space-y-3">
@@ -1030,7 +1011,6 @@ export default function ProDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* --- CAMPAIGN WIZARD DIALOG --- */}
       <Dialog open={isCampWizardOpen} onOpenChange={setIsCampWizardOpen}>
         <DialogContent className="max-w-2xl w-[95vw] rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl max-h-[90vh] flex flex-col">
             <DialogHeader className="p-6 bg-slate-900 text-white shrink-0">
@@ -1039,7 +1019,6 @@ export default function ProDashboard() {
                 </DialogTitle>
                 <DialogDescription className="text-slate-400 font-bold uppercase text-[10px]">Génération de contenu intelligent</DialogDescription>
             </DialogHeader>
-
             <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
                 {campStep === 'SETUP' && (
                     <div className="space-y-8 pb-10">
@@ -1049,7 +1028,6 @@ export default function ProDashboard() {
                                 Les filtres géographiques et les canaux choisis sur le simulateur ont été mémorisés pour la rédaction.
                             </AlertDescription>
                         </Alert>
-
                         <div className="space-y-4 p-6 bg-white border-2 rounded-[2rem] shadow-sm">
                             <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest px-1">Paramètres de Rédaction IA</Label>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -1075,7 +1053,6 @@ export default function ProDashboard() {
                                 </div>
                             </div>
                         </div>
-
                         <Card className="bg-slate-900 text-white border-none rounded-3xl overflow-hidden shadow-2xl">
                             <CardContent className="p-6 flex items-center justify-between">
                                 <div className="flex items-center gap-4">
@@ -1093,7 +1070,6 @@ export default function ProDashboard() {
                         </Card>
                     </div>
                 )}
-
                 {campStep === 'GENERATING' && (
                     <div className="py-24 flex flex-col items-center justify-center gap-6 text-center">
                         <div className="relative">
@@ -1106,7 +1082,6 @@ export default function ProDashboard() {
                         </div>
                     </div>
                 )}
-
                 {campStep === 'RESULTS' && generatedMessages && (
                     <div className="space-y-8 pb-10">
                         {campChannels.includes('SMS') && generatedMessages.smsPropositions && (
@@ -1121,7 +1096,6 @@ export default function ProDashboard() {
                                 </div>
                             </div>
                         )}
-
                         {campChannels.includes('PUSH') && generatedMessages.pushPropositions && (
                             <div className="space-y-3">
                                 <Label className="flex items-center gap-2 font-black uppercase text-xs text-primary"><Zap className="size-4" /> Variantes Push (Max 80 car.)</Label>
@@ -1134,7 +1108,6 @@ export default function ProDashboard() {
                                 </div>
                             </div>
                         )}
-
                         {campChannels.includes('MAIL') && generatedMessages.mailPropositions && (
                             <div className="space-y-3">
                                 <Label className="flex items-center gap-2 font-black uppercase text-xs text-green-600"><Mail className="size-4" /> Variantes E-mail</Label>
@@ -1151,7 +1124,6 @@ export default function ProDashboard() {
                     </div>
                 )}
             </div>
-
             <DialogFooter className="p-6 bg-white border-t shrink-0">
                 {campStep === 'SETUP' && (
                     <Button className="w-full h-16 font-black uppercase tracking-widest shadow-xl text-base gap-3" onClick={runCampaignIA} disabled={campChannels.length === 0}>
