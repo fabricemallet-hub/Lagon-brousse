@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -425,7 +426,7 @@ export default function ProDashboard() {
                     <div className="space-y-4">
                         <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Rayon cible</Label><Select value={targetCategory} onValueChange={setTargetCategory}><SelectTrigger className="h-10 border-2 bg-background font-black text-xs"><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs">{cat}</SelectItem>)}</SelectContent></Select></div>
                         
-                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Portée géographique</Label><Select value={targetScope} onValueChange={(v: any) => setTargetScope(v)}><SelectTrigger className="h-10 border-2 bg-background font-black text-xs"><Globe className="size-3 mr-2 text-primary" /><SelectValue /></SelectTrigger><SelectContent><SelectItem value="SPECIFIC">Communes spécifiques</SelectItem><SelectItem value="CALEDONIE">Nouvelle-Calédonie</SelectItem><SelectItem value="TAHITI">Tahiti</SelectItem><SelectItem value="ALL">Tout le réseau</SelectItem></SelectContent></Select></div>
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Portée géographique</Label><Select value={targetScope} onValueChange={(v: any) => setTargetScope(v)}><SelectTrigger className="h-10 border-2 bg-background font-black text-xs"><Globe className="size-3 mr-2 text-primary" /><SelectValue /></SelectTrigger><SelectContent><SelectItem value="SPECIFIC">Communes spécifiques</SelectItem><SelectItem value="CALEDONIE">Nouvelle-Calédonie</SelectItem><SelectItem value="TAHITI">Tahiti</SelectItem><SelectItem value="ALL">Tout le réseau</SelectItem></Select></div>
 
                         {targetScope === 'SPECIFIC' && (
                             <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">
@@ -491,7 +492,7 @@ export default function ProDashboard() {
                                             <span className="text-[8px] font-bold opacity-60 uppercase">Opt-in valide</span>
                                         </div>
                                     </div>
-                                    <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-primary"/> : `${pushTargetCount ?? 0} clients`}</span>
+                                    <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-primary"/> : `${pushTargetCount ?? 0} client${(pushTargetCount ?? 0) > 1 ? 's' : ''}`}</span>
                                 </div>
                                 <div className={cn("p-3 rounded-xl border-2 flex items-center justify-between transition-all", selectedChannels.includes('MAIL') ? "bg-green-50 border-green-200" : "bg-background opacity-50")}>
                                     <div className="flex items-center gap-2">
@@ -501,7 +502,7 @@ export default function ProDashboard() {
                                             <span className="text-[8px] font-bold opacity-60 uppercase">Opt-in valide</span>
                                         </div>
                                     </div>
-                                    <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-green-600"/> : `${mailTargetCount ?? 0} clients`}</span>
+                                    <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-green-600"/> : `${mailTargetCount ?? 0} client${(mailTargetCount ?? 0) > 1 ? 's' : ''}`}</span>
                                 </div>
                                 <div className={cn("p-3 rounded-xl border-2 flex items-center justify-between transition-all", selectedChannels.includes('SMS') ? "bg-blue-50 border-blue-200" : "bg-background opacity-50")}>
                                     <div className="flex items-center gap-2">
@@ -511,7 +512,7 @@ export default function ProDashboard() {
                                             <span className="text-[8px] font-bold opacity-60 uppercase">Mobile renseigné</span>
                                         </div>
                                     </div>
-                                    <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-blue-600"/> : `${smsTargetCount ?? 0} clients`}</span>
+                                    <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-blue-600"/> : `${smsTargetCount ?? 0} client${(smsTargetCount ?? 0) > 1 ? 's' : ''}`}</span>
                                 </div>
                             </div>
                             {reachError && <p className="text-[8px] font-bold text-red-500 text-center uppercase animate-pulse">Erreur de calcul. Sélectionnez une zone.</p>}

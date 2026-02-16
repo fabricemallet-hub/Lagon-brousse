@@ -8,6 +8,7 @@ import { addMonths } from 'date-fns';
 /**
  * Synchronisation du profil utilisateur.
  * Sécurité Master : Force les droits administrateurs pour les comptes de confiance.
+ * Garantit également les champs d'opt-in par défaut pour les calculs d'audience.
  */
 export async function ensureUserDocument(
   firestore: Firestore, 
@@ -31,35 +32,47 @@ export async function ensureUserDocument(
 
     if (docSnap.exists()) {
       const currentData = docSnap.data() as UserAccount;
+      const updates: any = {};
       
-      // Verification de l'intégrité de l'ID interne
+      // 1. Verification de l'intégrité de l'ID interne
       if (!currentData.id || currentData.id !== user.uid) {
-          console.warn("L&B Sync: Correction de l'ID manquant ou erroné...");
-          setDoc(userDocRef, { id: user.uid }, { merge: true });
+          updates.id = user.uid;
       }
 
-      // Restauration automatique si le rôle Master a sauté pour les admins réels
+      // 2. Restauration automatique du rôle Master
       if (isMasterAdmin && currentData.role !== 'admin') {
-          console.log(`L&B Master Sync: Restauration des droits pour [${email}]...`);
-          setDoc(userDocRef, { 
-            ...currentData,
-            id: user.uid,
-            role: 'admin', 
-            subscriptionStatus: 'admin' 
-          }, { merge: true });
+          updates.role = 'admin';
+          updates.subscriptionStatus = 'admin';
+      }
+
+      // 3. Initialisation des champs d'audience si manquants (Opt-in par défaut)
+      if (currentData.allowsPromoPush === undefined) updates.allowsPromoPush = true;
+      if (currentData.allowsPromoEmails === undefined) updates.allowsPromoEmails = true;
+      if (currentData.allowsPromoSMS === undefined) updates.allowsPromoSMS = true;
+      if (!currentData.subscribedCategories || currentData.subscribedCategories.length === 0) {
+          updates.subscribedCategories = ['Pêche', 'Chasse', 'Jardinage'];
+      }
+
+      if (Object.keys(updates).length > 0) {
+          await setDoc(userDocRef, updates, { merge: true });
       }
       return;
     }
 
-    // Création d'un nouveau profil
+    // Création d'un nouveau profil avec les réglages d'audience par défaut
     const effectiveDisplayName = displayName || user.displayName || email.split('@')[0] || 'Utilisateur';
     const newUser: UserAccount = {
-      id: user.uid, // CRITICAL: ID is explicitly set to match UID
+      id: user.uid,
       email: email,
       displayName: effectiveDisplayName,
       role: isMasterAdmin ? 'admin' : 'client',
       subscriptionStatus: isMasterAdmin ? 'admin' : 'trial',
       lastSelectedLocation: commune || 'Nouméa',
+      selectedRegion: 'CALEDONIE',
+      subscribedCategories: ['Pêche', 'Chasse', 'Jardinage'],
+      allowsPromoEmails: true,
+      allowsPromoPush: true,
+      allowsPromoSMS: true,
     };
 
     if (!isMasterAdmin) {
