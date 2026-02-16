@@ -59,7 +59,7 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 const IMMOBILITY_THRESHOLD_METERS = 20; 
@@ -322,7 +322,7 @@ export default function VesselTrackerPage() {
               path: vesselRef.path,
               operation: 'write',
               requestResourceData: updatePayload
-            }));
+            } satisfies SecurityRuleContext));
           });
     };
     update();
@@ -348,23 +348,24 @@ export default function VesselTrackerPage() {
           path: userRef.path,
           operation: 'update',
           requestResourceData: updates
-        }));
+        } satisfies SecurityRuleContext));
       });
   };
 
   const handleRemoveSavedVessel = (id: string) => {
     if (!user || !firestore) return;
     const userRef = doc(firestore, 'users', user.uid);
-    updateDoc(userRef, {
+    const updates = {
         savedVesselIds: arrayRemove(id)
-    })
+    };
+    updateDoc(userRef, updates)
     .then(() => toast({ title: "Navire retiré" }))
     .catch(async (err) => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: userRef.path,
           operation: 'update',
-          requestResourceData: { savedVesselIds: arrayRemove(id) }
-        }));
+          requestResourceData: updates
+        } satisfies SecurityRuleContext));
     });
   };
 
@@ -410,7 +411,7 @@ export default function VesselTrackerPage() {
           path: vesselRef.path,
           operation: 'update',
           requestResourceData: updatePayload
-        }));
+        } satisfies SecurityRuleContext));
       });
   };
 
@@ -419,7 +420,8 @@ export default function VesselTrackerPage() {
     setIsSharing(false);
     setIsReceiverGpsActive(false);
     const vesselRef = doc(firestore, 'vessels', sharingId);
-    setDoc(vesselRef, { isSharing: false, lastActive: serverTimestamp() }, { merge: true })
+    const payload = { isSharing: false, lastActive: serverTimestamp() };
+    setDoc(vesselRef, payload, { merge: true })
       .then(() => {
         if (watchIdRef.current) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
         setCurrentPos(null);
@@ -434,8 +436,8 @@ export default function VesselTrackerPage() {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: vesselRef.path,
           operation: 'write',
-          requestResourceData: { isSharing: false, lastActive: serverTimestamp() }
-        }));
+          requestResourceData: payload
+        } satisfies SecurityRuleContext));
       });
   };
 
@@ -460,7 +462,7 @@ export default function VesselTrackerPage() {
             errorEmitter.emit('permission-error', new FirestorePermissionError({
               path: vesselRef.path,
               operation: 'update'
-            }));
+            } satisfies SecurityRuleContext));
         });
     }
   };
@@ -478,7 +480,7 @@ export default function VesselTrackerPage() {
           path: userRef.path,
           operation: 'update',
           requestResourceData: updates
-        }));
+        } satisfies SecurityRuleContext));
       });
   };
 
@@ -492,7 +494,7 @@ export default function VesselTrackerPage() {
           path: userRef.path,
           operation: 'update',
           requestResourceData: { vesselPrefs: newPrefs }
-        }));
+        } satisfies SecurityRuleContext));
       });
   };
 

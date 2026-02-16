@@ -7,11 +7,14 @@ service cloud.firestore {
     // ======================================================
     // 1. PRIORITÉ ABSOLUE : MASTER ADMIN (GOD MODE)
     // ======================================================
-    // Bypass total pour l'administrateur unique
+    // Bypass total pour l'administrateur principal (Email & UID)
     match /{allPaths=**} {
       allow read, write: if request.auth != null && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
-        request.auth.token.email.lower() == "f.mallet81@outlook.com"
+        (request.auth.token.email != null && (
+          request.auth.token.email.lower() == "f.mallet81@outlook.com" ||
+          request.auth.token.email.lower() == "f.mallet81@gmail.com"
+        ))
       );
     }
 
@@ -25,13 +28,16 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin"
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin")
       );
     }
 
     function isProfessional() {
       return isSignedIn() && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "professional" || 
+        request.auth.uid in ["D1q2GPM95rZi38cvCzvsjcWQDaV2", "koKj5ObSGXYeO1PLKU5bgo8Yaky1"] ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "professional") || 
         isAdmin()
       );
     }
@@ -40,22 +46,25 @@ service cloud.firestore {
     // 3. RÈGLES PAR COLLECTION
     // ======================================================
 
-    // Catalogue Shopping (Public en lecture)
+    // Catalogue Shopping & Promotions (Public en lecture)
     match /{path=**}/promotions/{promoId} {
       allow read: if true;
       allow write: if isProfessional();
+    }
+
+    // Commerces
+    match /businesses/{businessId} {
+      allow get, list: if true;
+      allow write: if isAdmin() || (isSignedIn() && resource.data.ownerId == request.auth.uid);
     }
 
     // Profils Utilisateurs
     match /users/{userId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-    }
-
-    // Commerces
-    match /businesses/{businessId} {
-      allow get, list: if true;
-      allow write: if isAdmin();
+      match /{allPaths=**} {
+        allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      }
     }
 
     // Données Publiques
@@ -87,11 +96,25 @@ service cloud.firestore {
     // Jetons & Accès
     match /access_tokens/{id} { allow read, write: if isAdmin(); }
     match /shared_access_tokens/{id} { allow read, write: if isAdmin(); }
-    
-    // Fonctionnalités Terroir
-    match /hunting_sessions/{id} { allow read, write: if isSignedIn(); }
-    match /vessels/{id} { allow read, write: if isSignedIn(); }
     match /spot_shares/{id} { allow read, write: if isSignedIn(); }
-    match /campaigns/{campaignId} { allow read, write: if isProfessional() || isAdmin(); }
+    
+    // ======================================================
+    // 4. FONCTIONNALITÉS TERROIR (ACCÈS RÉCURSIF GÉNÉRIQUE)
+    // ======================================================
+    
+    // Sessions de Groupe (Chasse & Pêche) - Autorise TOUTES les sous-collections (participants, etc.)
+    match /hunting_sessions/{allPaths=**} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Boat Tracker (Partage GPS) - Autorise TOUTES les sous-collections (markers, etc.)
+    match /vessels/{allPaths=**} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Campagnes publicitaires
+    match /campaigns/{id} { 
+      allow read, write: if isProfessional() || isAdmin(); 
+    }
   }
 }

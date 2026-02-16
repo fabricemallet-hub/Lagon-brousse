@@ -80,7 +80,7 @@ import {
   orderBy
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 import type { WithId } from '@/firebase';
 import type { HuntingSession, SessionParticipant, UserAccount, SoundLibraryEntry } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
@@ -323,7 +323,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
         errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: participantRef.path,
           operation: 'delete'
-        }));
+        } satisfies SecurityRuleContext));
       });
   }, [user, session, firestore]);
 
@@ -355,7 +355,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                         path: ref.path,
                         operation: 'update',
                         requestResourceData: updatePayload
-                    }));
+                    } satisfies SecurityRuleContext));
                 });
             };
             updateWithBattery();
@@ -392,7 +392,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
               path: participantRef.path,
               operation: 'create',
               requestResourceData: participantData
-            }));
+            } satisfies SecurityRuleContext));
           });
 
         setSession({ id: code, ...sessionData } as any);
@@ -407,7 +407,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
           path: sessionRef.path,
           operation: 'create',
           requestResourceData: sessionData
-        }));
+        } satisfies SecurityRuleContext));
       });
   };
   
@@ -442,7 +442,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
             path: participantRef.path,
             operation: 'write',
             requestResourceData: participantData
-          }));
+          } satisfies SecurityRuleContext));
         });
     }).catch(e => {
         setIsSessionLoading(false);
@@ -494,7 +494,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
             errorEmitter.emit('permission-error', new FirestorePermissionError({
               path: `hunting_sessions/${sId}`,
               operation: 'delete'
-            }));
+            } satisfies SecurityRuleContext));
           });
       })
       .catch(console.error);
@@ -512,7 +512,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
           path: ref.path,
           operation: 'update',
           requestResourceData: { baseStatus: newVal }
-        }));
+        } satisfies SecurityRuleContext));
       });
 
     if (newVal) { playStatusSound(st); toast({ title: `Statut : ${st}` }); }
@@ -530,7 +530,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
           path: ref.path,
           operation: 'update',
           requestResourceData: { isGibierEnVue: newVal }
-        }));
+        } satisfies SecurityRuleContext));
       });
 
     if (newVal) playStatusSound('gibier');
@@ -565,7 +565,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                 path: participantRef.path,
                 operation: 'update',
                 requestResourceData: updateData
-              }));
+              } satisfies SecurityRuleContext));
             });
         }
         toast({ title: 'Préférences sauvegardées !' });
@@ -578,7 +578,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
           path: userRef.path,
           operation: 'update',
           requestResourceData: prefsPayload
-        }));
+        } satisfies SecurityRuleContext));
       });
   };
 
@@ -813,7 +813,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
               <AlertDialogHeader>
                 <AlertDialogTitle>Supprimer la session ?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Cette action est irréversible. Toutes les données de position et les participants seront supprimés de cette session.
+                  Cette action supprimera définitivement la session "{sessionToDelete}" ainsi que la position de tous les participants inscrits.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
