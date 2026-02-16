@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, doc, query, where, serverTimestamp, addDoc, setDoc, getDocs, orderBy, deleteDoc, updateDoc, getCountFromServer, getDoc } from 'firebase/firestore';
+import { collection, doc, query, where, serverTimestamp, addDoc, setDoc, getDocs, orderBy, deleteDoc, updateDoc, getCountFromServer } from 'firebase/firestore';
 import type { UserAccount, Business, Promotion, Campaign, CampaignPricingSettings } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -46,8 +46,7 @@ import {
   Check,
   CheckCircle2,
   LayoutTemplate,
-  CreditCard,
-  History
+  CreditCard
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -70,9 +69,8 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 type TargetScope = 'SPECIFIC' | 'CALEDONIE' | 'TAHITI' | 'ALL';
 type WizardStep = 'IDLE' | 'INFO' | 'TONE' | 'GENERATING' | 'OPTIONS' | 'STRATEGY';
@@ -105,8 +103,6 @@ export default function ProDashboard() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  const [activeMainTab, setActiveMainTab] = useState('catalogue');
-
   const userProfileRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return doc(firestore, 'users', user.uid);
@@ -138,7 +134,6 @@ export default function ProDashboard() {
   const [finalPush, setFinalPush] = useState('');
   const [finalMailSubject, setFinalMailSubject] = useState('');
   const [finalMailBody, setFinalMailBody] = useState('');
-  const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isUserLoading && profile && !isProfileLoading) {
@@ -161,17 +156,6 @@ export default function ProDashboard() {
     return query(collection(firestore, 'businesses', business.id, 'promotions'), orderBy('createdAt', 'desc'));
   }, [firestore, business?.id]);
   const { data: promotions, isLoading: isPromosLoading } = useCollection<Promotion>(promosRef);
-
-  const draftsRef = useMemoFirebase(() => {
-    if (!firestore || !business?.id || !user) return null;
-    return query(
-      collection(firestore, 'campaigns'), 
-      where('businessId', '==', business.id), 
-      where('status', '==', 'draft'), 
-      orderBy('createdAt', 'desc')
-    );
-  }, [firestore, business?.id, user]);
-  const { data: drafts, isLoading: isDraftsLoading } = useCollection<Campaign>(draftsRef);
 
   const [selectedPromoIds, setSelectedPromoIds] = useState<string[]>([]);
   const [targetCategory, setTargetCategory] = useState<string>('Pêche');
@@ -458,7 +442,6 @@ export default function ProDashboard() {
         toast({ variant: 'destructive', title: "Sélection vide", description: "Choisissez au moins un article à promouvoir." });
         return;
     }
-    setEditingCampaignId(null);
     setCampWizardStep('TONE');
   };
 
@@ -501,7 +484,7 @@ export default function ProDashboard() {
     setCampWizardStep('PREVIEW');
   };
 
-  const handleFinalDiffuse = (isDraft = false) => {
+  const handleFinalDiffuse = () => {
     if (!firestore || !business || !user) return;
     setIsSaving(true);
     
@@ -519,66 +502,34 @@ export default function ProDashboard() {
       targetCategory, 
       reach: baseTargetCount, 
       cost: totalCalculatedCost, 
-      status: isDraft ? 'draft' : 'pending', 
+      status: 'pending', 
       selectedChannels,
       promotedPromoIds: selectedPromoIds,
+      createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
 
-    const campaignRef = editingCampaignId 
-        ? doc(firestore, 'campaigns', editingCampaignId)
-        : doc(collection(firestore, 'campaigns'));
+    const campaignRef = doc(collection(firestore, 'campaigns'));
 
-    if (!editingCampaignId) campaignData.createdAt = serverTimestamp();
-
-    setDoc(campaignRef, campaignData, { merge: true })
+    setDoc(campaignRef, campaignData)
       .then(() => {
         toast({ 
-            title: isDraft ? "Brouillon sauvegardé" : "Campagne envoyée !", 
-            description: isDraft ? "Vous pourrez la modifier plus tard." : "L'admin validera votre envoi sous 24h." 
+            title: "Campagne envoyée !", 
+            description: "L'admin validera votre envoi sous 24h." 
         });
         setCampWizardStep('IDLE');
         setSelectedPromoIds([]);
         setIsSaving(false);
-        setEditingCampaignId(null);
-        if (isDraft) setActiveMainTab('drafts');
       })
       .catch(async (err) => {
         setIsSaving(false);
         const permissionError = new FirestorePermissionError({
           path: campaignRef.path,
-          operation: editingCampaignId ? 'update' : 'create',
+          operation: 'create',
           requestResourceData: campaignData,
         });
         errorEmitter.emit('permission-error', permissionError);
       });
-  };
-
-  const handleEditDraft = (draft: Campaign) => {
-    setEditingCampaignId(draft.id);
-    setSelectedPromoIds(draft.promotedPromoIds || []);
-    setFinalSms(draft.smsContent || '');
-    setFinalPush(draft.pushContent || '');
-    setFinalMailSubject(draft.mailSubject || '');
-    setFinalMailBody(draft.mailBody || '');
-    setSelectedChannels(draft.selectedChannels as any || ['PUSH', 'MAIL']);
-    setTargetCategory(draft.targetCategory);
-    setCampWizardStep('PREVIEW');
-    setActiveMainTab('catalogue');
-  };
-
-  const handleDeleteCampaign = (id: string) => {
-    if (!firestore) return;
-    const campaignRef = doc(firestore, 'campaigns', id);
-    deleteDoc(campaignRef)
-        .then(() => toast({ title: "Brouillon supprimé" }))
-        .catch(async (err) => {
-            const permissionError = new FirestorePermissionError({
-                path: campaignRef.path,
-                operation: 'delete'
-            });
-            errorEmitter.emit('permission-error', permissionError);
-        });
   };
 
   if (isUserLoading || isProfileLoading || isBusinessLoading) return <div className="p-8"><Skeleton className="h-64 w-full" /></div>;
@@ -607,360 +558,286 @@ export default function ProDashboard() {
             <p className="text-sm opacity-60">Transmettez votre UID à l'admin pour activer votre boutique.</p>
         </div>
       ) : (
-        <Tabs value={activeMainTab} onValueChange={setActiveMainTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 h-12 border-2 bg-white mb-6">
-                <TabsTrigger value="catalogue" className="font-black uppercase text-xs">
-                    <Store className="size-4 mr-2" /> Catalogue & Campagne
-                </TabsTrigger>
-                <TabsTrigger value="drafts" className="font-black uppercase text-xs">
-                    <History className="size-4 mr-2" /> Brouillons ({drafts?.length || 0})
-                </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="catalogue" className="space-y-8">
-                <Card className={cn("border-2 shadow-xl overflow-hidden", editingPromoId ? "border-accent" : "border-primary")}>
-                    <CardHeader className={cn(editingPromoId ? "bg-accent" : "bg-primary", "text-white")}>
-                    <CardTitle className="text-2xl font-black uppercase tracking-tighter">{editingPromoId ? "Modifier l'article" : "Gestion Boutique"}</CardTitle>
-                    <CardDescription className="text-white/80 font-bold uppercase text-[10px]">Catalogue & Campagnes publicitaires</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="space-y-4">
-                        <div className="flex items-center justify-between border-b pb-2">
-                            <h3 className="text-sm font-black uppercase flex items-center gap-2"><ShoppingBag className="size-4" /> {editingPromoId ? "Mise à jour" : "Nouveau Produit"}</h3>
-                            <Select value={promoType} onValueChange={(v: any) => setPromoType(v)}>
-                                <SelectTrigger className="h-8 w-32 border-2 font-black uppercase text-[9px]"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Promo" className="text-[9px] font-black uppercase text-red-600">Promotion</SelectItem>
-                                    <SelectItem value="Nouvel Arrivage" className="text-[9px] font-black uppercase text-primary">Nouveauté</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+        <div className="space-y-8">
+            <Card className={cn("border-2 shadow-xl overflow-hidden", editingPromoId ? "border-accent" : "border-primary")}>
+                <CardHeader className={cn(editingPromoId ? "bg-accent" : "bg-primary", "text-white")}>
+                <CardTitle className="text-2xl font-black uppercase tracking-tighter">{editingPromoId ? "Modifier l'article" : "Gestion Boutique"}</CardTitle>
+                <CardDescription className="text-white/80 font-bold uppercase text-[10px]">Catalogue & Campagnes publicitaires</CardDescription>
+                </CardHeader>
+                <CardContent className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                    <div className="flex items-center justify-between border-b pb-2">
+                        <h3 className="text-sm font-black uppercase flex items-center gap-2"><ShoppingBag className="size-4" /> {editingPromoId ? "Mise à jour" : "Nouveau Produit"}</h3>
+                        <Select value={promoType} onValueChange={(v: any) => setPromoType(v)}>
+                            <SelectTrigger className="h-8 w-32 border-2 font-black uppercase text-[9px]"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Promo" className="text-[9px] font-black uppercase text-red-600">Promotion</SelectItem>
+                                <SelectItem value="Nouvel Arrivage" className="text-[9px] font-black uppercase text-primary">Nouveauté</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    
+                    <div className="space-y-3">
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Titre</Label><Input value={promoTitle} onChange={e => setPromoTitle(e.target.value)} className="font-bold border-2" /></div>
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Rayon</Label><Select value={promoCategory} onValueChange={setPromoCategory}><SelectTrigger className="border-2 font-black uppercase text-xs"><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs uppercase">{cat}</SelectItem>)}</SelectContent></Select></div>
                         
-                        <div className="space-y-3">
-                            <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Titre</Label><Input value={promoTitle} onChange={e => setPromoTitle(e.target.value)} className="font-bold border-2" /></div>
-                            <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Rayon</Label><Select value={promoCategory} onValueChange={setPromoCategory}><SelectTrigger className="border-2 font-black uppercase text-xs"><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs uppercase">{cat}</SelectItem>)}</SelectContent></Select></div>
-                            
-                            <div className="grid grid-cols-2 gap-3 p-4 bg-muted/10 rounded-2xl border-2 border-dashed border-primary/5">
-                                <div className="space-y-1">
-                                    <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Prix Barré (Origine)</Label>
-                                    <Input 
-                                        type="number" 
-                                        value={originalPrice} 
-                                        onChange={e => setOriginalPrice(e.target.value)} 
-                                        className="border-2 bg-white" 
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Remise (%)</Label>
-                                    <div className="relative">
-                                        <Input 
-                                            type="number" 
-                                            placeholder="Ex: 50" 
-                                            value={manualDiscountInput}
-                                            onChange={e => setManualDiscountInput(e.target.value)}
-                                            className="h-10 border-2 font-black text-center text-xs bg-white pl-8" 
-                                        />
-                                        <Percent className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-primary opacity-40" />
-                                    </div>
-                                </div>
-                                <div className="col-span-2 space-y-1 mt-2">
-                                    <Label className="text-[10px] font-black uppercase text-primary ml-1 flex items-center justify-between">
-                                        Prix Final (S'affiche à l'écran)
-                                        {calculatedDiscount && (
-                                            <Badge variant="destructive" className="h-5 px-2 text-[10px] font-black animate-pulse shadow-md">
-                                                -{calculatedDiscount}%
-                                            </Badge>
-                                        )}
-                                    </Label>
-                                    <Input 
-                                        type="number" 
-                                        value={promoPrice} 
-                                        onChange={e => setPromoPrice(e.target.value)} 
-                                        className={cn(
-                                            "font-black text-lg border-2 h-12 transition-all",
-                                            calculatedDiscount ? "border-red-200 bg-red-50 text-red-600 ring-2 ring-red-100" : "bg-white"
-                                        )} 
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="p-4 bg-red-50/50 border-2 border-dashed border-red-200 rounded-2xl space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="space-y-0.5">
-                                        <Label className="text-xs font-black uppercase text-red-800">Produit épuisé</Label>
-                                        <p className="text-[8px] font-bold text-red-600/60 uppercase italic">Indisponibilité immédiate</p>
-                                    </div>
-                                    <Switch checked={isOutOfStock} onCheckedChange={setIsOutOfStock} />
-                                </div>
-
-                                {isOutOfStock && (
-                                    <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
-                                        <Label className="text-[9px] font-black uppercase text-red-800 ml-1">Arrivage prévu le</Label>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <Select value={nextArrivalMonth} onValueChange={setNextArrivalMonth}>
-                                                <SelectTrigger className="h-10 border-2 font-bold text-xs bg-white text-slate-800">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {MONTHS.map(m => <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>)}
-                                                </SelectContent>
-                                            </Select>
-                                            <Select value={nextArrivalYear} onValueChange={setNextArrivalYear}>
-                                                <SelectTrigger className="h-10 border-2 font-bold text-xs bg-white text-slate-800">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {YEARS.map(y => <SelectItem key={y} value={y} className="text-xs">{y}</SelectItem>)}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase opacity-60">Photos (Max 4)</Label>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {promoImages.map((img, idx) => (
-                                        <div key={idx} className="relative aspect-square rounded-xl border-2 overflow-hidden bg-muted"><img src={img} className="w-full h-full object-cover" alt="" /><button onClick={() => setPromoImages(prev => prev.filter((_, i) => i !== idx))} className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1"><X className="size-3" /></button></div>
-                                    ))}
-                                    {promoImages.length < 4 && (
-                                        <button onClick={() => fileInputRef.current?.click()} className="aspect-square rounded-xl border-2 border-dashed border-primary/20 flex flex-col items-center justify-center text-primary/40 hover:bg-primary/5 transition-colors gap-1">
-                                            <Plus className="size-4" />
-                                            <span className="text-[7px] font-black uppercase">Galerie</span>
-                                        </button>
-                                    )}
-                                    {promoImages.length < 4 && (
-                                        <button onClick={() => cameraInputRef.current?.click()} className="aspect-square rounded-xl border-2 border-dashed border-primary/20 flex flex-col items-center justify-center text-primary/40 hover:bg-primary/5 transition-colors gap-1">
-                                            <Camera className="size-4" />
-                                            <span className="text-[7px] font-black uppercase">Appareil</span>
-                                        </button>
-                                    )}
-                                </div>
-                                <input type="file" accept="image/*" multiple ref={fileInputRef} className="hidden" onChange={handleFileChange} />
-                                <input type="file" accept="image/*" capture="environment" ref={cameraInputRef} className="hidden" onChange={handleFileChange} />
-                            </div>
-
-                            <div className="space-y-1.5 pt-2">
-                                <div className="flex justify-between items-center mb-1">
-                                    <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Description commerciale</Label>
-                                    <Button 
-                                        variant="outline" 
-                                        size="sm" 
-                                        className="h-7 text-[8px] font-black uppercase border-primary/30 text-primary bg-primary/5 gap-1.5 shadow-sm"
-                                        onClick={startAiWizard}
-                                        disabled={!promoTitle || promoImages.length === 0}
-                                    >
-                                        <Wand2 className="size-2.5" /> Assistant Magicien IA
-                                    </Button>
-                                </div>
-                                <Textarea 
-                                    value={promoDescription} 
-                                    onChange={e => setPromoDescription(e.target.value)} 
-                                    className="font-medium border-2 min-h-[100px] text-sm" 
-                                    placeholder="Décrivez votre offre ou utilisez l'Assistant Magicien IA..."
+                        <div className="grid grid-cols-2 gap-3 p-4 bg-muted/10 rounded-2xl border-2 border-dashed border-primary/5">
+                            <div className="space-y-1">
+                                <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Prix Barré (Origine)</Label>
+                                <Input 
+                                    type="number" 
+                                    value={originalPrice} 
+                                    onChange={e => setOriginalPrice(e.target.value)} 
+                                    className="border-2 bg-white" 
                                 />
                             </div>
-
-                            <div className="flex gap-2 pt-2">
-                                {editingPromoId && <Button variant="ghost" onClick={resetForm} className="flex-1 border-2">Annuler</Button>}
-                                <Button onClick={handleSavePromotion} disabled={isSaving || !promoTitle || !business} className="flex-[2] h-12 font-black uppercase shadow-lg">Sauvegarder l'article</Button>
+                            <div className="space-y-1">
+                                <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Remise (%)</Label>
+                                <div className="relative">
+                                    <Input 
+                                        type="number" 
+                                        placeholder="Ex: 50" 
+                                        value={manualDiscountInput}
+                                        onChange={e => setManualDiscountInput(e.target.value)}
+                                        className="h-10 border-2 font-black text-center text-xs bg-white pl-8" 
+                                    />
+                                    <Percent className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-primary opacity-40" />
+                                </div>
+                            </div>
+                            <div className="col-span-2 space-y-1 mt-2">
+                                <Label className="text-[10px] font-black uppercase text-primary ml-1 flex items-center justify-between">
+                                    Prix Final (S'affiche à l'écran)
+                                    {calculatedDiscount && (
+                                        <Badge variant="destructive" className="h-5 px-2 text-[10px] font-black animate-pulse shadow-md">
+                                            -{calculatedDiscount}%
+                                        </Badge>
+                                    )}
+                                </Label>
+                                <Input 
+                                    type="number" 
+                                    value={promoPrice} 
+                                    onChange={e => setPromoPrice(e.target.value)} 
+                                    className={cn(
+                                        "font-black text-lg border-2 h-12 transition-all",
+                                        calculatedDiscount ? "border-red-200 bg-red-50 text-red-600 ring-2 ring-red-100" : "bg-white"
+                                    )} 
+                                />
                             </div>
                         </div>
+
+                        <div className="p-4 bg-red-50/50 border-2 border-dashed border-red-200 rounded-2xl space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-0.5">
+                                    <Label className="text-xs font-black uppercase text-red-800">Produit épuisé</Label>
+                                    <p className="text-[8px] font-bold text-red-600/60 uppercase italic">Indisponibilité immédiate</p>
+                                </div>
+                                <Switch checked={isOutOfStock} onCheckedChange={setIsOutOfStock} />
+                            </div>
+
+                            {isOutOfStock && (
+                                <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
+                                    <Label className="text-[9px] font-black uppercase text-red-800 ml-1">Arrivage prévu le</Label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <Select value={nextArrivalMonth} onValueChange={setNextArrivalMonth}>
+                                            <SelectTrigger className="h-10 border-2 font-bold text-xs bg-white text-slate-800">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {MONTHS.map(m => <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                        <Select value={nextArrivalYear} onValueChange={setNextArrivalYear}>
+                                            <SelectTrigger className="h-10 border-2 font-bold text-xs bg-white text-slate-800">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {YEARS.map(y => <SelectItem key={y} value={y} className="text-xs">{y}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
-                        <div className="bg-muted/30 p-6 rounded-2xl border-2 border-dashed space-y-6">
-                            <h3 className="text-sm font-black uppercase flex items-center gap-2 text-accent"><Megaphone className="size-4" /> Ciblage & Audiences</h3>
-                            <div className="space-y-4">
-                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Rayon cible</Label><Select value={targetCategory} onValueChange={setTargetCategory}><SelectTrigger className="h-10 border-2 bg-background font-black text-xs"><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs uppercase">{cat}</SelectItem>)}</SelectContent></Select></div>
-                                <div className="space-y-1">
-                                    <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Portée géographique</Label>
-                                    <Select value={targetScope} onValueChange={(v: any) => setTargetScope(v)}>
-                                        <SelectTrigger className="h-10 border-2 bg-background font-black text-xs">
-                                            <Globe className="size-3 mr-2 text-primary" />
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="SPECIFIC">Communes spécifiques</SelectItem>
-                                            <SelectItem value="CALEDONIE">Nouvelle-Calédonie</SelectItem>
-                                            <SelectItem value="TAHITI">Tahiti</SelectItem>
-                                            <SelectItem value="ALL">Tout le réseau</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                {targetScope === 'SPECIFIC' && (
-                                    <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">
-                                        <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Sélection des communes (Max 30)</Label>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button variant="outline" className="w-full h-10 border-2 bg-background justify-between font-bold text-xs">
-                                                    <div className="flex items-center gap-2 truncate"><MapPin className="size-3 text-primary" />{selectedTargetCommunes.length === 0 ? "Aucune commune" : selectedTargetCommunes.length === 1 ? selectedTargetCommunes[0] : `${selectedTargetCommunes.length} communes`}</div>
-                                                    <ChevronDown className="size-3 opacity-50" />
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-[300px] p-0" align="start">
-                                                <div className="p-3 border-b bg-slate-50/50"><p className="text-[10px] font-black uppercase tracking-tight">Sélecteur de communes</p></div>
-                                                <div className="p-2 border-b"><Input placeholder="Filtrer..." className="h-8 text-xs" value={communeSearch} onChange={(e) => setCommuneSearch(e.target.value)} /></div>
-                                                <ScrollArea className="h-[250px]"><div className="p-2 space-y-1">{filteredCommuneList.map(name => (<div key={name} className="flex items-center space-x-2 p-1.5 hover:bg-muted rounded cursor-pointer transition-colors" onClick={() => { setSelectedTargetCommunes(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name].slice(0, 30)); }}><Checkbox id={`check-${name}`} checked={selectedTargetCommunes.includes(name)} /><span className="text-xs font-bold uppercase">{name}</span></div>))}</div></ScrollArea>
-                                            </PopoverContent>
-                                        </Popover>
-                                    </div>
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-black uppercase opacity-60">Photos (Max 4)</Label>
+                            <div className="grid grid-cols-4 gap-2">
+                                {promoImages.map((img, idx) => (
+                                    <div key={idx} className="relative aspect-square rounded-xl border-2 overflow-hidden bg-muted"><img src={img} className="w-full h-full object-cover" alt="" /><button onClick={() => setPromoImages(prev => prev.filter((_, i) => i !== idx))} className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1"><X className="size-3" /></button></div>
+                                ))}
+                                {promoImages.length < 4 && (
+                                    <button onClick={() => fileInputRef.current?.click()} className="aspect-square rounded-xl border-2 border-dashed border-primary/20 flex flex-col items-center justify-center text-primary/40 hover:bg-primary/5 transition-colors gap-1">
+                                        <Plus className="size-4" />
+                                        <span className="text-[7px] font-black uppercase">Galerie</span>
+                                    </button>
                                 )}
-
-                                <div className="space-y-2">
-                                    <div className="flex justify-between items-center px-1"><p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Audiences Réelles :</p><div className="flex items-center gap-1.5"><span className="text-[8px] font-black uppercase text-muted-foreground">Potentiel Zone:</span><Badge variant="secondary" className="h-4 text-[9px] font-black">{isCalculatingReach ? '...' : `${baseTargetCount ?? 0}`}</Badge></div></div>
-                                    <div className="grid grid-cols-1 gap-2">
-                                        <div className={cn("p-3 rounded-xl border-2 flex items-center justify-between transition-all", selectedChannels.includes('PUSH') ? "bg-primary/10 border-primary/30" : "bg-background opacity-50")}>
-                                            <div className="flex items-center gap-2"><Zap className="size-4 text-primary" /><div className="flex flex-col"><span className="text-[10px] font-black uppercase leading-none">Push Notifications</span><span className="text-[8px] font-bold opacity-60 uppercase">Opt-in valide</span></div></div>
-                                            <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-primary"/> : `${pushTargetCount ?? 0}`}</span>
-                                        </div>
-                                        <div className={cn("p-3 rounded-xl border-2 flex items-center justify-between transition-all", selectedChannels.includes('MAIL') ? "bg-green-50 border-green-200" : "bg-background opacity-50")}>
-                                            <div className="flex items-center gap-2"><Mail className="size-4 text-green-600" /><div className="flex flex-col"><span className="text-[10px] font-black uppercase leading-none">Newsletter Email</span><span className="text-[8px] font-bold opacity-60 uppercase">Opt-in valide</span></div></div>
-                                            <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-green-600"/> : `${mailTargetCount ?? 0}`}</span>
-                                        </div>
-                                        <div className={cn("p-3 rounded-xl border-2 flex items-center justify-between transition-all", selectedChannels.includes('SMS') ? "bg-blue-50 border-blue-200" : "bg-background opacity-50")}>
-                                            <div className="flex items-center gap-2"><Smartphone className="size-4 text-blue-600" /><div className="flex flex-col"><span className="text-[10px] font-black uppercase leading-none">Alerte SMS</span><span className="text-[8px] font-bold opacity-60 uppercase">Mobile renseigné</span></div></div>
-                                            <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-blue-600"/> : `${smsTargetCount ?? 0}`}</span>
-                                        </div>
-                                    </div>
-                                    {reachError && <p className="text-[8px] font-bold text-red-500 text-center uppercase animate-pulse">Calcul indisponible. Vérifiez votre zone.</p>}
-                                </div>
-
-                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Canaux souhaités</Label><div className="flex flex-wrap gap-2">{[{ id: 'SMS', label: 'SMS' }, { id: 'PUSH', label: 'Push' }, { id: 'MAIL', label: 'Email' }].map(ch => (<Badge key={ch.id} variant={selectedChannels.includes(ch.id as any) ? "default" : "outline"} className="cursor-pointer font-black uppercase h-8 px-3 border-2" onClick={() => setSelectedChannels(prev => prev.includes(ch.id as any) ? prev.filter(c => c !== ch.id) : [...prev, ch.id as any])}>{ch.label}</Badge>))}</div></div>
-
-                                {pricing && selectedPromoIds.length > 0 && !isCalculatingReach && (
-                                    <div className="p-4 bg-primary/5 border-2 border-primary/20 rounded-2xl space-y-3 animate-in fade-in"><p className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2"><DollarSign className="size-3" /> Devis (x{selectedPromoIds.length} article{selectedPromoIds.length > 1 ? 's' : ''})</p><div className="space-y-1.5 text-[11px] font-bold text-slate-600"><div className="flex justify-between"><span className="opacity-60">Frais fixes (Campagne)</span><span>{pricing.fixedPrice} F</span></div><div className="flex justify-between border-t border-dashed pt-1 mt-1"><span className="opacity-60">Base Reach ({baseTargetCount} {baseTargetCount !== null && baseTargetCount > 1 ? 'utilisateurs' : 'utilisateur'} x {pricing.unitPricePerUser}F)</span><span>{Math.round((baseTargetCount || 0) * pricing.unitPricePerUser * selectedPromoIds.length)} F</span></div>{selectedChannels.includes('SMS') && <div className="flex justify-between text-blue-600"><span>Canal SMS ({smsTargetCount} x {pricing.priceSMS}F)</span><span>{Math.round((smsTargetCount || 0) * (pricing.priceSMS || 0) * selectedPromoIds.length)} F</span></div>}{selectedChannels.includes('PUSH') && <div className="flex justify-between text-primary"><span>Canal Push ({pushTargetCount} x {pricing.pricePush}F)</span><span>{Math.round((pushTargetCount || 0) * (pricing.pricePush || 0) * selectedPromoIds.length)} F</span></div>}{selectedChannels.includes('MAIL') && <div className="flex justify-between text-green-600"><span>Canal Email ({mailTargetCount} x {pricing.priceMail}F)</span><span>{Math.round((mailTargetCount || 0) * (pricing.priceMail || 0) * selectedPromoIds.length)} F</span></div>}<div className="flex justify-between items-center bg-primary/10 p-3 rounded-xl border border-primary/20 mt-3"><span className="text-[10px] font-black uppercase text-primary">Total estimé</span><span className="textxl text-primary font-black">{totalCalculatedCost} FCFP</span></div></div></div>
+                                {promoImages.length < 4 && (
+                                    <button onClick={() => cameraInputRef.current?.click()} className="aspect-square rounded-xl border-2 border-dashed border-primary/20 flex flex-col items-center justify-center text-primary/40 hover:bg-primary/5 transition-colors gap-1">
+                                        <Camera className="size-4" />
+                                        <span className="text-[7px] font-black uppercase">Appareil</span>
+                                    </button>
                                 )}
-
-                                <Button onClick={startCampWizard} disabled={isSaving || !baseTargetCount || selectedChannels.length === 0 || selectedPromoIds.length === 0} className="w-full h-14 bg-accent hover:bg-accent/90 text-white font-black uppercase shadow-lg gap-2"><Megaphone className="size-5" /> Configurer la campagne (IA)</Button>
                             </div>
+                            <input type="file" accept="image/*" multiple ref={fileInputRef} className="hidden" onChange={handleFileChange} />
+                            <input type="file" accept="image/*" capture="environment" ref={cameraInputRef} className="hidden" onChange={handleFileChange} />
+                        </div>
+
+                        <div className="space-y-1.5 pt-2">
+                            <div className="flex justify-between items-center mb-1">
+                                <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Description commerciale</Label>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="h-7 text-[8px] font-black uppercase border-primary/30 text-primary bg-primary/5 gap-1.5 shadow-sm"
+                                    onClick={startAiWizard}
+                                    disabled={!promoTitle || promoImages.length === 0}
+                                >
+                                    <Wand2 className="size-2.5" /> Assistant Magicien IA
+                                </Button>
+                            </div>
+                            <Textarea 
+                                value={promoDescription} 
+                                onChange={e => setPromoDescription(e.target.value)} 
+                                className="font-medium border-2 min-h-[100px] text-sm" 
+                                placeholder="Décrivez votre offre ou utilisez l'Assistant Magicien IA..."
+                            />
+                        </div>
+
+                        <div className="flex gap-2 pt-2">
+                            {editingPromoId && <Button variant="ghost" onClick={resetForm} className="flex-1 border-2">Annuler</Button>}
+                            <Button onClick={handleSavePromotion} disabled={isSaving || !promoTitle || !business} className="flex-[2] h-12 font-black uppercase shadow-lg">Sauvegarder l'article</Button>
                         </div>
                     </div>
-                    </CardContent>
-                </Card>
+                    </div>
 
-                <div className="space-y-4">
-                    <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground px-1 flex items-center justify-between">
-                        <span>Vos articles ({promotions?.length || 0})</span>
-                        <span className="text-[10px] text-primary">{selectedPromoIds.length} sélectionné{selectedPromoIds.length > 1 ? 's' : ''}</span>
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {isPromosLoading ? [1,2].map(i => <Skeleton key={i} className="h-32 w-full rounded-2xl" />) : promotions?.map(promo => (
-                            <Card key={promo.id} className={cn("overflow-hidden border-2 shadow-sm flex h-32 transition-all cursor-pointer", selectedPromoIds.includes(promo.id) ? "border-primary ring-2 ring-primary/10" : "hover:border-primary/30")} onClick={() => setSelectedPromoIds(prev => prev.includes(promo.id) ? prev.filter(pid => pid !== promo.id) : [...prev, promo.id])}>
-                                <div className="w-8 bg-muted/30 border-r flex items-center justify-center shrink-0" onClick={e => e.stopPropagation()}><Checkbox checked={selectedPromoIds.includes(promo.id)} onCheckedChange={() => setSelectedPromoIds(prev => prev.includes(promo.id) ? prev.filter(pid => pid !== promo.id) : [...prev, promo.id])} /></div>
-                                <div className="w-24 bg-muted/20 shrink-0 relative overflow-hidden flex items-center justify-center border-r">
-                                    {promo.imageUrl ? (
-                                        <img src={promo.imageUrl} className="w-full h-full object-cover" alt="" />
-                                    ) : (
-                                        <ImageIcon className="size-6 opacity-20" />
-                                    )}
-                                    <Badge className={cn(
-                                        "absolute top-1 left-1 font-black text-[7px] uppercase border-none shadow-md px-1.5 h-4",
-                                        promo.promoType === 'Promo' ? "bg-red-600" : "bg-primary"
-                                    )}>
-                                        {promo.promoType === 'Promo' ? 'Promo' : 'New'}
-                                    </Badge>
-                                    {promo.isOutOfStock && (
-                                        <div className="absolute inset-0 bg-red-600/40 flex items-center justify-center">
-                                            <span className="text-[8px] font-black text-white uppercase text-center leading-tight">STOCK VIDE</span>
-                                        </div>
-                                    )}
+                    <div className="bg-muted/30 p-6 rounded-2xl border-2 border-dashed space-y-6">
+                        <h3 className="text-sm font-black uppercase flex items-center gap-2 text-accent"><Megaphone className="size-4" /> Ciblage & Audiences</h3>
+                        <div className="space-y-4">
+                            <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Rayon cible</Label><Select value={targetCategory} onValueChange={setTargetCategory}><SelectTrigger className="h-10 border-2 bg-background font-black text-xs"><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs uppercase">{cat}</SelectItem>)}</SelectContent></Select></div>
+                            <div className="space-y-1">
+                                <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Portée géographique</Label>
+                                <Select value={targetScope} onValueChange={(v: any) => setTargetScope(v)}>
+                                    <SelectTrigger className="h-10 border-2 bg-background font-black text-xs">
+                                        <Globe className="size-3 mr-2 text-primary" />
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="SPECIFIC">Communes spécifiques</SelectItem>
+                                        <SelectItem value="CALEDONIE">Nouvelle-Calédonie</SelectItem>
+                                        <SelectItem value="TAHITI">Tahiti</SelectItem>
+                                        <SelectItem value="ALL">Tout le réseau</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {targetScope === 'SPECIFIC' && (
+                                <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">
+                                    <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Sélection des communes (Max 30)</Label>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button variant="outline" className="w-full h-10 border-2 bg-background justify-between font-bold text-xs">
+                                                <div className="flex items-center gap-2 truncate"><MapPin className="size-3 text-primary" />{selectedTargetCommunes.length === 0 ? "Aucune commune" : selectedTargetCommunes.length === 1 ? selectedTargetCommunes[0] : `${selectedTargetCommunes.length} communes`}</div>
+                                                <ChevronDown className="size-3 opacity-50" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[300px] p-0" align="start">
+                                            <div className="p-3 border-b bg-slate-50/50"><p className="text-[10px] font-black uppercase tracking-tight">Sélecteur de communes</p></div>
+                                            <div className="p-2 border-b"><Input placeholder="Filtrer..." className="h-8 text-xs" value={communeSearch} onChange={(e) => setCommuneSearch(e.target.value)} /></div>
+                                            <ScrollArea className="h-[250px]"><div className="p-2 space-y-1">{filteredCommuneList.map(name => (<div key={name} className="flex items-center space-x-2 p-1.5 hover:bg-muted rounded cursor-pointer transition-colors" onClick={() => { setSelectedTargetCommunes(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name].slice(0, 30)); }}><Checkbox id={`check-${name}`} checked={selectedTargetCommunes.includes(name)} /><span className="text-xs font-bold uppercase">{name}</span></div>))}</div></ScrollArea>
+                                        </PopoverContent>
+                                    </Popover>
                                 </div>
-                                <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
-                                    <div className="space-y-1">
-                                        <div className="flex justify-between items-start gap-2">
-                                            <h4 className={cn("font-black uppercase text-xs truncate flex-1 leading-none", promo.isOutOfStock && "line-through decoration-red-600")}>{promo.title}</h4>
-                                            {promo.discountPercentage && <Badge variant="destructive" className="h-3.5 px-1 text-[7px] font-black">-{Math.round(promo.discountPercentage)}%</Badge>}
-                                        </div>
-                                        {promo.isOutOfStock ? (
-                                            <p className="text-[9px] font-black text-red-600 uppercase mt-1 leading-tight animate-pulse">
-                                                STOCK ÉPUISÉ - Arrivage prévu le {promo.restockDate || "Prochainement"}
-                                            </p>
-                                        ) : (
-                                            <p className="text-[9px] text-muted-foreground line-clamp-2 italic">{promo.description || "Pas de description."}</p>
-                                        )}
+                            )}
+
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center px-1"><p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Audiences Réelles :</p><div className="flex items-center gap-1.5"><span className="text-[8px] font-black uppercase text-muted-foreground">Potentiel Zone:</span><Badge variant="secondary" className="h-4 text-[9px] font-black">{isCalculatingReach ? '...' : `${baseTargetCount ?? 0}`}</Badge></div></div>
+                                <div className="grid grid-cols-1 gap-2">
+                                    <div className={cn("p-3 rounded-xl border-2 flex items-center justify-between transition-all", selectedChannels.includes('PUSH') ? "bg-primary/10 border-primary/30" : "bg-background opacity-50")}>
+                                        <div className="flex items-center gap-2"><Zap className="size-4 text-primary" /><div className="flex flex-col"><span className="text-[10px] font-black uppercase leading-none">Push Notifications</span><span className="text-[8px] font-bold opacity-60 uppercase">Opt-in valide</span></div></div>
+                                        <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-primary"/> : `${pushTargetCount ?? 0}`}</span>
                                     </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className={cn(
-                                            "font-black text-sm tracking-tight",
-                                            promo.isOutOfStock ? "line-through decoration-red-600 text-muted-foreground" : (promo.promoType === 'Promo' ? "text-red-600" : "text-primary")
-                                        )}>
-                                            {promo.price.toLocaleString('fr-FR').replace(/\s/g, ' ')} <span className="text-[8px] uppercase opacity-60">CFP</span>
-                                        </span>
-                                        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}><Button variant="ghost" size="icon" className="size-7 border rounded-full" onClick={() => handleEditPromotion(promo)}><Pencil className="size-3.5" /></Button><Button variant="ghost" size="icon" className="size-7 text-destructive border rounded-full" onClick={() => handleDeletePromotion(promo.id)}><Trash2 className="size-3.5" /></Button></div>
+                                    <div className={cn("p-3 rounded-xl border-2 flex items-center justify-between transition-all", selectedChannels.includes('MAIL') ? "bg-green-50 border-green-200" : "bg-background opacity-50")}>
+                                        <div className="flex items-center gap-2"><Mail className="size-4 text-green-600" /><div className="flex flex-col"><span className="text-[10px] font-black uppercase leading-none">Newsletter Email</span><span className="text-[8px] font-bold opacity-60 uppercase">Opt-in valide</span></div></div>
+                                        <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-green-600"/> : `${mailTargetCount ?? 0}`}</span>
+                                    </div>
+                                    <div className={cn("p-3 rounded-xl border-2 flex items-center justify-between transition-all", selectedChannels.includes('SMS') ? "bg-blue-50 border-blue-200" : "bg-background opacity-50")}>
+                                        <div className="flex items-center gap-2"><Smartphone className="size-4 text-blue-600" /><div className="flex flex-col"><span className="text-[10px] font-black uppercase leading-none">Alerte SMS</span><span className="text-[8px] font-bold opacity-60 uppercase">Mobile renseigné</span></div></div>
+                                        <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-blue-600"/> : `${smsTargetCount ?? 0}`}</span>
                                     </div>
                                 </div>
-                            </Card>
-                        ))}
+                                {reachError && <p className="text-[8px] font-bold text-red-500 text-center uppercase animate-pulse">Calcul indisponible. Vérifiez votre zone.</p>}
+                            </div>
+
+                            <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Canaux souhaités</Label><div className="flex flex-wrap gap-2">{[{ id: 'SMS', label: 'SMS' }, { id: 'PUSH', label: 'Push' }, { id: 'MAIL', label: 'Email' }].map(ch => (<Badge key={ch.id} variant={selectedChannels.includes(ch.id as any) ? "default" : "outline"} className="cursor-pointer font-black uppercase h-8 px-3 border-2" onClick={() => setSelectedChannels(prev => prev.includes(ch.id as any) ? prev.filter(c => c !== ch.id) : [...prev, ch.id as any])}>{ch.label}</Badge>))}</div></div>
+
+                            {pricing && selectedPromoIds.length > 0 && !isCalculatingReach && (
+                                <div className="p-4 bg-primary/5 border-2 border-primary/20 rounded-2xl space-y-3 animate-in fade-in"><p className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2"><DollarSign className="size-3" /> Devis (x{selectedPromoIds.length} article{selectedPromoIds.length > 1 ? 's' : ''})</p><div className="space-y-1.5 text-[11px] font-bold text-slate-600"><div className="flex justify-between"><span className="opacity-60">Frais fixes (Campagne)</span><span>{pricing.fixedPrice} F</span></div><div className="flex justify-between border-t border-dashed pt-1 mt-1"><span className="opacity-60">Base Reach ({baseTargetCount} {baseTargetCount !== null && baseTargetCount > 1 ? 'utilisateurs' : 'utilisateur'} x {pricing.unitPricePerUser}F)</span><span>{Math.round((baseTargetCount || 0) * pricing.unitPricePerUser * selectedPromoIds.length)} F</span></div>{selectedChannels.includes('SMS') && <div className="flex justify-between text-blue-600"><span>Canal SMS ({smsTargetCount} x {pricing.priceSMS}F)</span><span>{Math.round((smsTargetCount || 0) * (pricing.priceSMS || 0) * selectedPromoIds.length)} F</span></div>}{selectedChannels.includes('PUSH') && <div className="flex justify-between text-primary"><span>Canal Push ({pushTargetCount} x {pricing.pricePush}F)</span><span>{Math.round((pushTargetCount || 0) * (pricing.pricePush || 0) * selectedPromoIds.length)} F</span></div>}{selectedChannels.includes('MAIL') && <div className="flex justify-between text-green-600"><span>Canal Email ({mailTargetCount} x {pricing.priceMail}F)</span><span>{Math.round((mailTargetCount || 0) * (pricing.priceMail || 0) * selectedPromoIds.length)} F</span></div>}<div className="flex justify-between items-center bg-primary/10 p-3 rounded-xl border border-primary/20 mt-3"><span className="text-[10px] font-black uppercase text-primary">Total estimé</span><span className="textxl text-primary font-black">{totalCalculatedCost} FCFP</span></div></div></div>
+                            )}
+
+                            <Button onClick={startCampWizard} disabled={isSaving || !baseTargetCount || selectedChannels.length === 0 || selectedPromoIds.length === 0} className="w-full h-14 bg-accent hover:bg-accent/90 text-white font-black uppercase shadow-lg gap-2"><Megaphone className="size-5" /> Configurer la campagne (IA)</Button>
+                        </div>
                     </div>
                 </div>
-            </TabsContent>
+                </CardContent>
+            </Card>
 
-            <TabsContent value="drafts" className="space-y-4">
-                {isDraftsLoading ? (
-                    <div className="grid gap-4">
-                        {[1,2].map(i => <Skeleton key={i} className="h-40 w-full rounded-2xl" />)}
-                    </div>
-                ) : drafts && drafts.length > 0 ? (
-                    <div className="grid gap-4">
-                        {drafts.map(draft => (
-                            <Card key={draft.id} className="border-2 shadow-md bg-white overflow-hidden">
-                                <CardHeader className="p-4 bg-muted/10 border-b flex-row justify-between items-center space-y-0">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-white rounded-lg shadow-sm"><FileText className="size-4 text-primary" /></div>
-                                        <div>
-                                            <CardTitle className="text-sm font-black uppercase truncate max-w-[200px]">{draft.title}</CardTitle>
-                                            <CardDescription className="text-[9px] font-bold uppercase">Sauvé le {draft.createdAt ? format(draft.createdAt.toDate(), 'dd/MM/yyyy HH:mm') : '...'}</CardDescription>
-                                        </div>
+            <div className="space-y-4">
+                <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground px-1 flex items-center justify-between">
+                    <span>Vos articles ({promotions?.length || 0})</span>
+                    <span className="text-[10px] text-primary">{selectedPromoIds.length} sélectionné{selectedPromoIds.length > 1 ? 's' : ''}</span>
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {isPromosLoading ? [1,2].map(i => <Skeleton key={i} className="h-32 w-full rounded-2xl" />) : promotions?.map(promo => (
+                        <Card key={promo.id} className={cn("overflow-hidden border-2 shadow-sm flex h-32 transition-all cursor-pointer", selectedPromoIds.includes(promo.id) ? "border-primary ring-2 ring-primary/10" : "hover:border-primary/30")} onClick={() => setSelectedPromoIds(prev => prev.includes(promo.id) ? prev.filter(pid => pid !== promo.id) : [...prev, promo.id])}>
+                            <div className="w-8 bg-muted/30 border-r flex items-center justify-center shrink-0" onClick={e => e.stopPropagation()}><Checkbox checked={selectedPromoIds.includes(promo.id)} onCheckedChange={() => setSelectedPromoIds(prev => prev.includes(promo.id) ? prev.filter(pid => pid !== promo.id) : [...prev, promo.id])} /></div>
+                            <div className="w-24 bg-muted/20 shrink-0 relative overflow-hidden flex items-center justify-center border-r">
+                                {promo.imageUrl ? (
+                                    <img src={promo.imageUrl} className="w-full h-full object-cover" alt="" />
+                                ) : (
+                                    <ImageIcon className="size-6 opacity-20" />
+                                )}
+                                <Badge className={cn(
+                                    "absolute top-1 left-1 font-black text-[7px] uppercase border-none shadow-md px-1.5 h-4",
+                                    promo.promoType === 'Promo' ? "bg-red-600" : "bg-primary"
+                                )}>
+                                    {promo.promoType === 'Promo' ? 'Promo' : 'New'}
+                                </Badge>
+                                {promo.isOutOfStock && (
+                                    <div className="absolute inset-0 bg-red-600/40 flex items-center justify-center">
+                                        <span className="text-[8px] font-black text-white uppercase text-center leading-tight">STOCK VIDE</span>
                                     </div>
-                                    <Badge variant="outline" className="text-[8px] font-black uppercase bg-white border-primary/20 text-primary">BROUILLON</Badge>
-                                </CardHeader>
-                                <CardContent className="p-4 space-y-4">
-                                    <div className="grid grid-cols-3 gap-2">
-                                        {draft.selectedChannels?.includes('SMS') && (
-                                            <div className="p-2 bg-blue-50 border border-blue-100 rounded-lg text-center">
-                                                <Smartphone className="size-3 text-blue-600 mx-auto mb-1" />
-                                                <span className="text-[8px] font-black text-blue-800 uppercase">SMS prêt</span>
-                                            </div>
-                                        )}
-                                        {draft.selectedChannels?.includes('PUSH') && (
-                                            <div className="p-2 bg-primary/5 border border-primary/10 rounded-lg text-center">
-                                                <Zap className="size-3 text-primary mx-auto mb-1" />
-                                                <span className="text-[8px] font-black text-primary uppercase">Push prêt</span>
-                                            </div>
-                                        )}
-                                        {draft.selectedChannels?.includes('MAIL') && (
-                                            <div className="p-2 bg-green-50 border border-green-100 rounded-lg text-center">
-                                                <Mail className="size-3 text-green-600 mx-auto mb-1" />
-                                                <span className="text-[8px] font-black text-green-800 uppercase">Mail prêt</span>
-                                            </div>
-                                        )}
+                                )}
+                            </div>
+                            <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
+                                <div className="space-y-1">
+                                    <div className="flex justify-between items-start gap-2">
+                                        <h4 className={cn("font-black uppercase text-xs truncate flex-1 leading-none", promo.isOutOfStock && "line-through decoration-red-600")}>{promo.title}</h4>
+                                        {promo.discountPercentage && <Badge variant="destructive" className="h-3.5 px-1 text-[7px] font-black">-{Math.round(promo.discountPercentage)}%</Badge>}
                                     </div>
-                                    <div className="bg-muted/10 p-3 rounded-xl border border-dashed italic text-xs text-muted-foreground line-clamp-2">
-                                        "{draft.message}"
-                                    </div>
-                                </CardContent>
-                                <CardFooter className="p-3 bg-slate-50 border-t flex gap-2">
-                                    <Button variant="outline" className="flex-1 h-10 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => handleEditDraft(draft)}>
-                                        <Pencil className="size-3" /> Éditer / Envoyer
-                                    </Button>
-                                    <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive border-2 border-destructive/10 rounded-xl" onClick={() => handleDeleteCampaign(draft.id)}>
-                                        <Trash2 className="size-4" />
-                                    </Button>
-                                </CardFooter>
-                            </Card>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="text-center py-20 border-4 border-dashed rounded-[2.5rem] opacity-30 flex flex-col items-center gap-4">
-                        <History className="size-12" />
-                        <p className="font-black uppercase tracking-widest text-sm">Aucun brouillon</p>
-                    </div>
-                )}
-            </TabsContent>
-        </Tabs>
+                                    {promo.isOutOfStock ? (
+                                        <p className="text-[9px] font-black text-red-600 uppercase mt-1 leading-tight animate-pulse">
+                                            STOCK ÉPUISÉ - Arrivage prévu le {promo.restockDate || "Prochainement"}
+                                        </p>
+                                    ) : (
+                                        <p className="text-[9px] text-muted-foreground line-clamp-2 italic">{promo.description || "Pas de description."}</p>
+                                    )}
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className={cn(
+                                        "font-black text-sm tracking-tight",
+                                        promo.isOutOfStock ? "line-through decoration-red-600 text-muted-foreground" : (promo.promoType === 'Promo' ? "text-red-600" : "text-primary")
+                                    )}>
+                                        {promo.price.toLocaleString('fr-FR').replace(/\s/g, ' ')} <span className="text-[8px] uppercase opacity-60">CFP</span>
+                                    </span>
+                                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}><Button variant="ghost" size="icon" className="size-7 border rounded-full" onClick={() => handleEditPromotion(promo)}><Pencil className="size-3.5" /></Button><Button variant="ghost" size="icon" className="size-7 text-destructive border rounded-full" onClick={() => handleDeletePromotion(promo.id)}><Trash2 className="size-3.5" /></Button></div>
+                                </div>
+                            </div>
+                        </Card>
+                    ))}
+                </div>
+            </div>
+        </div>
       )}
 
       {/* Assistant Magicien IA (Product) */}
@@ -1286,11 +1163,8 @@ export default function ProDashboard() {
                 )}
                 {campWizardStep === 'PREVIEW' && (
                     <div className="flex flex-col gap-2 w-full">
-                        <div className="grid grid-cols-2 gap-2">
-                            <Button variant="outline" onClick={() => setCampWizardStep('EDIT')} className="h-12 font-black uppercase text-[10px] border-2 gap-2"><Pencil className="size-3" /> Éditer textes</Button>
-                            <Button variant="secondary" onClick={() => handleFinalDiffuse(true)} className="h-12 font-black uppercase text-[10px] border-2 gap-2"><Save className="size-3" /> Sauver brouillon</Button>
-                        </div>
-                        <Button onClick={() => handleFinalDiffuse(false)} className="w-full h-16 font-black uppercase tracking-widest shadow-xl text-base gap-3 bg-accent hover:bg-accent/90">
+                        <Button variant="outline" onClick={() => setCampWizardStep('EDIT')} className="h-12 font-black uppercase text-[10px] border-2 gap-2"><Pencil className="size-3" /> Éditer textes manuellement</Button>
+                        <Button onClick={handleFinalDiffuse} className="w-full h-16 font-black uppercase tracking-widest shadow-xl text-base gap-3 bg-accent hover:bg-accent/90">
                             <CreditCard className="size-6" /> PAIEMENT & ENVOI
                         </Button>
                     </div>
