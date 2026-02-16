@@ -563,7 +563,6 @@ export function ShootingTableCard() {
                                 <span className="text-[10px] font-black text-primary/60">m</span>
                             </div>
                         </div>
-                        <Badge variant="outline" className="text-[9px] font-black uppercase h-8 rounded-full border-blue-200 text-blue-600 px-4 bg-white/80 w-fit shadow-sm mx-auto sm:mx-0 justify-center">1 clic = 1cm à 100m</Badge>
                     </div>
                 </div>
 
@@ -634,6 +633,12 @@ export function ShootingTableCard() {
                             </div>
                         </Card>
                     ))}
+                </div>
+
+                <div className="flex justify-center pt-2">
+                    <Badge variant="outline" className="text-[10px] font-black uppercase h-9 rounded-full border-blue-200 text-blue-600 px-6 bg-blue-50/50 shadow-sm border-2">
+                        1 CLIC = 1CM À 100M
+                    </Badge>
                 </div>
             </div>
           )}
