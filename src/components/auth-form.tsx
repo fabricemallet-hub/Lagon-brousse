@@ -33,7 +33,7 @@ import {
 } from 'firebase/auth';
 import { doc, collection, addDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { ForgotPasswordDialog } from './forgot-password-dialog';
-import { Eye, EyeOff, Ticket, MapPin, ScrollText, Globe, Bell, Mail, Smartphone, Phone, Home, Briefcase, User as UserIcon } from 'lucide-react';
+import { Eye, EyeOff, Ticket, MapPin, ScrollText, Globe, Bell, Mail, Smartphone, Phone, Home, Briefcase, User as UserIcon, Zap } from 'lucide-react';
 import { redeemAccessToken } from '@/lib/token-utils';
 import { ensureUserDocument } from '@/lib/user-utils';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -122,6 +122,7 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   const selectedRegion = form.watch('region') as Region;
   const accountType = form.watch('accountType');
+  const watchToken = form.watch('token');
 
   const availableLocations = useMemo(() => {
     return Object.keys(locationsByRegion[selectedRegion] || {}).sort();
@@ -596,22 +597,35 @@ export function AuthForm({ mode }: AuthFormProps) {
           </div>
         )}
         
-        <FormField
-          control={form.control}
-          name="token"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Jeton d'accès (Optionnel)</FormLabel>
-              <FormControl>
-                <div className="relative">
-                  <Input placeholder="LBN-XXXX-XXXX" {...field} autoComplete="off" className="pl-10 font-mono tracking-wider" />
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground"><Ticket className="h-5 w-5" /></div>
-                </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="p-4 bg-primary/5 border-2 rounded-2xl space-y-3 animate-in fade-in">
+          <FormField
+            control={form.control}
+            name="token"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary">
+                  <Ticket className="size-3" /> Jeton d'accès (Optionnel)
+                </FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Input placeholder="LBN-XXXX-XXXX" {...field} autoComplete="off" className="pl-10 font-mono tracking-wider h-12 border-2" />
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground"><Ticket className="h-5 w-5" /></div>
+                  </div>
+                </FormControl>
+                {watchToken && watchToken.length > 3 && (
+                  <Button 
+                    type="submit" 
+                    variant="secondary" 
+                    className="w-full h-10 mt-2 font-black uppercase text-[10px] tracking-widest border-2 border-primary/20 gap-2 shadow-sm"
+                  >
+                    <Zap className="size-3 text-primary fill-primary" /> Valider le jeton & Se connecter
+                  </Button>
+                )}
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
         {mode === 'signup' && (
           <FormField
@@ -654,7 +668,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         <div className="pt-4">
           <Button 
             type="submit" 
-            className="w-full h-12 font-black uppercase tracking-widest shadow-md" 
+            className="w-full h-14 font-black uppercase tracking-widest shadow-xl text-base" 
             disabled={isLoading || (mode === 'signup' && !form.getValues('acceptCgv'))}
           >
             {isLoading ? "Chargement..." : (mode === 'login' ? 'Se connecter' : "S'inscrire")}

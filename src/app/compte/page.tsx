@@ -792,41 +792,39 @@ export default function ComptePage() {
 
       <PushNotificationManager />
 
-      {!isSharedAccessActive && userProfile?.subscriptionStatus !== 'admin' && userProfile?.subscriptionStatus !== 'professional' && (
-        <Card className="w-full shadow-none border-2">
-            <CardHeader className="p-6 pb-2">
-                <CardTitle className="text-lg font-black uppercase tracking-tighter flex items-center gap-2">
-                    <Ticket className="text-primary" /> Activer un jeton Premium
-                </CardTitle>
-                <CardDescription className="text-[10px] font-bold uppercase">
-                    {userProfile?.subscriptionExpiryDate ? (
-                        <span className="flex items-center gap-1.5 text-primary">
-                            <CalendarIcon className="size-3" /> Date de fin d'activation : {format(new Date(userProfile.subscriptionExpiryDate), 'dd MMMM yyyy', { locale: fr })}
-                        </span>
-                    ) : (
-                        "Saisissez votre code pour activer l'accès illimité."
-                    )}
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="p-6 pt-2 space-y-4">
-                <div className="flex flex-col gap-3">
-                    <div className="space-y-1">
-                        <Label htmlFor="token-input" className="text-[10px] font-black uppercase ml-1">Code Jeton</Label>
-                        <Input 
-                            id="token-input" 
-                            placeholder="LBN-XXXX-XXXX" 
-                            value={accessToken}
-                            onChange={(e) => setAccessToken(e.target.value)}
-                            className="h-14 font-black text-center tracking-[0.2em] text-lg border-2"
-                        />
-                    </div>
-                    <Button onClick={handleRedeemTokenAction} disabled={isRedeeming || !accessToken} className="w-full h-12 font-black uppercase tracking-widest shadow-xl">
-                        {isRedeeming ? 'Validation en cours...' : 'Valider mon jeton'}
-                    </Button>
-                </div>
-            </CardContent>
-        </Card>
-      )}
+      <Card className="w-full shadow-none border-2">
+          <CardHeader className="p-6 pb-2">
+              <CardTitle className="text-lg font-black uppercase tracking-tighter flex items-center gap-2">
+                  <Ticket className="text-primary" /> Activer un jeton Premium
+              </CardTitle>
+              <CardDescription className="text-[10px] font-bold uppercase">
+                  {userProfile?.subscriptionExpiryDate ? (
+                      <span className="flex items-center gap-1.5 text-primary">
+                          <CalendarIcon className="size-3" /> Date de fin d'activation : {format(new Date(userProfile.subscriptionExpiryDate), 'dd MMMM yyyy', { locale: fr })}
+                      </span>
+                  ) : (
+                      "Saisissez votre code pour activer l'accès illimité."
+                  )}
+              </CardDescription>
+          </CardHeader>
+          <CardContent className="p-6 pt-2 space-y-4">
+              <div className="flex flex-col gap-3">
+                  <div className="space-y-1">
+                      <Label htmlFor="token-input" className="text-[10px] font-black uppercase ml-1">Code Jeton</Label>
+                      <Input 
+                          id="token-input" 
+                          placeholder="LBN-XXXX-XXXX" 
+                          value={accessToken}
+                          onChange={(e) => setAccessToken(e.target.value)}
+                          className="h-14 font-black text-center tracking-[0.2em] text-lg border-2"
+                      />
+                  </div>
+                  <Button onClick={handleRedeemTokenAction} disabled={isRedeeming || !accessToken} className="w-full h-12 font-black uppercase tracking-widest shadow-xl">
+                      {isRedeeming ? 'Validation en cours...' : 'Valider mon jeton'}
+                  </Button>
+              </div>
+          </CardContent>
+      </Card>
     </div>
   );
 }
