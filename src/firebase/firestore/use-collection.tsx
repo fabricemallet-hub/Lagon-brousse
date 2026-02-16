@@ -61,20 +61,6 @@ export function useCollection<T = any>(
       path = (memoizedTargetRefOrQuery as any)?.path || 'unknown';
     }
 
-    const isPublic = !!(path && (
-      path.includes('promotions') || 
-      path.includes('system_notifications') || 
-      path.includes('meteo_caledonie') || 
-      path.includes('app_settings') ||
-      path.includes('fish_species') ||
-      path.includes('sound_library')
-    ));
-    
-    const auth = getAuth();
-    if (!isPublic && memoizedTargetRefOrQuery && !auth.currentUser) {
-      return;
-    }
-
     if (!memoizedTargetRefOrQuery) {
       setData(null);
       setIsLoading(false);

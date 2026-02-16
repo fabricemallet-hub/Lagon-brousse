@@ -49,7 +49,7 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 4. CAMPAGNES (AUTORISATION LISTE EXPLICITE)
+    // 4. CAMPAGNES (FIX PERMISSION LIST)
     // ======================================================
     
     match /campaigns/{campaignId} {
