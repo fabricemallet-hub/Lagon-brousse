@@ -534,6 +534,29 @@ export default function VesselTrackerPage() {
                             <Button variant="outline" size="icon" className="h-12 w-12 border-2 bg-white" onClick={handleSaveVessel}><Save className="size-4 text-primary" /></Button>
                         </div>
                     </div>
+
+                    {savedVesselIds.length > 0 && (
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-black uppercase ml-1 opacity-40">Mes IDs enregistrés</Label>
+                        <div className="grid gap-2">
+                          {savedVesselIds.map(id => (
+                            <div key={id} className="flex items-center justify-between p-3 border-2 rounded-xl bg-white shadow-sm">
+                              <div 
+                                className="flex items-center gap-3 cursor-pointer flex-grow"
+                                onClick={() => setCustomSharingId(id)}
+                              >
+                                <div className="p-2 bg-primary/10 rounded-lg text-primary"><Navigation className="size-4" /></div>
+                                <span className="font-black text-xs uppercase tracking-widest">{id}</span>
+                              </div>
+                              <Button variant="ghost" size="icon" onClick={() => handleRemoveSavedVessel(id)} className="size-8 text-destructive/40 border-2">
+                                <Trash2 className="size-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between p-4 border-2 rounded-2xl bg-primary/5 border-primary/10">
                         <Label className="text-sm font-black uppercase">Partager ma position</Label>
                         <Switch checked={isSharing} onCheckedChange={setIsSharing} />
