@@ -14,17 +14,17 @@ service cloud.firestore {
     function isMasterAdmin() {
       return isSignedIn() && (
         request.auth.uid in ["t8nPnZLcTiaLJSKMuLzib3C5nPn1", "D1q2GPM95rZi38cvCzvsjcWQDaV2", "koKj5ObSGXYeO1PLKU5bgo8Yaky1"] ||
-        (request.auth.token.email != null && (
-          request.auth.token.email.lower() == "f.mallet81@outlook.com" ||
-          request.auth.token.email.lower() == "f.mallet81@gmail.com" ||
-          request.auth.token.email.lower() == "fabrice.mallet@gmail.com" ||
-          request.auth.token.email.lower() == "kledostyle@outlook.com" ||
-          request.auth.token.email.lower() == "kledostyle@hotmail.com"
-        ))
+        request.auth.token.get('email', '').lower() in [
+          "f.mallet81@outlook.com",
+          "f.mallet81@gmail.com",
+          "fabrice.mallet@gmail.com",
+          "kledostyle@outlook.com",
+          "kledostyle@hotmail.com"
+        ]
       );
     }
 
-    // Bypass total pour Master Admin
+    // Bypass total pour Master Admin - DOIT RESTER EN HAUT
     match /{allPaths=**} {
       allow read, write: if isMasterAdmin();
     }
@@ -33,7 +33,6 @@ service cloud.firestore {
     // 2. PRIORITÉ ABSOLUE : CAMPAGNES (CORRECTIF RADICAL)
     // ======================================================
     
-    // On sépare la collection du document pour lever toute ambiguïté sur le 'list'
     match /campaigns {
       allow list: if isSignedIn();
       match /{campaignId} {
@@ -58,7 +57,7 @@ service cloud.firestore {
     match /sound_library/{id} { allow read: if true; }
     match /businesses/{businessId} { allow get, list: if true; }
     
-    // Règle nécessaire pour le catalogue global
+    // Règle globale pour les promotions (Shopping)
     match /{path=**}/promotions/{promoId} { allow read: if true; }
 
     // ======================================================

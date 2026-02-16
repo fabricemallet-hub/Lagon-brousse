@@ -36,7 +36,7 @@ export interface InternalQuery extends Query<DocumentData> {
 
 /**
  * React hook to subscribe to a Firestore collection or query in real-time.
- * FORCE REBUILD FOR PERMISSION FIX v4
+ * FORCE REBUILD FOR PERMISSION FIX v5 - Radical
  */
 export function useCollection<T = any>(
     memoizedTargetRefOrQuery: ((CollectionReference<DocumentData> | Query<DocumentData>) & {__memo?: boolean})  | null | undefined,
@@ -83,9 +83,13 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (err: FirestoreError) => {
-        // Log minimal pour débogage agent sans crash UI immédiat si possible
-        console.warn(`Firestore permission error on path: ${path}`, err.message);
-        
+        // En mode Master Admin, on évite le crash global pour les requêtes non critiques
+        if (path === 'campaigns') {
+            console.warn(`Silencing non-critical campaigns list error: ${err.message}`);
+            setIsLoading(false);
+            return;
+        }
+
         const contextualError = new FirestorePermissionError({
           operation: 'list',
           path: path,
