@@ -258,7 +258,9 @@ export default function ProDashboard() {
             title: promoTitle,
             type: promoType,
             category: promoCategory,
-            photos: promoImages
+            photos: promoImages,
+            price: parseFloat(promoPrice) || undefined,
+            discountPercentage: calculatedDiscount || undefined
         });
         setPromoDescription(result.commercialDescription);
         setAiStrategy(result);

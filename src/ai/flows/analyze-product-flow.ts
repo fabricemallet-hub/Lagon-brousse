@@ -30,16 +30,18 @@ const analyzeProductFlow = ai.defineFlow(
         
         PRODUIT : ${input.title}
         TYPE : ${input.type}
+        ${input.price ? `PRIX : ${input.price} FCFP` : ''}
+        ${input.discountPercentage ? `REMISE : -${input.discountPercentage}%` : ''}
         
         TA MISSION :
         1. Regarde attentivement la ou les photos fournies.
         2. Rédige une DESCRIPTION COMMERCIALE percutante et attractive (env. 3-5 phrases).
-           - Si c'est une PROMO : Insiste sur l'opportunité, le prix et l'urgence.
-           - Si c'est une NOUVEAUTÉ : Insiste sur la qualité, l'innovation et l'exclusivité au pays.
-        3. Propose 3 à 5 ARGUMENTS DE VENTE clés pour le vendeur.
-        4. Donne un CONSEIL MARKETING spécifique pour mettre en avant ce produit dans le lagon ou la brousse (ex: "Mettez en avant la résistance au sel pour ce moulinet").
+           - SI C'EST UNE PROMO : Tu DOIS absolument promouvoir la vente. Insiste sur l'économie réalisée (mentionne le prix et la remise si fournis), la rareté de l'offre et l'urgence pour le client. Utilise des termes forts comme "Affaire exceptionnelle", "Prix cassé", "Opportunité à saisir".
+           - SI C'EST UNE NOUVEAUTÉ : Insiste sur la qualité, l'innovation, le design et l'exclusivité au pays.
+        3. Propose 3 à 5 ARGUMENTS DE VENTE clés pour le vendeur, centrés sur le bénéfice client.
+        4. Donne un CONSEIL MARKETING spécifique pour mettre en avant ce produit dans le lagon ou la brousse calédonienne (ex: "Mettez en avant la résistance au sel pour ce moulinet").
         
-        Réponds en français avec un ton professionnel et enthousiaste.` },
+        Réponds en français avec un ton professionnel, dynamique et très enthousiaste.` },
         ...input.photos.map(url => ({ media: { url } }))
       ],
       output: { schema: AnalyzeProductOutputSchema }

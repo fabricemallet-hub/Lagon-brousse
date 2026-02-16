@@ -149,6 +149,8 @@ export const AnalyzeProductInputSchema = z.object({
   type: z.enum(['Promo', 'Nouvel Arrivage']).describe("Type d'offre."),
   category: z.string().describe("Rayon du magasin."),
   photos: z.array(z.string()).describe("Liste des photos en data URI."),
+  price: z.number().optional().describe("Prix actuel du produit."),
+  discountPercentage: z.number().optional().describe("Pourcentage de remise si applicable."),
 });
 export type AnalyzeProductInput = z.infer<typeof AnalyzeProductInputSchema>;
 
