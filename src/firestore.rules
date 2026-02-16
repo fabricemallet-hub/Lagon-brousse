@@ -4,7 +4,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ======================================================
-    // 1. FONCTIONS DE SÉCURITÉ
+    // 1. FONCTIONS DE SÉCURITÉ & MASTER ADMIN
     // ======================================================
     
     function isSignedIn() {
@@ -22,91 +22,73 @@ service cloud.firestore {
       );
     }
 
-    function isBusinessOwner(busId) {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      return isSignedIn() && userDoc != null && userDoc.data.get('businessId', '') == busId;
-    }
-
-    // ======================================================
-    // 2. ACCÈS PRIORITAIRE ADMIN
-    // ======================================================
-
+    // Bypass total pour Master Admin
     match /{allPaths=**} {
       allow read, write: if isMasterAdmin();
     }
 
     // ======================================================
-    // 3. COMMERCES & PROMOTIONS
+    // 2. RÈGLES PUBLIQUES (LECTURE)
     // ======================================================
 
-    match /businesses/{businessId} {
-      allow read: if true; 
-
-      match /promotions/{promoId} {
-        allow read: if true; 
-        allow write: if isMasterAdmin() || isBusinessOwner(businessId);
-      }
+    match /app_settings/{document=**} { allow read: if true; }
+    match /system_notifications/{id} { allow read: if true; }
+    match /meteo_caledonie/{id} { 
+      allow get, list: if true;
+      match /previsions/{prevId} { allow get, list: if true; }
     }
-
-    // ======================================================
-    // 4. CAMPAGNES
-    // ======================================================
+    match /fish_species/{id} {
+      allow get, list: if true;
+      match /commune_stats/{communeId} { allow read, write: if isSignedIn(); }
+    }
+    match /sound_library/{id} { allow read: if true; }
+    match /businesses/{businessId} { allow get, list: if true; }
     
-    match /campaigns/{campaignId} {
-      allow read, write: if isSignedIn();
+    // Règle de groupe pour les promotions (Shopping)
+    match /{path=**}/promotions/{promoId} { 
+      allow read: if true; 
     }
 
     // ======================================================
-    // 5. UTILISATEURS & PROFILS
+    // 3. RÈGLES UTILISATEURS & PRIVÉES
     // ======================================================
 
     match /users/{userId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && (request.auth.uid == userId);
-      
       match /{allPaths=**} {
         allow read, write: if isSignedIn() && (request.auth.uid == userId);
       }
     }
 
-    // ======================================================
-    // 6. MESSAGERIE & DONNÉES SYSTÈME
-    // ======================================================
-
     match /conversations/{convId} {
-      allow read, write: if isSignedIn() && (request.auth.uid == convId || isMasterAdmin());
-      match /messages/{msgId} { allow read, write: if isSignedIn(); }
+      allow read, write: if isSignedIn() && (request.auth.uid == convId);
+      match /messages/{msgId} {
+        allow read, write: if isSignedIn() && (request.auth.uid == convId);
+      }
+    }
+    
+    match /cms_support/tickets/items/{id} {
+      allow create: if isSignedIn();
+      allow read, write: if isSignedIn() && (resource.data.userId == request.auth.uid);
     }
 
-    match /app_settings/{document=**} { allow read: if true; }
-    match /system_notifications/{id} { allow read: if true; }
-    match /meteo_caledonie/{id} { allow read: if true; }
-    match /fish_species/{id} { allow read: if true; }
-    match /sound_library/{id} { allow read: if true; }
-
-    // ======================================================
-    // 7. AUTRES COLLECTIONS
-    // ======================================================
-
-    match /hunting_sessions/{sessionId} { allow read, write: if isSignedIn(); }
-    match /vessel_sessions/{sessionId} { allow read, write: if isSignedIn(); }
-    match /vessels/{vesselId} { allow read, write: if isSignedIn(); }
     match /access_tokens/{id} { allow read: if isSignedIn(); }
     match /shared_access_tokens/{id} { allow read: if true; }
     match /spot_shares/{id} { allow read, write: if isSignedIn(); }
     
-    match /cms_support/tickets/items/{id} {
-      allow create: if isSignedIn();
-      allow read, write: if isSignedIn() && (resource.data.userId == request.auth.uid || isMasterAdmin());
+    match /hunting_sessions/{sessionId} {
+      allow read, write: if isSignedIn();
+      match /{allPaths=**} { allow read, write: if isSignedIn(); }
     }
-
-    // ======================================================
-    // 8. AUTORISATION COLLECTION GROUP (IMPORTANT)
-    // ======================================================
     
-    match /{path=**}/promotions/{promoId} {
-      allow read: if true;
-    }
+    match /vessels/{allPaths=**} { allow read, write: if isSignedIn(); }
 
+    // ======================================================
+    // 4. CAMPAGNES
+    // ======================================================
+    match /campaigns/{campaignId} {
+      allow read, write: if isSignedIn();
+    }
   }
 }

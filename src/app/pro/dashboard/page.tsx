@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, doc, query, orderBy, serverTimestamp, addDoc, deleteDoc, where, getCountFromServer } from 'firebase/firestore';
+import { collection, doc, query, orderBy, serverTimestamp, addDoc, deleteDoc, where, getCountFromServer, updateDoc } from 'firebase/firestore';
 import type { UserAccount, Business, Promotion, Campaign, CampaignPricingSettings, Region } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
