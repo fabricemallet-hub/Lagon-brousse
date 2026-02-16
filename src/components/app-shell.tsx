@@ -1,4 +1,3 @@
-
 'use client';
 import {
   Sidebar,
@@ -81,7 +80,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
-  // AUTO-SYNC PROFILE & ADMIN STATUS
   useEffect(() => {
     if (user && !isUserLoading && firestore) {
       ensureUserDocument(firestore, user).catch(console.error);
@@ -92,12 +90,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (isUserLoading) return 'loading';
     if (!user) return 'limited';
 
-    // UNIQUE COMPTE ADMIN AUTORISÉ
-    const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com', 'fabrice.mallet@gmail.com'];
-    const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'D1q2GPM95rZi38cvCzvsjcWQDaV2'];
+    const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com', 'fabrice.mallet@gmail.com', 'kledostyle@outlook.com'];
+    const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'D1q2GPM95rZi38cvCzvsjcWQDaV2', 'koKj5ObSGXYeO1PLKU5bgo8Yaky1'];
     const isMaster = masterEmails.includes(user.email?.toLowerCase() || '') || masterUids.includes(user.uid);
 
-    // PRIORITÉ 1 : ADMIN
     if (isMaster || userProfile?.subscriptionStatus === 'admin' || userProfile?.role === 'admin') {
       return 'admin';
     }
@@ -105,12 +101,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (isProfileLoading) return 'loading';
     if (!userProfile) return 'limited';
 
-    // PRIORITÉ 2 : PRO
     if (userProfile.subscriptionStatus === 'professional' || userProfile.role === 'professional') {
         return 'professional';
     }
 
-    // PRIORITÉ 3 : ABONNÉ / ESSAI (Actif)
     const expiryDate = userProfile.subscriptionExpiryDate ? new Date(userProfile.subscriptionExpiryDate) : null;
     const isValid = expiryDate && !isNaN(expiryDate.getTime()) && isBefore(new Date(), expiryDate);
 

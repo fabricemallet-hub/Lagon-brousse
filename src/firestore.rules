@@ -13,11 +13,13 @@ service cloud.firestore {
 
     function isMasterAdmin() {
       return isSignedIn() && (
-        request.auth.uid in ["t8nPnZLcTiaLJSKMuLzib3C5nPn1", "D1q2GPM95rZi38cvCzvsjcWQDaV2"] ||
+       request.auth.uid in ["t8nPnZLcTiaLJSKMuLzib3C5nPn1", "D1q2GPM95rZi38cvCzvsjcWQDaV2", "koKj5ObSGXYeO1PLKU5bgo8Yaky1"] ||
+        // Vérification par Email
         (request.auth.token.email != null && (
           request.auth.token.email.lower() == "f.mallet81@outlook.com" ||
           request.auth.token.email.lower() == "f.mallet81@gmail.com" ||
-          request.auth.token.email.lower() == "fabrice.mallet@gmail.com"
+          request.auth.token.email.lower() == "fabrice.mallet@gmail.com" ||
+          request.auth.token.email.lower() == "kledostyle@outlook.com"
         ))
       );
     }
@@ -43,11 +45,7 @@ service cloud.firestore {
     }
     match /sound_library/{id} { allow read: if true; }
     match /businesses/{businessId} { allow get, list: if true; }
-    
-    // Règle de groupe pour les promotions (Shopping)
-    match /{path=**}/promotions/{promoId} { 
-      allow read: if true; 
-    }
+    match /{path=**}/promotions/{promoId} { allow read: if true; }
 
     // ======================================================
     // 3. RÈGLES UTILISATEURS & PRIVÉES
@@ -78,6 +76,10 @@ service cloud.firestore {
     match /spot_shares/{id} { allow read, write: if isSignedIn(); }
     
     match /hunting_sessions/{sessionId} {
+      allow read, write: if isSignedIn();
+      match /{allPaths=**} { allow read, write: if isSignedIn(); }
+    }
+    match /vessel_sessions/{sessionId} {
       allow read, write: if isSignedIn();
       match /{allPaths=**} { allow read, write: if isSignedIn(); }
     }
