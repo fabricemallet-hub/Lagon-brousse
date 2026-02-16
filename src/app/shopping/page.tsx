@@ -66,12 +66,24 @@ export default function ShoppingPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
+  useEffect(() => {
+    if (user) {
+        console.log("[DEBUG] ShoppingPage - Auth User Logged In:", user.uid);
+    }
+  }, [user]);
+
   // --- DATA FETCHING ---
   const userProfileRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return doc(firestore, 'users', user.uid);
   }, [user, firestore]);
   const { data: profile, isLoading: isProfileLoading } = useDoc<UserAccount>(userProfileRef);
+
+  useEffect(() => {
+    if (profile) {
+        console.log("[DEBUG] ShoppingPage - Profile Ready:", profile.displayName, "Role:", profile.role);
+    }
+  }, [profile]);
 
   const businessesRef = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -81,6 +93,7 @@ export default function ShoppingPage() {
 
   const promosRef = useMemoFirebase(() => {
     if (!firestore) return null;
+    console.log("[DEBUG] ShoppingPage - Triggering collectionGroup('promotions')");
     return collectionGroup(firestore, 'promotions');
   }, [firestore]);
   
@@ -283,7 +296,13 @@ export default function ShoppingPage() {
       </Card>
 
       <div className="space-y-4">
-        {promosError && <Alert variant="destructive"><AlertTitle>Erreur</AlertTitle><AlertDescription>Impossible de charger le catalogue.</AlertDescription></Alert>}
+        {promosError && (
+            <Alert variant="destructive" className="bg-red-50 border-red-200">
+                <AlertCircle className="size-4" />
+                <AlertTitle className="font-black uppercase">Erreur de catalogue</AlertTitle>
+                <AlertDescription className="text-xs">Impossible de charger les offres. Vérifiez votre connexion.</AlertDescription>
+            </Alert>
+        )}
         {isLoading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[1, 2].map(i => <Skeleton key={i} className="h-48 w-full rounded-2xl" />)}
@@ -297,7 +316,7 @@ export default function ShoppingPage() {
         ) : (
             <div className="text-center py-20 border-4 border-dashed rounded-[2.5rem] opacity-30">
                 <ShoppingBag className="size-12 mb-2 mx-auto" />
-                <p className="font-black uppercase text-sm">Aucun produit</p>
+                <p className="font-black uppercase text-sm">Aucune offre trouvée</p>
             </div>
         )}
       </div>

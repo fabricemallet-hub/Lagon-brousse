@@ -78,7 +78,7 @@ export function useCollection<T = any>(
     }
 
     // PUBLIC DATA BARRIER: Only wait for auth if the collection is potentially private.
-    const isPublic = path && (
+    const isPublic = !!(path && (
       path.includes('system_notifications') || 
       path.includes('meteo_caledonie') || 
       path.includes('promotions') ||
@@ -86,10 +86,16 @@ export function useCollection<T = any>(
       path.includes('fish_species') ||
       path.includes('sound_library') ||
       path === 'promotions' || 
-      isCollectionGroup && path === 'promotions'
-    );
+      (isCollectionGroup && path === 'promotions')
+    ));
     
     const auth = getAuth();
+    
+    // Log debug for permissions investigation
+    if (path === 'promotions') {
+        console.log(`[DEBUG] useCollection - Path: "${path}", isPublic: ${isPublic}, HasUser: ${!!auth.currentUser}`);
+    }
+
     if (!isPublic && memoizedTargetRefOrQuery && !auth.currentUser) {
       return;
     }

@@ -5,37 +5,38 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ======================================================
-    // 1. RÈGLES DE GROUPE (Indispensables pour collectionGroup)
-    // DOIVENT ÊTRE EN HAUT POUR ÉVITER L'OMBRAGE
+    // 1. RÈGLES DE GROUPE (CRITIQUE : DOIVENT ÊTRE EN HAUT)
     // ======================================================
     
-    // Autorise la lecture globale des promotions (Catalogue Shopping)
+    // Autorise la lecture globale des promotions (Requis pour collectionGroup('promotions'))
     match /{path=**}/promotions/{promoId} {
-      allow get, list: if true;
+      allow read: if true;
     }
     
-    // Autorise la lecture globale des spots GPS (Carte Admin)
+    // Autorise la lecture globale des spots GPS (Requis pour collectionGroup('fishing_spots'))
     match /{path=**}/fishing_spots/{spotId} {
-      allow get, list: if request.auth != null;
+      allow read: if request.auth != null;
     }
 
     // ======================================================
-    // 2. FONCTIONS DE SÉCURITÉ
+    // 2. FONCTIONS DE SÉCURITÉ & MASTER ADMIN
     // ======================================================
     
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Détection Master Admin via UID ou Email
+    // Détection Master Admin via UID ou Email (Opérateur IN pour plus de robustesse)
     function isMasterAdmin() {
       return isSignedIn() && (
         request.auth.uid in ["t8nPnZLcTiaLJSKMuLzib3C5nPn1", "D1q2GPM95rZi38cvCzvsjcWQDaV2", "koKj5ObSGXYeO1PLKU5bgo8Yaky1"] ||
         (request.auth.token.email != null && (
-          request.auth.token.email.lower() == "f.mallet81@outlook.com" ||
-          request.auth.token.email.lower() == "f.mallet81@gmail.com" ||
-          request.auth.token.email.lower() == "fabrice.mallet@gmail.com" ||
-          request.auth.token.email.lower() == "kledostyle@outlook.com"
+          request.auth.token.email.lower() in [
+            "f.mallet81@outlook.com", 
+            "f.mallet81@gmail.com", 
+            "fabrice.mallet@gmail.com",
+            "kledostyle@outlook.com"
+          ]
         ))
       );
     }
@@ -47,8 +48,13 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == busId;
     }
 
+    // Bypass total pour Master Admin
+    match /{allPaths=**} {
+      allow read, write: if isMasterAdmin();
+    }
+
     // ======================================================
-    // 3. COMMERCES & PROMOTIONS (Accès direct)
+    // 3. COMMERCES & PROMOTIONS (ACCÈS DIRECT)
     // ======================================================
 
     match /businesses/{businessId} {
@@ -118,14 +124,6 @@ service cloud.firestore {
     match /cms_support/tickets/items/{id} {
       allow create: if isSignedIn();
       allow read, write: if isSignedIn() && (resource.data.userId == request.auth.uid || isMasterAdmin());
-    }
-
-    // ======================================================
-    // 8. ACCÈS PRIORITAIRE ADMIN (Catch-all)
-    // ======================================================
-
-    match /{allPaths=**} {
-      allow read, write: if isMasterAdmin();
     }
   }
 }
