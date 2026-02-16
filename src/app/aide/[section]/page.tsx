@@ -23,7 +23,11 @@ import {
   ShieldAlert,
   ExternalLink,
   BrainCircuit,
-  Megaphone
+  Megaphone,
+  Compass,
+  Zap,
+  Target,
+  LocateFixed
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -86,7 +90,7 @@ const sectionContent: Record<string, {
     ],
     tips: [
       "AVERTISSEMENT CRITIQUE : Cette application ne remplace PAS le site officiel de Météo Nouvelle-Calédonie (meteo.nc). Consultez-le toujours avant de prévoir une sortie en mer.",
-      "L'assistant IA vous aide à identifier la 'meilleure fenêtre' de la semaine pour vos activités, mas la décision finale et la sécurité vous incombent.",
+      "L'assistant IA vous aide à identifier la 'meilleure fenêtre' de la semaine pour vos activités, mais la décision finale et la sécurité vous incombent.",
       "La flèche du vent indique la provenance réelle de l'air : une flèche pointant vers le bas indique un vent de Nord."
     ]
   },
@@ -97,17 +101,17 @@ const sectionContent: Record<string, {
     role: "Un système de sécurité maritime haute-fidélité conçu pour partager votre position GPS, votre statut d'activité et votre niveau de batterie avec vos proches restés à terre.",
     steps: [
       "Émetteur (A) - Identité : Configurez un ID et votre surnom de navire. Ce surnom est inclus automatiquement au début de vos SMS d'urgence.",
-      "Émetteur (A) - Signaux Tactiques : Utilisez 'DEMANDE ASSISTANCE' pour une alerte rouge clignotante immédiate, ou 'REGROUPEMENT OISEAUX' pour marquer une chasse par un point GPS horodaté sur la carte.",
-      "Récepteur (B) - Flotte & Suivi : Saisissez l'ID d'un navire pour l'ajouter. Vous pouvez suivre plusieurs navires simultanément sur la carte satellite.",
-      "Récepteur (B) - Signalisation Inverse : Activez votre propre GPS pour signaler un 'REGROUPEMENT OISEAUX' à votre tour. Le point s'affichera sur la carte du capitaine.",
-      "Récepteur (B) - Veille Stratégique : Configurez une alerte d'immobilité (1h à 24h). Si le navire reste immobile trop longtemps, une alarme sonore jouera en boucle jusqu'à votre validation.",
-      "Récepteur (B) - Sons : Personnalisez chaque alerte (Mouvement, Assistance, Oiseaux, Batterie) via les sélecteurs de sons dédiés.",
-      "Journal de Bord : Consultez l'historique permanent. Utilisez le bouton 'Reset' pour vider l'historique et effacer les points de chasse de la carte."
+      "Émetteur (A) - Angle de Sécurité : Activez votre 'Angle de Tir / Sécurité' pour surveiller une zone précise. Réglez la direction (-180° à +180°) et la portée jusqu'à 2km.",
+      "Émetteur (A) - Signaux Tactiques : Utilisez 'DEMANDE ASSISTANCE' pour une alerte rouge clignotante immédiate.",
+      "Récepteur (B) - Flotte & Suivi : Saisissez l'ID d'un navire pour l'ajouter. Vous visualisez son angle de surveillance en bleu clair sur la carte.",
+      "Récepteur (B) - Sécurité Mutualisée : En activant votre GPS, si vous entrez dans l'angle du navire suivi, une alerte sonore retentit sur les deux appareils.",
+      "Récepteur (B) - Veille Stratégique : Configurez une alerte d'immobilité (1h à 24h).",
+      "Journal de Bord : Consultez l'historique incluant les changements de batterie et de statuts."
     ],
     tips: [
       "Surnom SMS : Votre surnom de navire (ex: [TITANIC]) est ajouté automatiquement au début du SMS pour une identification immédiate par les secours.",
-      "Lecture en boucle : L'alarme de veille stratégique ne s'arrête que si vous appuyez sur le bouton 'ARRÊTER L'ALARME' sur le téléphone du récepteur.",
-      "Mode Auto : Le système détecte l'immobilité après 30s. Le bouton 'Reprise Mode Auto' permet de recalibrer le statut en cas de dérive de pêche."
+      "Angle de Sécurité : Utilisez-le pour délimiter une zone de pêche ou une direction de surveillance. La portée s'adapte automatiquement au zoom de la carte.",
+      "Batterie : Une alerte automatique retentit chez le récepteur si la batterie du navire descend sous les 20%."
     ]
   },
   'peche': {
@@ -116,17 +120,15 @@ const sectionContent: Record<string, {
     color: 'bg-indigo-500',
     role: "Optimisez vos sorties en mer grâce aux prévisions d'activité par espèce et à la mémorisation de vos spots secrets.",
     steps: [
-      "Consultez les indices de réussite (sur 10) calculés selon la marée, la lune et l'heure pour chaque poisson.",
-      "Déroulez une fiche espèce pour obtenir des conseils de profondeur et de technique.",
-      "Suivez l'activité des crabes, langoustes et poulpes selon le cycle lunaire.",
+      "Consultez les indices de réussite (sur 10) calculés selon la marée, la lune et l'heure.",
       "Enregistrez vos 'Coins de Pêche' par GPS sur la carte satellite interactive.",
-      "Partagez vos spots : Envoyez un coin secret à un ami via son e-mail. Il sera automatiquement ajouté à son carnet dès son ouverture.",
-      "Consultez l'historique détaillé de vos prises : l'application mémorise automatiquement le contexte exact (lune, marée, vent, température).",
-      "Utilisez l'IA 'Chercher un jour similaire' sur un spot pour trouver la date idéale dans les 30 prochains jours."
+      "Partagez vos spots : Envoyez un coin secret à un ami via son e-mail directement depuis la fiche du spot.",
+      "Suivi des Crustacés : Repérez les jours de mue ou de remplissage des crabes et l'activité des poulpes.",
+      "Session de Groupe : Rejoignez vos amis pour voir leurs positions en temps réel et partager vos zones de surveillance.",
+      "IA 'Quel spot maintenant ?' : Laissez l'IA choisir le meilleur coin dans votre carnet selon les conditions actuelles."
     ],
     tips: [
-      "Le mode satellite de la carte est idéal pour repérer les patates de corail.",
-      "Le partage de spots inclut automatiquement tout le contexte environnemental enregistré lors du marquage.",
+      "Le partage de spots inclut automatiquement tout le contexte environnemental (marée, lune) enregistré lors du marquage.",
       "L'IA ignore météo et vent pour se concentrer sur les cycles immuables de la lune et des marées.",
       "SÉCURITÉ : Consultez toujours le guide de la CPS pour limiter les risques de ciguatera."
     ],
@@ -140,17 +142,15 @@ const sectionContent: Record<string, {
     color: 'bg-cyan-600',
     role: "Un répertoire intelligent des espèces de Nouvelle-Calédonie incluant un système de calcul de risque collaboratif et différencié par taille pour la ciguatera (gratte).",
     steps: [
-      "Identification IA : Prenez une photo de votre prise pour identifier instantanément l'espèce et obtenir son profil de risque théorique.",
-      "Analyse par Taille : Le risque est détaillé pour 3 catégories (Petit, Moyen, Grand). Les longueurs estimées en CM vous aident à situer votre prise.",
-      "Pêche & Cuisine : Accédez à des fiches détaillées incluant les techniques de capture (appâts, profondeur) et les meilleurs conseils culinaires locaux.",
-      "Risque Collaboratif : Visualisez le score final pondéré (Moyenne entre les données scientifiques et les retours des pêcheurs locaux) pour votre commune.",
-      "Signalement Citoyen : Contribuez à la sécurité de tous en signalant un ressenti de gratte. Précisez la taille du spécimen pour affiner les statistiques.",
-      "Indice de Confiance : Le nombre de 'retours citoyens' s'affiche pour crédibiliser la donnée locale sur chaque fiche."
+      "Identification IA : Prenez une photo de votre prise pour identifier l'espèce et son profil de risque.",
+      "Analyse par Taille : Le risque est détaillé pour 3 catégories (Petit, Moyen, Grand).",
+      "Risque Collaboratif : Visualisez le score final pondéré (Moyenne entre les données scientifiques et les retours des pêcheurs locaux).",
+      "Signalement Citoyen : Contribuez à la sécurité en signalant un ressenti de gratte par commune.",
+      "Indice de Confiance : Le nombre de votants s'affiche pour crédibiliser la donnée locale."
     ],
     tips: [
-      "Le risque de gratte augmente statistiquement avec la taille du poisson. Soyez particulièrement vigilants avec les spécimens de catégorie 'Grand'.",
-      "Les longueurs en CM sont des estimations spécifiques aux spécimens calédoniens pour vous guider lors de vos signalements.",
-      "L'indice de confiance (Vert, Orange, Rouge) est calculé sur la moyenne pondérée pour vous offrir une décision rapide avant consommation.",
+      "Le risque de gratte augmente statistiquement avec la taille du poisson.",
+      "L'indice de confiance (Vert, Orange, Rouge) vous offre une décision rapide avant consommation.",
       "Consultez systématiquement le guide pratique ciguatera de la CPS via le lien présent dans chaque fiche."
     ],
     links: [
@@ -161,40 +161,34 @@ const sectionContent: Record<string, {
     title: 'Chasse & Tactique',
     icon: Crosshair,
     color: 'bg-orange-600',
-    role: "Optimisez vos sorties en brousse grâce à l'analyse du vent, au suivi de groupe et désormais à un calculateur balistique complet pour carabines et fusils lisses.",
+    role: "Optimisez vos sorties en brousse grâce à l'analyse du vent, au suivi de groupe sécurisé et au calculateur balistique complet.",
     steps: [
-      "Consultez la période biologique (Brame, Chute des bois) pour adapter votre stratégie.",
-      "Table de Tir & Râtelier : Enregistrez vos armes favorites (nom, calibre, munition) dans la section 'Mon Râtelier' pour les charger instantanément.",
-      "Réglages Optiques : Indiquez votre distance de zérotage pour obtenir le nombre de clics exacts à appliquer sur vos tourelles (1 clic = 1cm à 100m).",
-      "Cible Mobile : Saisissez une distance cible personnalisée via le pavé numérique pour obtenir des corrections précises à n'importe quelle portée.",
-      "Compensation Vent : Saisissez la force et direction du vent pour corriger la dérive latérale en temps réel.",
-      "Accessoires : Activez le mode 'Silencieux' pour recalculer la poussée prolongée (+2% V0) et la stabilité au vent.",
-      "Simulateur de Gerbe : Pour les fusils lisses (12, 16, 20), visualisez le diamètre d'impact selon le Choke et la distance.",
-      "Session de Groupe : Partagez votre position GPS en temps réel avec vos partenaires au-dessus de la carte satellite via un code unique.",
-      "Sécurité Équipe : Visualisez le statut tactique (En position, En battue) et le niveau de batterie de vos coéquipiers en direct."
+      "Session de Groupe : Partagez votre position GPS en temps réel. Le niveau de précision GPS (+/- Xm) est affiché pour chaque participant.",
+      "Angle de Tir Tactique : Réglez votre axe de tir (Cône bleu). Si un coéquipier y pénètre, une alerte sonore retentit chez les deux chasseurs.",
+      "Alertes Gibier : Utilisez le bouton central pour prévenir instantanément toute l'équipe d'un contact visuel.",
+      "Table de Tir & Râtelier : Chargez vos carabines enregistrées pour obtenir les clics de réglage optique selon la distance et le vent.",
+      "Compensation Vent : Saisissez la force et direction du vent pour corriger la dérive latérale.",
+      "Simulateur de Gerbe : Visualisez le diamètre d'impact des plombs selon le Choke et la distance."
     ],
     tips: [
-      "Mon Râtelier : Utilisez des noms explicites comme 'Ma Tikka Savane' pour identifier rapidement vos réglages sur le terrain.",
-      "Simulateur de Gerbe : Au-delà de 40m au plomb n°6, la dispersion est trop forte pour un prélèvement éthique.",
-      "Mode Expert : Utilisez le modèle 'PERSONNALISÉ' pour saisir manuellement vos propres données de rechargement.",
-      "Batterie : Gardez un œil sur le pourcentage de batterie de vos partenaires dans la liste d'équipe pour anticiper les pertes de signal."
+      "Angle de Tir : En mode portrait plein écran, masquez les boutons de statut (icône Œil) pour régler votre angle plus précisément sur la carte.",
+      "Portée Sécurité : Réglez la détection jusqu'à 2km pour anticiper les mouvements des coéquipiers sur de longues distances en savane.",
+      "Éveil Écran : Utilisez le bouton 'MAINTENIR ÉCRAN' pour éviter que le GPS ne se coupe lors des phases d'approche."
     ]
   },
   'champs': {
     title: 'Champs & Jardin',
     icon: Leaf,
     color: 'bg-green-600',
-    role: "Jardiner selon les traditions calédoniennes et l'influence lunaire. Cette section inclut désormais un gestionnaire de jardin intelligent par IA.",
+    role: "Jardiner selon les traditions calédoniennes et l'influence lunaire. Cette section inclut un gestionnaire de jardin intelligent par IA.",
     steps: [
-      "Tendance du Jour : Identifiez si la lune est Montante ou Descendante et le signe du zodiaque actuel.",
-      "Inventaire Réel : Enregistrez vos plantes dans 'Mon Jardin'. L'IA corrige les noms et suggère les variétés locales optimales.",
-      "Bilan Stratégique IA : Générez un rapport global pour votre jardin. L'IA planifie les priorités et calcule l'arrosage au jet (en secondes) selon la météo.",
-      "Conseils de Taille : Cliquez sur une plante pour savoir précisément OÙ et COMMENT couper selon la sève actuelle.",
+      "Tendance du Jour : Identifiez si la lune est Montante ou Descendante.",
+      "Inventaire Réel : Enregistrez vos plantes. L'IA corrige les noms et suggère les variétés locales.",
+      "Bilan Stratégique IA : Générez un rapport global. L'IA planifie les priorités et calcule l'arrosage au jet (en secondes) selon la pluie réelle.",
       "Scanner Plante (IA) : Utilisez la photo pour identifier une plante, un nuisible ou diagnostiquer une maladie."
     ],
     tips: [
-      "Le Bilan Stratégique réduit automatiquement les besoins en eau s'il a plu récemment à votre commune.",
-      "Suivre le calendrier permet de renforcer naturellement vos plantes sans pesticides."
+      "Le Bilan Stratégique réduit automatiquement les besoins en eau s'il a plu récemment à votre commune via la météo live."
     ]
   },
   'semis': {
@@ -203,29 +197,26 @@ const sectionContent: Record<string, {
     color: 'bg-emerald-500',
     role: "Un assistant intelligent pour planifier vos cultures de A à Z selon les cycles biologiques et climatiques.",
     steps: [
-      "Recherche & Scanner : Tapez le nom d'une graine ou scannez un sachet/pousse pour identifier la variété.",
-      "Calcul de Fiche IA : L'IA définit le type de plante et génère les conseils d'arrosage et d'exposition spécifiques à la NC.",
+      "Recherche & Scanner : Tapez le nom d'une graine ou scannez un sachet pour identifier la variété.",
       "Validation Lunaire : L'IA vérifie votre date de semis. Si elle est mauvaise, elle vous donne la date idéale précise sur les 30 prochains jours.",
-      "Planification : Obtenez les dates estimées de récolte et les périodes de repiquage en pleine terre.",
-      "Top Semis : Consultez la liste 'Idéal pour aujourd'hui' basée on l'influence lunaire actuelle."
+      "Planification : Obtenez les dates estimées de récolte et les périodes de repiquage."
     ],
     tips: [
-      "L'IA suggère systématiquement des variétés résistantes à la chaleur calédonienne (ex: Tomate Heatmaster).",
-      "Une alerte visuelle vous signale dans votre historique si un semis a été fait hors période optimale."
+      "L'IA suggère systématiquement des variétés résistantes à la chaleur calédonienne."
     ]
   },
   'calendrier-peche': {
     title: 'Calendrier Pêche',
     icon: Calendar,
     color: 'bg-slate-700',
-    role: "Planification stratégique à long terme basée on les cycles biologiques marins.",
+    role: "Planification stratégique à long terme basée sur les cycles biologiques marins.",
     steps: [
       "Suivi des Crustacés : Repérez les jours 'Crabe Plein' (vives-eaux) ou 'Crabe Mout' (mue).",
-      "Saisons : Identifiez les périodes de passage (ex: Tazard en Nov/Déc) via les alertes intégrées.",
-      "Analyse des Marées : Visualisez les coefficients et les records de hauteur pour cibler les platiers."
+      "Marées : Visualisez les coefficients et les hauteurs record.",
+      "Potentiel IA : Repérez les icônes 'Poissons' (1 à 3) pour identifier les jours de très forte activité prévisible."
     ],
     tips: [
-      "Un indice 10/10 coïncide souvent avec les jours de grandes marées (Nouvelle ou Pleine lune)."
+      "Zoom & Pinch : Sur mobile, vous pouvez écarter deux doigts sur le calendrier pour agrandir les cases et voir plus de détails."
     ]
   },
   'calendrier-champs': {
@@ -235,11 +226,10 @@ const sectionContent: Record<string, {
     role: "Le calendrier lunaire complet pour organiser vos travaux du jardin.",
     steps: [
       "Zodiaque : Repérez visuellement les jours Fruits, Racines, Fleurs ou Feuilles.",
-      "Travaux Spéciaux : Les icônes indiquent les jours propices à la taille, au bouturage ou à la tonte.",
-      "Fiche Expert : Cliquez sur une date pour obtenir l'analyse IA complète de la journée."
+      "Travaux Spéciaux : Les icônes indiquent les jours propices à la taille, au bouturage ou à la tonte."
     ],
     tips: [
-      "Le signe du zodiaque change environ tous les 2 à 3 jours."
+      "Cliquez sur n'importe quel jour pour ouvrir la 'Fiche Tactique Journalière' détaillée."
     ]
   },
   'reglementation': {
@@ -248,26 +238,24 @@ const sectionContent: Record<string, {
     color: 'bg-slate-500',
     role: "L'essentiel des règles de pêche, de chasse et de sécurité maritime pour une pratique responsable.",
     steps: [
-      "Fermetures : Consultez le calendrier annuel des interdictions de pêche (Picot, Crabe de palétuvier, etc.).",
-      "Gestion de Flotte : Créez des profils pour vos navires en les nommant pour organiser votre matériel séparément.",
-      "Inventaire de Sécurité : Ajoutez vos équipements obligatoires (Fusées parachute, extincteurs, feux à main) pour chaque navire.",
-      "Suivi des Péremptions : Saisissez les dates limites de chaque objet. L'application calcule automatiquement l'état de conformité (Conforme, Alerte, Expiré).",
-      "Tailles & Espèces : Vérifiez les dimensions minimales autorisées et la liste des espèces strictement protégées (Napoléon, Dugong, etc.)."
+      "Fermetures : Consultez le calendrier annuel des interdictions (Picot, Crabe, etc.).",
+      "Suivi des Péremptions : Créez vos profils navires et gérez les dates de vos fusées et extincteurs.",
+      "Alertes Automatiques : L'application vous prévient sur l'accueil 3 mois avant une péremption."
     ],
     tips: [
-      "Le marquage de la queue de la langouste est obligatoire dès la capture.",
-      "Consultez régulièrement cette section pour vérifier que votre armement est à jour avant de prendre la mer."
+      "Le marquage de la queue de la langouste est obligatoire dès la capture."
     ]
   },
   'compte': {
     title: 'Compte & Abonnement',
     icon: User,
     color: 'bg-zinc-600',
-    role: "Gérez votre profil et votre accès premium.",
+    role: "Gérez votre profil, vos préférences et votre accès premium.",
     steps: [
-      "Statut : Consultez votre état actuel (Abonné, Essai, Limité).",
-      "Jetons : Saisissez vos codes d'accès offerts.",
-      "Notifications : Activez les alertes push pour la sécurité et la chasse."
+      "Coordonnées : Renseignez votre mobile et adresse pour le module Shopping.",
+      "Personnalisation : Choisissez vos 6 raccourcis favoris pour la barre de navigation.",
+      "Jetons : Activez vos codes d'accès offerts.",
+      "Notifications : Configurez vos alertes push et SMS."
     ],
     tips: [
       "En mode 'Limité', vous disposez d'une minute d'accès par jour pour les consultations rapides."

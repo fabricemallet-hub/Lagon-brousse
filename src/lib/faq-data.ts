@@ -7,7 +7,7 @@ export const INITIAL_FAQ_DATA = [
   // --- GENERAL (15) ---
   { categorie: "General", ordre: 1, question: "L'application remplace-t-elle les sources officielles ?", reponse: "Non. Pour votre sécurité, consultez toujours meteo.nc et les autorités maritimes (COSS). L'app est un assistant tactique." },
   { categorie: "General", ordre: 2, question: "Pourquoi la géolocalisation est-elle indispensable ?", reponse: "Elle permet de calculer les marées de la station la plus proche de VOUS, d'activer le Boat Tracker et de vous donner les risques de gratte locaux." },
-  { categorie: "General", ordre: 3, question: "Comment fonctionne le mode hors-ligne ?", reponse: "Les données consultées avec internet sont mises en cache (PWA). Le GPS fonctionne sans réseau, mas pas les mises à jour live." },
+  { categorie: "General", ordre: 3, question: "Comment fonctionne le mode hors-ligne ?", reponse: "Les données consultées avec internet sont mises en cache (PWA). Le GPS fonctionne sans réseau, mais pas les mises à jour live." },
   { categorie: "General", ordre: 4, question: "L'application consomme-t-elle beaucoup de batterie ?", reponse: "Le GPS en continu (Boat Tracker) est énergivore. Utilisez le 'Mode Éveil' uniquement quand nécessaire et prévoyez une batterie externe." },
   { categorie: "General", ordre: 5, question: "Quelle est la précision des marées ?", reponse: "Nous utilisons les constantes du SHOM ajustées par algorithme selon votre commune. La précision est de +/- 10 min." },
   { categorie: "General", ordre: 6, question: "Puis-je changer ma commune favorite ?", reponse: "Oui, via le sélecteur en haut de l'écran. Votre choix est mémorisé sur votre profil." },
@@ -76,6 +76,9 @@ export const INITIAL_FAQ_DATA = [
   { categorie: "Boat Tracker", ordre: 102, question: "Où s'affichent les alertes de péremption ?", reponse: "Un bandeau orange d'alerte apparaît automatiquement en haut de la page 'Accueil' dès qu'un équipement est à moins de 90 jours (3 mois) de sa fin de validité." },
   { categorie: "Boat Tracker", ordre: 103, question: "Peut-on gérer plusieurs bateaux ?", reponse: "Oui, vous pouvez créer autant de profils de navires que vous le souhaitez dans la section Réglementation et gérer le matériel de chacun séparément." },
   { categorie: "Boat Tracker", ordre: 107, question: "Le récepteur peut-il envoyer un signal au navire ?", reponse: "Oui. En activant son propre GPS dans l'onglet Récepteur, il peut marquer un 'Regroupement d'oiseaux'. Le point GPS s'affichera instantanément sur la carte de l'émetteur et une alerte sonore retentira à bord." },
+  { categorie: "Boat Tracker", ordre: 110, question: "Qu'est-ce que l'Angle de Tir / Sécurité ?", reponse: "C'est une zone de surveillance visuelle (cône bleu clair) que vous définissez sur la carte. Si un autre point GPS entre dans cet angle, vous recevez une alerte sonore immédiate." },
+  { categorie: "Boat Tracker", ordre: 111, question: "Comment régler la direction de l'angle ?", reponse: "Utilisez le curseur dans vos réglages : 0° est le centre, vous pouvez régler de -180° (gauche) à +180° (droite)." },
+  { categorie: "Boat Tracker", ordre: 112, question: "Quelle est la portée maximale de l'angle ?", reponse: "Vous pouvez régler la portée jusqu'à 2000m (2 km). La détection ne s'active que si le coéquipier est à l'intérieur de cette distance." },
 
   // --- CHASSE (15) ---
   { categorie: "Chasse", ordre: 61, question: "Comment rejoindre une battue ?", reponse: "Entrez le code session (CH-XXXX) fourni par l'organisateur." },
@@ -95,11 +98,13 @@ export const INITIAL_FAQ_DATA = [
   { categorie: "Chasse", ordre: 75, question: "Qui voit ma position en chasse ?", reponse: "Uniquement les personnes ayant rejoint votre code de session spécifique." },
   { categorie: "Chasse", ordre: 108, question: "Comment utiliser 'Mon Râtelier' ?", reponse: "Allez dans l'onglet Chasse > vignettes 'Balistique'. Enregistrez vos armes avec leur calibre et munition favorite. Dans la Table de Tir, utilisez le menu 'Charger une arme' pour remplir instantanément tous les paramètres techniques." },
   { categorie: "Chasse", ordre: 109, question: "Puis-je enregistrer plusieurs carabines ?", reponse: "Oui, vous pouvez créer un nombre illimité de fiches personnalisées. Chaque fiche mémorise ses réglages propres (Zéro, poids, munition)." },
+  { categorie: "Chasse", ordre: 113, question: "La détection de collision est-elle mutuelle ?", reponse: "Oui. Vous recevez une alerte si quelqu'un entre dans votre zone de tir, mais aussi si VOUS entrez dans la zone d'un coéquipier (si son angle est actif)." },
+  { categorie: "Chasse", ordre: 114, question: "Où voir la précision du GPS ?", reponse: "La précision s'affiche sous forme de badge (+/- Xm) dans la liste des participants de votre équipe." },
 
   // --- CHAMPS (15) ---
   { categorie: "Champs", ordre: 76, question: "Pourquoi l'arrosage est en secondes ?", reponse: "Pour vous aider à doser précisément au jet d'eau selon les besoins de chaque plante." },
   { categorie: "Champs", ordre: 77, question: "C'est quoi un jour 'Racines' ?", reponse: "Un jour où l'influence lunaire favorise les carottes, oignons, radis, etc." },
-  { categorie: "Champs", ordre: 78, question: "Le scanner diagnostique-t-il les maladies ?", reponse: "Oui, photographiez une feuille abîmée pour obtenir un conseil de traitement local." },
+  { categorie: "Champs", ordre: 78, question: "Le scanner diagnostique-t-ils les maladies ?", reponse: "Oui, photographiez une feuille abîmée pour obtenir un conseil de traitement local." },
   { categorie: "Champs", ordre: 79, question: "Comment marche le Bilan Stratégique ?", reponse: "L'IA analyse votre inventaire jardin et la météo live pour créer votre plan d'action du jour." },
   { categorie: "Champs", ordre: 80, question: "Peut-on planter des tomates toute l'année ?", reponse: "Oui, mais elles préfèrent la saison fraîche pour éviter le mildiou excessif." },
   { categorie: "Champs", ordre: 81, question: "Quelle lune pour tailler les arbres ?", reponse: "Lune descendante (sève en bas) pour ne pas épuiser l'arbre." },
