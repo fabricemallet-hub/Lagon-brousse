@@ -21,8 +21,12 @@ export async function ensureUserDocument(
   const userDocRef = doc(firestore, 'users', user.uid);
   const email = user.email?.toLowerCase() || '';
   
-  // COMPTES ADMIN AUTORISÉS
-  const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'D1q2GPM95rZi38cvCzvsjcWQDaV2', 'koKj5ObSGXYeO1PLKU5bgo8Yaky1'];
+  // COMPTES ADMIN AUTORISÉS (Consolidés)
+  const masterUids = [
+    't8nPnZLcTiaLJSKMuLzib3C5nPn1', 
+    'D1q2GPM95rZi38cvCzvsjcWQDaV2', 
+    'koKj5ObSGXYeO1PLKU5bgo8Yaky1'
+  ];
   const masterEmails = [
     'f.mallet81@outlook.com', 
     'f.mallet81@gmail.com', 
@@ -46,7 +50,7 @@ export async function ensureUserDocument(
       }
 
       // 2. Restauration automatique du rôle Master
-      if (isMasterAdmin && currentData.role !== 'admin') {
+      if (isMasterAdmin && (currentData.role !== 'admin' || currentData.subscriptionStatus !== 'admin')) {
           updates.role = 'admin';
           updates.subscriptionStatus = 'admin';
       }

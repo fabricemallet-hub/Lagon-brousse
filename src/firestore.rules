@@ -4,7 +4,19 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ======================================================
-    // 1. FONCTIONS DE SÉCURITÉ & MASTER ADMIN
+    // 1. PRIORITÉ ABSOLUE : CAMPAGNES
+    // ======================================================
+    // On place cette règle au sommet pour débloquer le Dashboard Pro immédiatement
+    match /campaigns/{campaignId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    match /{path=**}/campaigns/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    // ======================================================
+    // 2. FONCTIONS DE SÉCURITÉ & MASTER ADMIN
     // ======================================================
     
     function isSignedIn() {
@@ -30,15 +42,6 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 2. CAMPAGNES (URGENT FIX)
-    // ======================================================
-    
-    match /campaigns/{campaignId} {
-      // Autorisation simplifiée au maximum pour débloquer le listing
-      allow read, write: if request.auth != null;
-    }
-
-    // ======================================================
     // 3. RÈGLES PUBLIQUES (LECTURE)
     // ======================================================
 
@@ -57,7 +60,7 @@ service cloud.firestore {
     match /{path=**}/promotions/{promoId} { allow read: if true; }
 
     // ======================================================
-    // 4. UTILISATEURS & PRIVÉES
+    // 4. RÈGLES UTILISATEURS & PRIVÉES
     // ======================================================
 
     match /users/{userId} {
