@@ -56,11 +56,15 @@ export function useCollection<T = any>(
     // Determine path for security check
     let path: string = '';
     try {
-      path = memoizedTargetRefOrQuery 
-        ? (memoizedTargetRefOrQuery.type === 'collection'
-            ? (memoizedTargetRefOrQuery as CollectionReference).path
-            : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString())
-        : '';
+      if (memoizedTargetRefOrQuery) {
+        if (memoizedTargetRefOrQuery.type === 'collection') {
+          path = (memoizedTargetRefOrQuery as CollectionReference).path;
+        } else {
+          // It's a query. For collectionGroup, canonicalString() provides the collection ID or internal path.
+          const internalQuery = memoizedTargetRefOrQuery as unknown as InternalQuery;
+          path = internalQuery._query.path.canonicalString() || 'collectionGroup';
+        }
+      }
     } catch (e) {
       path = (memoizedTargetRefOrQuery as any)?.path || '/';
     }
@@ -72,7 +76,8 @@ export function useCollection<T = any>(
       path.includes('promotions') ||
       path.includes('app_settings') ||
       path.includes('fish_species') ||
-      path.includes('sound_library')
+      path.includes('sound_library') ||
+      path === 'collectionGroup'
     );
     
     const auth = getAuth();
