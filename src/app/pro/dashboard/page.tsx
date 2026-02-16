@@ -12,10 +12,27 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { 
-  Megaphone, Plus, Trash2, ShoppingBag, Store, RefreshCw, 
-  ImageIcon, X, Pencil, UserCircle, BrainCircuit, MapPin, 
-  ChevronDown, Globe, Smartphone, Mail, Zap, Wand2,
-  Check, CheckCircle2, CreditCard, Copy
+  Megaphone, 
+  Plus, 
+  Trash2, 
+  ShoppingBag, 
+  Store, 
+  RefreshCw, 
+  ImageIcon, 
+  X, 
+  Pencil, 
+  UserCircle, 
+  BrainCircuit, 
+  MapPin, 
+  ChevronDown, 
+  Globe, 
+  Smartphone, 
+  Mail, 
+  Zap, 
+  Wand2,
+  Check, 
+  CheckCircle2, 
+  CreditCard
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -27,7 +44,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { allCommuneNames } from '@/lib/locations';
 import { analyzeProduct } from '@/ai/flows/analyze-product-flow';
 import { generateCampaignMessages } from '@/ai/flows/generate-campaign-messages-flow';
-import type { AnalyzeProductOutput, GenerateCampaignOutput } from '@/ai/schemas';
 import {
   Dialog,
   DialogContent,
@@ -183,7 +199,7 @@ export default function ProDashboard() {
       }
       if (selectedTargetCommunes.length === 0) setSelectedTargetCommunes([business.commune]);
     }
-  }, [business, targetCategory, promoCategory, selectedTargetCommunes.length]);
+  }, [business, selectedTargetCommunes.length, targetCategory, promoCategory]);
 
   useEffect(() => {
     if (!firestore || !business || isUserLoading || !user) return;
@@ -581,7 +597,9 @@ export default function ProDashboard() {
                         {selectedChannels.includes('PUSH') && (
                             <div className="space-y-2">
                                 <p className="text-[10px] font-black uppercase text-primary flex items-center gap-2"><Zap className="size-3" /> Propositions Push</p>
-                                {campProps.pushPropositions?.map((t, i) => (<div key={i} onClick={() => setSelectedPushIdx(i)} className={cn("p-3 rounded-xl border-2 text-xs cursor-pointer", selectedPushIdx === i ? "bg-primary/5 border-primary" : "bg-white")}>"{t}"</div>))}
+                                {campProps.pushPropositions?.map((t, i) => (
+                                    <div key={i} onClick={() => setSelectedPushIdx(i)} className={cn("p-3 rounded-xl border-2 text-xs cursor-pointer", selectedPushIdx === i ? "bg-primary/5 border-primary" : "bg-white")}>"{t}"</div>
+                                ))}
                             </div>
                         )}
                         {selectedChannels.includes('MAIL') && (
@@ -604,7 +622,7 @@ export default function ProDashboard() {
                                 <p className="text-[10px] font-black uppercase opacity-40">Devis final estimé</p>
                                 <div className="flex items-baseline gap-1">
                                     <p className="text-3xl font-black text-primary">{totalCalculatedCost.toLocaleString('fr-FR').replace(/\s/g, ' ')}</p>
-                                    <span className="text-xs font-black opacity-60">FCFP</span>
+                                    <span className="text-xs font-black uppercase opacity-60">FCFP</span>
                                 </div>
                             </div>
                             <Button onClick={handleFinalDiffuse} className="w-full h-14 bg-accent hover:bg-accent/90 text-white font-black uppercase gap-3 shadow-xl text-base tracking-widest border-2 border-white/20">
@@ -620,7 +638,7 @@ export default function ProDashboard() {
                 {campWizardStep === 'SELECTION' && <Button onClick={handleConfirmSelections} className="w-full h-12 font-black uppercase">Aperçu Final & Devis</Button>}
             </DialogFooter>
         </DialogContent>
-        </Dialog>
+      </Dialog>
     </div>
   );
 }
