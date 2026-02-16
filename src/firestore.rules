@@ -5,7 +5,22 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ======================================================
-    // 1. FONCTIONS DE SÉCURITÉ
+    // 1. RÈGLES DE GROUPE (Indispensables pour collectionGroup)
+    // DOIVENT ÊTRE EN HAUT POUR ÉVITER L'OMBRAGE
+    // ======================================================
+    
+    // Autorise la lecture globale des promotions (Catalogue Shopping)
+    match /{path=**}/promotions/{promoId} {
+      allow get, list: if true;
+    }
+    
+    // Autorise la lecture globale des spots GPS (Carte Admin)
+    match /{path=**}/fishing_spots/{spotId} {
+      allow get, list: if request.auth != null;
+    }
+
+    // ======================================================
+    // 2. FONCTIONS DE SÉCURITÉ
     // ======================================================
     
     function isSignedIn() {
@@ -33,29 +48,7 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 2. RÈGLES DE GROUPE (CRITIQUE : DOIVENT ÊTRE EN HAUT)
-    // ======================================================
-    
-    // Autorise la lecture globale des promotions pour la page Shopping (collectionGroup)
-    match /{path=**}/promotions/{promoId} {
-      allow read: if true;
-    }
-    
-    // Autorise la lecture globale des spots GPS pour la carte Admin (collectionGroup)
-    match /{path=**}/fishing_spots/{spotId} {
-      allow read: if isSignedIn();
-    }
-
-    // ======================================================
-    // 3. ACCÈS PRIORITAIRE ADMIN
-    // ======================================================
-
-    match /{allPaths=**} {
-      allow read, write: if isMasterAdmin();
-    }
-
-    // ======================================================
-    // 4. COMMERCES & PROMOTIONS (Accès direct)
+    // 3. COMMERCES & PROMOTIONS (Accès direct)
     // ======================================================
 
     match /businesses/{businessId} {
@@ -68,7 +61,7 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 5. CAMPAGNES
+    // 4. CAMPAGNES
     // ======================================================
     
     match /campaigns/{campaignId} {
@@ -76,7 +69,7 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 6. UTILISATEURS & PROFILS
+    // 5. UTILISATEURS & PROFILS
     // ======================================================
 
     match /users/{userId} {
@@ -89,7 +82,7 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 7. MESSAGERIE & DONNÉES SYSTÈME
+    // 6. MESSAGERIE & DONNÉES SYSTÈME
     // ======================================================
 
     match /conversations/{convId} {
@@ -112,7 +105,7 @@ service cloud.firestore {
     match /sound_library/{id} { allow read: if true; }
 
     // ======================================================
-    // 8. AUTRES COLLECTIONS
+    // 7. AUTRES COLLECTIONS
     // ======================================================
 
     match /hunting_sessions/{sessionId} { allow read, write: if isSignedIn(); }
@@ -125,6 +118,14 @@ service cloud.firestore {
     match /cms_support/tickets/items/{id} {
       allow create: if isSignedIn();
       allow read, write: if isSignedIn() && (resource.data.userId == request.auth.uid || isMasterAdmin());
+    }
+
+    // ======================================================
+    // 8. ACCÈS PRIORITAIRE ADMIN (Catch-all)
+    // ======================================================
+
+    match /{allPaths=**} {
+      allow read, write: if isMasterAdmin();
     }
   }
 }

@@ -57,6 +57,7 @@ export function useCollection<T = any>(
   useEffect(() => {
     // Determine path for security check
     let path: string = '';
+    let isCollectionGroup = false;
     try {
       if (memoizedTargetRefOrQuery) {
         if (memoizedTargetRefOrQuery.type === 'collection') {
@@ -64,7 +65,12 @@ export function useCollection<T = any>(
         } else {
           // It's a query. Check for collectionGroup
           const internalQuery = memoizedTargetRefOrQuery as unknown as InternalQuery;
-          path = internalQuery._query.collectionGroup || internalQuery._query.path.canonicalString() || 'query';
+          if (internalQuery._query.collectionGroup) {
+              path = internalQuery._query.collectionGroup;
+              isCollectionGroup = true;
+          } else {
+              path = internalQuery._query.path.canonicalString() || 'query';
+          }
         }
       }
     } catch (e) {
@@ -79,12 +85,12 @@ export function useCollection<T = any>(
       path.includes('app_settings') ||
       path.includes('fish_species') ||
       path.includes('sound_library') ||
-      path === 'promotions' // collectionGroup detection
+      path === 'promotions' || 
+      isCollectionGroup && path === 'promotions'
     );
     
     const auth = getAuth();
     if (!isPublic && memoizedTargetRefOrQuery && !auth.currentUser) {
-      console.log("[DEBUG] useCollection - Waiting for auth for private path:", path);
       return;
     }
 

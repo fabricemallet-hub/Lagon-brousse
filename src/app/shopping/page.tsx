@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -65,21 +66,12 @@ export default function ShoppingPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  // --- DEBUG LOGS ---
-  useEffect(() => {
-    if (user) console.log("[DEBUG] ShoppingPage - Auth User Logged In:", user.uid);
-  }, [user]);
-
   // --- DATA FETCHING ---
   const userProfileRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return doc(firestore, 'users', user.uid);
   }, [user, firestore]);
   const { data: profile, isLoading: isProfileLoading } = useDoc<UserAccount>(userProfileRef);
-
-  useEffect(() => {
-    if (profile) console.log("[DEBUG] ShoppingPage - Profile Ready:", profile.displayName, "Role:", profile.role);
-  }, [profile]);
 
   const businessesRef = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -89,17 +81,10 @@ export default function ShoppingPage() {
 
   const promosRef = useMemoFirebase(() => {
     if (!firestore) return null;
-    // La règle collectionGroup est sensible : on s'assure que firestore est prêt
-    console.log("[DEBUG] ShoppingPage - Triggering collectionGroup('promotions')");
     return collectionGroup(firestore, 'promotions');
   }, [firestore]);
   
   const { data: allPromotions, isLoading: isPromosLoading, error: promosError } = useCollection<Promotion>(promosRef);
-
-  useEffect(() => {
-    if (allPromotions) console.log("[DEBUG] ShoppingPage - Promotions successfully loaded:", allPromotions.length);
-    if (promosError) console.error("[DEBUG] ShoppingPage - Error loading promotions:", promosError);
-  }, [allPromotions, promosError]);
 
   // --- DETAIL VIEW STATE ---
   const [selectedProductForDetail, setSelectedProductForDetail] = useState<Promotion & { business?: Business } | null>(null);
@@ -120,15 +105,9 @@ export default function ShoppingPage() {
   // Sync Carousel with Dots
   useEffect(() => {
     if (!api) return;
-    
-    const onSelect = () => {
-      setActiveImageIdx(api.selectedScrollSnap());
-    };
-
+    const onSelect = () => setActiveImageIdx(api.selectedScrollSnap());
     api.on("select", onSelect);
-    return () => {
-      api.off("select", onSelect);
-    };
+    return () => { api.off("select", onSelect); };
   }, [api]);
 
   useEffect(() => {
@@ -182,19 +161,18 @@ export default function ShoppingPage() {
   // --- MODERATION ---
   const isAdmin = useMemo(() => {
     if (!user) return false;
-    const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com', 'fabrice.mallet@gmail.com'];
-    const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'D1q2GPM95rZi38cvCzvsjcWQDaV2'];
-    return masterEmails.includes(user.email?.toLowerCase() || '') || masterUids.includes(user.uid) || profile?.role === 'admin' || profile?.subscriptionStatus === 'admin';
-  }, [user, profile]);
+    const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com', 'fabrice.mallet@gmail.com', 'kledostyle@outlook.com'];
+    const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'D1q2GPM95rZi38cvCzvsjcWQDaV2', 'koKj5ObSGXYeO1PLKU5bgo8Yaky1'];
+    return masterEmails.includes(user.email?.toLowerCase() || '') || masterUids.includes(user.uid);
+  }, [user]);
 
   const confirmDeleteProduct = async () => {
     if (!firestore || !isAdmin || !productToDelete) return;
-    
     try {
         await deleteDoc(doc(firestore, 'businesses', productToDelete.businessId, 'promotions', productToDelete.id));
-        toast({ title: "Annonce supprimée avec succès" });
+        toast({ title: "Annonce supprimée" });
     } catch (e) {
-        toast({ variant: "destructive", title: "Erreur suppression", description: "Vérifiez vos droits administrateur." });
+        toast({ variant: "destructive", title: "Erreur suppression" });
     } finally {
         setProductToDelete(null);
     }
@@ -202,43 +180,27 @@ export default function ShoppingPage() {
 
   const filteredProducts = useMemo(() => {
     if (!allPromotions) return [];
-
     const businessMap = new Map(businesses?.map(b => [b.id, b]) || []);
-
     const currentFRegion = filterRegion === 'USER_DEFAULT' ? userRegion : filterRegion;
     const currentFCommune = filterCommune === 'USER_DEFAULT' ? userCommune : filterCommune;
 
     return allPromotions
-      .map(promo => ({
-        ...promo,
-        business: businessMap.get(promo.businessId)
-      }))
+      .map(promo => ({ ...promo, business: businessMap.get(promo.businessId) }))
       .filter(item => {
-        const matchesSearch = !search || 
-                             item.title.toLowerCase().includes(search.toLowerCase()) || 
-                             (item.description?.toLowerCase() || '').includes(search.toLowerCase());
+        const matchesSearch = !search || item.title.toLowerCase().includes(search.toLowerCase()) || (item.description?.toLowerCase() || '').includes(search.toLowerCase());
         if (!matchesSearch) return false;
-
         if (currentFRegion !== 'ALL') {
             const itemCommune = item.business?.commune;
             if (itemCommune) {
                 const isTahiti = Object.keys(locationsByRegion['TAHITI']).includes(itemCommune);
                 const itemRegion = isTahiti ? 'TAHITI' : 'CALEDONIE';
                 if (itemRegion !== currentFRegion) return false;
-            } else {
-                return false; 
-            }
+            } else return false;
         }
-
-        if (currentFCommune !== 'ALL') {
-            if (item.business && item.business.commune !== currentFCommune) return false;
-            if (!item.business) return false; 
-        }
-
+        if (currentFCommune !== 'ALL' && item.business?.commune !== currentFCommune) return false;
         if (filterCategory !== 'ALL' && item.category !== filterCategory) return false;
         if (filterBusiness !== 'ALL' && item.businessId !== filterBusiness) return false;
         if (filterType !== 'ALL' && item.promoType !== filterType) return false;
-
         return true;
       })
       .sort((a, b) => {
@@ -248,9 +210,8 @@ export default function ShoppingPage() {
             if (aInCommune && !bInCommune) return -1;
             if (!aInCommune && bInCommune) return 1;
         }
-        
-        const timeA = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
-        const timeB = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
+        const timeA = a.createdAt?.toMillis?.() || 0;
+        const timeB = b.createdAt?.toMillis?.() || 0;
         return timeB - timeA;
       });
   }, [allPromotions, businesses, search, filterRegion, filterCommune, filterCategory, filterBusiness, filterType, userRegion, userCommune]);
@@ -262,12 +223,8 @@ export default function ShoppingPage() {
   }, [filterRegion, userRegion]);
 
   const resetFilters = () => {
-    setSearch('');
-    setFilterRegion('USER_DEFAULT');
-    setFilterCommune('USER_DEFAULT');
-    setFilterCategory('ALL');
-    setFilterBusiness('ALL');
-    setFilterType('ALL');
+    setSearch(''); setFilterRegion('USER_DEFAULT'); setFilterCommune('USER_DEFAULT');
+    setFilterCategory('ALL'); setFilterBusiness('ALL'); setFilterType('ALL');
   };
 
   const isLoading = isBusinessesLoading || isPromosLoading;
@@ -279,18 +236,15 @@ export default function ShoppingPage() {
           <CardTitle className="text-2xl font-black tracking-tight flex items-center gap-2 uppercase">
             <ShoppingBag className="text-primary size-7" /> Le Shopping NC
           </CardTitle>
-          <CardDescription className="text-xs font-bold uppercase opacity-60">
-            Découvrez les offres et nouveautés de vos magasins locaux.
-          </CardDescription>
+          <CardDescription className="text-xs font-bold uppercase opacity-60">Catalogue des offres locales.</CardDescription>
         </CardHeader>
       </Card>
 
       <div className="relative group">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-muted-foreground transition-colors group-focus-within:text-primary" />
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
         <Input 
-          placeholder="Chercher un produit (ex: Moulinet, terreau...)" 
-          value={search} 
-          onChange={(e) => setSearch(e.target.value)} 
+          placeholder="Chercher un produit..." 
+          value={search} onChange={(e) => setSearch(e.target.value)} 
           className="pl-12 h-14 border-2 shadow-sm font-black text-base bg-white" 
         />
       </div>
@@ -298,87 +252,29 @@ export default function ShoppingPage() {
       <Card className="border-2 shadow-md bg-muted/10">
         <CardContent className="p-4 space-y-4">
           <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2 text-[10px] font-black uppercase text-muted-foreground tracking-widest">
-                <Filter className="size-3" /> Paramètres de tri
-            </div>
-            <Button variant="ghost" size="sm" onClick={resetFilters} className="h-6 text-[9px] font-black uppercase text-primary">Réinitialiser</Button>
+            <div className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2"><Filter className="size-3" /> Paramètres de tri</div>
+            <Button variant="ghost" size="sm" onClick={resetFilters} className="h-6 text-[9px] font-black uppercase text-primary">Reset</Button>
           </div>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-                <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Région</Label>
+                <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Région</Label>
                 <Select value={filterRegion} onValueChange={(v) => { setFilterRegion(v); setFilterCommune('ALL'); }}>
-                    <SelectTrigger className="h-10 border-2 bg-white font-black uppercase text-xs">
-                        <Globe className="size-3 mr-2 text-primary" />
-                        <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger className="h-10 border-2 bg-white font-black uppercase text-xs"><Globe className="size-3 mr-2" /><SelectValue /></SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="USER_DEFAULT" className="font-black text-xs text-primary uppercase italic">Mise en avant : {userRegion}</SelectItem>
-                        <SelectItem value="ALL" className="font-black text-xs uppercase">Toutes les régions</SelectItem>
-                        {regions.map(reg => (
-                            <SelectItem key={reg} value={reg} className="font-black text-xs uppercase">{reg}</SelectItem>
-                        ))}
+                        <SelectItem value="USER_DEFAULT" className="font-black text-xs text-primary uppercase italic">Focus : {userRegion}</SelectItem>
+                        <SelectItem value="ALL" className="font-black text-xs uppercase">Tout</SelectItem>
+                        {regions.map(reg => <SelectItem key={reg} value={reg} className="font-black text-xs uppercase">{reg}</SelectItem>)}
                     </SelectContent>
                 </Select>
             </div>
-
             <div className="space-y-1">
-                <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Commune</Label>
+                <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Commune</Label>
                 <Select value={filterCommune} onValueChange={setFilterCommune}>
-                    <SelectTrigger className="h-10 border-2 bg-white font-bold text-xs">
-                        <MapPin className="size-3 mr-2 text-primary" />
-                        <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger className="h-10 border-2 bg-white font-bold text-xs"><MapPin className="size-3 mr-2" /><SelectValue /></SelectTrigger>
                     <SelectContent className="max-h-64">
-                        <SelectItem value="USER_DEFAULT" className="font-black text-xs text-primary uppercase italic">Mise en avant : {userCommune}</SelectItem>
-                        <SelectItem value="ALL" className="font-bold text-xs">Toutes les communes</SelectItem>
-                        {availableCommunes.map(loc => (
-                            <SelectItem key={loc} value={loc} className="text-xs font-bold">{loc}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
-
-            <div className="space-y-1">
-                <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Magasin</Label>
-                <Select value={filterBusiness} onValueChange={setFilterBusiness}>
-                    <SelectTrigger className="h-10 border-2 bg-white font-bold text-xs">
-                        <SelectValue placeholder="Tous les magasins" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-64">
-                        <SelectItem value="ALL" className="font-bold text-xs">Tous les magasins</SelectItem>
-                        {businesses?.map(b => (
-                            <SelectItem key={b.id} value={b.id} className="text-xs font-bold">{b.name} ({b.commune})</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
-
-            <div className="space-y-1">
-                <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Catégorie</Label>
-                <Select value={filterCategory} onValueChange={setFilterCategory}>
-                    <SelectTrigger className="h-10 border-2 bg-white font-bold text-xs">
-                        <SelectValue placeholder="Toutes les catégories" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="ALL" className="font-bold text-xs">Toutes les catégories</SelectItem>
-                        <SelectItem value="Pêche" className="text-xs font-bold text-blue-600">Pêche</SelectItem>
-                        <SelectItem value="Chasse" className="text-xs font-bold text-orange-600">Chasse</SelectItem>
-                        <SelectItem value="Jardinage" className="text-xs font-bold text-green-600">Jardinage</SelectItem>
-                    </SelectContent>
-                </Select>
-            </div>
-
-            <div className="space-y-1">
-                <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Type d'offre</Label>
-                <Select value={filterType} onValueChange={setFilterType}>
-                    <SelectTrigger className="h-10 border-2 bg-white font-bold text-xs">
-                        <SelectValue placeholder="Toutes les offres" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="ALL" className="font-bold text-xs">Tous types</SelectItem>
-                        <SelectItem value="Promo" className="text-xs font-bold text-red-600">Promotions</SelectItem>
-                        <SelectItem value="Nouvel Arrivage" className="text-xs font-bold text-primary">Nouveautés</SelectItem>
+                        <SelectItem value="USER_DEFAULT" className="font-black text-xs text-primary uppercase italic">Focus : {userCommune}</SelectItem>
+                        <SelectItem value="ALL" className="font-bold text-xs">Tout</SelectItem>
+                        {availableCommunes.map(loc => <SelectItem key={loc} value={loc} className="text-xs font-bold">{loc}</SelectItem>)}
                     </SelectContent>
                 </Select>
             </div>
@@ -387,352 +283,94 @@ export default function ShoppingPage() {
       </Card>
 
       <div className="space-y-4">
-        {promosError && (
-            <Alert variant="destructive" className="border-2 animate-in fade-in bg-red-50 text-red-900 border-red-200">
-                <AlertTriangle className="size-4 text-red-600" />
-                <AlertTitle className="text-xs font-black uppercase">ERREUR DE PERMISSIONS</AlertTitle>
-                <AlertDescription className="text-[10px] font-bold leading-tight mt-1">
-                    Le catalogue global nécessite une règle indexée sur toute la base. 
-                </AlertDescription>
-            </Alert>
-        )}
-
-        <div className="flex items-center justify-between px-1">
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                <Tag className="size-3" /> {filteredProducts.length} Article{filteredProducts.length > 1 ? 's' : ''} trouvé{filteredProducts.length > 1 ? 's' : ''}
-            </h3>
-            {filterCommune === 'USER_DEFAULT' && (
-                <Badge variant="outline" className="text-[8px] h-4 font-black border-primary/30 text-primary uppercase">Priorité {userCommune}</Badge>
-            )}
-        </div>
-
+        {promosError && <Alert variant="destructive"><AlertTitle>Erreur</AlertTitle><AlertDescription>Impossible de charger le catalogue.</AlertDescription></Alert>}
         {isLoading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-48 w-full rounded-2xl" />)}
+                {[1, 2].map(i => <Skeleton key={i} className="h-48 w-full rounded-2xl" />)}
             </div>
         ) : filteredProducts.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {filteredProducts.map((item) => (
-                    <ProductCard 
-                        key={item.id} 
-                        product={item} 
-                        onContact={handleOpenContact} 
-                        onViewDetail={() => setSelectedProductForDetail(item)}
-                        onDelete={(id, bid) => setProductToDelete({id, businessId: bid})}
-                        isAdmin={isAdmin}
-                    />
+                    <ProductCard key={item.id} product={item} onContact={handleOpenContact} onViewDetail={() => setSelectedProductForDetail(item)} onDelete={(id, bid) => setProductToDelete({id, businessId: bid})} isAdmin={isAdmin} />
                 ))}
             </div>
         ) : (
-            <div className="text-center py-20 border-4 border-dashed rounded-[2.5rem] flex flex-col items-center justify-center gap-4 opacity-30">
-                <ShoppingBag className="size-12 mb-2" />
-                <div className="space-y-1">
-                    <h3 className="font-black uppercase tracking-widest text-sm">Aucun produit visible</h3>
-                    <p className="text-[10px] font-bold uppercase">Vérifiez vos filtres ou tentez de rafraîchir la page.</p>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="h-10 font-black uppercase text-[10px] mt-2 border-2 gap-2">
-                    <RefreshCw className="size-3" /> Rafraîchir
-                </Button>
+            <div className="text-center py-20 border-4 border-dashed rounded-[2.5rem] opacity-30">
+                <ShoppingBag className="size-12 mb-2 mx-auto" />
+                <p className="font-black uppercase text-sm">Aucun produit</p>
             </div>
         )}
       </div>
 
-      <AlertDialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
-        <AlertDialogContent className="rounded-3xl border-none shadow-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="font-black uppercase tracking-tight text-destructive flex items-center gap-2">
-              <AlertCircle className="size-5" /> Supprimer l'annonce ?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-xs font-bold uppercase leading-relaxed">
-              Êtes-vous sûr de vouloir supprimer cette annonce définitivement ?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel className="h-12 font-black uppercase text-[10px] border-2">Annuler</AlertDialogCancel>
-            <AlertDialogAction 
-                onClick={confirmDeleteProduct} 
-                className="h-12 font-black uppercase text-[10px] bg-destructive hover:bg-destructive/90"
-            >
-                Supprimer définitivement
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* LIGHTBOX */}
-      <Dialog open={!!fullscreenImage} onOpenChange={(open) => !open && setFullscreenImage(null)}>
-        <DialogContent className="max-w-[100vw] w-full h-[100dvh] p-0 bg-black/95 border-none rounded-none overflow-hidden flex flex-col z-[200]">
-            <DialogHeader className="sr-only">
-                <DialogTitle>Zoom produit</DialogTitle>
-            </DialogHeader>
-            <div className="relative flex-1 flex items-center justify-center">
-                <button 
-                    onClick={() => setFullscreenImage(null)}
-                    className="absolute top-6 right-6 z-[210] p-3 bg-white/10 hover:bg-white/20 rounded-full text-white backdrop-blur-md transition-colors"
-                >
-                    <X className="size-6" />
-                </button>
-                {fullscreenImage && (
-                    <img 
-                        src={fullscreenImage} 
-                        className="max-w-full max-h-full object-contain animate-in zoom-in-95 duration-300" 
-                        alt="Zoom produit" 
-                    />
-                )}
-            </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* VUE DÉTAILLÉE */}
+      {/* DETAIL DIALOGS & LIGHTBOX */}
       <Dialog open={!!selectedProductForDetail} onOpenChange={(open) => !open && setSelectedProductForDetail(null)}>
         <DialogContent className="max-w-2xl w-[95vw] rounded-3xl p-0 overflow-hidden border-none shadow-2xl max-h-[95vh] flex flex-col">
             {selectedProductForDetail && (
                 <>
-                    <DialogHeader className="p-0 relative shrink-0">
-                        <DialogTitle className="sr-only">{selectedProductForDetail.title}</DialogTitle>
-                        <button 
-                            onClick={() => setSelectedProductForDetail(null)}
-                            className="absolute top-4 right-4 z-[160] p-2 bg-black/20 hover:bg-black/40 rounded-full text-white backdrop-blur-md transition-colors shadow-lg"
-                        >
-                            <X className="size-5" />
-                        </button>
-                        
-                        <div className="h-64 sm:h-80 bg-white relative overflow-hidden group border-b shrink-0">
-                            {selectedProductForDetail.images && selectedProductForDetail.images.length > 0 ? (
-                                <Carousel setApi={setApi} className="w-full h-full">
-                                    <CarouselContent className="h-full ml-0">
-                                        {selectedProductForDetail.images.map((img, idx) => (
-                                            <CarouselItem key={idx} className="h-full pl-0">
-                                                <div 
-                                                    className="w-full h-full flex items-center justify-center bg-white p-6 cursor-zoom-in"
-                                                    onClick={() => setFullscreenImage(img)}
-                                                >
-                                                    <img src={img} className="max-w-full max-h-full object-contain" alt="" />
-                                                </div>
-                                            </CarouselItem>
-                                        ))}
-                                    </CarouselContent>
-                                    {selectedProductForDetail.images.length > 1 && (
-                                        <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-2 px-4 z-[160]">
-                                            {selectedProductForDetail.images.map((_, idx) => (
-                                                <button 
-                                                    key={idx} 
-                                                    onClick={() => api?.scrollTo(idx)}
-                                                    className={cn("size-2 rounded-full transition-all shadow-md", activeImageIdx === idx ? "bg-primary w-6" : "bg-black/20")}
-                                                />
-                                            ))}
-                                        </div>
-                                    )}
-                                </Carousel>
-                            ) : (
-                                <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground/30 bg-white">
-                                    <ImageIcon className="size-16" />
-                                </div>
-                            )}
-                        </div>
-                    </DialogHeader>
-
-                    <div className="flex-1 overflow-y-auto bg-white p-6 space-y-6 scrollbar-hide">
-                        <div className="space-y-2">
-                            <h2 className={cn("text-2xl font-black uppercase tracking-tighter leading-tight text-slate-800", selectedProductForDetail.isOutOfStock && "line-through decoration-red-600")}>
-                                {selectedProductForDetail.title}
-                            </h2>
-                            <div className="flex items-center gap-2 text-primary">
-                                <Store className="size-4" />
-                                <span className="text-xs font-black uppercase">{selectedProductForDetail.business?.name}</span>
-                                <MapPin className="size-3" />
-                                <span className="text-[10px] font-bold uppercase">{selectedProductForDetail.business?.commune}</span>
-                            </div>
-                        </div>
-
-                        {selectedProductForDetail.isOutOfStock && (
-                            <Alert variant="destructive" className="bg-red-50 border-red-200 border-2">
-                                <AlertCircle className="size-4 text-red-600" />
-                                <AlertDescription className="text-sm font-black text-red-700">
-                                    STOCK ÉPUISÉ - Arrivage prévu le {selectedProductForDetail.restockDate || "Prochainement"}
-                                </AlertDescription>
-                            </Alert>
-                        )}
-
-                        <div className="p-5 bg-muted/10 rounded-2xl border-2 border-dashed border-primary/10 flex items-center justify-between">
-                            <div className="space-y-1">
-                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-none">Prix de vente</p>
-                                <div className="flex items-baseline gap-2">
-                                    <span className={cn(
-                                        "text-4xl font-black tracking-tighter",
-                                        selectedProductForDetail.isOutOfStock ? "line-through opacity-40" : (selectedProductForDetail.promoType === 'Promo' ? "text-red-600" : "text-primary")
-                                    )}>
-                                        {(selectedProductForDetail.price || 0).toLocaleString('fr-FR')}
-                                    </span>
-                                    <span className="text-xs font-black uppercase opacity-60">CFP</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="space-y-3 pb-6">
-                            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                                <FileText className="size-3" /> Description de l'offre
-                            </h3>
-                            <p className="text-sm font-medium leading-relaxed text-slate-600 whitespace-pre-wrap italic">
-                                {selectedProductForDetail.description || "Aucun détail complémentaire."}
-                            </p>
-                        </div>
+                    <div className="h-64 sm:h-80 bg-white relative shrink-0">
+                        <button onClick={() => setSelectedProductForDetail(null)} className="absolute top-4 right-4 z-[160] p-2 bg-black/20 rounded-full text-white"><X className="size-5" /></button>
+                        {selectedProductForDetail.images && selectedProductForDetail.images.length > 0 ? (
+                            <Carousel setApi={setApi} className="w-full h-full">
+                                <CarouselContent className="h-full ml-0">
+                                    {selectedProductForDetail.images.map((img, idx) => (
+                                        <CarouselItem key={idx} className="h-full pl-0" onClick={() => setFullscreenImage(img)}>
+                                            <img src={img} className="w-full h-full object-contain p-4" alt="" />
+                                        </CarouselItem>
+                                    ))}
+                                </CarouselContent>
+                            </Carousel>
+                        ) : <div className="w-full h-full flex items-center justify-center opacity-20"><ImageIcon className="size-16" /></div>}
                     </div>
-
-                    <DialogFooter className="p-4 bg-slate-50 border-t flex flex-col gap-2 shrink-0">
-                        <Button 
-                            className="w-full h-14 font-black uppercase tracking-widest shadow-xl gap-2 text-base"
-                            onClick={() => {
-                                const id = selectedProductForDetail.businessId;
-                                setSelectedProductForDetail(null);
-                                handleOpenContact(id);
-                            }}
-                        >
-                            Contacter le magasin <ChevronRight className="size-5" />
-                        </Button>
-                    </DialogFooter>
+                    <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-white">
+                        <h2 className={cn("text-2xl font-black uppercase text-slate-800", selectedProductForDetail.isOutOfStock && "line-through decoration-red-600")}>{selectedProductForDetail.title}</h2>
+                        <div className="flex items-center gap-2 text-primary font-black uppercase text-xs"><Store className="size-4" />{selectedProductForDetail.business?.name} <MapPin className="size-3" />{selectedProductForDetail.business?.commune}</div>
+                        {selectedProductForDetail.isOutOfStock && <Alert variant="destructive" className="bg-red-50 border-red-200 border-2"><AlertCircle className="size-4" /><AlertDescription className="text-sm font-black text-red-700">RUPTURE - Retour le {selectedProductForDetail.restockDate}</AlertDescription></Alert>}
+                        <div className="p-5 bg-muted/10 rounded-2xl border-2 border-dashed flex justify-between items-center">
+                            <div className="flex items-baseline gap-2">
+                                <span className={cn("text-4xl font-black", selectedProductForDetail.isOutOfStock ? "line-through opacity-40" : (selectedProductForDetail.promoType === 'Promo' ? "text-red-600" : "text-primary"))}>{(selectedProductForDetail.price || 0).toLocaleString('fr-FR')}</span>
+                                <span className="text-xs font-black uppercase opacity-60">CFP</span>
+                            </div>
+                        </div>
+                        <p className="text-sm font-medium leading-relaxed text-slate-600 italic">"{selectedProductForDetail.description || "Pas de description."}"</p>
+                    </div>
+                    <div className="p-4 bg-slate-50 border-t shrink-0"><Button className="w-full h-14 font-black uppercase tracking-widest shadow-xl" onClick={() => { const id = selectedProductForDetail.businessId; setSelectedProductForDetail(null); handleOpenContact(id); }}>Contacter le magasin</Button></div>
                 </>
             )}
         </DialogContent>
       </Dialog>
 
-      {/* MODAL CONTACT */}
       <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
         <DialogContent className="max-w-md rounded-2xl p-0 overflow-hidden">
-            <DialogHeader className="p-6 bg-slate-50 border-b">
-                <DialogTitle className="font-black uppercase tracking-tight flex items-center gap-2">
-                    <Store className="size-5 text-primary" /> Contact Magasin
-                </DialogTitle>
-                <DialogDescription className="text-xs font-bold uppercase">
-                    {selectedBusinessContact?.name}
-                </DialogDescription>
-            </DialogHeader>
-            <div className="p-6 space-y-6">
-                {isLoadingContact ? (
+            <DialogHeader className="p-6 bg-slate-50 border-b"><DialogTitle className="font-black uppercase flex items-center gap-2"><Store className="size-5" /> Contact Pro</DialogTitle></DialogHeader>
+            <div className="p-6 space-y-4">
+                {isLoadingContact ? <Skeleton className="h-12 w-full" /> : selectedBusinessContact && (
                     <div className="space-y-4">
-                        <Skeleton className="h-12 w-full rounded-xl" />
-                        <Skeleton className="h-12 w-full rounded-xl" />
+                        <Button asChild className="w-full h-14 font-black uppercase shadow-lg gap-3"><a href={`tel:${selectedBusinessContact.phoneNumber}`}><Smartphone className="size-5" /> Appeler le mobile</a></Button>
+                        <div className="p-4 bg-muted/30 rounded-2xl border-2 border-dashed flex items-start gap-3"><Home className="size-4 text-primary" /><div><p className="text-[10px] font-black uppercase opacity-40">Adresse</p><p className="text-xs font-bold">{selectedBusinessContact.address || "Non renseignée"}</p></div></div>
                     </div>
-                ) : selectedBusinessContact ? (
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-1 gap-3">
-                            <Button asChild className="h-14 font-black uppercase tracking-widest shadow-lg gap-3 text-base">
-                                <a href={`tel:${selectedBusinessContact.phoneNumber}`}>
-                                    <Smartphone className="size-5" /> Appeler le mobile
-                                </a>
-                            </Button>
-                        </div>
-                        <div className="p-4 bg-muted/30 rounded-2xl border-2 border-dashed space-y-3">
-                            <div className="flex items-start gap-3">
-                                <Home className="size-4 text-primary shrink-0 mt-0.5" />
-                                <div className="space-y-1">
-                                    <p className="text-[10px] font-black uppercase text-muted-foreground">Adresse</p>
-                                    <p className="text-xs font-bold leading-tight">{selectedBusinessContact.address || "Non renseignée"}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                ) : null}
+                )}
             </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!productToDelete} onOpenChange={(o) => !o && setProductToDelete(null)}><AlertDialogContent className="rounded-3xl"><AlertDialogHeader><AlertDialogTitle className="font-black uppercase">Supprimer ?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter className="gap-2"><AlertDialogCancel className="h-12 font-black uppercase text-[10px] border-2">Non</AlertDialogCancel><AlertDialogAction onClick={confirmDeleteProduct} className="h-12 font-black uppercase text-[10px] bg-destructive">Oui, supprimer</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </div>
   );
 }
 
-function ProductCard({ 
-    product, 
-    onContact, 
-    onViewDetail,
-    onDelete,
-    isAdmin
-}: { 
-    product: Promotion & { business?: Business }, 
-    onContact: (id: string) => void,
-    onViewDetail: () => void,
-    onDelete: (id: string, businessId: string) => void,
-    isAdmin: boolean
-}) {
+function ProductCard({ product, onContact, onViewDetail, onDelete, isAdmin }: any) {
     const isPromo = product.promoType === 'Promo';
-    const images = product.images || (product.imageUrl ? [product.imageUrl] : []);
-    const isOutOfStock = product.isOutOfStock;
-    
+    const image = product.images?.[0] || product.imageUrl;
     return (
-        <Card 
-            className={cn(
-                "overflow-hidden border-2 shadow-sm flex flex-col group transition-all hover:border-primary/40 cursor-pointer active:scale-[0.98]",
-                isPromo && "border-red-100 bg-red-50/10",
-                isOutOfStock && "opacity-75 border-red-200"
-            )}
-            onClick={onViewDetail}
-        >
-            <div className="px-3 py-2 bg-muted/20 border-b flex items-center justify-between">
-                <div className="flex items-center gap-2 min-w-0">
-                    <Store className="size-3 text-primary shrink-0" />
-                    <span className="text-[9px] font-black uppercase truncate text-slate-700">
-                        {product.business?.name || "Magasin NC"}
-                    </span>
-                </div>
-                <div className="flex items-center gap-2">
-                    {isAdmin && (
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="size-6 text-destructive hover:bg-destructive/10"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onDelete(product.id, product.businessId);
-                            }}
-                        >
-                            <Trash2 className="size-3" />
-                        </Button>
-                    )}
-                    <Badge variant="outline" className="text-[8px] h-4 font-bold border-muted-foreground/30">{product.business?.commune}</Badge>
-                </div>
-            </div>
-
-            <div className="flex min-h-[140px] h-auto relative">
-                <div className="w-32 bg-white shrink-0 relative flex items-center justify-center border-r overflow-hidden p-3">
-                    {images.length > 0 ? (
-                        <img src={images[0]} className="max-w-full max-h-full object-contain transition-transform group-hover:scale-105" alt="" />
-                    ) : (
-                        <ShoppingBag className="size-10 text-muted-foreground/20" />
-                    )}
-                    <Badge className={cn(
-                        "absolute top-1 left-1 font-black text-[8px] uppercase px-2 h-5",
-                        isPromo ? "bg-red-600 animate-pulse" : "bg-primary"
-                    )}>
-                        {product.promoType}
-                    </Badge>
-                </div>
-
+        <Card className={cn("overflow-hidden border-2 shadow-sm flex flex-col transition-all cursor-pointer", isPromo && "border-red-100 bg-red-50/10", product.isOutOfStock && "opacity-75")} onClick={onViewDetail}>
+            <div className="px-3 py-2 bg-muted/20 border-b flex justify-between items-center"><div className="flex items-center gap-2 min-w-0"><Store className="size-3 text-primary" /><span className="text-[9px] font-black uppercase truncate">{product.business?.name}</span></div>{isAdmin && <Button variant="ghost" size="icon" className="size-6 text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(product.id, product.businessId); }}><Trash2 className="size-3" /></Button>}</div>
+            <div className="flex h-36 relative">
+                <div className="w-32 bg-white shrink-0 flex items-center justify-center border-r p-2">{image ? <img src={image} className="max-w-full max-h-full object-contain" alt="" /> : <ShoppingBag className="size-8 opacity-10" />}<Badge className={cn("absolute top-1 left-1 font-black text-[8px] uppercase h-5", isPromo ? "bg-red-600" : "bg-primary")}>{product.promoType}</Badge></div>
                 <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
-                    <div className="space-y-1">
-                        <h4 className={cn("font-black uppercase text-xs leading-none break-words", isOutOfStock && "line-through decoration-red-600")}>{product.title}</h4>
-                        <p className="text-[10px] text-muted-foreground leading-tight line-clamp-3 italic">
-                            {product.description || "Aucune description."}
-                        </p>
-                    </div>
-
-                    <div className="flex items-end justify-between mt-3">
-                        <div className="flex items-baseline gap-1">
-                            <span className={cn("text-base font-black leading-none", isOutOfStock ? "line-through opacity-40" : (isPromo ? "text-red-600" : "text-primary"))}>
-                                {(product.price || 0).toLocaleString('fr-FR')}
-                            </span>
-                            <span className="text-[9px] font-black uppercase opacity-60">CFP</span>
-                        </div>
-                    </div>
+                    <h4 className={cn("font-black uppercase text-xs truncate", product.isOutOfStock && "line-through decoration-red-600")}>{product.title}</h4>
+                    <p className="text-[10px] text-muted-foreground line-clamp-2 italic">{product.description}</p>
+                    <div className="flex items-baseline gap-1"><span className={cn("text-base font-black", product.isOutOfStock ? "line-through opacity-40" : (isPromo ? "text-red-600" : "text-primary"))}>{(product.price || 0).toLocaleString('fr-FR')}</span><span className="text-[9px] font-black uppercase opacity-60">CFP</span></div>
                 </div>
-            </div>
-            
-            <div className="p-2 border-t bg-muted/10">
-                <Button 
-                    variant="ghost" 
-                    className="w-full h-10 text-[9px] font-black uppercase text-primary gap-2"
-                    onClick={(e) => { e.stopPropagation(); onContact(product.businessId); }}
-                >
-                    Contacter <ChevronRight className="size-3" />
-                </Button>
             </div>
         </Card>
     );
