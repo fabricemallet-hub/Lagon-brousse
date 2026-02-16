@@ -1,3 +1,4 @@
+
 'use client';
 import { doc, getDoc, setDoc, Firestore } from 'firebase/firestore';
 import { User } from 'firebase/auth';
@@ -21,7 +22,7 @@ export async function ensureUserDocument(
   const userDocRef = doc(firestore, 'users', user.uid);
   const email = user.email?.toLowerCase() || '';
   
-  // COMPTES ADMIN AUTORISÉS (Consolidés)
+  // COMPTES ADMIN AUTORISÉS (Consolidés avec les règles de sécurité)
   const masterUids = [
     't8nPnZLcTiaLJSKMuLzib3C5nPn1', 
     'D1q2GPM95rZi38cvCzvsjcWQDaV2', 
@@ -55,7 +56,7 @@ export async function ensureUserDocument(
           updates.subscriptionStatus = 'admin';
       }
 
-      // 3. Initialisation des champs d'audience si manquants (Opt-in par défaut pour migration)
+      // 3. Initialisation des champs d'audience si manquants
       if (currentData.allowsPromoPush === undefined) updates.allowsPromoPush = true;
       if (currentData.allowsPromoEmails === undefined) updates.allowsPromoEmails = true;
       if (currentData.allowsPromoSMS === undefined) updates.allowsPromoSMS = true;
@@ -63,7 +64,7 @@ export async function ensureUserDocument(
           updates.subscribedCategories = ['Pêche', 'Chasse', 'Jardinage'];
       }
 
-      // 4. Backfill de la région si manquante (Crucial pour le ciblage Pro)
+      // 4. Backfill de la région si manquante
       if (!currentData.selectedRegion) {
           const currentLoc = currentData.lastSelectedLocation || 'Nouméa';
           const isTahiti = Object.keys(locationsByRegion['TAHITI']).includes(currentLoc);
@@ -76,7 +77,7 @@ export async function ensureUserDocument(
       return;
     }
 
-    // Création d'un nouveau profil avec les réglages d'audience par défaut
+    // Création d'un nouveau profil
     const effectiveDisplayName = displayName || user.displayName || email.split('@')[0] || 'Utilisateur';
     const initialLocation = commune || 'Nouméa';
     const isTahiti = Object.keys(locationsByRegion['TAHITI']).includes(initialLocation);
