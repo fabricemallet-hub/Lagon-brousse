@@ -114,6 +114,7 @@ export default function ProDashboard() {
   const { data: pricing } = useDoc<CampaignPricingSettings>(pricingRef);
 
   // --- INVENTORY FORM STATE ---
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [promoTitle, setPromoTitle] = useState('');
   const [promoCategory, setPromoCategory] = useState('Pêche');
   const [promoDescription, setPromoDescription] = useState('');
@@ -209,6 +210,34 @@ export default function ProDashboard() {
     }
   };
 
+  const handleEditClick = (p: Promotion) => {
+    setEditingProductId(p.id);
+    setPromoTitle(p.title);
+    setPromoCategory(p.category || 'Pêche');
+    setPromoDescription(p.description || '');
+    setPromoPrice(p.price.toString());
+    setPromoType(p.promoType);
+    setPromoImages(p.images || [p.imageUrl].filter(Boolean) as string[]);
+    setIsOutOfStock(p.isOutOfStock || false);
+    if (p.restockDate) {
+        const [m, y] = p.restockDate.split(' ');
+        setNextArrivalMonth(m);
+        setNextArrivalYear(y);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    toast({ title: "Mode édition activé" });
+  };
+
+  const resetForm = () => {
+    setEditingProductId(null);
+    setPromoTitle('');
+    setPromoPrice('');
+    setPromoImages([]);
+    setPromoDescription('');
+    setPromoType('Promo');
+    setIsOutOfStock(false);
+  };
+
   const handleSavePromotion = async () => {
     if (!firestore || !business || !promoTitle) return;
     setIsSaving(true);
@@ -223,14 +252,17 @@ export default function ProDashboard() {
       imageUrl: promoImages[0] || '',
       isOutOfStock,
       restockDate: isOutOfStock ? `${nextArrivalMonth} ${nextArrivalYear}` : null,
-      createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
     try {
-        await addDoc(collection(firestore, 'businesses', business.id, 'promotions'), data);
-        toast({ title: "Article ajouté !" });
-        setPromoTitle(''); setPromoPrice(''); setPromoImages([]); setPromoDescription(''); setPromoType('Promo');
-        setIsOutOfStock(false);
+        if (editingProductId) {
+            await updateDoc(doc(firestore, 'businesses', business.id, 'promotions', editingProductId), data);
+            toast({ title: "Article mis à jour !" });
+        } else {
+            await addDoc(collection(firestore, 'businesses', business.id, 'promotions'), { ...data, createdAt: serverTimestamp() });
+            toast({ title: "Article ajouté !" });
+        }
+        resetForm();
     } catch (e) {
         toast({ variant: "destructive", title: "Erreur sauvegarde" });
     } finally {
@@ -412,9 +444,14 @@ export default function ProDashboard() {
         <TabsContent value="inventory" className="space-y-8 animate-in fade-in duration-300">
             {business ? (
                 <div className="space-y-8">
-                    <Card className="border-2 border-primary shadow-xl overflow-hidden rounded-3xl">
-                        <CardHeader className="bg-primary text-white flex-row justify-between items-center space-y-0 p-6">
-                            <CardTitle className="text-xl font-black uppercase tracking-tighter">Ajouter un article</CardTitle>
+                    <Card className={cn("border-2 shadow-xl overflow-hidden rounded-3xl transition-all", editingProductId ? "border-accent ring-4 ring-accent/10" : "border-primary")}>
+                        <CardHeader className={cn("text-white flex flex-row justify-between items-center space-y-0 p-6", editingProductId ? "bg-accent" : "bg-primary")}>
+                            <div>
+                                <CardTitle className="text-xl font-black uppercase tracking-tighter">
+                                    {editingProductId ? "Modifier l'article" : "Ajouter un article"}
+                                </CardTitle>
+                                {editingProductId && <p className="text-[9px] font-black uppercase opacity-70">Mode édition actif</p>}
+                            </div>
                             <Badge variant="outline" className="text-white border-white/30 text-[9px] font-black uppercase">Rayon {promoCategory}</Badge>
                         </CardHeader>
                         <CardContent className="p-6 space-y-6">
@@ -467,10 +504,13 @@ export default function ProDashboard() {
                                         )}
                                     </div>
 
-                                    <div className="pt-4 border-t border-dashed">
-                                        <Button onClick={handleSavePromotion} disabled={isSaving || !promoTitle} className="w-full h-14 font-black uppercase shadow-xl text-sm tracking-widest gap-2">
+                                    <div className="pt-4 border-t border-dashed flex gap-2">
+                                        {editingProductId && (
+                                            <Button variant="outline" onClick={resetForm} className="flex-1 h-14 font-black uppercase border-2">Annuler</Button>
+                                        )}
+                                        <Button onClick={handleSavePromotion} disabled={isSaving || !promoTitle} className={cn("flex-[2] h-14 font-black uppercase shadow-xl text-sm tracking-widest gap-2", editingProductId && "bg-accent hover:bg-accent/90")}>
                                             {isSaving ? <RefreshCw className="size-5 animate-spin" /> : <Save className="size-5" />}
-                                            Enregistrer l'article
+                                            {editingProductId ? "Mettre à jour" : "Enregistrer l'article"}
                                         </Button>
                                     </div>
                                 </div>
@@ -515,7 +555,7 @@ export default function ProDashboard() {
                         </h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {promotions?.map(p => (
-                                <Card key={p.id} className="overflow-hidden border-2 shadow-sm flex h-32 hover:border-primary/30 transition-all group">
+                                <Card key={p.id} className={cn("overflow-hidden border-2 shadow-sm flex h-32 hover:border-primary/30 transition-all group", editingProductId === p.id && "border-accent ring-2 ring-accent/20")}>
                                     <div className="w-28 bg-muted/20 shrink-0 relative overflow-hidden flex items-center justify-center border-r">
                                         {p.imageUrl ? <img src={p.imageUrl} className="w-full h-full object-cover" alt="" /> : <ImageIcon className="size-8 opacity-10" />}
                                         {p.isOutOfStock && (
@@ -527,13 +567,16 @@ export default function ProDashboard() {
                                     </div>
                                     <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
                                         <div className="flex justify-between items-start">
-                                            <h4 className={cn("font-black uppercase text-xs truncate leading-none", p.isOutOfStock && "line-through opacity-50")}>{p.title}</h4>
+                                            <div className="min-w-0 flex-1">
+                                                <h4 className={cn("font-black uppercase text-xs truncate leading-none", p.isOutOfStock && "line-through opacity-50")}>{p.title}</h4>
+                                                <p className="text-[9px] text-muted-foreground line-clamp-2 italic mt-1">{p.description || "Pas de description"}</p>
+                                            </div>
                                             <Checkbox 
                                                 checked={selectedProductIds.includes(p.id)} 
                                                 onCheckedChange={() => {
                                                     setSelectedProductIds(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id]);
                                                 }}
-                                                className="size-5 border-2 border-primary/30"
+                                                className="size-5 border-2 border-primary/30 ml-2"
                                             />
                                         </div>
                                         <div className="flex items-center justify-between mt-auto">
@@ -541,9 +584,14 @@ export default function ProDashboard() {
                                                 <span className={cn("text-base font-black", p.isOutOfStock ? "text-slate-400" : (p.promoType === 'Promo' ? "text-red-600" : "text-primary"))}>{(p.price || 0).toLocaleString('fr-FR')}</span>
                                                 <span className="text-[8px] font-black uppercase opacity-40">CFP</span>
                                             </div>
-                                            <Button variant="ghost" size="icon" className="size-8 text-destructive/40 hover:text-destructive hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => deleteDoc(doc(firestore!, 'businesses', business.id, 'promotions', p.id))}>
-                                                <Trash2 className="size-4" />
-                                            </Button>
+                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <Button variant="ghost" size="icon" className="size-8 text-primary/60 hover:text-primary hover:bg-primary/5" onClick={() => handleEditClick(p)}>
+                                                    <Pencil className="size-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="size-8 text-destructive/40 hover:text-destructive hover:bg-red-50" onClick={() => deleteDoc(doc(firestore!, 'businesses', business.id, 'promotions', p.id))}>
+                                                    <Trash2 className="size-4" />
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
                                 </Card>
