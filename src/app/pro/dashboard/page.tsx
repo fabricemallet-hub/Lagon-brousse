@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, doc, query, orderBy, serverTimestamp, addDoc, deleteDoc, where, getCountFromServer, updateDoc } from 'firebase/firestore';
 import type { UserAccount, Business, Promotion, Campaign, CampaignPricingSettings, Region } from '@/lib/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -249,7 +249,6 @@ export default function ProDashboard() {
     }
   };
 
-  // Recalculer le reach dès que les filtres changent sur l'onglet principal
   useEffect(() => {
     if (activeTab === 'campaigns' || isCampWizardOpen) {
         calculateReach();
