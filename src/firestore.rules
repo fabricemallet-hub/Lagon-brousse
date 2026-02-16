@@ -26,7 +26,20 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 2. ACCÈS PRIORITAIRE ADMIN
+    // 2. RÈGLES SPÉCIFIQUES (Évaluées en priorité)
+    // ======================================================
+
+    // Campagnes : Autoriser explicitement le list pour les utilisateurs connectés
+    // Note: Si une erreur persiste ici, vérifiez la création de l'INDEX COMPOSITE 
+    // sur businessId, status et createdAt.
+    match /campaigns/{campaignId} {
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // ======================================================
+    // 3. ACCÈS PRIORITAIRE ADMIN (Wildcard global)
     // ======================================================
 
     match /{allPaths=**} {
@@ -34,7 +47,7 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 3. COMMERCES & PROMOTIONS
+    // 4. COMMERCES & PROMOTIONS
     // ======================================================
 
     match /businesses/{businessId} {
@@ -47,20 +60,10 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 4. CAMPAGNES (BROUILLONS ET HISTORIQUE)
-    // ======================================================
-    
-    match /campaigns/{campaignId} {
-      // Autorise la lecture (get/list) et l'écriture pour tout utilisateur connecté
-      allow get, list, create, update, delete: if isSignedIn();
-    }
-
-    // ======================================================
     // 5. UTILISATEURS & PROFILS
     // ======================================================
 
     match /users/{userId} {
-      // Autorise la lecture pour le calcul du Reach (list) et le profil personnel (get)
       allow read: if isSignedIn();
       allow write: if isSignedIn() && (request.auth.uid == userId);
       
@@ -101,6 +104,5 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow read, write: if isSignedIn() && (resource.data.userId == request.auth.uid || isMasterAdmin());
     }
-
   }
 }
