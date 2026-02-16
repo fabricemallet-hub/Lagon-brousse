@@ -36,6 +36,7 @@ export interface InternalQuery extends Query<DocumentData> {
 
 /**
  * React hook to subscribe to a Firestore collection or query in real-time.
+ * FORCE REBUILD FOR PERMISSION FIX v4
  */
 export function useCollection<T = any>(
     memoizedTargetRefOrQuery: ((CollectionReference<DocumentData> | Query<DocumentData>) & {__memo?: boolean})  | null | undefined,
@@ -82,6 +83,9 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (err: FirestoreError) => {
+        // Log minimal pour débogage agent sans crash UI immédiat si possible
+        console.warn(`Firestore permission error on path: ${path}`, err.message);
+        
         const contextualError = new FirestorePermissionError({
           operation: 'list',
           path: path,
