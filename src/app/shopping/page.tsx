@@ -453,16 +453,16 @@ export default function ShoppingPage() {
                             <X className="size-5" />
                         </button>
                         
-                        <div className="aspect-video sm:aspect-[16/9] bg-muted relative overflow-hidden group border-b h-full">
+                        <div className="aspect-square bg-white relative overflow-hidden group border-b shrink-0 h-auto">
                             {selectedProductForDetail.images && selectedProductForDetail.images.length > 0 ? (
                                 <Carousel setApi={setApi} className="w-full h-full">
                                     <CarouselContent className="h-full ml-0">
                                         {selectedProductForDetail.images.map((img, idx) => (
                                             <CarouselItem key={idx} className="h-full pl-0">
-                                                <div className="w-full h-full flex items-center justify-center bg-white p-6 sm:p-10">
+                                                <div className="w-full h-full flex items-center justify-center bg-white p-12 sm:p-16">
                                                     <img 
                                                         src={img} 
-                                                        className="max-w-full max-h-full object-contain" 
+                                                        className="max-w-full max-h-full object-contain shadow-sm" 
                                                         alt={`${selectedProductForDetail.title} - ${idx + 1}`} 
                                                     />
                                                 </div>
@@ -470,14 +470,14 @@ export default function ShoppingPage() {
                                         ))}
                                     </CarouselContent>
                                     {selectedProductForDetail.images.length > 1 && (
-                                        <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 px-4 z-[160]">
+                                        <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-2 px-4 z-[160]">
                                             {selectedProductForDetail.images.map((_, idx) => (
                                                 <button 
                                                     key={idx} 
                                                     onClick={() => api?.scrollTo(idx)}
                                                     className={cn(
                                                         "size-2 rounded-full transition-all shadow-md",
-                                                        activeImageIdx === idx ? "bg-primary w-6" : "bg-white/60 hover:bg-white"
+                                                        activeImageIdx === idx ? "bg-primary w-6" : "bg-black/20 hover:bg-black/40"
                                                     )}
                                                 />
                                             ))}
@@ -716,7 +716,7 @@ function ProductCard({
             </div>
 
             <div className="flex min-h-[140px] h-auto">
-                <div className="w-32 bg-white shrink-0 relative flex items-center justify-center border-r overflow-hidden p-2">
+                <div className="w-32 bg-white shrink-0 relative flex items-center justify-center border-r overflow-hidden p-3">
                     {images.length > 0 ? (
                         <>
                             <img src={images[0]} className="max-w-full max-h-full object-contain transition-transform group-hover:scale-105" alt={product.title} />
