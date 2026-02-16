@@ -121,6 +121,8 @@ export interface Promotion {
   imageUrl?: string;
   images?: string[];
   createdAt: any;
+  isOutOfStock?: boolean;
+  nextArrival?: string | null;
 }
 
 export interface Campaign {

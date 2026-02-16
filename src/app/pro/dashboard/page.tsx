@@ -69,6 +69,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -91,6 +92,9 @@ const CAMPAIGN_LENGTHS = [
     { id: 'Medium', label: 'Moyen', desc: 'Équilibre parfait' },
     { id: 'Long', label: 'Long', desc: 'Détaillé et persuasif' },
 ];
+
+const MONTHS = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
+const YEARS = ["2025", "2026", "2027", "2028"];
 
 export default function ProDashboard() {
   const { user, isUserLoading } = useUser();
@@ -165,6 +169,11 @@ export default function ProDashboard() {
   const [promoType, setPromoType] = useState<'Promo' | 'Nouvel Arrivage'>('Promo');
   const [isSaving, setIsSaving] = useState(false);
   const [hasCopiedUid, setHasCopiedUid] = useState(false);
+
+  // Stock management fields
+  const [isOutOfStock, setIsOutOfStock] = useState(false);
+  const [nextArrivalMonth, setNextArrivalMonth] = useState('Mars');
+  const [nextArrivalYear, setNextArrivalYear] = useState('2025');
 
   // --- AI WIZARD STATES (Product) ---
   const [wizardStep, setWizardStep] = useState<WizardStep>('IDLE');
@@ -340,6 +349,8 @@ export default function ProDashboard() {
       promoType,
       imageUrl: promoImages[0] || '', 
       images: promoImages, 
+      isOutOfStock,
+      nextArrival: isOutOfStock ? `${nextArrivalMonth} ${nextArrivalYear}` : null,
       updatedAt: serverTimestamp(),
     };
 
@@ -376,6 +387,9 @@ export default function ProDashboard() {
     setManualDiscountInput('');
     setPromoImages([]); 
     setPromoCategory('Pêche'); 
+    setIsOutOfStock(false);
+    setNextArrivalMonth('Mars');
+    setNextArrivalYear('2025');
     setWizardStep('IDLE');
     setAiAdditionalInfo('');
     setAiSelectedTone('Commercial');
@@ -397,6 +411,14 @@ export default function ProDashboard() {
     }
     setPromoImages(promo.images || [promo.imageUrl || '']);
     setPromoType(promo.promoType); 
+    setIsOutOfStock(promo.isOutOfStock || false);
+    if (promo.nextArrival) {
+        const parts = promo.nextArrival.split(' ');
+        if (parts.length === 2) {
+            setNextArrivalMonth(parts[0]);
+            setNextArrivalYear(parts[1]);
+        }
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -523,7 +545,9 @@ export default function ProDashboard() {
                     <p className="font-mono font-black text-[10px] opacity-70 leading-none select-all">{user?.uid}</p>
                 </div>
             </div>
-            <Button variant="outline" size="sm" className="font-black uppercase text-[10px] border-2 bg-white" onClick={handleCopyUid}>{hasCopiedUid ? <Check className="size-3" /> : <Copy className="size-3" />}</Button>
+            <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" className="font-black uppercase text-[10px] border-2 bg-white" onClick={handleCopyUid}>{hasCopiedUid ? <Check className="size-3" /> : <Copy className="size-3" />}</Button>
+            </div>
         </CardContent>
       </Card>
 
@@ -600,6 +624,40 @@ export default function ProDashboard() {
                                 )} 
                             />
                         </div>
+                    </div>
+
+                    <div className="p-4 bg-red-50/50 border-2 border-dashed border-red-200 rounded-2xl space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                                <Label className="text-[10px] font-black uppercase text-red-800">Stock vide</Label>
+                                <p className="text-[8px] font-bold text-red-600/60 uppercase italic">Marquer comme indisponible</p>
+                            </div>
+                            <Switch checked={isOutOfStock} onCheckedChange={setIsOutOfStock} />
+                        </div>
+
+                        {isOutOfStock && (
+                            <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
+                                <Label className="text-[9px] font-black uppercase text-red-800 ml-1">Prochain arrivage prévu</Label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Select value={nextArrivalMonth} onValueChange={setNextArrivalMonth}>
+                                        <SelectTrigger className="h-10 border-2 font-bold text-xs bg-white text-slate-800">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {MONTHS.map(m => <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                    <Select value={nextArrivalYear} onValueChange={setNextArrivalYear}>
+                                        <SelectTrigger className="h-10 border-2 font-bold text-xs bg-white text-slate-800">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {YEARS.map(y => <SelectItem key={y} value={y} className="text-xs">{y}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="space-y-2">
@@ -745,6 +803,11 @@ export default function ProDashboard() {
                             )}>
                                 {promo.promoType === 'Promo' ? 'Promo' : 'New'}
                             </Badge>
+                            {promo.isOutOfStock && (
+                                <div className="absolute inset-0 bg-red-600/40 flex items-center justify-center">
+                                    <span className="text-[8px] font-black text-white uppercase text-center leading-tight">STOCK VIDE</span>
+                                </div>
+                            )}
                         </div>
                         <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
                             <div className="space-y-1">

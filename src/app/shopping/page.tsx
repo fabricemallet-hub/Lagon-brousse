@@ -543,6 +543,11 @@ export default function ShoppingPage() {
                                     {selectedProductForDetail.category}
                                 </Badge>
                             </div>
+                            {selectedProductForDetail.isOutOfStock && (
+                                <div className="absolute inset-0 bg-red-600/40 flex items-center justify-center z-30">
+                                    <Badge className="bg-red-600 text-white font-black text-lg py-2 px-6 shadow-2xl border-2 border-white/20">STOCK ÉPUISÉ</Badge>
+                                </div>
+                            )}
                         </div>
                     </DialogHeader>
 
@@ -559,6 +564,16 @@ export default function ShoppingPage() {
                                 <span className="text-[10px] font-bold uppercase">{selectedProductForDetail.business?.commune}</span>
                             </div>
                         </div>
+
+                        {selectedProductForDetail.isOutOfStock && (
+                            <Alert variant="destructive" className="bg-red-50 border-red-200 border-2">
+                                <AlertCircle className="size-4 text-red-600" />
+                                <AlertTitle className="text-xs font-black uppercase">Article indisponible</AlertTitle>
+                                <AlertDescription className="text-sm font-black text-red-700 mt-1">
+                                    STOCK ÉPUISÉ - Commande prévue le : {selectedProductForDetail.nextArrival || "Prochainement"}
+                                </AlertDescription>
+                            </Alert>
+                        )}
 
                         <div className="p-5 bg-muted/10 rounded-2xl border-2 border-dashed border-primary/10 flex items-center justify-between">
                             <div className="space-y-1">
@@ -718,12 +733,14 @@ function ProductCard({
 }) {
     const isPromo = product.promoType === 'Promo';
     const images = product.images || (product.imageUrl ? [product.imageUrl] : []);
+    const isOutOfStock = product.isOutOfStock;
     
     return (
         <Card 
             className={cn(
                 "overflow-hidden border-2 shadow-sm flex flex-col group transition-all hover:border-primary/40 cursor-pointer active:scale-[0.98]",
-                isPromo && "border-red-100 bg-red-50/10"
+                isPromo && "border-red-100 bg-red-50/10",
+                isOutOfStock && "opacity-75 border-red-200 grayscale-[0.3]"
             )}
             onClick={onViewDetail}
         >
@@ -757,7 +774,13 @@ function ProductCard({
                 </div>
             </div>
 
-            <div className="flex min-h-[140px] h-auto">
+            <div className="flex min-h-[140px] h-auto relative">
+                {isOutOfStock && (
+                    <div className="absolute top-0 left-0 right-0 bg-red-600 text-white text-[8px] font-black uppercase text-center py-1 z-30 shadow-lg animate-in slide-in-from-top duration-300">
+                        STOCK ÉPUISÉ
+                    </div>
+                )}
+                
                 <div className="w-32 bg-white shrink-0 relative flex items-center justify-center border-r overflow-hidden p-3">
                     {images.length > 0 ? (
                         <>
@@ -786,9 +809,16 @@ function ProductCard({
                             <h4 className="font-black uppercase text-xs leading-none break-words flex-1">{product.title}</h4>
                             <Badge variant="outline" className="text-[7px] h-3.5 px-1 font-black uppercase border-muted-foreground/30 shrink-0">{product.category}</Badge>
                         </div>
-                        <p className="text-[10px] text-muted-foreground leading-tight break-words italic line-clamp-3">
-                            {product.description || "Aucune description disponible."}
-                        </p>
+                        
+                        {isOutOfStock ? (
+                            <p className="text-[10px] font-black text-red-600 uppercase mt-1 leading-tight animate-pulse">
+                                STOCK ÉPUISÉ - Commande prévue le : {product.nextArrival || "Prochainement"}
+                            </p>
+                        ) : (
+                            <p className="text-[10px] text-muted-foreground leading-tight break-words italic line-clamp-3">
+                                {product.description || "Aucune description disponible."}
+                            </p>
+                        )}
                     </div>
 
                     <div className="flex items-end justify-between mt-3">
