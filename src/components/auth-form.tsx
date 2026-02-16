@@ -37,6 +37,7 @@ import { Eye, EyeOff, Ticket, MapPin, ScrollText, Globe, Bell, Mail, Smartphone,
 import { redeemAccessToken } from '@/lib/token-utils';
 import { ensureUserDocument } from '@/lib/user-utils';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { CgvSettings, Region } from '@/lib/types';
