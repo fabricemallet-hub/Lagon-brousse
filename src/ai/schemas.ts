@@ -162,7 +162,7 @@ export const AnalyzeProductInputSchema = z.object({
 export type AnalyzeProductInput = z.infer<typeof AnalyzeProductInputSchema>;
 
 export const AnalyzeProductOutputSchema = z.object({
-  commercialDescriptions: z.array(z.string()).describe("Liste de 3 variantes de descriptions commerciales basées sur le ton choisi."),
+  commercialDescriptions: z.array(z.string()).describe("Liste de 5 variantes de descriptions commerciales basées sur le ton choisi."),
   sellingPoints: z.array(z.string()).describe("Liste d'arguments de vente pour le commerçant."),
   marketingAdvice: z.string().describe("Conseil stratégique pour mettre en avant ce produit précisément."),
 });

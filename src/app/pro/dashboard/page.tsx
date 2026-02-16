@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -51,7 +52,8 @@ import {
   Star,
   Award,
   Home,
-  Settings
+  Settings,
+  ArrowLeft
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -172,9 +174,10 @@ export default function ProDashboard() {
 
   // --- IA PRODUCT WIZARD STATE ---
   const [isAiProductOpen, setIsAiProductOpen] = useState(false);
-  const [aiProductStep, setAiProductStep] = useState<'TONE' | 'GENERATING' | 'RESULTS'>('TONE');
+  const [aiProductStep, setAiProductStep] = useState<'TONE' | 'GENERATING' | 'RESULTS' | 'STRATEGY'>('TONE');
   const [aiProductTone, setAiProductTone] = useState('Commercial');
   const [aiProductResult, setAiProductResult] = useState<AnalyzeProductOutput | null>(null);
+  const [tempDescription, setTempDescription] = useState('');
 
   const userRegion = profile?.selectedRegion || 'CALEDONIE';
   const userCommune = profile?.lastSelectedLocation || 'Nouméa';
@@ -1033,13 +1036,15 @@ export default function ProDashboard() {
       </Tabs>
 
       <Dialog open={isAiProductOpen} onOpenChange={setIsAiProductOpen}>
-        <DialogContent className="max-w-md rounded-3xl p-0 overflow-hidden border-none shadow-2xl">
-            <DialogHeader className="p-6 bg-slate-50 border-b">
+        <DialogContent className="max-w-md rounded-3xl p-0 overflow-hidden border-none shadow-2xl flex flex-col max-h-[90vh]">
+            <DialogHeader className="p-6 bg-slate-50 border-b shrink-0">
                 <DialogTitle className="font-black uppercase tracking-tighter flex items-center gap-2">
-                    <BrainCircuit className="size-5 text-primary" /> Magicien Produit IA
+                    {aiProductStep === 'STRATEGY' ? <Target className="size-5 text-accent" /> : <BrainCircuit className="size-5 text-primary" />}
+                    {aiProductStep === 'STRATEGY' ? "Stratégie Marketing IA" : "Magicien Produit IA"}
                 </DialogTitle>
             </DialogHeader>
-            <div className="p-6 space-y-6">
+            
+            <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
                 {aiProductStep === 'TONE' && (
                     <div className="space-y-4">
                         <Label className="text-[10px] font-black uppercase text-center block opacity-60">Choisissez le ton de rédaction</Label>
@@ -1056,9 +1061,9 @@ export default function ProDashboard() {
                                 </div>
                             ))}
                         </div>
-                        <Button className="w-full h-14 font-black uppercase tracking-widest mt-4" onClick={runAiProductAnalysis}>Analyser & Rédiger</Button>
                     </div>
                 )}
+                
                 {aiProductStep === 'GENERATING' && (
                     <div className="py-12 flex flex-col items-center justify-center gap-4 text-center">
                         <div className="relative">
@@ -1071,26 +1076,90 @@ export default function ProDashboard() {
                         </div>
                     </div>
                 )}
+                
                 {aiProductStep === 'RESULTS' && aiProductResult && (
                     <div className="space-y-6">
                         <div className="space-y-3">
                             <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Descriptions proposées (Sélectionnez)</Label>
                             {aiProductResult.commercialDescriptions.map((desc, idx) => (
-                                <div key={idx} onClick={() => { setPromoDescription(desc); setAiProductStep('TONE'); setIsAiProductOpen(false); }} className="p-4 rounded-xl border-2 bg-white text-xs font-medium leading-relaxed italic hover:border-primary cursor-pointer transition-all border-slate-100 hover:shadow-md">
+                                <div 
+                                    key={idx} 
+                                    onClick={() => { 
+                                        setTempDescription(desc); 
+                                        setAiProductStep('STRATEGY'); 
+                                    }} 
+                                    className="p-4 rounded-xl border-2 bg-white text-xs font-medium leading-relaxed italic hover:border-primary cursor-pointer transition-all border-slate-100 hover:shadow-md active:scale-[0.98]"
+                                >
                                     "{desc}"
                                 </div>
                             ))}
                         </div>
-                        <div className="p-5 bg-primary/5 border-2 border-primary/20 rounded-2xl space-y-4">
-                            <p className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2"><Target className="size-3" /> Stratégie Marketing</p>
-                            <p className="text-xs font-bold leading-relaxed text-slate-700">{aiProductResult.marketingAdvice}</p>
-                            <div className="flex flex-wrap gap-2">
-                                {aiProductResult.sellingPoints.map((pt, i) => <Badge key={i} variant="secondary" className="bg-white border text-[9px] font-bold uppercase">{pt}</Badge>)}
+                    </div>
+                )}
+
+                {aiProductStep === 'STRATEGY' && aiProductResult && (
+                    <div className="space-y-6 animate-in fade-in zoom-in-95">
+                        <div className="p-4 bg-primary/5 border-2 border-primary/20 rounded-2xl space-y-2">
+                            <p className="text-[10px] font-black uppercase text-primary tracking-widest">Texte sélectionné</p>
+                            <p className="text-xs italic text-slate-600 font-medium">"{tempDescription}"</p>
+                        </div>
+
+                        <div className="space-y-4">
+                            <h4 className="text-[10px] font-black uppercase text-accent tracking-widest flex items-center gap-2 px-1">
+                                <Compass className="size-3" /> Conseil Stratégique pour le Caillou
+                            </h4>
+                            <div className="p-5 bg-accent/5 border-2 border-dashed border-accent/20 rounded-3xl">
+                                <p className="text-xs font-bold leading-relaxed text-slate-700">{aiProductResult.marketingAdvice}</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <h4 className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1 flex items-center gap-2">
+                                <Star className="size-3" /> Arguments de Vente Clés
+                            </h4>
+                            <div className="grid gap-2">
+                                {aiProductResult.sellingPoints.map((pt, i) => (
+                                    <div key={i} className="flex items-center gap-3 p-3 bg-white border-2 rounded-xl shadow-sm">
+                                        <div className="p-1.5 bg-green-50 rounded-lg"><Check className="size-3 text-green-600" /></div>
+                                        <span className="text-[10px] font-black uppercase text-slate-700">{pt}</span>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     </div>
                 )}
             </div>
+
+            <DialogFooter className="p-4 bg-slate-50 border-t shrink-0">
+                {aiProductStep === 'TONE' && (
+                    <Button className="w-full h-14 font-black uppercase tracking-widest shadow-xl" onClick={runAiProductAnalysis}>Analyser & Rédiger</Button>
+                )}
+                {aiProductStep === 'RESULTS' && (
+                    <Button variant="ghost" onClick={() => setAiProductStep('TONE')} className="w-full h-12 font-black uppercase text-[10px] border-2 bg-white">
+                        <ArrowLeft className="size-3 mr-2" /> Changer de ton
+                    </Button>
+                )}
+                {aiProductStep === 'STRATEGY' && (
+                    <div className="grid grid-cols-2 gap-2 w-full">
+                        <Button variant="outline" onClick={() => setAiProductStep('RESULTS')} className="h-14 font-black uppercase text-[10px] border-2">
+                            <ArrowLeft className="size-3 mr-2" /> Retour aux textes
+                        </Button>
+                        <Button 
+                            className="h-14 font-black uppercase tracking-widest shadow-xl text-[10px] bg-primary" 
+                            onClick={() => {
+                                setPromoDescription(tempDescription);
+                                setAiProductStep('TONE');
+                                setAiProductResult(null);
+                                setTempDescription('');
+                                setIsAiProductOpen(false);
+                                toast({ title: "Texte et stratégie adoptés !" });
+                            }}
+                        >
+                            Appliquer & Fermer
+                        </Button>
+                    </div>
+                )}
+            </DialogFooter>
         </DialogContent>
       </Dialog>
 

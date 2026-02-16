@@ -37,14 +37,14 @@ const analyzeProductFlow = ai.defineFlow(
         
         TA MISSION :
         1. Regarde attentivement la ou les photos fournies.
-        2. Rédige 3 VARIANTES de DESCRIPTION COMMERCIALE (env. 3-5 phrases par variante) en respectant STRICTEMENT le TON SOUHAITÉ.
+        2. Rédige 5 VARIANTES de DESCRIPTION COMMERCIALE (env. 3-5 phrases par variante) en respectant STRICTEMENT le TON SOUHAITÉ.
            - SI LE TON EST 'Local (Caillou)' : Utilise des expressions locales calédoniennes sans en faire trop, parle au coeur des gens du pays.
            - SI C'EST UNE PROMO : Insiste lourdement sur l'économie réalisée, la rareté et l'urgence.
            - SI C'EST UNE NOUVEAUTÉ : Insiste sur l'exclusivité et la qualité.
         3. Propose 3 à 5 ARGUMENTS DE VENTE clés centrés sur le bénéfice client.
         4. Donne un CONSEIL MARKETING spécifique pour le Caillou.
         
-        Réponds en français. Le champ 'commercialDescriptions' doit contenir exactement 3 textes distincts.` },
+        Réponds en français. Le champ 'commercialDescriptions' doit contenir exactement 5 textes distincts.` },
         ...input.photos.map(url => ({ media: { url } }))
       ],
       output: { schema: AnalyzeProductOutputSchema }
