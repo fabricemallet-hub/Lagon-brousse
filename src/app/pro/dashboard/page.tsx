@@ -42,7 +42,9 @@ import {
   Zap, 
   ChevronRight,
   ArrowLeft,
-  Wand2
+  Wand2,
+  Copy,
+  Check
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -254,7 +256,6 @@ export default function ProDashboard() {
     });
   };
 
-  // --- AI WIZARD LOGIC ---
   const startAiWizard = () => {
     if (!promoTitle || promoImages.length === 0) {
         toast({ variant: 'destructive', title: "Données manquantes", description: "Veuillez saisir un titre et ajouter au moins une photo." });
