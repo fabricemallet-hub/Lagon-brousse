@@ -261,9 +261,6 @@ export function ShootingTableCard() {
     const crosswindMps = (wSpeed / 3.6) * Math.sin(angleRad);
     const windDriftCm = crosswindMps * (timeTarget - dist / v0) * 100;
     
-    // Logic for Click Value based on User Input
-    // 1/4 MOA = 0.7 cm at 100m
-    // 0.1 MRAD = 1.0 cm at 100m
     const baseClickValueAt100 = clickValue === '1/4 MOA' ? 0.7 : 1.0;
     const currentClickValueAtDist = baseClickValueAt100 * (dist / 100);
 
@@ -368,7 +365,7 @@ export function ShootingTableCard() {
               </div>
 
               <div className="space-y-1.5">
-                  <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Tourelle (Clic)</Label>
+                  <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Jumelle</Label>
                   <Select value={clickValue} onValueChange={(v: any) => setClickValue(v)}>
                       <SelectTrigger className="h-10 border-2 font-black uppercase text-xs bg-white"><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -396,11 +393,6 @@ export function ShootingTableCard() {
                       />
                       <span className="text-[10px] font-black text-primary/60">m</span>
                   </div>
-              </div>
-              <div className="flex flex-col items-center">
-                <Badge variant="outline" className="text-[9px] font-black uppercase h-8 rounded-full border-blue-200 text-blue-600 px-4 bg-white/80 w-fit mx-auto sm:mx-0 shadow-sm border-2">
-                    {clickValue === '1/4 MOA' ? '1 CLIC = 0.7CM À 100M' : '1 CLIC = 1CM À 100M'}
-                </Badge>
               </div>
           </div>
 
@@ -466,6 +458,12 @@ export function ShootingTableCard() {
                       </div>
                   </Card>
               ))}
+          </div>
+
+          <div className="flex justify-center">
+            <Badge variant="outline" className="text-[10px] font-black uppercase h-10 rounded-xl border-blue-200 text-blue-600 px-6 bg-blue-50/50 shadow-sm border-2">
+                {clickValue === '1/4 MOA' ? 'VALEUR À 100M : 1 CLIC = 0.7CM' : 'VALEUR À 100M : 1 CLIC = 1CM'}
+            </Badge>
           </div>
 
           <Alert className="bg-slate-900 text-white border-none rounded-2xl p-4 shadow-xl relative overflow-hidden">
