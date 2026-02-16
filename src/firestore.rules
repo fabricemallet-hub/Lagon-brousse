@@ -24,6 +24,14 @@ service cloud.firestore {
       );
     }
 
+    // Détection compte Professionnel
+    function isProfessional() {
+      return isSignedIn() && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'professional' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'professional'
+      );
+    }
+
     // Bypass total pour Master Admin
     match /{allPaths=**} {
       allow read, write: if isMasterAdmin();
@@ -56,8 +64,13 @@ service cloud.firestore {
     // ======================================================
 
     match /users/{userId} {
-      allow read: if isSignedIn();
+      // Un utilisateur peut voir son propre profil
+      // Un Admin ou un Pro peut lister les utilisateurs pour les calculs d'audience
+      allow get: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
+      allow list: if isMasterAdmin() || isProfessional();
+      
       allow write: if isSignedIn() && (request.auth.uid == userId);
+      
       match /{allPaths=**} {
         allow read, write: if isSignedIn() && (request.auth.uid == userId);
       }
