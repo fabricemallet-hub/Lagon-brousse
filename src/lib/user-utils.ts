@@ -21,9 +21,15 @@ export async function ensureUserDocument(
   const userDocRef = doc(firestore, 'users', user.uid);
   const email = user.email?.toLowerCase() || '';
   
-  // COMPTES ADMIN AUTORISÉS (Uniquement le propriétaire principal)
-  const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'D1q2GPM95rZi38cvCzvsjcWQDaV2'];
-  const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com', 'fabrice.mallet@gmail.com'];
+  // COMPTES ADMIN AUTORISÉS
+  const masterUids = ['t8nPnZLcTiaLJSKMuLzib3C5nPn1', 'D1q2GPM95rZi38cvCzvsjcWQDaV2', 'koKj5ObSGXYeO1PLKU5bgo8Yaky1'];
+  const masterEmails = [
+    'f.mallet81@outlook.com', 
+    'f.mallet81@gmail.com', 
+    'fabrice.mallet@gmail.com',
+    'kledostyle@hotmail.com',
+    'kledostyle@outlook.com'
+  ];
   
   const isMasterAdmin = masterUids.includes(user.uid) || masterEmails.includes(email);
 
