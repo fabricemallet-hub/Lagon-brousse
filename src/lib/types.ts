@@ -460,6 +460,7 @@ export interface SystemNotification {
 export interface ShootingAngle {
   center: number;
   spread: number;
+  distance: number;
   isActive: boolean;
 }
 

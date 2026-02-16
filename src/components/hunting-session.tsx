@@ -59,7 +59,8 @@ import {
   Fish,
   ChevronDown,
   ShieldAlert,
-  Compass
+  Compass,
+  Ruler
 } from 'lucide-react';
 import {
   useUser,
@@ -125,19 +126,27 @@ const PulsingDot = React.memo(() => (
 ));
 PulsingDot.displayName = 'PulsingDot';
 
-const ShootingAngleWedge = React.memo(({ angle, spread, color }: { angle: number, spread: number, color: string }) => {
+const ShootingAngleWedge = React.memo(({ angle, spread, color, distance = 500, zoom = 16, lat = -21.3 }: { angle: number, spread: number, color: string, distance?: number, zoom?: number, lat?: number }) => {
+    // Calcul des pixels par mètre à la latitude et au zoom donnés
+    // Formule simplifiée : 156543.03392 * cos(lat * pi / 180) / pow(2, zoom)
+    const metersPerPixel = 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom);
+    const pixelRadius = distance / metersPerPixel;
+    const svgSize = Math.max(pixelRadius * 2 + 20, 40); // Taille minimale de 40px
+
     return (
         <div 
             style={{ 
                 position: 'absolute', 
                 transform: `translate(-50%, -50%) rotate(${angle}deg)`,
                 pointerEvents: 'none',
-                zIndex: 1
+                zIndex: 1,
+                width: svgSize,
+                height: svgSize
             }}
         >
-            <svg width="300" height="300" viewBox="0 0 200 200">
+            <svg width={svgSize} height={svgSize} viewBox={`0 0 ${svgSize} ${svgSize}`}>
                 <path 
-                    d={`M 100,100 L ${100 + 100 * Math.sin((-spread/2) * Math.PI / 180)},${100 - 100 * Math.cos((-spread/2) * Math.PI / 180)} A 100,100 0 0,1 ${100 + 100 * Math.sin((spread/2) * Math.PI / 180)},${100 - 100 * Math.cos((spread/2) * Math.PI / 180)} Z`} 
+                    d={`M ${svgSize/2},${svgSize/2} L ${svgSize/2 + pixelRadius * Math.sin((-spread/2) * Math.PI / 180)},${svgSize/2 - pixelRadius * Math.cos((-spread/2) * Math.PI / 180)} A ${pixelRadius},${pixelRadius} 0 0,1 ${svgSize/2 + pixelRadius * Math.sin((spread/2) * Math.PI / 180)},${svgSize/2 - pixelRadius * Math.cos((spread/2) * Math.PI / 180)} Z`} 
                     fill={color} 
                     fillOpacity="0.2"
                     stroke={color}
@@ -169,6 +178,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
   const [isParticipating, setIsParticipating] = useState(false);
   const [isGpsActive, setIsGpsActive] = useState(false);
   const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [mapZoom, setMapZoom] = useState<number>(16);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const shouldPanOnNextFix = useRef(false);
 
@@ -180,6 +190,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
   const [isAngleActive, setIsAngleActive] = useState(false);
   const [shootingAngle, setShootingAngle] = useState<number>(0);
   const [shootingSpread, setShootingSpread] = useState<number>(30);
+  const [shootingDistance, setShootingDistance] = useState<number>(500);
   const [isDangerActive, setIsDangerActive] = useState(false);
   const lastAlertTimeRef = useRef<number>(0);
 
@@ -304,6 +315,16 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     participants.forEach(p => {
         if (p.id === user.uid || !p.location) return;
         
+        // Vérifier d'abord la distance
+        const dist = getDistance(
+            userLocation.latitude, 
+            userLocation.longitude, 
+            p.location.latitude, 
+            p.location.longitude
+        );
+
+        if (dist > shootingDistance) return;
+
         const bearing = getBearing(
             userLocation.latitude, 
             userLocation.longitude, 
@@ -330,7 +351,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
         }
     }
     setIsDangerActive(dangerFound);
-  }, [isAngleActive, userLocation, participants, user, shootingAngle, shootingSpread, isDangerActive, playStatusSound, toast]);
+  }, [isAngleActive, userLocation, participants, user, shootingAngle, shootingSpread, shootingDistance, isDangerActive, playStatusSound, toast]);
 
   useEffect(() => {
     if (!participants || !user) return;
@@ -387,6 +408,13 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
         setSoundVolume(savedVesselPrefs.huntingVolume !== undefined ? savedVesselPrefs.huntingVolume : 0.8);
         setIsSoundEnabled(savedVesselPrefs.huntingSoundEnabled ?? true);
       }
+
+      if (userProfile.shootingAngle) {
+          setShootingAngle(userProfile.shootingAngle.center || 0);
+          setShootingSpread(userProfile.shootingAngle.spread || 30);
+          setShootingDistance(userProfile.shootingAngle.distance || 500);
+      }
+
       hasLoadedInitialPrefs.current = true;
     }
   }, [userProfile, user, sessionType]);
@@ -446,7 +474,12 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                 };
                 
                 if (isAngleActive) {
-                    updatePayload.shootingAngle = { center: shootingAngle, spread: shootingSpread, isActive: true };
+                    updatePayload.shootingAngle = { 
+                        center: shootingAngle, 
+                        spread: shootingSpread, 
+                        distance: shootingDistance,
+                        isActive: true 
+                    };
                 } else {
                     updatePayload.shootingAngle = null;
                 }
@@ -458,7 +491,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
         (err) => console.error(err),
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
-  }, [user, firestore, session, map, isAngleActive, shootingAngle, shootingSpread]);
+  }, [user, firestore, session, map, isAngleActive, shootingAngle, shootingSpread, shootingDistance]);
   
   useEffect(() => {
     if (isParticipating && session && isGpsActive) startTracking();
@@ -477,9 +510,12 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     
     setDoc(sessionRef, sessionData)
       .then(() => {
-        const participantData = { 
+        const participantData: any = { 
             id: user.uid, displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor, baseStatus: '', isGibierEnVue: false, updatedAt: serverTimestamp() 
         };
+        if (isAngleActive) {
+            participantData.shootingAngle = { center: shootingAngle, spread: shootingSpread, distance: shootingDistance, isActive: true };
+        }
         const participantRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
         setDoc(participantRef, participantData).catch(() => {});
 
@@ -508,9 +544,12 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
         return;
       }
 
-      const participantData = { 
+      const participantData: any = { 
           id: user.uid, displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor, baseStatus: '', isGibierEnVue: false, updatedAt: serverTimestamp() 
       };
+      if (isAngleActive) {
+          participantData.shootingAngle = { center: shootingAngle, spread: shootingSpread, distance: shootingDistance, isActive: true };
+      }
       const participantRef = doc(firestore, 'hunting_sessions', sessionId, 'participants', user.uid);
       
       setDoc(participantRef, participantData, { merge: true })
@@ -607,6 +646,11 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
       huntingNickname: nickname, 
       mapIcon: selectedIcon, 
       mapColor: selectedColor,
+      shootingAngle: {
+          center: shootingAngle,
+          spread: shootingSpread,
+          distance: shootingDistance
+      },
       vesselPrefs: {
         ...currentVesselPrefs,
         huntingSoundSettings: soundSettings,
@@ -620,7 +664,11 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
       .then(() => {
         if (session && isParticipating) {
           const participantRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
-          updateDoc(participantRef, { displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor }).catch(() => {});
+          const updateData: any = { displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor };
+          if (isAngleActive) {
+              updateData.shootingAngle = { center: shootingAngle, spread: shootingSpread, distance: shootingDistance, isActive: true };
+          }
+          updateDoc(participantRef, updateData).catch(() => {});
         }
         toast({ title: 'Préférences sauvegardées !' });
         setPrefsSection(undefined); 
@@ -663,6 +711,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                             defaultCenter={INITIAL_CENTER}
                             defaultZoom={16}
                             onLoad={setMap}
+                            onZoomChanged={() => map && setMapZoom(map.getZoom() || 16)}
                             options={{ disableDefaultUI: true, zoomControl: false, mapTypeControl: false, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
                         >
                             {userLocation && (
@@ -670,7 +719,14 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                                     <div className="relative">
                                         <PulsingDot />
                                         {isAngleActive && (
-                                            <ShootingAngleWedge angle={shootingAngle} spread={shootingSpread} color="#38bdf8" />
+                                            <ShootingAngleWedge 
+                                                angle={shootingAngle} 
+                                                spread={shootingSpread} 
+                                                distance={shootingDistance}
+                                                color="#38bdf8" 
+                                                zoom={mapZoom}
+                                                lat={userLocation.latitude}
+                                            />
                                         )}
                                     </div>
                                 </OverlayView>
@@ -678,8 +734,15 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                             {participants?.map(p => p.location && p.id !== user?.uid && (
                                 <OverlayView key={p.id} position={{ lat: p.location.latitude, lng: p.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                     <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 relative">
-                                        {p.shootingAngle && (
-                                            <ShootingAngleWedge angle={p.shootingAngle.center} spread={p.shootingAngle.spread} color="#38bdf8" />
+                                        {p.shootingAngle && p.shootingAngle.isActive && (
+                                            <ShootingAngleWedge 
+                                                angle={p.shootingAngle.center} 
+                                                spread={p.shootingAngle.spread} 
+                                                distance={p.shootingAngle.distance}
+                                                color="#38bdf8" 
+                                                zoom={mapZoom}
+                                                lat={p.location.latitude}
+                                            />
                                         )}
                                         <div className={cn(
                                             "px-2 py-1 rounded text-[11px] font-black text-white shadow-lg border transition-all whitespace-nowrap", 
@@ -767,7 +830,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                                         <AccordionItem value="angle-settings" className="border-none">
                                             <AccordionTrigger className="flex items-center justify-center gap-2 hover:no-underline py-2 bg-black/60 backdrop-blur-md text-white rounded-xl h-8 px-4 opacity-80">
                                                 <div className="flex items-center gap-2 font-black uppercase text-[9px] tracking-widest">
-                                                    <Compass className="size-3" /> Angle de Tir
+                                                    <Compass className="size-3" /> Angle & Portée de Tir
                                                 </div>
                                             </AccordionTrigger>
                                             <AccordionContent className="pt-2">
@@ -790,6 +853,13 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                                                                 <span>{shootingSpread}°</span>
                                                             </div>
                                                             <Slider value={[shootingSpread]} min={10} max={90} step={1} onValueChange={v => setShootingSpread(v[0])} />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <div className="flex justify-between text-[10px] text-white font-black uppercase">
+                                                                <span>Portée Détection</span>
+                                                                <span>{shootingDistance} m</span>
+                                                            </div>
+                                                            <Slider value={[shootingDistance]} min={50} max={2000} step={50} onValueChange={v => setShootingDistance(v[0])} />
                                                         </div>
                                                     </div>
                                                 </div>
@@ -852,12 +922,12 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                             <Card className="border-2 border-dashed border-primary/20 bg-primary/5 p-4 space-y-4">
                                 <div className="flex items-center justify-between">
                                     <h4 className="font-black text-[10px] uppercase tracking-widest flex items-center gap-2 text-primary">
-                                        <ShieldAlert className="size-3" /> Angle de Tir (Sécurité)
+                                        <ShieldAlert className="size-3" /> Angle & Portée de Tir
                                     </h4>
                                     <Switch checked={isAngleActive} onCheckedChange={setIsAngleActive} />
                                 </div>
                                 <div className={cn("space-y-4", !isAngleActive && "opacity-40 pointer-events-none")}>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                         <div className="space-y-2">
                                             <Label className="text-[9px] font-black uppercase opacity-60">Direction: {shootingAngle}°</Label>
                                             <Slider value={[shootingAngle]} min={0} max={360} step={1} onValueChange={v => setShootingAngle(v[0])} />
@@ -865,6 +935,13 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                                         <div className="space-y-2">
                                             <Label className="text-[9px] font-black uppercase opacity-60">Ouverture: {shootingSpread}°</Label>
                                             <Slider value={[shootingSpread]} min={10} max={90} step={1} onValueChange={v => setShootingSpread(v[0])} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-[9px] font-black uppercase opacity-60 flex items-center justify-between">
+                                                <span>Portée: {shootingDistance} m</span>
+                                                <Ruler className="size-3" />
+                                            </Label>
+                                            <Slider value={[shootingDistance]} min={50} max={2000} step={50} onValueChange={v => setShootingDistance(v[0])} />
                                         </div>
                                     </div>
                                     {isDangerActive && (
