@@ -46,6 +46,16 @@ import {
 import { locations, locationsByRegion, regions } from '@/lib/locations';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 
 export default function ShoppingPage() {
@@ -82,6 +92,9 @@ export default function ShoppingPage() {
   const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
   const [selectedBusinessContact, setSelectedBusinessContact] = useState<Business | null>(null);
   const [isLoadingContact, setIsLoadingContact] = useState(false);
+
+  // --- DELETE STATE ---
+  const [productToDelete, setProductToDelete] = useState<{id: string, businessId: string} | null>(null);
 
   // Sync Carousel with Dots
   useEffect(() => {
@@ -154,15 +167,16 @@ export default function ShoppingPage() {
     return masterEmails.includes(user.email?.toLowerCase() || '') || masterUids.includes(user.uid) || profile?.role === 'admin' || profile?.subscriptionStatus === 'admin';
   }, [user, profile]);
 
-  const handleDeleteProduct = async (id: string, businessId: string) => {
-    if (!firestore || !isAdmin) return;
-    if (!window.confirm("Supprimer cette annonce définitivement ? Cette action est irréversible.")) return;
+  const confirmDeleteProduct = async () => {
+    if (!firestore || !isAdmin || !productToDelete) return;
     
     try {
-        await deleteDoc(doc(firestore, 'businesses', businessId, 'promotions', id));
+        await deleteDoc(doc(firestore, 'businesses', productToDelete.businessId, 'promotions', productToDelete.id));
         toast({ title: "Annonce supprimée avec succès" });
     } catch (e) {
         toast({ variant: "destructive", title: "Erreur suppression", description: "Vérifiez vos droits administrateur." });
+    } finally {
+        setProductToDelete(null);
     }
   };
 
@@ -389,7 +403,7 @@ export default function ShoppingPage() {
                         product={item} 
                         onContact={handleOpenContact} 
                         onViewDetail={() => setSelectedProductForDetail(item)}
-                        onDelete={handleDeleteProduct}
+                        onDelete={(id, bid) => setProductToDelete({id, businessId: bid})}
                         isAdmin={isAdmin}
                     />
                 ))}
@@ -407,6 +421,29 @@ export default function ShoppingPage() {
             </div>
         )}
       </div>
+
+      {/* CONFIRMATION SUPPRESSION (ALERT DIALOG) */}
+      <AlertDialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
+        <AlertDialogContent className="rounded-3xl border-none shadow-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-black uppercase tracking-tight text-destructive flex items-center gap-2">
+              <AlertCircle className="size-5" /> Supprimer l'annonce ?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-xs font-bold uppercase leading-relaxed">
+              Êtes-vous sûr de vouloir supprimer cette annonce définitivement ? Cette action est irréversible et l'annonce disparaîtra pour tous les utilisateurs.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="h-12 font-black uppercase text-[10px] border-2">Annuler</AlertDialogCancel>
+            <AlertDialogAction 
+                onClick={confirmDeleteProduct} 
+                className="h-12 font-black uppercase text-[10px] bg-destructive hover:bg-destructive/90"
+            >
+                Supprimer définitivement
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* MODAL DÉTAIL PRODUIT */}
       <Dialog open={!!selectedProductForDetail} onOpenChange={(open) => !open && setSelectedProductForDetail(null)}>
@@ -542,7 +579,7 @@ export default function ShoppingPage() {
                                     const pid = selectedProductForDetail.id;
                                     const bid = selectedProductForDetail.businessId;
                                     setSelectedProductForDetail(null);
-                                    handleDeleteProduct(pid, bid);
+                                    setProductToDelete({id: pid, businessId: bid});
                                 }}
                             >
                                 <Trash2 className="size-3 mr-2" /> Supprimer cette annonce (Admin)
