@@ -150,15 +150,27 @@ export default function ProDashboard() {
       setReachError(false);
       try {
         const usersRef = collection(firestore, 'users');
+        
+        // Base query: Category + Scope
+        // We include ALL users matching category and region, regardless of delivery preferences for the base count
         const getBaseQuery = () => {
             let q = query(usersRef, where('subscribedCategories', 'array-contains', targetCategory));
-            if (targetScope === 'CALEDONIE') q = query(q, where('selectedRegion', '==', 'CALEDONIE'));
-            else if (targetScope === 'TAHITI') q = query(q, where('selectedRegion', '==', 'TAHITI'));
-            else if (targetScope === 'SPECIFIC' && selectedTargetCommunes.length > 0) q = query(q, where('lastSelectedLocation', 'in', selectedTargetCommunes.slice(0, 30)));
+            
+            if (targetScope === 'CALEDONIE') {
+                q = query(q, where('selectedRegion', '==', 'CALEDONIE'));
+            } else if (targetScope === 'TAHITI') {
+                q = query(q, where('selectedRegion', '==', 'TAHITI'));
+            } else if (targetScope === 'SPECIFIC' && selectedTargetCommunes.length > 0) {
+                // Limit to 30 communes for Firestore 'in' query
+                q = query(q, where('lastSelectedLocation', 'in', selectedTargetCommunes.slice(0, 30)));
+            }
             return q;
         };
 
         const qBase = getBaseQuery();
+        
+        // Specific channel queries based on the base criteria
+        // Note: Users matching category and scope who have explicitly opted-in
         const qPush = query(qBase, where('allowsPromoPush', '==', true));
         const qMail = query(qBase, where('allowsPromoEmails', '==', true));
         const qSms = query(qBase, where('allowsPromoSMS', '==', true));
@@ -194,8 +206,10 @@ export default function ProDashboard() {
     let baseCampaignCost = pricing.fixedPrice; 
     let costPerArticle = 0;
     
+    // We base the base cost on the total reachable matching population
     costPerArticle += (baseTargetCount * pricing.unitPricePerUser);
     
+    // Plus channel-specific surcharges
     if (selectedChannels.includes('SMS') && smsTargetCount !== null) costPerArticle += (smsTargetCount * (pricing.priceSMS || 0));
     if (selectedChannels.includes('PUSH') && pushTargetCount !== null) costPerArticle += (pushTargetCount * (pricing.pricePush || 0));
     if (selectedChannels.includes('MAIL') && mailTargetCount !== null) costPerArticle += (mailTargetCount * (pricing.priceMail || 0));
@@ -455,14 +469,20 @@ export default function ProDashboard() {
                         )}
 
                         <div className="space-y-2">
-                            <p className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">Audiences Réelles :</p>
+                            <div className="flex justify-between items-center px-1">
+                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Audiences Réelles :</p>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-[8px] font-black uppercase text-muted-foreground">Potentiel Zone:</span>
+                                    <Badge variant="secondary" className="h-4 text-[9px] font-black">{isCalculatingReach ? '...' : `${baseTargetCount ?? 0}`}</Badge>
+                                </div>
+                            </div>
                             <div className="grid grid-cols-1 gap-2">
                                 <div className={cn("p-3 rounded-xl border-2 flex items-center justify-between transition-all", selectedChannels.includes('PUSH') ? "bg-primary/10 border-primary/30" : "bg-background opacity-50")}>
                                     <div className="flex items-center gap-2">
                                         <Zap className="size-4 text-primary" />
                                         <div className="flex flex-col">
                                             <span className="text-[10px] font-black uppercase leading-none">Push Notifications</span>
-                                            <span className="text-[8px] font-bold opacity-60 uppercase">Clients actifs</span>
+                                            <span className="text-[8px] font-bold opacity-60 uppercase">Opt-in valide</span>
                                         </div>
                                     </div>
                                     <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-primary"/> : `${pushTargetCount ?? 0} clients`}</span>
@@ -491,7 +511,7 @@ export default function ProDashboard() {
                             {reachError && <p className="text-[8px] font-bold text-red-500 text-center uppercase animate-pulse">Erreur de calcul. Sélectionnez une zone.</p>}
                         </div>
 
-                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Canaux souhaités</Label>
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Canaux souhaités</Label>
                             <div className="flex flex-wrap gap-2">
                                 {[{ id: 'SMS', label: 'SMS' }, { id: 'PUSH', label: 'Push' }, { id: 'MAIL', label: 'Email' }].map(ch => (
                                     <Badge key={ch.id} variant={selectedChannels.includes(ch.id) ? "default" : "outline"} className="cursor-pointer font-black uppercase h-8 px-3 border-2" onClick={() => setSelectedChannels(prev => prev.includes(ch.id) ? prev.filter(c => c !== ch.id) : [...prev, ch.id])}>{ch.label}</Badge>
