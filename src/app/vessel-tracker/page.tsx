@@ -290,6 +290,28 @@ export default function VesselTrackerPage() {
     updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: newPrefs }).catch(() => {});
   };
 
+  const handleSaveSmsSettings = async () => {
+    if (!user || !firestore) return;
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            emergencyContact: emergencyContact,
+            vesselSmsMessage: vesselSmsMessage,
+            isEmergencyEnabled: isEmergencyEnabled,
+            isCustomMessageEnabled: isCustomMessageEnabled
+        });
+        toast({ title: "Paramètres SMS sauvegardés" });
+    } catch (e) {
+        console.error(e);
+        toast({ variant: 'destructive', title: "Erreur sauvegarde SMS" });
+    }
+  };
+
+  const smsPreview = useMemo(() => {
+    const nicknamePrefix = vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : "";
+    const customText = (isCustomMessageEnabled && vesselSmsMessage) ? vesselSmsMessage : "Requiert assistance immédiate.";
+    return `${nicknamePrefix}${customText} [MAYDAY/PAN PAN] Position : https://www.google.com/maps?q=-22.27,166.45`;
+  }, [vesselSmsMessage, isCustomMessageEnabled, vesselNickname]);
+
   useEffect(() => {
     if (!followedVessels) return;
     const newEntries: any[] = [];
@@ -421,40 +443,105 @@ export default function VesselTrackerPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                    <div className="p-4 border-2 rounded-2xl bg-primary/5 border-primary/10 space-y-3">
-                        <Label className="text-sm font-black uppercase">ID du navire</Label>
-                        <div className="flex gap-2">
-                            <Input placeholder="ID EX: BATEAU-1" value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest bg-white" />
-                            <Button variant="outline" size="icon" className="h-12 w-12 border-2 bg-white" onClick={handleSaveVessel}><Save className="size-4 text-primary" /></Button>
-                        </div>
-                    </div>
-
-                    {savedVesselIds.length > 0 && (
-                      <div className="space-y-2">
-                        <Label className="text-[10px] font-black uppercase ml-1 opacity-40">Mes IDs enregistrés</Label>
-                        <div className="grid gap-2">
-                          {savedVesselIds.map(id => (
-                            <div key={id} className="flex items-center justify-between p-3 border-2 rounded-xl bg-white shadow-sm">
-                              <div 
-                                className="flex items-center gap-3 cursor-pointer flex-grow"
-                                onClick={() => setCustomSharingId(id)}
-                              >
-                                <div className="p-2 bg-primary/10 rounded-lg text-primary"><Navigation className="size-4" /></div>
-                                <span className="font-black text-xs uppercase tracking-widest">{id}</span>
-                              </div>
-                              <Button variant="ghost" size="icon" onClick={() => handleRemoveSavedVessel(id)} className="size-8 text-destructive/40 border-2">
-                                <Trash2 className="size-3" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
                     <div className="flex items-center justify-between p-4 border-2 rounded-2xl bg-primary/5 border-primary/10">
                         <Label className="text-sm font-black uppercase">Partager ma position</Label>
                         <Switch checked={isSharing} onCheckedChange={setIsSharing} />
                     </div>
+
+                    <Accordion type="single" collapsible className="w-full">
+                        <AccordionItem value="sender-prefs" className="border-none">
+                            <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
+                                <Settings className="size-4 text-primary" />
+                                <span className="text-[10px] font-black uppercase">Identité & Surnom</span>
+                            </AccordionTrigger>
+                            <AccordionContent className="pt-4 space-y-4">
+                                <div className="space-y-1">
+                                    <Label className="text-[9px] font-black uppercase ml-1 opacity-60">ID du navire (Partage)</Label>
+                                    <div className="flex gap-2">
+                                        <Input placeholder="ID EX: BATEAU-1" value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest flex-grow" />
+                                        <Button variant="outline" size="icon" className="h-12 w-12 border-2 shrink-0" onClick={handleSaveVessel}>
+                                            <Save className="size-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Surnom du capitaine / navire</Label>
+                                    <Input 
+                                        placeholder="EX: CAPITAINE NEMO" 
+                                        value={vesselNickname} 
+                                        onChange={e => setVesselNickname(e.target.value)} 
+                                        className="font-bold text-center h-12 border-2 uppercase flex-grow w-full" 
+                                    />
+                                </div>
+                            </AccordionContent>
+                        </AccordionItem>
+
+                        <AccordionItem value="sms-settings" className="border-none mt-2">
+                            <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-orange-50/50 border-2 border-orange-100/50 rounded-xl">
+                                <Smartphone className="size-4 text-orange-600" />
+                                <span className="text-[10px] font-black uppercase text-orange-800">Réglages d'Urgence (SMS)</span>
+                            </AccordionTrigger>
+                            <AccordionContent className="pt-4 space-y-6">
+                                <div className="space-y-4 p-4 border-2 rounded-2xl bg-card shadow-inner">
+                                    <div className="flex items-center justify-between border-b border-dashed pb-3 mb-2">
+                                        <div className="space-y-0.5">
+                                            <Label className="text-xs font-black uppercase text-orange-800">Service d'Urgence</Label>
+                                            <p className="text-[9px] font-bold text-orange-600/60 uppercase">Activer/Désactiver le contact SMS</p>
+                                        </div>
+                                        <Switch 
+                                            checked={isEmergencyEnabled} 
+                                            onCheckedChange={setIsEmergencyEnabled} 
+                                        />
+                                    </div>
+
+                                    <div className={cn("space-y-4 transition-opacity", !isEmergencyEnabled && "opacity-40 pointer-events-none")}>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Numéro d'urgence (Contact à terre)</Label>
+                                            <Input 
+                                                placeholder="Ex: +687 75 27 97" 
+                                                value={emergencyContact} 
+                                                onChange={e => setEmergencyContact(e.target.value)} 
+                                                className="h-12 border-2 font-black text-lg" 
+                                                disabled={!isEmergencyEnabled}
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Message de détresse personnalisé</Label>
+                                                <Switch 
+                                                    checked={isCustomMessageEnabled} 
+                                                    onCheckedChange={setIsCustomMessageEnabled} 
+                                                    className="scale-75"
+                                                    disabled={!isEmergencyEnabled}
+                                                />
+                                            </div>
+                                            <Textarea 
+                                                placeholder="Ex: SOS j'ai un souci avec le bateau contact immédiatement les secours en mer pour me porter secours. voici mes coordonnées GPS" 
+                                                value={vesselSmsMessage} 
+                                                onChange={e => setVesselSmsMessage(e.target.value)} 
+                                                className={cn("border-2 font-medium min-h-[80px]", !isCustomMessageEnabled && "opacity-50")}
+                                                disabled={!isEmergencyEnabled || !isCustomMessageEnabled}
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2 pt-2 border-t border-dashed">
+                                            <p className="text-[9px] font-black uppercase text-primary flex items-center gap-2 ml-1">
+                                                <Eye className="size-3" /> Visualisation du SMS envoyé :
+                                            </p>
+                                            <div className="p-3 bg-muted/30 rounded-xl border-2 italic text-[10px] font-medium leading-relaxed text-slate-600">
+                                                "{smsPreview}"
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <Button onClick={handleSaveSmsSettings} className="w-full h-12 font-black uppercase text-[10px] tracking-widest gap-2 shadow-md">
+                                        <Save className="size-4" /> Enregistrer mes réglages SMS
+                                    </Button>
+                                </div>
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
                 </div>
               )}
             </div>
