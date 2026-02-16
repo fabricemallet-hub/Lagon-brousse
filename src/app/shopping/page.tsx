@@ -150,6 +150,33 @@ export default function ShoppingPage() {
     } catch (e) {}
   };
 
+  const renderPrice = (p: Promotion) => {
+    const hasTax = p.applyTax && p.taxRate;
+    const ttcValue = hasTax ? Math.ceil(p.price * (1 + p.taxRate! / 100)) : p.price;
+    const color = p.isOutOfStock ? "text-slate-400" : (p.promoType === 'Promo' ? "text-red-600" : "text-primary");
+
+    if (p.showBothPrices && hasTax) {
+        return (
+            <div className="flex flex-col">
+                <div className="flex items-baseline gap-1">
+                    <span className={cn("text-base font-black", color)}>{p.price.toLocaleString('fr-FR')}</span>
+                    <span className="text-[8px] font-black uppercase opacity-40">F HT</span>
+                </div>
+                <span className="text-[9px] font-bold text-blue-600 uppercase leading-none">{ttcValue.toLocaleString('fr-FR')} F TTC</span>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex items-baseline gap-1">
+            <span className={cn("text-base font-black", color)}>
+                {(hasTax ? ttcValue : p.price).toLocaleString('fr-FR')}
+            </span>
+            <span className="text-[8px] font-black uppercase opacity-40">F {hasTax ? 'TTC' : 'HT'}</span>
+        </div>
+    );
+  };
+
   const isLoading = isBusinessesLoading || isPromosLoading;
 
   return (
@@ -220,16 +247,13 @@ export default function ShoppingPage() {
                         <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
                             <h4 className={cn("font-black uppercase text-xs truncate", p.isOutOfStock && "line-through decoration-red-600")}>{p.title}</h4>
                             <p className="text-[10px] text-muted-foreground line-clamp-2 italic">{p.description}</p>
-                            <div className="flex items-baseline gap-1.5 flex-wrap">
-                                <span className={cn("text-base font-black", p.isOutOfStock ? "line-through opacity-40" : (p.promoType === 'Promo' ? "text-red-600" : "text-primary"))}>
-                                    {(p.price || 0).toLocaleString('fr-FR')}
-                                </span>
+                            <div className="mt-auto">
+                                {renderPrice(p)}
                                 {p.originalPrice && p.originalPrice > p.price && !p.isOutOfStock && (
                                     <span className="text-[10px] font-bold text-muted-foreground line-through opacity-60">
-                                        {(p.originalPrice).toLocaleString('fr-FR')}
+                                        {(p.originalPrice).toLocaleString('fr-FR')} F
                                     </span>
                                 )}
-                                <span className="text-[8px] font-black uppercase opacity-60">CFP</span>
                             </div>
                         </div>
                     </div>
@@ -269,17 +293,35 @@ export default function ShoppingPage() {
                         <h2 className={cn("text-2xl font-black uppercase text-slate-800", selectedProduct.isOutOfStock && "line-through decoration-red-600")}>{selectedProduct.title}</h2>
                         <div className="flex items-center gap-2 text-primary font-black uppercase text-xs"><Store className="size-4" />{selectedProduct.business?.name} <MapPin className="size-3" />{selectedProduct.business?.commune}</div>
                         {selectedProduct.isOutOfStock && <Alert variant="destructive" className="bg-red-50 border-red-200 border-2"><AlertCircle className="size-4" /><AlertDescription className="text-sm font-black text-red-700">RUPTURE - Retour le {selectedProduct.restockDate}</AlertDescription></Alert>}
-                        <div className="p-5 bg-muted/10 rounded-2xl border-2 border-dashed flex items-baseline gap-3 flex-wrap">
-                            <span className={cn("text-4xl font-black", selectedProduct.isOutOfStock ? "line-through opacity-40" : (selectedProduct.promoType === 'Promo' ? "text-red-600" : "text-primary"))}>
-                                {(selectedProduct.price || 0).toLocaleString('fr-FR')}
-                            </span>
+                        
+                        <div className="p-5 bg-muted/10 rounded-2xl border-2 border-dashed">
+                            {selectedProduct.showBothPrices && selectedProduct.applyTax && selectedProduct.taxRate ? (
+                                <div className="flex flex-col gap-1">
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="text-4xl font-black">{selectedProduct.price.toLocaleString('fr-FR')}</span>
+                                        <span className="text-xl font-black uppercase opacity-40">F HT</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-blue-600">
+                                        <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 font-black">TOTAL TTC</Badge>
+                                        <span className="text-2xl font-black">{Math.ceil(selectedProduct.price * (1 + selectedProduct.taxRate / 100)).toLocaleString('fr-FR')} F</span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex items-baseline gap-3 flex-wrap">
+                                    <span className={cn("text-4xl font-black", selectedProduct.isOutOfStock ? "line-through opacity-40" : (selectedProduct.promoType === 'Promo' ? "text-red-600" : "text-primary"))}>
+                                        {(selectedProduct.applyTax && selectedProduct.taxRate ? Math.ceil(selectedProduct.price * (1 + selectedProduct.taxRate / 100)) : selectedProduct.price).toLocaleString('fr-FR')}
+                                    </span>
+                                    <span className="text-xs font-black uppercase opacity-60">F {selectedProduct.applyTax ? 'TTC' : 'HT'}</span>
+                                </div>
+                            )}
+                            
                             {selectedProduct.originalPrice && selectedProduct.originalPrice > selectedProduct.price && !selectedProduct.isOutOfStock && (
-                                <span className="text-xl font-bold text-muted-foreground line-through opacity-60">
-                                    {(selectedProduct.originalPrice).toLocaleString('fr-FR')}
+                                <span className="text-xl font-bold text-muted-foreground line-through opacity-60 block mt-2">
+                                    {(selectedProduct.originalPrice).toLocaleString('fr-FR')} F
                                 </span>
                             )}
-                            <span className="text-xs font-black uppercase opacity-60">CFP</span>
                         </div>
+                        
                         <p className="text-sm font-medium leading-relaxed text-slate-600 italic">"{selectedProduct.description || "Pas de description."}"</p>
                     </div>
                     <div className="p-4 bg-slate-50 border-t shrink-0"><Button className="w-full h-14 font-black uppercase tracking-widest shadow-xl" onClick={() => { const id = selectedProduct.businessId; setSelectedProduct(null); handleOpenContact(id); }}>Contacter le magasin</Button></div>

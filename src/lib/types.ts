@@ -122,6 +122,10 @@ export interface Promotion {
   createdAt: any;
   isOutOfStock?: boolean;
   restockDate?: string | null;
+  taxName?: string;
+  taxRate?: number;
+  applyTax?: boolean;
+  showBothPrices?: boolean;
 }
 
 export interface Campaign {

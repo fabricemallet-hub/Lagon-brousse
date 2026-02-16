@@ -43,7 +43,9 @@ import {
   MapPin,
   Globe,
   TrendingUp,
-  Tags
+  Tags,
+  Percent,
+  Receipt
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -129,6 +131,12 @@ export default function ProDashboard() {
   const [nextArrivalYear, setNextArrivalYear] = useState('2025');
   const [isSaving, setIsSaving] = useState(false);
   const [hasCopiedUid, setHasCopiedUid] = useState(false);
+
+  // Taxes
+  const [taxName, setTaxName] = useState('TGC');
+  const [taxRate, setTaxRate] = useState('');
+  const [applyTax, setApplyTax] = useState(false);
+  const [showBothPrices, setShowBothPrices] = useState(false);
 
   // --- CIBLAGE & REACH STATE ---
   const [campTargetRegion, setCampTargetRegion] = useState<string>('USER_DEFAULT');
@@ -237,6 +245,10 @@ export default function ProDashboard() {
     setPromoType(p.promoType);
     setPromoImages(p.images || [p.imageUrl].filter(Boolean) as string[]);
     setIsOutOfStock(p.isOutOfStock || false);
+    setTaxName(p.taxName || 'TGC');
+    setTaxRate(p.taxRate?.toString() || '');
+    setApplyTax(p.applyTax || false);
+    setShowBothPrices(p.showBothPrices || false);
     if (p.restockDate) {
         const [m, y] = p.restockDate.split(' ');
         setNextArrivalMonth(m);
@@ -256,6 +268,10 @@ export default function ProDashboard() {
     setPromoDescription('');
     setPromoType('Promo');
     setIsOutOfStock(false);
+    setTaxName('TGC');
+    setTaxRate('');
+    setApplyTax(false);
+    setShowBothPrices(false);
   };
 
   const handleSavePromotion = async () => {
@@ -274,6 +290,10 @@ export default function ProDashboard() {
       imageUrl: promoImages[0] || '',
       isOutOfStock,
       restockDate: isOutOfStock ? `${nextArrivalMonth} ${nextArrivalYear}` : null,
+      taxName,
+      taxRate: parseFloat(taxRate) || 0,
+      applyTax,
+      showBothPrices,
       updatedAt: serverTimestamp()
     };
     try {
@@ -430,6 +450,13 @@ export default function ProDashboard() {
     }
   };
 
+  const currentPreviewPrice = useMemo(() => {
+    const base = parseFloat(promoPrice) || 0;
+    const rate = parseFloat(taxRate) || 0;
+    const ttc = applyTax ? Math.ceil(base * (1 + rate / 100)) : base;
+    return { base, ttc };
+  }, [promoPrice, taxRate, applyTax]);
+
   if (isUserLoading) return <div className="p-8"><Skeleton className="h-64 w-full" /></div>;
 
   return (
@@ -514,7 +541,7 @@ export default function ProDashboard() {
                                         </div>
 
                                         <div className="space-y-1.5 pt-2 border-t border-dashed">
-                                            <Label className="text-[10px] font-black uppercase text-primary ml-1">Prix Affiché (Final)</Label>
+                                            <Label className="text-[10px] font-black uppercase text-primary ml-1">Prix Affiché (Base HT)</Label>
                                             <Input 
                                                 type="number" 
                                                 value={promoPrice} 
@@ -525,6 +552,59 @@ export default function ProDashboard() {
                                             <p className="text-[8px] font-bold text-muted-foreground uppercase text-center italic mt-1 leading-none">
                                                 Automatique si remise saisie
                                             </p>
+                                        </div>
+                                    </div>
+
+                                    {/* SECTION TAXES */}
+                                    <div className="space-y-4 p-4 bg-blue-50/30 border-2 border-dashed border-blue-200 rounded-2xl">
+                                        <div className="flex items-center gap-2 border-b border-dashed border-blue-200 pb-2">
+                                            <Receipt className="size-4 text-blue-600" />
+                                            <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-800">Gestion des Taxes</h4>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1.5">
+                                                <Label className="text-[9px] font-black uppercase text-blue-800/60 ml-1">Nom (ex: TGC)</Label>
+                                                <Input value={taxName} onChange={e => setTaxName(e.target.value)} className="h-10 border-2 bg-white font-bold" />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label className="text-[9px] font-black uppercase text-blue-800/60 ml-1">Taux (%)</Label>
+                                                <Input type="number" value={taxRate} onChange={e => setTaxRate(e.target.value)} placeholder="0" className="h-10 border-2 bg-white font-black text-blue-600" />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-3 pt-2">
+                                            <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border shadow-sm">
+                                                <div className="space-y-0.5">
+                                                    <span className="text-[10px] font-black uppercase block">Appliquer la Taxe</span>
+                                                    <span className="text-[8px] font-bold text-muted-foreground uppercase">Afficher prix TTC</span>
+                                                </div>
+                                                <Switch checked={applyTax} onCheckedChange={setApplyTax} />
+                                            </div>
+                                            <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border shadow-sm">
+                                                <div className="space-y-0.5">
+                                                    <span className="text-[10px] font-black uppercase block">Afficher les deux</span>
+                                                    <span className="text-[8px] font-bold text-muted-foreground uppercase">HT (Gros) + TTC (Petit)</span>
+                                                </div>
+                                                <Switch checked={showBothPrices} onCheckedChange={setShowBothPrices} disabled={!applyTax} />
+                                            </div>
+                                        </div>
+
+                                        <div className="p-3 bg-white/80 rounded-xl border border-blue-100 flex flex-col items-center justify-center gap-1">
+                                            <p className="text-[8px] font-black uppercase text-muted-foreground">Aperçu affichage :</p>
+                                            <div className="text-center">
+                                                {showBothPrices && applyTax ? (
+                                                    <>
+                                                        <p className="text-base font-black text-slate-800 leading-none">{currentPreviewPrice.base.toLocaleString('fr-FR')} F HT</p>
+                                                        <p className="text-[9px] font-bold text-blue-600 uppercase mt-1">{currentPreviewPrice.ttc.toLocaleString('fr-FR')} F TTC</p>
+                                                    </>
+                                                ) : (
+                                                    <p className="text-base font-black text-slate-800 leading-none">
+                                                        {applyTax ? currentPreviewPrice.ttc.toLocaleString('fr-FR') : currentPreviewPrice.base.toLocaleString('fr-FR')} 
+                                                        <span className="ml-1 text-[10px] opacity-60">{applyTax ? 'F TTC' : 'F HT'}</span>
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
 
@@ -614,7 +694,10 @@ export default function ProDashboard() {
                             <Store className="size-4" /> Mon Catalogue ({promotions?.length || 0})
                         </h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {promotions?.map(p => (
+                            {promotions?.map(p => {
+                                const hasTax = p.applyTax && p.taxRate;
+                                const ttcValue = hasTax ? Math.ceil(p.price * (1 + p.taxRate! / 100)) : p.price;
+                                return (
                                 <Card key={p.id} className={cn("overflow-hidden border-2 shadow-sm flex h-32 hover:border-primary/30 transition-all group", editingProductId === p.id && "border-accent ring-2 ring-accent/20")}>
                                     <div className="w-28 bg-muted/20 shrink-0 relative overflow-hidden flex items-center justify-center border-r">
                                         {p.imageUrl ? <img src={p.imageUrl} className="w-full h-full object-cover" alt="" /> : <ImageIcon className="size-8 opacity-10" />}
@@ -645,19 +728,19 @@ export default function ProDashboard() {
                                             />
                                         </div>
                                         <div className="flex items-center justify-between mt-auto">
-                                            <div className="flex items-baseline gap-1">
-                                                <span className={cn("text-base font-black", p.isOutOfStock ? "text-slate-400" : (p.promoType === 'Promo' ? "text-red-600" : "text-primary"))}>
-                                                    {(p.price || 0).toLocaleString('fr-FR')}
-                                                </span>
-                                                {p.originalPrice && p.originalPrice > p.price && (
-                                                    <span className="text-[9px] font-bold text-muted-foreground line-through opacity-60">
-                                                        {p.originalPrice.toLocaleString('fr-FR')}
+                                            <div className="flex flex-col">
+                                                <div className="flex items-baseline gap-1">
+                                                    <span className={cn("text-base font-black", p.isOutOfStock ? "text-slate-400" : (p.promoType === 'Promo' ? "text-red-600" : "text-primary"))}>
+                                                        {(p.showBothPrices && hasTax ? p.price : (applyTax ? ttcValue : p.price)).toLocaleString('fr-FR')}
                                                     </span>
+                                                    <span className="text-[8px] font-black uppercase opacity-40">F {p.showBothPrices && hasTax ? 'HT' : (hasTax ? 'TTC' : 'HT')}</span>
+                                                </div>
+                                                {p.showBothPrices && hasTax && (
+                                                    <span className="text-[9px] font-bold text-blue-600 uppercase leading-none">{ttcValue.toLocaleString('fr-FR')} F TTC</span>
                                                 )}
-                                                <span className="text-[8px] font-black uppercase opacity-40">CFP</span>
                                             </div>
                                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <Button variant="ghost" size="icon" className="size-8 text-primary/60 hover:text-primary hover:bg-primary/5" onClick={() => handleEditClick(p)}>
+                                                <Button variant="ghost" size="icon" className="size-8 rounded-full text-primary/60 hover:text-primary hover:bg-primary/5" onClick={() => handleEditClick(p)}>
                                                     <Pencil className="size-4" />
                                                 </Button>
                                                 <Button variant="ghost" size="icon" className="size-8 text-destructive/40 hover:text-destructive hover:bg-red-50" onClick={() => deleteDoc(doc(firestore!, 'businesses', business.id, 'promotions', p.id))}>
@@ -667,7 +750,7 @@ export default function ProDashboard() {
                                         </div>
                                     </div>
                                 </Card>
-                            ))}
+                            )})}
                         </div>
                     </div>
                 </div>
