@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, isBefore, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { 
-  Crown, Star, XCircle, Ticket, Gift, LogOut, Mail, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink, Copy, Check, MapPin, RefreshCw, Store, Zap, Pencil, LayoutGrid, Heart, Save, Globe, Smartphone, Phone, Home, Map as MapIcon, Target, LocateFixed, Expand, Shrink
+  Crown, Star, XCircle, Ticket, Gift, LogOut, Mail, User, Bell, BellOff, Landmark, CreditCard, Download, ExternalLink, Copy, Check, MapPin, RefreshCw, Store, Zap, Pencil, LayoutGrid, Heart, Save, Globe, Smartphone, Phone, Home, Map as MapIcon, Target, LocateFixed, Expand, Shrink, Calendar as CalendarIcon
 } from 'lucide-react';
 import {
   Select,
@@ -372,7 +372,7 @@ export default function ComptePage() {
     if (subLower === 'active') {
         const exp = userProfile.subscriptionExpiryDate ? new Date(userProfile.subscriptionExpiryDate) : null;
         if (exp && isBefore(new Date(), exp)) {
-            return { label: 'Abonné', variant: 'default', icon: Star, desc: `Actif jusqu'au ${format(exp, 'dd MMMM yyyy', { locale: fr })}.` };
+            return { label: 'Abonné Premium', variant: 'default', icon: Star, desc: `Date de fin d'activation : ${format(exp, 'dd MMMM yyyy', { locale: fr })}.` };
         }
     }
 
@@ -795,7 +795,18 @@ export default function ComptePage() {
       {!isSharedAccessActive && userProfile?.subscriptionStatus !== 'admin' && userProfile?.subscriptionStatus !== 'professional' && (
         <Card className="w-full shadow-none border-2">
             <CardHeader className="p-6 pb-2">
-                <CardTitle className="text-lg font-black uppercase tracking-tighter flex items-center gap-2"><Ticket className="text-primary" /> Activer un jeton</CardTitle>
+                <CardTitle className="text-lg font-black uppercase tracking-tighter flex items-center gap-2">
+                    <Ticket className="text-primary" /> Activer un jeton Premium
+                </CardTitle>
+                <CardDescription className="text-[10px] font-bold uppercase">
+                    {userProfile?.subscriptionExpiryDate ? (
+                        <span className="flex items-center gap-1.5 text-primary">
+                            <CalendarIcon className="size-3" /> Date de fin d'activation : {format(new Date(userProfile.subscriptionExpiryDate), 'dd MMMM yyyy', { locale: fr })}
+                        </span>
+                    ) : (
+                        "Saisissez votre code pour activer l'accès illimité."
+                    )}
+                </CardDescription>
             </CardHeader>
             <CardContent className="p-6 pt-2 space-y-4">
                 <div className="flex flex-col gap-3">
@@ -803,14 +814,14 @@ export default function ComptePage() {
                         <Label htmlFor="token-input" className="text-[10px] font-black uppercase ml-1">Code Jeton</Label>
                         <Input 
                             id="token-input" 
-                            placeholder="Code Alphanumérique" 
+                            placeholder="LBN-XXXX-XXXX" 
                             value={accessToken}
                             onChange={(e) => setAccessToken(e.target.value)}
                             className="h-14 font-black text-center tracking-[0.2em] text-lg border-2"
                         />
                     </div>
-                    <Button onClick={handleRedeemTokenAction} disabled={isRedeeming || !accessToken} className="w-full h-12 font-black uppercase tracking-widest">
-                        {isRedeeming ? 'Validation...' : 'Valider le code'}
+                    <Button onClick={handleRedeemTokenAction} disabled={isRedeeming || !accessToken} className="w-full h-12 font-black uppercase tracking-widest shadow-xl">
+                        {isRedeeming ? 'Validation en cours...' : 'Valider mon jeton'}
                     </Button>
                 </div>
             </CardContent>
