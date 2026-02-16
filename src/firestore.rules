@@ -26,12 +26,12 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 2. JETONS D'ACCÈS (PRIORITÉ PUBLIQUE)
+    // 2. JETONS D'ACCÈS (VÉRIFICATION PUBLIQUE PRIORITAIRE)
     // ======================================================
     
     match /access_tokens/{tokenId} {
-      // Autoriser GET pour vérification publique (avant connexion)
-      // Indispensable pour le Magicien de Jeton sur la page Login
+      // Autoriser explicitement le GET pour tout le monde (même déconnecté)
+      // C'est indispensable pour la vérification du jeton sur les pages Login/Signup
       allow get: if true;
       // Autoriser LIST et UPDATE uniquement si connecté
       allow list, update: if isSignedIn();

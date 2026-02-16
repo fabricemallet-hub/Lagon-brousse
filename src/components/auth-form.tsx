@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -164,30 +165,35 @@ export function AuthForm({ mode }: AuthFormProps) {
     if (!token?.trim() || !firestore) return;
     
     setIsValidatingToken(true);
+    setTokenInfo(null);
+    
     try {
       const tokenDocRef = doc(firestore, 'access_tokens', token.trim());
       const tokenDoc = await getDoc(tokenDocRef);
       
-      if (tokenDoc.exists() && tokenDoc.data().status === 'active') {
-        setTokenInfo({ duration: tokenDoc.data().durationMonths });
-        toast({ title: "Jeton valide !", description: `Ce code active ${tokenDoc.data().durationMonths} mois d'accès.` });
+      if (tokenDoc.exists()) {
+        const data = tokenDoc.data();
+        if (data.status === 'active') {
+            setTokenInfo({ duration: data.durationMonths });
+            toast({ title: "Jeton valide !", description: `Ce code active ${data.durationMonths} mois d'accès.` });
+        } else {
+            toast({ variant: 'destructive', title: "Jeton expiré", description: "Ce code a déjà été utilisé." });
+        }
       } else {
-        setTokenInfo(null);
-        toast({ variant: 'destructive', title: "Jeton invalide", description: "Ce code n'existe pas ou est déjà utilisé." });
+        toast({ variant: 'destructive', title: "Jeton inconnu", description: "Ce code n'existe pas dans notre base." });
       }
     } catch (e: any) {
       console.error("Token verification error:", e);
       
       // DIAGNOSTIC : Si c'est une erreur de permission, on émet l'erreur contextuelle pour voir le JSON
-      if (e.code === 'permission-denied' || e.message?.includes('permissions')) {
+      if (e.code === 'permission-denied' || e.message?.toLowerCase().includes('permissions')) {
           errorEmitter.emit('permission-error', new FirestorePermissionError({
               path: `access_tokens/${token.trim()}`,
               operation: 'get'
           }));
       }
       
-      setTokenInfo(null);
-      toast({ variant: 'destructive', title: "Erreur", description: "Impossible de vérifier le jeton. Vérifiez votre connexion." });
+      toast({ variant: 'destructive', title: "Erreur technique", description: "Impossible de vérifier le jeton pour le moment." });
     } finally {
       setIsValidatingToken(false);
     }
@@ -318,7 +324,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         {/* ÉTAPE 1 : JETON ET EXPIRATION */}
         <div className="space-y-4">
           <div className="flex items-center gap-2 px-1">
-            <Badge className="bg-primary size-5 rounded-full flex items-center justify-center p-0">1</Badge>
+            <Badge className="bg-primary size-5 rounded-full flex items-center justify-center p-0 text-[10px] font-black">1</Badge>
             <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Validation du Jeton</h3>
           </div>
           
@@ -340,6 +346,7 @@ export function AuthForm({ mode }: AuthFormProps) {
                           autoComplete="off" 
                           autoCapitalize="none"
                           autoCorrect="off"
+                          spellCheck="false"
                           className="pl-10 font-mono tracking-wider h-12 border-2 bg-white" 
                         />
                         <div className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground"><Ticket className="h-5 w-5" /></div>
@@ -381,7 +388,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         {/* ÉTAPE 2 : IDENTIFIANTS ET PROFIL */}
         <div className="space-y-4">
           <div className="flex items-center gap-2 px-1">
-            <Badge className="bg-slate-400 size-5 rounded-full flex items-center justify-center p-0">2</Badge>
+            <Badge className="bg-slate-400 size-5 rounded-full flex items-center justify-center p-0 text-[10px] font-black">2</Badge>
             <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Mes Identifiants</h3>
           </div>
 
