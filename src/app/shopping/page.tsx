@@ -126,7 +126,6 @@ export default function ShoppingPage() {
         const bSnap = await getDoc(doc(firestore, 'businesses', businessId));
         if (bSnap.exists()) {
             const bData = bSnap.data() as Business;
-            // On enrichit avec les données du propriétaire si les champs business sont vides
             const ownerSnap = await getDoc(doc(firestore, 'users', bData.ownerId));
             if (ownerSnap.exists()) {
                 const oData = ownerSnap.data() as UserAccount;
@@ -180,7 +179,6 @@ export default function ShoppingPage() {
     }
   };
 
-  // --- LOGIQUE DE FILTRAGE ---
   const filteredProducts = useMemo(() => {
     if (!allPromotions) return [];
 
@@ -200,11 +198,9 @@ export default function ShoppingPage() {
                              (item.description?.toLowerCase() || '').includes(search.toLowerCase());
         if (!matchesSearch) return false;
 
-        // Filtre Région
         if (currentFRegion !== 'ALL') {
             const itemCommune = item.business?.commune;
             if (itemCommune) {
-                // Déterminer la région du produit basée sur la commune
                 const isTahiti = Object.keys(locationsByRegion['TAHITI']).includes(itemCommune);
                 const itemRegion = isTahiti ? 'TAHITI' : 'CALEDONIE';
                 if (itemRegion !== currentFRegion) return false;
@@ -213,7 +209,6 @@ export default function ShoppingPage() {
             }
         }
 
-        // Filtre Commune
         if (currentFCommune !== 'ALL') {
             if (item.business && item.business.commune !== currentFCommune) return false;
             if (!item.business) return false; 
@@ -226,7 +221,6 @@ export default function ShoppingPage() {
         return true;
       })
       .sort((a, b) => {
-        // Priorité à la commune de l'utilisateur si on est en mode USER_DEFAULT
         if (filterCommune === 'USER_DEFAULT') {
             const aInCommune = a.business?.commune === userCommune;
             const bInCommune = b.business?.commune === userCommune;
@@ -422,7 +416,6 @@ export default function ShoppingPage() {
         )}
       </div>
 
-      {/* CONFIRMATION SUPPRESSION (ALERT DIALOG) */}
       <AlertDialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
         <AlertDialogContent className="rounded-3xl border-none shadow-2xl">
           <AlertDialogHeader>
@@ -445,7 +438,6 @@ export default function ShoppingPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* MODAL DÉTAIL PRODUIT */}
       <Dialog open={!!selectedProductForDetail} onOpenChange={(open) => !open && setSelectedProductForDetail(null)}>
         <DialogContent className="max-w-2xl w-[95vw] rounded-3xl p-0 overflow-hidden border-none shadow-2xl max-h-[95vh] flex flex-col">
             {selectedProductForDetail && (
@@ -461,16 +453,16 @@ export default function ShoppingPage() {
                             <X className="size-5" />
                         </button>
                         
-                        <div className="aspect-video sm:aspect-[16/9] bg-muted relative overflow-hidden group">
+                        <div className="aspect-video sm:aspect-[16/9] bg-muted relative overflow-hidden group border-b">
                             {selectedProductForDetail.images && selectedProductForDetail.images.length > 0 ? (
                                 <Carousel setApi={setApi} className="w-full h-full">
                                     <CarouselContent className="h-full ml-0">
                                         {selectedProductForDetail.images.map((img, idx) => (
                                             <CarouselItem key={idx} className="h-full pl-0">
-                                                <div className="w-full h-full flex items-center justify-center bg-slate-50">
+                                                <div className="w-full h-full flex items-center justify-center bg-slate-50 p-8">
                                                     <img 
                                                         src={img} 
-                                                        className="max-w-full max-h-full object-contain" 
+                                                        className="max-w-full max-h-full object-contain shadow-sm" 
                                                         alt={`${selectedProductForDetail.title} - ${idx + 1}`} 
                                                     />
                                                 </div>
@@ -534,7 +526,7 @@ export default function ShoppingPage() {
                                         "text-4xl font-black tracking-tighter",
                                         selectedProductForDetail.promoType === 'Promo' ? "text-red-600" : "text-primary"
                                     )}>
-                                        {selectedProductForDetail.price.toLocaleString('fr-FR')}
+                                        {selectedProductForDetail.price.toLocaleString('fr-FR').replace(/\s/g, ' ')}
                                     </span>
                                     <span className="text-xs font-black uppercase opacity-60">CFP</span>
                                 </div>
@@ -542,7 +534,7 @@ export default function ShoppingPage() {
                             
                             {selectedProductForDetail.promoType === 'Promo' && selectedProductForDetail.originalPrice && (
                                 <div className="text-right flex flex-col items-end gap-1">
-                                    <span className="text-sm text-muted-foreground line-through font-bold">{selectedProductForDetail.originalPrice.toLocaleString('fr-FR')} F</span>
+                                    <span className="text-sm text-muted-foreground line-through font-bold">{selectedProductForDetail.originalPrice.toLocaleString('fr-FR').replace(/\s/g, ' ')} F</span>
                                     {selectedProductForDetail.discountPercentage && (
                                         <Badge className="bg-red-600 text-white font-black text-sm px-2 py-1 rounded-lg shadow-lg border-none">
                                             -{Math.round(selectedProductForDetail.discountPercentage)}%
@@ -651,10 +643,10 @@ function ProductCard({
             </div>
 
             <div className="flex min-h-[140px] h-auto">
-                <div className="w-32 bg-muted/20 shrink-0 relative flex items-center justify-center border-r overflow-hidden">
+                <div className="w-32 bg-muted/20 shrink-0 relative flex items-center justify-center border-r overflow-hidden p-2">
                     {images.length > 0 ? (
                         <>
-                            <img src={images[0]} className="w-full h-full object-contain transition-transform group-hover:scale-105" alt={product.title} />
+                            <img src={images[0]} className="max-w-full max-h-full object-contain transition-transform group-hover:scale-105" alt={product.title} />
                             {images.length > 1 && (
                                 <div className="absolute bottom-1 right-1 bg-black/60 backdrop-blur-md text-white font-black text-[8px] px-1.5 py-0.5 rounded flex items-center gap-1 shadow-lg border border-white/10">
                                     <ImageIcon className="size-2" />
@@ -687,11 +679,11 @@ function ProductCard({
                     <div className="flex items-end justify-between mt-3">
                         <div className="flex flex-col">
                             {isPromo && product.originalPrice && (
-                                <span className="text-[9px] text-muted-foreground line-through font-bold">{product.originalPrice.toLocaleString('fr-FR')} F</span>
+                                <span className="text-[9px] text-muted-foreground line-through font-bold">{product.originalPrice.toLocaleString('fr-FR').replace(/\s/g, ' ')} F</span>
                             )}
                             <div className="flex items-baseline gap-1">
                                 <span className={cn("text-base font-black leading-none", isPromo ? "text-red-600" : "text-primary")}>
-                                    {product.price.toLocaleString('fr-FR')}
+                                    {product.price.toLocaleString('fr-FR').replace(/\s/g, ' ')}
                                 </span>
                                 <span className="text-[9px] font-black uppercase opacity-60">CFP</span>
                             </div>
