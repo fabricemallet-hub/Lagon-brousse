@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -563,6 +564,199 @@ export default function VesselTrackerPage() {
                       );
                   })}
               </div>
+
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="receiver-settings" className="border-none">
+                  <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
+                    <Settings className="size-4 text-primary" />
+                    <span className="text-[10px] font-black uppercase">Réglages Notifications & Veille</span>
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-4 space-y-6">
+                    {/* 1. ALERTES SONORES */}
+                    <div className="space-y-4 p-4 border-2 rounded-2xl bg-card shadow-inner">
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                                <Label className="text-sm font-black uppercase text-primary">Alertes Sonores</Label>
+                                <p className="text-[9px] font-bold text-muted-foreground uppercase">Activer les signaux audio</p>
+                            </div>
+                            <Switch 
+                                checked={vesselPrefs.isNotifyEnabled} 
+                                onCheckedChange={v => saveVesselPrefs({ ...vesselPrefs, isNotifyEnabled: v })} 
+                            />
+                        </div>
+
+                        <div className={cn("space-y-6 transition-opacity", !vesselPrefs.isNotifyEnabled && "opacity-40 pointer-events-none")}>
+                            <div className="space-y-3 pt-2 border-t border-dashed">
+                                <div className="flex items-center gap-2">
+                                    <Volume2 className="size-3 text-muted-foreground" />
+                                    <Label className="text-[10px] font-black uppercase opacity-60">Volume des alertes</Label>
+                                </div>
+                                <Slider 
+                                    value={[vesselPrefs.vesselVolume * 100]} 
+                                    max={100} step={1} 
+                                    onValueChange={v => saveVesselPrefs({ ...vesselPrefs, vesselVolume: v[0] / 100 })} 
+                                />
+                            </div>
+
+                            <div className="space-y-4 pt-2 border-t border-dashed">
+                                <p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Sons par événement</p>
+                                <div className="grid gap-4">
+                                    {[
+                                        { key: 'moving', label: 'Mouvement' },
+                                        { key: 'stationary', label: 'Mouillage' },
+                                        { key: 'offline', label: 'Signal Perdu' },
+                                        { key: 'emergency', label: 'Assistance (Urgence)' },
+                                        { key: 'birds', label: 'Oiseaux (Chasse)' }
+                                    ].map(item => (
+                                        <div key={item.key} className="flex flex-col gap-2 p-2 bg-muted/10 rounded-xl">
+                                            <div className="flex items-center justify-between px-1">
+                                                <div className="flex items-center gap-2">
+                                                    <Switch 
+                                                        checked={vesselPrefs.notifySettings[item.key as keyof typeof vesselPrefs.notifySettings]} 
+                                                        onCheckedChange={v => saveVesselPrefs({ 
+                                                            ...vesselPrefs, 
+                                                            notifySettings: { ...vesselPrefs.notifySettings, [item.key]: v } 
+                                                        })}
+                                                        className="scale-75"
+                                                    />
+                                                    <span className="text-[10px] font-black uppercase">{item.label}</span>
+                                                    <span className="text-[8px] font-bold opacity-40 uppercase ml-1">Actif</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <Select 
+                                                    value={vesselPrefs.notifySounds[item.key as keyof typeof vesselPrefs.notifySounds]} 
+                                                    onValueChange={v => saveVesselPrefs({ 
+                                                        ...vesselPrefs, 
+                                                        notifySounds: { ...vesselPrefs.notifySounds, [item.key]: v } 
+                                                    })}
+                                                >
+                                                    <SelectTrigger className="h-9 text-[9px] font-black uppercase bg-white border-2">
+                                                        <SelectValue placeholder="Choisir un son..." />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] uppercase font-black">{s.label}</SelectItem>)}
+                                                    </SelectContent>
+                                                </Select>
+                                                <Button variant="ghost" size="icon" className="h-9 w-9 border-2 shrink-0 bg-white" onClick={() => playVesselSound(vesselPrefs.notifySounds[item.key as keyof typeof vesselPrefs.notifySounds])}>
+                                                    <Play className="size-3" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 2. VEILLE STRATÉGIQUE */}
+                    <div className="space-y-4 p-4 border-2 rounded-2xl bg-orange-50/30 border-orange-100">
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                                <Label className="text-xs font-black uppercase text-orange-800">Veille Stratégique</Label>
+                                <p className="text-[9px] font-bold text-orange-600/60 uppercase">Alarme si immobile (mouillage) trop longtemps</p>
+                            </div>
+                            <Switch 
+                                checked={vesselPrefs.isWatchEnabled} 
+                                onCheckedChange={v => saveVesselPrefs({ ...vesselPrefs, isWatchEnabled: v })} 
+                            />
+                        </div>
+                        
+                        <div className={cn("space-y-6 transition-opacity", !vesselPrefs.isWatchEnabled && "opacity-40 pointer-events-none")}>
+                            <div className="space-y-4 pt-2 border-t border-dashed border-orange-200">
+                                <div className="flex justify-between items-center px-1">
+                                    <Label className="text-[10px] font-black uppercase text-orange-800/60">Seuil d'immobilité</Label>
+                                    <Badge variant="outline" className="font-black bg-white border-orange-200 text-orange-800 h-6">
+                                        {vesselPrefs.watchDuration >= 60 ? `${Math.floor(vesselPrefs.watchDuration / 60)}h` : `${vesselPrefs.watchDuration} min`}
+                                    </Badge>
+                                </div>
+                                <Slider 
+                                    value={[vesselPrefs.watchDuration || 60]} 
+                                    min={60} 
+                                    max={1440} 
+                                    step={60}
+                                    onValueChange={v => saveVesselPrefs({ ...vesselPrefs, watchDuration: v[0] })} 
+                                />
+                                <div className="flex justify-between text-[8px] font-black uppercase text-orange-800/40 px-1">
+                                    <span>1h</span>
+                                    <span>24h</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase text-orange-800/60 ml-1">Son de l'alarme</Label>
+                                <div className="flex gap-2">
+                                    <Select 
+                                        value={vesselPrefs.watchSound} 
+                                        onValueChange={v => saveVesselPrefs({ ...vesselPrefs, watchSound: v })}
+                                    >
+                                        <SelectTrigger className="h-9 text-[9px] font-black uppercase bg-white border-2 border-orange-100">
+                                            <SelectValue placeholder="Choisir..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] uppercase font-black">{s.label}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                    <Button variant="ghost" size="icon" className="h-9 w-9 border-2 border-orange-100 shrink-0 bg-white text-orange-600" onClick={() => playVesselSound(vesselPrefs.watchSound)}>
+                                        <Play className="size-3" />
+                                    </Button>
+                                </div>
+                                <p className="text-[8px] font-bold text-orange-800/60 italic leading-tight px-1">
+                                    Note : L'alarme de veille jouera en boucle jusqu'à validation manuelle de votre part.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 3. SEUIL BATTERIE FAIBLE */}
+                    <div className="space-y-4 p-4 border-2 rounded-2xl bg-red-50/30 border-red-100">
+                        <div className="space-y-0.5">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-xs font-black uppercase text-red-800">Seuil Batterie Faible</Label>
+                                <Badge variant="outline" className="font-black bg-white border-red-200 text-red-800 h-6">
+                                    {vesselPrefs.batteryThreshold || 20}%
+                                </Badge>
+                            </div>
+                            <p className="text-[9px] font-bold text-red-600/60 uppercase">Alerte niveau bas batterie smartphone</p>
+                        </div>
+                        
+                        <div className="space-y-6">
+                            <div className="space-y-4 pt-2 border-t border-dashed border-red-200">
+                                <Slider 
+                                    value={[vesselPrefs.batteryThreshold || 20]} 
+                                    min={5} max={50} step={5}
+                                    onValueChange={v => saveVesselPrefs({ ...vesselPrefs, batteryThreshold: v[0] })} 
+                                />
+                                <div className="flex justify-between text-[8px] font-black uppercase text-red-800/40 px-1">
+                                    <span>5%</span>
+                                    <span>50%</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase text-red-800/60 ml-1">Son de l'alerte</Label>
+                                <div className="flex gap-2">
+                                    <Select 
+                                        value={vesselPrefs.batterySound} 
+                                        onValueChange={v => saveVesselPrefs({ ...vesselPrefs, batterySound: v })}
+                                    >
+                                        <SelectTrigger className="h-9 text-[9px] font-black uppercase bg-white border-2 border-red-100">
+                                            <SelectValue placeholder="Choisir..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] uppercase font-black">{s.label}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                    <Button variant="ghost" size="icon" className="h-9 w-9 border-2 border-red-100 shrink-0 bg-white text-red-600" onClick={() => playVesselSound(vesselPrefs.batterySound)}>
+                                        <Play className="size-3" />
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             </div>
           )}
         </CardContent>
