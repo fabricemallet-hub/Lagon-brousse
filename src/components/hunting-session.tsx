@@ -55,7 +55,8 @@ import {
   X,
   RefreshCw,
   Anchor,
-  Fish
+  Fish,
+  ChevronUp
 } from 'lucide-react';
 import {
   useUser,
@@ -76,7 +77,8 @@ import {
   getDocs,
   collection,
   query,
-  orderBy
+  orderBy,
+  arrayUnion
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
@@ -325,13 +327,12 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     if (!user || !previousSessionId || !firestore) return;
     
     const participantRef = doc(firestore, 'hunting_sessions', previousSessionId, 'participants', user.uid);
-    deleteDoc(participantRef)
-      .catch(async (err) => {
+    deleteDoc(participantRef).catch(async (err) => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: participantRef.path,
           operation: 'delete'
         } satisfies SecurityRuleContext));
-      });
+    });
   }, [user, session, firestore]);
 
   const startTracking = useCallback(() => {
@@ -392,14 +393,13 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
             id: user.uid, displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor, baseStatus: '', isGibierEnVue: false, updatedAt: serverTimestamp() 
         };
         const participantRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
-        setDoc(participantRef, participantData)
-          .catch(async (err) => {
+        setDoc(participantRef, participantData).catch(async (err) => {
             errorEmitter.emit('permission-error', new FirestorePermissionError({
               path: participantRef.path,
               operation: 'create',
               requestResourceData: participantData
             } satisfies SecurityRuleContext));
-          });
+        });
 
         setSession({ id: code, ...sessionData } as any);
         setIsParticipating(true);
@@ -513,14 +513,13 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     const isDeactivating = me?.baseStatus === st;
     const newVal = isDeactivating ? '' : st;
     
-    updateDoc(ref, { baseStatus: newVal })
-      .catch(async (err) => {
+    updateDoc(ref, { baseStatus: newVal }).catch(async (err) => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: ref.path,
           operation: 'update',
           requestResourceData: { baseStatus: newVal }
         } satisfies SecurityRuleContext));
-      });
+    });
 
     if (!isDeactivating) { 
         const type = st === labels.status1 ? 'position' : 'battue';
@@ -535,14 +534,13 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     const me = participants?.find(p => p.id === user.uid);
     const newVal = !me?.isGibierEnVue;
     
-    updateDoc(ref, { isGibierEnVue: newVal })
-      .catch(async (err) => {
+    updateDoc(ref, { isGibierEnVue: newVal }).catch(async (err) => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: ref.path,
           operation: 'update',
           requestResourceData: { isGibierEnVue: newVal }
         } satisfies SecurityRuleContext));
-      });
+    });
 
     if (newVal) playStatusSound('gibier');
     toast({ title: newVal ? labels.alertDesc : "Alerte levée", variant: newVal ? "destructive" : "default" });
@@ -570,14 +568,13 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
         if (session && isParticipating) {
           const participantRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
           const updateData = { displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor };
-          updateDoc(participantRef, updateData)
-            .catch(async (err) => {
+          updateDoc(participantRef, updateData).catch(async (err) => {
               errorEmitter.emit('permission-error', new FirestorePermissionError({
                 path: participantRef.path,
                 operation: 'update',
                 requestResourceData: updateData
               } satisfies SecurityRuleContext));
-            });
+          });
         }
         toast({ title: 'Préférences sauvegardées !' });
         setPrefsSection(undefined); 
@@ -599,21 +596,30 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     const me = participants?.find(p => p.id === user?.uid);
 
     return (
-        <Card className={cn("transition-all", isFullscreen && "fixed inset-0 z-50 w-screen h-screen rounded-none border-none flex flex-col")}>
-            <CardHeader className={cn("flex-shrink-0", isFullscreen ? "p-4 border-b bg-background" : "")}>
+        <Card className={cn("transition-all", isFullscreen ? "fixed inset-0 z-[100] w-screen h-screen rounded-none border-none flex flex-col bg-black" : "border-2 shadow-sm overflow-hidden")}>
+            <CardHeader className={cn("flex-shrink-0 bg-background", isFullscreen ? "p-3 border-b shadow-sm" : "p-4")}>
                 <CardTitle className="flex items-center justify-between">
-                    <div className="flex items-center gap-2"><Users className="size-5 text-primary" /> {session.id}</div>
-                    <Button onClick={handleLeaveSession} variant="destructive" size="sm" disabled={isSessionLoading}><LogOut className="size-4 mr-2"/> Quitter</Button>
+                    <div className="flex items-center gap-2"><Users className="size-4 text-primary" /> <span className="text-sm font-black uppercase">{session.id}</span></div>
+                    <div className="flex items-center gap-2">
+                        {isFullscreen && (
+                            <Button onClick={handleRecenter} variant="outline" size="sm" className="h-8 text-[9px] font-black uppercase border-2 gap-1 px-2">
+                                <LocateFixed className="size-3" /> Recentrer
+                            </Button>
+                        )}
+                        <Button onClick={handleLeaveSession} variant="destructive" size="sm" className="h-8 text-[9px] font-black uppercase gap-1" disabled={isSessionLoading}>
+                            <LogOut className="size-3"/> Quitter
+                        </Button>
+                    </div>
                 </CardTitle>
             </CardHeader>
-            <CardContent className={cn("flex-grow flex flex-col overflow-y-auto scrollbar-hide", isFullscreen ? "p-0 gap-0" : "p-2 gap-4")}>
+            <CardContent className={cn("flex-grow flex flex-col overflow-hidden relative", isFullscreen ? "p-0" : "p-2 gap-4")}>
                  <div className={cn("relative w-full overflow-hidden", isFullscreen ? "flex-grow" : "h-80 rounded-lg border")}>
                     <GoogleMap
                         mapContainerClassName="w-full h-full"
                         defaultCenter={INITIAL_CENTER}
                         defaultZoom={16}
                         onLoad={setMap}
-                        options={{ disableDefaultUI: true, zoomControl: true, mapTypeControl: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
+                        options={{ disableDefaultUI: true, zoomControl: false, mapTypeControl: false, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
                     >
                         {userLocation && (
                             <OverlayView position={{ lat: userLocation.latitude, lng: userLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
@@ -656,76 +662,134 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                             </OverlayView>
                         ))}
                     </GoogleMap>
-                    <Button size="icon" onClick={() => setIsFullscreen(!isFullscreen)} className="absolute top-2 left-2 shadow-lg h-9 w-9 z-10 bg-background/80 backdrop-blur-sm">
-                        {isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}
+                    
+                    <Button size="icon" onClick={() => setIsFullscreen(!isFullscreen)} className="absolute top-3 left-3 shadow-2xl h-10 w-10 z-10 bg-background/90 backdrop-blur-md border-2 border-primary/20">
+                        {isFullscreen ? <Shrink className="size-6 text-primary" /> : <Expand className="size-6 text-primary" />}
                     </Button>
-                    <Button 
-                        onClick={handleRecenter} 
-                        className={cn(
-                            "absolute top-2 right-2 shadow-lg h-10 w-auto px-3 z-10 border-2 gap-2 flex items-center", 
-                            isGpsActive ? "bg-primary text-white border-primary" : "bg-background/80 backdrop-blur-sm"
-                        )}
-                    >
-                        <span className="text-[9px] font-black uppercase tracking-tighter">GPS + RECENTRER</span>
-                        <LocateFixed className="size-5" />
-                    </Button>
-                </div>
 
-                <div className={cn("flex flex-col gap-4 bg-background", isFullscreen ? "p-4 border-t-2 shadow-[0_-4px_20px_rgba(0,0,0,0.1)]" : "")}>
-                    {!isGpsActive && (
-                        <Alert className="bg-primary/5 border-primary/20">
-                            <LocateFixed className="size-4 text-primary" />
-                            <AlertTitle className="text-xs font-black uppercase">GPS Inactif</AlertTitle>
-                            <AlertDescription className="flex flex-col gap-2">
-                                <p className="text-[10px] font-medium leading-relaxed">Activez votre position pour que vos coéquipiers puissent vous situer sur la carte.</p>
-                                <Button size="sm" onClick={handleToggleGps} className="font-black h-10 uppercase text-[10px] tracking-widest">Activez ma position</Button>
-                            </AlertDescription>
-                        </Alert>
+                    {!isFullscreen && (
+                        <Button 
+                            onClick={handleRecenter} 
+                            className={cn(
+                                "absolute top-3 right-3 shadow-lg h-10 w-auto px-3 z-10 border-2 gap-2 flex items-center", 
+                                isGpsActive ? "bg-primary text-white border-primary" : "bg-background/90 backdrop-blur-md border-primary/10"
+                            )}
+                        >
+                            <span className="text-[9px] font-black uppercase tracking-tighter text-primary">RECENTRER</span>
+                            <LocateFixed className="size-5 text-primary" />
+                        </Button>
                     )}
 
-                    <div className="grid grid-cols-2 gap-2">
-                        <Button variant={me?.baseStatus === labels.status1 ? 'default' : 'outline'} className="h-12 font-bold" onClick={() => updateTacticalStatus(labels.status1)}><labels.icon1 className="mr-2 size-4" /> {labels.status1}</Button>
-                        <Button variant={me?.baseStatus === labels.status2 ? 'default' : 'outline'} className="h-12 font-bold" onClick={() => updateTacticalStatus(labels.status2)}><labels.icon2 className="mr-2 size-4" /> {labels.status2}</Button>
-                        <Button variant={me?.isGibierEnVue ? 'destructive' : 'secondary'} className={cn("col-span-2 h-14 text-lg font-black shadow-lg", me?.isGibierEnVue && "animate-pulse")} onClick={toggleGibierEnVue}><Target className="mr-2 size-6" /> {me?.isGibierEnVue ? labels.alertTitle : labels.alertBtn}</Button>
-                    </div>
-
-                    <div className="space-y-2">
-                        <h4 className="font-black text-[10px] uppercase tracking-widest flex items-center gap-2 px-1 text-muted-foreground"><Users className="size-3" /> Équipe ({participants?.length || 0})</h4>
-                        <div className={cn("overflow-y-auto space-y-1 divide-y border-2 rounded-xl bg-card shadow-inner scrollbar-hide", isFullscreen ? "max-h-[120px]" : "max-h-64")}>
-                            {participants?.map(p => (
-                                <div key={p.id} className={cn("flex justify-between items-center p-3 text-sm transition-colors", p.isGibierEnVue && "bg-red-50 animate-pulse")}>
-                                    <div className="flex flex-col min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <div className="size-2.5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: p.mapColor || '#3b82f6' }} />
-                                            <span className="font-black uppercase text-xs truncate text-slate-800">{p.displayName}</span>
-                                        </div>
-                                        {(p.baseStatus || p.isGibierEnVue) && (
-                                            <span className={cn(
-                                                "text-[9px] font-black uppercase ml-4.5 mt-0.5 px-1.5 rounded w-fit leading-tight",
-                                                p.isGibierEnVue ? "text-red-600 bg-red-100" : "text-primary bg-primary/5"
-                                            )}>
-                                                {p.isGibierEnVue ? (sessionType === 'chasse' ? 'GIBIER EN VUE !' : 'POISSON SIGNALÉ !') : p.baseStatus}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-2 shrink-0 ml-4">
-                                        {p.battery && (
-                                            <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-lg border-2 border-slate-100 text-[10px] font-black shadow-sm">
-                                                <span className={cn(p.battery.level < 0.2 ? "text-red-600 animate-pulse" : "text-slate-500")}>
-                                                    {Math.round(p.battery.level * 100)}%
-                                                </span>
-                                                <BatteryIcon level={p.battery.level} charging={p.battery.charging} />
-                                            </div>
-                                        )}
-                                    </div>
+                    {isFullscreen && (
+                        <div className="absolute bottom-0 left-0 right-0 p-4 space-y-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none">
+                            <div className="flex flex-col gap-3 pointer-events-auto">
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Button 
+                                        variant={me?.baseStatus === labels.status1 ? 'default' : 'secondary'} 
+                                        className={cn("h-14 font-black uppercase text-xs border-2 shadow-xl", me?.baseStatus === labels.status1 ? "border-primary" : "bg-white/90 backdrop-blur-md border-white/20")} 
+                                        onClick={() => updateTacticalStatus(labels.status1)}
+                                    >
+                                        <labels.icon1 className="mr-2 size-5" /> {labels.status1}
+                                    </Button>
+                                    <Button 
+                                        variant={me?.baseStatus === labels.status2 ? 'default' : 'secondary'} 
+                                        className={cn("h-14 font-black uppercase text-xs border-2 shadow-xl", me?.baseStatus === labels.status2 ? "border-primary" : "bg-white/90 backdrop-blur-md border-white/20")} 
+                                        onClick={() => updateTacticalStatus(labels.status2)}
+                                    >
+                                        <labels.icon2 className="mr-2 size-5" /> {labels.status2}
+                                    </Button>
                                 </div>
-                            ))}
+                                <Button 
+                                    variant={me?.isGibierEnVue ? 'destructive' : 'secondary'} 
+                                    className={cn("h-16 text-lg font-black shadow-2xl border-4 uppercase tracking-tighter", me?.isGibierEnVue ? "animate-pulse border-red-400" : "bg-white border-white/20")} 
+                                    onClick={toggleGibierEnVue}
+                                >
+                                    <Target className="mr-3 size-8" /> {me?.isGibierEnVue ? labels.alertTitle : labels.alertBtn}
+                                </Button>
+
+                                <Accordion type="single" collapsible className="w-full">
+                                    <AccordionItem value="team-list" className="border-none">
+                                        <AccordionTrigger className="flex items-center justify-center gap-2 hover:no-underline py-2 bg-black/60 backdrop-blur-md text-white rounded-xl h-8 px-4 opacity-80">
+                                            <div className="flex items-center gap-2 font-black uppercase text-[9px] tracking-widest">
+                                                <Users className="size-3" /> Voir l'équipe ({participants?.length || 0})
+                                            </div>
+                                        </AccordionTrigger>
+                                        <AccordionContent className="pt-2">
+                                            <div className="bg-black/80 backdrop-blur-xl border border-white/10 rounded-xl overflow-y-auto max-h-40 divide-y divide-white/5 scrollbar-hide">
+                                                {participants?.map(p => (
+                                                    <div key={p.id} className="flex justify-between items-center p-3">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <div className="size-2 rounded-full shrink-0" style={{ backgroundColor: p.mapColor || '#3b82f6' }} />
+                                                            <div className="flex flex-col min-w-0">
+                                                                <span className="font-black uppercase text-[10px] text-white truncate">{p.displayName}</span>
+                                                                {p.baseStatus && <span className="text-[8px] font-black text-primary uppercase">{p.baseStatus}</span>}
+                                                            </div>
+                                                        </div>
+                                                        {p.battery && <div className="flex items-center gap-1 text-[9px] font-black text-white/60"><BatteryIcon level={p.battery.level} charging={p.battery.charging} /> {Math.round(p.battery.level * 100)}%</div>}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                </Accordion>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {!isFullscreen && (
-                    <div className="space-y-4 p-2">
+                    <div className="flex flex-col gap-4 animate-in fade-in">
+                        {!isGpsActive && (
+                            <Alert className="bg-primary/5 border-primary/20">
+                                <LocateFixed className="size-4 text-primary" />
+                                <AlertTitle className="text-xs font-black uppercase">GPS Inactif</AlertTitle>
+                                <AlertDescription className="flex flex-col gap-2">
+                                    <p className="text-[10px] font-medium leading-relaxed">Activez votre position pour que vos coéquipiers puissent vous situer sur la carte.</p>
+                                    <Button size="sm" onClick={handleToggleGps} className="font-black h-10 uppercase text-[10px] tracking-widest">Activez ma position</Button>
+                                </AlertDescription>
+                            </Alert>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-2">
+                            <Button variant={me?.baseStatus === labels.status1 ? 'default' : 'outline'} className="h-12 font-bold" onClick={() => updateTacticalStatus(labels.status1)}><labels.icon1 className="mr-2 size-4" /> {labels.status1}</Button>
+                            <Button variant={me?.baseStatus === labels.status2 ? 'default' : 'outline'} className="h-12 font-bold" onClick={() => updateTacticalStatus(labels.status2)}><labels.icon2 className="mr-2 size-4" /> {labels.status2}</Button>
+                            <Button variant={me?.isGibierEnVue ? 'destructive' : 'secondary'} className={cn("col-span-2 h-14 text-lg font-black shadow-lg", me?.isGibierEnVue && "animate-pulse")} onClick={toggleGibierEnVue}><Target className="mr-2 size-6" /> {me?.isGibierEnVue ? labels.alertTitle : labels.alertBtn}</Button>
+                        </div>
+
+                        <div className="space-y-2">
+                            <h4 className="font-black text-[10px] uppercase tracking-widest flex items-center gap-2 px-1 text-muted-foreground"><Users className="size-3" /> Équipe ({participants?.length || 0})</h4>
+                            <div className="overflow-y-auto space-y-1 divide-y border-2 rounded-xl bg-card shadow-inner max-h-64 scrollbar-hide">
+                                {participants?.map(p => (
+                                    <div key={p.id} className={cn("flex justify-between items-center p-3 text-sm transition-colors", p.isGibierEnVue && "bg-red-50 animate-pulse")}>
+                                        <div className="flex flex-col min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <div className="size-2.5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: p.mapColor || '#3b82f6' }} />
+                                                <span className="font-black uppercase text-xs truncate text-slate-800">{p.displayName}</span>
+                                            </div>
+                                            {(p.baseStatus || p.isGibierEnVue) && (
+                                                <span className={cn(
+                                                    "text-[9px] font-black uppercase ml-4.5 mt-0.5 px-1.5 rounded w-fit leading-tight",
+                                                    p.isGibierEnVue ? "text-red-600 bg-red-100" : "text-primary bg-primary/5"
+                                                )}>
+                                                    {p.isGibierEnVue ? (sessionType === 'chasse' ? 'GIBIER EN VUE !' : 'POISSON SIGNALÉ !') : p.baseStatus}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0 ml-4">
+                                            {p.battery && (
+                                                <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-lg border-2 border-slate-100 text-[10px] font-black shadow-sm">
+                                                    <span className={cn(p.battery.level < 0.2 ? "text-red-600 animate-pulse" : "text-slate-500")}>
+                                                        {Math.round(p.battery.level * 100)}%
+                                                    </span>
+                                                    <BatteryIcon level={p.battery.level} charging={p.battery.charging} />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
                         <Accordion type="single" collapsible value={prefsSection} onValueChange={setPrefsSection} className="w-full">
                             <AccordionItem value="prefs" className="border-none">
                                 <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-2 bg-muted/50 rounded-lg px-4 mb-2"><Settings className="size-4" /><span>Profil & Sons</span></AccordionTrigger>
