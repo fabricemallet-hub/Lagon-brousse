@@ -45,7 +45,8 @@ export async function ensureUserDocument(
           updates.subscriptionStatus = 'admin';
       }
 
-      // 3. Initialisation des champs d'audience si manquants (Opt-in par défaut)
+      // 3. Initialisation des champs d'audience si manquants (Opt-in par défaut pour migration)
+      // On force true pour garantir que les audiences ne soient pas à 0 à cause de champs non-définis
       if (currentData.allowsPromoPush === undefined) updates.allowsPromoPush = true;
       if (currentData.allowsPromoEmails === undefined) updates.allowsPromoEmails = true;
       if (currentData.allowsPromoSMS === undefined) updates.allowsPromoSMS = true;

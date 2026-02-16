@@ -110,7 +110,6 @@ export default function ProDashboard() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasCopiedUid, setHasCopiedUid] = useState(false);
 
-  // Auto-calculate selling price when original price or manual discount changes
   useEffect(() => {
     if (manualDiscountInput && originalPrice) {
         const pct = parseFloat(manualDiscountInput);
@@ -140,7 +139,7 @@ export default function ProDashboard() {
       }
       if (selectedTargetCommunes.length === 0) setSelectedTargetCommunes([business.commune]);
     }
-  }, [business, targetCategory, promoCategory, selectedTargetCommunes.length]);
+  }, [business]);
 
   useEffect(() => {
     if (!firestore || !business || isUserLoading || !user) return;
@@ -151,7 +150,6 @@ export default function ProDashboard() {
       try {
         const usersRef = collection(firestore, 'users');
         
-        // Base query builder
         const getBaseQuery = () => {
             let q = query(usersRef, where('subscribedCategories', 'array-contains', targetCategory));
             
@@ -163,7 +161,7 @@ export default function ProDashboard() {
                 if (selectedTargetCommunes.length > 0) {
                     q = query(q, where('lastSelectedLocation', 'in', selectedTargetCommunes.slice(0, 30)));
                 } else {
-                    return null; // Return null if specific but no communes selected
+                    return null;
                 }
             }
             return q;
@@ -180,7 +178,6 @@ export default function ProDashboard() {
             return;
         }
         
-        // Specific channel queries based on the base criteria
         const qPush = query(qBase, where('allowsPromoPush', '==', true));
         const qMail = query(qBase, where('allowsPromoEmails', '==', true));
         const qSms = query(qBase, where('allowsPromoSMS', '==', true));
