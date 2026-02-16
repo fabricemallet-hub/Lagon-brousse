@@ -76,6 +76,7 @@ export default function ShoppingPage() {
   const [filterCommune, setFilterCommune] = useState<string>('USER_DEFAULT');
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
   const [filterType, setFilterType] = useState<string>('ALL');
+  const [filterBusiness, setFilterBusiness] = useState<string>('ALL');
 
   const [selectedProduct, setSelectedProduct] = useState<Promotion & { business?: Business } | null>(null);
   const [isContactOpen, setIsContactOpen] = useState(false);
@@ -111,6 +112,7 @@ export default function ShoppingPage() {
         if (currentFCommune !== 'ALL' && p.business?.commune !== currentFCommune) return false;
         if (filterCategory !== 'ALL' && p.category !== filterCategory) return false;
         if (filterType !== 'ALL' && p.promoType !== filterType) return false;
+        if (filterBusiness !== 'ALL' && p.businessId !== filterBusiness) return false;
         return true;
       })
       .sort((a, b) => {
@@ -118,7 +120,7 @@ export default function ShoppingPage() {
         const timeB = b.createdAt?.toMillis?.() || 0;
         return timeB - timeA;
       });
-  }, [allPromotions, businesses, search, filterRegion, filterCommune, filterCategory, filterType, userRegion, userCommune]);
+  }, [allPromotions, businesses, search, filterRegion, filterCommune, filterCategory, filterType, filterBusiness, userRegion, userCommune]);
 
   const availableCommunes = useMemo(() => {
     const r = filterRegion === 'USER_DEFAULT' ? userRegion : filterRegion;
@@ -199,8 +201,23 @@ export default function ShoppingPage() {
 
       <Card className="border-2 shadow-md bg-muted/10">
         <CardContent className="p-4 space-y-4">
-          <div className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2"><Filter className="size-3" /> Filtres</div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="flex items-center justify-between">
+            <div className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2"><Filter className="size-3" /> Filtres</div>
+            <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-6 text-[8px] font-black uppercase text-muted-foreground"
+                onClick={() => {
+                    setFilterRegion('USER_DEFAULT');
+                    setFilterCommune('USER_DEFAULT');
+                    setFilterCategory('ALL');
+                    setFilterBusiness('ALL');
+                }}
+            >
+                Effacer tout
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="space-y-1">
                 <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Région</Label>
                 <Select value={filterRegion} onValueChange={setFilterRegion}>
@@ -232,6 +249,21 @@ export default function ShoppingPage() {
                         <SelectItem value="Pêche">Pêche</SelectItem>
                         <SelectItem value="Chasse">Chasse</SelectItem>
                         <SelectItem value="Jardinage">Jardinage</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="space-y-1">
+                <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Magasin</Label>
+                <Select value={filterBusiness} onValueChange={setFilterBusiness}>
+                    <SelectTrigger className="h-10 border-2 bg-white font-black text-xs">
+                        <Store className="size-3 mr-2" />
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-64">
+                        <SelectItem value="ALL">Tous les magasins</SelectItem>
+                        {businesses?.map(b => (
+                            <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                        ))}
                     </SelectContent>
                 </Select>
             </div>
