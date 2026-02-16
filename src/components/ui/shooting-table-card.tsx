@@ -85,6 +85,7 @@ export function ShootingTableCard() {
   const [selectedWeight, setSelectedWeight] = useState<number>(0);
   const [zeroDistance, setZeroDistance] = useState('100');
   const [customTargetDist, setCustomTargetDist] = useState('150');
+  const [clickValue, setClickValue] = useState<'1/4 MOA' | '0.1 MRAD'>('1/4 MOA');
   
   const [windKmh, setWindKmh] = useState('10');
   const [windAngle, setWindAngle] = useState('90'); 
@@ -110,6 +111,7 @@ export function ShootingTableCard() {
 
     setSelectedCaliber(weapon.caliber);
     setZeroDistance(weapon.zeroDistance);
+    setClickValue(weapon.clickValue || '1/4 MOA');
     
     const munition = BALLISTIC_DATABASE.find(m => m.id === weapon.munitionId);
     if (munition) {
@@ -140,6 +142,7 @@ export function ShootingTableCard() {
       setManualWeight(prefs.manualWeight || '150');
       setManualV0(prefs.manualV0 || '860');
       setManualBC(prefs.manualBC || '0.400');
+      setClickValue(prefs.clickValue || '1/4 MOA');
       isInitialSyncDone.current = true;
     }
   }, [userProfile]);
@@ -162,7 +165,8 @@ export function ShootingTableCard() {
         shotDistance,
         manualWeight,
         manualV0,
-        manualBC
+        manualBC,
+        clickValue
       };
       updateDoc(doc(firestore, 'users', user.uid), { ballisticsPrefs: prefs })
         .catch(err => console.warn("Failed to auto-save ballistics prefs", err));
@@ -172,7 +176,7 @@ export function ShootingTableCard() {
   }, [
     selectedCaliber, selectedModel, selectedWeight, zeroDistance, customTargetDist,
     windKmh, windAngle, hasSilencer, hasMuzzleBrake, 
-    selectedChoke, shotDistance, manualWeight, manualV0, manualBC,
+    selectedChoke, shotDistance, manualWeight, manualV0, manualBC, clickValue,
     user, firestore
   ]);
 
@@ -256,18 +260,23 @@ export function ShootingTableCard() {
     
     const crosswindMps = (wSpeed / 3.6) * Math.sin(angleRad);
     const windDriftCm = crosswindMps * (timeTarget - dist / v0) * 100;
-    const distFactor = dist / 100;
+    
+    // Logic for Click Value based on User Input
+    // 1/4 MOA = 0.7 cm at 100m
+    // 0.1 MRAD = 1.0 cm at 100m
+    const baseClickValueAt100 = clickValue === '1/4 MOA' ? 0.7 : 1.0;
+    const currentClickValueAtDist = baseClickValueAt100 * (dist / 100);
 
     return {
         dist,
         dropCm: parseFloat(Math.abs(correctionCm).toFixed(1)),
-        clicks: Math.abs(Math.round(correctionCm / distFactor)),
+        clicks: Math.abs(Math.round(correctionCm / currentClickValueAtDist)),
         elevationDir: correctionCm > 0 ? 'HAUT' : 'BAS',
         driftCm: parseFloat(Math.abs(windDriftCm).toFixed(1)),
-        driftClicks: Math.abs(Math.round(windDriftCm / distFactor)),
+        driftClicks: Math.abs(Math.round(windDriftCm / currentClickValueAtDist)),
         driftDir: windDriftCm > 0 ? 'DROITE' : 'GAUCHE'
     };
-  }, [selectedMunition, selectedCaliber, zeroDistance, windKmh, windAngle, hasSilencer]);
+  }, [selectedMunition, selectedCaliber, zeroDistance, windKmh, windAngle, hasSilencer, clickValue]);
 
   const resultsTable = useMemo(() => {
     let distances = [];
@@ -333,7 +342,7 @@ export function ShootingTableCard() {
         </CardHeader>
         
         <CardContent className="p-6 space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-5 bg-muted/20 rounded-3xl border-2 border-dashed border-primary/10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 p-5 bg-muted/20 rounded-3xl border-2 border-dashed border-primary/10">
               <div className="space-y-1.5">
                   <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Calibre</Label>
                   <Select value={selectedCaliber} onValueChange={setSelectedCaliber}>
@@ -359,6 +368,17 @@ export function ShootingTableCard() {
               </div>
 
               <div className="space-y-1.5">
+                  <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Tourelle (Clic)</Label>
+                  <Select value={clickValue} onValueChange={(v: any) => setClickValue(v)}>
+                      <SelectTrigger className="h-10 border-2 font-black uppercase text-xs bg-white"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="1/4 MOA" className="font-black text-xs">1/4 MOA (0.7cm)</SelectItem>
+                          <SelectItem value="0.1 MRAD" className="font-black text-xs">0.1 MRAD (1cm)</SelectItem>
+                      </SelectContent>
+                  </Select>
+              </div>
+
+              <div className="space-y-1.5">
                   <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Zéro (m)</Label>
                   <Input type="number" value={zeroDistance} onChange={e => setZeroDistance(e.target.value)} className="h-10 border-2 font-black text-center text-sm bg-white" />
               </div>
@@ -377,9 +397,11 @@ export function ShootingTableCard() {
                       <span className="text-[10px] font-black text-primary/60">m</span>
                   </div>
               </div>
-              <Badge variant="outline" className="text-[9px] font-black uppercase h-8 rounded-full border-blue-200 text-blue-600 px-4 bg-white/80 w-fit mx-auto sm:mx-0 shadow-sm border-2">
-                  1 CLIC = 1CM À 100M
-              </Badge>
+              <div className="flex flex-col items-center">
+                <Badge variant="outline" className="text-[9px] font-black uppercase h-8 rounded-full border-blue-200 text-blue-600 px-4 bg-white/80 w-fit mx-auto sm:mx-0 shadow-sm border-2">
+                    {clickValue === '1/4 MOA' ? '1 CLIC = 0.7CM À 100M' : '1 CLIC = 1CM À 100M'}
+                </Badge>
+              </div>
           </div>
 
           <div className="hidden md:block border-2 rounded-2xl overflow-hidden bg-white shadow-md">

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -32,6 +33,7 @@ export function GunRackManager() {
   const [munitionId, setMunitionId] = useState('');
   const [weight, setWeight] = useState('');
   const [zeroDistance, setZeroDistance] = useState('100');
+  const [clickValue, setClickValue] = useState<'1/4 MOA' | '0.1 MRAD'>('1/4 MOA');
 
   const weaponsRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -59,6 +61,7 @@ export function GunRackManager() {
     setMunitionId('');
     setWeight('');
     setZeroDistance('100');
+    setClickValue('1/4 MOA');
     setEditingId(null);
     setIsAdding(false);
   };
@@ -71,6 +74,7 @@ export function GunRackManager() {
     setMunitionId(weapon.munitionId);
     setWeight(weapon.weight.toString());
     setZeroDistance(weapon.zeroDistance);
+    setClickValue(weapon.clickValue || '1/4 MOA');
     setIsAdding(true);
   };
 
@@ -86,6 +90,7 @@ export function GunRackManager() {
       munitionId,
       weight: parseFloat(weight) || 0,
       zeroDistance,
+      clickValue,
       updatedAt: serverTimestamp()
     };
 
@@ -167,6 +172,16 @@ export function GunRackManager() {
                 </Select>
               </div>
               <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Valeur Clic (Lunette)</Label>
+                  <Select value={clickValue} onValueChange={(v: any) => setClickValue(v)}>
+                      <SelectTrigger className="h-11 border-2 font-black uppercase text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="1/4 MOA" className="font-black text-xs">1/4 MOA (0.7cm à 100m)</SelectItem>
+                          <SelectItem value="0.1 MRAD" className="font-black text-xs">0.1 MRAD (1cm à 100m)</SelectItem>
+                      </SelectContent>
+                  </Select>
+              </div>
+              <div className="space-y-1.5">
                 <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Poids ({weightUnit})</Label>
                 <Input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder={`Ex: ${weightUnit === 'g' ? '26' : '150'}`} className="h-11 border-2 font-black text-center" />
               </div>
@@ -210,7 +225,10 @@ export function GunRackManager() {
                 <CardContent className="p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <Badge variant="outline" className="font-black uppercase text-[9px] border-primary/20 text-primary">{w.caliber}</Badge>
-                    <span className="text-[9px] font-black uppercase text-muted-foreground">Zéro: {w.zeroDistance}m</span>
+                    <div className="flex flex-col items-end">
+                        <span className="text-[9px] font-black uppercase text-muted-foreground">Zéro: {w.zeroDistance}m</span>
+                        <span className="text-[8px] font-bold text-primary uppercase">Clic: {w.clickValue || '1/4 MOA'}</span>
+                    </div>
                   </div>
                   <div className="p-2.5 bg-primary/5 rounded-xl border border-dashed border-primary/10 flex items-center justify-between">
                     <div className="flex items-center gap-2 min-w-0">

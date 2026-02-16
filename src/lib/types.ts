@@ -20,6 +20,7 @@ export interface BallisticsPrefs {
   manualV0: string;
   manualBC: string;
   customTargetDist?: string;
+  clickValue?: '1/4 MOA' | '0.1 MRAD';
 }
 
 export interface Weapon {
@@ -31,6 +32,7 @@ export interface Weapon {
   munitionId: string;
   weight: number;
   zeroDistance: string;
+  clickValue: '1/4 MOA' | '0.1 MRAD';
   createdAt: any;
 }
 
