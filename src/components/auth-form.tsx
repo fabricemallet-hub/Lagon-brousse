@@ -33,7 +33,7 @@ import {
 } from 'firebase/auth';
 import { doc, collection, addDoc, serverTimestamp, setDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { ForgotPasswordDialog } from './forgot-password-dialog';
-import { Eye, EyeOff, Ticket, MapPin, ScrollText, Globe, Bell, Mail, Smartphone, Phone, Home, Briefcase, User as UserIcon, Zap, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Eye, EyeOff, Ticket, MapPin, ScrollText, Globe, Bell, Mail, Smartphone, Phone, Home, Briefcase, User as UserIcon, Zap, CheckCircle2, RefreshCw, ChevronDown } from 'lucide-react';
 import { redeemAccessToken } from '@/lib/token-utils';
 import { ensureUserDocument } from '@/lib/user-utils';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -45,6 +45,7 @@ import { addMonths, format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
+import { cn } from '@/lib/utils';
 
 type AuthFormProps = {
   mode: 'login' | 'signup';
@@ -127,7 +128,6 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   const selectedRegion = form.watch('region') as Region;
   const accountType = form.watch('accountType');
-  const watchToken = form.watch('token');
 
   const availableLocations = useMemo(() => {
     return Object.keys(locationsByRegion[selectedRegion] || {}).sort();
@@ -171,8 +171,9 @@ export function AuthForm({ mode }: AuthFormProps) {
         toast({ variant: 'destructive', title: "Jeton invalide", description: "Ce code n'existe pas ou est déjà utilisé." });
       }
     } catch (e) {
+      console.error("Token verification error:", e);
       setTokenInfo(null);
-      toast({ variant: 'destructive', title: "Erreur", description: "Impossible de vérifier le jeton." });
+      toast({ variant: 'destructive', title: "Erreur", description: "Impossible de vérifier le jeton. Vérifiez votre connexion." });
     } finally {
       setIsValidatingToken(false);
     }
@@ -298,56 +299,79 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col space-y-4">
-        {/* SECTION 1: JETON (EN PREMIER) */}
-        <div className="p-4 bg-primary/5 border-2 rounded-2xl space-y-3 animate-in fade-in">
-          <FormField
-            control={form.control}
-            name="token"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary">
-                  <Ticket className="size-3" /> Jeton d'accès Premium (Optionnel)
-                </FormLabel>
-                <FormControl>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Input placeholder="LBN-XXXX-XXXX" {...field} autoComplete="off" className="pl-10 font-mono tracking-wider h-12 border-2 bg-white" />
-                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground"><Ticket className="h-5 w-5" /></div>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col space-y-6">
+        
+        {/* ÉTAPE 1 : JETON ET EXPIRATION */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 px-1">
+            <Badge className="bg-primary size-5 rounded-full flex items-center justify-center p-0">1</Badge>
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Validation du Jeton</h3>
+          </div>
+          
+          <div className="p-4 bg-primary/5 border-2 rounded-2xl space-y-3 animate-in fade-in">
+            <FormField
+              control={form.control}
+              name="token"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary">
+                    <Ticket className="size-3" /> Jeton d'accès Premium (Optionnel)
+                  </FormLabel>
+                  <FormControl>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Input 
+                          placeholder="LBN-XXXX-XXXX" 
+                          {...field} 
+                          autoComplete="off" 
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                          className="pl-10 font-mono tracking-wider h-12 border-2 bg-white" 
+                        />
+                        <div className="absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground"><Ticket className="h-5 w-5" /></div>
+                      </div>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        className="h-12 border-2 font-black uppercase text-[10px] shrink-0 bg-white shadow-sm transition-all active:scale-95"
+                        onClick={handleVerifyToken}
+                        disabled={isValidatingToken || !field.value}
+                      >
+                        {isValidatingToken ? <RefreshCw className="animate-spin size-4" /> : "Vérifier"}
+                      </Button>
                     </div>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      className="h-12 border-2 font-black uppercase text-[10px] shrink-0 bg-white"
-                      onClick={handleVerifyToken}
-                      disabled={isValidatingToken || !field.value}
-                    >
-                      {isValidatingToken ? <RefreshCw className="animate-spin size-4" /> : "Vérifier"}
-                    </Button>
-                  </div>
-                </FormControl>
-                {tokenInfo && (
-                  <div className="mt-3 p-3 bg-green-50 border-2 border-green-100 rounded-xl animate-in zoom-in-95">
-                    <p className="text-[10px] font-black uppercase text-green-700 flex items-center gap-2">
-                      <CheckCircle2 className="size-3" /> Jeton Valide
-                    </p>
-                    <p className="text-xs font-bold mt-1 text-green-900">
-                      Active {tokenInfo.duration} mois d'accès Premium.
-                    </p>
-                    <p className="text-[9px] font-bold text-green-600 uppercase mt-0.5">
-                      Fin d'activation : {format(addMonths(new Date(), tokenInfo.duration), 'dd MMMM yyyy', { locale: fr })}
-                    </p>
-                  </div>
-                )}
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+                  </FormControl>
+                  {tokenInfo && (
+                    <div className="mt-3 p-3 bg-green-50 border-2 border-green-100 rounded-xl animate-in zoom-in-95 shadow-sm">
+                      <p className="text-[10px] font-black uppercase text-green-700 flex items-center gap-2">
+                        <CheckCircle2 className="size-3" /> Jeton Valide
+                      </p>
+                      <p className="text-xs font-bold mt-1 text-green-900">
+                        Active {tokenInfo.duration} mois d'accès Premium.
+                      </p>
+                      <p className="text-[9px] font-bold text-green-600 uppercase mt-0.5 border-t border-green-100 pt-1.5 flex items-center justify-between">
+                        <span>Fin d'activation :</span>
+                        <span>{format(addMonths(new Date(), tokenInfo.duration), 'dd MMMM yyyy', { locale: fr })}</span>
+                      </p>
+                    </div>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
         </div>
 
-        {/* SECTION 2: IDENTITÉ (POUR INSCRIPTION) */}
-        {mode === 'signup' && (
-          <>
+        <div className="border-t border-dashed border-slate-200" />
+
+        {/* ÉTAPE 2 : IDENTIFIANTS ET PROFIL */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 px-1">
+            <Badge className="bg-slate-400 size-5 rounded-full flex items-center justify-center p-0">2</Badge>
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Mes Identifiants</h3>
+          </div>
+
+          {mode === 'signup' && (
             <div className="p-4 bg-muted/10 border-2 rounded-2xl space-y-4 animate-in fade-in">
               <div className="flex items-center gap-2 border-b border-dashed border-primary/20 pb-2">
                 <Briefcase className="size-4 text-primary" />
@@ -408,7 +432,9 @@ export function AuthForm({ mode }: AuthFormProps) {
                 />
               )}
             </div>
+          )}
 
+          {mode === 'signup' && (
             <FormField
               control={form.control}
               name="displayName"
@@ -416,13 +442,15 @@ export function AuthForm({ mode }: AuthFormProps) {
                 <FormItem>
                   <FormLabel>{accountType === 'professional' ? "Nom de l'entreprise" : "Nom d'utilisateur"}</FormLabel>
                   <FormControl>
-                    <Input placeholder={accountType === 'professional' ? "Ex: Etablissements Martin" : "Votre nom"} {...field} autoComplete="name" />
+                    <Input placeholder={accountType === 'professional' ? "Ex: Etablissements Martin" : "Votre nom"} {...field} autoComplete="name" className="h-12 border-2" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            
+          )}
+          
+          {mode === 'signup' && (
             <div className="grid grid-cols-2 gap-3">
               <FormField
                 control={form.control}
@@ -468,133 +496,59 @@ export function AuthForm({ mode }: AuthFormProps) {
                 )}
               />
             </div>
+          )}
 
-            <div className="p-4 bg-muted/5 border-2 rounded-2xl space-y-4 animate-in fade-in">
-              <div className="flex items-center gap-2 border-b border-dashed border-primary/20 pb-2">
-                <Phone className="size-4 text-primary" />
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-800">Coordonnées</h3>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="grid grid-cols-3 gap-2">
-                  <FormField
-                    control={form.control}
-                    name="phoneCountryCode"
-                    render={({ field }) => (
-                      <FormItem className="col-span-1">
-                        <FormLabel className="text-[10px] font-black uppercase">Code</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger className="h-10 border-2 font-black text-xs bg-white">
-                              <SelectValue />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="+687" className="text-xs font-black">+687 (NC)</SelectItem>
-                            <SelectItem value="+689" className="text-xs font-black">+689 (PF)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </FormItem>
+          <div className="space-y-4 animate-in fade-in">
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input placeholder="votre@email.com" {...field} autoComplete="email" className="h-12 border-2" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <div className="flex items-center justify-between">
+                    <FormLabel>Mot de passe</FormLabel>
+                    {mode === 'login' && (
+                      <ForgotPasswordDialog>
+                          <button type="button" className="text-sm font-medium text-primary hover:underline -translate-y-px">
+                            Mot de passe oublié ?
+                          </button>
+                      </ForgotPasswordDialog>
                     )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="phoneNumber"
-                    render={({ field }) => (
-                      <FormItem className="col-span-2">
-                        <FormLabel className="text-[10px] font-black uppercase">Mobile (Obligatoire)</FormLabel>
-                        <FormControl>
-                          <Input type="tel" placeholder="00 00 00" {...field} className="h-10 border-2 font-black bg-white" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="pt-2 space-y-3 border-t border-dashed border-primary/10">
-                  <p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest italic">Informations optionnelles :</p>
-                  <FormField
-                    control={form.control}
-                    name="landline"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px]">Téléphone Fixe</FormLabel>
-                        <FormControl>
-                          <Input type="tel" placeholder="Fixe" {...field} className="h-10 border-2 bg-white" />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="address"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[10px]">Adresse physique</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Ex: 12 rue des Flamboyants" {...field} className="h-10 border-2 bg-white" />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* SECTION 3: AUTH (EMAIL / PASSWORD) */}
-        <div className="space-y-4 animate-in fade-in">
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Email</FormLabel>
-                <FormControl>
-                  <Input placeholder="votre@email.com" {...field} autoComplete="email" className="h-12 border-2" />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <div className="flex items-center justify-between">
-                  <FormLabel>Mot de passe</FormLabel>
-                  {mode === 'login' && (
-                    <ForgotPasswordDialog>
-                        <button type="button" className="text-sm font-medium text-primary hover:underline -translate-y-px">
-                          Mot de passe oublié ?
-                        </button>
-                    </ForgotPasswordDialog>
-                  )}
-                </div>
-                <FormControl>
-                  <div className="relative">
-                    <Input 
-                      type={showPassword ? 'text' : 'password'} 
-                      placeholder="********" {...field} 
-                      autoComplete={mode === 'login' ? 'current-password' : 'new-password'} 
-                      className="h-12 border-2"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground"
-                    >
-                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                    </button>
                   </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+                  <FormControl>
+                    <div className="relative">
+                      <Input 
+                        type={showPassword ? 'text' : 'password'} 
+                        placeholder="********" {...field} 
+                        autoComplete={mode === 'login' ? 'current-password' : 'new-password'} 
+                        className="h-12 border-2"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground"
+                      >
+                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </button>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
         </div>
 
         {mode === 'login' && (
@@ -611,65 +565,49 @@ export function AuthForm({ mode }: AuthFormProps) {
         )}
 
         {mode === 'signup' && (
-          <div className="p-4 bg-muted/10 border-2 rounded-2xl space-y-4 animate-in fade-in slide-in-from-top-2">
+          <div className="p-4 bg-muted/5 border-2 rounded-2xl space-y-4 animate-in fade-in">
             <div className="flex items-center gap-2 border-b border-dashed border-primary/20 pb-2">
-              <Bell className="size-4 text-primary" />
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-800">Mes Intérêts & Notifications</h3>
+              <Phone className="size-4 text-primary" />
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-800">Coordonnées</h3>
             </div>
             
             <div className="space-y-3">
-              <p className="text-[9px] font-bold uppercase text-muted-foreground">Catégories d'offres souhaitées :</p>
-              <div className="grid grid-cols-1 gap-2">
-                {['Pêche', 'Chasse', 'Jardinage'].map(cat => (
-                  <div key={cat} className="flex items-center space-x-3">
-                    <Checkbox 
-                      id={`cat-${cat}`} 
-                      checked={form.watch('subscribedCategories').includes(cat)}
-                      onCheckedChange={(checked) => {
-                        const current = form.getValues('subscribedCategories');
-                        if (checked) form.setValue('subscribedCategories', [...current, cat]);
-                        else form.setValue('subscribedCategories', current.filter(c => c !== cat));
-                      }}
-                    />
-                    <label htmlFor={`cat-${cat}`} className="text-xs font-bold cursor-pointer">{cat}</label>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="pt-2 space-y-3 border-t border-dashed border-primary/10">
-              <p className="text-[9px] font-bold uppercase text-muted-foreground">Canaux de réception :</p>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center space-x-3">
-                  <Checkbox 
-                    id="allow-email" 
-                    checked={form.watch('allowsPromoEmails')}
-                    onCheckedChange={(checked) => form.setValue('allowsPromoEmails', !!checked)}
-                  />
-                  <label htmlFor="allow-email" className="text-xs font-bold flex items-center gap-2 cursor-pointer">
-                    <Mail className="size-3 text-primary" /> E-mails de nouveautés
-                  </label>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <Checkbox 
-                    id="allow-push" 
-                    checked={form.watch('allowsPromoPush')}
-                    onCheckedChange={(checked) => form.setValue('allowsPromoPush', !!checked)}
-                  />
-                  <label htmlFor="allow-push" className="text-xs font-bold flex items-center gap-2 cursor-pointer">
-                    <Smartphone className="size-3 text-primary" /> Notifications sur mobile
-                  </label>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <Checkbox 
-                    id="allow-sms" 
-                    checked={form.watch('allowsPromoSMS')}
-                    onCheckedChange={(checked) => form.setValue('allowsPromoSMS', !!checked)}
-                  />
-                  <label htmlFor="allow-sms" className="text-xs font-bold flex items-center gap-2 cursor-pointer">
-                    <Smartphone className="size-3 text-primary" /> Alertes SMS
-                  </label>
-                </div>
+              <div className="grid grid-cols-3 gap-2">
+                <FormField
+                  control={form.control}
+                  name="phoneCountryCode"
+                  render={({ field }) => (
+                    <FormItem className="col-span-1">
+                      <FormLabel className="text-[10px] font-black uppercase">Code</FormLabel>
+                      <FormControl>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="h-10 border-2 font-black text-xs bg-white">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="+687" className="text-xs font-black">+687 (NC)</SelectItem>
+                            <SelectItem value="+689" className="text-xs font-black">+689 (PF)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="phoneNumber"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2">
+                      <FormLabel className="text-[10px] font-black uppercase">Mobile (Obligatoire)</FormLabel>
+                      <FormControl>
+                        <Input type="tel" placeholder="00 00 00" {...field} className="h-10 border-2 font-black bg-white" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             </div>
           </div>
@@ -716,7 +654,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         <div className="pt-4">
           <Button 
             type="submit" 
-            className="w-full h-14 font-black uppercase tracking-widest shadow-xl text-base" 
+            className="w-full h-14 font-black uppercase tracking-widest shadow-xl text-base transition-all active:scale-[0.98]" 
             disabled={isLoading || (mode === 'signup' && !form.getValues('acceptCgv'))}
           >
             {isLoading ? <RefreshCw className="animate-spin mr-2 size-5" /> : (mode === 'login' ? 'Se connecter' : "S'inscrire")}

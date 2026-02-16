@@ -87,7 +87,12 @@ service cloud.firestore {
       allow read, write: if isSignedIn() && (resource.data.userId == request.auth.uid);
     }
 
-    match /access_tokens/{id} { allow read: if isSignedIn(); }
+    // Jeton d'accès : Autoriser GET pour vérification sans être connecté (Login/Signup)
+    match /access_tokens/{id} { 
+      allow get: if true;
+      allow list: if isSignedIn();
+    }
+
     match /shared_access_tokens/{id} { allow read: if true; }
     match /spot_shares/{id} { allow read, write: if isSignedIn(); }
     
