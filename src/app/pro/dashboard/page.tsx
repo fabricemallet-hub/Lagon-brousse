@@ -44,7 +44,10 @@ import {
   ArrowLeft,
   Wand2,
   Copy,
-  Check
+  Check,
+  CheckCircle2,
+  LayoutTemplate,
+  CreditCard
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -55,7 +58,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { locations } from '@/lib/locations';
 import { analyzeProduct } from '@/ai/flows/analyze-product-flow';
-import type { AnalyzeProductOutput } from '@/ai/schemas';
+import { generateCampaignMessages } from '@/ai/flows/generate-campaign-messages-flow';
+import type { AnalyzeProductOutput, GenerateCampaignOutput } from '@/ai/schemas';
 import {
   Dialog,
   DialogContent,
@@ -69,6 +73,7 @@ import { FirestorePermissionError } from '@/firebase/errors';
 
 type TargetScope = 'SPECIFIC' | 'CALEDONIE' | 'TAHITI' | 'ALL';
 type WizardStep = 'IDLE' | 'INFO' | 'TONE' | 'GENERATING' | 'OPTIONS' | 'STRATEGY';
+type CampaignWizardStep = 'IDLE' | 'TONE' | 'LENGTH' | 'GENERATING' | 'SELECTION' | 'PREVIEW' | 'EDIT';
 
 const MAIN_CATEGORIES = ["Pêche", "Chasse", "Jardinage"];
 const AVAILABLE_TONES = [
@@ -78,6 +83,12 @@ const AVAILABLE_TONES = [
     { id: 'Sérieux', label: 'Sérieux', desc: 'Sobriété et efficacité' },
     { id: 'Professionnel', label: 'Professionnel', desc: 'Ton expert et rassurant' },
     { id: 'Simple', label: 'Simple', desc: 'Direct et facile à lire' },
+];
+
+const CAMPAIGN_LENGTHS = [
+    { id: 'Short', label: 'Court', desc: 'Direct à l\'essentiel' },
+    { id: 'Medium', label: 'Moyen', desc: 'Équilibre parfait' },
+    { id: 'Long', label: 'Long', desc: 'Détaillé et persuasif' },
 ];
 
 export default function ProDashboard() {
@@ -132,7 +143,7 @@ export default function ProDashboard() {
   
   const [isCalculatingReach, setIsCalculatingReach] = useState(false);
   const [reachError, setReachError] = useState(false);
-  const [selectedChannels, setSelectedChannels] = useState<string[]>(['PUSH', 'MAIL']);
+  const [selectedChannels, setSelectedChannels] = useState<('SMS' | 'PUSH' | 'MAIL')[]>(['PUSH', 'MAIL']);
   const [targetScope, setTargetScope] = useState<TargetScope>('SPECIFIC');
   const [selectedTargetCommunes, setSelectedTargetCommunes] = useState<string[]>([]);
   const [communeSearch, setCommuneSearch] = useState('');
@@ -154,12 +165,27 @@ export default function ProDashboard() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasCopiedUid, setHasCopiedUid] = useState(false);
 
-  // --- AI WIZARD STATES ---
+  // --- AI WIZARD STATES (Product) ---
   const [wizardStep, setWizardStep] = useState<WizardStep>('IDLE');
   const [aiAdditionalInfo, setAiAdditionalInfo] = useState('');
   const [aiSelectedTone, setAiSelectedTone] = useState('Commercial');
   const [aiAnalysisResult, setAiAnalysisResult] = useState<AnalyzeProductOutput | null>(null);
   const [selectedOptionIdx, setSelectedOptionIdx] = useState<number | null>(null);
+
+  // --- AI CAMPAIGN WIZARD STATES ---
+  const [campWizardStep, setCampWizardStep] = useState<CampaignWizardStep>('IDLE');
+  const [campTone, setCampTone] = useState('Commercial');
+  const [campLength, setCampLength] = useState<'Short' | 'Medium' | 'Long'>('Short');
+  const [campProps, setCampProps] = useState<GenerateCampaignOutput | null>(null);
+  
+  const [selectedSmsIdx, setSelectedSmsIdx] = useState<number | null>(null);
+  const [selectedPushIdx, setSelectedPushIdx] = useState<number | null>(null);
+  const [selectedMailIdx, setSelectedMailIdx] = useState<number | null>(null);
+
+  const [finalSms, setFinalSms] = useState('');
+  const [finalPush, setFinalPush] = useState('');
+  const [finalMailSubject, setFinalMailSubject] = useState('');
+  const [finalMailBody, setFinalMailBody] = useState('');
 
   useEffect(() => {
     if (manualDiscountInput && originalPrice) {
@@ -389,30 +415,86 @@ export default function ProDashboard() {
       });
   };
 
-  const handleDiffuse = () => {
-    if (!firestore || !business || baseTargetCount === null || selectedPromoIds.length === 0) return;
+  // --- CAMPAIGN WIZARD LOGIC ---
+  const startCampWizard = () => {
+    if (selectedPromoIds.length === 0) {
+        toast({ variant: 'destructive', title: "Sélection vide", description: "Choisissez au moins un article à promouvoir." });
+        return;
+    }
+    setCampWizardStep('TONE');
+  };
+
+  const processCampGeneration = async () => {
+    setCampWizardStep('GENERATING');
+    try {
+        const selectedPromos = promotions?.filter(p => selectedPromoIds.includes(p.id)) || [];
+        const result = await generateCampaignMessages({
+            businessName: business!.name,
+            products: selectedPromos.map(p => ({
+                title: p.title,
+                description: p.description || '',
+                price: p.price,
+                discount: p.discountPercentage || undefined
+            })),
+            channels: selectedChannels,
+            tone: campTone,
+            length: campLength
+        });
+        setCampProps(result);
+        setCampWizardStep('SELECTION');
+    } catch (e) {
+        toast({ variant: 'destructive', title: "Erreur IA", description: "La génération de campagne a échoué." });
+        setCampWizardStep('LENGTH');
+    }
+  };
+
+  const handleConfirmSelections = () => {
+    if (selectedChannels.includes('SMS') && selectedSmsIdx !== null) {
+        setFinalSms(campProps!.smsPropositions![selectedSmsIdx]);
+    }
+    if (selectedChannels.includes('PUSH') && selectedPushIdx !== null) {
+        setFinalPush(campProps!.pushPropositions![selectedPushIdx]);
+    }
+    if (selectedChannels.includes('MAIL') && selectedMailIdx !== null) {
+        setFinalMailSubject(campProps!.mailPropositions![selectedMailIdx].subject);
+        setFinalMailBody(campProps!.mailPropositions![selectedMailIdx].body);
+    }
+    setCampWizardStep('PREVIEW');
+  };
+
+  const handleFinalDiffuse = (isDraft = false) => {
+    if (!firestore || !business || !user) return;
     setIsSaving(true);
     
-    const selectedPromos = promotions?.filter(p => selectedPromoIds.includes(p.id)) || [];
-    const campaignData = {
-      ownerId: user!.uid, 
+    const campaignData: any = {
+      ownerId: user.uid, 
       businessId: business.id, 
       businessName: business.name,
-      title: `${business.name} : ${selectedPromos.length} offres !`,
-      message: `Offres : ${selectedPromos.map(p => p.title).join(', ')}.`,
+      title: finalMailSubject || `${business.name} : Nouvelles offres`,
+      message: finalPush || finalSms || "Découvrez nos offres !",
+      smsContent: finalSms || null,
+      pushContent: finalPush || null,
+      mailSubject: finalMailSubject || null,
+      mailBody: finalMailBody || null,
       targetCommune: targetScope === 'ALL' ? 'GLOBAL' : (targetScope === 'SPECIFIC' ? selectedTargetCommunes.join(', ') : targetScope),
       targetCategory, 
       reach: baseTargetCount, 
       cost: totalCalculatedCost, 
-      status: 'pending', 
+      status: isDraft ? 'draft' : 'pending', 
       createdAt: serverTimestamp(), 
-      selectedChannels
+      selectedChannels,
+      promotedPromoIds: selectedPromoIds
     };
 
     const campaignRef = collection(firestore, 'campaigns');
     addDoc(campaignRef, campaignData)
       .then(() => {
-        toast({ title: "Campagne envoyée pour validation !" });
+        toast({ 
+            title: isDraft ? "Brouillon sauvegardé" : "Campagne envoyée !", 
+            description: isDraft ? "Vous pourrez la modifier plus tard." : "L'admin validera votre envoi sous 24h." 
+        });
+        setCampWizardStep('IDLE');
+        setSelectedPromoIds([]);
         setIsSaving(false);
       })
       .catch(async (err) => {
@@ -627,13 +709,13 @@ export default function ProDashboard() {
                             {reachError && <p className="text-[8px] font-bold text-red-500 text-center uppercase animate-pulse">Erreur de calcul. Sélectionnez une zone.</p>}
                         </div>
 
-                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Canaux souhaités</Label><div className="flex flex-wrap gap-2">{[{ id: 'SMS', label: 'SMS' }, { id: 'PUSH', label: 'Push' }, { id: 'MAIL', label: 'Email' }].map(ch => (<Badge key={ch.id} variant={selectedChannels.includes(ch.id) ? "default" : "outline"} className="cursor-pointer font-black uppercase h-8 px-3 border-2" onClick={() => setSelectedChannels(prev => prev.includes(ch.id) ? prev.filter(c => c !== ch.id) : [...prev, ch.id])}>{ch.label}</Badge>))}</div></div>
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Canaux souhaités</Label><div className="flex flex-wrap gap-2">{[{ id: 'SMS', label: 'SMS' }, { id: 'PUSH', label: 'Push' }, { id: 'MAIL', label: 'Email' }].map(ch => (<Badge key={ch.id} variant={selectedChannels.includes(ch.id as any) ? "default" : "outline"} className="cursor-pointer font-black uppercase h-8 px-3 border-2" onClick={() => setSelectedChannels(prev => prev.includes(ch.id as any) ? prev.filter(c => c !== ch.id) : [...prev, ch.id as any])}>{ch.label}</Badge>))}</div></div>
 
                         {pricing && selectedPromoIds.length > 0 && !isCalculatingReach && (
                             <div className="p-4 bg-primary/5 border-2 border-primary/20 rounded-2xl space-y-3 animate-in fade-in"><p className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2"><DollarSign className="size-3" /> Devis (x{selectedPromoIds.length} article{selectedPromoIds.length > 1 ? 's' : ''})</p><div className="space-y-1.5 text-[11px] font-bold text-slate-600"><div className="flex justify-between"><span className="opacity-60">Frais fixes (Campagne)</span><span>{pricing.fixedPrice} F</span></div><div className="flex justify-between border-t border-dashed pt-1 mt-1"><span className="opacity-60">Base Reach ({baseTargetCount} {baseTargetCount !== null && baseTargetCount > 1 ? 'utilisateurs' : 'utilisateur'} x {pricing.unitPricePerUser}F)</span><span>{Math.round((baseTargetCount || 0) * pricing.unitPricePerUser * selectedPromoIds.length)} F</span></div>{selectedChannels.includes('SMS') && <div className="flex justify-between text-blue-600"><span>Canal SMS ({smsTargetCount} x {pricing.priceSMS}F)</span><span>{Math.round((smsTargetCount || 0) * (pricing.priceSMS || 0) * selectedPromoIds.length)} F</span></div>}{selectedChannels.includes('PUSH') && <div className="flex justify-between text-primary"><span>Canal Push ({pushTargetCount} x {pricing.pricePush}F)</span><span>{Math.round((pushTargetCount || 0) * (pricing.pricePush || 0) * selectedPromoIds.length)} F</span></div>}{selectedChannels.includes('MAIL') && <div className="flex justify-between text-green-600"><span>Canal Email ({mailTargetCount} x {pricing.priceMail}F)</span><span>{Math.round((mailTargetCount || 0) * (pricing.priceMail || 0) * selectedPromoIds.length)} F</span></div>}<div className="flex justify-between items-center bg-primary/10 p-3 rounded-xl border border-primary/20 mt-3"><span className="text-[10px] font-black uppercase text-primary">Total estimé</span><span className="textxl text-primary font-black">{totalCalculatedCost} FCFP</span></div></div></div>
                         )}
 
-                        <Button onClick={handleDiffuse} disabled={isSaving || !baseTargetCount || selectedChannels.length === 0 || selectedPromoIds.length === 0} className="w-full h-14 bg-accent hover:bg-accent/90 text-white font-black uppercase shadow-lg gap-2"><Megaphone className="size-5" /> Lancer la campagne</Button>
+                        <Button onClick={startCampWizard} disabled={isSaving || !baseTargetCount || selectedChannels.length === 0 || selectedPromoIds.length === 0} className="w-full h-14 bg-accent hover:bg-accent/90 text-white font-black uppercase shadow-lg gap-2"><Megaphone className="size-5" /> Configurer la campagne (IA)</Button>
                     </div>
                 </div>
               </div>
@@ -810,6 +892,194 @@ export default function ProDashboard() {
                     )}
                     {wizardStep !== 'GENERATING' && wizardStep !== 'STRATEGY' && (
                         <Button variant="ghost" onClick={() => setWizardStep('IDLE')} className="w-full font-black uppercase text-[9px] h-8 opacity-40">Quitter l'assistant</Button>
+                    )}
+                </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* --- CAMPAIGN AI WIZARD DIALOG --- */}
+          <Dialog open={campWizardStep !== 'IDLE'} onOpenChange={(open) => !open && setCampWizardStep('IDLE')}>
+            <DialogContent className="max-w-md w-[95vw] rounded-3xl p-0 overflow-hidden border-none shadow-2xl flex flex-col max-h-[90vh]">
+                <DialogHeader className="p-6 bg-slate-900 text-white border-b border-white/10 shrink-0">
+                    <DialogTitle className="font-black uppercase tracking-tighter flex items-center gap-3">
+                        <Megaphone className="size-6 text-accent" /> Assistant Campagne IA
+                    </DialogTitle>
+                    <DialogDescription className="text-white/60 text-[10px] font-bold uppercase mt-1">
+                        Générez vos messages optimisés par canal
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="flex-grow overflow-y-auto p-6 bg-slate-50/50 scrollbar-hide">
+                    {campWizardStep === 'TONE' && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Ton de la campagne</Label>
+                            <div className="grid grid-cols-1 gap-2">
+                                {AVAILABLE_TONES.map(tone => (
+                                    <div 
+                                        key={tone.id} 
+                                        onClick={() => setCampTone(tone.id)}
+                                        className={cn(
+                                            "p-4 rounded-2xl border-2 transition-all cursor-pointer select-none",
+                                            campTone === tone.id ? "bg-accent border-accent text-white shadow-md scale-[1.02]" : "bg-white border-slate-100 hover:border-primary/20"
+                                        )}
+                                    >
+                                        <p className="font-black uppercase text-[11px]">{tone.label}</p>
+                                        <p className={cn("text-[9px] font-medium uppercase opacity-60", campTone === tone.id ? "text-white" : "text-muted-foreground")}>{tone.desc}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {campWizardStep === 'LENGTH' && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Longueur souhaitée</Label>
+                            <div className="grid grid-cols-1 gap-2">
+                                {CAMPAIGN_LENGTHS.map(len => (
+                                    <div 
+                                        key={len.id} 
+                                        onClick={() => setCampLength(len.id as any)}
+                                        className={cn(
+                                            "p-4 rounded-2xl border-2 transition-all cursor-pointer select-none",
+                                            campLength === len.id ? "bg-accent border-accent text-white shadow-md scale-[1.02]" : "bg-white border-slate-100 hover:border-primary/20"
+                                        )}
+                                    >
+                                        <p className="font-black uppercase text-[11px]">{len.label}</p>
+                                        <p className={cn("text-[9px] font-medium uppercase opacity-60", campLength === len.id ? "text-white" : "text-muted-foreground")}>{len.desc}</p>
+                                    </div>
+                                ))}
+                            </div>
+                            <Alert className="bg-primary/5 border-dashed border-2">
+                                <Info className="size-4 text-primary" />
+                                <AlertDescription className="text-[10px] leading-relaxed font-medium">L'IA adaptera cette longueur selon les contraintes de chaque canal (ex: SMS toujours court).</AlertDescription>
+                            </Alert>
+                        </div>
+                    )}
+
+                    {campWizardStep === 'GENERATING' && (
+                        <div className="flex flex-col items-center justify-center py-20 gap-6 text-center">
+                            <RefreshCw className="size-16 text-accent animate-spin" />
+                            <div className="space-y-2">
+                                <h3 className="font-black uppercase tracking-tighter text-xl">Rédaction multi-canaux...</h3>
+                                <p className="text-[10px] font-bold uppercase text-muted-foreground">Génération de 5 propositions par canal</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {campWizardStep === 'SELECTION' && campProps && (
+                        <div className="space-y-8 pb-10">
+                            {selectedChannels.includes('SMS') && (
+                                <div className="space-y-3">
+                                    <p className="text-[10px] font-black uppercase text-blue-600 tracking-widest flex items-center gap-2"><Smartphone className="size-3" /> Choisissez votre SMS</p>
+                                    <div className="flex flex-col gap-2">
+                                        {campProps.smsPropositions?.map((text, i) => (
+                                            <div key={i} onClick={() => setSelectedSmsIdx(i)} className={cn("p-3 rounded-xl border-2 text-xs font-medium cursor-pointer transition-all", selectedSmsIdx === i ? "bg-blue-50 border-blue-600 shadow-md" : "bg-white border-slate-100")}>
+                                                "{text}"
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {selectedChannels.includes('PUSH') && (
+                                <div className="space-y-3">
+                                    <p className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2"><Zap className="size-3" /> Choisissez votre Push</p>
+                                    <div className="flex flex-col gap-2">
+                                        {campProps.pushPropositions?.map((text, i) => (
+                                            <div key={i} onClick={() => setSelectedPushIdx(i)} className={cn("p-3 rounded-xl border-2 text-xs font-medium cursor-pointer transition-all", selectedPushIdx === i ? "bg-primary/5 border-primary shadow-md" : "bg-white border-slate-100")}>
+                                                "{text}"
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {selectedChannels.includes('MAIL') && (
+                                <div className="space-y-3">
+                                    <p className="text-[10px] font-black uppercase text-green-600 tracking-widest flex items-center gap-2"><Mail className="size-3" /> Choisissez votre Mail</p>
+                                    <div className="flex flex-col gap-2">
+                                        {campProps.mailPropositions?.map((mail, i) => (
+                                            <div key={i} onClick={() => setSelectedMailIdx(i)} className={cn("p-3 rounded-xl border-2 text-xs font-medium cursor-pointer transition-all", selectedMailIdx === i ? "bg-green-50 border-green-600 shadow-md" : "bg-white border-slate-100")}>
+                                                <p className="font-black uppercase text-[9px] mb-1">Objet : {mail.subject}</p>
+                                                <p className="line-clamp-2 italic opacity-70">"{mail.body}"</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {campWizardStep === 'PREVIEW' && (
+                        <div className="space-y-6 pb-10">
+                            <div className="p-4 bg-green-50 border-2 border-green-200 rounded-2xl flex items-center gap-3">
+                                <CheckCircle2 className="size-6 text-green-600 shrink-0" />
+                                <p className="text-xs font-black uppercase text-green-800">Messages prêts pour diffusion !</p>
+                            </div>
+                            
+                            <div className="space-y-4">
+                                {selectedChannels.includes('SMS') && (
+                                    <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-blue-600 ml-1">Aperçu SMS</Label><div className="p-4 bg-slate-50 rounded-2xl border-2 border-dashed font-medium text-xs italic">"{finalSms}"</div></div>
+                                )}
+                                {selectedChannels.includes('PUSH') && (
+                                    <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-primary ml-1">Aperçu Push</Label><div className="p-4 bg-slate-50 rounded-2xl border-2 border-dashed font-medium text-xs italic">"{finalPush}"</div></div>
+                                )}
+                                {selectedChannels.includes('MAIL') && (
+                                    <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase text-green-600 ml-1">Aperçu Mail</Label><div className="p-4 bg-slate-50 rounded-2xl border-2 border-dashed space-y-2"><p className="font-black text-[10px] uppercase border-b pb-1">Objet : {finalMailSubject}</p><p className="font-medium text-xs italic leading-relaxed">"{finalMailBody}"</p></div></div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {campWizardStep === 'EDIT' && (
+                        <div className="space-y-6 pb-10">
+                            <p className="text-[10px] font-black uppercase text-muted-foreground text-center">Édition manuelle des textes</p>
+                            {selectedChannels.includes('SMS') && (
+                                <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">Texte SMS</Label><Textarea value={finalSms} onChange={e => setFinalSms(e.target.value)} className="border-2 font-medium" /></div>
+                            )}
+                            {selectedChannels.includes('PUSH') && (
+                                <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">Texte Push</Label><Textarea value={finalPush} onChange={e => setFinalPush(e.target.value)} className="border-2 font-medium" /></div>
+                            )}
+                            {selectedChannels.includes('MAIL') && (
+                                <div className="space-y-4">
+                                    <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">Objet Mail</Label><Input value={finalMailSubject} onChange={e => setFinalMailSubject(e.target.value)} className="border-2 font-bold" /></div>
+                                    <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1">Corps Mail</Label><Textarea value={finalMailBody} onChange={e => setFinalMailBody(e.target.value)} className="border-2 font-medium min-h-[150px]" /></div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                <DialogFooter className="p-4 bg-white border-t shrink-0 flex flex-col gap-2">
+                    {campWizardStep === 'TONE' && (
+                        <div className="flex gap-2 w-full">
+                            <Button variant="ghost" onClick={() => setCampWizardStep('IDLE')} className="flex-1 font-bold uppercase text-[10px]">Annuler</Button>
+                            <Button onClick={() => setCampWizardStep('LENGTH')} className="flex-[2] h-12 font-black uppercase tracking-widest shadow-lg gap-2">Suivant <ChevronRight className="size-4" /></Button>
+                        </div>
+                    )}
+                    {campWizardStep === 'LENGTH' && (
+                        <div className="flex gap-2 w-full">
+                            <Button variant="ghost" onClick={() => setCampWizardStep('TONE')} className="flex-1 font-bold uppercase text-[10px] border-2">Retour</Button>
+                            <Button onClick={processCampGeneration} className="flex-[2] h-12 font-black uppercase tracking-widest shadow-lg gap-2">Générer les variantes <Wand2 className="size-4" /></Button>
+                        </div>
+                    )}
+                    {campWizardStep === 'SELECTION' && (
+                        <div className="flex gap-2 w-full">
+                            <Button variant="ghost" onClick={() => setCampWizardStep('LENGTH')} className="flex-1 font-bold uppercase text-[10px] border-2">Retour</Button>
+                            <Button onClick={handleConfirmSelections} className="flex-[2] h-12 font-black uppercase tracking-widest shadow-lg gap-2">Valider mes choix <ChevronRight className="size-4" /></Button>
+                        </div>
+                    )}
+                    {campWizardStep === 'PREVIEW' && (
+                        <div className="flex flex-col gap-2 w-full">
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button variant="outline" onClick={() => setCampWizardStep('EDIT')} className="h-12 font-black uppercase text-[10px] border-2 gap-2"><Pencil className="size-3" /> Éditer textes</Button>
+                                <Button variant="secondary" onClick={() => handleFinalDiffuse(true)} className="h-12 font-black uppercase text-[10px] border-2 gap-2"><Save className="size-3" /> Sauver plus tard</Button>
+                            </div>
+                            <Button onClick={() => handleFinalDiffuse(false)} className="w-full h-16 font-black uppercase tracking-widest shadow-xl text-base gap-3 bg-accent hover:bg-accent/90">
+                                <CreditCard className="size-6" /> PAIEMENT & ENVOI
+                            </Button>
+                        </div>
+                    )}
+                    {campWizardStep === 'EDIT' && (
+                        <Button onClick={() => setCampWizardStep('PREVIEW')} className="w-full h-12 font-black uppercase tracking-widest shadow-lg">Enregistrer modifications</Button>
                     )}
                 </DialogFooter>
             </DialogContent>

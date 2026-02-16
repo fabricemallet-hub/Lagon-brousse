@@ -119,6 +119,11 @@ export const GenerateFishInfoOutputSchema = z.object({
   fishingAdvice: z.string().describe("Conseils de techniques de pêche en NC."),
   category: z.enum(['Lagon', 'Large', 'Recif']).describe("Catégorie d'habitat."),
 });
+export type GenerateCampaignMessagesOutput = {
+  smsPropositions?: string[];
+  pushPropositions?: string[];
+  mailPropositions?: { subject: string; body: string }[];
+};
 export type GenerateFishInfoOutput = z.infer<typeof GenerateFishInfoOutputSchema>;
 
 // Recommend Best Spot (GPS + Current Context)
@@ -162,3 +167,28 @@ export const AnalyzeProductOutputSchema = z.object({
   marketingAdvice: z.string().describe("Conseil stratégique pour mettre en avant ce produit précisément."),
 });
 export type AnalyzeProductOutput = z.infer<typeof AnalyzeProductOutputSchema>;
+
+// Generate Campaign Messages Schemas
+export const GenerateCampaignInputSchema = z.object({
+  businessName: z.string(),
+  products: z.array(z.object({
+    title: z.string(),
+    description: z.string(),
+    price: z.number().optional(),
+    discount: z.number().optional(),
+  })),
+  channels: z.array(z.enum(['SMS', 'PUSH', 'MAIL'])),
+  tone: z.string(),
+  length: z.enum(['Short', 'Medium', 'Long']),
+});
+export type GenerateCampaignInput = z.infer<typeof GenerateCampaignInputSchema>;
+
+export const GenerateCampaignOutputSchema = z.object({
+  smsPropositions: z.array(z.string()).optional().describe("5 propositions SMS ultra-courtes (max 160 car.)."),
+  pushPropositions: z.array(z.string()).optional().describe("5 propositions Push percutantes (max 80 car.)."),
+  mailPropositions: z.array(z.object({
+    subject: z.string().describe("Objet du mail accrocheur."),
+    body: z.string().describe("Corps du mail structuré."),
+  })).optional().describe("5 propositions Mail détaillées."),
+});
+export type GenerateCampaignOutput = z.infer<typeof GenerateCampaignOutputSchema>;
