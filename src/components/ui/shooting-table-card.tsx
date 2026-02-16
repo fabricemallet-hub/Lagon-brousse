@@ -101,6 +101,9 @@ export function ShootingTableCard() {
 
   const isInitialSyncDone = useRef(false);
 
+  // Logic to determine weight unit based on caliber
+  const weightUnit = selectedCaliber.startsWith('Calibre') || selectedCaliber.includes('.410') ? 'g' : 'gr';
+
   const handleLoadWeapon = (weaponId: string) => {
     const weapon = myWeapons?.find(w => w.id === weaponId);
     if (!weapon) return;
