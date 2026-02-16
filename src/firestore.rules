@@ -1,94 +1,64 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // ======================================================
-    // 1. FONCTIONS DE SÉCURITÉ & MASTER ADMIN
+    // 1. FONCTIONS DE SÉCURITÉ
     // ======================================================
     
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Détection Master Admin via UID ou Email
     function isMasterAdmin() {
       return isSignedIn() && (
-        request.auth.uid in ["t8nPnZLcTiaLJSKMuLzib3C5nPn1", "D1q2GPM95rZi38cvCzvsjcWQDaV2"] ||
-        (request.auth.token.email != null && (
-          request.auth.token.email.lower() == "f.mallet81@outlook.com" ||
-          request.auth.token.email.lower() == "f.mallet81@gmail.com" ||
-          request.auth.token.email.lower() == "fabrice.mallet@gmail.com"
-        ))
+        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
+        (request.auth.token.email != null && 
+         request.auth.token.email.lower() == "f.mallet81@outlook.com")
       );
     }
 
-    // Détection compte Professionnel
-    function isProfessional() {
-      return isSignedIn() && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'professional' ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionStatus == 'professional'
-      );
+    function isBusinessOwner(busId) {
+      return isSignedIn() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == busId;
     }
 
-    // Bypass total pour Master Admin
+    // ======================================================
+    // 2. ACCÈS PRIORITAIRE ADMIN
+    // ======================================================
+
     match /{allPaths=**} {
       allow read, write: if isMasterAdmin();
     }
 
     // ======================================================
-    // 2. RÈGLES PUBLIQUES (LECTURE)
+    // 3. COMMERCES & PROMOTIONS
     // ======================================================
 
-    // Accès public total pour les réglages de l'application (Splash, CGV, etc.)
-    match /app_settings/{document=**} { 
+    match /businesses/{businessId} {
       allow read: if true; 
-    }
-    
-    match /system_notifications/{id} { allow read: if true; }
-    match /meteo_caledonie/{id} { 
-      allow get, list: if true;
-      match /previsions/{prevId} { allow get, list: if true; }
-    }
-    match /fish_species/{id} {
-      allow get, list: if true;
-      match /commune_stats/{communeId} { allow read, write: if isSignedIn(); }
-    }
-    match /sound_library/{id} { allow read: if true; }
-    
-    // Boutique et Promotions
-    match /businesses/{businessId} { 
-      allow get, list: if true; 
-      allow write: if isSignedIn() && (isMasterAdmin() || (resource != null && resource.data.ownerId == request.auth.uid) || (resource == null && request.resource.data.ownerId == request.auth.uid));
-      
+
       match /promotions/{promoId} {
-        allow read: if true;
-        // Règle simplifiée et robuste : l'utilisateur doit avoir ce businessId dans son profil
-        allow write: if isSignedIn() && (
-          isMasterAdmin() || 
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.businessId == businessId
-        );
+        allow read: if true; 
+        allow write: if isMasterAdmin() || isBusinessOwner(businessId);
       }
     }
+
+    // ======================================================
+    // 4. CAMPAGNES
+    // ======================================================
     
-    match /{path=**}/promotions/{promoId} { allow read: if true; }
-
-    // ======================================================
-    // 3. RÈGLES PRIVÉES (CAMPAGNES, USERS, SESSIONS)
-    // ======================================================
-
-    // Campagnes publicitaires et brouillons
     match /campaigns/{campaignId} {
       allow read, write: if isSignedIn();
     }
 
+    // ======================================================
+    // 5. UTILISATEURS & PROFILS
+    // ======================================================
+
     match /users/{userId} {
-      // Un utilisateur peut voir son propre profil
-      allow get: if isSignedIn() && (request.auth.uid == userId || isMasterAdmin());
-      // Un Admin ou un Pro peut lister les utilisateurs pour les calculs d'audience
-      allow list: if isSignedIn() && (isMasterAdmin() || isProfessional());
-      
+      allow read: if isSignedIn();
       allow write: if isSignedIn() && (request.auth.uid == userId);
       
       match /{allPaths=**} {
@@ -96,24 +66,36 @@ service cloud.firestore {
       }
     }
 
+    // ======================================================
+    // 6. MESSAGERIE & DONNÉES SYSTÈME
+    // ======================================================
+
     match /conversations/{convId} {
-      allow read, write: if isSignedIn() && (request.auth.uid == convId);
-      match /messages/{msgId} {
-        allow read, write: if isSignedIn() && (request.auth.uid == convId);
-      }
-    }
-    
-    match /cms_support/tickets/items/{id} {
-      allow create: if isSignedIn();
-      allow read, write: if isSignedIn() && (resource.data.userId == request.auth.uid);
+      allow read, write: if isSignedIn() && (request.auth.uid == convId || isMasterAdmin());
+      match /messages/{msgId} { allow read, write: if isSignedIn(); }
     }
 
+    match /app_settings/{document=**} { allow read: if true; }
+    match /system_notifications/{id} { allow read: if true; }
+    match /meteo_caledonie/{id} { allow read: if true; }
+    match /fish_species/{id} { allow read: if true; }
+    match /sound_library/{id} { allow read: if true; }
+
+    // ======================================================
+    // 7. AUTRES COLLECTIONS
+    // ======================================================
+
+    match /hunting_sessions/{sessionId} { allow read, write: if isSignedIn(); }
+    match /vessel_sessions/{sessionId} { allow read, write: if isSignedIn(); }
+    match /vessels/{vesselId} { allow read, write: if isSignedIn(); }
     match /access_tokens/{id} { allow read: if isSignedIn(); }
     match /shared_access_tokens/{id} { allow read: if true; }
     match /spot_shares/{id} { allow read, write: if isSignedIn(); }
     
-    // Sessions de Groupe & Tracker
-    match /hunting_sessions/{allPaths=**} { allow read, write: if isSignedIn(); }
-    match /vessels/{allPaths=**} { allow read, write: if isSignedIn(); }
+    match /cms_support/tickets/items/{id} {
+      allow create: if isSignedIn();
+      allow read, write: if isSignedIn() && (resource.data.userId == request.auth.uid || isMasterAdmin());
+    }
+
   }
 }
