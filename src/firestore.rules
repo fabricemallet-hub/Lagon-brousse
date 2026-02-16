@@ -30,14 +30,17 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 2. PRIORITÉ ABSOLUE : CAMPAGNES (CORRECTIF RADICAL)
+    // 2. PRIORITÉ ABSOLUE : CAMPAGNES & REACH
     // ======================================================
     
-    match /campaigns {
+    // Règle explicite pour permettre le listing des campagnes
+    match /campaigns/{campaignId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Règle indispensable pour le calcul de Reach (getCountFromServer)
+    match /users {
       allow list: if isSignedIn();
-      match /{campaignId} {
-        allow get, write: if isSignedIn();
-      }
     }
 
     // ======================================================

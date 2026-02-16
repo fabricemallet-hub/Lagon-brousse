@@ -38,7 +38,8 @@ import {
   History,
   LayoutGrid,
   MapPin,
-  Globe
+  Globe,
+  TrendingUp
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -122,17 +123,19 @@ export default function ProDashboard() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasCopiedUid, setHasCopiedUid] = useState(false);
 
-  // --- CAMPAIGN MAGICIAN STATE ---
-  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
-  const [isCampWizardOpen, setIsCampWizardOpen] = useState(false);
-  const [campStep, setCampStep] = useState<'SETUP' | 'GENERATING' | 'RESULTS' | 'DEVIS'>('SETUP');
+  // --- CIBLAGE & REACH STATE ---
   const [campTargetRegion, setCampTargetRegion] = useState<string>('USER_DEFAULT');
   const [campTargetCommune, setCampTargetCommune] = useState<string>('ALL');
   const [campChannels, setCampChannels] = useState<string[]>(['PUSH']);
-  const [campTone, setCampTone] = useState('Commercial');
-  const [campLength, setCampLength] = useState<'Short' | 'Medium' | 'Long'>('Short');
   const [reachCount, setReachCount] = useState(0);
   const [isCalculatingReach, setIsCalculatingReach] = useState(false);
+
+  // --- CAMPAIGN WIZARD STATE ---
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [isCampWizardOpen, setIsCampWizardOpen] = useState(false);
+  const [campStep, setCampStep] = useState<'SETUP' | 'GENERATING' | 'RESULTS' | 'DEVIS'>('SETUP');
+  const [campTone, setCampTone] = useState('Commercial');
+  const [campLength, setCampLength] = useState<'Short' | 'Medium' | 'Long'>('Short');
   const [generatedMessages, setGeneratedMessages] = useState<GenerateCampaignOutput | null>(null);
   const [selectedSms, setSelectedSms] = useState('');
   const [selectedPush, setSelectedPush] = useState('');
@@ -219,7 +222,7 @@ export default function ProDashboard() {
     }
   };
 
-  // --- CAMPAIGN LOGIC ---
+  // --- CAMPAIGN & REACH LOGIC ---
   const calculateReach = async () => {
     if (!firestore) return;
     setIsCalculatingReach(true);
@@ -231,6 +234,7 @@ export default function ProDashboard() {
         if (targetRegion !== 'ALL') constraints.push(where('selectedRegion', '==', targetRegion));
         if (campTargetCommune !== 'ALL') constraints.push(where('lastSelectedLocation', '==', campTargetCommune));
         
+        // On cible les utilisateurs qui s'intéressent aux thématiques du magasin
         if (business?.categories?.length) {
             constraints.push(where('subscribedCategories', 'array-contains-any', business.categories));
         }
@@ -239,15 +243,18 @@ export default function ProDashboard() {
         const snap = await getCountFromServer(reachQ);
         setReachCount(snap.data().count);
     } catch (e) {
-        console.error(e);
+        console.error("Reach Calculation Error:", e);
     } finally {
         setIsCalculatingReach(false);
     }
   };
 
+  // Recalculer le reach dès que les filtres changent sur l'onglet principal
   useEffect(() => {
-    if (isCampWizardOpen) calculateReach();
-  }, [campTargetRegion, campTargetCommune, isCampWizardOpen, business]);
+    if (activeTab === 'campaigns' || isCampWizardOpen) {
+        calculateReach();
+    }
+  }, [campTargetRegion, campTargetCommune, activeTab, isCampWizardOpen, business]);
 
   const handleStartCampaignWizard = () => {
     if (selectedProductIds.length === 0) {
@@ -360,7 +367,7 @@ export default function ProDashboard() {
                 <LayoutGrid className="size-4" /> Magasin & Stocks
             </TabsTrigger>
             <TabsTrigger value="campaigns" className="font-black uppercase text-[11px] tracking-widest gap-2">
-                <Megaphone className="size-4" /> Publicité IA
+                <Megaphone className="size-4" /> Publicité & Reach
             </TabsTrigger>
         </TabsList>
 
@@ -515,50 +522,161 @@ export default function ProDashboard() {
         </TabsContent>
 
         <TabsContent value="campaigns" className="space-y-8 animate-in fade-in duration-300">
-            <Card className="border-2 border-dashed border-primary/20 bg-primary/5 rounded-[2rem] p-8 text-center flex flex-col items-center gap-4">
-                <div className="p-4 bg-primary text-white rounded-2xl shadow-xl"><Megaphone className="size-8" /></div>
-                <div className="space-y-1">
-                    <h3 className="text-2xl font-black uppercase tracking-tighter">Prêt à booster vos ventes ?</h3>
-                    <p className="text-xs text-muted-foreground font-medium max-w-xs mx-auto">Générez une campagne intelligente (SMS, Push, Mail) basée sur votre catalogue.</p>
-                </div>
-                <Button 
-                    className="h-14 px-10 font-black uppercase tracking-widest shadow-xl gap-3 text-sm mt-2" 
-                    onClick={handleStartCampaignWizard}
-                    disabled={selectedProductIds.length === 0}
-                >
-                    <Zap className="size-5 fill-white" /> Créer une Campagne {selectedProductIds.length > 0 ? `(${selectedProductIds.length} articles)` : ''}
-                </Button>
-                {selectedProductIds.length === 0 && <p className="text-[9px] font-black uppercase text-destructive">Sélectionnez d'abord des articles dans l'onglet Magasin</p>}
+            {/* CIBLAGE & REACH SIMULATOR */}
+            <Card className="border-2 border-slate-200 shadow-xl overflow-hidden rounded-3xl bg-white">
+                <CardHeader className="bg-slate-900 text-white p-6">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2.5 bg-primary rounded-xl shadow-lg">
+                                <TrendingUp className="size-6 text-white" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-xl font-black uppercase tracking-tight">Simulateur d'Audience & Budget</CardTitle>
+                                <CardDescription className="text-slate-400 font-bold uppercase text-[9px] mt-0.5 tracking-widest">Estimez votre impact sur le Caillou</CardDescription>
+                            </div>
+                        </div>
+                        <Badge variant="outline" className="border-white/20 text-white font-black text-[10px] uppercase">Reach NC</Badge>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-6 space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="space-y-6">
+                            <div className="space-y-4">
+                                <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest px-1">1. Zone Géographique</Label>
+                                <div className="grid grid-cols-1 gap-3">
+                                    <div className="space-y-1.5">
+                                        <p className="text-[9px] font-bold uppercase opacity-40 ml-1">Région cible</p>
+                                        <Select value={campTargetRegion} onValueChange={setCampTargetRegion}>
+                                            <SelectTrigger className="h-12 border-2 bg-slate-50"><Globe className="size-4 mr-2 text-primary"/><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="USER_DEFAULT" className="font-bold text-xs uppercase">Focus : {userRegion}</SelectItem>
+                                                <SelectItem value="ALL" className="font-bold text-xs uppercase">Toute la Nouvelle-Calédonie</SelectItem>
+                                                {regions.map(r => <SelectItem key={r} value={r} className="font-bold text-xs uppercase">{r}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <p className="text-[9px] font-bold uppercase opacity-40 ml-1">Commune (Optionnel)</p>
+                                        <Select value={campTargetCommune} onValueChange={setCampTargetCommune}>
+                                            <SelectTrigger className="h-12 border-2 bg-slate-50"><MapPin className="size-4 mr-2 text-primary"/><SelectValue /></SelectTrigger>
+                                            <SelectContent className="max-h-60">
+                                                <SelectItem value="ALL" className="font-bold text-xs uppercase">Toutes les communes</SelectItem>
+                                                {Object.keys(locationsByRegion[campTargetRegion === 'USER_DEFAULT' ? userRegion : (campTargetRegion as Region)] || {}).sort().map(loc => (
+                                                    <SelectItem key={loc} value={loc} className="font-bold text-xs uppercase">{loc}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest px-1">2. Canaux de Diffusion</Label>
+                                <div className="grid grid-cols-1 gap-2">
+                                    {[
+                                        { id: 'PUSH', label: 'Push App', icon: Zap, color: 'text-primary' },
+                                        { id: 'SMS', label: 'SMS Mobile', icon: Smartphone, color: 'text-blue-600' },
+                                        { id: 'MAIL', label: 'E-mail Direct', icon: Mail, color: 'text-green-600' }
+                                    ].map(ch => (
+                                        <div key={ch.id} onClick={() => setCampChannels(prev => prev.includes(ch.id) ? prev.filter(c => c !== ch.id) : [...prev, ch.id])} className={cn("p-3 rounded-xl border-2 flex items-center justify-between cursor-pointer transition-all", campChannels.includes(ch.id) ? "border-primary bg-primary/5 shadow-sm" : "border-slate-100 bg-white opacity-60")}>
+                                            <div className="flex items-center gap-3">
+                                                <ch.icon className={cn("size-4", ch.color)} />
+                                                <span className="text-[10px] font-black uppercase">{ch.label}</span>
+                                            </div>
+                                            {campChannels.includes(ch.id) && <Check className="size-4 text-primary" />}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-4">
+                            <Card className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] flex-1 flex flex-col items-center justify-center p-8 text-center shadow-inner">
+                                <div className="size-20 rounded-[2rem] bg-white border-2 border-primary/20 flex items-center justify-center mb-4 shadow-xl">
+                                    <Users className="size-10 text-primary" />
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">Audience Potentielle</p>
+                                    {isCalculatingReach ? (
+                                        <div className="flex items-center gap-2 justify-center mt-2">
+                                            <RefreshCw className="size-6 text-primary animate-spin" />
+                                            <span className="text-2xl font-black uppercase">Calcul...</span>
+                                        </div>
+                                    ) : (
+                                        <p className="text-5xl font-black tracking-tighter text-slate-900">{reachCount}</p>
+                                    )}
+                                    <p className="text-[9px] font-bold text-muted-foreground uppercase mt-2">Utilisateurs actifs ciblés</p>
+                                </div>
+                            </Card>
+
+                            <Card className="bg-primary/5 border-2 border-primary/20 rounded-3xl p-6 shadow-sm">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] font-black uppercase text-primary tracking-widest">Budget Estimé</span>
+                                        <div className="flex items-baseline gap-1 mt-1">
+                                            <span className="text-3xl font-black text-slate-800">{campaignCost.toLocaleString('fr-FR')}</span>
+                                            <span className="text-sm font-black uppercase opacity-40">F</span>
+                                        </div>
+                                    </div>
+                                    <div className="p-3 bg-white rounded-2xl shadow-sm border border-primary/10">
+                                        <DollarSign className="size-6 text-primary" />
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
+                    </div>
+                </CardContent>
+                <CardFooter className="bg-slate-50 p-6 border-t">
+                    <Button 
+                        className="w-full h-16 font-black uppercase tracking-widest shadow-xl text-base gap-3 rounded-2xl group" 
+                        onClick={handleStartCampaignWizard}
+                        disabled={selectedProductIds.length === 0}
+                    >
+                        <Zap className="size-5 fill-white group-hover:animate-pulse" /> 
+                        Créer une Campagne avec l'IA {selectedProductIds.length > 0 ? `(${selectedProductIds.length} articles)` : ''}
+                    </Button>
+                    {selectedProductIds.length === 0 && (
+                        <p className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[8px] font-black uppercase text-destructive animate-bounce">
+                            ⚠️ Sélectionnez d'abord des articles dans l'onglet Magasin
+                        </p>
+                    )}
+                </CardFooter>
             </Card>
 
-            <div className="space-y-4">
+            <div className="space-y-4 pt-4">
                 <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground px-1 flex items-center gap-2">
-                    <History className="size-4" /> Mes Campagnes ({campaigns?.length || 0})
+                    <History className="size-4" /> Historique de mes Envois ({campaigns?.length || 0})
                 </h3>
-                <div className="grid gap-3">
+                <div className="grid grid-cols-1 gap-3">
                     {campaigns?.map(c => (
-                        <Card key={c.id} className="border-2 shadow-sm overflow-hidden flex flex-col">
+                        <Card key={c.id} className="border-2 shadow-sm overflow-hidden flex flex-col bg-white">
                             <div className="p-4 bg-muted/10 border-b flex justify-between items-center">
                                 <div className="flex flex-col">
                                     <span className="font-black text-xs uppercase text-slate-800">{c.title}</span>
                                     <span className="text-[9px] font-bold text-muted-foreground uppercase">{c.createdAt ? format(c.createdAt.toDate(), 'dd MMMM yyyy', { locale: fr }) : '...'}</span>
                                 </div>
-                                <Badge className={cn("font-black text-[9px] uppercase", c.status === 'sent' ? "bg-green-600" : "bg-orange-500")}>
-                                    {c.status === 'sent' ? 'Envoyée' : 'En attente'}
+                                <Badge className={cn("font-black text-[9px] uppercase h-6 px-3 rounded-full", c.status === 'sent' ? "bg-green-600" : "bg-orange-500")}>
+                                    {c.status === 'sent' ? 'Diffusée' : 'En attente'}
                                 </Badge>
                             </div>
                             <CardContent className="p-4 grid grid-cols-2 gap-4">
                                 <div className="space-y-1">
                                     <p className="text-[8px] font-black uppercase text-muted-foreground">Reach total</p>
-                                    <p className="text-xl font-black flex items-center gap-2"><Users className="size-4 text-primary" /> {c.reach} abonnés</p>
+                                    <p className="text-xl font-black flex items-center gap-2 text-slate-800"><Users className="size-4 text-primary" /> {c.reach} abonnés</p>
                                 </div>
                                 <div className="space-y-1 border-l pl-4">
-                                    <p className="text-[8px] font-black uppercase text-muted-foreground">Budget investi</p>
+                                    <p className="text-[8px] font-black uppercase text-muted-foreground">Investissement</p>
                                     <p className="text-xl font-black text-slate-800">{(c.cost || 0).toLocaleString('fr-FR')} F</p>
                                 </div>
                             </CardContent>
                         </Card>
                     ))}
+                    {(!campaigns || campaigns.length === 0) && (
+                        <div className="text-center py-12 border-2 border-dashed rounded-[2rem] opacity-30">
+                            <Megaphone className="size-10 mx-auto mb-2" />
+                            <p className="font-black uppercase text-[10px] tracking-widest">Aucune campagne envoyée</p>
+                        </div>
+                    )}
                 </div>
             </div>
         </TabsContent>
@@ -631,64 +749,21 @@ export default function ProDashboard() {
                 <DialogTitle className="text-2xl font-black uppercase tracking-tighter flex items-center gap-3">
                     <Sparkles className="size-6 text-primary" /> Magicien de Campagne IA
                 </DialogTitle>
-                <DialogDescription className="text-slate-400 font-bold uppercase text-[10px]">Boostez votre visibilité sur le Caillou</DialogDescription>
+                <DialogDescription className="text-slate-400 font-bold uppercase text-[10px]">Génération de contenu intelligent</DialogDescription>
             </DialogHeader>
 
             <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
                 {campStep === 'SETUP' && (
                     <div className="space-y-8 pb-10">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                            <div className="space-y-4">
-                                <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest px-1">1. Ciblage Géographique</Label>
-                                <div className="space-y-3">
-                                    <div className="space-y-1">
-                                        <p className="text-[9px] font-bold uppercase opacity-40 ml-1">Région</p>
-                                        <Select value={campTargetRegion} onValueChange={setCampTargetRegion}>
-                                            <SelectTrigger className="h-12 border-2 bg-white"><Globe className="size-4 mr-2 text-primary"/><SelectValue /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="USER_DEFAULT">Focus : {userRegion}</SelectItem>
-                                                <SelectItem value="ALL">Toute la Nouvelle-Calédonie</SelectItem>
-                                                {regions.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-[9px] font-bold uppercase opacity-40 ml-1">Commune (Optionnel)</p>
-                                        <Select value={campTargetCommune} onValueChange={setCampTargetCommune}>
-                                            <SelectTrigger className="h-12 border-2 bg-white"><MapPin className="size-4 mr-2 text-primary"/><SelectValue /></SelectTrigger>
-                                            <SelectContent className="max-h-60">
-                                                <SelectItem value="ALL">Toutes les communes</SelectItem>
-                                                {Object.keys(locationsByRegion[campTargetRegion === 'USER_DEFAULT' ? userRegion : (campTargetRegion as Region)] || {}).sort().map(loc => (
-                                                    <SelectItem key={loc} value={loc}>{loc}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="space-y-4">
-                                <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest px-1">2. Canaux de Diffusion</Label>
-                                <div className="grid gap-2">
-                                    {[
-                                        { id: 'PUSH', label: 'Push App', icon: Zap, color: 'text-primary' },
-                                        { id: 'SMS', label: 'SMS Mobile', icon: Smartphone, color: 'text-blue-600' },
-                                        { id: 'MAIL', label: 'E-mail Direct', icon: Mail, color: 'text-green-600' }
-                                    ].map(ch => (
-                                        <div key={ch.id} onClick={() => setCampChannels(prev => prev.includes(ch.id) ? prev.filter(c => c !== ch.id) : [...prev, ch.id])} className={cn("p-3 rounded-xl border-2 flex items-center justify-between cursor-pointer transition-all", campChannels.includes(ch.id) ? "border-primary bg-primary/5 shadow-sm" : "border-slate-100 bg-white opacity-60")}>
-                                            <div className="flex items-center gap-3">
-                                                <ch.icon className={cn("size-4", ch.color)} />
-                                                <span className="text-[10px] font-black uppercase">{ch.label}</span>
-                                            </div>
-                                            {campChannels.includes(ch.id) && <Check className="size-4 text-primary" />}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
+                        <Alert className="bg-primary/5 border-primary/20">
+                            <Zap className="size-4 text-primary" />
+                            <AlertDescription className="text-[10px] font-bold uppercase">
+                                Les filtres géographiques et les canaux choisis sur le simulateur ont été mémorisés pour la rédaction.
+                            </AlertDescription>
+                        </Alert>
 
                         <div className="space-y-4 p-6 bg-white border-2 rounded-[2rem] shadow-sm">
-                            <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest px-1">3. Paramètres de Rédaction IA</Label>
+                            <Label className="text-[10px] font-black uppercase text-slate-500 tracking-widest px-1">Paramètres de Rédaction IA</Label>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                 <div className="space-y-2">
                                     <p className="text-[9px] font-bold uppercase opacity-40">Ton souhaité</p>
@@ -718,12 +793,12 @@ export default function ProDashboard() {
                                 <div className="flex items-center gap-4">
                                     <div className="p-3 bg-white/10 rounded-2xl"><Users className="size-6 text-primary" /></div>
                                     <div>
-                                        <p className="text-[10px] font-black uppercase text-primary tracking-widest">Audience Estimée</p>
-                                        {isCalculatingReach ? <Skeleton className="h-8 w-20 bg-white/10 mt-1" /> : <p className="text-3xl font-black">{reachCount} abonnés</p>}
+                                        <p className="text-[10px] font-black uppercase text-primary tracking-widest">Reach Final</p>
+                                        <p className="text-3xl font-black">{reachCount} abonnés</p>
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-[10px] font-black uppercase text-slate-400">Budget estimé</p>
+                                    <p className="text-[10px] font-black uppercase text-slate-400">Budget Devis</p>
                                     <p className="text-2xl font-black text-white">{campaignCost.toLocaleString('fr-FR')} F</p>
                                 </div>
                             </CardContent>
