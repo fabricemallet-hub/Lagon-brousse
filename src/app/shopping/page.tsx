@@ -208,11 +208,29 @@ export default function ShoppingPage() {
                 <Card key={p.id} className={cn("overflow-hidden border-2 shadow-sm flex flex-col cursor-pointer transition-all hover:border-primary/30", p.promoType === 'Promo' && "border-red-100 bg-red-50/10", p.isOutOfStock && "opacity-75")} onClick={() => setSelectedProduct(p)}>
                     <div className="px-3 py-2 bg-muted/20 border-b flex justify-between items-center"><div className="flex items-center gap-2 min-w-0"><Store className="size-3 text-primary" /><span className="text-[9px] font-black uppercase truncate">{p.business?.name}</span></div>{isAdmin && <Button variant="ghost" size="icon" className="size-6 text-destructive" onClick={(e) => { e.stopPropagation(); setProductToDelete({id: p.id, bid: p.businessId}); }}><Trash2 className="size-3" /></Button>}</div>
                     <div className="flex h-36 relative">
-                        <div className="w-32 bg-white shrink-0 flex items-center justify-center border-r p-2">{p.imageUrl ? <img src={p.imageUrl} className="max-w-full max-h-full object-contain" alt="" /> : <ImageIcon className="size-8 opacity-10" />}<Badge className={cn("absolute top-1 left-1 font-black text-[8px] uppercase h-5", p.promoType === 'Promo' ? "bg-red-600" : "bg-primary")}>{p.promoType}</Badge></div>
+                        <div className="w-32 bg-white shrink-0 flex items-center justify-center border-r p-2">
+                            {p.imageUrl ? <img src={p.imageUrl} className="max-w-full max-h-full object-contain" alt="" /> : <ImageIcon className="size-8 opacity-10" />}
+                            <Badge className={cn("absolute top-1 left-1 font-black text-[8px] uppercase h-5", p.promoType === 'Promo' ? "bg-red-600" : "bg-primary")}>{p.promoType}</Badge>
+                            {p.discountPercentage && p.discountPercentage > 0 && !p.isOutOfStock && (
+                                <div className="absolute bottom-1 left-1 bg-red-600 text-white text-[8px] font-black uppercase px-1.5 py-0.5 rounded shadow-lg">
+                                    -{p.discountPercentage}%
+                                </div>
+                            )}
+                        </div>
                         <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
                             <h4 className={cn("font-black uppercase text-xs truncate", p.isOutOfStock && "line-through decoration-red-600")}>{p.title}</h4>
                             <p className="text-[10px] text-muted-foreground line-clamp-2 italic">{p.description}</p>
-                            <div className="flex items-baseline gap-1"><span className={cn("text-base font-black", p.isOutOfStock ? "line-through opacity-40" : (p.promoType === 'Promo' ? "text-red-600" : "text-primary"))}>{(p.price || 0).toLocaleString('fr-FR')}</span><span className="text-[9px] font-black uppercase opacity-60">CFP</span></div>
+                            <div className="flex items-baseline gap-1.5 flex-wrap">
+                                <span className={cn("text-base font-black", p.isOutOfStock ? "line-through opacity-40" : (p.promoType === 'Promo' ? "text-red-600" : "text-primary"))}>
+                                    {(p.price || 0).toLocaleString('fr-FR')}
+                                </span>
+                                {p.originalPrice && p.originalPrice > p.price && !p.isOutOfStock && (
+                                    <span className="text-[10px] font-bold text-muted-foreground line-through opacity-60">
+                                        {(p.originalPrice).toLocaleString('fr-FR')}
+                                    </span>
+                                )}
+                                <span className="text-[8px] font-black uppercase opacity-60">CFP</span>
+                            </div>
                         </div>
                     </div>
                 </Card>
@@ -241,13 +259,25 @@ export default function ShoppingPage() {
                                 </CarouselContent>
                             </Carousel>
                         ) : <div className="w-full h-full flex items-center justify-center opacity-20"><ImageIcon className="size-16" /></div>}
+                        {selectedProduct.discountPercentage && selectedProduct.discountPercentage > 0 && (
+                            <div className="absolute bottom-4 left-4 bg-red-600 text-white text-xs font-black uppercase px-3 py-1 rounded-full shadow-2xl">
+                                OFFRE SPÉCIALE : -{selectedProduct.discountPercentage}%
+                            </div>
+                        )}
                     </div>
                     <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-white">
                         <h2 className={cn("text-2xl font-black uppercase text-slate-800", selectedProduct.isOutOfStock && "line-through decoration-red-600")}>{selectedProduct.title}</h2>
                         <div className="flex items-center gap-2 text-primary font-black uppercase text-xs"><Store className="size-4" />{selectedProduct.business?.name} <MapPin className="size-3" />{selectedProduct.business?.commune}</div>
                         {selectedProduct.isOutOfStock && <Alert variant="destructive" className="bg-red-50 border-red-200 border-2"><AlertCircle className="size-4" /><AlertDescription className="text-sm font-black text-red-700">RUPTURE - Retour le {selectedProduct.restockDate}</AlertDescription></Alert>}
-                        <div className="p-5 bg-muted/10 rounded-2xl border-2 border-dashed flex items-baseline gap-2">
-                            <span className={cn("text-4xl font-black", selectedProduct.isOutOfStock ? "line-through opacity-40" : (selectedProduct.promoType === 'Promo' ? "text-red-600" : "text-primary"))}>{(selectedProduct.price || 0).toLocaleString('fr-FR')}</span>
+                        <div className="p-5 bg-muted/10 rounded-2xl border-2 border-dashed flex items-baseline gap-3 flex-wrap">
+                            <span className={cn("text-4xl font-black", selectedProduct.isOutOfStock ? "line-through opacity-40" : (selectedProduct.promoType === 'Promo' ? "text-red-600" : "text-primary"))}>
+                                {(selectedProduct.price || 0).toLocaleString('fr-FR')}
+                            </span>
+                            {selectedProduct.originalPrice && selectedProduct.originalPrice > selectedProduct.price && !selectedProduct.isOutOfStock && (
+                                <span className="text-xl font-bold text-muted-foreground line-through opacity-60">
+                                    {(selectedProduct.originalPrice).toLocaleString('fr-FR')}
+                                </span>
+                            )}
                             <span className="text-xs font-black uppercase opacity-60">CFP</span>
                         </div>
                         <p className="text-sm font-medium leading-relaxed text-slate-600 italic">"{selectedProduct.description || "Pas de description."}"</p>

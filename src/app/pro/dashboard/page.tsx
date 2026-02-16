@@ -42,7 +42,8 @@ import {
   LayoutGrid,
   MapPin,
   Globe,
-  TrendingUp
+  TrendingUp,
+  Tags
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -119,6 +120,8 @@ export default function ProDashboard() {
   const [promoCategory, setPromoCategory] = useState('Pêche');
   const [promoDescription, setPromoDescription] = useState('');
   const [promoPrice, setPromoPrice] = useState('');
+  const [originalPrice, setOriginalPrice] = useState('');
+  const [discountPercentage, setDiscountPercentage] = useState('');
   const [promoImages, setPromoImages] = useState<string[]>([]);
   const [promoType, setPromoType] = useState<'Promo' | 'Nouvel Arrivage'>('Promo');
   const [isOutOfStock, setIsOutOfStock] = useState(false);
@@ -166,6 +169,18 @@ export default function ProDashboard() {
     }
   }, [profile?.lastSelectedLocation]);
 
+  // Calcul automatique du prix remisé
+  useEffect(() => {
+    if (originalPrice && discountPercentage) {
+        const base = parseFloat(originalPrice);
+        const disc = parseFloat(discountPercentage);
+        if (!isNaN(base) && !isNaN(disc) && disc > 0) {
+            const final = base * (1 - disc / 100);
+            setPromoPrice(Math.round(final).toString());
+        }
+    }
+  }, [originalPrice, discountPercentage]);
+
   const handleCopyUid = () => {
     if (user?.uid) {
         navigator.clipboard.writeText(user.uid);
@@ -200,6 +215,7 @@ export default function ProDashboard() {
             category: promoCategory,
             photos: promoImages,
             price: parseFloat(promoPrice) || undefined,
+            discountPercentage: parseFloat(discountPercentage) || undefined,
             tone: aiProductTone
         });
         setAiProductResult(result);
@@ -216,6 +232,8 @@ export default function ProDashboard() {
     setPromoCategory(p.category || 'Pêche');
     setPromoDescription(p.description || '');
     setPromoPrice(p.price.toString());
+    setOriginalPrice(p.originalPrice?.toString() || '');
+    setDiscountPercentage(p.discountPercentage?.toString() || '');
     setPromoType(p.promoType);
     setPromoImages(p.images || [p.imageUrl].filter(Boolean) as string[]);
     setIsOutOfStock(p.isOutOfStock || false);
@@ -232,6 +250,8 @@ export default function ProDashboard() {
     setEditingProductId(null);
     setPromoTitle('');
     setPromoPrice('');
+    setOriginalPrice('');
+    setDiscountPercentage('');
     setPromoImages([]);
     setPromoDescription('');
     setPromoType('Promo');
@@ -247,6 +267,8 @@ export default function ProDashboard() {
       category: promoCategory,
       description: promoDescription,
       price: parseFloat(promoPrice) || 0,
+      originalPrice: parseFloat(originalPrice) || null,
+      discountPercentage: parseFloat(discountPercentage) || null,
       promoType,
       images: promoImages,
       imageUrl: promoImages[0] || '',
@@ -462,21 +484,59 @@ export default function ProDashboard() {
                                         <Input value={promoTitle} onChange={e => setPromoTitle(e.target.value)} placeholder="Ex: Moulinet Shimano..." className="h-12 border-2 font-black text-base" />
                                     </div>
                                     
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="space-y-1.5">
-                                            <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Prix (CFP)</Label>
-                                            <Input type="number" value={promoPrice} onChange={e => setPromoPrice(e.target.value)} className="h-12 border-2 font-black text-lg" />
+                                    <div className="space-y-4 p-4 bg-white border-2 rounded-2xl shadow-inner">
+                                        <div className="flex items-center gap-2 border-b border-dashed pb-2 mb-2">
+                                            <Tags className="size-4 text-primary" />
+                                            <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Gestion des Prix & Remises</h4>
                                         </div>
-                                        <div className="space-y-1.5">
-                                            <Label className="text-[10px] font-black uppercase ml-1">Type d'offre</Label>
-                                            <Select value={promoType} onValueChange={(v: any) => setPromoType(v)}>
-                                                <SelectTrigger className="h-12 border-2 font-black uppercase text-[10px]"><SelectValue /></SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="Promo" className="font-black text-[10px] uppercase text-red-600">PROMOTION</SelectItem>
-                                                    <SelectItem value="Nouvel Arrivage" className="font-black text-[10px] uppercase text-primary">NOUVEL ARRIVAGE</SelectItem>
-                                                </SelectContent>
-                                            </Select>
+                                        
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1.5">
+                                                <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Prix de Base (Barré)</Label>
+                                                <Input 
+                                                    type="number" 
+                                                    value={originalPrice} 
+                                                    onChange={e => setOriginalPrice(e.target.value)} 
+                                                    placeholder="Prix normal" 
+                                                    className="h-12 border-2 font-bold bg-slate-50" 
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Réduction (%)</Label>
+                                                <Input 
+                                                    type="number" 
+                                                    value={discountPercentage} 
+                                                    onChange={e => setDiscountPercentage(e.target.value)} 
+                                                    placeholder="Ex: 20" 
+                                                    className="h-12 border-2 font-black text-red-600" 
+                                                />
+                                            </div>
                                         </div>
+
+                                        <div className="space-y-1.5 pt-2 border-t border-dashed">
+                                            <Label className="text-[10px] font-black uppercase text-primary ml-1">Prix Affiché (Final)</Label>
+                                            <Input 
+                                                type="number" 
+                                                value={promoPrice} 
+                                                onChange={e => setPromoPrice(e.target.value)} 
+                                                placeholder="Prix de vente" 
+                                                className="h-14 border-primary border-4 font-black text-2xl bg-white shadow-sm" 
+                                            />
+                                            <p className="text-[8px] font-bold text-muted-foreground uppercase text-center italic mt-1 leading-none">
+                                                Automatique si remise saisie
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 gap-1.5">
+                                        <Label className="text-[10px] font-black uppercase ml-1">Type d'offre</Label>
+                                        <Select value={promoType} onValueChange={(v: any) => setPromoType(v)}>
+                                            <SelectTrigger className="h-12 border-2 font-black uppercase text-[10px]"><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Promo" className="font-black text-[10px] uppercase text-red-600">PROMOTION</SelectItem>
+                                                <SelectItem value="Nouvel Arrivage" className="font-black text-[10px] uppercase text-primary">NOUVEL ARRIVAGE</SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                     </div>
 
                                     <div className="p-4 bg-red-50 border-2 border-dashed border-red-200 rounded-2xl space-y-3">
@@ -564,6 +624,11 @@ export default function ProDashboard() {
                                                 <span className="text-[7px] font-bold uppercase">{p.restockDate}</span>
                                             </div>
                                         )}
+                                        {p.discountPercentage && p.discountPercentage > 0 && !p.isOutOfStock && (
+                                            <div className="absolute top-1 left-1 bg-red-600 text-white text-[8px] font-black uppercase px-1.5 py-0.5 rounded shadow-lg">
+                                                -{p.discountPercentage}%
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
                                         <div className="flex justify-between items-start">
@@ -581,7 +646,14 @@ export default function ProDashboard() {
                                         </div>
                                         <div className="flex items-center justify-between mt-auto">
                                             <div className="flex items-baseline gap-1">
-                                                <span className={cn("text-base font-black", p.isOutOfStock ? "text-slate-400" : (p.promoType === 'Promo' ? "text-red-600" : "text-primary"))}>{(p.price || 0).toLocaleString('fr-FR')}</span>
+                                                <span className={cn("text-base font-black", p.isOutOfStock ? "text-slate-400" : (p.promoType === 'Promo' ? "text-red-600" : "text-primary"))}>
+                                                    {(p.price || 0).toLocaleString('fr-FR')}
+                                                </span>
+                                                {p.originalPrice && p.originalPrice > p.price && (
+                                                    <span className="text-[9px] font-bold text-muted-foreground line-through opacity-60">
+                                                        {p.originalPrice.toLocaleString('fr-FR')}
+                                                    </span>
+                                                )}
                                                 <span className="text-[8px] font-black uppercase opacity-40">CFP</span>
                                             </div>
                                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -702,7 +774,7 @@ export default function ProDashboard() {
                                             </PopoverContent>
                                         </Popover>
                                         <p className="text-[8px] font-bold text-muted-foreground italic px-1">
-                                            Choisir en priorité la commune du compte utilisateur. possibilité de choisir plusieurs communes (max 30).
+                                            Choisir en priorité la commune du compte utilisateur. possibilité de choisir plusieurs communes
                                         </p>
                                     </div>
                                 </div>
@@ -769,27 +841,27 @@ export default function ProDashboard() {
                                                 </div>
                                                 
                                                 <div className="text-[8px] font-bold text-muted-foreground uppercase flex justify-between">
-                                                    <span>Base audience ({reachCount} pers. x {pricing.unitPricePerUser} F) :</span>
+                                                    <span>Base audience ({reachCount} x {pricing.unitPricePerUser}F) :</span>
                                                     <span>{((pricing.unitPricePerUser || 0) * reachCount).toLocaleString('fr-FR')} F</span>
                                                 </div>
 
                                                 {campChannels.includes('SMS') && (
                                                     <div className="text-[8px] font-bold text-blue-600 uppercase flex justify-between">
-                                                        <span>Option SMS ({smsCount} SMS x {pricing.priceSMS} F) :</span>
+                                                        <span>Option SMS ({smsCount} x {pricing.priceSMS}F) :</span>
                                                         <span>{((pricing.priceSMS || 0) * smsCount).toLocaleString('fr-FR')} F</span>
                                                     </div>
                                                 )}
 
                                                 {campChannels.includes('PUSH') && (
                                                     <div className="text-[8px] font-bold text-primary uppercase flex justify-between">
-                                                        <span>Option PUSH ({pushCount} Push x {pricing.pricePush} F) :</span>
+                                                        <span>Option PUSH ({pushCount} x {pricing.pricePush}F) :</span>
                                                         <span>{((pricing.pricePush || 0) * pushCount).toLocaleString('fr-FR')} F</span>
                                                     </div>
                                                 )}
 
                                                 {campChannels.includes('MAIL') && (
                                                     <div className="text-[8px] font-bold text-green-600 uppercase flex justify-between">
-                                                        <span>Option MAIL ({emailCount} Mail x {pricing.priceMail} F) :</span>
+                                                        <span>Option MAIL ({emailCount} x {pricing.priceMail}F) :</span>
                                                         <span>{((pricing.priceMail || 0) * emailCount).toLocaleString('fr-FR')} F</span>
                                                     </div>
                                                 )}
