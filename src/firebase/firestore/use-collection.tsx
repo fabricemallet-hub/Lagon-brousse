@@ -54,15 +54,26 @@ export function useCollection<T = any>(
 
   useEffect(() => {
     // Determine path for security check
-    const path: string | undefined = memoizedTargetRefOrQuery 
-      ? (memoizedTargetRefOrQuery.type === 'collection'
-          ? (memoizedTargetRefOrQuery as CollectionReference).path
-          : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString())
-      : undefined;
+    let path: string = '';
+    try {
+      path = memoizedTargetRefOrQuery 
+        ? (memoizedTargetRefOrQuery.type === 'collection'
+            ? (memoizedTargetRefOrQuery as CollectionReference).path
+            : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString())
+        : '';
+    } catch (e) {
+      path = (memoizedTargetRefOrQuery as any)?.path || '/';
+    }
 
     // PUBLIC DATA BARRIER: Only wait for auth if the collection is potentially private.
-    // system_notifications and meteo_caledonie are public.
-    const isPublic = path && (path.includes('system_notifications') || path.includes('meteo_caledonie') || path.includes('promotions'));
+    const isPublic = path && (
+      path.includes('system_notifications') || 
+      path.includes('meteo_caledonie') || 
+      path.includes('promotions') ||
+      path.includes('app_settings') ||
+      path.includes('fish_species') ||
+      path.includes('sound_library')
+    );
     
     const auth = getAuth();
     if (!isPublic && memoizedTargetRefOrQuery && !auth.currentUser) {

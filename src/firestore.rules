@@ -11,14 +11,19 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Détection Master Admin via UID ou Email
     function isMasterAdmin() {
       return isSignedIn() && (
-        request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
-        (request.auth.token.email != null && 
-         request.auth.token.email.lower() == "f.mallet81@outlook.com")
+        request.auth.uid in ["t8nPnZLcTiaLJSKMuLzib3C5nPn1", "D1q2GPM95rZi38cvCzvsjcWQDaV2"] ||
+        (request.auth.token.email != null && (
+          request.auth.token.email.lower() == "f.mallet81@outlook.com" ||
+          request.auth.token.email.lower() == "f.mallet81@gmail.com" ||
+          request.auth.token.email.lower() == "fabrice.mallet@gmail.com"
+        ))
       );
     }
 
+    // Vérifie si l'utilisateur est le propriétaire de la boutique
     function isBusinessOwner(busId) {
       return isSignedIn() && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -29,24 +34,23 @@ service cloud.firestore {
     // 2. RÈGLES DE GROUPE (Indispensables pour collectionGroup)
     // ======================================================
     
+    // Autorise la lecture globale des promotions pour la page Shopping
     match /{path=**}/promotions/{promoId} {
       allow read: if true;
     }
     
+    // Autorise la lecture globale des spots pour la carte Admin
     match /{path=**}/fishing_spots/{spotId} {
       allow read: if isSignedIn();
     }
 
-    // ======================================================
-    // 3. ACCÈS PRIORITAIRE ADMIN
-    // ======================================================
-
+    // Bypass total pour Master Admin
     match /{allPaths=**} {
       allow read, write: if isMasterAdmin();
     }
 
     // ======================================================
-    // 4. COMMERCES & PROMOTIONS
+    // 3. COMMERCES & PROMOTIONS
     // ======================================================
 
     match /businesses/{businessId} {
@@ -59,7 +63,7 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 5. CAMPAGNES
+    // 4. CAMPAGNES (Annonces et Brouillons)
     // ======================================================
     
     match /campaigns/{campaignId} {
@@ -67,7 +71,7 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 6. UTILISATEURS & PROFILS
+    // 5. UTILISATEURS & PROFILS
     // ======================================================
 
     match /users/{userId} {
@@ -80,7 +84,7 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 7. MESSAGERIE & DONNÉES SYSTÈME
+    // 6. MESSAGERIE & DONNÉES SYSTÈME
     // ======================================================
 
     match /conversations/{convId} {
@@ -92,12 +96,18 @@ service cloud.firestore {
 
     match /app_settings/{document=**} { allow read: if true; }
     match /system_notifications/{id} { allow read: if true; }
-    match /meteo_caledonie/{id} { allow read: if true; }
-    match /fish_species/{id} { allow read: if true; }
+    match /meteo_caledonie/{id} { 
+      allow get, list: if true;
+      match /previsions/{prevId} { allow get, list: if true; }
+    }
+    match /fish_species/{id} { 
+      allow get, list: if true; 
+      match /commune_stats/{communeId} { allow read, write: if isSignedIn(); }
+    }
     match /sound_library/{id} { allow read: if true; }
 
     // ======================================================
-    // 8. AUTRES COLLECTIONS
+    // 7. AUTRES COLLECTIONS
     // ======================================================
 
     match /hunting_sessions/{sessionId} { allow read, write: if isSignedIn(); }
