@@ -50,7 +50,9 @@ import {
   Compass,
   ZapOff,
   Star,
-  Award
+  Award,
+  Home,
+  Settings
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -522,7 +524,7 @@ export default function ProDashboard() {
                                             </div>
                                         </div>
                                         <div className="space-y-1 pt-1.5 border-t border-dashed">
-                                            <Label className="text-[9px] font-black uppercase text-primary ml-1">Prix Affiché (Base HT)</Label>
+                                            <Label className="text-[9px] font-black uppercase text-primary ml-1">Prix Affiché (Final)</Label>
                                             <Input type="number" value={promoPrice} onChange={e => setPromoPrice(e.target.value)} placeholder="Vente" className="h-12 border-primary border-2 font-black text-xl bg-white shadow-sm" />
                                         </div>
                                     </div>
@@ -691,7 +693,7 @@ export default function ProDashboard() {
                                             <Checkbox 
                                                 checked={selectedProductIds.includes(p.id)} 
                                                 onCheckedChange={() => {
-                                                    setSelectedProductIds(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, id]);
+                                                    setSelectedProductIds(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id]);
                                                 }}
                                                 className="size-5 border-2 border-primary/30 ml-2"
                                             />
