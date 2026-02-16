@@ -24,6 +24,7 @@ service cloud.firestore {
     }
 
     // Vérifie si l'utilisateur est le propriétaire de la boutique
+    // Sécurisé avec exists() pour éviter les erreurs de lecture sur profil inexistant
     function isBusinessOwner(busId) {
       return isSignedIn() && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -31,15 +32,15 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 2. RÈGLES DE GROUPE (Indispensables pour collectionGroup)
+    // 2. RÈGLES DE GROUPE (CRUCIAL pour collectionGroup)
     // ======================================================
     
-    // Autorise la lecture globale des promotions pour la page Shopping
+    // Autorise la lecture globale des promotions (Page Shopping)
     match /{path=**}/promotions/{promoId} {
       allow read: if true;
     }
     
-    // Autorise la lecture globale des spots pour la carte Admin
+    // Autorise la lecture globale des spots (Carte Admin)
     match /{path=**}/fishing_spots/{spotId} {
       allow read: if isSignedIn();
     }
@@ -63,7 +64,7 @@ service cloud.firestore {
     }
 
     // ======================================================
-    // 4. CAMPAGNES
+    // 4. CAMPAGNES (Annonces et Brouillons)
     // ======================================================
     
     match /campaigns/{campaignId} {
