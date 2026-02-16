@@ -131,6 +131,9 @@ export default function ProDashboard() {
   const [campTargetCommunes, setCampTargetCommunes] = useState<string[]>([]);
   const [campChannels, setCampChannels] = useState<string[]>(['PUSH']);
   const [reachCount, setReachCount] = useState(0);
+  const [pushCount, setPushCount] = useState(0);
+  const [smsCount, setSmsCount] = useState(0);
+  const [emailCount, setEmailCount] = useState(0);
   const [isCalculatingReach, setIsCalculatingReach] = useState(false);
 
   // --- CAMPAIGN WIZARD STATE ---
@@ -237,23 +240,37 @@ export default function ProDashboard() {
     if (!firestore) return;
     setIsCalculatingReach(true);
     try {
-        let q = collection(firestore, 'users');
-        const constraints = [];
+        const usersCol = collection(firestore, 'users');
         
-        const targetRegion = campTargetRegion === 'USER_DEFAULT' ? userRegion : campTargetRegion;
-        if (targetRegion !== 'ALL') constraints.push(where('selectedRegion', '==', targetRegion));
-        
-        if (campTargetCommunes.length > 0) {
-            constraints.push(where('lastSelectedLocation', 'in', campTargetCommunes.slice(0, 30)));
-        }
-        
-        if (business?.categories?.length) {
-            constraints.push(where('subscribedCategories', 'array-contains-any', business.categories));
-        }
+        const getBaseConstraints = () => {
+            const constraints = [];
+            const targetRegion = campTargetRegion === 'USER_DEFAULT' ? userRegion : campTargetRegion;
+            if (targetRegion !== 'ALL') constraints.push(where('selectedRegion', '==', targetRegion));
+            if (campTargetCommunes.length > 0) {
+                constraints.push(where('lastSelectedLocation', 'in', campTargetCommunes.slice(0, 30)));
+            }
+            if (business?.categories?.length) {
+                constraints.push(where('subscribedCategories', 'array-contains-any', business.categories));
+            }
+            return constraints;
+        };
 
-        const reachQ = query(q, ...constraints);
-        const snap = await getCountFromServer(reachQ);
-        setReachCount(snap.data().count);
+        const baseConstraints = getBaseConstraints();
+
+        // 1. Total Reach matching criteria
+        const totalSnap = await getCountFromServer(query(usersCol, ...baseConstraints));
+        setReachCount(totalSnap.data().count);
+
+        // 2. Reach per channel (opt-in counting)
+        const pushSnap = await getCountFromServer(query(usersCol, ...baseConstraints, where('allowsPromoPush', '==', true)));
+        setPushCount(pushSnap.data().count);
+
+        const smsSnap = await getCountFromServer(query(usersCol, ...baseConstraints, where('allowsPromoSMS', '==', true)));
+        setSmsCount(smsSnap.data().count);
+
+        const emailSnap = await getCountFromServer(query(usersCol, ...baseConstraints, where('allowsPromoEmails', '==', true)));
+        setEmailCount(emailSnap.data().count);
+
     } catch (e) {
         console.error("Reach Calculation Error:", e);
     } finally {
@@ -266,6 +283,22 @@ export default function ProDashboard() {
         calculateReach();
     }
   }, [campTargetRegion, campTargetCommunes, activeTab, isCampWizardOpen, business]);
+
+  const campaignCost = useMemo(() => {
+    if (!pricing) return 0;
+    const base = pricing.fixedPrice || 0;
+    let unitSum = 0;
+    
+    // We base the cost on the channel-specific reach if selected
+    if (campChannels.includes('SMS')) unitSum += (pricing.priceSMS || 0) * smsCount;
+    if (campChannels.includes('PUSH')) unitSum += (pricing.pricePush || 0) * pushCount;
+    if (campChannels.includes('MAIL')) unitSum += (pricing.priceMail || 0) * emailCount;
+    
+    // If we want a simple cost per "any selected user", we would use reachCount
+    // But usually we pay per message sent, so we use specific opt-in counts
+    // For the UI display, let's keep it simple as base + selected reach impact
+    return base + (unitSum);
+  }, [pricing, campChannels, reachCount, pushCount, smsCount, emailCount]);
 
   const handleStartCampaignWizard = () => {
     if (selectedProductIds.length === 0) {
@@ -305,17 +338,6 @@ export default function ProDashboard() {
         setCampStep('SETUP');
     }
   };
-
-  const campaignCost = useMemo(() => {
-    if (!pricing) return 0;
-    const base = pricing.fixedPrice || 0;
-    let unitSum = 0;
-    if (campChannels.includes('SMS')) unitSum += pricing.priceSMS || 0;
-    if (campChannels.includes('PUSH')) unitSum += pricing.pricePush || 0;
-    if (campChannels.includes('MAIL')) unitSum += pricing.priceMail || 0;
-    
-    return base + (reachCount * unitSum);
-  }, [pricing, campChannels, reachCount]);
 
   const handleFinalizeCampaign = async () => {
     if (!firestore || !business) return;
@@ -505,7 +527,7 @@ export default function ProDashboard() {
                                             <Checkbox 
                                                 checked={selectedProductIds.includes(p.id)} 
                                                 onCheckedChange={() => {
-                                                    setSelectedProductIds(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, p.id]);
+                                                    setSelectedProductIds(prev => prev.includes(p.id) ? prev.filter(id => id !== p.id) : [...prev, id]);
                                                 }}
                                                 className="size-5 border-2 border-primary/30"
                                             />
@@ -646,7 +668,12 @@ export default function ProDashboard() {
                                         <div key={ch.id} onClick={() => setCampChannels(prev => prev.includes(ch.id) ? prev.filter(c => c !== ch.id) : [...prev, ch.id])} className={cn("p-3 rounded-xl border-2 flex items-center justify-between cursor-pointer transition-all", campChannels.includes(ch.id) ? "border-primary bg-primary/5 shadow-sm" : "border-slate-100 bg-white opacity-60")}>
                                             <div className="flex items-center gap-3">
                                                 <ch.icon className={cn("size-4", ch.color)} />
-                                                <span className="text-[10px] font-black uppercase">{ch.label}</span>
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] font-black uppercase">{ch.label}</span>
+                                                    <span className="text-[8px] font-bold opacity-60 italic">
+                                                        {ch.id === 'PUSH' ? pushCount : ch.id === 'SMS' ? smsCount : emailCount} abonnés ont validé ce canal
+                                                    </span>
+                                                </div>
                                             </div>
                                             {campChannels.includes(ch.id) && <Check className="size-4 text-primary" />}
                                         </div>
