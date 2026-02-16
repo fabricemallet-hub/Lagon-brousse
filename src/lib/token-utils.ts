@@ -17,7 +17,8 @@ export async function redeemAccessToken(firestore: Firestore, user: User, access
         return { success: false, message: 'Veuillez entrer un jeton valide.' };
     }
     
-    const tokenRef = doc(firestore, 'access_tokens', accessToken.trim().toUpperCase());
+    // FIX: Removed .toUpperCase() to support mixed-case alphanumeric tokens
+    const tokenRef = doc(firestore, 'access_tokens', accessToken.trim());
     
     try {
       const tokenSnap = await getDoc(tokenRef);

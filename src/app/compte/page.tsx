@@ -44,6 +44,7 @@ import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
+import { redeemAccessToken } from '@/lib/token-utils';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -336,25 +337,17 @@ export default function ComptePage() {
     setTimeout(() => setHasCopied(false), 2000);
   };
 
-  const handleRedeemToken = async () => {
+  const handleRedeemTokenAction = async () => {
     if (!firestore || !user || !accessToken) return;
     setIsRedeeming(true);
-    const tokenRef = doc(firestore, 'access_tokens', accessToken.trim().toUpperCase());
     try {
-      const tokenSnap = await getDoc(tokenRef);
-      if (!tokenSnap.exists() || tokenSnap.data()?.status !== 'active') throw new Error('Jeton invalide.');
-      const tokenData = tokenSnap.data() as AccessToken;
-      const now = new Date();
-      const expiryDate = addMonths(now, tokenData.durationMonths);
-      const batch = writeBatch(firestore);
-      batch.update(doc(firestore, 'users', user.uid), {
-        subscriptionStatus: 'active',
-        subscriptionExpiryDate: expiryDate.toISOString(),
-      });
-      batch.update(tokenRef, { status: 'redeemed', redeemedBy: user.uid, redeemedAt: serverTimestamp() });
-      await batch.commit();
-      toast({ title: 'Accès activé !' });
-      setAccessToken('');
+      const result = await redeemAccessToken(firestore, user, accessToken);
+      if (result.success) {
+        toast({ title: 'Accès activé !', description: result.message });
+        setAccessToken('');
+      } else {
+        toast({ variant: 'destructive', title: 'Erreur', description: result.message });
+      }
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Erreur', description: error.message });
     } finally {
@@ -810,13 +803,13 @@ export default function ComptePage() {
                         <Label htmlFor="token-input" className="text-[10px] font-black uppercase ml-1">Code Jeton</Label>
                         <Input 
                             id="token-input" 
-                            placeholder="LBN-XXXX-XXXX" 
+                            placeholder="Code Alphanumérique" 
                             value={accessToken}
                             onChange={(e) => setAccessToken(e.target.value)}
-                            className="h-14 font-black text-center uppercase tracking-[0.2em] text-lg border-2"
+                            className="h-14 font-black text-center tracking-[0.2em] text-lg border-2"
                         />
                     </div>
-                    <Button onClick={handleRedeemToken} disabled={isRedeeming || !accessToken} className="w-full h-12 font-black uppercase tracking-widest">
+                    <Button onClick={handleRedeemTokenAction} disabled={isRedeeming || !accessToken} className="w-full h-12 font-black uppercase tracking-widest">
                         {isRedeeming ? 'Validation...' : 'Valider le code'}
                     </Button>
                 </div>
