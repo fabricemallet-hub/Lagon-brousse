@@ -45,12 +45,10 @@ import {
   Bird,
   AlertCircle,
   Clock,
-  EyeOff,
-  Compass,
-  Ruler
+  EyeOff
 } from 'lucide-react';
-import { cn, getDistance, getBearing } from '@/lib/utils';
-import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
+import { cn, getDistance } from '@/lib/utils';
+import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -59,8 +57,6 @@ import { fr } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 const IMMOBILITY_THRESHOLD_METERS = 20; 
@@ -75,46 +71,12 @@ const BatteryIconComp = ({ level, charging, className }: { level?: number, charg
   return <BatteryFull {...props} className={cn(props.className, "text-green-600")} />;
 };
 
-const ShootingAngleWedge = React.memo(({ angle, spread, color, distance = 500, zoom = 16, lat = -21.3 }: { angle: number, spread: number, color: string, distance?: number, zoom?: number, lat?: number }) => {
-    const metersPerPixel = 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom);
-    const pixelRadius = distance / metersPerPixel;
-    const svgSize = Math.max(pixelRadius * 2 + 20, 40);
-
-    if (spread >= 360) {
-        return (
-            <div style={{ position: 'absolute', transform: 'translate(-50%, -50%)', pointerEvents: 'none', zIndex: 1, width: svgSize, height: svgSize }}>
-                <svg width={svgSize} height={svgSize}>
-                    <circle cx={svgSize/2} cy={svgSize/2} r={pixelRadius} fill={color} fillOpacity="0.2" stroke={color} strokeWidth="1" strokeOpacity="0.5" />
-                </svg>
-            </div>
-        );
-    }
-
-    return (
-        <div 
-            style={{ 
-                position: 'absolute', 
-                transform: `translate(-50%, -50%) rotate(${angle}deg)`,
-                pointerEvents: 'none',
-                zIndex: 1,
-                width: svgSize,
-                height: svgSize
-            }}
-        >
-            <svg width={svgSize} height={svgSize} viewBox={`0 0 ${svgSize} ${svgSize}`}>
-                <path 
-                    d={`M ${svgSize/2},${svgSize/2} L ${svgSize/2 + pixelRadius * Math.sin((-spread/2) * Math.PI / 180)},${svgSize/2 - pixelRadius * Math.cos((-spread/2) * Math.PI / 180)} A ${pixelRadius},${pixelRadius} 0 ${spread > 180 ? 1 : 0},1 ${svgSize/2 + pixelRadius * Math.sin((spread/2) * Math.PI / 180)},${svgSize/2 - pixelRadius * Math.cos((spread/2) * Math.PI / 180)} Z`} 
-                    fill={color} 
-                    fillOpacity="0.2"
-                    stroke={color}
-                    strokeWidth="1"
-                    strokeOpacity="0.5"
-                />
-            </svg>
-        </div>
-    );
-});
-ShootingAngleWedge.displayName = 'ShootingAngleWedge';
+const PulsingDot = () => (
+    <div className="absolute" style={{ transform: 'translate(-50%, -50%)' }}>
+      <div className="size-5 rounded-full bg-blue-500 opacity-75 animate-ping absolute"></div>
+      <div className="size-5 rounded-full bg-blue-500 border-2 border-white relative"></div>
+    </div>
+);
 
 export default function VesselTrackerPage() {
   const { user } = useUser();
@@ -144,19 +106,9 @@ export default function VesselTrackerPage() {
   const anchorPosRef = useRef<google.maps.LatLngLiteral | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [mapZoom, setMapZoom] = useState(10);
   const watchIdRef = useRef<number | null>(null);
   const immobilityStartTime = useRef<number | null>(null);
   const isFirstFixRef = useRef<boolean>(true);
-
-  // Shooting Angle State
-  const [isAngleActive, setIsAngleActive] = useState(false);
-  const [shootingAngle, setShootingAngle] = useState(0);
-  const [shootingSpread, setShootingSpread] = useState(30);
-  const [shootingDistance, setShootingDistance] = useState(500);
-  const [isDangerActive, setIsDangerActive] = useState(false);
-  const [dangerMessage, setDangerMessage] = useState('');
-  const lastAlertTimeRef = useRef<number>(0);
 
   const [vesselPrefs, setVesselPrefs] = useState<NonNullable<UserAccount['vesselPrefs']>>({
     isNotifyEnabled: true,
@@ -239,75 +191,6 @@ export default function VesselTrackerPage() {
     }
   };
 
-  // Sync angle to firestore
-  useEffect(() => {
-    if (mode !== 'sender' || !isSharing) return;
-    const updatePayload: any = {};
-    if (isAngleActive) {
-        updatePayload.shootingAngle = { center: shootingAngle, spread: shootingSpread, distance: shootingDistance, isActive: true };
-    } else {
-        updatePayload.shootingAngle = null;
-    }
-    updateVesselInFirestore(updatePayload);
-  }, [isAngleActive, shootingAngle, shootingSpread, shootingDistance]);
-
-  // Collision Detection
-  useEffect(() => {
-    if (!currentPosRef.current || !followedVessels) {
-        setIsDangerActive(false);
-        return;
-    }
-
-    const isWithinAngle = (bearing: number, center: number, spread: number) => {
-        if (spread >= 360) return true;
-        let diff = Math.abs(bearing - center) % 360;
-        if (diff > 180) diff = 360 - diff;
-        return diff <= spread / 2;
-    };
-
-    let dangerFound = false;
-    let msg = '';
-
-    followedVessels.forEach(v => {
-        if (v.id === sharingId || !v.location || !v.isSharing || v.isPositionHidden) return;
-        
-        // If VESSEL points at ME (local user)
-        if (v.shootingAngle?.isActive) {
-            const distToMe = getDistance(v.location.latitude, v.location.longitude, currentPosRef.current!.lat, currentPosRef.current!.lng);
-            if (distToMe <= v.shootingAngle.distance) {
-                const bearingToMe = getBearing(v.location.latitude, v.location.longitude, currentPosRef.current!.lat, currentPosRef.current!.lng);
-                if (isWithinAngle(bearingToMe, v.shootingAngle.center, v.shootingAngle.spread)) {
-                    dangerFound = true;
-                    msg = `DANGER : Vous êtes dans l'axe de tir de ${v.displayName} !`;
-                }
-            }
-        }
-
-        // If I (local user as sender) point at VESSEL
-        if (!dangerFound && isAngleActive && mode === 'sender') {
-            const distToV = getDistance(currentPosRef.current!.lat, currentPosRef.current!.lng, v.location.latitude, v.location.longitude);
-            if (distToV <= shootingDistance) {
-                const bearingToV = getBearing(currentPosRef.current!.lat, currentPosRef.current!.lng, v.location.latitude, v.location.longitude);
-                if (isWithinAngle(bearingToV, shootingAngle, shootingSpread)) {
-                    dangerFound = true;
-                    msg = `ATTENTION : ${v.displayName} est dans votre axe de tir !`;
-                }
-            }
-        }
-    });
-
-    if (dangerFound && !isDangerActive) {
-        const now = Date.now();
-        if (now - lastAlertTimeRef.current > 5000) {
-            playVesselSound('alerte');
-            toast({ variant: 'destructive', title: "ALERTE COLLISION", description: msg });
-            lastAlertTimeRef.current = now;
-        }
-    }
-    setIsDangerActive(dangerFound);
-    setDangerMessage(msg);
-  }, [followedVessels, currentPos, isAngleActive, shootingAngle, shootingSpread, shootingDistance, mode, sharingId]);
-
   useEffect(() => {
     if (userProfile) {
       if (userProfile.vesselPrefs) setVesselPrefs(userProfile.vesselPrefs);
@@ -381,7 +264,7 @@ export default function VesselTrackerPage() {
     setIsSharing(false);
     setIsReceiverGpsActive(false);
     const vesselRef = doc(firestore, 'vessels', sharingId);
-    setDoc(vesselRef, { isSharing: false, lastActive: serverTimestamp(), shootingAngle: null }, { merge: true })
+    setDoc(vesselRef, { isSharing: false, lastActive: serverTimestamp() }, { merge: true })
       .then(() => {
         if (watchIdRef.current) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
         setCurrentPos(null); currentPosRef.current = null; anchorPosRef.current = null; lastSentStatusRef.current = null; isFirstFixRef.current = true;
@@ -502,27 +385,6 @@ export default function VesselTrackerPage() {
                         </div>
                     </div>
 
-                    <Card className="border-2 border-dashed border-primary/20 bg-primary/5 p-4 space-y-4">
-                        <div className="flex items-center justify-between">
-                            <h4 className="font-black text-[10px] uppercase tracking-widest flex items-center gap-2 text-primary"><ShieldAlert className="size-3" /> Angle de Tir / Sécurité</h4>
-                            <Switch checked={isAngleActive} onCheckedChange={setIsAngleActive} />
-                        </div>
-                        <div className={cn("space-y-4", !isAngleActive && "opacity-40 pointer-events-none")}>
-                            <div className="space-y-2">
-                                <Label className="text-[9px] font-black uppercase opacity-60">Direction: {shootingAngle}°</Label>
-                                <Slider value={[shootingAngle]} min={-180} max={180} step={1} onValueChange={v => setShootingAngle(v[0])} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-[9px] font-black uppercase opacity-60">Ouverture: {shootingSpread}°</Label>
-                                <Slider value={[shootingSpread]} min={10} max={360} step={1} onValueChange={v => setShootingSpread(v[0])} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-[9px] font-black uppercase opacity-60 flex justify-between"><span>Portée: {shootingDistance}m</span><Ruler className="size-3" /></Label>
-                                <Slider value={[shootingDistance]} min={50} max={2000} step={50} onValueChange={v => setShootingDistance(v[0])} />
-                            </div>
-                        </div>
-                    </Card>
-
                     <Button variant="destructive" className="w-full h-16 text-xs font-black uppercase tracking-widest shadow-lg rounded-xl" onClick={handleStopSharing}>ARRÊTER LE PARTAGE</Button>
                 </div>
               ) : (
@@ -591,33 +453,22 @@ export default function VesselTrackerPage() {
         <div className={cn("relative bg-muted/20", isFullscreen ? "flex-grow" : "h-[300px]")}>
           <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} onZoomChanged={() => map && setMapZoom(map.getZoom() || 10)} options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
                 {followedVessels?.map(vessel => vessel.isSharing && vessel.location && (
-                    <React.Fragment key={`vessel-render-${vessel.id}`}>
-                        {vessel.shootingAngle?.isActive && (
-                            <OverlayView position={{ lat: vessel.location.latitude, lng: vessel.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                                <ShootingAngleWedge angle={vessel.shootingAngle.center} spread={vessel.shootingAngle.spread} distance={vessel.shootingAngle.distance} color="#38bdf8" zoom={mapZoom} lat={vessel.location.latitude} />
-                            </OverlayView>
-                        )}
-                        <OverlayView position={{ lat: vessel.location.latitude, lng: vessel.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                            <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
-                                <div className="px-2 py-1 rounded text-[10px] font-black bg-slate-900/90 text-white shadow-lg border border-white/20 whitespace-nowrap flex items-center gap-2">
-                                  <span>{vessel.displayName || vessel.id}</span>
-                                  <BatteryIconComp level={vessel.batteryLevel} charging={vessel.isCharging} />
-                                </div>
-                                <div className={cn("p-2 rounded-full border-2 border-white shadow-xl", vessel.status === 'moving' ? "bg-blue-600" : vessel.status === 'emergency' ? "bg-red-600 animate-pulse" : "bg-amber-600")}><Navigation className="size-5 text-white" /></div>
+                    <OverlayView key={`vessel-render-${vessel.id}`} position={{ lat: vessel.location.latitude, lng: vessel.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                        <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
+                            <div className="px-2 py-1 rounded text-[10px] font-black bg-slate-900/90 text-white shadow-lg border border-white/20 whitespace-nowrap flex items-center gap-2">
+                              <span>{vessel.displayName || vessel.id}</span>
+                              <BatteryIconComp level={vessel.batteryLevel} charging={vessel.isCharging} />
                             </div>
-                        </OverlayView>
-                    </React.Fragment>
+                            <div className={cn("p-2 rounded-full border-2 border-white shadow-xl", vessel.status === 'moving' ? "bg-blue-600" : vessel.status === 'emergency' ? "bg-red-600 animate-pulse" : "bg-amber-600")}><Navigation className="size-5 text-white" /></div>
+                        </div>
+                    </OverlayView>
                 ))}
                 {(currentPos || (mode === 'sender' && isSharing)) && (
                     <OverlayView position={currentPos || INITIAL_CENTER} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                        <div className="relative">
-                            <div style={{ transform: 'translate(-50%, -50%)' }} className="size-6 bg-blue-500 border-4 border-white rounded-full shadow-lg animate-pulse" />
-                            {isAngleActive && mode === 'sender' && currentPos && <ShootingAngleWedge angle={shootingAngle} spread={shootingSpread} distance={shootingDistance} color="#38bdf8" zoom={mapZoom} lat={currentPos.lat} />}
-                        </div>
+                        <div style={{ transform: 'translate(-50%, -50%)' }} className="size-6 bg-blue-500 border-4 border-white rounded-full shadow-lg animate-pulse" />
                     </OverlayView>
                 )}
           </GoogleMap>
-          {isDangerActive && <div className="absolute inset-0 border-[10px] border-red-600 animate-pulse pointer-events-none z-30" />}
           <div className="absolute top-3 right-3 flex flex-col gap-2">
             <Button onClick={handleRecenter} className="shadow-lg h-10 w-10 bg-background/90 backdrop-blur-md border-2 p-0"><LocateFixed className="size-5" /></Button>
             <Button size="icon" className="shadow-lg h-10 w-10 bg-background/90 backdrop-blur-md border-2" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}</Button>
@@ -625,7 +476,6 @@ export default function VesselTrackerPage() {
         </div>
 
         <div className="bg-card p-4 flex flex-col gap-4 border-t-2">
-            {isDangerActive && <div className="p-3 bg-red-600 text-white rounded-xl text-center font-black uppercase text-xs animate-bounce shadow-lg">⚠️ {dangerMessage} ⚠️</div>}
             <div className="flex gap-2">
                 <Button variant="destructive" className="flex-1 h-14 font-black uppercase rounded-xl shadow-lg text-xs" onClick={() => sendEmergencySms('MAYDAY')}><ShieldAlert className="size-5 mr-2" /> MAYDAY</Button>
                 <Button variant="secondary" className="flex-1 h-14 font-black uppercase rounded-xl shadow-lg text-xs border-2" onClick={() => sendEmergencySms('PAN PAN')}><AlertTriangle className="size-5 mr-2 text-primary" /> PAN PAN</Button>
