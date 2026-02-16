@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -28,7 +27,8 @@ import {
     Percent, 
     Filter, 
     RefreshCw, 
-    AlertTriangle, 
+    AlertTriangle,
+    AlertCircle,
     ChevronRight, 
     ShieldCheck, 
     Phone, 
@@ -51,7 +51,6 @@ import {
   AlertDialogAction, 
   AlertDialogCancel, 
   AlertDialogContent, 
-  AlertDialogDescription, 
   AlertDialogFooter, 
   AlertDialogHeader, 
   AlertDialogTitle 
