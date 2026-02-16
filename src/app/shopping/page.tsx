@@ -453,16 +453,16 @@ export default function ShoppingPage() {
                             <X className="size-5" />
                         </button>
                         
-                        <div className="aspect-square bg-white relative overflow-hidden group border-b shrink-0 h-auto">
+                        <div className="h-64 sm:h-80 bg-white relative overflow-hidden group border-b shrink-0">
                             {selectedProductForDetail.images && selectedProductForDetail.images.length > 0 ? (
                                 <Carousel setApi={setApi} className="w-full h-full">
                                     <CarouselContent className="h-full ml-0">
                                         {selectedProductForDetail.images.map((img, idx) => (
                                             <CarouselItem key={idx} className="h-full pl-0">
-                                                <div className="w-full h-full flex items-center justify-center bg-white p-12 sm:p-16">
+                                                <div className="w-full h-full flex items-center justify-center bg-white p-4">
                                                     <img 
                                                         src={img} 
-                                                        className="max-w-full max-h-full object-contain shadow-sm" 
+                                                        className="max-w-full max-h-full object-contain" 
                                                         alt={`${selectedProductForDetail.title} - ${idx + 1}`} 
                                                     />
                                                 </div>
