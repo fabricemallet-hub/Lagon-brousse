@@ -58,6 +58,7 @@ export function useCollection<T = any>(
     // Determine path for security check
     let path: string = '';
     let isCollectionGroup = false;
+    
     try {
       if (memoizedTargetRefOrQuery) {
         if (memoizedTargetRefOrQuery.type === 'collection') {
@@ -65,10 +66,10 @@ export function useCollection<T = any>(
         } else {
           // It's a query. Check for collectionGroup
           const internalQuery = memoizedTargetRefOrQuery as unknown as InternalQuery;
-          if (internalQuery._query.collectionGroup) {
+          if (internalQuery._query && internalQuery._query.collectionGroup) {
               path = internalQuery._query.collectionGroup;
               isCollectionGroup = true;
-          } else {
+          } else if (internalQuery._query && internalQuery._query.path) {
               path = internalQuery._query.path.canonicalString() || 'query';
           }
         }
@@ -78,24 +79,18 @@ export function useCollection<T = any>(
     }
 
     // PUBLIC DATA BARRIER: Only wait for auth if the collection is potentially private.
+    // In L&B, 'promotions' and 'meteo' are always public.
     const isPublic = !!(path && (
       path.includes('system_notifications') || 
       path.includes('meteo_caledonie') || 
       path.includes('promotions') ||
       path.includes('app_settings') ||
       path.includes('fish_species') ||
-      path.includes('sound_library') ||
-      path === 'promotions' || 
-      (isCollectionGroup && path === 'promotions')
+      path.includes('sound_library')
     ));
     
     const auth = getAuth();
     
-    // Log debug for permissions investigation
-    if (path === 'promotions') {
-        console.log(`[DEBUG] useCollection - Path: "${path}", isPublic: ${isPublic}, HasUser: ${!!auth.currentUser}`);
-    }
-
     if (!isPublic && memoizedTargetRefOrQuery && !auth.currentUser) {
       return;
     }
@@ -122,7 +117,7 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (error: FirestoreError) => {
-        const errorPath = path || '/';
+        const errorPath = isCollectionGroup ? `collectionGroup("${path}")` : (path || '/');
         console.error(`[DEBUG] useCollection - Error on path "${errorPath}":`, error.message);
 
         const contextualError = new FirestorePermissionError({
