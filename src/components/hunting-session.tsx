@@ -93,7 +93,7 @@ import { cn, getDistance, getBearing } from '@/lib/utils';
 import { Skeleton } from './ui/skeleton';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
-import Link from 'next/navigation';
+import Link from 'next/link';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -199,6 +199,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
   const [shootingSpread, setShootingSpread] = useState<number>(30);
   const [shootingDistance, setShootingDistance] = useState<number>(500);
   const [isDangerActive, setIsDangerActive] = useState(false);
+  const [dangerMessage, setDangerMessage] = useState('');
   const lastAlertTimeRef = useRef<number>(0);
 
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
@@ -305,9 +306,29 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     }
   }, [isSoundEnabled, soundSettings, soundVolume, availableSounds, labels]);
 
-  // Shooting Angle Collision Logic
+  // Sync shooting angle to firestore when it changes
   useEffect(() => {
-    if (!isAngleActive || !userLocation || !participants || !user) {
+    if (!isParticipating || !session || !user || !firestore) return;
+    const ref = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
+    const updatePayload: any = {};
+    
+    if (isAngleActive) {
+        updatePayload.shootingAngle = { 
+            center: shootingAngle, 
+            spread: shootingSpread, 
+            distance: shootingDistance,
+            isActive: true 
+        };
+    } else {
+        updatePayload.shootingAngle = null;
+    }
+    
+    updateDoc(ref, updatePayload).catch(() => {});
+  }, [isAngleActive, shootingAngle, shootingSpread, shootingDistance, isParticipating, session, user, firestore]);
+
+  // Shooting Angle Collision Logic (Mutual detection)
+  useEffect(() => {
+    if (!userLocation || !participants || !user) {
         setIsDangerActive(false);
         return;
     }
@@ -320,27 +341,57 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     };
 
     let dangerFound = false;
+    let msg = '';
+
     participants.forEach(p => {
         if (p.id === user.uid || !p.location) return;
         
-        const dist = getDistance(
-            userLocation.latitude, 
-            userLocation.longitude, 
-            p.location.latitude, 
-            p.location.longitude
-        );
+        // 1. Check if THEY are in MY zone
+        if (isAngleActive) {
+            const distToP = getDistance(
+                userLocation.latitude, 
+                userLocation.longitude, 
+                p.location.latitude, 
+                p.location.longitude
+            );
 
-        if (dist > shootingDistance) return;
+            if (distToP <= shootingDistance) {
+                const bearingToP = getBearing(
+                    userLocation.latitude, 
+                    userLocation.longitude, 
+                    p.location.latitude, 
+                    p.location.longitude
+                );
 
-        const bearing = getBearing(
-            userLocation.latitude, 
-            userLocation.longitude, 
-            p.location.latitude, 
-            p.location.longitude
-        );
+                if (isWithinAngle(bearingToP, shootingAngle, shootingSpread)) {
+                    dangerFound = true;
+                    msg = `COLLISION : ${p.displayName} est dans votre axe de tir !`;
+                }
+            }
+        }
 
-        if (isWithinAngle(bearing, shootingAngle, shootingSpread)) {
-            dangerFound = true;
+        // 2. Check if I am in THEIR zone
+        if (!dangerFound && p.shootingAngle && p.shootingAngle.isActive) {
+            const distToMe = getDistance(
+                p.location.latitude, 
+                p.location.longitude, 
+                userLocation.latitude, 
+                userLocation.longitude
+            );
+
+            if (distToMe <= p.shootingAngle.distance) {
+                const bearingToMe = getBearing(
+                    p.location.latitude, 
+                    p.location.longitude, 
+                    userLocation.latitude, 
+                    userLocation.longitude
+                );
+
+                if (isWithinAngle(bearingToMe, p.shootingAngle.center, p.shootingAngle.spread)) {
+                    dangerFound = true;
+                    msg = `DANGER : Vous êtes dans l'axe de tir de ${p.displayName} !`;
+                }
+            }
         }
     });
 
@@ -350,14 +401,15 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
             playStatusSound('safety');
             toast({ 
                 variant: 'destructive', 
-                title: "DANGER : TIR INTERDIT", 
-                description: "Un coéquipier est dans votre axe de tir !",
+                title: "ALERTE SÉCURITÉ", 
+                description: msg,
                 duration: 4000
             });
             lastAlertTimeRef.current = now;
         }
     }
     setIsDangerActive(dangerFound);
+    setDangerMessage(msg);
   }, [isAngleActive, userLocation, participants, user, shootingAngle, shootingSpread, shootingDistance, isDangerActive, playStatusSound, toast]);
 
   useEffect(() => {
@@ -480,6 +532,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                     updatedAt: serverTimestamp() 
                 };
                 
+                // Add current shooting angle to participant doc for global sharing
                 if (isAngleActive) {
                     updatePayload.shootingAngle = { 
                         center: shootingAngle, 
@@ -487,8 +540,6 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                         distance: shootingDistance,
                         isActive: true 
                     };
-                } else {
-                    updatePayload.shootingAngle = null;
                 }
 
                 updateDoc(ref, updatePayload).catch(() => {});
@@ -669,14 +720,6 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     const userRef = doc(firestore, 'users', user.uid);
     updateDoc(userRef, prefsPayload)
       .then(() => {
-        if (session && isParticipating) {
-          const participantRef = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
-          const updateData: any = { displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor };
-          if (isAngleActive) {
-              updateData.shootingAngle = { center: shootingAngle, spread: shootingSpread, distance: shootingDistance, isActive: true };
-          }
-          updateDoc(participantRef, updateData).catch(() => {});
-        }
         toast({ title: 'Préférences sauvegardées !' });
         setPrefsSection(undefined); 
         setIsSavingPrefs(false);
@@ -809,6 +852,11 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                         {isFullscreen && (
                             <div className="absolute bottom-0 left-0 right-0 p-4 space-y-4 bg-gradient-to-t from-black/90 via-black/40 to-transparent pointer-events-none z-20">
                                 <div className="flex flex-col gap-3 pointer-events-auto max-w-lg mx-auto">
+                                    {isDangerActive && (
+                                        <div className="p-3 bg-red-600 text-white rounded-xl text-center font-black uppercase text-xs animate-bounce shadow-2xl border-2 border-white/20">
+                                            ⚠️ {dangerMessage} ⚠️
+                                        </div>
+                                    )}
                                     <div className="grid grid-cols-2 gap-2">
                                         <Button 
                                             variant={me?.baseStatus === labels.status1 ? 'default' : 'secondary'} 
@@ -843,7 +891,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                                             <AccordionContent className="pt-2">
                                                 <div className="bg-black/80 backdrop-blur-xl border border-white/10 rounded-xl p-4 space-y-4">
                                                     <div className="flex items-center justify-between">
-                                                        <Label className="text-[10px] font-black uppercase text-white">Activer l'angle</Label>
+                                                        <Label className="text-[10px] font-black uppercase text-white">Activer mon angle</Label>
                                                         <Switch checked={isAngleActive} onCheckedChange={setIsAngleActive} />
                                                     </div>
                                                     <div className={cn("space-y-4", !isAngleActive && "opacity-40 pointer-events-none")}>
@@ -920,6 +968,12 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                                 </Alert>
                             )}
 
+                            {isDangerActive && (
+                                <div className="p-3 bg-red-600 text-white rounded-xl text-center font-black uppercase text-xs animate-bounce shadow-lg border-2 border-red-400">
+                                    ⚠️ {dangerMessage} ⚠️
+                                </div>
+                            )}
+
                             <div className="grid grid-cols-2 gap-2">
                                 <Button variant={me?.baseStatus === labels.status1 ? 'default' : 'outline'} className="h-12 font-bold" onClick={() => updateTacticalStatus(labels.status1)}><labels.icon1 className="mr-2 size-4" /> {labels.status1}</Button>
                                 <Button variant={me?.baseStatus === labels.status2 ? 'default' : 'outline'} className="h-12 font-bold" onClick={() => updateTacticalStatus(labels.status2)}><labels.icon2 className="mr-2 size-4" /> {labels.status2}</Button>
@@ -951,11 +1005,6 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                                             <Slider value={[shootingDistance]} min={50} max={2000} step={50} onValueChange={v => setShootingDistance(v[0])} />
                                         </div>
                                     </div>
-                                    {isDangerActive && (
-                                        <div className="p-2 bg-red-100 border-2 border-red-400 rounded-lg text-red-700 text-center font-black uppercase text-[10px] animate-bounce">
-                                            ⚠️ OBSTACLE DANS L'AXE DE TIR ⚠️
-                                        </div>
-                                    )}
                                 </div>
                             </Card>
 
@@ -1034,7 +1083,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                                                     { key: 'position', label: labels.status1 },
                                                     { key: 'battue', label: labels.status2 },
                                                     { key: 'gibier', label: 'Gibier / Poisson' },
-                                                    { key: 'safety', label: 'Alerte Sécurité (Axe de tir)' }
+                                                    { key: 'safety', label: 'Alerte Sécurité' }
                                                   ].map(item => (
                                                     <div key={item.key} className="flex items-center justify-between gap-4">
                                                       <span className="text-[10px] font-bold uppercase flex-1">{item.label}</span>
