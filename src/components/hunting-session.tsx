@@ -115,7 +115,7 @@ BatteryIcon.displayName = 'BatteryIcon';
 const PulsingDot = React.memo(() => (
     <div className="absolute" style={{ transform: 'translate(-50%, -50%)' }}>
       <div className="w-5 h-5 rounded-full bg-blue-500 opacity-75 animate-ping absolute"></div>
-      <div className="w-5 h-5 rounded-full bg-blue-500 border-2 border-white relative"></div>
+      <div className="size-5 rounded-full bg-blue-500 border-2 border-white relative"></div>
     </div>
 ));
 PulsingDot.displayName = 'PulsingDot';
@@ -351,7 +351,6 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
             }
             const ref = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
             
-            // Get battery info asynchronously
             const updateWithBattery = async () => {
                 let batt = null;
                 if ('getBattery' in navigator) {
@@ -842,7 +841,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
 }
 
 export function HuntingSessionCard({ sessionType = 'chasse' }: HuntingSessionProps) {
-  const { user, isUserLoading } = useUserHook();
+  const { user, isUserLoading } = useUser();
   if (isUserLoading) return <Skeleton className="h-48 w-full" />;
   if (!user) return <Card><CardHeader><CardTitle className="flex items-center gap-2"><AlertCircle className="text-destructive" /> Connexion requise</CardTitle></CardHeader><CardContent><Button asChild className="w-full"><Link href="/login">Se connecter</Link></Button></CardContent></Card>;
   return <HuntingSessionContent sessionType={sessionType} />;
