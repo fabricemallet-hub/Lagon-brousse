@@ -367,6 +367,10 @@ export default function ShoppingPage() {
         <DialogContent className="max-w-2xl w-[95vw] rounded-3xl p-0 overflow-hidden border-none shadow-2xl flex flex-col">
             {selectedProduct && (
                 <>
+                    <DialogHeader className="sr-only">
+                        <DialogTitle>{selectedProduct.title}</DialogTitle>
+                        <DialogDescription>Détails du produit et informations vendeur</DialogDescription>
+                    </DialogHeader>
                     <div className="h-64 sm:h-80 bg-white relative shrink-0">
                         <button onClick={() => setSelectedProduct(null)} className="absolute top-4 right-4 z-[160] p-2 bg-black/20 rounded-full text-white"><X className="size-5" /></button>
                         {selectedProduct.images && selectedProduct.images.length > 0 ? (
@@ -445,7 +449,12 @@ export default function ShoppingPage() {
 
       <Dialog open={isContactOpen} onOpenChange={setIsContactOpen}>
         <DialogContent className="max-w-md rounded-2xl p-0 overflow-hidden">
-            <DialogHeader className="p-6 bg-slate-50 border-b"><DialogTitle className="font-black uppercase flex items-center gap-2"><Store className="size-5" /> Contact Pro</DialogTitle></DialogHeader>
+            <DialogHeader className="p-6 bg-slate-50 border-b">
+                <DialogTitle className="font-black uppercase flex items-center gap-2">
+                    <Store className="size-5" /> Contact Pro
+                </DialogTitle>
+                <DialogDescription className="sr-only">Options de contact du vendeur</DialogDescription>
+            </DialogHeader>
             <div className="p-6 space-y-4">
                 {contactBusiness && (
                     <div className="space-y-4">
@@ -489,7 +498,18 @@ export default function ShoppingPage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!productToDelete} onOpenChange={(o) => !o && setProductToDelete(null)}><AlertDialogContent className="rounded-3xl"><AlertDialogHeader><AlertDialogTitle className="font-black uppercase">Supprimer ?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter className="gap-2"><AlertDialogCancel className="h-12 font-black uppercase text-[10px] border-2">Non</AlertDialogCancel><AlertDialogAction onClick={handleDeleteProduct} className="h-12 font-black uppercase text-[10px] bg-destructive">Oui, supprimer</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      <AlertDialog open={!!productToDelete} onOpenChange={(o) => !o && setProductToDelete(null)}>
+        <AlertDialogContent className="rounded-3xl">
+            <AlertDialogHeader>
+                <AlertDialogTitle className="font-black uppercase">Supprimer ?</AlertDialogTitle>
+                <AlertDialogDescription className="text-xs">Êtes-vous sûr de vouloir supprimer définitivement cet article du catalogue ?</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2">
+                <AlertDialogCancel className="h-12 font-black uppercase text-[10px] border-2">Non</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteProduct} className="h-12 font-black uppercase text-[10px] bg-destructive">Oui, supprimer</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
