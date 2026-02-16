@@ -137,7 +137,7 @@ const ShootingAngleWedge = React.memo(({ angle, spread, color, distance = 500, z
         return (
             <div style={{ position: 'absolute', transform: 'translate(-50%, -50%)', pointerEvents: 'none', zIndex: 1, width: svgSize, height: svgSize }}>
                 <svg width={svgSize} height={svgSize}>
-                    <circle cx={svgSize/2} cx={svgSize/2} r={pixelRadius} fill={color} fillOpacity="0.2" stroke={color} strokeWidth="1" strokeOpacity="0.5" />
+                    <circle cx={svgSize/2} cy={svgSize/2} r={pixelRadius} fill={color} fillOpacity="0.2" stroke={color} strokeWidth="1" strokeOpacity="0.5" />
                 </svg>
             </div>
         );
@@ -196,10 +196,8 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
   const [selectedIcon, setSelectedIcon] = useState(sessionType === 'chasse' ? 'Navigation' : 'Anchor');
   const [selectedColor, setSelectedColor] = useState(sessionType === 'chasse' ? '#f97316' : '#3b82f6');
   
-  // New State: Tactical Panel Visibility in Fullscreen
   const [showTacticalControls, setShowTacticalControls] = useState(true);
 
-  // Shooting Angle State
   const [isAngleActive, setIsAngleActive] = useState(false);
   const [shootingAngle, setShootingAngle] = useState<number>(0);
   const [shootingSpread, setShootingSpread] = useState<number>(30);
@@ -857,7 +855,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                         )}
 
                         {isFullscreen && (
-                            <div className="absolute bottom-0 left-0 right-0 p-4 space-y-4 bg-gradient-to-t from-black/90 via-black/40 to-transparent pointer-events-none z-20">
+                            <div className="absolute bottom-0 left-0 right-0 p-4 pb-10 sm:pb-4 space-y-4 bg-gradient-to-t from-black/90 via-black/40 to-transparent pointer-events-none z-20">
                                 <div className="flex flex-col gap-3 pointer-events-auto max-w-lg mx-auto">
                                     {isDangerActive && (
                                         <div className="p-3 bg-red-600 text-white rounded-xl text-center font-black uppercase text-xs animate-bounce shadow-2xl border-2 border-white/20">
@@ -870,7 +868,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                                         <Button 
                                             variant="ghost" 
                                             size="sm" 
-                                            className="h-8 text-white hover:bg-white/10 gap-2"
+                                            className="h-8 text-white hover:bg-white/10 gap-2 border border-white/10"
                                             onClick={() => setShowTacticalControls(!showTacticalControls)}
                                         >
                                             <span className="text-[9px] font-black uppercase">{showTacticalControls ? 'Masquer' : 'Afficher'}</span>
