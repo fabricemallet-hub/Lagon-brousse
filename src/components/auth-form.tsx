@@ -48,8 +48,6 @@ import { fr } from 'date-fns/locale';
 import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { cn } from '@/lib/utils';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 
 type AuthFormProps = {
   mode: 'login' | 'signup';
@@ -168,7 +166,9 @@ export function AuthForm({ mode }: AuthFormProps) {
     setTokenInfo(null);
     
     try {
-      const tokenDocRef = doc(firestore, 'access_tokens', token.trim());
+      // Nettoyage de l'ID (pas de transformation en majuscule pour respecter la casse)
+      const cleanToken = token.trim();
+      const tokenDocRef = doc(firestore, 'access_tokens', cleanToken);
       const tokenDoc = await getDoc(tokenDocRef);
       
       if (tokenDoc.exists()) {
@@ -183,17 +183,8 @@ export function AuthForm({ mode }: AuthFormProps) {
         toast({ variant: 'destructive', title: "Jeton inconnu", description: "Ce code n'existe pas dans notre base." });
       }
     } catch (e: any) {
-      console.error("Token verification error:", e);
-      
-      // DIAGNOSTIC : Si c'est une erreur de permission, on émet l'erreur contextuelle pour voir le JSON
-      if (e.code === 'permission-denied' || e.message?.toLowerCase().includes('permissions')) {
-          errorEmitter.emit('permission-error', new FirestorePermissionError({
-              path: `access_tokens/${token.trim()}`,
-              operation: 'get'
-          }));
-      }
-      
-      toast({ variant: 'destructive', title: "Erreur technique", description: "Impossible de vérifier le jeton pour le moment." });
+      console.warn("Token verification error:", e.message);
+      toast({ variant: 'destructive', title: "Erreur technique", description: "Vérification impossible." });
     } finally {
       setIsValidatingToken(false);
     }

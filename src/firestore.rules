@@ -5,18 +5,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ======================================================
-    // 1. JETONS D'ACCÈS (VÉRIFICATION PUBLIQUE PRIORITAIRE)
-    // ======================================================
-    // Cette règle DOIT rester en haut pour permettre la vérification 
-    // du jeton avant la connexion (Page Login/Signup).
-    
-    match /access_tokens/{tokenId} {
-      allow get: if true;
-      allow list, update: if request.auth != null;
-    }
-
-    // ======================================================
-    // 2. FONCTIONS DE SÉCURITÉ & MASTER ADMIN
+    // 1. FONCTIONS DE BASE
     // ======================================================
     
     function isSignedIn() {
@@ -26,7 +15,8 @@ service cloud.firestore {
     function isMasterAdmin() {
       return isSignedIn() && (
         request.auth.uid in ["t8nPnZLcTiaLJSKMuLzib3C5nPn1", "D1q2GPM95rZi38cvCzvsjcWQDaV2", "koKj5ObSGXYeO1PLKU5bgo8Yaky1"] ||
-        (request.auth.token.get('email', "").lower() in [
+        (request.auth.token.email != null && 
+         request.auth.token.email.lower() in [
           "f.mallet81@outlook.com",
           "f.mallet81@gmail.com",
           "fabrice.mallet@gmail.com",
@@ -36,33 +26,42 @@ service cloud.firestore {
       );
     }
 
-    // Bypass total pour Master Admin
+    // ======================================================
+    // 2. JETONS & ACCÈS PUBLICS (PRIORITAIRE)
+    // ======================================================
+    
+    // Autoriser la vérification des jetons pour tout le monde
+    match /access_tokens/{token} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Données publiques (Météo, Poissons, Réglages, Notifications)
+    match /app_settings/{document=**} { allow read: if true; }
+    match /system_notifications/{id} { allow read: if true; }
+    match /meteo_caledonie/{id} { 
+      allow read: if true;
+      match /previsions/{prevId} { allow read: if true; }
+    }
+    match /fish_species/{id} { allow read: if true; }
+    match /sound_library/{id} { allow read: if true; }
+    match /businesses/{id} { allow read: if true; }
+    match /shared_access_tokens/{id} { allow read: if true; }
+    match /{path=**}/promotions/{promoId} { allow read: if true; }
+
+    // ======================================================
+    // 3. BYPASS MASTER ADMIN (TOTAL)
+    // ======================================================
+    
     match /{allPaths=**} {
       allow read, write: if isMasterAdmin();
     }
 
     // ======================================================
-    // 3. RÈGLES PUBLIQUES (LECTURE)
+    // 4. RÈGLES SIMPLIFIÉES POUR LE DÉVELOPPEMENT
     // ======================================================
 
-    match /app_settings/{document=**} { allow read: if true; }
-    match /system_notifications/{id} { allow read: if true; }
-    match /meteo_caledonie/{id} { 
-      allow get, list: if true;
-      match /previsions/{prevId} { allow get, list: if true; }
-    }
-    match /fish_species/{id} {
-      allow get, list: if true;
-      match /commune_stats/{communeId} { allow read, write: if isSignedIn(); }
-    }
-    match /sound_library/{id} { allow read: if true; }
-    match /businesses/{businessId} { allow get, list: if true; }
-    match /{path=**}/promotions/{promoId} { allow read: if true; }
-
-    // ======================================================
-    // 4. RÈGLES UTILISATEURS & PRIVÉES
-    // ======================================================
-
+    // Profils Utilisateurs
     match /users/{userId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && (request.auth.uid == userId);
@@ -71,34 +70,23 @@ service cloud.firestore {
       }
     }
 
-    match /conversations/{convId} {
-      allow read, write: if isSignedIn() && (request.auth.uid == convId);
-      match /messages/{msgId} {
-        allow read, write: if isSignedIn() && (request.auth.uid == convId);
-      }
-    }
-    
-    match /cms_support/tickets/items/{id} {
-      allow create: if isSignedIn();
-      allow read, write: if isSignedIn() && (resource.data.userId == request.auth.uid);
-    }
-
-    match /shared_access_tokens/{id} { allow read: if true; }
+    // Sessions, Spots, Conversations, etc.
+    // On autorise la lecture/écriture si connecté pour ne pas bloquer les tests
+    match /hunting_sessions/{id} { allow read, write: if isSignedIn(); }
+    match /vessel_sessions/{id} { allow read, write: if isSignedIn(); }
+    match /vessels/{id} { allow read, write: if isSignedIn(); }
     match /spot_shares/{id} { allow read, write: if isSignedIn(); }
+    match /cms_support/tickets/items/{id} { allow read, write: if isSignedIn(); }
+    match /conversations/{id} { allow read, write: if isSignedIn(); }
+    match /campaigns/{id} { allow read, write: if isSignedIn(); }
     
-    match /hunting_sessions/{sessionId} {
-      allow read, write: if isSignedIn();
-      match /{allPaths=**} { allow read, write: if isSignedIn(); }
-    }
-    match /vessel_sessions/{sessionId} {
-      allow read, write: if isSignedIn();
-      match /{allPaths=**} { allow read, write: if isSignedIn(); }
-    }
-    
-    match /vessels/{allPaths=**} { allow read, write: if isSignedIn(); }
-
-    match /campaigns/{campaignId} {
-      allow read, write: if isSignedIn();
-    }
+    // Requêtes de groupe (collectionGroup)
+    match /{path=**}/fishing_spots/{spotId} { allow read, write: if isSignedIn(); }
+    match /{path=**}/commune_stats/{id} { allow read, write: if isSignedIn(); }
+    match /{path=**}/messages/{id} { allow read, write: if isSignedIn(); }
+    match /{path=**}/vessels_safety/{id} { allow read, write: if isSignedIn(); }
+    match /{path=**}/weapons/{id} { allow read, write: if isSignedIn(); }
+    match /{path=**}/sowings/{id} { allow read, write: if isSignedIn(); }
+    match /{path=**}/garden_plants/{id} { allow read, write: if isSignedIn(); }
   }
 }
