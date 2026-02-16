@@ -62,6 +62,7 @@ export function useCollection<T = any>(
         } else {
           // It's a query. For collectionGroup, canonicalString() provides the collection ID or internal path.
           const internalQuery = memoizedTargetRefOrQuery as unknown as InternalQuery;
+          // IMPORTANT: collectionGroup often returns an empty path or the ID.
           path = internalQuery._query.path.canonicalString() || 'collectionGroup';
         }
       }
@@ -82,6 +83,7 @@ export function useCollection<T = any>(
     
     const auth = getAuth();
     if (!isPublic && memoizedTargetRefOrQuery && !auth.currentUser) {
+      console.log("[DEBUG] useCollection - Waiting for auth for private path:", path);
       return;
     }
 
@@ -108,6 +110,7 @@ export function useCollection<T = any>(
       },
       (error: FirestoreError) => {
         const errorPath = path || '/';
+        console.error(`[DEBUG] useCollection - Error on path "${errorPath}":`, error.message);
 
         const contextualError = new FirestorePermissionError({
           operation: 'list',

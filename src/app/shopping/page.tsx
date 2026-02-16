@@ -64,12 +64,21 @@ export default function ShoppingPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
+  // --- DEBUG LOGS ---
+  useEffect(() => {
+    console.log("[DEBUG] ShoppingPage - Auth User:", user?.uid);
+  }, [user]);
+
   // --- DATA FETCHING ---
   const userProfileRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return doc(firestore, 'users', user.uid);
   }, [user, firestore]);
-  const { data: profile } = useDoc<UserAccount>(userProfileRef);
+  const { data: profile, isLoading: isProfileLoading } = useDoc<UserAccount>(userProfileRef);
+
+  useEffect(() => {
+    if (profile) console.log("[DEBUG] ShoppingPage - User Profile Loaded:", profile.id, "Role:", profile.role);
+  }, [profile]);
 
   const businessesRef = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -79,10 +88,16 @@ export default function ShoppingPage() {
 
   const promosRef = useMemoFirebase(() => {
     if (!firestore) return null;
+    console.log("[DEBUG] ShoppingPage - Initiating collectionGroup('promotions')");
     return collectionGroup(firestore, 'promotions');
   }, [firestore]);
   
   const { data: allPromotions, isLoading: isPromosLoading, error: promosError } = useCollection<Promotion>(promosRef);
+
+  useEffect(() => {
+    if (allPromotions) console.log("[DEBUG] ShoppingPage - Promotions Loaded count:", allPromotions.length);
+    if (promosError) console.error("[DEBUG] ShoppingPage - Promotions Error:", promosError);
+  }, [allPromotions, promosError]);
 
   // --- DETAIL VIEW STATE ---
   const [selectedProductForDetail, setSelectedProductForDetail] = useState<Promotion & { business?: Business } | null>(null);
@@ -375,7 +390,7 @@ export default function ShoppingPage() {
                 <AlertTriangle className="size-4 text-red-600" />
                 <AlertTitle className="text-xs font-black uppercase">ERREUR DE PERMISSIONS</AlertTitle>
                 <AlertDescription className="text-[10px] font-bold leading-tight mt-1">
-                    Firestore bloque l'accès au catalogue global. Rafraîchissez la page ou vérifiez les règles Master Admin.
+                    Firestore bloque l'accès au catalogue global. Vérifiez les règles Master Admin.
                 </AlertDescription>
             </Alert>
         )}
@@ -427,7 +442,7 @@ export default function ShoppingPage() {
               <AlertCircle className="size-5" /> Supprimer l'annonce ?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-xs font-bold uppercase leading-relaxed">
-              Êtes-vous sûr de vouloir supprimer cette annonce définitivement ? Cette action est irréversible et l'annonce disparaîtra pour tous les utilisateurs.
+              Êtes-vous sûr de vouloir supprimer cette annonce définitivement ?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2">
@@ -442,12 +457,11 @@ export default function ShoppingPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* LIGHTBOX POUR ZOOM TACTILE */}
+      {/* LIGHTBOX */}
       <Dialog open={!!fullscreenImage} onOpenChange={(open) => !open && setFullscreenImage(null)}>
         <DialogContent className="max-w-[100vw] w-full h-[100dvh] p-0 bg-black/95 border-none rounded-none overflow-hidden flex flex-col z-[200]">
             <DialogHeader className="sr-only">
                 <DialogTitle>Zoom produit</DialogTitle>
-                <DialogDescription>Agrandissement de la photo pour visualisation détaillée.</DialogDescription>
             </DialogHeader>
             <div className="relative flex-1 flex items-center justify-center">
                 <button 
@@ -464,21 +478,16 @@ export default function ShoppingPage() {
                     />
                 )}
             </div>
-            <div className="p-6 bg-black/40 backdrop-blur-md text-white/60 text-center font-black uppercase text-[10px] tracking-[0.2em]">
-                Pincez pour zoomer
-            </div>
         </DialogContent>
       </Dialog>
 
-      {/* VUE DÉTAILLÉE DU PRODUIT */}
+      {/* VUE DÉTAILLÉE */}
       <Dialog open={!!selectedProductForDetail} onOpenChange={(open) => !open && setSelectedProductForDetail(null)}>
         <DialogContent className="max-w-2xl w-[95vw] rounded-3xl p-0 overflow-hidden border-none shadow-2xl max-h-[95vh] flex flex-col">
             {selectedProductForDetail && (
                 <>
                     <DialogHeader className="p-0 relative shrink-0">
                         <DialogTitle className="sr-only">{selectedProductForDetail.title}</DialogTitle>
-                        <DialogDescription className="sr-only">Détails de l'offre publicitaire du magasin {selectedProductForDetail.business?.name}</DialogDescription>
-                        
                         <button 
                             onClick={() => setSelectedProductForDetail(null)}
                             className="absolute top-4 right-4 z-[160] p-2 bg-black/20 hover:bg-black/40 rounded-full text-white backdrop-blur-md transition-colors shadow-lg"
@@ -496,16 +505,7 @@ export default function ShoppingPage() {
                                                     className="w-full h-full flex items-center justify-center bg-white p-6 cursor-zoom-in"
                                                     onClick={() => setFullscreenImage(img)}
                                                 >
-                                                    <img 
-                                                        src={img} 
-                                                        className="max-w-full max-h-full object-contain" 
-                                                        alt={`${selectedProductForDetail.title} - ${idx + 1}`} 
-                                                    />
-                                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                                        <div className="p-3 bg-white/90 rounded-full shadow-xl text-primary flex items-center gap-2 font-black uppercase text-[10px]">
-                                                            <Maximize2 className="size-4" /> Agrandir
-                                                        </div>
-                                                    </div>
+                                                    <img src={img} className="max-w-full max-h-full object-contain" alt="" />
                                                 </div>
                                             </CarouselItem>
                                         ))}
@@ -516,10 +516,7 @@ export default function ShoppingPage() {
                                                 <button 
                                                     key={idx} 
                                                     onClick={() => api?.scrollTo(idx)}
-                                                    className={cn(
-                                                        "size-2 rounded-full transition-all shadow-md",
-                                                        activeImageIdx === idx ? "bg-primary w-6" : "bg-black/20 hover:bg-black/40"
-                                                    )}
+                                                    className={cn("size-2 rounded-full transition-all shadow-md", activeImageIdx === idx ? "bg-primary w-6" : "bg-black/20")}
                                                 />
                                             ))}
                                         </div>
@@ -528,23 +525,6 @@ export default function ShoppingPage() {
                             ) : (
                                 <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground/30 bg-white">
                                     <ImageIcon className="size-16" />
-                                    <span className="font-black uppercase text-[10px] mt-2">Aucun visuel</span>
-                                </div>
-                            )}
-                            <div className="absolute top-4 left-4 flex flex-col gap-2 z-20">
-                                <Badge className={cn(
-                                    "font-black text-[10px] uppercase border-none shadow-lg px-3 h-7",
-                                    selectedProductForDetail.promoType === 'Promo' ? "bg-red-600 animate-pulse" : "bg-primary"
-                                )}>
-                                    {selectedProductForDetail.promoType}
-                                </Badge>
-                                <Badge variant="outline" className="bg-white/90 backdrop-blur-md border-none text-slate-800 font-black text-[9px] uppercase shadow-lg">
-                                    {selectedProductForDetail.category}
-                                </Badge>
-                            </div>
-                            {selectedProductForDetail.isOutOfStock && (
-                                <div className="absolute inset-0 bg-red-600/40 flex items-center justify-center z-30">
-                                    <Badge className="bg-red-600 text-white font-black text-lg py-2 px-6 shadow-2xl border-2 border-white/20">STOCK ÉPUISÉ</Badge>
                                 </div>
                             )}
                         </div>
@@ -558,7 +538,6 @@ export default function ShoppingPage() {
                             <div className="flex items-center gap-2 text-primary">
                                 <Store className="size-4" />
                                 <span className="text-xs font-black uppercase">{selectedProductForDetail.business?.name}</span>
-                                <span className="text-slate-300">•</span>
                                 <MapPin className="size-3" />
                                 <span className="text-[10px] font-bold uppercase">{selectedProductForDetail.business?.commune}</span>
                             </div>
@@ -567,8 +546,7 @@ export default function ShoppingPage() {
                         {selectedProductForDetail.isOutOfStock && (
                             <Alert variant="destructive" className="bg-red-50 border-red-200 border-2">
                                 <AlertCircle className="size-4 text-red-600" />
-                                <AlertTitle className="text-xs font-black uppercase">Article indisponible</AlertTitle>
-                                <AlertDescription className="text-sm font-black text-red-700 mt-1">
+                                <AlertDescription className="text-sm font-black text-red-700">
                                     STOCK ÉPUISÉ - Arrivage prévu le {selectedProductForDetail.restockDate || "Prochainement"}
                                 </AlertDescription>
                             </Alert>
@@ -580,24 +558,13 @@ export default function ShoppingPage() {
                                 <div className="flex items-baseline gap-2">
                                     <span className={cn(
                                         "text-4xl font-black tracking-tighter",
-                                        selectedProductForDetail.isOutOfStock ? "line-through decoration-red-600 opacity-40" : (selectedProductForDetail.promoType === 'Promo' ? "text-red-600" : "text-primary")
+                                        selectedProductForDetail.isOutOfStock ? "line-through opacity-40" : (selectedProductForDetail.promoType === 'Promo' ? "text-red-600" : "text-primary")
                                     )}>
-                                        {(selectedProductForDetail.price || 0).toLocaleString('fr-FR').replace(/\s/g, ' ')}
+                                        {(selectedProductForDetail.price || 0).toLocaleString('fr-FR')}
                                     </span>
                                     <span className="text-xs font-black uppercase opacity-60">CFP</span>
                                 </div>
                             </div>
-                            
-                            {selectedProductForDetail.promoType === 'Promo' && selectedProductForDetail.originalPrice && (
-                                <div className="text-right flex flex-col items-end gap-1">
-                                    <span className="text-sm text-muted-foreground line-through font-bold">{selectedProductForDetail.originalPrice.toLocaleString('fr-FR').replace(/\s/g, ' ')} F</span>
-                                    {selectedProductForDetail.discountPercentage && (
-                                        <Badge className="bg-red-600 text-white font-black text-sm px-2 py-1 rounded-lg shadow-lg border-none">
-                                            -{Math.round(selectedProductForDetail.discountPercentage)}%
-                                        </Badge>
-                                    )}
-                                </div>
-                            )}
                         </div>
 
                         <div className="space-y-3 pb-6">
@@ -605,7 +572,7 @@ export default function ShoppingPage() {
                                 <FileText className="size-3" /> Description de l'offre
                             </h3>
                             <p className="text-sm font-medium leading-relaxed text-slate-600 whitespace-pre-wrap italic">
-                                {selectedProductForDetail.description || "Aucun détail complémentaire fourni pour cet article."}
+                                {selectedProductForDetail.description || "Aucun détail complémentaire."}
                             </p>
                         </div>
                     </div>
@@ -621,27 +588,13 @@ export default function ShoppingPage() {
                         >
                             Contacter le magasin <ChevronRight className="size-5" />
                         </Button>
-                        {isAdmin && (
-                            <Button 
-                                variant="ghost"
-                                className="w-full text-destructive font-black uppercase text-[10px]"
-                                onClick={() => {
-                                    const pid = selectedProductForDetail.id;
-                                    const bid = selectedProductForDetail.businessId;
-                                    setSelectedProductForDetail(null);
-                                    setProductToDelete({id: pid, businessId: bid});
-                                }}
-                            >
-                                <Trash2 className="size-3 mr-2" /> Supprimer cette annonce (Admin)
-                            </Button>
-                        )}
                     </DialogFooter>
                 </>
             )}
         </DialogContent>
       </Dialog>
 
-      {/* MODAL CONTACT MAGASIN */}
+      {/* MODAL CONTACT */}
       <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
         <DialogContent className="max-w-md rounded-2xl p-0 overflow-hidden">
             <DialogHeader className="p-6 bg-slate-50 border-b">
@@ -666,51 +619,19 @@ export default function ShoppingPage() {
                                     <Smartphone className="size-5" /> Appeler le mobile
                                 </a>
                             </Button>
-                            {selectedBusinessContact.landline && (
-                                <Button asChild variant="outline" className="h-12 font-black uppercase tracking-widest border-2 gap-3">
-                                    <a href={`tel:${selectedBusinessContact.landline}`}>
-                                        <Phone className="size-4" /> Ligne Fixe
-                                    </a>
-                                </Button>
-                            )}
                         </div>
-
                         <div className="p-4 bg-muted/30 rounded-2xl border-2 border-dashed space-y-3">
                             <div className="flex items-start gap-3">
                                 <Home className="size-4 text-primary shrink-0 mt-0.5" />
                                 <div className="space-y-1">
-                                    <p className="text-[10px] font-black uppercase text-muted-foreground">Adresse physique</p>
+                                    <p className="text-[10px] font-black uppercase text-muted-foreground">Adresse</p>
                                     <p className="text-xs font-bold leading-tight">{selectedBusinessContact.address || "Non renseignée"}</p>
                                 </div>
                             </div>
-                            <div className="flex items-start gap-3">
-                                <MapPin className="size-4 text-primary shrink-0 mt-0.5" />
-                                <div className="space-y-1">
-                                    <p className="text-[10px] font-black uppercase text-muted-foreground">Commune</p>
-                                    <p className="text-xs font-bold">{selectedBusinessContact.commune}</p>
-                                </div>
-                            </div>
                         </div>
-
-                        {selectedBusinessContact.location && (
-                            <Button asChild variant="secondary" className="w-full h-12 font-black uppercase tracking-widest gap-2">
-                                <a 
-                                    href={`https://www.google.com/maps?q=${selectedBusinessContact.location.latitude},${selectedBusinessContact.location.longitude}`} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                >
-                                    <Navigation className="size-4" /> Itinéraire GPS
-                                </a>
-                            </Button>
-                        )}
                     </div>
-                ) : (
-                    <p className="text-center text-sm italic opacity-60">Impossible de charger les coordonnées.</p>
-                )}
+                ) : null}
             </div>
-            <DialogFooter className="p-4 bg-muted/5 border-t">
-                <Button variant="ghost" className="w-full font-black uppercase text-[10px]" onClick={() => setIsContactDialogOpen(false)}>Fermer</Button>
-            </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
@@ -739,15 +660,13 @@ function ProductCard({
             className={cn(
                 "overflow-hidden border-2 shadow-sm flex flex-col group transition-all hover:border-primary/40 cursor-pointer active:scale-[0.98]",
                 isPromo && "border-red-100 bg-red-50/10",
-                isOutOfStock && "opacity-75 border-red-200 grayscale-[0.3]"
+                isOutOfStock && "opacity-75 border-red-200"
             )}
             onClick={onViewDetail}
         >
             <div className="px-3 py-2 bg-muted/20 border-b flex items-center justify-between">
                 <div className="flex items-center gap-2 min-w-0">
-                    <div className="size-6 rounded-lg bg-white flex items-center justify-center border shadow-sm shrink-0">
-                        <Store className="size-3 text-primary" />
-                    </div>
+                    <Store className="size-3 text-primary shrink-0" />
                     <span className="text-[9px] font-black uppercase truncate text-slate-700">
                         {product.business?.name || "Magasin NC"}
                     </span>
@@ -766,36 +685,19 @@ function ProductCard({
                             <Trash2 className="size-3" />
                         </Button>
                     )}
-                    <div className="flex items-center gap-1 text-[8px] font-bold text-muted-foreground shrink-0 bg-white/50 px-1.5 py-0.5 rounded border">
-                        <MapPin className="size-2 text-primary" />
-                        {product.business?.commune || "NC"}
-                    </div>
+                    <Badge variant="outline" className="text-[8px] h-4 font-bold border-muted-foreground/30">{product.business?.commune}</Badge>
                 </div>
             </div>
 
             <div className="flex min-h-[140px] h-auto relative">
-                {isOutOfStock && (
-                    <div className="absolute top-0 left-0 right-0 bg-red-600 text-white text-[8px] font-black uppercase text-center py-1 z-30 shadow-lg animate-in slide-in-from-top duration-300">
-                        STOCK ÉPUISÉ
-                    </div>
-                )}
-                
                 <div className="w-32 bg-white shrink-0 relative flex items-center justify-center border-r overflow-hidden p-3">
                     {images.length > 0 ? (
-                        <>
-                            <img src={images[0]} className="max-w-full max-h-full object-contain transition-transform group-hover:scale-105" alt={product.title} />
-                            {images.length > 1 && (
-                                <div className="absolute bottom-1 right-1 bg-black/60 backdrop-blur-md text-white font-black text-[8px] px-1.5 py-0.5 rounded flex items-center gap-1 shadow-lg border border-white/10">
-                                    <ImageIcon className="size-2" />
-                                    {images.length}
-                                </div>
-                            )}
-                        </>
+                        <img src={images[0]} className="max-w-full max-h-full object-contain transition-transform group-hover:scale-105" alt="" />
                     ) : (
                         <ShoppingBag className="size-10 text-muted-foreground/20" />
                     )}
                     <Badge className={cn(
-                        "absolute top-1 left-1 font-black text-[8px] uppercase border-none shadow-md px-2 h-5",
+                        "absolute top-1 left-1 font-black text-[8px] uppercase px-2 h-5",
                         isPromo ? "bg-red-600 animate-pulse" : "bg-primary"
                     )}>
                         {product.promoType}
@@ -804,54 +706,30 @@ function ProductCard({
 
                 <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
                     <div className="space-y-1">
-                        <div className="flex justify-between items-start gap-2">
-                            <h4 className={cn("font-black uppercase text-xs leading-none break-words flex-1", isOutOfStock && "line-through decoration-red-600")}>{product.title}</h4>
-                            <Badge variant="outline" className="text-[7px] h-3.5 px-1 font-black uppercase border-muted-foreground/30 shrink-0">{product.category}</Badge>
-                        </div>
-                        
-                        {isOutOfStock ? (
-                            <p className="text-[10px] font-black text-red-600 uppercase mt-1 leading-tight animate-pulse">
-                                STOCK ÉPUISÉ - Arrivage prévu le {product.restockDate || "Prochainement"}
-                            </p>
-                        ) : (
-                            <p className="text-[10px] text-muted-foreground leading-tight break-words italic line-clamp-3">
-                                {product.description || "Aucune description disponible."}
-                            </p>
-                        )}
+                        <h4 className={cn("font-black uppercase text-xs leading-none break-words", isOutOfStock && "line-through decoration-red-600")}>{product.title}</h4>
+                        <p className="text-[10px] text-muted-foreground leading-tight line-clamp-3 italic">
+                            {product.description || "Aucune description."}
+                        </p>
                     </div>
 
                     <div className="flex items-end justify-between mt-3">
-                        <div className="flex flex-col">
-                            {isPromo && product.originalPrice && (
-                                <span className="text-[9px] text-muted-foreground line-through font-bold">{product.originalPrice.toLocaleString('fr-FR').replace(/\s/g, ' ')} F</span>
-                            )}
-                            <div className="flex items-baseline gap-1">
-                                <span className={cn("text-base font-black leading-none", isOutOfStock ? "line-through decoration-red-600 opacity-40" : (isPromo ? "text-red-600" : "text-primary"))}>
-                                    {(product.price || 0).toLocaleString('fr-FR').replace(/\s/g, ' ')}
-                                </span>
-                                <span className="text-[9px] font-black uppercase opacity-60">CFP</span>
-                            </div>
+                        <div className="flex items-baseline gap-1">
+                            <span className={cn("text-base font-black leading-none", isOutOfStock ? "line-through opacity-40" : (isPromo ? "text-red-600" : "text-primary"))}>
+                                {(product.price || 0).toLocaleString('fr-FR')}
+                            </span>
+                            <span className="text-[9px] font-black uppercase opacity-60">CFP</span>
                         </div>
-
-                        {isPromo && product.discountPercentage && !isOutOfStock && (
-                            <div className="flex flex-col items-end">
-                                <div className="bg-red-600 text-white font-black text-[11px] px-2 py-1 rounded-lg shadow-lg flex items-center gap-1 animate-in zoom-in-95">
-                                    <Percent className="size-3" />
-                                    {Math.round(product.discountPercentage)}%
-                                </div>
-                            </div>
-                        )}
                     </div>
                 </div>
             </div>
             
-            <div className="p-2 border-t bg-muted/10" onClick={(e) => e.stopPropagation()}>
+            <div className="p-2 border-t bg-muted/10">
                 <Button 
                     variant="ghost" 
-                    className="w-full h-10 text-[9px] font-black uppercase text-primary gap-2 hover:bg-primary/5 active:scale-95 transition-transform"
-                    onClick={() => onContact(product.businessId)}
+                    className="w-full h-10 text-[9px] font-black uppercase text-primary gap-2"
+                    onClick={(e) => { e.stopPropagation(); onContact(product.businessId); }}
                 >
-                    Contacter le magasin <ChevronRight className="size-3" />
+                    Contacter <ChevronRight className="size-3" />
                 </Button>
             </div>
         </Card>

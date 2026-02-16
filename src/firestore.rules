@@ -104,6 +104,10 @@ service cloud.firestore {
       allow get, list: if true; 
       match /commune_stats/{communeId} { allow read, write: if isSignedIn(); }
     }
+    match /fish_species/{id} { 
+      allow get, list: if true; 
+      match /commune_stats/{communeId} { allow read, write: if isSignedIn(); }
+    }
     match /sound_library/{id} { allow read: if true; }
 
     // ======================================================
