@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -151,8 +150,7 @@ export default function ProDashboard() {
       try {
         const usersRef = collection(firestore, 'users');
         
-        // Base query: Category + Scope
-        // We include ALL users matching category and region, regardless of delivery preferences for the base count
+        // Base query builder
         const getBaseQuery = () => {
             let q = query(usersRef, where('subscribedCategories', 'array-contains', targetCategory));
             
@@ -160,17 +158,28 @@ export default function ProDashboard() {
                 q = query(q, where('selectedRegion', '==', 'CALEDONIE'));
             } else if (targetScope === 'TAHITI') {
                 q = query(q, where('selectedRegion', '==', 'TAHITI'));
-            } else if (targetScope === 'SPECIFIC' && selectedTargetCommunes.length > 0) {
-                // Limit to 30 communes for Firestore 'in' query
-                q = query(q, where('lastSelectedLocation', 'in', selectedTargetCommunes.slice(0, 30)));
+            } else if (targetScope === 'SPECIFIC') {
+                if (selectedTargetCommunes.length > 0) {
+                    q = query(q, where('lastSelectedLocation', 'in', selectedTargetCommunes.slice(0, 30)));
+                } else {
+                    return null; // Return null if specific but no communes selected
+                }
             }
             return q;
         };
 
         const qBase = getBaseQuery();
         
+        if (!qBase) {
+            setBaseTargetCount(0);
+            setPushTargetCount(0);
+            setMailTargetCount(0);
+            setSmsTargetCount(0);
+            setIsCalculatingReach(false);
+            return;
+        }
+        
         // Specific channel queries based on the base criteria
-        // Note: Users matching category and scope who have explicitly opted-in
         const qPush = query(qBase, where('allowsPromoPush', '==', true));
         const qMail = query(qBase, where('allowsPromoEmails', '==', true));
         const qSms = query(qBase, where('allowsPromoSMS', '==', true));
@@ -206,10 +215,8 @@ export default function ProDashboard() {
     let baseCampaignCost = pricing.fixedPrice; 
     let costPerArticle = 0;
     
-    // We base the base cost on the total reachable matching population
     costPerArticle += (baseTargetCount * pricing.unitPricePerUser);
     
-    // Plus channel-specific surcharges
     if (selectedChannels.includes('SMS') && smsTargetCount !== null) costPerArticle += (smsTargetCount * (pricing.priceSMS || 0));
     if (selectedChannels.includes('PUSH') && pushTargetCount !== null) costPerArticle += (pushTargetCount * (pricing.pricePush || 0));
     if (selectedChannels.includes('MAIL') && mailTargetCount !== null) costPerArticle += (mailTargetCount * (pricing.priceMail || 0));
@@ -385,7 +392,6 @@ export default function ProDashboard() {
                                 value={promoPrice} 
                                 onChange={e => {
                                     setPromoPrice(e.target.value);
-                                    // Si on modifie le prix de vente directement, on vide le % maître pour laisser la main
                                     if (!originalPrice) setManualDiscountInput('');
                                 }} 
                                 className={cn(
@@ -419,7 +425,7 @@ export default function ProDashboard() {
                     <div className="space-y-4">
                         <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Rayon cible</Label><Select value={targetCategory} onValueChange={setTargetCategory}><SelectTrigger className="h-10 border-2 bg-background font-black text-xs"><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs">{cat}</SelectItem>)}</SelectContent></Select></div>
                         
-                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Portée géographique</Label><Select value={targetScope} onValueChange={(v: any) => setTargetScope(v)}><SelectTrigger className="h-10 border-2 bg-background font-black text-xs"><Globe className="size-3 mr-2 text-primary" /><SelectValue /></SelectTrigger><SelectContent><SelectItem value="SPECIFIC">Communes spécifiques</SelectItem><SelectItem value="CALEDONIE">Nouvelle-Calédonie</SelectItem><SelectItem value="TAHITI">Tahiti</SelectItem><SelectItem value="ALL">Tout le réseau</SelectItem></SelectContent></Select></div>
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Portée géographique</Label><Select value={targetScope} onValueChange={(v: any) => setTargetScope(v)}><SelectTrigger className="h-10 border-2 bg-background font-black text-xs"><Globe className="size-3 mr-2 text-primary" /><SelectValue /></SelectTrigger><SelectContent><SelectItem value="SPECIFIC">Communes spécifiques</SelectItem><SelectItem value="CALEDONIE">Nouvelle-Calédonie</SelectItem><SelectItem value="TAHITI">Tahiti</SelectItem><SelectItem value="ALL">Tout le réseau</SelectItem></SelectContent></Select></div>
 
                         {targetScope === 'SPECIFIC' && (
                             <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">
@@ -437,10 +443,10 @@ export default function ProDashboard() {
                                         </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-[300px] p-0" align="start">
-                                        <DialogHeader className="sr-only">
-                                            <DialogTitle>Sélecteur de communes</DialogTitle>
-                                            <DialogDescription>Choisissez les zones à cibler pour votre campagne</DialogDescription>
-                                        </DialogHeader>
+                                        <div className="p-3 border-b bg-slate-50/50">
+                                            <p className="text-[10px] font-black uppercase tracking-tight">Sélecteur de communes</p>
+                                            <p className="text-[8px] font-bold uppercase text-muted-foreground">Zones de diffusion de la campagne</p>
+                                        </div>
                                         <div className="p-2 border-b">
                                             <Input 
                                                 placeholder="Filtrer..." 
