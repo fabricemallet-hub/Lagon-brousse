@@ -119,6 +119,27 @@ export default function ProDashboard() {
   }, [firestore]);
   const { data: pricing } = useDoc<CampaignPricingSettings>(pricingRef);
 
+  // States for Product Wizard
+  const [wizardStep, setWizardStep] = useState<WizardStep>('IDLE');
+  const [aiAdditionalInfo, setAiAdditionalInfo] = useState('');
+  const [aiSelectedTone, setAiSelectedTone] = useState('Commercial');
+  const [aiAnalysisResult, setAiAnalysisResult] = useState<AnalyzeProductOutput | null>(null);
+  const [selectedOptionIdx, setSelectedOptionIdx] = useState<number | null>(null);
+
+  // States for Campaign Wizard
+  const [campWizardStep, setCampWizardStep] = useState<CampaignWizardStep>('IDLE');
+  const [campTone, setCampTone] = useState('Commercial');
+  const [campLength, setCampLength] = useState<'Short' | 'Medium' | 'Long'>('Medium');
+  const [campProps, setCampProps] = useState<GenerateCampaignOutput | null>(null);
+  const [selectedSmsIdx, setSelectedSmsIdx] = useState<number | null>(null);
+  const [selectedPushIdx, setSelectedPushIdx] = useState<number | null>(null);
+  const [selectedMailIdx, setSelectedMailIdx] = useState<number | null>(null);
+  const [finalSms, setFinalSms] = useState('');
+  const [finalPush, setFinalPush] = useState('');
+  const [finalMailSubject, setFinalMailSubject] = useState('');
+  const [finalMailBody, setFinalMailBody] = useState('');
+  const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
+
   useEffect(() => {
     if (!isUserLoading && profile && !isProfileLoading) {
         const masterEmails = ['f.mallet81@outlook.com', 'f.mallet81@gmail.com', 'fabrice.mallet@gmail.com'];
@@ -141,7 +162,6 @@ export default function ProDashboard() {
   }, [firestore, business?.id]);
   const { data: promotions, isLoading: isPromosLoading } = useCollection<Promotion>(promosRef);
 
-  // Brouillons - BARRIÈRE D'AUTH : On attend que user et business soient prêts
   const draftsRef = useMemoFirebase(() => {
     if (!firestore || !business?.id || !user) return null;
     return query(
@@ -185,7 +205,6 @@ export default function ProDashboard() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasCopiedUid, setHasCopiedUid] = useState(false);
 
-  // Stock management fields
   const [isOutOfStock, setIsOutOfStock] = useState(false);
   const [nextArrivalMonth, setNextArrivalMonth] = useState('Mars');
   const [nextArrivalYear, setNextArrivalYear] = useState('2025');
@@ -236,7 +255,6 @@ export default function ProDashboard() {
                 query(usersRef, where('selectedRegion', '==', targetScope), where('subscribedCategories', 'array-contains', targetCategory))
             );
         
-        // Exécution protégée contre les erreurs de permission
         const [snapBase, snapPush, snapMail, snapSms] = await Promise.all([
             getCountFromServer(qBase),
             getCountFromServer(query(qBase, where('allowsPromoPush', '==', true))),
@@ -254,7 +272,6 @@ export default function ProDashboard() {
         setPushTargetCount(0);
         setMailTargetCount(0);
         setSmsTargetCount(0);
-        console.warn("Reach calculation error (Permissions check):", e);
       } finally {
         setIsCalculatingReach(false);
       }
@@ -357,7 +374,6 @@ export default function ProDashboard() {
       ? doc(firestore, 'businesses', business.id, 'promotions', editingPromoId)
       : doc(collection(firestore, 'businesses', business.id, 'promotions'));
 
-    const operation = editingPromoId ? 'update' : 'create';
     if (!editingPromoId) promoData.createdAt = serverTimestamp();
 
     setDoc(targetDoc, promoData, { merge: true })
@@ -370,7 +386,7 @@ export default function ProDashboard() {
         setIsSaving(false);
         const permissionError = new FirestorePermissionError({
           path: targetDoc.path,
-          operation: operation as any,
+          operation: editingPromoId ? 'update' : 'create',
           requestResourceData: promoData,
         });
         errorEmitter.emit('permission-error', permissionError);
@@ -437,7 +453,6 @@ export default function ProDashboard() {
       });
   };
 
-  // --- CAMPAIGN WIZARD LOGIC ---
   const startCampWizard = () => {
     if (selectedPromoIds.length === 0) {
         toast({ variant: 'destructive', title: "Sélection vide", description: "Choisissez au moins un article à promouvoir." });
@@ -548,8 +563,6 @@ export default function ProDashboard() {
     setFinalMailBody(draft.mailBody || '');
     setSelectedChannels(draft.selectedChannels as any || ['PUSH', 'MAIL']);
     setTargetCategory(draft.targetCategory);
-    
-    // On saute directement à l'aperçu pour modification
     setCampWizardStep('PREVIEW');
     setActiveMainTab('catalogue');
   };
@@ -683,7 +696,7 @@ export default function ProDashboard() {
 
                                 {isOutOfStock && (
                                     <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
-                                        <Label className="text-[9px] font-black uppercase text-red-800 ml-1">Date de prochain arrivage</Label>
+                                        <Label className="text-[9px] font-black uppercase text-red-800 ml-1">Arrivage prévu le</Label>
                                         <div className="grid grid-cols-2 gap-2">
                                             <Select value={nextArrivalMonth} onValueChange={setNextArrivalMonth}>
                                                 <SelectTrigger className="h-10 border-2 font-bold text-xs bg-white text-slate-800">
@@ -950,6 +963,7 @@ export default function ProDashboard() {
         </Tabs>
       )}
 
+      {/* Assistant Magicien IA (Product) */}
       <Dialog open={wizardStep !== 'IDLE'} onOpenChange={(open) => !open && setWizardStep('IDLE')}>
         <DialogContent className="max-w-md w-[95vw] rounded-3xl p-0 overflow-hidden border-none shadow-2xl flex flex-col max-h-[90vh]">
             <DialogHeader className="p-6 bg-slate-900 text-white border-b border-white/10 shrink-0">
@@ -1097,7 +1111,7 @@ export default function ProDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* --- CAMPAIGN AI WIZARD DIALOG --- */}
+      {/* Assistant Campagne IA */}
       <Dialog open={campWizardStep !== 'IDLE'} onOpenChange={(open) => !open && setCampWizardStep('IDLE')}>
         <DialogContent className="max-w-md w-[95vw] rounded-3xl p-0 overflow-hidden border-none shadow-2xl flex flex-col max-h-[90vh]">
             <DialogHeader className="p-6 bg-slate-900 text-white border-b border-white/10 shrink-0">
@@ -1258,7 +1272,7 @@ export default function ProDashboard() {
                 )}
                 {campWizardStep === 'LENGTH' && (
                     <div className="flex gap-2 w-full">
-                        <Button variant="ghost" onClick={() => setCampTone(tone.id)} className="flex-1 font-bold uppercase text-[10px] border-2">Retour</Button>
+                        <Button variant="ghost" onClick={() => setCampWizardStep('TONE')} className="flex-1 font-bold uppercase text-[10px] border-2">Retour</Button>
                         <Button onClick={processCampGeneration} className="flex-[2] h-12 font-black uppercase tracking-widest shadow-lg gap-2">Généner les variantes <Wand2 className="size-4" />
                         </Button>
                     </div>
