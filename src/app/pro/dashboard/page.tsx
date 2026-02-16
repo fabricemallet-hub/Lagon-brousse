@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -42,10 +43,10 @@ import {
   LayoutGrid,
   MapPin,
   Globe,
-  TrendingUp,
   Tags,
   Percent,
-  Receipt
+  Receipt,
+  TrendingUp
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -494,170 +495,124 @@ export default function ProDashboard() {
             {business ? (
                 <div className="space-y-8">
                     <Card className={cn("border-2 shadow-xl overflow-hidden rounded-3xl transition-all", editingProductId ? "border-accent ring-4 ring-accent/10" : "border-primary")}>
-                        <CardHeader className={cn("text-white flex flex-row justify-between items-center space-y-0 p-6", editingProductId ? "bg-accent" : "bg-primary")}>
+                        <CardHeader className={cn("text-white flex flex-row justify-between items-center space-y-0 p-4", editingProductId ? "bg-accent" : "bg-primary")}>
                             <div>
-                                <CardTitle className="text-xl font-black uppercase tracking-tighter">
+                                <CardTitle className="text-lg font-black uppercase tracking-tighter leading-none">
                                     {editingProductId ? "Modifier l'article" : "Ajouter un article"}
                                 </CardTitle>
-                                {editingProductId && <p className="text-[9px] font-black uppercase opacity-70">Mode édition actif</p>}
+                                {editingProductId && <p className="text-[8px] font-black uppercase opacity-70 mt-1">Mode édition actif</p>}
                             </div>
-                            <Badge variant="outline" className="text-white border-white/30 text-[9px] font-black uppercase">Rayon {promoCategory}</Badge>
+                            <Badge variant="outline" className="text-white border-white/30 text-[8px] font-black uppercase">Rayon {promoCategory}</Badge>
                         </CardHeader>
-                        <CardContent className="p-6 space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div className="space-y-5">
-                                    <div className="space-y-1.5">
+                        <CardContent className="p-4 space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-4">
+                                    <div className="space-y-1">
                                         <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Nom du produit</Label>
-                                        <Input value={promoTitle} onChange={e => setPromoTitle(e.target.value)} placeholder="Ex: Moulinet Shimano..." className="h-12 border-2 font-black text-base" />
+                                        <Input value={promoTitle} onChange={e => setPromoTitle(e.target.value)} placeholder="Ex: Moulinet Shimano..." className="h-11 border-2 font-black" />
                                     </div>
                                     
-                                    <div className="space-y-4 p-4 bg-white border-2 rounded-2xl shadow-inner">
-                                        <div className="flex items-center gap-2 border-b border-dashed pb-2 mb-2">
-                                            <Tags className="size-4 text-primary" />
-                                            <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Gestion des Prix & Remises</h4>
+                                    <div className="p-3 bg-white border-2 rounded-2xl shadow-inner space-y-3">
+                                        <div className="flex items-center gap-2 border-b border-dashed pb-1.5">
+                                            <Tags className="size-3.5 text-primary" />
+                                            <h4 className="text-[9px] font-black uppercase tracking-widest text-slate-500">Prix & Remises</h4>
                                         </div>
-                                        
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div className="space-y-1.5">
-                                                <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Prix de Base (Barré)</Label>
-                                                <Input 
-                                                    type="number" 
-                                                    value={originalPrice} 
-                                                    onChange={e => setOriginalPrice(e.target.value)} 
-                                                    placeholder="Prix normal" 
-                                                    className="h-12 border-2 font-bold bg-slate-50" 
-                                                />
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div className="space-y-1">
+                                                <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Base (Barré)</Label>
+                                                <Input type="number" value={originalPrice} onChange={e => setOriginalPrice(e.target.value)} placeholder="0" className="h-10 border-2 font-bold bg-slate-50" />
                                             </div>
-                                            <div className="space-y-1.5">
-                                                <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Réduction (%)</Label>
-                                                <Input 
-                                                    type="number" 
-                                                    value={discountPercentage} 
-                                                    onChange={e => setDiscountPercentage(e.target.value)} 
-                                                    placeholder="Ex: 20" 
-                                                    className="h-12 border-2 font-black text-red-600" 
-                                                />
+                                            <div className="space-y-1">
+                                                <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Réduction (%)</Label>
+                                                <Input type="number" value={discountPercentage} onChange={e => setDiscountPercentage(e.target.value)} placeholder="0" className="h-10 border-2 font-black text-red-600" />
                                             </div>
                                         </div>
-
-                                        <div className="space-y-1.5 pt-2 border-t border-dashed">
-                                            <Label className="text-[10px] font-black uppercase text-primary ml-1">Prix Affiché (Base HT)</Label>
-                                            <Input 
-                                                type="number" 
-                                                value={promoPrice} 
-                                                onChange={e => setPromoPrice(e.target.value)} 
-                                                placeholder="Prix de vente" 
-                                                className="h-14 border-primary border-4 font-black text-2xl bg-white shadow-sm" 
-                                            />
-                                            <p className="text-[8px] font-bold text-muted-foreground uppercase text-center italic mt-1 leading-none">
-                                                Automatique si remise saisie
-                                            </p>
+                                        <div className="space-y-1 pt-1.5 border-t border-dashed">
+                                            <Label className="text-[9px] font-black uppercase text-primary ml-1">Prix Affiché (Base HT)</Label>
+                                            <Input type="number" value={promoPrice} onChange={e => setPromoPrice(e.target.value)} placeholder="Vente" className="h-12 border-primary border-2 font-black text-xl bg-white shadow-sm" />
                                         </div>
                                     </div>
 
-                                    {/* SECTION TAXES */}
-                                    <div className="space-y-4 p-4 bg-blue-50/30 border-2 border-dashed border-blue-200 rounded-2xl">
-                                        <div className="flex items-center gap-2 border-b border-dashed border-blue-200 pb-2">
-                                            <Receipt className="size-4 text-blue-600" />
-                                            <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-800">Gestion des Taxes</h4>
+                                    <div className="p-3 bg-blue-50/30 border-2 border-dashed border-blue-200 rounded-2xl space-y-3">
+                                        <div className="flex items-center gap-2 border-b border-dashed border-blue-200 pb-1.5">
+                                            <Receipt className="size-3.5 text-blue-600" />
+                                            <h4 className="text-[9px] font-black uppercase tracking-widest text-blue-800">Taxes</h4>
                                         </div>
-                                        
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div className="space-y-1.5">
-                                                <Label className="text-[9px] font-black uppercase text-blue-800/60 ml-1">Nom (ex: TGC)</Label>
-                                                <Input value={taxName} onChange={e => setTaxName(e.target.value)} className="h-10 border-2 bg-white font-bold" />
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div className="space-y-1">
+                                                <Label className="text-[8px] font-black uppercase opacity-60">Nom (ex: TGC)</Label>
+                                                <Input value={taxName} onChange={e => setTaxName(e.target.value)} className="h-9 border-2 bg-white font-bold" />
                                             </div>
-                                            <div className="space-y-1.5">
-                                                <Label className="text-[9px] font-black uppercase text-blue-800/60 ml-1">Taux (%)</Label>
-                                                <Input type="number" value={taxRate} onChange={e => setTaxRate(e.target.value)} placeholder="0" className="h-10 border-2 bg-white font-black text-blue-600" />
+                                            <div className="space-y-1">
+                                                <Label className="text-[8px] font-black uppercase opacity-60">Taux (%)</Label>
+                                                <Input type="number" value={taxRate} onChange={e => setTaxRate(e.target.value)} className="h-9 border-2 bg-white font-black text-blue-600" />
                                             </div>
                                         </div>
-
-                                        <div className="space-y-3 pt-2">
-                                            <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border shadow-sm">
-                                                <div className="space-y-0.5">
-                                                    <span className="text-[10px] font-black uppercase block">Appliquer la Taxe</span>
-                                                    <span className="text-[8px] font-bold text-muted-foreground uppercase">Afficher prix TTC</span>
-                                                </div>
-                                                <Switch checked={applyTax} onCheckedChange={setApplyTax} />
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div className="flex items-center justify-between p-2 bg-white rounded-xl border">
+                                                <span className="text-[8px] font-black uppercase">Appliquer</span>
+                                                <Switch checked={applyTax} onCheckedChange={setApplyTax} className="scale-75" />
                                             </div>
-                                            <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border shadow-sm">
-                                                <div className="space-y-0.5">
-                                                    <span className="text-[10px] font-black uppercase block">Afficher les deux</span>
-                                                    <span className="text-[8px] font-bold text-muted-foreground uppercase">HT (Gros) + TTC (Petit)</span>
-                                                </div>
-                                                <Switch checked={showBothPrices} onCheckedChange={setShowBothPrices} disabled={!applyTax} />
+                                            <div className="flex items-center justify-between p-2 bg-white rounded-xl border">
+                                                <span className="text-[8px] font-black uppercase">Les deux</span>
+                                                <Switch checked={showBothPrices} onCheckedChange={setShowBothPrices} disabled={!applyTax} className="scale-75" />
                                             </div>
                                         </div>
-
-                                        <div className="p-3 bg-white/80 rounded-xl border border-blue-100 flex flex-col items-center justify-center gap-1">
-                                            <p className="text-[8px] font-black uppercase text-muted-foreground">Aperçu affichage :</p>
-                                            <div className="text-center">
-                                                {showBothPrices && applyTax ? (
-                                                    <>
-                                                        <p className="text-base font-black text-slate-800 leading-none">{currentPreviewPrice.base.toLocaleString('fr-FR')} F HT</p>
-                                                        <p className="text-[9px] font-bold text-blue-600 uppercase mt-1">{currentPreviewPrice.ttc.toLocaleString('fr-FR')} F TTC</p>
-                                                    </>
-                                                ) : (
-                                                    <p className="text-base font-black text-slate-800 leading-none">
-                                                        {applyTax ? currentPreviewPrice.ttc.toLocaleString('fr-FR') : currentPreviewPrice.base.toLocaleString('fr-FR')} 
-                                                        <span className="ml-1 text-[10px] opacity-60">{applyTax ? 'F TTC' : 'F HT'}</span>
-                                                    </p>
-                                                )}
-                                            </div>
+                                        <div className="text-center bg-white/80 p-2 rounded-lg border border-blue-100">
+                                            {showBothPrices && applyTax ? (
+                                                <p className="text-xs font-black text-slate-800 leading-tight">{currentPreviewPrice.base.toLocaleString('fr-FR')} F HT <span className="text-blue-600">({currentPreviewPrice.ttc.toLocaleString('fr-FR')} F TTC)</span></p>
+                                            ) : (
+                                                <p className="text-xs font-black text-slate-800 leading-tight">
+                                                    {applyTax ? currentPreviewPrice.ttc.toLocaleString('fr-FR') : currentPreviewPrice.base.toLocaleString('fr-FR')} 
+                                                    <span className="ml-1 opacity-60">{applyTax ? 'F TTC' : 'F HT'}</span>
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-1 gap-1.5">
-                                        <Label className="text-[10px] font-black uppercase ml-1">Type d'offre</Label>
-                                        <Select value={promoType} onValueChange={(v: any) => setPromoType(v)}>
-                                            <SelectTrigger className="h-12 border-2 font-black uppercase text-[10px]"><SelectValue /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="Promo" className="font-black text-[10px] uppercase text-red-600">PROMOTION</SelectItem>
-                                                <SelectItem value="Nouvel Arrivage" className="font-black text-[10px] uppercase text-primary">NOUVEL ARRIVAGE</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    <div className="p-4 bg-red-50 border-2 border-dashed border-red-200 rounded-2xl space-y-3">
-                                        <div className="flex items-center justify-between">
-                                            <Label className="text-xs font-black uppercase text-red-800">Stock vide (Rupture)</Label>
-                                            <Switch checked={isOutOfStock} onCheckedChange={setIsOutOfStock} />
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1">
+                                            <Label className="text-[9px] font-black uppercase ml-1">Type d'offre</Label>
+                                            <Select value={promoType} onValueChange={(v: any) => setPromoType(v)}>
+                                                <SelectTrigger className="h-10 border-2 font-black uppercase text-[9px]"><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="Promo" className="font-black text-[9px] uppercase text-red-600">PROMO</SelectItem>
+                                                    <SelectItem value="Nouvel Arrivage" className="font-black text-[9px] uppercase text-primary">ARRIVAGE</SelectItem>
+                                                </SelectContent>
+                                            </Select>
                                         </div>
-                                        {isOutOfStock && (
-                                            <div className="grid grid-cols-2 gap-2 animate-in zoom-in-95">
-                                                <div className="space-y-1">
-                                                    <p className="text-[8px] font-black uppercase text-red-600/60 ml-1">Mois retour</p>
+                                        <div className="p-2 bg-red-50 border-2 border-dashed border-red-200 rounded-2xl flex flex-col justify-center">
+                                            <div className="flex items-center justify-between">
+                                                <Label className="text-[9px] font-black uppercase text-red-800">Stock vide</Label>
+                                                <Switch checked={isOutOfStock} onCheckedChange={setIsOutOfStock} className="scale-75" />
+                                            </div>
+                                            {isOutOfStock && (
+                                                <div className="mt-1 flex gap-1 animate-in zoom-in-95">
                                                     <Select value={nextArrivalMonth} onValueChange={setNextArrivalMonth}>
-                                                        <SelectTrigger className="h-9 border-2 bg-white text-[10px] font-bold"><SelectValue /></SelectTrigger>
+                                                        <SelectTrigger className="h-7 border-2 bg-white text-[8px] font-bold"><SelectValue /></SelectTrigger>
                                                         <SelectContent>{MONTHS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
                                                     </Select>
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <p className="text-[8px] font-black uppercase text-red-600/60 ml-1">Année</p>
                                                     <Select value={nextArrivalYear} onValueChange={setNextArrivalYear}>
-                                                        <SelectTrigger className="h-9 border-2 bg-white text-[10px] font-bold"><SelectValue /></SelectTrigger>
+                                                        <SelectTrigger className="h-7 border-2 bg-white text-[8px] font-bold"><SelectValue /></SelectTrigger>
                                                         <SelectContent>{YEARS.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
                                                     </Select>
                                                 </div>
-                                            </div>
-                                        )}
+                                            )}
+                                        </div>
                                     </div>
 
-                                    <div className="pt-4 border-t border-dashed flex gap-2">
-                                        {editingProductId && (
-                                            <Button variant="outline" onClick={resetForm} className="flex-1 h-14 font-black uppercase border-2">Annuler</Button>
-                                        )}
-                                        <Button onClick={handleSavePromotion} disabled={isSaving || !promoTitle} className={cn("flex-[2] h-14 font-black uppercase shadow-xl text-sm tracking-widest gap-2", editingProductId && "bg-accent hover:bg-accent/90")}>
-                                            {isSaving ? <RefreshCw className="size-5 animate-spin" /> : <Save className="size-5" />}
-                                            {editingProductId ? "Mettre à jour" : "Enregistrer l'article"}
+                                    <div className="flex gap-2">
+                                        {editingProductId && <Button variant="outline" onClick={resetForm} className="flex-1 h-12 font-black uppercase text-[10px] border-2">Annuler</Button>}
+                                        <Button onClick={handleSavePromotion} disabled={isSaving || !promoTitle} className={cn("flex-[2] h-12 font-black uppercase shadow-lg text-[11px] gap-2", editingProductId && "bg-accent")}>
+                                            {isSaving ? <RefreshCw className="size-4 animate-spin" /> : <Save className="size-4" />}
+                                            {editingProductId ? "Mettre à jour" : "Enregistrer"}
                                         </Button>
                                     </div>
                                 </div>
 
-                                <div className="space-y-5">
+                                <div className="space-y-4">
                                     <div className="space-y-2">
-                                        <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Photos (Analyse IA)</Label>
+                                        <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Photos</Label>
                                         <div className="grid grid-cols-4 gap-2">
                                             {promoImages.map((img, i) => (
                                                 <div key={i} className="relative aspect-square rounded-xl border-2 overflow-hidden shadow-sm">
@@ -667,8 +622,8 @@ export default function ProDashboard() {
                                             ))}
                                             {promoImages.length < 4 && (
                                                 <button onClick={() => fileInputRef.current?.click()} className="aspect-square rounded-xl border-2 border-dashed border-primary/20 flex flex-col items-center justify-center text-primary/40 bg-primary/5 hover:bg-primary/10 transition-colors">
-                                                    <Plus className="size-5" />
-                                                    <span className="text-[8px] font-black uppercase mt-1">Ajouter</span>
+                                                    <Plus className="size-4" />
+                                                    <span className="text-[7px] font-black uppercase">Ajouter</span>
                                                 </button>
                                             )}
                                         </div>
@@ -678,11 +633,11 @@ export default function ProDashboard() {
                                     <div className="space-y-2">
                                         <div className="flex items-center justify-between px-1">
                                             <Label className="text-[10px] font-black uppercase opacity-60">Description commerciale</Label>
-                                            <Button variant="ghost" className="h-6 text-[9px] font-black uppercase text-primary gap-1" onClick={handleStartAiProduct}>
-                                                <Wand2 className="size-3" /> Magicien IA
+                                            <Button variant="ghost" className="h-6 text-[8px] font-black uppercase text-primary gap-1" onClick={handleStartAiProduct}>
+                                                <Wand2 className="size-2.5" /> Magicien IA
                                             </Button>
                                         </div>
-                                        <Textarea value={promoDescription} onChange={e => setPromoDescription(e.target.value)} placeholder="Décrivez l'offre ou utilisez l'IA..." className="min-h-[150px] border-2 text-sm leading-relaxed" />
+                                        <Textarea value={promoDescription} onChange={e => setPromoDescription(e.target.value)} placeholder="Décrivez l'offre..." className="h-48 border-2 text-sm leading-relaxed" />
                                     </div>
                                 </div>
                             </div>
@@ -1185,7 +1140,7 @@ export default function ProDashboard() {
                                 <Label className="flex items-center gap-2 font-black uppercase text-xs text-green-600"><Mail className="size-4" /> Variantes E-mail</Label>
                                 <div className="space-y-2">
                                     {generatedMessages.mailPropositions.map((mail, i) => (
-                                        <div key={i} onClick={() => setSelectedMail(mail)} className={cn("p-4 rounded-2xl border-2 cursor-pointer transition-all", selectedMail?.body === mail.body ? "border-green-600 bg-green-50 shadow-md" : "bg-white border-slate-100")}>
+                                        <div key={i} onClick={() => setSelectedMail(mail)} className={cn("p-4 rounded-2xl border-2 cursor-pointer transition-all", selectedMail?.body === mail.body ? "border-green-600 bg-blue-50 shadow-md" : "bg-white border-slate-100")}>
                                             <p className="text-[10px] font-black uppercase text-green-800 mb-1">OBJET : {mail.subject}</p>
                                             <p className="text-[11px] leading-relaxed text-slate-600 line-clamp-3">{mail.body}</p>
                                         </div>
