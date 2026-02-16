@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -286,7 +285,7 @@ export default function ProDashboard() {
     }
   }, [campTargetRegion, campTargetCommunes, activeTab, isCampWizardOpen, business]);
 
-  // DEVIS INSTANTANÉ basé sur les tarifs ADMIN
+  // DEVIS INSTANTANÉ basé sur les tarifs ADMIN - Arrondi au franc supérieur
   const campaignCost = useMemo(() => {
     if (!pricing) return 0;
     
@@ -302,7 +301,7 @@ export default function ProDashboard() {
     if (campChannels.includes('PUSH')) channelSum += (pricing.pricePush || 0) * pushCount;
     if (campChannels.includes('MAIL')) channelSum += (pricing.priceMail || 0) * emailCount;
     
-    return base + reachBaseCost + channelSum;
+    return Math.ceil(base + reachBaseCost + channelSum);
   }, [pricing, campChannels, reachCount, pushCount, smsCount, emailCount]);
 
   const handleStartCampaignWizard = () => {
@@ -710,7 +709,7 @@ export default function ProDashboard() {
                                     <div className="flex flex-col flex-1">
                                         <span className="text-[10px] font-black uppercase text-primary tracking-widest">Budget Estimé</span>
                                         <div className="flex items-baseline gap-1 mt-1">
-                                            <span className="text-3xl font-black text-slate-800">{campaignCost.toLocaleString('fr-FR')}</span>
+                                            <span className="text-3xl font-black text-slate-800">{(campaignCost || 0).toLocaleString('fr-FR')}</span>
                                             <span className="text-sm font-black uppercase opacity-40">F</span>
                                         </div>
                                         {/* Détail du devis instantané */}
