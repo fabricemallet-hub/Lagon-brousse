@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Users,
@@ -95,7 +96,6 @@ import {
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
-  AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
@@ -167,6 +167,15 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     return doc(firestore, 'users', user.uid);
   }, [user, firestore]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
+
+  const savedVesselIds = useMemo(() => userProfile?.savedVesselIds || [], [userProfile?.savedVesselIds]);
+  
+  const vesselsQuery = useMemoFirebase(() => {
+    if (!firestore || savedVesselIds.length === 0) return null;
+    return query(collection(firestore, 'vessels'), where('id', 'in', savedVesselIds.slice(0, 10)));
+  }, [firestore, savedVesselIds]);
+  
+  const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
   const labels = useMemo(() => {
     if (sessionType === 'peche') {
@@ -766,7 +775,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
 
                             <Accordion type="single" collapsible value={prefsSection} onValueChange={setPrefsSection} className="w-full">
                                 <AccordionItem value="prefs" className="border-none">
-                                    <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-2 bg-muted/50 rounded-lg px-4 mb-2"><Settings className="size-4" /><span>Profil & Sons</span></AccordionTrigger>
+                                    <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-2 bg-muted/5 rounded-lg px-4 mb-2"><Settings className="size-4" /><span>Profil & Sons</span></AccordionTrigger>
                                     <AccordionContent className="space-y-4 pt-2 px-1">
                                         <div className="space-y-4 rounded-lg border p-4 bg-muted/30">
                                             <div className="space-y-1.5">
