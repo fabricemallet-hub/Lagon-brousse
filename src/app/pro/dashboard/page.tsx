@@ -59,6 +59,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { locations } from '@/lib/locations';
 import { analyzeProduct } from '@/ai/flows/analyze-product-flow';
 import { generateCampaignMessages } from '@/ai/flows/generate-campaign-messages-flow';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { AnalyzeProductOutput, GenerateCampaignOutput } from '@/ai/schemas';
 import {
   Dialog,
@@ -68,7 +69,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 
@@ -733,17 +733,34 @@ export default function ProDashboard() {
                 {isPromosLoading ? [1,2].map(i => <Skeleton key={i} className="h-32 w-full rounded-2xl" />) : promotions?.map(promo => (
                     <Card key={promo.id} className={cn("overflow-hidden border-2 shadow-sm flex h-32 transition-all cursor-pointer", selectedPromoIds.includes(promo.id) ? "border-primary ring-2 ring-primary/10" : "hover:border-primary/30")} onClick={() => setSelectedPromoIds(prev => prev.includes(promo.id) ? prev.filter(pid => pid !== promo.id) : [...prev, promo.id])}>
                         <div className="w-8 bg-muted/30 border-r flex items-center justify-center shrink-0" onClick={e => e.stopPropagation()}><Checkbox checked={selectedPromoIds.includes(promo.id)} onCheckedChange={() => setSelectedPromoIds(prev => prev.includes(promo.id) ? prev.filter(pid => pid !== promo.id) : [...prev, promo.id])} /></div>
-                        <div className="w-24 bg-muted/20 shrink-0 relative overflow-hidden flex items-center justify-center border-r">{promo.imageUrl ? <img src={promo.imageUrl} className="w-full h-full object-cover" alt="" /> : <ImageIcon className="size-6 opacity-20" />}</div>
+                        <div className="w-24 bg-muted/20 shrink-0 relative overflow-hidden flex items-center justify-center border-r">
+                            {promo.imageUrl ? (
+                                <img src={promo.imageUrl} className="w-full h-full object-cover" alt="" />
+                            ) : (
+                                <ImageIcon className="size-6 opacity-20" />
+                            )}
+                            <Badge className={cn(
+                                "absolute top-1 left-1 font-black text-[7px] uppercase border-none shadow-md px-1.5 h-4",
+                                promo.promoType === 'Promo' ? "bg-red-600" : "bg-primary"
+                            )}>
+                                {promo.promoType === 'Promo' ? 'Promo' : 'New'}
+                            </Badge>
+                        </div>
                         <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
                             <div className="space-y-1">
-                                <div className="flex justify-between items-start">
-                                    <h4 className="font-black uppercase text-xs truncate flex-1">{promo.title}</h4>
+                                <div className="flex justify-between items-start gap-2">
+                                    <h4 className="font-black uppercase text-xs truncate flex-1 leading-none">{promo.title}</h4>
                                     {promo.discountPercentage && <Badge variant="destructive" className="h-3.5 px-1 text-[7px] font-black">-{Math.round(promo.discountPercentage)}%</Badge>}
                                 </div>
                                 <p className="text-[9px] text-muted-foreground line-clamp-2 italic">{promo.description || "Pas de description."}</p>
                             </div>
                             <div className="flex items-center justify-between">
-                                <Badge variant="outline" className="text-[7px] h-4 font-black uppercase border-primary/20 text-primary">{promo.price} F</Badge>
+                                <span className={cn(
+                                    "font-black text-sm tracking-tight",
+                                    promo.promoType === 'Promo' ? "text-red-600" : "text-primary"
+                                )}>
+                                    {promo.price.toLocaleString('fr-FR').replace(/\s/g, ' ')} <span className="text-[8px] uppercase opacity-60">CFP</span>
+                                </span>
                                 <div className="flex gap-1" onClick={(e) => e.stopPropagation()}><Button variant="ghost" size="icon" className="size-7 border rounded-full" onClick={() => handleEditPromotion(promo)}><Pencil className="size-3.5" /></Button><Button variant="ghost" size="icon" className="size-7 text-destructive border rounded-full" onClick={() => handleDeletePromotion(promo.id)}><Trash2 className="size-3.5" /></Button></div>
                             </div>
                         </div>
@@ -837,7 +854,7 @@ export default function ProDashboard() {
                     {wizardStep === 'STRATEGY' && aiAnalysisResult && (
                         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300 pb-10">
                             <div className="p-4 bg-green-50 border-2 border-green-200 rounded-2xl flex items-center gap-3">
-                                <Check className="size-6 text-green-600 shrink-0" />
+                                <CheckCircle2 className="size-6 text-green-600 shrink-0" />
                                 <p className="text-xs font-black uppercase text-green-800">Description validée avec succès !</p>
                             </div>
 
@@ -1059,7 +1076,7 @@ export default function ProDashboard() {
                     )}
                     {campWizardStep === 'LENGTH' && (
                         <div className="flex gap-2 w-full">
-                            <Button variant="ghost" onClick={() => setCampWizardStep('TONE')} className="flex-1 font-bold uppercase text-[10px] border-2">Retour</Button>
+                            <Button variant="ghost" onClick={() => setCampTone(tone => tone)} className="flex-1 font-bold uppercase text-[10px] border-2">Retour</Button>
                             <Button onClick={processCampGeneration} className="flex-[2] h-12 font-black uppercase tracking-widest shadow-lg gap-2">Généner les variantes <Wand2 className="size-4" /></Button>
                         </div>
                     )}

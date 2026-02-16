@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -772,7 +773,7 @@ function ProductCard({
                         <ShoppingBag className="size-10 text-muted-foreground/20" />
                     )}
                     <Badge className={cn(
-                        "absolute top-1 left-1 font-black text-[8px] uppercase border-none shadow-md",
+                        "absolute top-1 left-1 font-black text-[8px] uppercase border-none shadow-md px-2 h-5",
                         isPromo ? "bg-red-600 animate-pulse" : "bg-primary"
                     )}>
                         {product.promoType}
