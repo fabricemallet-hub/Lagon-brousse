@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -280,7 +279,7 @@ export default function AdminPage() {
           <TabsContent value="acces">
             <div className="flex flex-col gap-6">
               <GlobalAccessManager globalGift={globalGift} />
-              <TokenManager tokens={tokens} />
+              <TokenManager tokens={tokens} users={users} />
             </div>
           </TabsContent>
 
@@ -1329,7 +1328,7 @@ function CampaignPricingManager() {
     );
 }
 
-function TokenManager({ tokens }: { tokens: AccessToken[] | null }) {
+function TokenManager({ tokens, users }: { tokens: AccessToken[] | null, users: UserAccount[] | null }) {
     const firestore = useFirestore();
     const { toast } = useToast();
     const [duration, setDuration] = useState('1');
@@ -1355,15 +1354,32 @@ function TokenManager({ tokens }: { tokens: AccessToken[] | null }) {
                 <div className="space-y-3">
                     <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Jetons actifs ({tokens?.length || 0})</p>
                     <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
-                        {tokens?.slice(0, 20).map(t => (
-                            <div key={t.id} className="p-4 flex items-center justify-between border-2 rounded-xl bg-white shadow-sm">
-                                <div className="flex flex-col">
-                                    <code className="font-black text-primary text-xs select-all tracking-wider">{t.id}</code>
-                                    <span className="text-[9px] font-bold uppercase opacity-40 mt-1">{t.durationMonths} mois d'accès</span>
+                        {tokens?.slice(0, 20).map(t => {
+                            const redeemedUser = t.redeemedBy ? users?.find(u => u.id === t.redeemedBy) : null;
+                            return (
+                                <div key={t.id} className={cn("p-4 flex items-center justify-between border-2 rounded-xl bg-white shadow-sm", t.status === 'redeemed' && "bg-slate-50 border-dashed opacity-80")}>
+                                    <div className="flex flex-col min-w-0 pr-2">
+                                        <div className="flex items-center gap-2">
+                                            <code className="font-black text-primary text-xs select-all tracking-wider">{t.id}</code>
+                                            {t.status === 'active' ? (
+                                                <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200 text-[8px] font-black h-4 px-1.5 uppercase">Libre</Badge>
+                                            ) : (
+                                                <Badge variant="secondary" className="text-[8px] font-black h-4 px-1.5 uppercase">Utilisé</Badge>
+                                            )}
+                                        </div>
+                                        <div className="flex flex-col mt-1 gap-0.5">
+                                            <span className="text-[9px] font-bold uppercase opacity-40">{t.durationMonths} mois d'accès</span>
+                                            {t.status === 'redeemed' && (
+                                                <span className="text-[9px] font-black text-slate-600 truncate">
+                                                    Par : {redeemedUser?.email || 'Utilisateur inconnu'}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(firestore!, 'access_tokens', t.id))} className="size-10 text-destructive/40 hover:text-destructive hover:bg-red-50 rounded-xl shrink-0"><Trash2 className="size-5" /></Button>
                                 </div>
-                                <Button variant="ghost" size="icon" onClick={() => deleteDoc(doc(firestore!, 'access_tokens', t.id))} className="size-10 text-destructive/40 hover:text-destructive hover:bg-red-50 rounded-xl"><Trash2 className="size-5" /></Button>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             </CardContent>
