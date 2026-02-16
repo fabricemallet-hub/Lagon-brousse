@@ -7,7 +7,7 @@ export const INITIAL_FAQ_DATA = [
   // --- GENERAL (15) ---
   { categorie: "General", ordre: 1, question: "L'application remplace-t-elle les sources officielles ?", reponse: "Non. Pour votre sécurité, consultez toujours meteo.nc et les autorités maritimes (COSS). L'app est un assistant tactique." },
   { categorie: "General", ordre: 2, question: "Pourquoi la géolocalisation est-elle indispensable ?", reponse: "Elle permet de calculer les marées de la station la plus proche de VOUS, d'activer le Boat Tracker et de vous donner les risques de gratte locaux." },
-  { categorie: "General", ordre: 3, question: "Comment fonctionne le mode hors-ligne ?", reponse: "Les données consultées avec internet sont mises en cache (PWA). Le GPS fonctionne sans réseau, mas pas les mises à jour live." },
+  { categorie: "General", ordre: 3, question: "Comment fonctionne le mode hors-ligne ?", reponse: "Les données consultées avec internet sont mises en cache (PWA). Le GPS fonctionne sans réseau, mais pas les mises à jour live." },
   { categorie: "General", ordre: 4, question: "L'application consomme-t-elle beaucoup de batterie ?", reponse: "Le GPS en continu (Boat Tracker) est énergivore. Utilisez le 'Mode Éveil' uniquement quand nécessaire et prévoyez une batterie externe." },
   { categorie: "General", ordre: 5, question: "Quelle est la précision des marées ?", reponse: "Nous utilisons les constantes du SHOM ajustées par algorithme selon votre commune. La précision est de +/- 10 min." },
   { categorie: "General", ordre: 6, question: "Puis-je changer ma commune favorite ?", reponse: "Oui, via le sélecteur en haut de l'écran. Votre choix est mémorisé sur votre profil." },
@@ -21,17 +21,22 @@ export const INITIAL_FAQ_DATA = [
   { categorie: "General", ordre: 14, question: "L'heure affichée est-elle celle de NC ?", reponse: "Oui, l'application est configurée sur le fuseau GMT+11 (Nouméa)." },
   { categorie: "General", ordre: 15, question: "Peut-on utiliser l'app sur tablette ?", reponse: "Oui, l'interface est responsive et s'adapte aux grands écrans." },
 
-  // --- PRO (10) ---
+  // --- PRO (15) ---
   { categorie: "PRO", ordre: 120, question: "Comment activer mon compte commerçant ?", reponse: "Vous devez d'abord créer un compte classique, puis transmettre votre UID (visible dans l'onglet Profil) à l'administrateur pour qu'il relie votre boutique." },
   { categorie: "PRO", ordre: 121, question: "À quoi sert l'Assistant Magicien IA Produit ?", reponse: "Il utilise la vision artificielle pour analyser vos photos de produits. En un clic, il rédige une description attractive et génère une stratégie de vente (arguments clés et conseils marketing)." },
   { categorie: "PRO", ordre: 122, question: "Comment fonctionne le Magicien de Campagne ?", reponse: "Une fois vos articles sélectionnés, l'IA rédige automatiquement 5 variantes de messages par canal (Email, SMS, Push). Elle adapte la longueur selon le format technique de chaque support." },
   { categorie: "PRO", ordre: 123, question: "Pourquoi y a-t-il 3 choix de longueur dans les campagnes ?", reponse: "Vous pouvez choisir entre Court, Moyen ou Long. L'IA adapte alors le contenu : un mail 'Court' sera plus riche qu'un SMS 'Court' pour respecter les usages de chaque média." },
   { categorie: "PRO", ordre: 124, question: "Comment est calculé le devis d'une campagne ?", reponse: "Le prix total = Frais fixes + (Nombre d'abonnés ciblés x Tarif par canal). Le 'Reach' affiche l'audience réelle atteignable selon vos rayons et votre zone géographique." },
-  { categorie: "PRO", ordre: 125, question: "Puis-je modifier les textes de l'IA ?", reponse: "Oui, l'étape finale du Magicien de Campagne vous permet d'éditer manuellement chaque message avant de procéder au paiement." },
-  { categorie: "PRO", ordre: 126, question: "Qu'est-ce qu'une campagne en brouillon ?", reponse: "C'est une campagne configurée mais non payée. Elle reste accessible dans votre historique pour un envoi ultérieur." },
-  { categorie: "PRO", ordre: 127, question: "Le ciblage par commune est-il précis ?", reponse: "Oui, vous pouvez choisir jusqu'à 30 communes spécifiques. Seuls les utilisateurs ayant ces communes en 'Favori' recevront l'alerte." },
-  { categorie: "PRO", ordre: 128, question: "Peut-on mettre plusieurs photos par produit ?", reponse: "Oui, vous pouvez charger jusqu'à 4 photos. L'IA les analysera toutes pour créer la meilleure description possible." },
-  { categorie: "PRO", ordre: 129, question: "Comment savoir si ma campagne est envoyée ?", reponse: "Après le paiement, votre campagne passe en statut 'En attente'. L'administrateur valide techniquement l'envoi sous 24h et vous recevez une notification." },
+  { categorie: "PRO", ordre: 125, question: "Comment marquer un article en rupture de stock ?", reponse: "Activez l'interrupteur 'Stock vide' dans la fiche du produit. Sélectionnez ensuite le mois et l'année du prochain arrivage prévu pour informer vos clients." },
+  { categorie: "PRO", ordre: 126, question: "Qu'est-ce que l'affichage 'Rupture' côté client ?", reponse: "L'annonce apparaît en opacité réduite avec un badge rouge 'STOCK ÉPUISÉ'. Un message en gras indique la date de la prochaine commande prévue." },
+  { categorie: "PRO", ordre: 127, question: "L'IA peut-elle inventer des produits dans mes messages ?", reponse: "Non. Nous avons configuré l'IA pour qu'elle respecte strictement votre catalogue. Elle n'ajoutera jamais d'articles (ex: vêtements) qui ne sont pas dans votre sélection actuelle." },
+  { categorie: "PRO", ordre: 128, question: "Puis-je modifier les textes de l'IA ?", reponse: "Oui, l'étape finale du Magicien de Campagne vous permet d'éditer manuellement chaque message avant de procéder au paiement." },
+  { categorie: "PRO", ordre: 129, question: "Le ciblage par commune est-il précis ?", reponse: "Oui, vous pouvez choisir jusqu'à 30 communes spécifiques. Seuls les utilisateurs ayant ces communes en 'Favori' recevront l'alerte." },
+  { categorie: "PRO", ordre: 130, question: "Peut-on mettre plusieurs photos par produit ?", reponse: "Oui, vous pouvez charger jusqu'à 4 photos. L'IA les analysera toutes pour créer la meilleure description possible." },
+  { categorie: "PRO", ordre: 131, question: "Pourquoi utiliser les Nouvel Arrivage sans promo ?", reponse: "Cela permet de créer de l'exclusivité et du passage en magasin sans dévaluer vos marges. L'IA utilisera alors un ton centré sur la nouveauté et non sur le prix." },
+  { categorie: "PRO", ordre: 132, question: "Comment savoir si ma campagne est envoyée ?", reponse: "Après le paiement, votre campagne passe en statut 'En attente'. L'administrateur valide techniquement l'envoi sous 24h et vous recevez une notification." },
+  { categorie: "PRO", ordre: 133, question: "Les clients peuvent-ils me contacter ?", reponse: "Oui, via le bouton 'Contacter le magasin' sur chaque annonce. Ils peuvent vous appeler directement ou lancer un itinéraire GPS vers votre boutique." },
+  { categorie: "PRO", ordre: 134, question: "Comment mettre à jour mon point GPS Boutique ?", reponse: "Allez dans l'onglet 'Profil' et cliquez sur 'Modifier mes coordonnées'. Vous pouvez alors déplacer le curseur sur la carte satellite." },
 
   // --- PECHE & FISH (25) ---
   { categorie: "Peche", ordre: 16, question: "Qu'est-ce qu'un indice de réussite 10/10 ?", reponse: "C'est une coïncidence parfaite entre vive-eau, phase lunaire optimale et créneau d'activité de l'espèce." },
@@ -100,7 +105,7 @@ export const INITIAL_FAQ_DATA = [
   { categorie: "Chasse", ordre: 65, question: "Puis-je changer ma couleur sur la carte ?", reponse: "Oui, dans vos préférences de profil ou dans les réglages de la session." },
   { categorie: "Chasse", ordre: 66, question: "Comment fonctionne le simulateur de gerbe ?", reponse: "Il permet de voir le diamètre d'impact des plombs (n°2 à n°9) en fonction du Choke (Lisse à Full) et de la distance choisie." },
   { categorie: "Chasse", ordre: 67, question: "Comment régler ma lunette avec la table de tir ?", reponse: "Indiquez votre distance de zéro (ex: 100m). Le tableau calcule alors les clics (1 clic = 1cm à 100m) à appliquer sur vos tourelles pour compenser la chute à d'autres distances." },
-  { categorie: "Chasse", ordre: 68, question: "Le silencieux change-t-il la trajectoire ?", reponse: "Oui, l'app simule un gain de +2% sur la vitesse initiale ($V_0$) car le silencieux prolonge la poussée des gaz, rendant la trajectoire plus tendue." },
+  { categorie: "Chasse", ordre: 68, question: "Le silencieux change-t-ils la trajectoire ?", reponse: "Oui, l'app simule un gain de +2% sur la vitesse initiale ($V_0$) car le silencieux prolonge la poussée des gaz, rendant la trajectoire plus tendue." },
   { categorie: "Chasse", ordre: 69, question: "Peut-on saisir ses propres munitions ?", reponse: "Oui, le modèle 'PERSONNALISÉ' permet de saisir manuellement le poids, la vitesse ($V_0$) et le coefficient balistique ($BC$) pour vos chargements personnels." },
   { categorie: "Chasse", ordre: 70, question: "Pourquoi y a-t-il une alerte éthique sur les plombs ?", reponse: "Le simulateur vous prévient si la gerbe devient trop large (ex: plomb n°6 à 40m), risquant de blesser le gibier au lieu de le prélever proprement." },
   { categorie: "Chasse", ordre: 71, question: "Comment compenser le vent latéral ?", reponse: "Saisissez la vitesse du vent et sa direction (en horloge). Le calculateur vous donne le nombre de clics à appliquer sur votre tourelle de dérive (DROITE/GAUCHE)." },
@@ -110,7 +115,7 @@ export const INITIAL_FAQ_DATA = [
   { categorie: "Chasse", ordre: 75, question: "Qui voit ma position en chasse ?", reponse: "Uniquement les personnes ayant rejoint votre code de session spécifique." },
   { categorie: "Chasse", ordre: 108, question: "Comment utiliser 'Mon Râtelier' ?", reponse: "Allez dans l'onglet Chasse > vignettes 'Balistique'. Enregistrez vos armes avec leur calibre et munition favorite. Dans la Table de Tir, utilisez le menu 'Charger une arme' pour remplir instantanément tous les paramètres techniques." },
   { categorie: "Chasse", ordre: 109, question: "Puis-je enregistrer plusieurs carabines ?", reponse: "Oui, vous pouvez créer un nombre illimité de fiches personnalisées. Chaque fiche mémorise ses réglages propres (Zéro, poids, munition)." },
-  { categorie: "Chasse", ordre: 113, question: "La détection de collision est-elle mutuelle ?", reponse: "Oui. Vous recevez une alerte si quelqu'un entre dans votre zone de tir, mas aussi si VOUS entrez dans la zone d'un coéquipier (si son angle est actif)." },
+  { categorie: "Chasse", ordre: 113, question: "La détection de collision est-elle mutuelle ?", reponse: "Oui. Vous recevez une alerte si quelqu'un entre dans votre zone de tir, mais aussi si VOUS entrez dans la zone d'un coéquipier (si son angle est actif)." },
   { categorie: "Chasse", ordre: 114, question: "Où voir la précision du GPS ?", reponse: "La précision s'affiche sous forme de badge (+/- Xm) dans la liste des participants de votre équipe." },
 
   // --- CHAMPS (15) ---

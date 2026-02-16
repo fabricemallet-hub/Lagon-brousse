@@ -36,7 +36,8 @@ import {
   DollarSign,
   Smartphone,
   Mail,
-  Bell
+  Bell,
+  Package
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -57,16 +58,17 @@ const sectionContent: Record<string, {
     color: 'bg-slate-800',
     role: "La console Master permet de piloter l'ensemble de l'écosystème L&B : utilisateurs, partenaires commerciaux, tarification et base de données scientifique.",
     steps: [
-      "Gestion des Comptes : Modifiez les statuts d'abonnement et les dates d'expiration manuellement.",
-      "Liaison PRO : Pour activer un magasin, récupérez l'UID de l'utilisateur (dans son profil) et liez-le à un commerce via l'onglet 'Boutiques'.",
+      "Gestion des Comptes : Modifiez les statuts d'abonnement et les dates d'expiration manuellement via l'onglet 'Comptes'.",
+      "Liaison PRO : Pour activer un magasin, récupérez l'UID de l'utilisateur (dans son profil) et liez-le à un commerce via l'onglet 'Pros'.",
       "Configuration Tarifs : Gérez les frais fixes et les coûts par utilisateur/canal pour les campagnes publicitaires dans l'onglet 'Tarifs'.",
-      "Alertes Globales : Diffusez des messages de maintenance ou de sécurité qui s'afficheront en haut de l'accueil de tous les utilisateurs.",
+      "Alertes Globales : Diffusez des messages de maintenance ou de sécurité (Info, Warning, Urgent) qui s'afficheront instantanément sur l'accueil de tous les utilisateurs.",
       "Guide Poissons : Enrichissez le catalogue et utilisez l'IA pour générer automatiquement les fiches techniques (Ciguatera, biologie, cuisine).",
-      "Accès Premium : Gérez les jetons cadeaux et activez l'accès libre global pour des événements spéciaux."
+      "Cartographie Globale : Surveillez l'ensemble des spots GPS enregistrés par les utilisateurs pour identifier les zones de forte activité."
     ],
     tips: [
       "La liaison PRO via UID est indispensable pour que le commerçant voit son 'Dashboard Pro'.",
-      "Les tarifs de pub modifiés ici sont appliqués instantanément sur les devis des commerçants."
+      "Les tarifs de pub modifiés ici sont appliqués instantanément sur les devis générés par les commerçants.",
+      "Utilisez le 'Mode Fantôme' dans le tracker pour superviser sans être vu."
     ]
   },
   'accueil': {
@@ -117,7 +119,7 @@ const sectionContent: Record<string, {
     ],
     tips: [
       "AVERTISSEMENT CRITIQUE : Cette application ne remplace PAS le site officiel de Météo Nouvelle-Calédonie (meteo.nc). Consultez-le toujours avant de prévoir une sortie en mer.",
-      "L'assistant IA vous aide à identifier la 'meilleure fenêtre' de la semaine pour vos activités, mas la décision finale et la sécurité vous incombent.",
+      "L'assistant IA vous aide à identifier la 'meilleure fenêtre' de la semaine pour vos activités, mais la décision finale et la sécurité vous incombent.",
       "La flèche du vent indique la provenance réelle de l'air : une flèche pointant vers le bas indique un vent de Nord."
     ]
   },
@@ -145,19 +147,19 @@ const sectionContent: Record<string, {
     title: 'Dashboard Pro & Publicité',
     icon: Briefcase,
     color: 'bg-slate-900',
-    role: "Le Dashboard Pro permet de dynamiser votre point de vente en diffusant des offres ciblées. Il intègre désormais des assistants IA pour vos rédactions et vos stratégies.",
+    role: "Le Dashboard Pro permet de piloter votre point de vente en diffusant des offres ciblées. Il intègre désormais des assistants IA pour vos rédactions et la gestion de vos ruptures de stock.",
     steps: [
-      "Magicien IA Produit : Lors de l'ajout d'un article, utilisez l'Assistant Magicien. Donnez des infos sup, choisissez un ton (Local, Humour...) et l'IA analyse vos photos pour proposer 3 descriptions percutantes.",
-      "Stratégie de Vente : Après avoir choisi un texte, l'IA vous donne des arguments de vente et des conseils marketing spécifiques pour réussir sur le Caillou.",
-      "Magicien Campagne : Sélectionnez un ou plusieurs articles, cliquez sur 'Lancer la campagne'. L'IA générera alors 5 propositions de messages par canal (SMS, Push, Mail).",
-      "Longueur Adaptative : Choisissez entre Court, Moyen ou Long. L'IA adapte intelligemment la longueur selon le canal (ex: un 'court' pour un mail sera plus long qu'un SMS).",
-      "Ciblage & Devis : Choisissez vos communes ou régions. Le devis est calculé en temps réel selon la portée (Reach) de l'audience active.",
-      "Finalisation : Modifiez manuellement les textes générés si besoin, puis validez via le bouton 'PAIEMENT' pour envoyer la campagne à l'admin."
+      "Magicien IA Produit : Lors de l'ajout d'un article, l'IA analyse vos photos et les données (prix, remise) pour proposer 3 descriptions percutantes adaptées au ton choisi.",
+      "Gestion des Stocks : Utilisez le toggle 'Stock vide' pour marquer un article comme épuisé. Indiquez le mois et l'année du 'Prochain arrivage' pour rassurer vos clients.",
+      "Mise en avant Shopping : Les articles en rupture s'affichent avec un badge rouge et une opacité réduite sur la page Shopping, tout en restant informatifs sur le futur stock.",
+      "Magicien Campagne : Sélectionnez vos articles et laissez l'IA générer 5 propositions de messages par canal (SMS, Push, Mail). L'IA est entraînée pour ne jamais inventer de produits hors catalogue.",
+      "Longueur Adaptative : Choisissez Court, Moyen ou Long. L'IA adapte techniquement le texte : un mail sera plus détaillé qu'un SMS pour une même sélection.",
+      "Ciblage & Reach : Définissez votre zone (Communes, Pays ou Région). Le devis se met à jour en temps réel selon le nombre d'abonnés actifs et les canaux choisis."
     ],
     tips: [
       "Le ton 'Local (Caillou)' est idéal pour créer un lien de confiance immédiat avec les pêcheurs et chasseurs du pays.",
-      "Vérifiez toujours le 'Reach' (Audiences Réelles) avant de valider : cela vous indique combien de personnes recevront réellement votre alerte.",
-      "Vous pouvez sauvegarder une campagne en brouillon et l'envoyer plus tard."
+      "Articles en rupture : Ne les supprimez pas ! Indiquer une date de retour de stock permet de générer de l'attente et du passage en magasin.",
+      "Vérifiez toujours le 'Reach' avant de valider : il indique combien de personnes recevront réellement votre alerte selon leurs préférences de thématiques."
     ]
   },
   'peche': {
