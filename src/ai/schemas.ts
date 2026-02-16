@@ -174,6 +174,7 @@ export const GenerateCampaignInputSchema = z.object({
   products: z.array(z.object({
     title: z.string(),
     description: z.string(),
+    type: z.enum(['Promo', 'Nouvel Arrivage']).optional(),
     price: z.number().optional(),
     discount: z.number().optional(),
   })),

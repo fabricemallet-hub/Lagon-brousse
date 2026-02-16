@@ -25,22 +25,30 @@ const generateCampaignMessagesFlow = ai.defineFlow(
   async (input) => {
     const { output } = await ai.generate({
       prompt: `Tu es un expert en marketing direct en Nouvelle-Calédonie pour le magasin ${input.businessName}.
-      Ta mission est de rédiger des messages de campagne pour les articles suivants :
+      Ta mission est de rédiger des messages de campagne publicitaire pour les articles suivants :
       
       {{#each products}}
-      - {{title}} : {{description}} {{#if price}}({{price}} F){{/if}} {{#if discount}}-{{discount}}%{{/if}}
+      - ARTICLE : {{title}}
+      - TYPE : {{#if type}}{{type}}{{else}}Standard{{/if}}
+      - INFOS : {{description}}
+      - PRIX : {{#if price}}{{price}} FCFP{{else}}Non spécifié{{/if}}
+      - REMISE : {{#if discount}}-{{discount}}%{{else}}AUCUNE REMISE (C'est un Arrivage/Nouveauté){{/if}}
       {{/each}}
       
       TON SOUHAITÉ : ${input.tone}
       LONGUEUR SOUHAITÉE : ${input.length} (Note: adapte la longueur réelle au canal).
       
-      CONSIGNES PAR CANAL :
-      1. SMS : Ultra-court, urgent, max 160 caractères. Doit inclure le nom du magasin et l'offre phare.
-      2. PUSH : Accrocheur, court, max 100 caractères.
-      3. MAIL : Plus détaillé, avec un objet captivant.
+      CONSIGNES CRITIQUES DE RÉDACTION :
+      1. STRICTE FIDÉLITÉ : Ne parle QUE des produits listés ci-dessus. N'ajoute AUCUN autre article (pas de vêtements, pas de leurres si ils ne sont pas dans la liste).
+      2. RESPECT DU TYPE : 
+         - Si c'est un 'Nouvel Arrivage' sans remise : Ne parle JAMAIS de 'promo', 'remise', 'soldes' ou 'prix cassés'. Utilise des termes comme 'Exclusivité', 'Nouveauté', 'Enfin disponible'.
+         - Si c'est une 'Promo' : Insiste sur l'économie réalisée et l'urgence.
+      3. SMS : Max 160 caractères. Doit être direct et inclure le nom du magasin.
+      4. PUSH : Max 80 caractères. Accrocheur et urgent.
+      5. MAIL : Objet percutant + corps de texte structuré et vendeur.
       
       Pour chaque canal sélectionné dans [{{channels}}], génère EXACTEMENT 5 VARIANTES différentes.
-      Utilise des expressions locales si le ton est 'Local'.`,
+      Utilise des expressions locales calédoniennes si le ton est 'Local (Caillou)'.`,
       output: { schema: GenerateCampaignOutputSchema }
     });
     return output!;

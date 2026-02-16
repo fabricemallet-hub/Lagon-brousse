@@ -434,6 +434,7 @@ export default function ProDashboard() {
             products: selectedPromos.map(p => ({
                 title: p.title,
                 description: p.description || '',
+                type: p.promoType,
                 price: p.price,
                 discount: p.discountPercentage || undefined
             })),
@@ -1059,7 +1060,7 @@ export default function ProDashboard() {
                     {campWizardStep === 'LENGTH' && (
                         <div className="flex gap-2 w-full">
                             <Button variant="ghost" onClick={() => setCampWizardStep('TONE')} className="flex-1 font-bold uppercase text-[10px] border-2">Retour</Button>
-                            <Button onClick={processCampGeneration} className="flex-[2] h-12 font-black uppercase tracking-widest shadow-lg gap-2">Générer les variantes <Wand2 className="size-4" /></Button>
+                            <Button onClick={processCampGeneration} className="flex-[2] h-12 font-black uppercase tracking-widest shadow-lg gap-2">Généner les variantes <Wand2 className="size-4" /></Button>
                         </div>
                     )}
                     {campWizardStep === 'SELECTION' && (
