@@ -489,7 +489,7 @@ export default function ProDashboard() {
                             <Button 
                                 variant="outline" 
                                 size="sm" 
-                                className="h-7 text-[8px] font-black uppercase border-primary/30 text-primary bg-primary/5 gap-1.5"
+                                className="h-7 text-[8px] font-black uppercase border-primary/30 text-primary bg-primary/5 gap-1.5 shadow-sm"
                                 onClick={startAiWizard}
                                 disabled={!promoTitle || promoImages.length === 0}
                             >
@@ -602,7 +602,7 @@ export default function ProDashboard() {
                             </div>
                             <div className="flex items-center justify-between">
                                 <Badge variant="outline" className="text-[7px] h-4 font-black uppercase border-primary/20 text-primary">{promo.price} F</Badge>
-                                <div className="flex gap-1" onClick={(e) => e.stopPropagation()}><Button variant="ghost" size="icon" className="size-7 border rounded-full" onClick={() => handleEditPromotion(promo)}><Pencil className="size-3" /></Button><Button variant="ghost" size="icon" className="size-7 text-destructive border rounded-full" onClick={() => handleDeletePromotion(promo.id)}><Trash2 className="size-3" /></Button></div>
+                                <div className="flex gap-1" onClick={(e) => e.stopPropagation()}><Button variant="ghost" size="icon" className="size-7 border rounded-full" onClick={() => handleEditPromotion(promo)}><Pencil className="size-3.5" /></Button><Button variant="ghost" size="icon" className="size-7 text-destructive border rounded-full" onClick={() => handleDeletePromotion(promo.id)}><Trash2 className="size-3.5" /></Button></div>
                             </div>
                         </div>
                     </Card>
@@ -611,7 +611,7 @@ export default function ProDashboard() {
           </div>
 
           <Dialog open={wizardStep !== 'IDLE'} onOpenChange={(open) => !open && setWizardStep('IDLE')}>
-            <DialogContent className="max-w-md w-[95vw] rounded-3xl p-0 overflow-hidden border-none shadow-2xl">
+            <DialogContent className="max-w-md w-[95vw] rounded-3xl p-0 overflow-hidden border-none shadow-2xl flex flex-col max-h-[90vh]">
                 <DialogHeader className="p-6 bg-slate-900 text-white border-b border-white/10 shrink-0">
                     <DialogTitle className="font-black uppercase tracking-tighter flex items-center gap-3">
                         <Wand2 className="size-6 text-primary" /> Assistant Magicien IA
@@ -621,7 +621,7 @@ export default function ProDashboard() {
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="p-6 space-y-6 bg-slate-50/50 max-h-[70vh] overflow-y-auto scrollbar-hide">
+                <div className="flex-grow overflow-y-auto p-6 bg-slate-50/50 scrollbar-hide">
                     {wizardStep === 'INFO' && (
                         <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
                             <div className="space-y-2">
@@ -634,9 +634,6 @@ export default function ProDashboard() {
                                 />
                                 <p className="text-[9px] font-bold text-muted-foreground italic px-1">L'IA utilisera ces détails pour enrichir votre annonce.</p>
                             </div>
-                            <Button onClick={() => setWizardStep('TONE')} className="w-full h-14 font-black uppercase tracking-widest shadow-lg gap-2">
-                                Suivant <ChevronRight className="size-5" />
-                            </Button>
                         </div>
                     )}
 
@@ -657,12 +654,6 @@ export default function ProDashboard() {
                                         <p className={cn("text-[9px] font-medium uppercase opacity-60", aiSelectedTone === tone.id ? "text-white" : "text-muted-foreground")}>{tone.desc}</p>
                                     </div>
                                 ))}
-                            </div>
-                            <div className="flex gap-2 pt-2">
-                                <Button variant="ghost" onClick={() => setWizardStep('INFO')} className="flex-1 font-bold uppercase text-[10px]">Retour</Button>
-                                <Button onClick={processAiAnalysis} className="flex-[2] h-14 font-black uppercase tracking-widest shadow-lg gap-2">
-                                    Valider & Analyser <Wand2 className="size-5" />
-                                </Button>
                             </div>
                         </div>
                     )}
@@ -698,14 +689,11 @@ export default function ProDashboard() {
                                     </div>
                                 ))}
                             </div>
-                            <Button variant="ghost" onClick={() => setWizardStep('TONE')} className="w-full font-bold uppercase text-[10px] gap-2">
-                                <ArrowLeft className="size-3" /> Changer de ton / Recommencer
-                            </Button>
                         </div>
                     )}
 
                     {wizardStep === 'STRATEGY' && aiAnalysisResult && (
-                        <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                        <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300 pb-10">
                             <div className="p-4 bg-green-50 border-2 border-green-200 rounded-2xl flex items-center gap-3">
                                 <Check className="size-6 text-green-600 shrink-0" />
                                 <p className="text-xs font-black uppercase text-green-800">Description validée avec succès !</p>
@@ -731,19 +719,41 @@ export default function ProDashboard() {
                                 </p>
                                 <p className="text-xs font-medium leading-relaxed italic text-slate-600">"{aiAnalysisResult.marketingAdvice}"</p>
                             </div>
-
-                            <Button onClick={() => setWizardStep('IDLE')} className="w-full h-14 font-black uppercase tracking-widest shadow-lg">
-                                Terminer & Fermer
-                            </Button>
                         </div>
                     )}
                 </div>
 
-                {wizardStep !== 'GENERATING' && (
-                    <DialogFooter className="p-4 bg-white border-t shrink-0">
-                        <Button variant="ghost" onClick={() => setWizardStep('IDLE')} className="w-full font-black uppercase text-[10px]">Fermer le Magicien</Button>
-                    </DialogFooter>
-                )}
+                <DialogFooter className="p-4 bg-white border-t shrink-0 flex flex-col gap-2">
+                    {wizardStep === 'INFO' && (
+                        <div className="flex gap-2 w-full">
+                            <Button variant="ghost" onClick={() => setWizardStep('IDLE')} className="flex-1 font-bold uppercase text-[10px]">Annuler</Button>
+                            <Button onClick={() => setWizardStep('TONE')} className="flex-[2] h-12 font-black uppercase tracking-widest shadow-lg gap-2">
+                                Suivant <ChevronRight className="size-4" />
+                            </Button>
+                        </div>
+                    )}
+                    {wizardStep === 'TONE' && (
+                        <div className="flex gap-2 w-full">
+                            <Button variant="ghost" onClick={() => setWizardStep('INFO')} className="flex-1 font-bold uppercase text-[10px] border-2">Retour</Button>
+                            <Button onClick={processAiAnalysis} className="flex-[2] h-12 font-black uppercase tracking-widest shadow-lg gap-2">
+                                Analyser <Wand2 className="size-4" />
+                            </Button>
+                        </div>
+                    )}
+                    {wizardStep === 'OPTIONS' && (
+                        <Button variant="ghost" onClick={() => setWizardStep('TONE')} className="w-full font-bold uppercase text-[10px] gap-2">
+                            <ArrowLeft className="size-3" /> Retour au choix du ton
+                        </Button>
+                    )}
+                    {wizardStep === 'STRATEGY' && (
+                        <Button onClick={() => setWizardStep('IDLE')} className="w-full h-12 font-black uppercase tracking-widest shadow-lg">
+                            Terminer le Magicien
+                        </Button>
+                    )}
+                    {wizardStep !== 'GENERATING' && wizardStep !== 'STRATEGY' && (
+                        <Button variant="ghost" onClick={() => setWizardStep('IDLE')} className="w-full font-black uppercase text-[9px] h-8 opacity-40">Quitter l'assistant</Button>
+                    )}
+                </DialogFooter>
             </DialogContent>
           </Dialog>
         </>
