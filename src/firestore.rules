@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -7,7 +6,6 @@ service cloud.firestore {
     // ======================================================
     // 1. PRIORITÉ ABSOLUE : MASTER ADMIN (GOD MODE)
     // ======================================================
-    // Bypass total pour l'administrateur principal (Email & UID)
     match /{allPaths=**} {
       allow read, write: if request.auth != null && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
@@ -46,7 +44,7 @@ service cloud.firestore {
     // 3. RÈGLES PAR COLLECTION
     // ======================================================
 
-    // Catalogue Shopping & Promotions (Public en lecture)
+    // Catalogue Shopping & Promotions
     match /{path=**}/promotions/{promoId} {
       allow read: if true;
       allow write: if isProfessional();
@@ -99,15 +97,15 @@ service cloud.firestore {
     match /spot_shares/{id} { allow read, write: if isSignedIn(); }
     
     // ======================================================
-    // 4. FONCTIONNALITÉS TERROIR (ACCÈS RÉCURSIF)
+    // 4. FONCTIONNALITÉS TERROIR (ACCÈS RÉCURSIF GÉNÉRIQUE)
     // ======================================================
     
-    // Sessions de Groupe (Chasse & Pêche)
+    // Sessions de Groupe (Chasse & Pêche) - Autorise TOUTES les sous-collections
     match /hunting_sessions/{allPaths=**} {
       allow read, write: if isSignedIn();
     }
 
-    // Boat Tracker (Partage GPS)
+    // Boat Tracker (Partage GPS) - Autorise TOUTES les sous-collections
     match /vessels/{allPaths=**} {
       allow read, write: if isSignedIn();
     }
