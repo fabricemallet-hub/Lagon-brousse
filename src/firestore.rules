@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -53,7 +52,7 @@ service cloud.firestore {
     // 4. CAMPAGNES
     // ======================================================
     
-    match /campaigns/{allPaths=**} {
+    match /campaigns/{campaignId} {
       allow read, write: if isSignedIn();
     }
 
