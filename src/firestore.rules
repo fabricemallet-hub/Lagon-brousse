@@ -33,7 +33,11 @@ service cloud.firestore {
     // 2. RÈGLES PUBLIQUES (LECTURE)
     // ======================================================
 
-    match /app_settings/{id} { allow read: if true; }
+    // Accès public total pour les réglages de l'application (Splash, CGV, etc.)
+    match /app_settings/{document=**} { 
+      allow read: if true; 
+    }
+    
     match /system_notifications/{id} { allow read: if true; }
     match /meteo_caledonie/{id} { 
       allow get, list: if true;

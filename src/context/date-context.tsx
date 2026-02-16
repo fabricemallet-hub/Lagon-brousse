@@ -26,30 +26,34 @@ export function DateProvider({ children }: { children: ReactNode }) {
     return doc(firestore, 'app_settings', 'splash');
   }, [firestore]);
 
-  const { data: splashSettings, isLoading: isSettingsLoading } = useDoc<SplashScreenSettings>(settingsRef);
+  const { data: splashSettings, isLoading: isSettingsLoading, error: settingsError } = useDoc<SplashScreenSettings>(settingsRef);
 
   useEffect(() => {
-    timersRef.current.forEach(clearTimeout);
-    timersRef.current = [];
+    // Si on a une erreur ou si le chargement est fini (avec ou sans data)
+    // On lance le timer de sortie du splash
+    if (!isSettingsLoading) {
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
 
-    const duration = (splashSettings?.splashDuration || 2.5) * 1000;
+      const duration = (splashSettings?.splashDuration || 2.5) * 1000;
 
-    const timer1 = setTimeout(() => {
-      setIsExiting(true);
-      const timer2 = setTimeout(() => {
-        setShowSplash(false);
-        setSelectedDate(new Date());
-      }, 1000);
-      timersRef.current.push(timer2);
-    }, duration);
+      const timer1 = setTimeout(() => {
+        setIsExiting(true);
+        const timer2 = setTimeout(() => {
+          setShowSplash(false);
+          setSelectedDate(new Date());
+        }, 1000);
+        timersRef.current.push(timer2);
+      }, duration);
 
-    timersRef.current.push(timer1);
+      timersRef.current.push(timer1);
+    }
 
     return () => {
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
     };
-  }, [splashSettings]);
+  }, [splashSettings, isSettingsLoading]);
 
   const defaultSettings: SplashScreenSettings = useMemo(() => ({
     splashMode: 'image',
@@ -59,7 +63,8 @@ export function DateProvider({ children }: { children: ReactNode }) {
     splashDuration: 2.5
   }), []);
 
-  const finalSettings = isSettingsLoading 
+  // En cas d'erreur ou si les données sont manquantes, on utilise systématiquement les réglages par défaut
+  const finalSettings = (isSettingsLoading || settingsError) 
     ? defaultSettings 
     : (splashSettings || defaultSettings);
 
