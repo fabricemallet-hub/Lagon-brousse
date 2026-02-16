@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Users,
   LogOut,
@@ -219,7 +220,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     const posLabelNorm = labels.status1.toLowerCase().trim();
     const battueLabelNorm = labels.status2.toLowerCase().trim();
 
-    if (normalized === 'gibier' || normalized === labels.alertBtn.toLowerCase()) {
+    if (normalized === 'gibier' || normalized === labels.alertBtn.toLowerCase() || normalized === labels.alertTitle.toLowerCase()) {
       sId = soundSettings.gibier;
     } else if (normalized === 'position' || normalized === posLabelNorm) {
       sId = soundSettings.position;
@@ -853,9 +854,19 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     <div className="space-y-6">
         <Card><CardHeader><CardTitle className="flex items-center gap-2"><Users className="size-5 text-primary" /> {labels.title}</CardTitle></CardHeader>
             <CardContent>
-                <Tabs defaultValue="join"><TabsList className="grid w-full grid-cols-2"><TabsTrigger value="join">Rejoindre</TabsTrigger><TabsTrigger value="create">Créer</TabsTrigger></TabsList>
-                    <TabsContent value="join" className="space-y-4 pt-4"><Input placeholder="Code EX: CH-XXXX" value={joinCode} onChange={e => setJoinCode(e.target.value)} className="text-center font-mono text-lg uppercase h-12" /><Button onClick={handleJoinSession} className="w-full h-12 text-lg font-bold" disabled={isSessionLoading}>Rejoindre le groupe</Button></TabsContent>
-                    <TabsContent value="create" className="space-y-4 pt-4"><Input placeholder="Code perso (optionnel)" value={createCode} onChange={e => setCreateCode(e.target.value)} className="text-center font-mono text-lg uppercase h-12" /><Button onClick={handleCreateSession} className="w-full h-12 text-lg font-bold" disabled={isSessionLoading}>Créer une session</Button></TabsContent>
+                <Tabs defaultValue="join">
+                    <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="join">Rejoindre</TabsTrigger>
+                        <TabsTrigger value="create">Créer</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="join" className="space-y-4 pt-4">
+                        <Input placeholder="Code EX: CH-XXXX" value={joinCode} onChange={e => setJoinCode(e.target.value)} className="text-center font-mono text-lg uppercase h-12" />
+                        <Button onClick={handleJoinSession} className="w-full h-12 text-lg font-bold" disabled={isSessionLoading}>Rejoindre le groupe</Button>
+                    </TabsContent>
+                    <TabsContent value="create" className="space-y-4 pt-4">
+                        <Input placeholder="Code perso (optionnel)" value={createCode} onChange={e => setCreateCode(e.target.value)} className="text-center font-mono text-lg uppercase h-12" />
+                        <Button onClick={handleCreateSession} className="w-full h-12 text-lg font-bold" disabled={isSessionLoading}>Créer une session</Button>
+                    </TabsContent>
                 </Tabs>
             </CardContent>
         </Card>
