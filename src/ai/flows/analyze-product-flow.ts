@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview AI flow for analyzing product photos and generating commercial descriptions.
+ * @fileOverview AI flow for analyzing product photos and generating commercial descriptions with multiple options and tones.
  */
 
 import { ai } from '@/ai/genkit';
@@ -32,16 +32,19 @@ const analyzeProductFlow = ai.defineFlow(
         TYPE : ${input.type}
         ${input.price ? `PRIX : ${input.price} FCFP` : ''}
         ${input.discountPercentage ? `REMISE : -${input.discountPercentage}%` : ''}
+        ${input.additionalInfo ? `INFOS COMPLÉMENTAIRES DU VENDEUR : ${input.additionalInfo}` : ''}
+        TON SOUHAITÉ : ${input.tone || 'Commercial'}
         
         TA MISSION :
         1. Regarde attentivement la ou les photos fournies.
-        2. Rédige une DESCRIPTION COMMERCIALE percutante et attractive (env. 3-5 phrases).
-           - SI C'EST UNE PROMO : Tu DOIS absolument promouvoir la vente. Insiste sur l'économie réalisée (mentionne le prix et la remise si fournis), la rareté de l'offre et l'urgence pour le client. Utilise des termes forts comme "Affaire exceptionnelle", "Prix cassé", "Opportunité à saisir".
-           - SI C'EST UNE NOUVEAUTÉ : Insiste sur la qualité, l'innovation, le design et l'exclusivité au pays.
-        3. Propose 3 à 5 ARGUMENTS DE VENTE clés pour le vendeur, centrés sur le bénéfice client.
-        4. Donne un CONSEIL MARKETING spécifique pour mettre en avant ce produit dans le lagon ou la brousse calédonienne (ex: "Mettez en avant la résistance au sel pour ce moulinet").
+        2. Rédige 3 VARIANTES de DESCRIPTION COMMERCIALE (env. 3-5 phrases par variante) en respectant STRICTEMENT le TON SOUHAITÉ.
+           - SI LE TON EST 'Local (Caillou)' : Utilise des expressions locales calédoniennes sans en faire trop, parle au coeur des gens du pays.
+           - SI C'EST UNE PROMO : Insiste lourdement sur l'économie réalisée, la rareté et l'urgence.
+           - SI C'EST UNE NOUVEAUTÉ : Insiste sur l'exclusivité et la qualité.
+        3. Propose 3 à 5 ARGUMENTS DE VENTE clés centrés sur le bénéfice client.
+        4. Donne un CONSEIL MARKETING spécifique pour le Caillou.
         
-        Réponds en français avec un ton professionnel, dynamique et très enthousiaste.` },
+        Réponds en français. Le champ 'commercialDescriptions' doit contenir exactement 3 textes distincts.` },
         ...input.photos.map(url => ({ media: { url } }))
       ],
       output: { schema: AnalyzeProductOutputSchema }

@@ -151,11 +151,13 @@ export const AnalyzeProductInputSchema = z.object({
   photos: z.array(z.string()).describe("Liste des photos en data URI."),
   price: z.number().optional().describe("Prix actuel du produit."),
   discountPercentage: z.number().optional().describe("Pourcentage de remise si applicable."),
+  additionalInfo: z.string().optional().describe("Informations supplémentaires fournies par le vendeur."),
+  tone: z.string().optional().describe("Le ton souhaité pour la rédaction (ex: Local, Commercial, Humoristique)."),
 });
 export type AnalyzeProductInput = z.infer<typeof AnalyzeProductInputSchema>;
 
 export const AnalyzeProductOutputSchema = z.object({
-  commercialDescription: z.string().describe("Texte de description optimisé pour la vente."),
+  commercialDescriptions: z.array(z.string()).describe("Liste de 3 variantes de descriptions commerciales basées sur le ton choisi."),
   sellingPoints: z.array(z.string()).describe("Liste d'arguments de vente pour le commerçant."),
   marketingAdvice: z.string().describe("Conseil stratégique pour mettre en avant ce produit précisément."),
 });

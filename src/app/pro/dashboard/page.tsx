@@ -12,10 +12,41 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Megaphone, Plus, Trash2, Send, DollarSign, Users, ShoppingBag, Store, Camera, RefreshCw, Percent, Tag, FileText, ImageIcon, X, Info, Pencil, Save, AlertCircle, LogOut, HelpCircle, Copy, Check, UserCircle, ShieldCheck, BrainCircuit, MapPin, ChevronDown, Globe, Smartphone, Mail, Zap, Lightbulb } from 'lucide-react';
+import { 
+  Megaphone, 
+  Plus, 
+  Trash2, 
+  Send, 
+  DollarSign, 
+  Users, 
+  ShoppingBag, 
+  Store, 
+  Camera, 
+  RefreshCw, 
+  Percent, 
+  Tag, 
+  FileText, 
+  ImageIcon, 
+  X, 
+  Info, 
+  Pencil, 
+  Save, 
+  AlertCircle, 
+  UserCircle, 
+  BrainCircuit, 
+  MapPin, 
+  ChevronDown, 
+  Globe, 
+  Smartphone, 
+  Mail, 
+  Zap, 
+  ChevronRight,
+  ArrowLeft,
+  Wand2
+} from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
-import { cn, getDistance } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -33,8 +64,17 @@ import {
 } from '@/components/ui/dialog';
 
 type TargetScope = 'SPECIFIC' | 'CALEDONIE' | 'TAHITI' | 'ALL';
+type WizardStep = 'IDLE' | 'INFO' | 'TONE' | 'GENERATING' | 'OPTIONS' | 'STRATEGY';
 
 const MAIN_CATEGORIES = ["Pêche", "Chasse", "Jardinage"];
+const AVAILABLE_TONES = [
+    { id: 'Local (Caillou)', label: 'Local (Caillou)', desc: 'Parle au coeur des Calédoniens' },
+    { id: 'Commercial', label: 'Commercial', desc: 'Ton vendeur et dynamique' },
+    { id: 'Humoristique', label: 'Humoristique', desc: 'Un peu de rire pour accrocher' },
+    { id: 'Sérieux', label: 'Sérieux', desc: 'Sobriété et efficacité' },
+    { id: 'Professionnel', label: 'Professionnel', desc: 'Ton expert et rassurant' },
+    { id: 'Simple', label: 'Simple', desc: 'Direct et facile à lire' },
+];
 
 export default function ProDashboard() {
   const { user, isUserLoading } = useUser();
@@ -110,10 +150,12 @@ export default function ProDashboard() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasCopiedUid, setHasCopiedUid] = useState(false);
 
-  // AI Strategy States
-  const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
-  const [aiStrategy, setAiStrategy] = useState<AnalyzeProductOutput | null>(null);
-  const [isStrategyDialogOpen, setIsStrategyDialogOpen] = useState(false);
+  // --- AI WIZARD STATES ---
+  const [wizardStep, setWizardStep] = useState<WizardStep>('IDLE');
+  const [aiAdditionalInfo, setAiAdditionalInfo] = useState('');
+  const [aiSelectedTone, setAiSelectedTone] = useState('Commercial');
+  const [aiAnalysisResult, setAiAnalysisResult] = useState<AnalyzeProductOutput | null>(null);
+  const [selectedOptionIdx, setSelectedOptionIdx] = useState<number | null>(null);
 
   useEffect(() => {
     if (manualDiscountInput && originalPrice) {
@@ -154,53 +196,25 @@ export default function ProDashboard() {
       setReachError(false);
       try {
         const usersRef = collection(firestore, 'users');
+        const qBase = (targetScope === 'ALL') ? 
+            query(usersRef, where('subscribedCategories', 'array-contains', targetCategory)) :
+            (targetScope === 'SPECIFIC' ? 
+                query(usersRef, where('lastSelectedLocation', 'in', selectedTargetCommunes.slice(0, 30)), where('subscribedCategories', 'array-contains', targetCategory)) :
+                query(usersRef, where('selectedRegion', '==', targetScope), where('subscribedCategories', 'array-contains', targetCategory))
+            );
         
-        const getBaseQuery = () => {
-            let q = query(usersRef, where('subscribedCategories', 'array-contains', targetCategory));
-            
-            if (targetScope === 'CALEDONIE') {
-                q = query(q, where('selectedRegion', '==', 'CALEDONIE'));
-            } else if (targetScope === 'TAHITI') {
-                q = query(q, where('selectedRegion', '==', 'TAHITI'));
-            } else if (targetScope === 'SPECIFIC') {
-                if (selectedTargetCommunes.length > 0) {
-                    q = query(q, where('lastSelectedLocation', 'in', selectedTargetCommunes.slice(0, 30)));
-                } else {
-                    return null;
-                }
-            }
-            return q;
-        };
-
-        const qBase = getBaseQuery();
-        
-        if (!qBase) {
-            setBaseTargetCount(0);
-            setPushTargetCount(0);
-            setMailTargetCount(0);
-            setSmsTargetCount(0);
-            setIsCalculatingReach(false);
-            return;
-        }
-        
-        const qPush = query(qBase, where('allowsPromoPush', '==', true));
-        const qMail = query(qBase, where('allowsPromoEmails', '==', true));
-        const qSms = query(qBase, where('allowsPromoSMS', '==', true));
-
         const [snapBase, snapPush, snapMail, snapSms] = await Promise.all([
             getCountFromServer(qBase),
-            getCountFromServer(qPush),
-            getCountFromServer(qMail),
-            getCountFromServer(qSms)
+            getCountFromServer(query(qBase, where('allowsPromoPush', '==', true))),
+            getCountFromServer(query(qBase, where('allowsPromoEmails', '==', true))),
+            getCountFromServer(query(qBase, where('allowsPromoSMS', '==', true)))
         ]);
         
         setBaseTargetCount(snapBase.data().count);
         setPushTargetCount(snapPush.data().count);
         setMailTargetCount(snapMail.data().count);
         setSmsTargetCount(snapSms.data().count);
-
       } catch (e: any) {
-        console.warn("Reach calculation error", e);
         setReachError(true);
       } finally {
         setIsCalculatingReach(false);
@@ -213,18 +227,11 @@ export default function ProDashboard() {
 
   const totalCalculatedCost = useMemo(() => {
     if (!pricing || baseTargetCount === null || selectedPromoIds.length === 0) return 0;
-    
-    const articleCount = selectedPromoIds.length;
-    let baseCampaignCost = pricing.fixedPrice; 
-    let costPerArticle = 0;
-    
-    costPerArticle += (baseTargetCount * pricing.unitPricePerUser);
-    
-    if (selectedChannels.includes('SMS') && smsTargetCount !== null) costPerArticle += (smsTargetCount * (pricing.priceSMS || 0));
-    if (selectedChannels.includes('PUSH') && pushTargetCount !== null) costPerArticle += (pushTargetCount * (pricing.pricePush || 0));
-    if (selectedChannels.includes('MAIL') && mailTargetCount !== null) costPerArticle += (mailTargetCount * (pricing.priceMail || 0));
-
-    return Math.ceil(baseCampaignCost + (costPerArticle * articleCount));
+    let cost = pricing.fixedPrice + (selectedPromoIds.length * baseTargetCount * pricing.unitPricePerUser);
+    if (selectedChannels.includes('SMS') && smsTargetCount) cost += (smsTargetCount * (pricing.priceSMS || 0));
+    if (selectedChannels.includes('PUSH') && pushTargetCount) cost += (pushTargetCount * (pricing.pricePush || 0));
+    if (selectedChannels.includes('MAIL') && mailTargetCount) cost += (mailTargetCount * (pricing.priceMail || 0));
+    return Math.ceil(cost);
   }, [pricing, baseTargetCount, smsTargetCount, pushTargetCount, mailTargetCount, selectedChannels, selectedPromoIds]);
 
   const handleCopyUid = () => {
@@ -247,12 +254,17 @@ export default function ProDashboard() {
     });
   };
 
-  const handleGenerateAiDescription = async () => {
+  // --- AI WIZARD LOGIC ---
+  const startAiWizard = () => {
     if (!promoTitle || promoImages.length === 0) {
-        toast({ variant: 'destructive', title: "Infos manquantes", description: "Veuillez saisir un titre et ajouter au moins une photo pour l'IA." });
+        toast({ variant: 'destructive', title: "Données manquantes", description: "Veuillez saisir un titre et ajouter au moins une photo." });
         return;
     }
-    setIsAiAnalyzing(true);
+    setWizardStep('INFO');
+  };
+
+  const processAiAnalysis = async () => {
+    setWizardStep('GENERATING');
     try {
         const result = await analyzeProduct({
             title: promoTitle,
@@ -260,17 +272,23 @@ export default function ProDashboard() {
             category: promoCategory,
             photos: promoImages,
             price: parseFloat(promoPrice) || undefined,
-            discountPercentage: calculatedDiscount || undefined
+            discountPercentage: calculatedDiscount || undefined,
+            additionalInfo: aiAdditionalInfo,
+            tone: aiSelectedTone
         });
-        setPromoDescription(result.commercialDescription);
-        setAiStrategy(result);
-        setIsStrategyDialogOpen(true);
-        toast({ title: "Description générée !" });
+        setAiAnalysisResult(result);
+        setWizardStep('OPTIONS');
     } catch (e) {
         toast({ variant: 'destructive', title: "Erreur IA", description: "L'analyse a échoué." });
-    } finally {
-        setIsAiAnalyzing(false);
+        setWizardStep('TONE');
     }
+  };
+
+  const handleSelectOption = (idx: number) => {
+    if (!aiAnalysisResult) return;
+    setSelectedOptionIdx(idx);
+    setPromoDescription(aiAnalysisResult.commercialDescriptions[idx]);
+    setWizardStep('STRATEGY');
   };
 
   const handleSavePromotion = async () => {
@@ -303,7 +321,11 @@ export default function ProDashboard() {
     setManualDiscountInput('');
     setPromoImages([]); 
     setPromoCategory('Pêche'); 
-    setAiStrategy(null);
+    setWizardStep('IDLE');
+    setAiAdditionalInfo('');
+    setAiSelectedTone('Commercial');
+    setAiAnalysisResult(null);
+    setSelectedOptionIdx(null);
   };
 
   const handleEditPromotion = (promo: Promotion) => {
@@ -320,16 +342,13 @@ export default function ProDashboard() {
     }
     setPromoImages(promo.images || [promo.imageUrl || '']);
     setPromoType(promo.promoType); 
-    setAiStrategy(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDeletePromotion = async (id: string) => {
     if (!firestore || !business) return;
-    try {
-        await deleteDoc(doc(firestore, 'businesses', business.id, 'promotions', id));
-        toast({ title: "Article supprimé" });
-    } catch (e) {}
+    await deleteDoc(doc(firestore, 'businesses', business.id, 'promotions', id));
+    toast({ title: "Article supprimé" });
   };
 
   const handleDiffuse = async () => {
@@ -431,10 +450,7 @@ export default function ProDashboard() {
                             <Input 
                                 type="number" 
                                 value={promoPrice} 
-                                onChange={e => {
-                                    setPromoPrice(e.target.value);
-                                    if (!originalPrice) setManualDiscountInput('');
-                                }} 
+                                onChange={e => setPromoPrice(e.target.value)} 
                                 className={cn(
                                     "font-black text-lg border-2 h-12 transition-all",
                                     calculatedDiscount ? "border-red-200 bg-red-50 text-red-600 ring-2 ring-red-100" : "bg-white"
@@ -450,19 +466,13 @@ export default function ProDashboard() {
                                 <div key={idx} className="relative aspect-square rounded-xl border-2 overflow-hidden bg-muted"><img src={img} className="w-full h-full object-cover" alt="" /><button onClick={() => setPromoImages(prev => prev.filter((_, i) => i !== idx))} className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1"><X className="size-3" /></button></div>
                             ))}
                             {promoImages.length < 4 && (
-                                <button 
-                                    onClick={() => fileInputRef.current?.click()} 
-                                    className="aspect-square rounded-xl border-2 border-dashed border-primary/20 flex flex-col items-center justify-center text-primary/40 hover:bg-primary/5 transition-colors gap-1"
-                                >
+                                <button onClick={() => fileInputRef.current?.click()} className="aspect-square rounded-xl border-2 border-dashed border-primary/20 flex flex-col items-center justify-center text-primary/40 hover:bg-primary/5 transition-colors gap-1">
                                     <Plus className="size-4" />
                                     <span className="text-[7px] font-black uppercase">Galerie</span>
                                 </button>
                             )}
                             {promoImages.length < 4 && (
-                                <button 
-                                    onClick={() => cameraInputRef.current?.click()} 
-                                    className="aspect-square rounded-xl border-2 border-dashed border-primary/20 flex flex-col items-center justify-center text-primary/40 hover:bg-primary/5 transition-colors gap-1"
-                                >
+                                <button onClick={() => cameraInputRef.current?.click()} className="aspect-square rounded-xl border-2 border-dashed border-primary/20 flex flex-col items-center justify-center text-primary/40 hover:bg-primary/5 transition-colors gap-1">
                                     <Camera className="size-4" />
                                     <span className="text-[7px] font-black uppercase">Appareil</span>
                                 </button>
@@ -479,29 +489,18 @@ export default function ProDashboard() {
                                 variant="outline" 
                                 size="sm" 
                                 className="h-7 text-[8px] font-black uppercase border-primary/30 text-primary bg-primary/5 gap-1.5"
-                                onClick={handleGenerateAiDescription}
-                                disabled={isAiAnalyzing || !promoTitle || promoImages.length === 0}
+                                onClick={startAiWizard}
+                                disabled={!promoTitle || promoImages.length === 0}
                             >
-                                {isAiAnalyzing ? <RefreshCw className="size-2.5 animate-spin" /> : <BrainCircuit className="size-2.5" />}
-                                {isAiAnalyzing ? 'Analyse...' : 'Rédiger via IA (Analyse Photo)'}
+                                <Wand2 className="size-2.5" /> Assistant Magicien IA
                             </Button>
                         </div>
                         <Textarea 
                             value={promoDescription} 
                             onChange={e => setPromoDescription(e.target.value)} 
                             className="font-medium border-2 min-h-[100px] text-sm" 
-                            placeholder="Décrivez votre offre ou laissez l'IA le faire pour vous..."
+                            placeholder="Décrivez votre offre ou utilisez l'Assistant Magicien IA..."
                         />
-                        {aiStrategy && (
-                            <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="w-full h-6 text-[8px] font-black uppercase text-accent mt-1 gap-1"
-                                onClick={() => setIsStrategyDialogOpen(true)}
-                            >
-                                <Lightbulb className="size-3" /> Voir les arguments de vente IA
-                            </Button>
-                        )}
                     </div>
 
                     <div className="flex gap-2 pt-2">
@@ -514,18 +513,7 @@ export default function ProDashboard() {
                 <div className="bg-muted/30 p-6 rounded-2xl border-2 border-dashed space-y-6">
                     <h3 className="text-sm font-black uppercase flex items-center gap-2 text-accent"><Megaphone className="size-4" /> Ciblage & Audiences</h3>
                     <div className="space-y-4">
-                        <div className="space-y-1">
-                            <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Rayon cible</Label>
-                            <Select value={targetCategory} onValueChange={setTargetCategory}>
-                                <SelectTrigger className="h-10 border-2 bg-background font-black text-xs">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs uppercase">{cat}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Rayon cible</Label><Select value={targetCategory} onValueChange={setTargetCategory}><SelectTrigger className="h-10 border-2 bg-background font-black text-xs"><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs uppercase">{cat}</SelectItem>)}</SelectContent></Select></div>
                         <div className="space-y-1">
                             <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Portée géographique</Label>
                             <Select value={targetScope} onValueChange={(v: any) => setTargetScope(v)}>
@@ -548,110 +536,42 @@ export default function ProDashboard() {
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <Button variant="outline" className="w-full h-10 border-2 bg-background justify-between font-bold text-xs">
-                                            <div className="flex items-center gap-2 truncate">
-                                                <MapPin className="size-3 text-primary" />
-                                                {selectedTargetCommunes.length === 0 ? "Aucune commune" : 
-                                                 selectedTargetCommunes.length === 1 ? selectedTargetCommunes[0] :
-                                                 `${selectedTargetCommunes.length} communes`}
-                                            </div>
+                                            <div className="flex items-center gap-2 truncate"><MapPin className="size-3 text-primary" />{selectedTargetCommunes.length === 0 ? "Aucune commune" : selectedTargetCommunes.length === 1 ? selectedTargetCommunes[0] : `${selectedTargetCommunes.length} communes`}</div>
                                             <ChevronDown className="size-3 opacity-50" />
                                         </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-[300px] p-0" align="start">
-                                        <div className="p-3 border-b bg-slate-50/50">
-                                            <p className="text-[10px] font-black uppercase tracking-tight">Sélecteur de communes</p>
-                                            <p className="text-[8px] font-bold uppercase text-muted-foreground">Zones de diffusion de la campagne</p>
-                                        </div>
-                                        <div className="p-2 border-b">
-                                            <Input 
-                                                placeholder="Filtrer..." 
-                                                className="h-8 text-xs" 
-                                                value={communeSearch}
-                                                onChange={(e) => setCommuneSearch(e.target.value)}
-                                            />
-                                        </div>
-                                        <ScrollArea className="h-[250px]">
-                                            <div className="p-2 space-y-1">
-                                                {filteredCommuneList.map(name => (
-                                                    <div key={name} className="flex items-center space-x-2 p-1.5 hover:bg-muted rounded cursor-pointer transition-colors" onClick={() => {
-                                                        setSelectedTargetCommunes(prev => 
-                                                            prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name].slice(0, 30)
-                                                        );
-                                                    }}>
-                                                        <Checkbox id={`check-${name}`} checked={selectedTargetCommunes.includes(name)} />
-                                                        <span className="text-xs font-bold uppercase">{name}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </ScrollArea>
+                                        <div className="p-3 border-b bg-slate-50/50"><p className="text-[10px] font-black uppercase tracking-tight">Sélecteur de communes</p></div>
+                                        <div className="p-2 border-b"><Input placeholder="Filtrer..." className="h-8 text-xs" value={communeSearch} onChange={(e) => setCommuneSearch(e.target.value)} /></div>
+                                        <ScrollArea className="h-[250px]"><div className="p-2 space-y-1">{filteredCommuneList.map(name => (<div key={name} className="flex items-center space-x-2 p-1.5 hover:bg-muted rounded cursor-pointer transition-colors" onClick={() => { setSelectedTargetCommunes(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name].slice(0, 30)); }}><Checkbox id={`check-${name}`} checked={selectedTargetCommunes.includes(name)} /><span className="text-xs font-bold uppercase">{name}</span></div>))}</div></ScrollArea>
                                     </PopoverContent>
                                 </Popover>
                             </div>
                         )}
 
                         <div className="space-y-2">
-                            <div className="flex justify-between items-center px-1">
-                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Audiences Réelles :</p>
-                                <div className="flex items-center gap-1.5">
-                                    <span className="text-[8px] font-black uppercase text-muted-foreground">Potentiel Zone:</span>
-                                    <Badge variant="secondary" className="h-4 text-[9px] font-black">{isCalculatingReach ? '...' : `${baseTargetCount ?? 0}`}</Badge>
-                                </div>
-                            </div>
+                            <div className="flex justify-between items-center px-1"><p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Audiences Réelles :</p><div className="flex items-center gap-1.5"><span className="text-[8px] font-black uppercase text-muted-foreground">Potentiel Zone:</span><Badge variant="secondary" className="h-4 text-[9px] font-black">{isCalculatingReach ? '...' : `${baseTargetCount ?? 0}`}</Badge></div></div>
                             <div className="grid grid-cols-1 gap-2">
                                 <div className={cn("p-3 rounded-xl border-2 flex items-center justify-between transition-all", selectedChannels.includes('PUSH') ? "bg-primary/10 border-primary/30" : "bg-background opacity-50")}>
-                                    <div className="flex items-center gap-2">
-                                        <Zap className="size-4 text-primary" />
-                                        <div className="flex flex-col">
-                                            <span className="text-[10px] font-black uppercase leading-none">Push Notifications</span>
-                                            <span className="text-[8px] font-bold opacity-60 uppercase">Opt-in valide</span>
-                                        </div>
-                                    </div>
+                                    <div className="flex items-center gap-2"><Zap className="size-4 text-primary" /><div className="flex flex-col"><span className="text-[10px] font-black uppercase leading-none">Push Notifications</span><span className="text-[8px] font-bold opacity-60 uppercase">Opt-in valide</span></div></div>
                                     <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-primary"/> : `${pushTargetCount ?? 0} client${(pushTargetCount ?? 0) > 1 ? 's' : ''}`}</span>
                                 </div>
                                 <div className={cn("p-3 rounded-xl border-2 flex items-center justify-between transition-all", selectedChannels.includes('MAIL') ? "bg-green-50 border-green-200" : "bg-background opacity-50")}>
-                                    <div className="flex items-center gap-2">
-                                        <Mail className="size-4 text-green-600" />
-                                        <div className="flex flex-col">
-                                            <span className="text-[10px] font-black uppercase leading-none">Newsletter Email</span>
-                                            <span className="text-[8px] font-bold opacity-60 uppercase">Opt-in valide</span>
-                                        </div>
-                                    </div>
+                                    <div className="flex items-center gap-2"><Mail className="size-4 text-green-600" /><div className="flex flex-col"><span className="text-[10px] font-black uppercase leading-none">Newsletter Email</span><span className="text-[8px] font-bold opacity-60 uppercase">Opt-in valide</span></div></div>
                                     <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-green-600"/> : `${mailTargetCount ?? 0} client${(mailTargetCount ?? 0) > 1 ? 's' : ''}`}</span>
                                 </div>
                                 <div className={cn("p-3 rounded-xl border-2 flex items-center justify-between transition-all", selectedChannels.includes('SMS') ? "bg-blue-50 border-blue-200" : "bg-background opacity-50")}>
-                                    <div className="flex items-center gap-2">
-                                        <Smartphone className="size-4 text-blue-600" />
-                                        <div className="flex flex-col">
-                                            <span className="text-[10px] font-black uppercase leading-none">Alerte SMS</span>
-                                            <span className="text-[8px] font-bold opacity-60 uppercase">Mobile renseigné</span>
-                                        </div>
-                                    </div>
+                                    <div className="flex items-center gap-2"><Smartphone className="size-4 text-blue-600" /><div className="flex flex-col"><span className="text-[10px] font-black uppercase leading-none">Alerte SMS</span><span className="text-[8px] font-bold opacity-60 uppercase">Mobile renseigné</span></div></div>
                                     <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-blue-600"/> : `${smsTargetCount ?? 0} client${(smsTargetCount ?? 0) > 1 ? 's' : ''}`}</span>
                                 </div>
                             </div>
                             {reachError && <p className="text-[8px] font-bold text-red-500 text-center uppercase animate-pulse">Erreur de calcul. Sélectionnez une zone.</p>}
                         </div>
 
-                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Canaux souhaités</Label>
-                            <div className="flex flex-wrap gap-2">
-                                {[{ id: 'SMS', label: 'SMS' }, { id: 'PUSH', label: 'Push' }, { id: 'MAIL', label: 'Email' }].map(ch => (
-                                    <Badge key={ch.id} variant={selectedChannels.includes(ch.id) ? "default" : "outline"} className="cursor-pointer font-black uppercase h-8 px-3 border-2" onClick={() => setSelectedChannels(prev => prev.includes(ch.id) ? prev.filter(c => c !== ch.id) : [...prev, ch.id])}>{ch.label}</Badge>
-                                ))}
-                            </div>
-                        </div>
+                        <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Canaux souhaités</Label><div className="flex flex-wrap gap-2">{[{ id: 'SMS', label: 'SMS' }, { id: 'PUSH', label: 'Push' }, { id: 'MAIL', label: 'Email' }].map(ch => (<Badge key={ch.id} variant={selectedChannels.includes(ch.id) ? "default" : "outline"} className="cursor-pointer font-black uppercase h-8 px-3 border-2" onClick={() => setSelectedChannels(prev => prev.includes(ch.id) ? prev.filter(c => c !== ch.id) : [...prev, ch.id])}>{ch.label}</Badge>))}</div></div>
 
                         {pricing && selectedPromoIds.length > 0 && !isCalculatingReach && (
-                            <div className="p-4 bg-primary/5 border-2 border-primary/20 rounded-2xl space-y-3 animate-in fade-in">
-                                <p className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2"><DollarSign className="size-3" /> Devis (x{selectedPromoIds.length} article{selectedPromoIds.length > 1 ? 's' : ''})</p>
-                                <div className="space-y-1.5 text-[11px] font-bold text-slate-600">
-                                    <div className="flex justify-between"><span className="opacity-60">Frais fixes (Campagne)</span><span>{pricing.fixedPrice} F</span></div>
-                                    <div className="flex justify-between border-t border-dashed pt-1 mt-1"><span className="opacity-60">Base Reach ({baseTargetCount} x {pricing.unitPricePerUser}F)</span><span>{Math.round((baseTargetCount || 0) * pricing.unitPricePerUser * selectedPromoIds.length)} F</span></div>
-                                    {selectedChannels.includes('SMS') && <div className="flex justify-between text-blue-600"><span>Canal SMS ({smsTargetCount} x {pricing.priceSMS}F)</span><span>{Math.round((smsTargetCount || 0) * (pricing.priceSMS || 0) * selectedPromoIds.length)} F</span></div>}
-                                    {selectedChannels.includes('PUSH') && <div className="flex justify-between text-primary"><span>Canal Push ({pushTargetCount} x {pricing.pricePush}F)</span><span>{Math.round((pushTargetCount || 0) * (pricing.pricePush || 0) * selectedPromoIds.length)} F</span></div>}
-                                    {selectedChannels.includes('MAIL') && <div className="flex justify-between text-green-600"><span>Canal Email ({mailTargetCount} x {pricing.priceMail}F)</span><span>{Math.round((mailTargetCount || 0) * (pricing.priceMail || 0) * selectedPromoIds.length)} F</span></div>}
-                                    <div className="flex justify-between items-center bg-primary/10 p-3 rounded-xl border border-primary/20 mt-3"><span className="text-[10px] font-black uppercase text-primary">Total estimé</span><span className="text-xl text-primary font-black">{totalCalculatedCost} FCFP</span></div>
-                                </div>
-                            </div>
+                            <div className="p-4 bg-primary/5 border-2 border-primary/20 rounded-2xl space-y-3 animate-in fade-in"><p className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2"><DollarSign className="size-3" /> Devis (x{selectedPromoIds.length} article{selectedPromoIds.length > 1 ? 's' : ''})</p><div className="space-y-1.5 text-[11px] font-bold text-slate-600"><div className="flex justify-between"><span className="opacity-60">Frais fixes (Campagne)</span><span>{pricing.fixedPrice} F</span></div><div className="flex justify-between border-t border-dashed pt-1 mt-1"><span className="opacity-60">Base Reach ({baseTargetCount} {baseTargetCount !== null && baseTargetCount > 1 ? 'utilisateurs' : 'utilisateur'} x {pricing.unitPricePerUser}F)</span><span>{Math.round((baseTargetCount || 0) * pricing.unitPricePerUser * selectedPromoIds.length)} F</span></div>{selectedChannels.includes('SMS') && <div className="flex justify-between text-blue-600"><span>Canal SMS ({smsTargetCount} x {pricing.priceSMS}F)</span><span>{Math.round((smsTargetCount || 0) * (pricing.priceSMS || 0) * selectedPromoIds.length)} F</span></div>}{selectedChannels.includes('PUSH') && <div className="flex justify-between text-primary"><span>Canal Push ({pushTargetCount} x {pricing.pricePush}F)</span><span>{Math.round((pushTargetCount || 0) * (pricing.pricePush || 0) * selectedPromoIds.length)} F</span></div>}{selectedChannels.includes('MAIL') && <div className="flex justify-between text-green-600"><span>Canal Email ({mailTargetCount} x {pricing.priceMail}F)</span><span>{Math.round((mailTargetCount || 0) * (pricing.priceMail || 0) * selectedPromoIds.length)} F</span></div>}<div className="flex justify-between items-center bg-primary/10 p-3 rounded-xl border border-primary/20 mt-3"><span className="text-[10px] font-black uppercase text-primary">Total estimé</span><span className="text-xl text-primary font-black">{totalCalculatedCost} FCFP</span></div></div></div>
                         )}
 
                         <Button onClick={handleDiffuse} disabled={isSaving || !baseTargetCount || selectedChannels.length === 0 || selectedPromoIds.length === 0} className="w-full h-14 bg-accent hover:bg-accent/90 text-white font-black uppercase shadow-lg gap-2"><Megaphone className="size-5" /> Lancer la campagne</Button>
@@ -675,9 +595,7 @@ export default function ProDashboard() {
                             <div className="space-y-1">
                                 <div className="flex justify-between items-start">
                                     <h4 className="font-black uppercase text-xs truncate flex-1">{promo.title}</h4>
-                                    {promo.discountPercentage && (
-                                        <Badge variant="destructive" className="h-3.5 px-1 text-[7px] font-black">-{Math.round(promo.discountPercentage)}%</Badge>
-                                    )}
+                                    {promo.discountPercentage && <Badge variant="destructive" className="h-3.5 px-1 text-[7px] font-black">-{Math.round(promo.discountPercentage)}%</Badge>}
                                 </div>
                                 <p className="text-[9px] text-muted-foreground line-clamp-2 italic">{promo.description || "Pas de description."}</p>
                             </div>
@@ -691,30 +609,115 @@ export default function ProDashboard() {
             </div>
           </div>
 
-          {/* Dialog for AI Strategy & Selling Points */}
-          <Dialog open={isStrategyDialogOpen} onOpenChange={setIsStrategyDialogOpen}>
-            <DialogContent className="max-w-md rounded-2xl p-0 overflow-hidden border-none shadow-2xl">
-                <DialogHeader className="p-6 bg-accent text-white border-b border-white/10">
+          <Dialog open={wizardStep !== 'IDLE'} onOpenChange={(open) => !open && setWizardStep('IDLE')}>
+            <DialogContent className="max-w-md w-[95vw] rounded-3xl p-0 overflow-hidden border-none shadow-2xl">
+                <DialogHeader className="p-6 bg-slate-900 text-white border-b border-white/10 shrink-0">
                     <DialogTitle className="font-black uppercase tracking-tighter flex items-center gap-3">
-                        <Lightbulb className="size-6 text-yellow-300" /> Stratégie de Vente IA
+                        <Wand2 className="size-6 text-primary" /> Assistant Magicien IA
                     </DialogTitle>
-                    <DialogDescription className="text-white/80 text-[10px] font-bold uppercase mt-1">
-                        Conseils d'expert pour booster votre article
+                    <DialogDescription className="text-white/60 text-[10px] font-bold uppercase mt-1">
+                        Créez une annonce percutante en quelques clics
                     </DialogDescription>
                 </DialogHeader>
+
                 <div className="p-6 space-y-6 bg-slate-50/50 max-h-[70vh] overflow-y-auto scrollbar-hide">
-                    {aiStrategy ? (
-                        <div className="space-y-6 animate-in fade-in zoom-in-95">
+                    {wizardStep === 'INFO' && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                            <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Infos supplémentaires (Optionnel)</Label>
+                                <Textarea 
+                                    placeholder="Ex: Arrivage direct, Garantie 2 ans, Quantité limitée..." 
+                                    value={aiAdditionalInfo} 
+                                    onChange={e => setAiAdditionalInfo(e.target.value)}
+                                    className="min-h-[120px] border-2 font-medium bg-white"
+                                />
+                                <p className="text-[9px] font-bold text-muted-foreground italic px-1">L'IA utilisera ces détails pour enrichir votre annonce.</p>
+                            </div>
+                            <Button onClick={() => setWizardStep('TONE')} className="w-full h-14 font-black uppercase tracking-widest shadow-lg gap-2">
+                                Suivant <ChevronRight className="size-5" />
+                            </Button>
+                        </div>
+                    )}
+
+                    {wizardStep === 'TONE' && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Quel ton doit utiliser l'IA ?</Label>
+                            <div className="grid grid-cols-1 gap-2">
+                                {AVAILABLE_TONES.map(tone => (
+                                    <div 
+                                        key={tone.id} 
+                                        onClick={() => setAiSelectedTone(tone.id)}
+                                        className={cn(
+                                            "p-4 rounded-2xl border-2 transition-all cursor-pointer select-none",
+                                            aiSelectedTone === tone.id ? "bg-primary border-primary text-white shadow-md scale-[1.02]" : "bg-white border-slate-100 hover:border-primary/20"
+                                        )}
+                                    >
+                                        <p className="font-black uppercase text-[11px]">{tone.label}</p>
+                                        <p className={cn("text-[9px] font-medium uppercase opacity-60", aiSelectedTone === tone.id ? "text-white" : "text-muted-foreground")}>{tone.desc}</p>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                                <Button variant="ghost" onClick={() => setWizardStep('INFO')} className="flex-1 font-bold uppercase text-[10px]">Retour</Button>
+                                <Button onClick={processAiAnalysis} className="flex-[2] h-14 font-black uppercase tracking-widest shadow-lg gap-2">
+                                    Valider & Analyser <Wand2 className="size-5" />
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {wizardStep === 'GENERATING' && (
+                        <div className="flex flex-col items-center justify-center py-20 gap-6 text-center">
+                            <div className="relative">
+                                <RefreshCw className="size-16 text-primary animate-spin" />
+                                <BrainCircuit className="size-8 text-slate-800 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                            </div>
+                            <div className="space-y-2">
+                                <h3 className="font-black uppercase tracking-tighter text-xl">Le magicien travaille...</h3>
+                                <p className="text-[10px] font-bold uppercase text-muted-foreground">Analyse des visuels et rédaction des variantes</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {wizardStep === 'OPTIONS' && aiAnalysisResult && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Choisissez la meilleure variante :</Label>
+                            <div className="grid grid-cols-1 gap-4">
+                                {aiAnalysisResult.commercialDescriptions.map((text, idx) => (
+                                    <div 
+                                        key={idx} 
+                                        onClick={() => handleSelectOption(idx)}
+                                        className="group p-5 rounded-2xl border-2 bg-white hover:border-primary/40 transition-all cursor-pointer relative shadow-sm"
+                                    >
+                                        <div className="absolute -top-3 -left-3 size-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-black text-xs shadow-lg">{idx + 1}</div>
+                                        <p className="text-xs font-medium leading-relaxed text-slate-700 italic">"{text}"</p>
+                                        <div className="mt-4 pt-4 border-t border-dashed flex justify-end">
+                                            <span className="text-[9px] font-black uppercase text-primary flex items-center gap-1 group-hover:gap-2 transition-all">Valider ce texte <ChevronRight className="size-3" /></span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <Button variant="ghost" onClick={() => setWizardStep('TONE')} className="w-full font-bold uppercase text-[10px] gap-2">
+                                <ArrowLeft className="size-3" /> Changer de ton / Recommencer
+                            </Button>
+                        </div>
+                    )}
+
+                    {wizardStep === 'STRATEGY' && aiAnalysisResult && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                            <div className="p-4 bg-green-50 border-2 border-green-200 rounded-2xl flex items-center gap-3">
+                                <Check className="size-6 text-green-600 shrink-0" />
+                                <p className="text-xs font-black uppercase text-green-800">Description validée avec succès !</p>
+                            </div>
+
                             <div className="space-y-3">
-                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2 px-1">
                                     <Zap className="size-3 text-accent" /> Arguments de vente clés
                                 </p>
                                 <div className="grid gap-2">
-                                    {aiStrategy.sellingPoints.map((point, idx) => (
+                                    {aiAnalysisResult.sellingPoints.map((point, idx) => (
                                         <div key={idx} className="flex items-start gap-3 p-3 bg-white rounded-xl border shadow-sm">
-                                            <div className="size-5 rounded-full bg-accent/10 text-accent flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">
-                                                {idx + 1}
-                                            </div>
+                                            <div className="size-5 rounded-full bg-accent/10 text-accent flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">{idx + 1}</div>
                                             <p className="text-xs font-bold text-slate-700 leading-snug">{point}</p>
                                         </div>
                                     ))}
@@ -723,25 +726,23 @@ export default function ProDashboard() {
 
                             <div className="p-4 bg-white border-2 border-dashed border-accent/20 rounded-2xl space-y-2 shadow-inner">
                                 <p className="text-[10px] font-black uppercase text-accent flex items-center gap-2">
-                                    <BrainCircuit className="size-3" /> Conseil de mise en avant
+                                    <BrainCircuit className="size-3" /> Conseil Marketing IA
                                 </p>
-                                <p className="text-xs font-medium leading-relaxed italic text-slate-600">
-                                    "{aiStrategy.marketingAdvice}"
-                                </p>
+                                <p className="text-xs font-medium leading-relaxed italic text-slate-600">"{aiAnalysisResult.marketingAdvice}"</p>
                             </div>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col items-center justify-center py-10 gap-4 opacity-40">
-                            <RefreshCw className="size-8 animate-spin" />
-                            <p className="font-black uppercase text-[10px]">Génération en cours...</p>
+
+                            <Button onClick={() => setWizardStep('IDLE')} className="w-full h-14 font-black uppercase tracking-widest shadow-lg">
+                                Terminer & Fermer
+                            </Button>
                         </div>
                     )}
                 </div>
-                <DialogFooter className="p-4 bg-white border-t">
-                    <Button onClick={() => setIsStrategyDialogOpen(false)} className="w-full h-12 font-black uppercase tracking-widest shadow-lg">
-                        C'est noté !
-                    </Button>
-                </DialogFooter>
+
+                {wizardStep !== 'GENERATING' && (
+                    <DialogFooter className="p-4 bg-white border-t shrink-0">
+                        <Button variant="ghost" onClick={() => setWizardStep('IDLE')} className="w-full font-black uppercase text-[10px]">Fermer le Magicien</Button>
+                    </DialogFooter>
+                )}
             </DialogContent>
           </Dialog>
         </>
