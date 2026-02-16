@@ -453,16 +453,16 @@ export default function ShoppingPage() {
                             <X className="size-5" />
                         </button>
                         
-                        <div className="aspect-video sm:aspect-[16/9] bg-muted relative overflow-hidden group border-b">
+                        <div className="aspect-video sm:aspect-[16/9] bg-muted relative overflow-hidden group border-b h-full">
                             {selectedProductForDetail.images && selectedProductForDetail.images.length > 0 ? (
                                 <Carousel setApi={setApi} className="w-full h-full">
                                     <CarouselContent className="h-full ml-0">
                                         {selectedProductForDetail.images.map((img, idx) => (
                                             <CarouselItem key={idx} className="h-full pl-0">
-                                                <div className="w-full h-full flex items-center justify-center bg-slate-50 p-8">
+                                                <div className="w-full h-full flex items-center justify-center bg-white p-6 sm:p-10">
                                                     <img 
                                                         src={img} 
-                                                        className="max-w-full max-h-full object-contain shadow-sm" 
+                                                        className="max-w-full max-h-full object-contain" 
                                                         alt={`${selectedProductForDetail.title} - ${idx + 1}`} 
                                                     />
                                                 </div>
@@ -485,7 +485,7 @@ export default function ShoppingPage() {
                                     )}
                                 </Carousel>
                             ) : (
-                                <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground/30">
+                                <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground/30 bg-white">
                                     <ImageIcon className="size-16" />
                                     <span className="font-black uppercase text-[10px] mt-2">Aucun visuel</span>
                                 </div>
@@ -584,6 +584,79 @@ export default function ShoppingPage() {
             )}
         </DialogContent>
       </Dialog>
+
+      {/* MODAL CONTACT MAGASIN */}
+      <Dialog open={isContactDialogOpen} onOpenChange={setIsContactDialogOpen}>
+        <DialogContent className="max-w-md rounded-2xl p-0 overflow-hidden">
+            <DialogHeader className="p-6 bg-slate-50 border-b">
+                <DialogTitle className="font-black uppercase tracking-tight flex items-center gap-2">
+                    <Store className="size-5 text-primary" /> Contact Magasin
+                </DialogTitle>
+                <DialogDescription className="text-xs font-bold uppercase">
+                    {selectedBusinessContact?.name}
+                </DialogDescription>
+            </DialogHeader>
+            <div className="p-6 space-y-6">
+                {isLoadingContact ? (
+                    <div className="space-y-4">
+                        <Skeleton className="h-12 w-full rounded-xl" />
+                        <Skeleton className="h-12 w-full rounded-xl" />
+                    </div>
+                ) : selectedBusinessContact ? (
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-1 gap-3">
+                            <Button asChild className="h-14 font-black uppercase tracking-widest shadow-lg gap-3 text-base">
+                                <a href={`tel:${selectedBusinessContact.phoneNumber}`}>
+                                    <Smartphone className="size-5" /> Appeler le mobile
+                                </a>
+                            </Button>
+                            {selectedBusinessContact.landline && (
+                                <Button asChild variant="outline" className="h-12 font-black uppercase tracking-widest border-2 gap-3">
+                                    <a href={`tel:${selectedBusinessContact.landline}`}>
+                                        <Phone className="size-4" /> Ligne Fixe
+                                    </a>
+                                </Button>
+                            )}
+                        </div>
+
+                        <div className="p-4 bg-muted/30 rounded-2xl border-2 border-dashed space-y-3">
+                            <div className="flex items-start gap-3">
+                                <Home className="size-4 text-primary shrink-0 mt-0.5" />
+                                <div className="space-y-1">
+                                    <p className="text-[10px] font-black uppercase text-muted-foreground">Adresse physique</p>
+                                    <p className="text-xs font-bold leading-tight">{selectedBusinessContact.address || "Non renseignée"}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-3">
+                                <MapPin className="size-4 text-primary shrink-0 mt-0.5" />
+                                <div className="space-y-1">
+                                    <p className="text-[10px] font-black uppercase text-muted-foreground">Commune</p>
+                                    <p className="text-xs font-bold">{selectedBusinessContact.commune}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {selectedBusinessContact.location && (
+                            <Button asChild variant="secondary" className="w-full h-12 font-black uppercase tracking-widest gap-2">
+                                <a 
+                                    href={`https://www.google.com/maps?q=${selectedBusinessContact.location.latitude},${selectedBusinessContact.location.longitude}`} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                >
+                                    <Navigation className="size-4" /> Itinéraire GPS
+                                </a>
+                            </Button>
+                        )}
+                    </div>
+                ) : (
+                    <p className="text-center text-sm italic opacity-60">Impossible de charger les coordonnées.</p>
+                )}
+            </div>
+            <DialogFooter className="p-4 bg-muted/5 border-t">
+                <Button variant="ghost" className="w-full font-black uppercase text-[10px]" onClick={() => setIsContactDialogOpen(false)}>Fermer</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -643,7 +716,7 @@ function ProductCard({
             </div>
 
             <div className="flex min-h-[140px] h-auto">
-                <div className="w-32 bg-muted/20 shrink-0 relative flex items-center justify-center border-r overflow-hidden p-2">
+                <div className="w-32 bg-white shrink-0 relative flex items-center justify-center border-r overflow-hidden p-2">
                     {images.length > 0 ? (
                         <>
                             <img src={images[0]} className="max-w-full max-h-full object-contain transition-transform group-hover:scale-105" alt={product.title} />
