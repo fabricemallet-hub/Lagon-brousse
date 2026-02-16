@@ -15,12 +15,17 @@ import {
   Megaphone, 
   Plus, 
   Trash2, 
+  Send, 
+  DollarSign, 
   ShoppingBag, 
   Store, 
+  Camera, 
   RefreshCw, 
+  Percent, 
   ImageIcon, 
   X, 
   Pencil, 
+  Save, 
   UserCircle, 
   BrainCircuit, 
   MapPin, 
@@ -29,11 +34,12 @@ import {
   Smartphone, 
   Mail, 
   Zap, 
+  ChevronRight,
   Wand2,
-  Check, 
-  CheckCircle2, 
+  Check,
+  CheckCircle2,
   CreditCard,
-  ChevronRight
+  Copy
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useRouter } from 'next/navigation';
@@ -45,6 +51,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { allCommuneNames } from '@/lib/locations';
 import { analyzeProduct } from '@/ai/flows/analyze-product-flow';
 import { generateCampaignMessages } from '@/ai/flows/generate-campaign-messages-flow';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import type { AnalyzeProductOutput, GenerateCampaignOutput } from '@/ai/schemas';
 import {
   Dialog,
@@ -447,7 +454,7 @@ export default function ProDashboard() {
                             
                             <div className="space-y-3">
                                 <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Titre</Label><Input value={promoTitle} onChange={e => setPromoTitle(e.target.value)} className="font-bold border-2" /></div>
-                                <div className="space-y-1"><Label className="text-[10px) font-black uppercase opacity-60 ml-1">Rayon</Label><Select value={promoCategory} onValueChange={setPromoCategory}><SelectTrigger className="border-2 font-black uppercase text-xs bg-white"><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs uppercase">{cat}</SelectItem>)}</SelectContent></Select></div>
+                                <div className="space-y-1"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Rayon</Label><Select value={promoCategory} onValueChange={setPromoCategory}><SelectTrigger className="border-2 font-black uppercase text-xs bg-white"><SelectValue /></SelectTrigger><SelectContent>{MAIN_CATEGORIES.map(cat => <SelectItem key={cat} value={cat} className="font-black text-xs uppercase">{cat}</SelectItem>)}</SelectContent></Select></div>
                                 
                                 <div className="grid grid-cols-2 gap-3 p-4 bg-muted/10 rounded-2xl border-2 border-dashed border-primary/5">
                                     <div className="space-y-1">
@@ -588,56 +595,13 @@ export default function ProDashboard() {
                 {campWizardStep === 'TONE' && <div className="grid gap-2 animate-in fade-in">{AVAILABLE_TONES.map(t => (<div key={t.id} onClick={() => setCampTone(t.id)} className={cn("p-4 rounded-2xl border-2 transition-all cursor-pointer", campTone === t.id ? "bg-accent border-accent text-white" : "bg-white")}><p className="font-black uppercase text-[11px]">{t.label}</p></div>))}</div>}
                 {campWizardStep === 'LENGTH' && <div className="grid gap-2 animate-in fade-in">{CAMPAIGN_LENGTHS.map(l => (<div key={l.id} onClick={() => setCampLength(l.id as any)} className={cn("p-4 rounded-2xl border-2 transition-all cursor-pointer", campLength === l.id ? "bg-accent border-accent text-white" : "bg-white")}><p className="font-black uppercase text-[11px]">{l.label}</p></div>))}</div>}
                 {campWizardStep === 'GENERATING' && <div className="py-20 text-center"><RefreshCw className="size-16 text-accent animate-spin mx-auto" /></div>}
-                {campWizardStep === 'SELECTION' && campProps && (
-                    <div className="space-y-6 pb-10">
-                        {selectedChannels.includes('SMS') && (
-                            <div className="space-y-2">
-                                <p className="text-[10px] font-black uppercase text-blue-600 flex items-center gap-2"><Smartphone className="size-3" /> SMS</p>
-                                {campProps.smsPropositions?.map((t, i) => (<div key={i} onClick={() => setSelectedSmsIdx(i)} className={cn("p-3 rounded-xl border-2 text-xs cursor-pointer", selectedSmsIdx === i ? "bg-blue-50 border-blue-600" : "bg-white")}>"{t}"</div>))}
-                            </div>
-                        )}
-                        {selectedChannels.includes('PUSH') && (
-                            <div className="space-y-2">
-                                <p className="text-[10px] font-black uppercase text-primary flex items-center gap-2"><Zap className="size-3" /> Push Notifications</p>
-                                {campProps.pushPropositions?.map((t, i) => (
-                                    <div key={i} onClick={() => setSelectedPushIdx(i)} className={cn("p-3 rounded-xl border-2 text-xs cursor-pointer", selectedPushIdx === i ? "bg-primary/5 border-primary" : "bg-white")}>"{t}"</div>
-                                ))}
-                            </div>
-                        )}
-                        {selectedChannels.includes('MAIL') && (
-                            <div className="space-y-2">
-                                <p className="text-[10px] font-black uppercase text-green-600 flex items-center gap-2"><Mail className="size-3" /> E-mails</p>
-                                {campProps.mailPropositions?.map((t, i) => (
-                                    <div key={i} onClick={() => setSelectedMailIdx(i)} className={cn("p-3 rounded-xl border-2 text-xs cursor-pointer", selectedMailIdx === i ? "bg-green-50 border-green-600" : "bg-white")}>
-                                        <p className="font-black text-[10px] mb-1">OBJET : {t.subject}</p>
-                                        <p className="opacity-70 line-clamp-2">{t.body}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
-                {campWizardStep === 'PREVIEW' && (
-                    <div className="space-y-4 pb-10">
-                        <div className="p-4 bg-slate-50 border-2 border-dashed rounded-xl space-y-4">
-                            <div className="space-y-1">
-                                <p className="text-[10px] font-black uppercase opacity-40">Devis final estimé</p>
-                                <div className="flex items-baseline gap-1">
-                                    <p className="text-3xl font-black text-primary">{totalCalculatedCost}</p>
-                                    <span className="text-xs font-black uppercase opacity-60">FCFP</span>
-                                </div>
-                            </div>
-                            <Button onClick={handleFinalDiffuse} className="w-full h-14 bg-accent hover:bg-accent/90 text-white font-black uppercase gap-3 shadow-xl text-base tracking-widest border-2 border-white/20">
-                                <CreditCard className="size-6" /> PAIEMENT & ENVOI
-                            </Button>
-                        </div>
-                    </div>
-                )}
+                {campWizardStep === 'SELECTION' && campProps && <div className="space-y-6 pb-10">{selectedChannels.includes('SMS') && <div className="space-y-2"><p className="text-[10px] font-black uppercase text-blue-600">SMS</p>{campProps.smsPropositions?.map((t, i) => (<div key={i} onClick={() => setSelectedSmsIdx(i)} className={cn("p-3 rounded-xl border-2 text-xs cursor-pointer", selectedSmsIdx === i ? "bg-blue-50 border-blue-600" : "bg-white")}>"{t}"</div>))}</div>}</div>}
+                {campWizardStep === 'PREVIEW' && <div className="space-y-4 pb-10"><div className="p-4 bg-slate-50 border-2 border-dashed rounded-xl space-y-4"><div className="space-y-1"><p className="text-[10px] font-black uppercase opacity-40">Devis final</p><p className="text-xl font-black">{totalCalculatedCost} FCFP</p></div><Button onClick={handleFinalDiffuse} className="w-full h-14 bg-accent text-white font-black uppercase gap-2"><CreditCard className="size-5" /> PAIEMENT & ENVOI</Button></div></div>}
             </div>
             <DialogFooter className="p-4 bg-white border-t shrink-0 flex flex-col gap-2">
                 {campWizardStep === 'TONE' && <Button onClick={() => setCampWizardStep('LENGTH')} className="w-full h-12 font-black uppercase">Suivant</Button>}
-                {campWizardStep === 'LENGTH' && <Button onClick={processCampGeneration} className="w-full h-12 font-black uppercase">Générer les messages</Button>}
-                {campWizardStep === 'SELECTION' && <Button onClick={handleConfirmSelections} className="w-full h-12 font-black uppercase">Aperçu Final & Devis</Button>}
+                {campWizardStep === 'LENGTH' && <Button onClick={processCampGeneration} className="w-full h-12 font-black uppercase">Générer</Button>}
+                {campWizardStep === 'SELECTION' && <Button onClick={handleConfirmSelections} className="w-full h-12 font-black uppercase">Aperçu Final</Button>}
             </DialogFooter>
         </DialogContent>
       </Dialog>
