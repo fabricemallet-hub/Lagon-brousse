@@ -1,4 +1,3 @@
-
 'use client';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
@@ -28,7 +27,7 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   Users,
   LogOut,
@@ -60,7 +59,10 @@ import {
   ChevronDown,
   ShieldAlert,
   Compass,
-  Ruler
+  Ruler,
+  Eye,
+  EyeOff,
+  ChevronUp
 } from 'lucide-react';
 import {
   useUser,
@@ -194,6 +196,9 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
   const [selectedIcon, setSelectedIcon] = useState(sessionType === 'chasse' ? 'Navigation' : 'Anchor');
   const [selectedColor, setSelectedColor] = useState(sessionType === 'chasse' ? '#f97316' : '#3b82f6');
   
+  // New State: Tactical Panel Visibility in Fullscreen
+  const [showTacticalControls, setShowTacticalControls] = useState(true);
+
   // Shooting Angle State
   const [isAngleActive, setIsAngleActive] = useState(false);
   const [shootingAngle, setShootingAngle] = useState<number>(0);
@@ -307,7 +312,6 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     }
   }, [isSoundEnabled, soundSettings, soundVolume, availableSounds, labels]);
 
-  // Sync shooting angle to firestore when it changes
   useEffect(() => {
     if (!isParticipating || !session || !user || !firestore) return;
     const ref = doc(firestore, 'hunting_sessions', session.id, 'participants', user.uid);
@@ -327,7 +331,6 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     updateDoc(ref, updatePayload).catch(() => {});
   }, [isAngleActive, shootingAngle, shootingSpread, shootingDistance, isParticipating, session, user, firestore]);
 
-  // Shooting Angle Collision Logic (Mutual detection)
   useEffect(() => {
     if (!userLocation || !participants || !user) {
         setIsDangerActive(false);
@@ -347,7 +350,6 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     participants.forEach(p => {
         if (p.id === user.uid || !p.location) return;
         
-        // 1. Check if THEY are in MY zone
         if (isAngleActive) {
             const distToP = getDistance(
                 userLocation.latitude, 
@@ -371,7 +373,6 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
             }
         }
 
-        // 2. Check if I am in THEIR zone
         if (!dangerFound && p.shootingAngle && p.shootingAngle.isActive) {
             const distToMe = getDistance(
                 p.location.latitude, 
@@ -533,7 +534,6 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                     updatedAt: serverTimestamp() 
                 };
                 
-                // Add current shooting angle to participant doc for global sharing
                 if (isAngleActive) {
                     updatePayload.shootingAngle = { 
                         center: shootingAngle, 
@@ -864,29 +864,47 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                                             ⚠️ {dangerMessage} ⚠️
                                         </div>
                                     )}
-                                    <div className="grid grid-cols-2 gap-2">
+                                    
+                                    <div className="flex items-center justify-between bg-black/60 backdrop-blur-md p-2 rounded-xl mb-1">
+                                        <p className="text-[10px] font-black uppercase text-white tracking-widest px-2">Statuts & Alertes</p>
                                         <Button 
-                                            variant={me?.baseStatus === labels.status1 ? 'default' : 'secondary'} 
-                                            className={cn("h-14 font-black uppercase text-xs border-2 shadow-xl", me?.baseStatus === labels.status1 ? "border-primary" : "bg-white/90 backdrop-blur-md border-white/20")} 
-                                            onClick={() => updateTacticalStatus(labels.status1)}
+                                            variant="ghost" 
+                                            size="sm" 
+                                            className="h-8 text-white hover:bg-white/10 gap-2"
+                                            onClick={() => setShowTacticalControls(!showTacticalControls)}
                                         >
-                                            <labels.icon1 className="mr-2 size-5" /> {labels.status1}
-                                        </Button>
-                                        <Button 
-                                            variant={me?.baseStatus === labels.status2 ? 'default' : 'secondary'} 
-                                            className={cn("h-14 font-black uppercase text-xs border-2 shadow-xl", me?.baseStatus === labels.status2 ? "border-primary" : "bg-white/90 backdrop-blur-md border-white/20")} 
-                                            onClick={() => updateTacticalStatus(labels.status2)}
-                                        >
-                                            <labels.icon2 className="mr-2 size-5" /> {labels.status2}
+                                            <span className="text-[9px] font-black uppercase">{showTacticalControls ? 'Masquer' : 'Afficher'}</span>
+                                            {showTacticalControls ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                                         </Button>
                                     </div>
-                                    <Button 
-                                        variant={me?.isGibierEnVue ? 'destructive' : 'secondary'} 
-                                        className={cn("h-16 text-lg font-black shadow-2xl border-4 uppercase tracking-tighter", me?.isGibierEnVue ? "animate-pulse border-red-400" : "bg-white border-white/20")} 
-                                        onClick={toggleGibierEnVue}
-                                    >
-                                        <Target className="mr-3 size-8" /> {me?.isGibierEnVue ? labels.alertTitle : labels.alertBtn}
-                                    </Button>
+
+                                    {showTacticalControls && (
+                                        <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <Button 
+                                                    variant={me?.baseStatus === labels.status1 ? 'default' : 'secondary'} 
+                                                    className={cn("h-14 font-black uppercase text-xs border-2 shadow-xl", me?.baseStatus === labels.status1 ? "border-primary" : "bg-white/90 backdrop-blur-md border-white/20")} 
+                                                    onClick={() => updateTacticalStatus(labels.status1)}
+                                                >
+                                                    <labels.icon1 className="mr-2 size-5" /> {labels.status1}
+                                                </Button>
+                                                <Button 
+                                                    variant={me?.baseStatus === labels.status2 ? 'default' : 'secondary'} 
+                                                    className={cn("h-14 font-black uppercase text-xs border-2 shadow-xl", me?.baseStatus === labels.status2 ? "border-primary" : "bg-white/90 backdrop-blur-md border-white/20")} 
+                                                    onClick={() => updateTacticalStatus(labels.status2)}
+                                                >
+                                                    <labels.icon2 className="mr-2 size-5" /> {labels.status2}
+                                                </Button>
+                                            </div>
+                                            <Button 
+                                                variant={me?.isGibierEnVue ? 'destructive' : 'secondary'} 
+                                                className={cn("h-16 text-lg font-black shadow-2xl border-4 uppercase tracking-tighter", me?.isGibierEnVue ? "animate-pulse border-red-400" : "bg-white border-white/20")} 
+                                                onClick={toggleGibierEnVue}
+                                            >
+                                                <Target className="mr-3 size-8" /> {me?.isGibierEnVue ? labels.alertTitle : labels.alertBtn}
+                                            </Button>
+                                        </div>
+                                    )}
 
                                     <Accordion type="single" collapsible className="w-full">
                                         <AccordionItem value="angle-settings" className="border-none">
