@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -148,6 +147,7 @@ export default function ProDashboard() {
   const [taxRate, setTaxRate] = useState('');
   const [applyTax, setApplyTax] = useState(false);
   const [showBothPrices, setShowBothPrices] = useState(false);
+  const [isTaxesCollapsed, setIsTaxesCollapsed] = useState(true);
 
   // --- CIBLAGE & REACH STATE ---
   const [campTargetRegion, setCampTargetRegion] = useState<string>('USER_DEFAULT');
@@ -186,6 +186,23 @@ export default function ProDashboard() {
         hasSetDefaultCommune.current = true;
     }
   }, [profile?.lastSelectedLocation]);
+
+  // Initialisation des taxes par défaut depuis la boutique
+  useEffect(() => {
+    if (business && !editingProductId) {
+        if (business.defaultTaxName) setTaxName(business.defaultTaxName);
+        if (business.defaultTaxRate !== undefined) setTaxRate(business.defaultTaxRate.toString());
+        if (business.defaultApplyTax !== undefined) setApplyTax(business.defaultApplyTax);
+        if (business.defaultShowBothPrices !== undefined) setShowBothPrices(business.defaultShowBothPrices);
+        
+        // Si les taxes sont déjà renseignées, on replie le cadre
+        if (business.defaultTaxName && business.defaultTaxRate !== undefined) {
+            setIsTaxesCollapsed(true);
+        } else {
+            setIsTaxesCollapsed(false);
+        }
+    }
+  }, [business, editingProductId]);
 
   useEffect(() => {
     if (originalPrice && discountPercentage) {
@@ -258,6 +275,7 @@ export default function ProDashboard() {
     setTaxRate(p.taxRate?.toString() || '');
     setApplyTax(p.applyTax || false);
     setShowBothPrices(p.showBothPrices || false);
+    setIsTaxesCollapsed(true);
     if (p.restockDate) {
         const [m, y] = p.restockDate.split(' ');
         setNextArrivalMonth(m);
@@ -277,15 +295,21 @@ export default function ProDashboard() {
     setPromoDescription('');
     setPromoType('Promo');
     setIsOutOfStock(false);
-    setTaxName('TGC');
-    setTaxRate('');
-    setApplyTax(false);
-    setShowBothPrices(false);
+    
+    // Reprendre les taxes de la boutique pour le prochain article
+    if (business) {
+        setTaxName(business.defaultTaxName || 'TGC');
+        setTaxRate(business.defaultTaxRate?.toString() || '');
+        setApplyTax(business.defaultApplyTax || false);
+        setShowBothPrices(business.defaultShowBothPrices || false);
+        setIsTaxesCollapsed(true);
+    }
   };
 
   const handleSavePromotion = async () => {
     if (!firestore || !business || !promoTitle) return;
     setIsSaving(true);
+    const taxRateNum = parseFloat(taxRate) || 0;
     const data = {
       businessId: business.id,
       title: promoTitle,
@@ -300,12 +324,13 @@ export default function ProDashboard() {
       isOutOfStock,
       restockDate: isOutOfStock ? `${nextArrivalMonth} ${nextArrivalYear}` : null,
       taxName,
-      taxRate: parseFloat(taxRate) || 0,
+      taxRate: taxRateNum,
       applyTax,
       showBothPrices,
       updatedAt: serverTimestamp()
     };
     try {
+        // 1. Sauvegarder la promotion
         if (editingProductId) {
             await updateDoc(doc(firestore, 'businesses', business.id, 'promotions', editingProductId), data);
             toast({ title: "Article mis à jour !" });
@@ -313,6 +338,16 @@ export default function ProDashboard() {
             await addDoc(collection(firestore, 'businesses', business.id, 'promotions'), { ...data, createdAt: serverTimestamp() });
             toast({ title: "Article ajouté !" });
         }
+
+        // 2. Mémoriser les taxes au niveau de la boutique
+        await updateDoc(doc(firestore, 'businesses', business.id), {
+            defaultTaxName: taxName,
+            defaultTaxRate: taxRateNum,
+            defaultApplyTax: applyTax,
+            defaultShowBothPrices: showBothPrices,
+            updatedAt: serverTimestamp()
+        });
+
         resetForm();
     } catch (e) {
         toast({ variant: "destructive", title: "Erreur sauvegarde" });
@@ -529,42 +564,58 @@ export default function ProDashboard() {
                                         </div>
                                     </div>
 
-                                    <div className="p-3 bg-blue-50/30 border-2 border-dashed border-blue-200 rounded-2xl space-y-3">
-                                        <div className="flex items-center gap-2 border-b border-dashed border-blue-200 pb-1.5">
-                                            <Receipt className="size-3.5 text-blue-600" />
-                                            <h4 className="text-[9px] font-black uppercase tracking-widest text-blue-800">Taxes</h4>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <div className="space-y-1">
-                                                <Label className="text-[8px] font-black uppercase opacity-60">Nom (ex: TGC)</Label>
-                                                <Input value={taxName} onChange={e => setTaxName(e.target.value)} className="h-9 border-2 bg-white font-bold" />
+                                    {isTaxesCollapsed ? (
+                                        <div className="p-3 bg-blue-50/30 border-2 border-blue-100 rounded-2xl flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <Receipt className="size-4 text-blue-600" />
+                                                <div className="flex flex-col">
+                                                    <span className="text-[9px] font-black uppercase text-blue-800">Taxes actives</span>
+                                                    <span className="text-[10px] font-bold">{taxName} {taxRate}% {applyTax ? '(Inclus)' : '(HT)'}</span>
+                                                </div>
                                             </div>
-                                            <div className="space-y-1">
-                                                <Label className="text-[8px] font-black uppercase opacity-60">Taux (%)</Label>
-                                                <Input type="number" value={taxRate} onChange={e => setTaxRate(e.target.value)} className="h-9 border-2 bg-white font-black text-blue-600" />
+                                            <Button variant="ghost" size="sm" onClick={() => setIsTaxesCollapsed(false)} className="h-7 text-[8px] font-black uppercase border border-blue-200 text-blue-600 hover:bg-blue-100">Modifier les taxes</Button>
+                                        </div>
+                                    ) : (
+                                        <div className="p-3 bg-blue-50/30 border-2 border-dashed border-blue-200 rounded-2xl space-y-3 animate-in slide-in-from-top-2 duration-300">
+                                            <div className="flex items-center justify-between border-b border-dashed border-blue-200 pb-1.5">
+                                                <div className="flex items-center gap-2">
+                                                    <Receipt className="size-3.5 text-blue-600" />
+                                                    <h4 className="text-[9px] font-black uppercase tracking-widest text-blue-800">Configuration Taxes</h4>
+                                                </div>
+                                                <button onClick={() => setIsTaxesCollapsed(true)} className="p-1 hover:bg-blue-100 rounded-full"><ChevronDown className="size-3 rotate-180" /></button>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div className="space-y-1">
+                                                    <Label className="text-[8px] font-black uppercase opacity-60">Nom (ex: TGC)</Label>
+                                                    <Input value={taxName} onChange={e => setTaxName(e.target.value)} className="h-9 border-2 bg-white font-bold" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[8px] font-black uppercase opacity-60">Taux (%)</Label>
+                                                    <Input type="number" value={taxRate} onChange={e => setTaxRate(e.target.value)} className="h-9 border-2 bg-white font-black text-blue-600" />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div className="flex items-center justify-between p-2 bg-white rounded-xl border">
+                                                    <span className="text-[8px] font-black uppercase">Appliquer</span>
+                                                    <Switch checked={applyTax} onCheckedChange={setApplyTax} className="scale-75" />
+                                                </div>
+                                                <div className="flex items-center justify-between p-2 bg-white rounded-xl border">
+                                                    <span className="text-[8px] font-black uppercase">Les deux</span>
+                                                    <Switch checked={showBothPrices} onCheckedChange={setShowBothPrices} disabled={!applyTax} className="scale-75" />
+                                                </div>
+                                            </div>
+                                            <div className="text-center bg-white/80 p-2 rounded-lg border border-blue-100">
+                                                {showBothPrices && applyTax ? (
+                                                    <p className="text-xs font-black text-slate-800 leading-tight">{currentPreviewPrice.base.toLocaleString('fr-FR')} F HT <span className="text-blue-600">({currentPreviewPrice.ttc.toLocaleString('fr-FR')} F TTC)</span></p>
+                                                ) : (
+                                                    <p className="text-xs font-black text-slate-800 leading-tight">
+                                                        {applyTax ? currentPreviewPrice.ttc.toLocaleString('fr-FR') : currentPreviewPrice.base.toLocaleString('fr-FR')} 
+                                                        <span className="ml-1 opacity-60">{applyTax ? 'F TTC' : 'F HT'}</span>
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <div className="flex items-center justify-between p-2 bg-white rounded-xl border">
-                                                <span className="text-[8px] font-black uppercase">Appliquer</span>
-                                                <Switch checked={applyTax} onCheckedChange={setApplyTax} className="scale-75" />
-                                            </div>
-                                            <div className="flex items-center justify-between p-2 bg-white rounded-xl border">
-                                                <span className="text-[8px] font-black uppercase">Les deux</span>
-                                                <Switch checked={showBothPrices} onCheckedChange={setShowBothPrices} disabled={!applyTax} className="scale-75" />
-                                            </div>
-                                        </div>
-                                        <div className="text-center bg-white/80 p-2 rounded-lg border border-blue-100">
-                                            {showBothPrices && applyTax ? (
-                                                <p className="text-xs font-black text-slate-800 leading-tight">{currentPreviewPrice.base.toLocaleString('fr-FR')} F HT <span className="text-blue-600">({currentPreviewPrice.ttc.toLocaleString('fr-FR')} F TTC)</span></p>
-                                            ) : (
-                                                <p className="text-xs font-black text-slate-800 leading-tight">
-                                                    {applyTax ? currentPreviewPrice.ttc.toLocaleString('fr-FR') : currentPreviewPrice.base.toLocaleString('fr-FR')} 
-                                                    <span className="ml-1 opacity-60">{applyTax ? 'F TTC' : 'F HT'}</span>
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
+                                    )}
 
                                     <div className="grid grid-cols-2 gap-3">
                                         <div className="space-y-1">

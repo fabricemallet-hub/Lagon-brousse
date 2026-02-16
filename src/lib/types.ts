@@ -105,6 +105,10 @@ export interface Business {
   landline?: string;
   address?: string;
   location?: { latitude: number; longitude: number };
+  defaultTaxName?: string;
+  defaultTaxRate?: number;
+  defaultApplyTax?: boolean;
+  defaultShowBothPrices?: boolean;
 }
 
 export interface Promotion {
