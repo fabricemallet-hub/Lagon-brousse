@@ -56,7 +56,19 @@ service cloud.firestore {
       match /commune_stats/{communeId} { allow read, write: if isSignedIn(); }
     }
     match /sound_library/{id} { allow read: if true; }
-    match /businesses/{businessId} { allow get, list: if true; }
+    
+    // Boutique et Promotions
+    match /businesses/{businessId} { 
+      allow get, list: if true; 
+      allow write: if isSignedIn() && (isMasterAdmin() || (resource != null && resource.data.ownerId == request.auth.uid) || (resource == null && request.resource.data.ownerId == request.auth.uid));
+      
+      match /promotions/{promoId} {
+        allow read: if true;
+        // Autoriser le propriétaire du business à gérer les promos
+        allow write: if isSignedIn() && (isMasterAdmin() || get(/databases/$(database)/documents/businesses/$(businessId)).data.ownerId == request.auth.uid);
+      }
+    }
+    
     match /{path=**}/promotions/{promoId} { allow read: if true; }
 
     // ======================================================

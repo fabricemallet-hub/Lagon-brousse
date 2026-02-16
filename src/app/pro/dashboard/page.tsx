@@ -64,6 +64,8 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 type TargetScope = 'SPECIFIC' | 'CALEDONIE' | 'TAHITI' | 'ALL';
 type WizardStep = 'IDLE' | 'INFO' | 'TONE' | 'GENERATING' | 'OPTIONS' | 'STRATEGY';
@@ -292,25 +294,40 @@ export default function ProDashboard() {
     setWizardStep('STRATEGY');
   };
 
-  const handleSavePromotion = async () => {
+  const handleSavePromotion = () => {
     if (!firestore || !business || !promoTitle || !promoCategory) return;
     setIsSaving(true);
-    try {
-      const priceNum = parseFloat(promoPrice) || 0;
-      const originalPriceNum = parseFloat(originalPrice) || null;
-      let discount = (originalPriceNum && originalPriceNum > priceNum) ? ((originalPriceNum - priceNum) / originalPriceNum) * 100 : null;
+    
+    const priceNum = parseFloat(promoPrice) || 0;
+    const originalPriceNum = parseFloat(originalPrice) || null;
+    const discount = (originalPriceNum && originalPriceNum > priceNum) ? ((originalPriceNum - priceNum) / originalPriceNum) * 100 : null;
 
-      const promoData: any = {
-        businessId: business.id, title: promoTitle, category: promoCategory, description: promoDescription,
-        price: priceNum, originalPrice: originalPriceNum, discountPercentage: discount, promoType,
-        imageUrl: promoImages[0] || '', images: promoImages, updatedAt: serverTimestamp(),
-      };
+    const promoData: any = {
+      businessId: business.id, title: promoTitle, category: promoCategory, description: promoDescription,
+      price: priceNum, originalPrice: originalPriceNum, discountPercentage: discount, promoType,
+      imageUrl: promoImages[0] || '', images: promoImages, updatedAt: serverTimestamp(),
+    };
 
-      if (editingPromoId) await updateDoc(doc(firestore, 'businesses', business.id, 'promotions', editingPromoId), promoData);
-      else { promoData.createdAt = serverTimestamp(); await addDoc(collection(firestore, 'businesses', business.id, 'promotions'), promoData); }
-      resetForm();
-      toast({ title: "Article enregistré !" });
-    } finally { setIsSaving(false); }
+    const targetDoc = editingPromoId 
+      ? doc(firestore, 'businesses', business.id, 'promotions', editingPromoId)
+      : doc(collection(firestore, 'businesses', business.id, 'promotions'));
+
+    const operation = editingPromoId ? 'update' : 'create';
+    if (!editingPromoId) promoData.createdAt = serverTimestamp();
+
+    setDoc(targetDoc, promoData, { merge: true })
+      .catch(async (err) => {
+        const permissionError = new FirestorePermissionError({
+          path: targetDoc.path,
+          operation: operation as any,
+          requestResourceData: promoData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      });
+    
+    toast({ title: editingPromoId ? "Article mis à jour !" : "Article enregistré !" });
+    resetForm();
+    setIsSaving(false);
   };
 
   const resetForm = () => { 
@@ -346,26 +363,46 @@ export default function ProDashboard() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleDeletePromotion = async (id: string) => {
+  const handleDeletePromotion = (id: string) => {
     if (!firestore || !business) return;
-    await deleteDoc(doc(firestore, 'businesses', business.id, 'promotions', id));
+    const promoRef = doc(firestore, 'businesses', business.id, 'promotions', id);
+    deleteDoc(promoRef)
+      .catch(async (err) => {
+        const permissionError = new FirestorePermissionError({
+          path: promoRef.path,
+          operation: 'delete',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      });
     toast({ title: "Article supprimé" });
   };
 
-  const handleDiffuse = async () => {
+  const handleDiffuse = () => {
     if (!firestore || !business || baseTargetCount === null || selectedPromoIds.length === 0) return;
     setIsSaving(true);
-    try {
-      const selectedPromos = promotions?.filter(p => selectedPromoIds.includes(p.id)) || [];
-      await addDoc(collection(firestore, 'campaigns'), {
-        ownerId: user!.uid, businessId: business.id, businessName: business.name,
-        title: `${business.name} : ${selectedPromos.length} offres !`,
-        message: `Offres : ${selectedPromos.map(p => p.title).join(', ')}.`,
-        targetCommune: targetScope === 'ALL' ? 'GLOBAL' : (targetScope === 'SPECIFIC' ? selectedTargetCommunes.join(', ') : targetScope),
-        targetCategory, reach: baseTargetCount, cost: totalCalculatedCost, status: 'pending', createdAt: serverTimestamp(), selectedChannels
+    
+    const selectedPromos = promotions?.filter(p => selectedPromoIds.includes(p.id)) || [];
+    const campaignData = {
+      ownerId: user!.uid, businessId: business.id, businessName: business.name,
+      title: `${business.name} : ${selectedPromos.length} offres !`,
+      message: `Offres : ${selectedPromos.map(p => p.title).join(', ')}.`,
+      targetCommune: targetScope === 'ALL' ? 'GLOBAL' : (targetScope === 'SPECIFIC' ? selectedTargetCommunes.join(', ') : targetScope),
+      targetCategory, reach: baseTargetCount, cost: totalCalculatedCost, status: 'pending', createdAt: serverTimestamp(), selectedChannels
+    };
+
+    const campaignRef = collection(firestore, 'campaigns');
+    addDoc(campaignRef, campaignData)
+      .catch(async (err) => {
+        const permissionError = new FirestorePermissionError({
+          path: campaignRef.path,
+          operation: 'create',
+          requestResourceData: campaignData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
       });
-      toast({ title: "Campagne envoyée pour validation !" });
-    } finally { setIsSaving(false); }
+    
+    toast({ title: "Campagne envoyée pour validation !" });
+    setIsSaving(false);
   };
 
   if (isUserLoading || isProfileLoading || isBusinessLoading) return <div className="p-8"><Skeleton className="h-64 w-full" /></div>;
@@ -572,7 +609,7 @@ export default function ProDashboard() {
                         <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Canaux souhaités</Label><div className="flex flex-wrap gap-2">{[{ id: 'SMS', label: 'SMS' }, { id: 'PUSH', label: 'Push' }, { id: 'MAIL', label: 'Email' }].map(ch => (<Badge key={ch.id} variant={selectedChannels.includes(ch.id) ? "default" : "outline"} className="cursor-pointer font-black uppercase h-8 px-3 border-2" onClick={() => setSelectedChannels(prev => prev.includes(ch.id) ? prev.filter(c => c !== ch.id) : [...prev, ch.id])}>{ch.label}</Badge>))}</div></div>
 
                         {pricing && selectedPromoIds.length > 0 && !isCalculatingReach && (
-                            <div className="p-4 bg-primary/5 border-2 border-primary/20 rounded-2xl space-y-3 animate-in fade-in"><p className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2"><DollarSign className="size-3" /> Devis (x{selectedPromoIds.length} article{selectedPromoIds.length > 1 ? 's' : ''})</p><div className="space-y-1.5 text-[11px] font-bold text-slate-600"><div className="flex justify-between"><span className="opacity-60">Frais fixes (Campagne)</span><span>{pricing.fixedPrice} F</span></div><div className="flex justify-between border-t border-dashed pt-1 mt-1"><span className="opacity-60">Base Reach ({baseTargetCount} {baseTargetCount !== null && baseTargetCount > 1 ? 'utilisateurs' : 'utilisateur'} x {pricing.unitPricePerUser}F)</span><span>{Math.round((baseTargetCount || 0) * pricing.unitPricePerUser * selectedPromoIds.length)} F</span></div>{selectedChannels.includes('SMS') && <div className="flex justify-between text-blue-600"><span>Canal SMS ({smsTargetCount} x {pricing.priceSMS}F)</span><span>{Math.round((smsTargetCount || 0) * (pricing.priceSMS || 0) * selectedPromoIds.length)} F</span></div>}{selectedChannels.includes('PUSH') && <div className="flex justify-between text-primary"><span>Canal Push ({pushTargetCount} x {pricing.pricePush}F)</span><span>{Math.round((pushTargetCount || 0) * (pricing.pricePush || 0) * selectedPromoIds.length)} F</span></div>}{selectedChannels.includes('MAIL') && <div className="flex justify-between text-green-600"><span>Canal Email ({mailTargetCount} x {pricing.priceMail}F)</span><span>{Math.round((mailTargetCount || 0) * (pricing.priceMail || 0) * selectedPromoIds.length)} F</span></div>}<div className="flex justify-between items-center bg-primary/10 p-3 rounded-xl border border-primary/20 mt-3"><span className="text-[10px] font-black uppercase text-primary">Total estimé</span><span className="text-xl text-primary font-black">{totalCalculatedCost} FCFP</span></div></div></div>
+                            <div className="p-4 bg-primary/5 border-2 border-primary/20 rounded-2xl space-y-3 animate-in fade-in"><p className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2"><DollarSign className="size-3" /> Devis (x{selectedPromoIds.length} article{selectedPromoIds.length > 1 ? 's' : ''})</p><div className="space-y-1.5 text-[11px] font-bold text-slate-600"><div className="flex justify-between"><span className="opacity-60">Frais fixes (Campagne)</span><span>{pricing.fixedPrice} F</span></div><div className="flex justify-between border-t border-dashed pt-1 mt-1"><span className="opacity-60">Base Reach ({baseTargetCount} {baseTargetCount !== null && baseTargetCount > 1 ? 'utilisateurs' : 'utilisateur'} x {pricing.unitPricePerUser}F)</span><span>{Math.round((baseTargetCount || 0) * pricing.unitPricePerUser * selectedPromoIds.length)} F</span></div>{selectedChannels.includes('SMS') && <div className="flex justify-between text-blue-600"><span>Canal SMS ({smsTargetCount} x {pricing.priceSMS}F)</span><span>{Math.round((smsTargetCount || 0) * (pricing.priceSMS || 0) * selectedPromoIds.length)} F</span></div>}{selectedChannels.includes('PUSH') && <div className="flex justify-between text-primary"><span>Canal Push ({pushTargetCount} x {pricing.pricePush}F)</span><span>{Math.round((pushTargetCount || 0) * (pricing.pricePush || 0) * selectedPromoIds.length)} F</span></div>}{selectedChannels.includes('MAIL') && <div className="flex justify-between text-green-600"><span>Canal Email ({mailTargetCount} x {pricing.priceMail}F)</span><span>{Math.round((mailTargetCount || 0) * (pricing.priceMail || 0) * selectedPromoIds.length)} F</span></div>}<div className="flex justify-between items-center bg-primary/10 p-3 rounded-xl border border-primary/20 mt-3"><span className="text-[10px] font-black uppercase text-primary">Total estimé</span><span className="textxl text-primary font-black">{totalCalculatedCost} FCFP</span></div></div></div>
                         )}
 
                         <Button onClick={handleDiffuse} disabled={isSaving || !baseTargetCount || selectedChannels.length === 0 || selectedPromoIds.length === 0} className="w-full h-14 bg-accent hover:bg-accent/90 text-white font-black uppercase shadow-lg gap-2"><Megaphone className="size-5" /> Lancer la campagne</Button>
