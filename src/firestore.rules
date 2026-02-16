@@ -51,7 +51,9 @@ service cloud.firestore {
     // ======================================================
     
     match /campaigns/{campaignId} {
-      allow read, write: if isSignedIn();
+      // Autoriser explicitement get et list pour les utilisateurs connectés
+      allow get, list: if isSignedIn();
+      allow write: if isSignedIn();
     }
 
     // ======================================================
