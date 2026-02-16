@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -487,13 +486,20 @@ export default function VesselTrackerPage() {
   const saveVesselPrefs = (newPrefs: typeof vesselPrefs) => {
     if (!user || !firestore) return;
     setVesselPrefs(newPrefs);
+    // On n'enregistre pas en base immédiatement pour éviter de figer l'UI pendant le slide
+    // L'enregistrement se fera via handleSavePreferences ou sur d'autres actions
+  };
+
+  const commitVesselPrefs = () => {
+    if (!user || !firestore) return;
     const userRef = doc(firestore, 'users', user.uid);
-    updateDoc(userRef, { vesselPrefs: newPrefs })
+    updateDoc(userRef, { vesselPrefs })
+      .then(() => toast({ title: "Réglages enregistrés" }))
       .catch(async (err) => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: userRef.path,
           operation: 'update',
-          requestResourceData: { vesselPrefs: newPrefs }
+          requestResourceData: { vesselPrefs }
         } satisfies SecurityRuleContext));
       });
   };
@@ -801,7 +807,6 @@ export default function VesselTrackerPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                    {/* ID du navire (Design "Partager ma position") */}
                     <div className="p-4 border-2 rounded-2xl bg-primary/5 border-primary/10 space-y-3">
                         <Label className="text-sm font-black uppercase">ID du navire (Partage)</Label>
                         <div className="flex gap-2">
@@ -938,7 +943,7 @@ export default function VesselTrackerPage() {
                             <Volume2 className="size-3" /> Volume des alertes
                           </Label>
                           <Slider 
-                            value={[vesselPrefs.vesselVolume * 100]} 
+                            value={[Math.round((vesselPrefs.vesselVolume || 0) * 100)]} 
                             max={100} step={1} 
                             onValueChange={v => saveVesselPrefs({ ...vesselPrefs, vesselVolume: v[0] / 100 })} 
                           />
@@ -989,6 +994,9 @@ export default function VesselTrackerPage() {
                           </div>
                         </div>
                       </div>
+                      <Button onClick={commitVesselPrefs} className="w-full font-black uppercase text-[10px] tracking-widest mt-4">
+                        Enregistrer ces réglages
+                      </Button>
                     </div>
 
                     <div className="space-y-4 p-4 border-2 rounded-2xl bg-orange-50/30 border-orange-100">

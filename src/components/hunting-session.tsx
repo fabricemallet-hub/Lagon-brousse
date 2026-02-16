@@ -1,4 +1,3 @@
-
 'use client';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
@@ -162,7 +161,6 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
   const prevParticipantsRef = useRef<SessionParticipant[] | null>(null);
   const hasLoadedInitialPrefs = useRef(false);
 
-  // DATA FETCHING
   const userDocRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return doc(firestore, 'users', user.uid);
@@ -475,7 +473,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     if (watchIdRef.current === null) {
         setIsGpsActive(true);
         shouldPanOnNextFix.current = true;
-        toast({ title: "GPS Activé" });
+        toast({ description: "Activation du GPS..." });
     } else if (userLocation && map) {
         map.panTo({ lat: userLocation.latitude, lng: userLocation.longitude });
         map.setZoom(16);
@@ -717,7 +715,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                                                 <Volume2 className="size-3" /> Volume des alertes
                                               </Label>
                                               <Slider 
-                                                value={[soundVolume * 100]} 
+                                                value={[Math.round((soundVolume || 0) * 100)]} 
                                                 max={100} step={1} 
                                                 onValueChange={v => setSoundVolume(v[0] / 100)} 
                                               />
