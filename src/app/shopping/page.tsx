@@ -552,7 +552,7 @@ export default function ShoppingPage() {
 
                     <div className="flex-1 overflow-y-auto bg-white p-6 space-y-6 scrollbar-hide">
                         <div className="space-y-2">
-                            <h2 className="text-2xl font-black uppercase tracking-tighter leading-tight text-slate-800">
+                            <h2 className={cn("text-2xl font-black uppercase tracking-tighter leading-tight text-slate-800", selectedProductForDetail.isOutOfStock && "line-through decoration-red-600")}>
                                 {selectedProductForDetail.title}
                             </h2>
                             <div className="flex items-center gap-2 text-primary">
@@ -569,7 +569,7 @@ export default function ShoppingPage() {
                                 <AlertCircle className="size-4 text-red-600" />
                                 <AlertTitle className="text-xs font-black uppercase">Article indisponible</AlertTitle>
                                 <AlertDescription className="text-sm font-black text-red-700 mt-1">
-                                    STOCK ÉPUISÉ - Arrivage prévu le {selectedProductForDetail.nextArrival || "Prochainement"}
+                                    STOCK ÉPUISÉ - Arrivage prévu le {selectedProductForDetail.restockDate || "Prochainement"}
                                 </AlertDescription>
                             </Alert>
                         )}
@@ -580,7 +580,7 @@ export default function ShoppingPage() {
                                 <div className="flex items-baseline gap-2">
                                     <span className={cn(
                                         "text-4xl font-black tracking-tighter",
-                                        selectedProductForDetail.promoType === 'Promo' ? "text-red-600" : "text-primary"
+                                        selectedProductForDetail.isOutOfStock ? "line-through decoration-red-600 opacity-40" : (selectedProductForDetail.promoType === 'Promo' ? "text-red-600" : "text-primary")
                                     )}>
                                         {(selectedProductForDetail.price || 0).toLocaleString('fr-FR').replace(/\s/g, ' ')}
                                     </span>
@@ -805,13 +805,13 @@ function ProductCard({
                 <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
                     <div className="space-y-1">
                         <div className="flex justify-between items-start gap-2">
-                            <h4 className="font-black uppercase text-xs leading-none break-words flex-1">{product.title}</h4>
+                            <h4 className={cn("font-black uppercase text-xs leading-none break-words flex-1", isOutOfStock && "line-through decoration-red-600")}>{product.title}</h4>
                             <Badge variant="outline" className="text-[7px] h-3.5 px-1 font-black uppercase border-muted-foreground/30 shrink-0">{product.category}</Badge>
                         </div>
                         
                         {isOutOfStock ? (
                             <p className="text-[10px] font-black text-red-600 uppercase mt-1 leading-tight animate-pulse">
-                                STOCK ÉPUISÉ - Arrivage prévu le {product.nextArrival || "Prochainement"}
+                                STOCK ÉPUISÉ - Arrivage prévu le {product.restockDate || "Prochainement"}
                             </p>
                         ) : (
                             <p className="text-[10px] text-muted-foreground leading-tight break-words italic line-clamp-3">
@@ -826,14 +826,14 @@ function ProductCard({
                                 <span className="text-[9px] text-muted-foreground line-through font-bold">{product.originalPrice.toLocaleString('fr-FR').replace(/\s/g, ' ')} F</span>
                             )}
                             <div className="flex items-baseline gap-1">
-                                <span className={cn("text-base font-black leading-none", isPromo ? "text-red-600" : "text-primary")}>
+                                <span className={cn("text-base font-black leading-none", isOutOfStock ? "line-through decoration-red-600 opacity-40" : (isPromo ? "text-red-600" : "text-primary"))}>
                                     {(product.price || 0).toLocaleString('fr-FR').replace(/\s/g, ' ')}
                                 </span>
                                 <span className="text-[9px] font-black uppercase opacity-60">CFP</span>
                             </div>
                         </div>
 
-                        {isPromo && product.discountPercentage && (
+                        {isPromo && product.discountPercentage && !isOutOfStock && (
                             <div className="flex flex-col items-end">
                                 <div className="bg-red-600 text-white font-black text-[11px] px-2 py-1 rounded-lg shadow-lg flex items-center gap-1 animate-in zoom-in-95">
                                     <Percent className="size-3" />

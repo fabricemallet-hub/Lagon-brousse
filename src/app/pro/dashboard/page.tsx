@@ -141,16 +141,16 @@ export default function ProDashboard() {
   }, [firestore, business?.id]);
   const { data: promotions, isLoading: isPromosLoading } = useCollection<Promotion>(promosRef);
 
-  // Brouillons - Query explicitement autorisée par isSignedIn()
+  // Brouillons - BARRIÈRE D'AUTH : On attend que user et business soient prêts
   const draftsRef = useMemoFirebase(() => {
-    if (!firestore || !business?.id) return null;
+    if (!firestore || !business?.id || !user) return null;
     return query(
       collection(firestore, 'campaigns'), 
       where('businessId', '==', business.id), 
       where('status', '==', 'draft'), 
       orderBy('createdAt', 'desc')
     );
-  }, [firestore, business?.id]);
+  }, [firestore, business?.id, user]);
   const { data: drafts, isLoading: isDraftsLoading } = useCollection<Campaign>(draftsRef);
 
   const [selectedPromoIds, setSelectedPromoIds] = useState<string[]>([]);
@@ -189,29 +189,6 @@ export default function ProDashboard() {
   const [isOutOfStock, setIsOutOfStock] = useState(false);
   const [nextArrivalMonth, setNextArrivalMonth] = useState('Mars');
   const [nextArrivalYear, setNextArrivalYear] = useState('2025');
-
-  // --- AI WIZARD STATES (Product) ---
-  const [wizardStep, setWizardStep] = useState<WizardStep>('IDLE');
-  const [aiAdditionalInfo, setAiAdditionalInfo] = useState('');
-  const [aiSelectedTone, setAiSelectedTone] = useState('Commercial');
-  const [aiAnalysisResult, setAiAnalysisResult] = useState<AnalyzeProductOutput | null>(null);
-  const [selectedOptionIdx, setSelectedOptionIdx] = useState<number | null>(null);
-
-  // --- AI CAMPAIGN WIZARD STATES ---
-  const [campWizardStep, setCampWizardStep] = useState<CampaignWizardStep>('IDLE');
-  const [campTone, setCampTone] = useState('Commercial');
-  const [campLength, setCampLength] = useState<'Short' | 'Medium' | 'Long'>('Short');
-  const [campProps, setCampProps] = useState<GenerateCampaignOutput | null>(null);
-  
-  const [selectedSmsIdx, setSelectedSmsIdx] = useState<number | null>(null);
-  const [selectedPushIdx, setSelectedPushIdx] = useState<number | null>(null);
-  const [selectedMailIdx, setSelectedMailIdx] = useState<number | null>(null);
-
-  const [finalSms, setFinalSms] = useState('');
-  const [finalPush, setFinalPush] = useState('');
-  const [finalMailSubject, setFinalMailSubject] = useState('');
-  const [finalMailBody, setFinalMailBody] = useState('');
-  const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
 
   useEffect(() => {
     if (manualDiscountInput && originalPrice) {
@@ -259,7 +236,7 @@ export default function ProDashboard() {
                 query(usersRef, where('selectedRegion', '==', targetScope), where('subscribedCategories', 'array-contains', targetCategory))
             );
         
-        // Exécution protégée contre les erreurs de permission lors du listing partiel
+        // Exécution protégée contre les erreurs de permission
         const [snapBase, snapPush, snapMail, snapSms] = await Promise.all([
             getCountFromServer(qBase),
             getCountFromServer(query(qBase, where('allowsPromoPush', '==', true))),
@@ -272,8 +249,11 @@ export default function ProDashboard() {
         setMailTargetCount(snapMail.data().count);
         setSmsTargetCount(snapSms.data().count);
       } catch (e: any) {
-        // En cas d'erreur de permission sur les statistiques, on ne bloque pas l'app
         setReachError(true);
+        setBaseTargetCount(0);
+        setPushTargetCount(0);
+        setMailTargetCount(0);
+        setSmsTargetCount(0);
         console.warn("Reach calculation error (Permissions check):", e);
       } finally {
         setIsCalculatingReach(false);
@@ -369,7 +349,7 @@ export default function ProDashboard() {
       imageUrl: promoImages[0] || '', 
       images: promoImages, 
       isOutOfStock,
-      nextArrival: isOutOfStock ? `${nextArrivalMonth} ${nextArrivalYear}` : null,
+      restockDate: isOutOfStock ? `${nextArrivalMonth} ${nextArrivalYear}` : null,
       updatedAt: serverTimestamp(),
     };
 
@@ -431,8 +411,8 @@ export default function ProDashboard() {
     setPromoImages(promo.images || [promo.imageUrl || '']);
     setPromoType(promo.promoType); 
     setIsOutOfStock(promo.isOutOfStock || false);
-    if (promo.nextArrival) {
-        const parts = promo.nextArrival.split(' ');
+    if (promo.restockDate) {
+        const parts = promo.restockDate.split(' ');
         if (parts.length === 2) {
             setNextArrivalMonth(parts[0]);
             setNextArrivalYear(parts[1]);
@@ -695,15 +675,15 @@ export default function ProDashboard() {
                             <div className="p-4 bg-red-50/50 border-2 border-dashed border-red-200 rounded-2xl space-y-4">
                                 <div className="flex items-center justify-between">
                                     <div className="space-y-0.5">
-                                        <Label className="text-xs font-black uppercase text-red-800">Stock vide</Label>
-                                        <p className="text-[8px] font-bold text-red-600/60 uppercase italic">Marquer comme indisponible</p>
+                                        <Label className="text-xs font-black uppercase text-red-800">Produit épuisé</Label>
+                                        <p className="text-[8px] font-bold text-red-600/60 uppercase italic">Indisponibilité immédiate</p>
                                     </div>
                                     <Switch checked={isOutOfStock} onCheckedChange={setIsOutOfStock} />
                                 </div>
 
                                 {isOutOfStock && (
                                     <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
-                                        <Label className="text-[9px] font-black uppercase text-red-800 ml-1">Prochain arrivage prévu</Label>
+                                        <Label className="text-[9px] font-black uppercase text-red-800 ml-1">Date de prochain arrivage</Label>
                                         <div className="grid grid-cols-2 gap-2">
                                             <Select value={nextArrivalMonth} onValueChange={setNextArrivalMonth}>
                                                 <SelectTrigger className="h-10 border-2 font-bold text-xs bg-white text-slate-800">
@@ -821,18 +801,18 @@ export default function ProDashboard() {
                                     <div className="grid grid-cols-1 gap-2">
                                         <div className={cn("p-3 rounded-xl border-2 flex items-center justify-between transition-all", selectedChannels.includes('PUSH') ? "bg-primary/10 border-primary/30" : "bg-background opacity-50")}>
                                             <div className="flex items-center gap-2"><Zap className="size-4 text-primary" /><div className="flex flex-col"><span className="text-[10px] font-black uppercase leading-none">Push Notifications</span><span className="text-[8px] font-bold opacity-60 uppercase">Opt-in valide</span></div></div>
-                                            <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-primary"/> : `${pushTargetCount ?? 0} client${(pushTargetCount ?? 0) > 1 ? 's' : ''}`}</span>
+                                            <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-primary"/> : `${pushTargetCount ?? 0}`}</span>
                                         </div>
                                         <div className={cn("p-3 rounded-xl border-2 flex items-center justify-between transition-all", selectedChannels.includes('MAIL') ? "bg-green-50 border-green-200" : "bg-background opacity-50")}>
                                             <div className="flex items-center gap-2"><Mail className="size-4 text-green-600" /><div className="flex flex-col"><span className="text-[10px] font-black uppercase leading-none">Newsletter Email</span><span className="text-[8px] font-bold opacity-60 uppercase">Opt-in valide</span></div></div>
-                                            <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-green-600"/> : `${mailTargetCount ?? 0} client${(mailTargetCount ?? 0) > 1 ? 's' : ''}`}</span>
+                                            <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-green-600"/> : `${mailTargetCount ?? 0}`}</span>
                                         </div>
                                         <div className={cn("p-3 rounded-xl border-2 flex items-center justify-between transition-all", selectedChannels.includes('SMS') ? "bg-blue-50 border-blue-200" : "bg-background opacity-50")}>
                                             <div className="flex items-center gap-2"><Smartphone className="size-4 text-blue-600" /><div className="flex flex-col"><span className="text-[10px] font-black uppercase leading-none">Alerte SMS</span><span className="text-[8px] font-bold opacity-60 uppercase">Mobile renseigné</span></div></div>
-                                            <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-blue-600"/> : `${smsTargetCount ?? 0} client${(smsTargetCount ?? 0) > 1 ? 's' : ''}`}</span>
+                                            <span className="font-black text-xs">{isCalculatingReach ? <RefreshCw className="size-3 animate-spin text-blue-600"/> : `${smsTargetCount ?? 0}`}</span>
                                         </div>
                                     </div>
-                                    {reachError && <p className="text-[8px] font-bold text-red-500 text-center uppercase animate-pulse">Erreur de calcul. Sélectionnez une zone.</p>}
+                                    {reachError && <p className="text-[8px] font-bold text-red-500 text-center uppercase animate-pulse">Calcul indisponible. Vérifiez votre zone.</p>}
                                 </div>
 
                                 <div className="space-y-1"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Canaux souhaités</Label><div className="flex flex-wrap gap-2">{[{ id: 'SMS', label: 'SMS' }, { id: 'PUSH', label: 'Push' }, { id: 'MAIL', label: 'Email' }].map(ch => (<Badge key={ch.id} variant={selectedChannels.includes(ch.id as any) ? "default" : "outline"} className="cursor-pointer font-black uppercase h-8 px-3 border-2" onClick={() => setSelectedChannels(prev => prev.includes(ch.id as any) ? prev.filter(c => c !== ch.id) : [...prev, ch.id as any])}>{ch.label}</Badge>))}</div></div>
@@ -878,12 +858,12 @@ export default function ProDashboard() {
                                 <div className="flex-1 p-3 flex flex-col justify-between min-w-0">
                                     <div className="space-y-1">
                                         <div className="flex justify-between items-start gap-2">
-                                            <h4 className="font-black uppercase text-xs truncate flex-1 leading-none">{promo.title}</h4>
+                                            <h4 className={cn("font-black uppercase text-xs truncate flex-1 leading-none", promo.isOutOfStock && "line-through decoration-red-600")}>{promo.title}</h4>
                                             {promo.discountPercentage && <Badge variant="destructive" className="h-3.5 px-1 text-[7px] font-black">-{Math.round(promo.discountPercentage)}%</Badge>}
                                         </div>
                                         {promo.isOutOfStock ? (
                                             <p className="text-[9px] font-black text-red-600 uppercase mt-1 leading-tight animate-pulse">
-                                                STOCK ÉPUISÉ - Arrivage prévu le {promo.nextArrival || "Prochainement"}
+                                                STOCK ÉPUISÉ - Arrivage prévu le {promo.restockDate || "Prochainement"}
                                             </p>
                                         ) : (
                                             <p className="text-[9px] text-muted-foreground line-clamp-2 italic">{promo.description || "Pas de description."}</p>
@@ -892,7 +872,7 @@ export default function ProDashboard() {
                                     <div className="flex items-center justify-between">
                                         <span className={cn(
                                             "font-black text-sm tracking-tight",
-                                            promo.promoType === 'Promo' ? "text-red-600" : "text-primary"
+                                            promo.isOutOfStock ? "line-through decoration-red-600 text-muted-foreground" : (promo.promoType === 'Promo' ? "text-red-600" : "text-primary")
                                         )}>
                                             {promo.price.toLocaleString('fr-FR').replace(/\s/g, ' ')} <span className="text-[8px] uppercase opacity-60">CFP</span>
                                         </span>
@@ -1278,7 +1258,7 @@ export default function ProDashboard() {
                 )}
                 {campWizardStep === 'LENGTH' && (
                     <div className="flex gap-2 w-full">
-                        <Button variant="ghost" onClick={() => setCampWizardStep('TONE')} className="flex-1 font-bold uppercase text-[10px] border-2">Retour</Button>
+                        <Button variant="ghost" onClick={() => setCampTone(tone.id)} className="flex-1 font-bold uppercase text-[10px] border-2">Retour</Button>
                         <Button onClick={processCampGeneration} className="flex-[2] h-12 font-black uppercase tracking-widest shadow-lg gap-2">Généner les variantes <Wand2 className="size-4" />
                         </Button>
                     </div>
@@ -1294,7 +1274,7 @@ export default function ProDashboard() {
                     <div className="flex flex-col gap-2 w-full">
                         <div className="grid grid-cols-2 gap-2">
                             <Button variant="outline" onClick={() => setCampWizardStep('EDIT')} className="h-12 font-black uppercase text-[10px] border-2 gap-2"><Pencil className="size-3" /> Éditer textes</Button>
-                            <Button variant="secondary" onClick={() => handleFinalDiffuse(true)} className="h-12 font-black uppercase text-[10px] border-2 gap-2"><Save className="size-3" /> Sauver plus tard</Button>
+                            <Button variant="secondary" onClick={() => handleFinalDiffuse(true)} className="h-12 font-black uppercase text-[10px] border-2 gap-2"><Save className="size-3" /> Sauver brouillon</Button>
                         </div>
                         <Button onClick={() => handleFinalDiffuse(false)} className="w-full h-16 font-black uppercase tracking-widest shadow-xl text-base gap-3 bg-accent hover:bg-accent/90">
                             <CreditCard className="size-6" /> PAIEMENT & ENVOI
