@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
@@ -782,49 +783,55 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
                                 </OverlayView>
                             )}
                             {participants?.map(p => p.location && p.id !== user?.uid && (
-                                <OverlayView key={p.id} position={{ lat: p.location.latitude, lng: p.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                                    <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 relative">
-                                        {p.shootingAngle && p.shootingAngle.isActive && (
-                                            <ShootingAngleWedge 
-                                                angle={p.shootingAngle.center} 
-                                                spread={p.shootingAngle.spread} 
-                                                distance={p.shootingAngle.distance}
-                                                color="#38bdf8" 
-                                                zoom={mapZoom}
-                                                lat={p.location.latitude}
-                                            />
-                                        )}
-                                        <div className={cn(
-                                            "px-2 py-1 rounded text-[11px] font-black text-white shadow-lg border transition-all whitespace-nowrap", 
-                                            p.isGibierEnVue 
-                                                ? "bg-red-600 animate-bounce border-red-400" 
-                                                : p.baseStatus === labels.status1 
-                                                    ? "bg-blue-600 border-blue-400" 
-                                                    : p.baseStatus === labels.status2 
-                                                        ? "bg-indigo-600 border-indigo-400" 
-                                                        : "bg-slate-900/80 backdrop-blur-md border-white/20"
-                                        )}>
-                                            {p.displayName} {p.baseStatus && <span className="ml-1 opacity-80">| {p.baseStatus.toUpperCase()}</span>}
-                                        </div>
-                                        <div 
-                                            className={cn(
-                                                "p-1.5 rounded-full shadow-lg border-2 border-white transition-all", 
-                                                p.isGibierEnVue && "scale-125 ring-4 ring-red-500/50"
-                                            )} 
-                                            style={{ 
-                                                backgroundColor: p.isGibierEnVue 
-                                                    ? '#ef4444' 
+                                <React.Fragment key={`p-group-${p.id}`}>
+                                    {p.shootingAngle?.isActive && (
+                                        <OverlayView position={{ lat: p.location.latitude, lng: p.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                                            <div className="relative">
+                                                <ShootingAngleWedge 
+                                                    angle={p.shootingAngle.center} 
+                                                    spread={p.shootingAngle.spread} 
+                                                    distance={p.shootingAngle.distance}
+                                                    color="#38bdf8" 
+                                                    zoom={mapZoom}
+                                                    lat={p.location.latitude}
+                                                />
+                                            </div>
+                                        </OverlayView>
+                                    )}
+                                    <OverlayView position={{ lat: p.location.latitude, lng: p.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                                        <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 relative">
+                                            <div className={cn(
+                                                "px-2 py-1 rounded text-[11px] font-black text-white shadow-lg border transition-all whitespace-nowrap", 
+                                                p.isGibierEnVue 
+                                                    ? "bg-red-600 animate-bounce border-red-400" 
                                                     : p.baseStatus === labels.status1 
-                                                        ? '#2563eb' 
+                                                        ? "bg-blue-600 border-blue-400" 
                                                         : p.baseStatus === labels.status2 
-                                                            ? '#4f46e5' 
-                                                            : (p.mapColor || '#3b82f6') 
-                                            }}
-                                        >
-                                            {React.createElement(iconMap[p.mapIcon as keyof typeof iconMap] || Navigation, { className: "size-4 text-white" })}
+                                                            ? "bg-indigo-600 border-indigo-400" 
+                                                            : "bg-slate-900/80 backdrop-blur-md border-white/20"
+                                            )}>
+                                                {p.displayName} {p.baseStatus && <span className="ml-1 opacity-80">| {p.baseStatus.toUpperCase()}</span>}
+                                            </div>
+                                            <div 
+                                                className={cn(
+                                                    "p-1.5 rounded-full shadow-lg border-2 border-white transition-all", 
+                                                    p.isGibierEnVue && "scale-125 ring-4 ring-red-500/50"
+                                                )} 
+                                                style={{ 
+                                                    backgroundColor: p.isGibierEnVue 
+                                                        ? '#ef4444' 
+                                                        : p.baseStatus === labels.status1 
+                                                            ? '#2563eb' 
+                                                            : p.baseStatus === labels.status2 
+                                                                ? '#4f46e5' 
+                                                                : (p.mapColor || '#3b82f6') 
+                                                }}
+                                            >
+                                                {React.createElement(iconMap[p.mapIcon as keyof typeof iconMap] || Navigation, { className: "size-4 text-white" })}
+                                            </div>
                                         </div>
-                                    </div>
-                                </OverlayView>
+                                    </OverlayView>
+                                </React.Fragment>
                             ))}
                         </GoogleMap>
                         

@@ -34,6 +34,13 @@ export interface Weapon {
   createdAt: any;
 }
 
+export interface ShootingAngle {
+  center: number;
+  spread: number;
+  distance: number;
+  isActive: boolean;
+}
+
 export interface UserAccount {
   id: string;
   email: string;
@@ -76,6 +83,11 @@ export interface UserAccount {
   address?: string;
   contactLocation?: { latitude: number; longitude: number };
   ridet?: string;
+  shootingAngle?: {
+      center: number;
+      spread: number;
+      distance: number;
+  };
 }
 
 export interface Business {
@@ -358,6 +370,7 @@ export interface VesselStatus {
   huntingMarkers?: HuntingMarker[];
   isPositionHidden?: boolean;
   accuracy?: number;
+  shootingAngle?: ShootingAngle;
 }
 
 export interface SoundLibraryEntry {
@@ -455,13 +468,6 @@ export interface SystemNotification {
   type: 'info' | 'warning' | 'error' | 'success';
   isActive: boolean;
   createdAt: any;
-}
-
-export interface ShootingAngle {
-  center: number;
-  spread: number;
-  distance: number;
-  isActive: boolean;
 }
 
 export interface SessionParticipant {

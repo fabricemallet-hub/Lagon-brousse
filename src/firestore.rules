@@ -7,6 +7,7 @@ service cloud.firestore {
     // ======================================================
     // 1. PRIORITÉ ABSOLUE : MASTER ADMIN (GOD MODE)
     // ======================================================
+    // Bypass total pour l'administrateur principal (Email & UID)
     match /{allPaths=**} {
       allow read, write: if request.auth != null && (
         request.auth.uid == "t8nPnZLcTiaLJSKMuLzib3C5nPn1" ||
@@ -45,16 +46,19 @@ service cloud.firestore {
     // 3. RÈGLES PAR COLLECTION
     // ======================================================
 
+    // Catalogue Shopping & Promotions (Public en lecture)
     match /{path=**}/promotions/{promoId} {
       allow read: if true;
       allow write: if isProfessional();
     }
 
+    // Commerces
     match /businesses/{businessId} {
       allow get, list: if true;
       allow write: if isAdmin() || (isSignedIn() && resource.data.ownerId == request.auth.uid);
     }
 
+    // Profils Utilisateurs
     match /users/{userId} {
       allow read: if isSignedIn();
       allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
@@ -63,6 +67,7 @@ service cloud.firestore {
       }
     }
 
+    // Données Publiques
     match /app_settings/{id} { allow read: if true; }
     match /system_notifications/{id} { allow read: if true; }
     match /meteo_caledonie/{id} { 
@@ -75,6 +80,7 @@ service cloud.firestore {
     }
     match /sound_library/{id} { allow read: if true; }
 
+    // Support (Messagerie & Tickets)
     match /conversations/{convId} {
       allow read, write: if isSignedIn() && (request.auth.uid == convId || isAdmin());
       match /messages/{msgId} {
@@ -87,18 +93,26 @@ service cloud.firestore {
       allow read, write: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
+    // Jetons & Accès
     match /access_tokens/{id} { allow read, write: if isAdmin(); }
     match /shared_access_tokens/{id} { allow read, write: if isAdmin(); }
     match /spot_shares/{id} { allow read, write: if isSignedIn(); }
     
+    // ======================================================
+    // 4. FONCTIONNALITÉS TERROIR (ACCÈS RÉCURSIF GÉNÉRIQUE)
+    // ======================================================
+    
+    // Sessions de Groupe (Chasse & Pêche) - Autorise TOUTES les sous-collections (participants, etc.)
     match /hunting_sessions/{allPaths=**} {
       allow read, write: if isSignedIn();
     }
 
+    // Boat Tracker (Partage GPS) - Autorise TOUTES les sous-collections (markers, etc.)
     match /vessels/{allPaths=**} {
       allow read, write: if isSignedIn();
     }
 
+    // Campagnes publicitaires
     match /campaigns/{id} { 
       allow read, write: if isProfessional() || isAdmin(); 
     }
