@@ -47,7 +47,8 @@ import {
   AlertCircle,
   Clock,
   EyeOff,
-  Sparkles
+  Sparkles,
+  Copy
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -114,7 +115,6 @@ export default function VesselTrackerPage() {
   const immobilityStartTime = useRef<number | null>(null);
   const isFirstFixRef = useRef<boolean>(true);
 
-  // Minuteur de décompte (30s)
   const [countdown, setCountdown] = useState<number | null>(null);
 
   useEffect(() => {
@@ -340,16 +340,6 @@ export default function VesselTrackerPage() {
     return `${nicknamePrefix}${customText} [MAYDAY/PAN PAN] Position : https://www.google.com/maps?q=-22.27,166.45`;
   }, [vesselSmsMessage, isCustomMessageEnabled, vesselNickname]);
 
-  const labels = useMemo(() => ({
-    title: "Vessel Tracker",
-    status1: "Au Mouillage",
-    status2: "En Dérive",
-    alertBtn: "DEMANDE ASSISTANCE",
-    alertTitle: "URGENCE !",
-    alertDesc: "Demande assistance !",
-  }), []);
-
-  // --- LOGIQUE DE SURVEILLANCE ACTIVE DES 30 SECONDES ---
   useEffect(() => {
     if (mode !== 'sender' || !isSharing || vesselStatus !== 'moving') {
         setCountdown(null);
@@ -357,7 +347,6 @@ export default function VesselTrackerPage() {
     }
 
     const interval = setInterval(() => {
-      // Si on n'a pas encore démarré le chrono, on ne fait rien
       if (!immobilityStartTime.current) return;
 
       const timeSinceStart = Date.now() - (immobilityStartTime.current || 0);
@@ -365,16 +354,13 @@ export default function VesselTrackerPage() {
       
       setCountdown(remaining);
       
-      // Si on a atteint 30s et qu'on est toujours en mode "moving"
       if (timeSinceStart >= 30000) {
         if (currentPosRef.current && anchorPosRef.current) {
           const distFromAnchor = getDistance(currentPosRef.current.lat, currentPosRef.current.lng, anchorPosRef.current.lat, anchorPosRef.current.lng);
           
           if (distFromAnchor <= IMMOBILITY_THRESHOLD_METERS) {
-            // IMMOBILE -> PASSAGE AU MOUILLAGE
             handleManualStatus('stationary', 'AU MOUILLAGE (DÉTECTION AUTO)');
           } else {
-            // EN MOUVEMENT -> CONFIRMATION MOUVEMENT
             handleManualStatus('moving', 'EN MOUVEMENT (DÉTECTION AUTO)');
             anchorPosRef.current = currentPosRef.current;
             immobilityStartTime.current = Date.now();
@@ -504,6 +490,14 @@ export default function VesselTrackerPage() {
     window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
 
+  const labels = {
+    status1: "Au Mouillage",
+    status2: "En Dérive",
+    alertBtn: "DEMANDE ASSISTANCE",
+    alertTitle: "URGENCE !",
+    alertDesc: "Demande assistance !",
+  };
+
   if (loadError) return <div className="p-4 text-destructive">Erreur Google Maps.</div>;
   if (!isLoaded) return <Skeleton className="h-96 w-full" />;
 
@@ -528,7 +522,6 @@ export default function VesselTrackerPage() {
                             <p className="text-xs font-bold opacity-80 mt-1 italic">{vesselNickname || 'Capitaine'}</p>
                         </div>
 
-                        {/* COMPTE À REBOURS DE QUALIFICATION */}
                         {countdown !== null && countdown > 0 && (
                             <div className="mt-6 p-4 bg-white/10 rounded-3xl border-2 border-white/20 flex flex-col items-center justify-center relative z-10 animate-in zoom-in-95">
                                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60 mb-1 flex items-center gap-2">
@@ -594,7 +587,7 @@ export default function VesselTrackerPage() {
                         <Switch checked={isSharing} onCheckedChange={(val) => {
                             if (val) {
                                 setIsSharing(true);
-                                immobilityStartTime.current = Date.now(); // Start countdown timer immediately
+                                immobilityStartTime.current = Date.now();
                             } else {
                                 handleStopSharing();
                             }
@@ -987,23 +980,53 @@ export default function VesselTrackerPage() {
                         <AccordionTrigger className="flex-1 text-[10px] font-black uppercase hover:no-underline py-0"><History className="size-3 mr-2"/> Journal de bord</AccordionTrigger>
                         <Button variant="ghost" size="sm" className="h-7 px-2 text-[8px] font-black text-destructive" onClick={handleClearHistory}><Trash2 className="size-3 mr-1" /> Reset</Button>
                     </div>
-                    <AccordionContent className="space-y-2 pt-2 pb-4 px-3 overflow-y-auto max-h-64 scrollbar-hide">
-                        {history.length > 0 ? history.map((h, i) => (
-                            <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 shadow-sm animate-in fade-in">
-                                <div className="flex flex-col gap-0.5">
-                                    <span className={cn("font-black uppercase text-[10px]", 
-                                        h.statusLabel.includes('URGENCE') ? 'text-red-600' :
-                                        h.statusLabel.includes('MOUILLAGE') ? 'text-amber-600' :
-                                        h.statusLabel.includes('RETOUR') ? 'text-indigo-600' :
-                                        h.statusLabel.includes('TERRE') ? 'text-green-600' :
-                                        h.statusLabel.includes('LANCEMENT') ? 'text-blue-400 animate-pulse' :
-                                        'text-primary'
-                                    )}>{h.vesselName} - {h.statusLabel}</span>
-                                    <span className="text-[8px] font-bold opacity-40 uppercase">{format(h.time, 'HH:mm:ss')} {h.accuracy ? `• +/-${h.accuracy}m` : ''}</span>
-                                </div>
-                                {h.pos && <Button variant="outline" size="sm" className="h-8 text-[9px] font-black border-2" onClick={() => { if (h.pos && map) { map.panTo(h.pos); map.setZoom(17); } }}><MapPin className="size-3 text-primary" /> GPS</Button>}
+                    <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide">
+                        {history.length > 0 ? (
+                            <div className="space-y-2 px-3">
+                                {history.map((h, i) => (
+                                    <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm animate-in fade-in slide-in-from-left-2">
+                                        <div className="flex flex-col gap-0.5">
+                                          <div className="flex items-center gap-2">
+                                            <span className="font-black text-primary">{h.vesselName}</span>
+                                            <span className={cn("font-black uppercase", 
+                                                h.statusLabel.includes('URGENCE') ? 'text-red-600' :
+                                                h.statusLabel.includes('MOUILLAGE') ? 'text-amber-600' :
+                                                h.statusLabel.includes('RETOUR') ? 'text-indigo-600' :
+                                                h.statusLabel.includes('TERRE') ? 'text-green-600' :
+                                                h.statusLabel.includes('LANCEMENT') ? 'text-blue-400 animate-pulse' :
+                                                'text-primary'
+                                            )}>{h.statusLabel}</span>
+                                            {h.batteryLevel !== undefined && (
+                                                <span className="flex items-center gap-1 bg-slate-100 px-1.5 py-0.5 rounded text-[8px] font-black text-slate-500 border border-slate-200">
+                                                    <BatteryIconComp level={h.batteryLevel} charging={h.isCharging} className="size-2.5" />
+                                                    {h.batteryLevel}%
+                                                </span>
+                                            )}
+                                          </div>
+                                          <span className="text-[9px] font-bold opacity-40 uppercase">
+                                            {format(h.time, 'HH:mm:ss')} {h.accuracy ? `• +/-${h.accuracy}m` : ''}
+                                          </span>
+                                        </div>
+                                        <div className="flex gap-1">
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary border-2" onClick={() => {
+                                                if (h.pos) {
+                                                    const coords = `${h.pos.lat.toFixed(6)},${h.pos.lng.toFixed(6)}`;
+                                                    navigator.clipboard.writeText(coords);
+                                                    toast({ title: "Position copiée", description: coords });
+                                                }
+                                            }}>
+                                                <Copy className="size-3.5" />
+                                            </Button>
+                                            {h.pos && (
+                                                <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase border-2 px-3 gap-2 touch-manipulation" onClick={() => { if (h.pos && map) { map.panTo(h.pos); map.setZoom(17); } }}>
+                                                  <MapPin className="size-3 text-primary" /> GPS
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                        )) : (
+                        ) : (
                             <div className="text-center py-10 opacity-40 uppercase text-[10px] font-black italic">
                                 pas d'affichage dans l'historique
                             </div>
