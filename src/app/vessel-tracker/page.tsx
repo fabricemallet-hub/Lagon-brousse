@@ -138,6 +138,9 @@ export default function VesselTrackerPage() {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isCatchDialogOpen, setIsCatchDialogOpen] = useState(false);
 
+  // Gestion des suppressions locales pour récepteur B et flotte C
+  const [locallyClearedMarkerIds, setLocallyClearedMarkerIds] = useState<string[]>([]);
+
   const [vesselPrefs, setVesselPrefs] = useState<NonNullable<UserAccount['vesselPrefs']>>({
     isNotifyEnabled: true,
     vesselVolume: 0.8,
@@ -181,6 +184,14 @@ export default function VesselTrackerPage() {
   }, [firestore, savedVesselIds, sharingId, isSharing, mode, fleetGroupId]);
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
+
+  const tacticalMarkers = useMemo(() => {
+    if (!followedVessels) return [];
+    return followedVessels
+        .flatMap(v => (v.huntingMarkers || []).map(m => ({ ...m, vesselId: v.id, vesselName: v.displayName })))
+        .filter(m => !locallyClearedMarkerIds.includes(m.id))
+        .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+  }, [followedVessels, locallyClearedMarkerIds]);
 
   const soundsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -325,15 +336,32 @@ export default function VesselTrackerPage() {
   };
 
   const handleDeleteMarker = (marker: any) => {
-    if (!firestore || !user || !isSharing) return;
-    updateDoc(doc(firestore, 'vessels', sharingId), {
-        huntingMarkers: arrayRemove(marker)
-    }).then(() => toast({ title: "Point retiré" }));
+    if (!firestore || !user) return;
+    
+    // Si je suis l'émetteur et que c'est mon point : suppression globale sur le serveur
+    if (isSharing && marker.vesselId === sharingId) {
+        updateDoc(doc(firestore, 'vessels', sharingId), {
+            huntingMarkers: arrayRemove(marker)
+        }).then(() => toast({ title: "Point retiré (Global)" }));
+    } else {
+        // Sinon (Récepteur B ou Flotte C) : suppression locale uniquement
+        setLocallyClearedMarkerIds(prev => [...prev, marker.id]);
+        toast({ title: "Point masqué (Local)" });
+    }
   };
 
   const handleClearHuntingHistory = () => {
-    if (!firestore || !user || !isSharing) return;
-    updateDoc(doc(firestore, 'vessels', sharingId), { huntingMarkers: [] }).then(() => toast({ title: "Journal tactique réinitialisé" }));
+    setLocallyClearedMarkerIds([]); // On reset les masquages locaux si on veut tout revoir
+    
+    if (isSharing && firestore && user) {
+        // Émetteur A : Suppression globale
+        updateDoc(doc(firestore, 'vessels', sharingId), { huntingMarkers: [] }).then(() => toast({ title: "Journal tactique réinitialisé (Global)" }));
+    } else {
+        // Récepteur B ou Flotte C : Suppression locale
+        const currentIds = tacticalMarkers.map(m => m.id);
+        setLocallyClearedMarkerIds(prev => [...prev, ...currentIds]);
+        toast({ title: "Journal tactique vidé (Local)" });
+    }
   };
 
   const handleStopSharing = () => {
@@ -351,8 +379,13 @@ export default function VesselTrackerPage() {
 
   const handleClearHistory = () => {
     setHistory([]);
-    if (!firestore || !user || !isSharing) return;
-    updateDoc(doc(firestore, 'vessels', sharingId), { historyClearedAt: serverTimestamp() }).then(() => toast({ title: "Journal de bord réinitialisé" }));
+    if (isSharing && firestore && user) {
+        // Émetteur A : Trigger la suppression globale via historyClearedAt
+        updateDoc(doc(firestore, 'vessels', sharingId), { historyClearedAt: serverTimestamp() }).then(() => toast({ title: "Journal de bord réinitialisé (Global)" }));
+    } else {
+        // Récepteur B ou Flotte C : Local seulement (déjà fait par setHistory([]))
+        toast({ title: "Journal de bord vidé (Local)" });
+    }
   };
 
   const saveVesselPrefs = (newPrefs: typeof vesselPrefs) => {
@@ -426,6 +459,14 @@ export default function VesselTrackerPage() {
         const isSharingActive = vessel.isSharing === true;
         const currentStatus = isSharingActive ? (vessel.status || 'moving') : 'offline';
         const timeKey = vessel.statusChangedAt?.toMillis ? vessel.statusChangedAt.toMillis() : (vessel.statusChangedAt?.seconds ? vessel.statusChangedAt.seconds * 1000 : 0);
+        const clearTimeKey = vessel.historyClearedAt?.toMillis ? vessel.historyClearedAt.toMillis() : (vessel.historyClearedAt?.seconds ? vessel.historyClearedAt.seconds * 1000 : 0);
+
+        // Si l'émetteur a vidé le journal, on vide localement pour ce navire
+        if (clearTimeKey > (lastUpdatesRef.current[vessel.id + '_clear'] || 0)) {
+            setHistory(prev => prev.filter(h => h.vesselName !== (vessel.displayName || vessel.id)));
+            lastUpdatesRef.current[vessel.id + '_clear'] = clearTimeKey;
+        }
+
         if (timeKey === 0) return;
         
         const lastStatus = lastStatusesRef.current[vessel.id];
@@ -973,7 +1014,7 @@ export default function VesselTrackerPage() {
                             </div>
                         </OverlayView>
                         
-                        {vessel.huntingMarkers?.map(m => {
+                        {vessel.huntingMarkers?.filter(m => !locallyClearedMarkerIds.includes(m.id)).map(m => {
                             const isCatch = (m as any).type !== undefined;
                             if (isCatch) {
                                 const catchInfo = FISH_TYPES.find(f => f.id === (m as any).type);
@@ -1103,9 +1144,9 @@ export default function VesselTrackerPage() {
                             <Button variant="ghost" size="sm" className="h-7 px-2 text-[8px] font-black text-destructive" onClick={handleClearHuntingHistory}><Trash2 className="size-3 mr-1" /> Reset</Button>
                         </div>
                         <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide">
-                            {followedVessels?.some(v => v.huntingMarkers && v.huntingMarkers.length > 0) ? (
+                            {tacticalMarkers.length > 0 ? (
                                 <div className="space-y-2 px-3">
-                                    {followedVessels.flatMap(v => (v.huntingMarkers || []).map(m => ({ ...m, vesselId: v.id, vesselName: v.displayName }))).sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0, 20).map((m, i) => {
+                                    {tacticalMarkers.map((m, i) => {
                                         const isCatch = (m as any).type !== undefined;
                                         return (
                                             <div key={m.id} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm animate-in fade-in slide-in-from-left-2">
@@ -1129,11 +1170,9 @@ export default function VesselTrackerPage() {
                                                     <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase border-2 px-3 gap-2" onClick={() => { if (map) { map.panTo({ lat: m.lat, lng: m.lng }); map.setZoom(17); } }}>
                                                         <LocateFixed className="size-3 text-primary" /> GPS
                                                     </Button>
-                                                    {isSharing && m.vesselId === sharingId && (
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive border-2" onClick={() => handleDeleteMarker(m)}>
-                                                            <Trash2 className="size-3.5" />
-                                                        </Button>
-                                                    )}
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive border-2" onClick={() => handleDeleteMarker(m)}>
+                                                        <Trash2 className="size-3.5" />
+                                                    </Button>
                                                 </div>
                                             </div>
                                         );
