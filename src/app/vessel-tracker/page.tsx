@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useUser as useUserHook, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where, deleteDoc, getDoc } from 'firebase/firestore';
 import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -56,7 +56,7 @@ import {
   Pencil
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
-import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
+import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -125,7 +125,7 @@ export default function VesselTrackerPage() {
   const [currentPos, setCurrentPos] = useState<google.maps.LatLngLiteral | null>(null);
   const [anchorPos, setAnchorPos] = useState<google.maps.LatLngLiteral | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
-  const [preEmergencyStatus, setPreEmergencyStatus] = useState<VesselStatus['status'] | null>(null);
+  const [preManualStatus, setPreManualStatus] = useState<VesselStatus['status'] | null>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const isFirstFixRef = useRef<boolean>(true);
@@ -401,16 +401,27 @@ export default function VesselTrackerPage() {
     toast({ title: label || 'Statut mis à jour' });
   };
 
+  const handleManualToggle = (st: VesselStatus['status'], label: string) => {
+    if (vesselStatus !== st) {
+        setPreManualStatus(vesselStatus);
+        handleManualStatus(st, label);
+    } else {
+        const revertTo = preManualStatus || 'moving';
+        handleManualStatus(revertTo, 'ERREUR INVOLONTAIRE');
+        setPreManualStatus(null);
+    }
+  };
+
   const handleEmergencyToggle = () => {
     if (vesselStatus !== 'emergency') {
-        setPreEmergencyStatus(vesselStatus);
+        setPreManualStatus(vesselStatus);
         handleManualStatus('emergency', 'DEMANDE ASSISTANCE (PROBLÈME)');
         if (isGhostMode) handleGhostModeToggle(false);
         sendEmergencySms('MAYDAY');
     } else {
-        const revertTo = preEmergencyStatus || 'moving';
+        const revertTo = preManualStatus || 'moving';
         handleManualStatus(revertTo, 'ERREUR INVOLONTAIRE');
-        setPreEmergencyStatus(null);
+        setPreManualStatus(null);
     }
   };
 
@@ -738,10 +749,18 @@ export default function VesselTrackerPage() {
                             </Button>
 
                             <div className="grid grid-cols-2 gap-2">
-                                <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatus('returning')} disabled={vesselStatus === 'returning'}>
+                                <Button 
+                                    variant={vesselStatus === 'returning' ? 'default' : 'outline'} 
+                                    className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" 
+                                    onClick={() => handleManualToggle('returning', 'RETOUR MAISON')}
+                                >
                                     <Navigation className="size-4 text-blue-600" /> Retour Maison
                                 </Button>
-                                <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatus('landed')} disabled={vesselStatus === 'landed'}>
+                                <Button 
+                                    variant={vesselStatus === 'landed' ? 'default' : 'outline'} 
+                                    className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" 
+                                    onClick={() => handleManualToggle('landed', 'À TERRE (HOME)')}
+                                >
                                     <Home className="size-4 text-green-600" /> Home (À terre)
                                 </Button>
                             </div>
