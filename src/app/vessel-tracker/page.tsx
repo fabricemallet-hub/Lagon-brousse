@@ -270,9 +270,8 @@ export default function VesselTrackerPage() {
     const now = Date.now();
     const newStatus = data.status || vesselStatusRef.current;
     const statusChanged = newStatus !== lastSentStatusRef.current;
-    const isManualTrigger = data.eventLabel && data.eventLabel.includes('FORCÉ');
+    const isManualTrigger = data.eventLabel && (data.eventLabel.includes('FORCÉ') || data.eventLabel.includes('TACTIQUE') || data.eventLabel.includes('MANUEL'));
 
-    // On réduit la fréquence d'envoi à 60s si rien ne change pour éviter de saturer Firestore
     if (!statusChanged && !forceImmediate && !isManualTrigger && (now - lastSentTimeRef.current < 60000)) {
         return;
     }
@@ -452,12 +451,13 @@ export default function VesselTrackerPage() {
         
         const baseLabel = vessel.eventLabel || statusLabels[currentStatus] || currentStatus.toUpperCase();
         
+        const isManualAction = baseLabel.includes('FORCÉE') || baseLabel.includes('ERREUR') || baseLabel.includes('ASSISTANCE') || baseLabel.includes('REPRISE') || baseLabel.includes('TACTIQUE');
+
         if (!baseLabel.includes('TACTIQUE')) {
             setHistory(prev => {
                 const lastEntryIdx = prev.findIndex(h => h.vesselId === vessel.id);
                 const lastEntry = lastEntryIdx !== -1 ? prev[lastEntryIdx] : null;
 
-                const isManualAction = baseLabel.includes('FORCÉE') || baseLabel.includes('ERREUR') || baseLabel.includes('ASSISTANCE') || baseLabel.includes('REPRISE');
                 const wasManualAction = lastEntry?.statusLabel.includes('FORCÉE') || lastEntry?.statusLabel.includes('ERREUR') || lastEntry?.statusLabel.includes('ASSISTANCE') || lastEntry?.statusLabel.includes('REPRISE');
 
                 if (lastEntry && lastEntry.statusCategory === currentStatus && !isManualAction && !wasManualAction) {
@@ -495,10 +495,44 @@ export default function VesselTrackerPage() {
             });
         }
 
+        // --- GESTION DES NOTIFICATIONS SONORES (MODE B & C) ---
+        if (mode !== 'sender' && lastStatus && statusChanged && vesselPrefs.isNotifyEnabled) {
+            const soundKey = (currentStatus === 'returning' || currentStatus === 'landed' || currentStatus === 'moving') ? 'moving' : 
+                             (currentStatus === 'stationary' ? 'stationary' : 
+                             (currentStatus === 'emergency' ? 'emergency' : currentStatus));
+            
+            if (vesselPrefs.notifySettings[soundKey]) {
+                const soundId = vesselPrefs.notifySounds[soundKey];
+                playVesselSound(soundId || 'sonar', soundKey, vessel.displayName || vessel.id);
+                toast({ title: vessel.displayName || vessel.id, description: `Changement d'état : ${baseLabel.toLowerCase()}` });
+            }
+        }
+
+        // --- VEILLE STRATÉGIQUE (IMMOBILITÉ TROP LONGUE) ---
+        if (mode !== 'sender' && vesselPrefs.isWatchEnabled && currentStatus === 'stationary' && startTimeKey > 0) {
+            const minutesStationary = (Date.now() - startTimeKey) / 60000;
+            if (minutesStationary >= vesselPrefs.watchDuration) {
+                if (!activeLoopingAlert || activeLoopingAlert.type !== 'watch' || activeLoopingAlert.vesselName !== (vessel.displayName || vessel.id)) {
+                    playVesselSound(vesselPrefs.notifySounds.watch || 'alerte', 'watch', vessel.displayName || vessel.id);
+                }
+            }
+        }
+
+        // --- BATTERIE FAIBLE ---
+        const currentBattery = vessel.batteryLevel ?? 100;
+        const lastBattery = lastBatteryLevelsRef.current[vessel.id] ?? 100;
+        if (mode !== 'sender' && lastBattery >= vesselPrefs.batteryThreshold && currentBattery < vesselPrefs.batteryThreshold) {
+            playVesselSound(vesselPrefs.notifySounds.battery || 'alerte', 'battery', vessel.displayName || vessel.id);
+            toast({ variant: 'destructive', title: "Batterie Critique", description: `${vessel.displayName || vessel.id} : ${currentBattery}%` });
+        }
+
         lastStatusesRef.current[vessel.id] = currentStatus;
         lastUpdatesRef.current[vessel.id] = timeKey;
+        lastBatteryLevelsRef.current[vessel.id] = currentBattery;
     });
-  }, [followedVessels, mode, vesselPrefs, playVesselSound]);
+  }, [followedVessels, mode, vesselPrefs, playVesselSound, activeLoopingAlert]);
+
+  const lastBatteryLevelsRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) return;
@@ -534,9 +568,6 @@ export default function VesselTrackerPage() {
         }
 
         const dist = getDistance(newPos.lat, newPos.lng, currentAnchor.lat, currentAnchor.lng);
-        
-        // LOGIQUE DE FILTRAGE DES MOUVEMENTS GPS (ANTI-BRUIT)
-        // On ne considère un mouvement que s'il dépasse le rayon ET la précision du signal (marge d'erreur)
         const isActuallyMoving = dist > radius && dist > (accuracy * 0.5);
 
         if (isActuallyMoving) {
@@ -546,22 +577,21 @@ export default function VesselTrackerPage() {
             if (currentStatus !== 'moving') {
                 setVesselStatus('moving');
                 updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng }, status: 'moving', eventLabel: null }, true);
+                playVesselSound('sonar'); 
             } else {
                 updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng } });
             }
         } else {
-            // Le bateau est stable (à l'intérieur du rayon ou du bruit GPS)
             if (!immobilityStartTime.current) {
                 immobilityStartTime.current = Date.now();
-                // On signale l'analyse d'immobilité pour retour visuel
                 updateVesselInFirestore({ eventLabel: 'ANALYSE IMMOBILITÉ...' }, false);
             }
 
-            // Si stable depuis plus de 15 secondes (seuil réduit pour réactivité)
             if (Date.now() - immobilityStartTime.current > 15000) {
                 if (currentStatus !== 'stationary') {
                     setVesselStatus('stationary');
                     updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng }, status: 'stationary', eventLabel: null }, true);
+                    playVesselSound('sonar');
                 } else {
                     updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng } });
                 }
@@ -575,13 +605,14 @@ export default function VesselTrackerPage() {
     );
 
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
-  }, [isSharing, mode, map, toast, vesselPrefs.mooringRadius, updateVesselInFirestore]);
+  }, [isSharing, mode, map, toast, vesselPrefs.mooringRadius, updateVesselInFirestore, playVesselSound]);
 
   const handleManualToggle = (st: VesselStatus['status'], label: string) => {
     if (vesselStatus !== st) {
         setPreManualStatus(vesselStatus);
         setVesselStatus(st);
         updateVesselInFirestore({ status: st, eventLabel: label }, true);
+        playVesselSound('sonar');
     } else {
         const revertTo = preManualStatus || 'moving';
         updateVesselInFirestore({ eventLabel: 'ERREUR INVOLONTAIRE' }, true);
@@ -589,6 +620,7 @@ export default function VesselTrackerPage() {
             setVesselStatus(revertTo);
             updateVesselInFirestore({ status: revertTo, eventLabel: `${statusLabels[revertTo]} (REPRISE)` }, true);
             setPreManualStatus(null);
+            playVesselSound('sonar');
         }, 500);
     }
   };
@@ -599,6 +631,7 @@ export default function VesselTrackerPage() {
         setVesselStatus('emergency');
         updateVesselInFirestore({ status: 'emergency', eventLabel: 'DEMANDE ASSISTANCE (PROBLÈME)' }, true);
         if (isGhostMode) setIsGhostMode(false);
+        playVesselSound('alerte');
     } else {
         const revertTo = preManualStatus || 'moving';
         updateVesselInFirestore({ eventLabel: 'ERREUR INVOLONTAIRE' }, true);
@@ -606,6 +639,7 @@ export default function VesselTrackerPage() {
             setVesselStatus(revertTo);
             updateVesselInFirestore({ status: revertTo, eventLabel: `${statusLabels[revertTo]} (REPRISE)` }, true);
             setPreManualStatus(null);
+            playVesselSound('sonar');
         }, 500);
     }
   };
@@ -618,6 +652,7 @@ export default function VesselTrackerPage() {
     if (!isSharing || mode !== 'sender') return;
     setSecondsUntilUpdate(60);
     updateVesselInFirestore({ eventLabel: `${statusLabels[vesselStatus]} (POINT FORCÉ)` }, true);
+    playVesselSound('sonar');
     toast({ title: "Point GPS forcé" });
   };
 
@@ -663,11 +698,6 @@ export default function VesselTrackerPage() {
     if (!user || !firestore) return;
     setVesselPrefs(newPrefs);
     updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: newPrefs }).catch(() => {});
-  };
-
-  const handleRemoveSavedVessel = async (id: string) => {
-    if (!user || !firestore) return;
-    updateDoc(doc(firestore, 'users', user.uid), { savedVesselIds: arrayRemove(id) }).catch(() => {});
   };
 
   if (isProfileLoading) return <div className="p-8"><Skeleton className="h-64 w-full" /></div>;
