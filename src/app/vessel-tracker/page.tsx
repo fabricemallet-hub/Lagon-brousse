@@ -73,8 +73,8 @@ const TACTICAL_TYPES = [
     { id: 'thon', label: 'THON', icon: Fish, color: 'bg-red-600 text-white border-red-600' },
     { id: 'tazard', label: 'TAZARD', icon: Fish, color: 'bg-slate-500 text-white border-slate-500' },
     { id: 'wahoo', label: 'WAHOO', icon: Fish, color: 'bg-cyan-600 text-white border-cyan-600' },
-    { id: 'bossu', label: 'BOSSU', icon: Fish, color: 'bg-yellow-500 text-white border-yellow-500' },
-    { id: 'bdc', label: 'BEC DE CANE', icon: Fish, color: 'bg-orange-500 text-white border-orange-500' },
+    { id: 'bonite', label: 'BONITE', icon: Fish, color: 'bg-indigo-600 text-white border-indigo-600' },
+    { id: 'sardines', label: 'SARDINES', icon: Fish, color: 'bg-teal-500 text-white border-teal-500' },
 ];
 
 const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
@@ -211,7 +211,6 @@ export default function VesselTrackerPage() {
   const playVesselSound = useCallback((soundId: string, forceLoop: boolean = false) => {
     if (!vesselPrefs.isNotifyEnabled) return;
     
-    // Arrêter le son précédent
     if (activeAudioRef.current) {
         activeAudioRef.current.pause();
         activeAudioRef.current = null;
@@ -335,7 +334,6 @@ export default function VesselTrackerPage() {
     setVesselStatus(nextStatus);
     updateVesselInFirestore({ status: nextStatus, eventLabel: nextLabel });
     
-    // Play feedback sound for the sender
     playVesselSound('sonar');
 
     if (nextStatus === 'moving') {
@@ -490,7 +488,6 @@ export default function VesselTrackerPage() {
         const durationMin = statusStart > 0 ? Math.floor((Date.now() - statusStart) / 60000) : 0;
 
         const statusChanged = lastStatus !== currentStatus;
-        const timestampUpdated = timeKey > lastUpdate;
         const minutePassed = durationMin > lastHistMin;
 
         if (statusChanged || (minutePassed && isSharingActive)) {
@@ -732,9 +729,9 @@ export default function VesselTrackerPage() {
                     <Label className="text-xs font-black uppercase text-red-800">Seuil Batterie Faible</Label>
                     <p className="text-[9px] font-bold text-red-600/60 uppercase">Alerte niveau bas batterie smartphone</p>
                 </div>
-                <Badge variant="outline" className="font-black border-red-200 bg-white text-red-800 h-7 px-3 text-xs">{vesselPrefs.batteryThreshold}%</Badge>
+                <Badge variant="outline" className="font-black border-red-200 bg-white text-red-800 h-7 px-3 text-xs">{vesselPrefs.batteryThreshold || 20}%</Badge>
             </div>
-            <Slider value={[vesselPrefs.batteryThreshold]} min={5} max={50} step={5} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, batteryThreshold: v[0] })} />
+            <Slider value={[vesselPrefs.batteryThreshold || 20]} min={5} max={50} step={5} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, batteryThreshold: v[0] })} />
             <div className="flex justify-between text-[8px] font-black uppercase opacity-40 px-1">
                 <span>5%</span>
                 <span>50%</span>
