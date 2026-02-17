@@ -85,6 +85,8 @@ const tacticalIcons: Record<string, any> = {
     tazard: Fish,
     wahoo: Fish,
     mahimahi: Fish,
+    bonite: Fish,
+    sardines: Waves,
     fire: Flame
 };
 
@@ -382,7 +384,8 @@ export default function VesselTrackerPage() {
             vessel.huntingMarkers.forEach(m => {
                 setTacticalHistory(prev => {
                     if (prev.some(h => h.id === m.id)) return prev;
-                    const type = vessel.eventLabel?.toLowerCase().includes('oiseau') ? 'bird' : 'fish';
+                    const type = vessel.eventLabel?.toLowerCase().includes('oiseau') ? 'bird' : 
+                                vessel.eventLabel?.toLowerCase().includes('sardine') ? 'sardines' : 'fish';
                     return [{
                         id: m.id,
                         vesselName: vessel.displayName || vessel.id,
@@ -594,6 +597,12 @@ export default function VesselTrackerPage() {
                                     <Button variant="outline" className="h-14 flex-col gap-1 border-2 font-black uppercase text-[9px] bg-white text-primary border-primary/10" onClick={() => addTacticalMarker('WAHOO', 'wahoo')}>
                                         <Fish className="size-5" /> Wahoo
                                     </Button>
+                                    <Button variant="outline" className="h-14 flex-col gap-1 border-2 font-black uppercase text-[9px] bg-white text-primary border-primary/10" onClick={() => addTacticalMarker('BONITE', 'bonite')}>
+                                        <Fish className="size-5" /> Bonite
+                                    </Button>
+                                    <Button variant="outline" className="h-14 flex-col gap-1 border-2 font-black uppercase text-[9px] bg-white text-blue-400 border-blue-100" onClick={() => addTacticalMarker('SARDINES / ANCHOIS', 'sardines')}>
+                                        <Waves className="size-5" /> Sardines
+                                    </Button>
                                 </div>
                                 <Button variant="ghost" className="w-full h-10 font-black uppercase text-[8px] text-destructive/60 hover:text-destructive border-2 border-dashed border-destructive/10" onClick={handleClearTactical}>
                                     <Trash2 className="size-3 mr-1" /> Reset Tactique (Vider la carte)
@@ -730,7 +739,9 @@ export default function VesselTrackerPage() {
                             <OverlayView key={m.id} position={{ lat: m.lat, lng: m.lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                 <div style={{ transform: 'translate(-50%, -50%)' }} className="flex flex-col items-center">
                                     <div className="p-1.5 rounded-full bg-white border-2 border-primary shadow-lg animate-in zoom-in-50">
-                                        {vessel.eventLabel?.toLowerCase().includes('oiseau') ? <Bird className="size-3 text-primary" /> : <Fish className="size-3 text-primary" />}
+                                        {vessel.eventLabel?.toLowerCase().includes('oiseau') ? <Bird className="size-3 text-primary" /> : 
+                                         vessel.eventLabel?.toLowerCase().includes('sardine') ? <Waves className="size-3 text-primary" /> :
+                                         <Fish className="size-3 text-primary" />}
                                     </div>
                                 </div>
                             </OverlayView>
