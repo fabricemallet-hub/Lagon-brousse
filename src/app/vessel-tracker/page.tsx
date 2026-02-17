@@ -265,6 +265,7 @@ export default function VesselTrackerPage() {
             batteryInfo = { batteryLevel: Math.round(b.level * 100), isCharging: b.charging };
         }
 
+        const newStatus = data.status || vesselStatusRef.current;
         const updatePayload: any = { 
             id: sharingId,
             userId: user.uid, 
@@ -275,14 +276,15 @@ export default function VesselTrackerPage() {
             groupId: fleetGroupId ? fleetGroupId.toUpperCase() : null,
             isGhostMode: isGhostMode,
             accuracy: userAccuracyRef.current || null,
+            status: newStatus,
             ...batteryInfo,
             ...data 
         };
 
-        // On ne met à jour statusChangedAt que si le statut réel change
-        if (data.status && data.status !== lastSentStatusRef.current) {
+        // On force statusChangedAt si c'est le début du partage ou si le statut change
+        if (data.isSharing === true || (data.status && data.status !== lastSentStatusRef.current)) {
             updatePayload.statusChangedAt = serverTimestamp();
-            lastSentStatusRef.current = data.status;
+            lastSentStatusRef.current = newStatus;
         }
 
         if (!updatePayload.location && currentPosRef.current) {
@@ -429,7 +431,6 @@ export default function VesselTrackerPage() {
         const lastUpdate = lastUpdatesRef.current[vessel.id] || 0;
         const pos = { lat: vessel.location?.latitude || INITIAL_CENTER.lat, lng: vessel.location?.longitude || INITIAL_CENTER.lng };
         
-        // On construit l'étiquette de base sans mention de MAJ pour éviter les répétitions
         const baseLabel = vessel.eventLabel || statusLabels[currentStatus] || currentStatus.toUpperCase();
         
         if (!baseLabel.includes('TACTIQUE')) {
@@ -440,10 +441,8 @@ export default function VesselTrackerPage() {
                 const isManualAction = baseLabel.includes('FORCÉE') || baseLabel.includes('ERREUR') || baseLabel.includes('ASSISTANCE') || baseLabel.includes('REPRISE');
                 const wasManualAction = lastEntry?.statusLabel.includes('FORCÉE') || lastEntry?.statusLabel.includes('ERREUR') || lastEntry?.statusLabel.includes('ASSISTANCE') || lastEntry?.statusLabel.includes('REPRISE');
 
-                // FUSION DES LIGNES IDENTIQUES
                 if (lastEntry && lastEntry.statusCategory === currentStatus && !isManualAction && !wasManualAction) {
                     const newHistory = [...prev];
-                    // Nettoyer l'étiquette de toute mention MAJ précédente pour ne pas les cumuler
                     const cleanBaseLabel = lastEntry.statusLabel.split(' (MAJ')[0];
                     newHistory[lastEntryIdx] = {
                         ...lastEntry,
@@ -454,7 +453,6 @@ export default function VesselTrackerPage() {
                     return newHistory;
                 }
 
-                // NOUVELLE LIGNE
                 if (lastStatus !== currentStatus || timeKey > lastUpdate || isManualAction) {
                     const newEntry = { 
                         vesselId: vessel.id,
@@ -570,7 +568,6 @@ export default function VesselTrackerPage() {
   const handleForceGpsUpdate = () => {
     if (!isSharing || mode !== 'sender') return;
     setSecondsUntilUpdate(60);
-    // On force un label d'événement pour créer une ligne dans le journal
     updateVesselInFirestore({ eventLabel: `${statusLabels[vesselStatus]} (POINT FORCÉ)` });
     toast({ title: "Point GPS forcé" });
   };
@@ -580,7 +577,6 @@ export default function VesselTrackerPage() {
     const interval = setInterval(() => {
         setSecondsUntilUpdate(prev => {
             if (prev <= 1) {
-                // MAJ automatique sans étiquette d'événement pour fusionner dans le journal
                 updateVesselInFirestore({ eventLabel: null });
                 return 60;
             }
@@ -844,7 +840,7 @@ export default function VesselTrackerPage() {
           <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
                 {followedVessels?.filter(v => v.isSharing).map(vessel => (
                     <React.Fragment key={vessel.id}>
-                        {vessel.status === 'stationary' && vessel.location && (
+                        {(vessel.status === 'stationary' || vessel.status === 'drifting') && vessel.location && (
                             <Circle 
                                 center={{ lat: vessel.location.latitude, lng: vessel.location.longitude }}
                                 radius={vessel.mooringRadius || 20}
@@ -859,7 +855,11 @@ export default function VesselTrackerPage() {
                                     <span className="truncate max-w-[80px]">{vessel.displayName || vessel.id}</span>
                                     <BatteryIconComp level={vessel.batteryLevel} charging={vessel.isCharging} />
                                 </div>
-                                <div className={cn("p-2 rounded-full border-2 border-white shadow-xl", vessel.status === 'moving' ? "bg-blue-600" : vessel.status === 'returning' ? "bg-indigo-600" : vessel.status === 'landed' ? "bg-green-600" : "bg-amber-600")}>
+                                <div className={cn("p-2 rounded-full border-2 border-white shadow-xl", 
+                                    vessel.status === 'moving' ? "bg-blue-600" : 
+                                    vessel.status === 'returning' ? "bg-indigo-600" : 
+                                    vessel.status === 'landed' ? "bg-green-600" : 
+                                    vessel.status === 'stationary' ? "bg-amber-600" : "bg-red-600")}>
                                     {vessel.status === 'stationary' ? <Anchor className="size-5 text-white" /> : <Navigation className="size-5 text-white" />}
                                 </div>
                             </div>
@@ -878,6 +878,11 @@ export default function VesselTrackerPage() {
                         ))}
                     </React.Fragment>
                 ))}
+                {mode === 'sender' && currentPos && (
+                    <OverlayView position={currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                        <div style={{ transform: 'translate(-50%, -50%)' }} className="size-6 bg-blue-500 border-4 border-white rounded-full shadow-lg animate-pulse" />
+                    </OverlayView>
+                )}
           </GoogleMap>
           <div className="absolute top-3 right-3 flex flex-col gap-2">
             <Button onClick={handleRecenter} className="h-10 w-10 p-0"><LocateFixed className="size-5" /></Button>
@@ -914,7 +919,14 @@ export default function VesselTrackerPage() {
                                         <div className="flex flex-col gap-0.5">
                                             <div className="flex items-center gap-2">
                                                 <span className="font-black text-primary">{h.vesselName}</span>
-                                                <span className={cn("font-black uppercase", h.statusLabel.includes('ERREUR') ? 'text-orange-600' : 'text-slate-800')}>{h.statusLabel}</span>
+                                                <span className={cn("font-black uppercase", 
+                                                    h.statusLabel.includes('ERREUR') ? 'text-orange-600' : 
+                                                    h.statusLabel.includes('MOUILLAGE') ? 'text-amber-600' :
+                                                    h.statusLabel.includes('MOUVEMENT') ? 'text-blue-600' :
+                                                    h.statusLabel.includes('RETOUR') ? 'text-indigo-600' :
+                                                    h.statusLabel.includes('TERRE') ? 'text-green-600' : 'text-slate-800')}>
+                                                    {h.statusLabel}
+                                                </span>
                                             </div>
                                             <div className="flex items-center gap-2 opacity-40 font-bold">
                                                 <span>{format(h.time, 'HH:mm:ss')}</span>
