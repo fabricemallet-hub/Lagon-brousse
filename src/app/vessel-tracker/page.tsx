@@ -1,11 +1,12 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useUser as useUserHook, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where, getDoc, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where, deleteDoc } from 'firebase/firestore';
 import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,7 +35,6 @@ import {
   Volume2,
   Check,
   Trash2,
-  Ship,
   Home,
   RefreshCw,
   Settings,
@@ -122,6 +122,7 @@ export default function VesselTrackerPage() {
   const isFirstFixRef = useRef<boolean>(true);
   const lastMinutePosRef = useRef<google.maps.LatLngLiteral | null>(null);
   const lastForcedUpdateTimeRef = useRef<number>(0);
+  const [secondsUntilUpdate, setSecondsUntilUpdate] = useState(60);
 
   const [isCatchDialogOpen, setIsCatchDialogOpen] = useState(false);
   const [locallyClearedMarkerIds, setLocallyClearedMarkerIds] = useState<string[]>([]);
@@ -419,22 +420,6 @@ export default function VesselTrackerPage() {
     updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: newPrefs }).catch(() => {});
   };
 
-  const handleSaveSmsSettings = async () => {
-    if (!user || !firestore) return;
-    try {
-        await updateDoc(doc(firestore, 'users', user.uid), {
-            emergencyContact: emergencyContact,
-            vesselSmsMessage: vesselSmsMessage,
-            isEmergencyEnabled: isEmergencyEnabled,
-            isCustomMessageEnabled: isCustomMessageEnabled
-        });
-        toast({ title: "Paramètres SMS sauvegardés" });
-    } catch (e) {
-        console.error(e);
-        toast({ variant: 'destructive', title: "Erreur sauvegarde SMS" });
-    }
-  };
-
   const sendEmergencySms = (type: string) => {
     const pos = currentPos || (followedVessels?.find(v => v.isSharing && v.id === sharingId)?.location ? { lat: followedVessels.find(v => v.isSharing && v.id === sharingId)!.location!.latitude, lng: followedVessels.find(v => v.isSharing && v.id === sharingId)!.location!.longitude } : null);
     if (!pos) { toast({ variant: "destructive", title: "GPS non verrouillé" }); return; }
@@ -457,35 +442,48 @@ export default function VesselTrackerPage() {
     return tacticalMarkers.filter(m => mode !== 'sender' || m.vesselId === sharingId);
   }, [tacticalMarkers, mode, sharingId]);
 
+  // EFFET POUR LE DÉCOMPTE VISUEL ET LES MAJ GPS MINUTE PAR MINUTE
   useEffect(() => {
-    if (!isSharing || mode !== 'sender') return;
+    if (!isSharing || mode !== 'sender') {
+        setSecondsUntilUpdate(60);
+        return;
+    }
 
     const interval = setInterval(() => {
-        const now = Date.now();
-        
-        if (currentPos && lastMinutePosRef.current) {
-            const distInMinute = getDistance(currentPos.lat, currentPos.lng, lastMinutePosRef.current.lat, lastMinutePosRef.current.lng);
-            const radius = vesselPrefs.mooringRadius || 20;
-            
-            if (vesselStatus !== 'returning' && vesselStatus !== 'landed' && vesselStatus !== 'emergency') {
-                if (distInMinute <= radius) {
-                    if (vesselStatus !== 'stationary') handleManualStatus('stationary');
-                } else if (distInMinute < 100) {
-                    if (vesselStatus !== 'drifting') handleManualStatus('drifting', 'BATEAU À LA DÉRIVE');
-                } else {
-                    if (vesselStatus !== 'moving') handleManualStatus('moving');
+        setSecondsUntilUpdate(prev => {
+            if (prev <= 1) {
+                // MISE À JOUR FORCEE TOUTES LES MINUTES
+                const now = Date.now();
+                let statusToUpdate = vesselStatus;
+                let labelToUpdate = null;
+
+                if (currentPos && lastMinutePosRef.current) {
+                    const distInMinute = getDistance(currentPos.lat, currentPos.lng, lastMinutePosRef.current.lat, lastMinutePosRef.current.lng);
+                    const radius = vesselPrefs.mooringRadius || 20;
+                    
+                    if (vesselStatus !== 'returning' && vesselStatus !== 'landed' && vesselStatus !== 'emergency') {
+                        if (distInMinute <= radius) {
+                            statusToUpdate = 'stationary';
+                        } else if (distInMinute < 100) {
+                            statusToUpdate = 'drifting';
+                            labelToUpdate = 'BATEAU À LA DÉRIVE';
+                        } else {
+                            statusToUpdate = 'moving';
+                        }
+                    }
                 }
+
+                updateVesselInFirestore({ 
+                    status: statusToUpdate,
+                    eventLabel: labelToUpdate || `MAJ DU POINT GPS à ${format(new Date(), 'HH:mm')}`
+                });
+
+                lastMinutePosRef.current = currentPos;
+                return 60;
             }
-        }
-        
-        if (now - lastForcedUpdateTimeRef.current >= 60000) {
-            updateVesselInFirestore({ 
-                eventLabel: `MAJ DU POINT GPS à ${format(new Date(), 'HH:mm')}`
-            });
-            lastMinutePosRef.current = currentPos;
-            lastForcedUpdateTimeRef.current = now;
-        }
-    }, 60000);
+            return prev - 1;
+        });
+    }, 1000);
 
     return () => clearInterval(interval);
   }, [isSharing, mode, vesselStatus, currentPos, vesselPrefs.mooringRadius, updateVesselInFirestore]);
@@ -590,6 +588,13 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
+      {/* DÉCOMPTE VISUEL EN HAUT SI PARTAGE ACTIF */}
+      {isSharing && mode === 'sender' && (
+          <div className="bg-primary text-white text-[10px] font-black uppercase py-1.5 px-4 rounded-full shadow-lg flex items-center gap-2 animate-pulse mx-auto w-fit border-2 border-white/20">
+              <RefreshCw className="size-3" /> MAJ GPS DANS {secondsUntilUpdate}S
+          </div>
+      )}
+
       <Card className="border-2 shadow-sm overflow-hidden">
         <div className="flex bg-muted/30 p-1">
           <Button variant={mode === 'sender' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => setMode('sender')}>Émetteur (A)</Button>
@@ -602,7 +607,6 @@ export default function VesselTrackerPage() {
             <div className="space-y-6">
               {isSharing ? (
                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                    {/* STATUS DU PARTAGE COMPACT SI PAS EN MODIF */}
                     {sharingTarget !== 'none' && !isTargetMenuOpen ? (
                         <div className="flex items-center justify-between p-4 border-2 rounded-2xl bg-primary/5 border-primary/20 shadow-sm">
                             <div className="flex items-center gap-3">
@@ -775,10 +779,8 @@ export default function VesselTrackerPage() {
                     );
                 })}
 
-                {/* TACTICAL MARKERS (BIRDS & FISH) */}
                 {tacticalMarkers.map(marker => {
                     if (mode === 'sender' && marker.vesselId !== sharingId) return null;
-                    
                     return (
                         <OverlayView 
                             key={`map-marker-${marker.id}`} 
@@ -804,13 +806,6 @@ export default function VesselTrackerPage() {
             <Button onClick={handleRecenter} className="shadow-lg h-10 w-10 bg-background/90 backdrop-blur-md border-2 p-0"><LocateFixed className="size-5" /></Button>
             <Button size="icon" className="shadow-lg h-10 w-10 bg-background/90 backdrop-blur-md border-2" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}</Button>
           </div>
-          
-          {isGhostMode && mode !== 'receiver' && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-slate-900/80 backdrop-blur-md border border-white/20 rounded-full flex items-center gap-2 shadow-2xl animate-in zoom-in-95">
-                <EyeOff className="size-4 text-primary" />
-                <span className="text-[10px] font-black uppercase text-white tracking-widest">Navigation Invisible active</span>
-            </div>
-          )}
         </div>
 
         <div className="bg-card p-4 flex flex-col gap-4 border-t-2">
