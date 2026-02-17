@@ -1188,7 +1188,8 @@ export default function VesselTrackerPage() {
                                                 <div className="flex flex-col gap-0.5">
                                                     <span className={cn("font-black uppercase text-[10px] leading-none", 
                                                         h.statusLabel.includes('ASSISTANCE') ? 'text-red-600' :
-                                                        h.statusLabel.includes('MOUVEMENT') ? 'text-blue-600' : 'text-slate-800')}>
+                                                        h.statusLabel.includes('MOUVEMENT') ? 'text-blue-600' :
+                                                        h.statusLabel.includes('MOUILLAGE') ? 'text-orange-600' : 'text-slate-800')}>
                                                         {h.statusLabel}
                                                     </span>
                                                     {h.statusDurationMin !== undefined && (
@@ -1265,6 +1266,66 @@ export default function VesselTrackerPage() {
                     </Accordion>
                 </div>
             </div>
+
+            {/* ANNUAIRE MARITIME NC - AJOUTÉ ICI */}
+            <Card className="border-2 bg-slate-50/50 shadow-sm rounded-2xl overflow-hidden mt-2">
+                <div className="p-3 border-b bg-muted/20 flex items-center gap-2">
+                    <Phone className="size-4 text-primary" />
+                    <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">Annuaire Maritime NC</h3>
+                </div>
+                <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-6">
+                    {/* URGENCES */}
+                    <div className="space-y-3">
+                        <h4 className="text-[10px] font-black uppercase text-red-600 flex items-center gap-2 border-b border-red-100 pb-1">
+                            <ShieldAlert className="size-3" /> Urgences
+                        </h4>
+                        <div className="space-y-3">
+                            <div className="flex flex-col gap-0.5">
+                                <span className="text-[8px] font-bold text-muted-foreground uppercase leading-none">COSS NC (Mer)</span>
+                                <a href="tel:16" className="text-sm font-black flex items-center gap-2 text-slate-800 hover:text-primary transition-colors">
+                                    <Phone className="size-3.5 opacity-40" /> 16
+                                </a>
+                            </div>
+                            <div className="flex flex-col gap-0.5">
+                                <span className="text-[8px] font-bold text-muted-foreground uppercase leading-none">SAMU (Terre)</span>
+                                <a href="tel:15" className="text-sm font-black flex items-center gap-2 text-slate-800 hover:text-primary transition-colors">
+                                    <Phone className="size-3.5 opacity-40" /> 15
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* SERVICES */}
+                    <div className="space-y-3">
+                        <h4 className="text-[10px] font-black uppercase text-blue-600 flex items-center gap-2 border-b border-blue-100 pb-1">
+                            <Waves className="size-3" /> Services
+                        </h4>
+                        <div className="space-y-3">
+                            <div className="flex flex-col gap-0.5">
+                                <span className="text-[8px] font-bold text-muted-foreground uppercase leading-none">Météo Marine</span>
+                                <a href="tel:366736" className="text-sm font-black flex items-center gap-2 text-slate-800 hover:text-primary transition-colors">
+                                    <Phone className="size-3.5 opacity-40" /> 36 67 36
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* PORTS & MARINAS */}
+                    <div className="space-y-3">
+                        <h4 className="text-[10px] font-black uppercase text-indigo-600 flex items-center gap-2 border-b border-indigo-100 pb-1">
+                            <Ship className="size-3" /> Ports & Marinas
+                        </h4>
+                        <div className="space-y-3">
+                            <div className="flex flex-col gap-0.5">
+                                <span className="text-[8px] font-bold text-muted-foreground uppercase leading-none">Port Autonome (VHF 12)</span>
+                                <a href="tel:255000" className="text-sm font-black flex items-center gap-2 text-slate-800 hover:text-primary transition-colors">
+                                    <Phone className="size-3.5 opacity-40" /> 25 50 00
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
       </Card>
 
