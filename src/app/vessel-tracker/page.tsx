@@ -1047,7 +1047,16 @@ export default function VesselTrackerPage() {
       <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all", isFullscreen && "fixed inset-0 z-[100] w-screen h-screen rounded-none")}>
         <div className={cn("relative bg-muted/20", isFullscreen ? "flex-grow" : "h-[300px]")}>
           <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
-                {followedVessels?.filter(v => v.isSharing && !v.isGhostMode && ((mode === 'receiver' && !v.isPrivateHidden) || (mode === 'fleet' && !v.isPositionHidden))).map(vessel => (
+                {followedVessels?.filter(v => {
+                    // Émetteur A : Toujours voir son propre navire même en mode fantôme
+                    if (mode === 'sender' && v.id === sharingId && isSharing) return true;
+                    
+                    // Récepteur B et Flotte C : Suivre les règles de masquage
+                    return v.isSharing && !v.isGhostMode && (
+                        (mode === 'receiver' && !v.isPrivateHidden) || 
+                        (mode === 'fleet' && !v.isPositionHidden)
+                    );
+                }).map(vessel => (
                     <React.Fragment key={vessel.id}>
                         {vessel.status === 'stationary' && vessel.location && (
                             <Circle
@@ -1119,29 +1128,9 @@ export default function VesselTrackerPage() {
                     </React.Fragment>
                 ))}
                 {mode === 'sender' && currentPos && (
-                    <>
-                        {vesselStatus === 'stationary' && anchorPos && (
-                            <Circle
-                                center={anchorPos}
-                                radius={vesselPrefs.mooringRadius || 20}
-                                options={{
-                                    fillColor: '#3b82f6',
-                                    fillOpacity: 0.3,
-                                    strokeColor: '#3b82f6',
-                                    strokeOpacity: 0.8,
-                                    strokeWeight: 2,
-                                    clickable: false,
-                                    editable: false,
-                                    draggable: false,
-                                    visible: true,
-                                    zIndex: 100
-                                }}
-                            />
-                        )}
-                        <OverlayView position={currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                            <div style={{ transform: 'translate(-50%, -50%)' }} className="size-6 bg-blue-500 border-4 border-white rounded-full shadow-lg animate-pulse" />
-                        </OverlayView>
-                    </>
+                    <OverlayView position={currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                        <PulsingDot />
+                    </OverlayView>
                 )}
           </GoogleMap>
           <div className="absolute top-3 right-3 flex flex-col gap-2">
