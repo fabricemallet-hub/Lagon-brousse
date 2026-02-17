@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -121,8 +120,8 @@ export default function VesselTrackerPage() {
   const [vesselPrefs, setVesselPrefs] = useState<NonNullable<UserAccount['vesselPrefs']>>({
     isNotifyEnabled: true,
     vesselVolume: 0.8,
-    notifySettings: { moving: true, stationary: true, offline: true, battery: true },
-    notifySounds: { moving: '', stationary: '', offline: '', battery: '' },
+    notifySettings: { moving: true, stationary: true, offline: true, battery: true, emergency: true },
+    notifySounds: { moving: '', stationary: '', offline: '', battery: '', emergency: '' },
     isWatchEnabled: false,
     watchDuration: 60,
     batteryThreshold: 20
@@ -379,7 +378,8 @@ export default function VesselTrackerPage() {
             stationary: 'AU MOUILLAGE', 
             offline: 'SIGNAL PERDU',
             returning: 'RETOUR MAISON',
-            landed: 'À TERRE (HOME)'
+            landed: 'À TERRE (HOME)',
+            emergency: 'DEMANDE D\'ASSISTANCE'
         };
 
         const addToHistory = (label: string) => {
@@ -448,7 +448,7 @@ export default function VesselTrackerPage() {
 
         if (shouldPanOnNextFix.current && map) { map.panTo(newPos); map.setZoom(15); shouldPanOnNextFix.current = false; }
         
-        if (vesselStatus !== 'returning' && vesselStatus !== 'landed') {
+        if (vesselStatus !== 'returning' && vesselStatus !== 'landed' && vesselStatus !== 'emergency') {
             if (!anchorPos) { 
               setAnchorPos(newPos); 
               updateVesselInFirestore({ location: { latitude, longitude }, status: 'moving', isSharing: true, accuracy: roundedAccuracy }); 
@@ -537,7 +537,8 @@ export default function VesselTrackerPage() {
                 { key: 'moving', label: 'Mouvement', color: 'text-blue-600' },
                 { key: 'stationary', label: 'Mouillage', color: 'text-amber-600' },
                 { key: 'offline', label: 'Signal Perdu', color: 'text-red-600' },
-                { key: 'battery', label: 'Batterie Faible', color: 'text-red-800' }
+                { key: 'battery', label: 'Batterie Faible', color: 'text-red-800' },
+                { key: 'emergency', label: 'Demande Assistance', color: 'text-red-600' }
             ].map(ev => (
                 <div key={ev.key} className={cn("p-3 rounded-xl border-2 flex flex-col gap-3 transition-all", vesselPrefs.notifySettings[ev.key as keyof typeof vesselPrefs.notifySettings] ? "bg-white" : "bg-muted/30 opacity-60")}>
                     <div className="flex items-center justify-between">
@@ -576,7 +577,9 @@ export default function VesselTrackerPage() {
               {isSharing ? (
                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
                     <div className={cn("p-6 rounded-2xl shadow-xl relative overflow-hidden border-2 text-white", 
-                        vesselStatus === 'landed' ? "bg-green-600 border-green-400/20" : "bg-primary border-primary-foreground/20")}>
+                        vesselStatus === 'landed' ? "bg-green-600 border-green-400/20" : 
+                        vesselStatus === 'emergency' ? "bg-red-600 border-red-400/20 animate-pulse" :
+                        "bg-primary border-primary-foreground/20")}>
                         <Navigation className="absolute -right-4 -bottom-4 size-32 opacity-10 rotate-12" />
                         <div className="space-y-1 relative z-10">
                             <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
@@ -588,11 +591,20 @@ export default function VesselTrackerPage() {
                         <div className="mt-8 flex items-center gap-3 relative z-10">
                             <Badge variant="outline" className="bg-green-500/30 border-green-200 text-white font-black text-[10px] px-3 h-6 animate-pulse">EN LIGNE</Badge>
                             <span className="text-[10px] font-black uppercase tracking-widest text-white/80 flex items-center gap-2">
-                                {vesselStatus === 'moving' ? <Move className="size-3" /> : vesselStatus === 'returning' ? <Navigation className="size-3" /> : vesselStatus === 'landed' ? <Home className="size-3" /> : <Anchor className="size-3" />}
-                                {vesselStatus === 'moving' ? 'En mouvement' : vesselStatus === 'returning' ? 'Retour Maison' : vesselStatus === 'landed' ? 'À terre' : 'Au mouillage'}
+                                {vesselStatus === 'moving' ? <Move className="size-3" /> : vesselStatus === 'returning' ? <Navigation className="size-3" /> : vesselStatus === 'landed' ? <Home className="size-3" /> : vesselStatus === 'emergency' ? <ShieldAlert className="size-3" /> : <Anchor className="size-3" />}
+                                {vesselStatus === 'moving' ? 'En mouvement' : vesselStatus === 'returning' ? 'Retour Maison' : vesselStatus === 'landed' ? 'À terre' : vesselStatus === 'emergency' ? 'EN DÉTRESSE' : 'Au mouillage'}
                             </span>
                         </div>
                     </div>
+
+                    <Button 
+                        variant="destructive" 
+                        className={cn("w-full h-16 text-lg font-black shadow-2xl border-4 uppercase tracking-tighter gap-3", 
+                            vesselStatus === 'emergency' && "animate-pulse border-red-400 bg-red-700")} 
+                        onClick={() => handleManualStatus(vesselStatus === 'emergency' ? 'moving' : 'emergency', vesselStatus === 'emergency' ? 'ASSISTANCE ANNULÉE' : 'DEMANDE D\'ASSISTANCE')}
+                    >
+                        <ShieldAlert className="size-8" /> {vesselStatus === 'emergency' ? "ANNULER ASSISTANCE" : "DEMANDE D'ASSISTANCE"}
+                    </Button>
 
                     <div className="bg-muted/20 p-4 rounded-2xl border-2 border-dashed space-y-3">
                         <p className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest flex items-center gap-2"><Zap className="size-3" /> Signalisation manuelle</p>
@@ -765,15 +777,20 @@ export default function VesselTrackerPage() {
                 {followedVessels?.filter(v => v.isSharing).map(vessel => (
                     <OverlayView key={vessel.id} position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                     <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
-                        <div className="px-2 py-1 bg-slate-900/90 text-white rounded text-[10px] font-black shadow-lg border border-white/20 whitespace-nowrap flex items-center gap-2">
-                          <span className="truncate max-w-[80px]">{vessel.displayName || vessel.id}</span>
+                        <div className={cn("px-2 py-1 text-white rounded text-[10px] font-black shadow-lg border whitespace-nowrap flex items-center gap-2", 
+                            vessel.status === 'emergency' ? "bg-red-600 border-red-400 animate-pulse" : "bg-slate-900/90 border-white/20")}>
+                          <span className="truncate max-w-[80px]">{vessel.status === 'emergency' ? '!!! URGENCE !!!' : (vessel.displayName || vessel.id)}</span>
                           <BatteryIconComp level={vessel.batteryLevel} charging={vessel.isCharging} className="size-2.5" />
                         </div>
-                        <div className={cn("p-2 rounded-full border-2 border-white shadow-xl", 
+                        <div className={cn("p-2 rounded-full border-2 border-white shadow-xl transition-all", 
                             vessel.status === 'moving' ? "bg-blue-600" : 
                             vessel.status === 'returning' ? "bg-indigo-600" :
-                            vessel.status === 'landed' ? "bg-green-600" : "bg-amber-600")}>
-                          {vessel.status === 'stationary' ? <Anchor className="size-5 text-white" /> : <Navigation className="size-5 text-white" />}
+                            vessel.status === 'landed' ? "bg-green-600" : 
+                            vessel.status === 'emergency' ? "bg-red-600 animate-pulse scale-125 ring-4 ring-red-500/50" :
+                            "bg-amber-600")}>
+                          {vessel.status === 'stationary' ? <Anchor className="size-5 text-white" /> : 
+                           vessel.status === 'emergency' ? <ShieldAlert className="size-5 text-white" /> :
+                           <Navigation className="size-5 text-white" />}
                         </div>
                     </div>
                     </OverlayView>
@@ -804,7 +821,11 @@ export default function VesselTrackerPage() {
                                     <div className="flex flex-col gap-0.5">
                                         <div className="flex items-center gap-2">
                                             <span className="font-black text-primary uppercase">{h.vesselName}</span>
-                                            <span className="font-black uppercase opacity-60">{h.statusLabel}</span>
+                                            <span className={cn("font-black uppercase", 
+                                                h.statusLabel.includes('ASSISTANCE') || h.statusLabel.includes('DÉTRESSE') ? 'text-red-600 animate-pulse' :
+                                                h.statusLabel.includes('MOUVEMENT') ? 'text-blue-600' : 'text-slate-500')}>
+                                                {h.statusLabel}
+                                            </span>
                                             <span className={cn("flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-black border", h.isCharging ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-slate-50 text-slate-500 border-slate-200")}>
                                                 {h.isCharging && <Zap className="size-2.5 fill-current" />}{h.batteryLevel}%
                                             </span>
