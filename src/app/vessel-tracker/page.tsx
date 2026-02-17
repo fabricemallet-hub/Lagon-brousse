@@ -105,10 +105,17 @@ export default function VesselTrackerPage() {
   const currentAccuracyRef = useRef<number | null>(null);
   const anchorPosRef = useRef<google.maps.LatLngLiteral | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
+  const vesselStatusRef = useRef<VesselStatus['status']>('moving');
+  
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const immobilityStartTime = useRef<number | null>(null);
   const isFirstFixRef = useRef<boolean>(true);
+
+  // Sync ref with state for use in callbacks without re-triggering effects
+  useEffect(() => {
+    vesselStatusRef.current = vesselStatus;
+  }, [vesselStatus]);
 
   const [vesselPrefs, setVesselPrefs] = useState<NonNullable<UserAccount['vesselPrefs']>>({
     isNotifyEnabled: true,
@@ -372,14 +379,25 @@ export default function VesselTrackerPage() {
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         const newPos = { lat: position.coords.latitude, lng: position.coords.longitude };
+        const currentVesselStatus = vesselStatusRef.current;
+        
         setCurrentPos(newPos); currentPosRef.current = newPos; currentAccuracyRef.current = Math.round(position.coords.accuracy);
         if (shouldPanOnNextFix.current && map) { map.panTo(newPos); map.setZoom(15); shouldPanOnNextFix.current = false; }
+        
         if (mode === 'sender') {
             if (isFirstFixRef.current) { anchorPosRef.current = newPos; updateVesselInFirestore({ status: 'moving', isSharing: true }); immobilityStartTime.current = Date.now(); isFirstFixRef.current = false; return; }
-            if (vesselStatus !== 'returning' && vesselStatus !== 'landed' && vesselStatus !== 'emergency') {
+            if (currentVesselStatus !== 'returning' && currentVesselStatus !== 'landed' && currentVesselStatus !== 'emergency') {
                 const dist = getDistance(newPos.lat, newPos.lng, anchorPosRef.current!.lat, anchorPosRef.current!.lng);
-                if (dist > IMMOBILITY_THRESHOLD_METERS) { setVesselStatus('moving'); anchorPosRef.current = newPos; immobilityStartTime.current = null; updateVesselInFirestore({ status: 'moving' }); }
-                else if (Date.now() - (immobilityStartTime.current || 0) > 30000 && vesselStatus !== 'stationary') { setVesselStatus('stationary'); updateVesselInFirestore({ status: 'stationary' }); }
+                if (dist > IMMOBILITY_THRESHOLD_METERS) { 
+                    setVesselStatus('moving'); 
+                    anchorPosRef.current = newPos; 
+                    immobilityStartTime.current = null; 
+                    updateVesselInFirestore({ status: 'moving' }); 
+                }
+                else if (Date.now() - (immobilityStartTime.current || 0) > 30000 && currentVesselStatus !== 'stationary') { 
+                    setVesselStatus('stationary'); 
+                    updateVesselInFirestore({ status: 'stationary' }); 
+                }
                 else updateVesselInFirestore({});
             } else updateVesselInFirestore({});
         }
@@ -388,7 +406,7 @@ export default function VesselTrackerPage() {
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
-  }, [isSharing, isReceiverGpsActive, mode, updateVesselInFirestore, map, toast, vesselStatus]);
+  }, [isSharing, isReceiverGpsActive, mode, updateVesselInFirestore, map, toast]); // Removed vesselStatus to prevent constant restarts
 
   const handleRecenter = () => {
     let pos = currentPosRef.current;
@@ -581,7 +599,7 @@ export default function VesselTrackerPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="space-y-1"><Label className="text-[9px] font-black uppercase ml-1 opacity-60">Suivre le navire ID</Label><div className="flex gap-2"><Input placeholder="ENTREZ L'ID..." value={vesselIdToFollow} onChange={e => setVesselIdToFollow(e.target.value)} className="font-black text-center h-12 border-2 uppercase bg-white" /><Button variant="default" className="h-12 px-4 font-black uppercase text-[10px]" onClick={handleSaveVessel} disabled={!vesselIdToFollow.trim()}><Check className="size-4" /></Button></div></div>
+              <div className="space-y-1"><Label className="text-[9px] font-black uppercase ml-1 opacity-60">Suivre le navire ID</Label><div className="flex gap-2"><Input placeholder="ENTREZ L'ID..." value={vesselIdToFollow} onChange={e => setVesselIdToFollow(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest flex-grow bg-white" /><Button variant="default" className="h-12 px-4 font-black uppercase text-[10px]" onClick={handleSaveVessel} disabled={!vesselIdToFollow.trim()}><Check className="size-4" /></Button></div></div>
               <div className="grid gap-2">
                   {savedVesselIds.map(id => {
                       const vessel = followedVessels?.find(v => v.id === id);
@@ -605,7 +623,6 @@ export default function VesselTrackerPage() {
                     <span className="text-[10px] font-black uppercase">Réglages Notifications & Veille</span>
                   </AccordionTrigger>
                   <AccordionContent className="pt-4 space-y-6">
-                    {/* 1. ALERTES SONORES */}
                     <div className="space-y-4 p-4 border-2 rounded-2xl bg-card shadow-inner">
                         <div className="flex items-center justify-between">
                             <div className="space-y-0.5">
@@ -682,12 +699,11 @@ export default function VesselTrackerPage() {
                         </div>
                     </div>
 
-                    {/* 2. VEILLE STRATÉGIQUE */}
                     <div className="space-y-4 p-4 border-2 rounded-2xl bg-orange-50/30 border-orange-100">
                         <div className="flex items-center justify-between">
                             <div className="space-y-0.5">
                                 <Label className="text-xs font-black uppercase text-orange-800">Veille Stratégique</Label>
-                                <p className="text-[9px] font-bold text-orange-600/60 uppercase">Alarme si immobile (mouillage) trop longtemps</p>
+                                <p className="text-[9px] font-bold text-orange-600/60 uppercase">Alarme si immobile trop longtemps</p>
                             </div>
                             <Switch 
                                 checked={vesselPrefs.isWatchEnabled} 
@@ -734,14 +750,10 @@ export default function VesselTrackerPage() {
                                         <Play className="size-3" />
                                     </Button>
                                 </div>
-                                <p className="text-[8px] font-bold text-orange-800/60 italic leading-tight px-1">
-                                    Note : L'alarme de veille jouera en boucle jusqu'à validation manuelle de votre part.
-                                </p>
                             </div>
                         </div>
                     </div>
 
-                    {/* 3. SEUIL BATTERIE FAIBLE */}
                     <div className="space-y-4 p-4 border-2 rounded-2xl bg-red-50/30 border-red-100">
                         <div className="space-y-0.5">
                             <div className="flex items-center justify-between">

@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useState, useMemo, useEffect } from 'react';
 import type { MeteoLive, MeteoForecast, WindDirection } from '@/lib/types';
-import { translateWindDirection, degreesToCardinal, getMeteoCondition, getRegionalNow } from '@/lib/utils';
+import { translateWindDirection, degreesToCardinal, getMeteoCondition, getRegionalNow, getDistance } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -19,18 +19,6 @@ import type { WeatherSummaryOutput } from '@/ai/schemas';
 import { useLocation } from '@/context/location-context';
 import { locationsByRegion } from '@/lib/locations';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-
-// Helper: Calculate distance between two points (Haversine)
-const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const R = 6371e3; // Earth radius in meters
-  const φ1 = (lat1 * Math.PI) / 180;
-  const φ2 = (lat2 * Math.PI) / 180;
-  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
-  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-};
 
 // Helper: Calculate progressive UV factor based on time of day (Zenith at 12:00, 0 before 6:00 and after 18:00)
 const getProgressiveUV = (maxUV: number, date: Date): number => {
