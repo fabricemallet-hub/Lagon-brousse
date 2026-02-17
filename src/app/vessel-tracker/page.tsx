@@ -135,7 +135,6 @@ export default function VesselTrackerPage() {
     watchDuration: 60,
     watchSound: '',
     batteryThreshold: 20,
-    batterySound: '',
     mooringRadius: 20
   });
   
@@ -381,12 +380,10 @@ export default function VesselTrackerPage() {
   const handleClearHuntingHistory = () => {
     if (!firestore || !user) return;
     if (isSharing && mode === 'sender') {
-        // Clear Firestore for owner
         updateDoc(doc(firestore, 'vessels', sharingId), {
             huntingMarkers: []
         }).then(() => toast({ title: "Signalements tactiques supprimés" }));
     } else {
-        // Local hide for follower
         setLocallyClearedMarkerIds(prev => [...prev, ...tacticalMarkers.map(m => m.id)]);
         toast({ title: "Journal tactique masqué" });
     }
@@ -435,11 +432,27 @@ export default function VesselTrackerPage() {
     }
   };
 
-  const smsPreview = useMemo(() => {
-    const nicknamePrefix = vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : "";
-    const customText = (isCustomMessageEnabled && vesselSmsMessage) ? vesselSmsMessage : "Requiert assistance immédiate.";
-    return `${nicknamePrefix}${customText} [MAYDAY/PAN PAN] Position : https://www.google.com/maps?q=-22.27,166.45`;
-  }, [vesselSmsMessage, isCustomMessageEnabled, vesselNickname]);
+  const sendEmergencySms = (type: string) => {
+    const pos = currentPos || (followedVessels?.find(v => v.isSharing && v.id === sharingId)?.location ? { lat: followedVessels.find(v => v.isSharing && v.id === sharingId)!.location!.latitude, lng: followedVessels.find(v => v.isSharing && v.id === sharingId)!.location!.longitude } : null);
+    if (!pos) { toast({ variant: "destructive", title: "GPS non verrouillé" }); return; }
+    
+    if (isGhostMode) {
+        setIsGhostMode(false);
+        updateVesselInFirestore({ isGhostMode: false, status: 'emergency', eventLabel: 'DEMANDE D\'ASSISTANCE (MAYDAY)' });
+    }
+
+    const posUrl = `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
+    const body = `${vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : ""}${isCustomMessageEnabled ? vesselSmsMessage : "Assistance requise."} [${type}] Position : ${posUrl}`;
+    window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
+  };
+
+  const filteredHistory = useMemo(() => {
+    return history.filter(h => mode !== 'sender' || h.vesselId === sharingId);
+  }, [history, mode, sharingId]);
+
+  const filteredTactical = useMemo(() => {
+    return tacticalMarkers.filter(m => mode !== 'sender' || m.vesselId === sharingId);
+  }, [tacticalMarkers, mode, sharingId]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender') return;
@@ -571,28 +584,6 @@ export default function VesselTrackerPage() {
     const pos = currentPos || (followedVessels?.find(v => v.isSharing && v.id === sharingId)?.location ? { lat: followedVessels.find(v => v.isSharing && v.id === sharingId)!.location!.latitude, lng: followedVessels.find(v => v.isSharing && v.id === sharingId)!.location!.longitude } : null);
     if (pos && map) { map.panTo(pos); map.setZoom(15); } else { shouldPanOnNextFix.current = true; }
   };
-
-  const sendEmergencySms = (type: string) => {
-    const pos = currentPos || (followedVessels?.find(v => v.isSharing && v.id === sharingId)?.location ? { lat: followedVessels.find(v => v.isSharing && v.id === sharingId)!.location!.latitude, lng: followedVessels.find(v => v.isSharing && v.id === sharingId)!.location!.longitude } : null);
-    if (!pos) { toast({ variant: "destructive", title: "GPS non verrouillé" }); return; }
-    
-    if (isGhostMode) {
-        setIsGhostMode(false);
-        updateVesselInFirestore({ isGhostMode: false, status: 'emergency', eventLabel: 'DEMANDE D\'ASSISTANCE (MAYDAY)' });
-    }
-
-    const posUrl = `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
-    const body = `${vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : ""}${isCustomMessageEnabled ? vesselSmsMessage : "Assistance requise."} [${type}] Position : ${posUrl}`;
-    window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
-  };
-
-  const filteredHistory = useMemo(() => {
-    return history.filter(h => mode !== 'sender' || h.vesselId === sharingId);
-  }, [history, mode, sharingId]);
-
-  const filteredTactical = useMemo(() => {
-    return tacticalMarkers.filter(m => mode !== 'sender' || m.vesselId === sharingId);
-  }, [tacticalMarkers, mode, sharingId]);
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
@@ -762,6 +753,32 @@ export default function VesselTrackerPage() {
                         </React.Fragment>
                     );
                 })}
+
+                {/* TACTICAL MARKERS (BIRDS & FISH) */}
+                {tacticalMarkers.map(marker => {
+                    // If we are in sender mode, only show our own markers
+                    if (mode === 'sender' && marker.vesselId !== sharingId) return null;
+                    
+                    return (
+                        <OverlayView 
+                            key={`map-marker-${marker.id}`} 
+                            position={{ lat: marker.lat, lng: marker.lng }} 
+                            mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                        >
+                            <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
+                                <div className="px-1.5 py-0.5 bg-white/90 backdrop-blur-sm border rounded text-[8px] font-black uppercase shadow-sm whitespace-nowrap">
+                                    {marker.type || 'OISEAUX'}
+                                </div>
+                                <div className={cn(
+                                    "p-1.5 rounded-full border-2 border-white shadow-lg",
+                                    marker.type ? "bg-blue-600" : "bg-orange-500"
+                                )}>
+                                    {marker.type ? <Fish className="size-3 text-white" /> : <Bird className="size-3 text-white" />}
+                                </div>
+                            </div>
+                        </OverlayView>
+                    );
+                })}
           </GoogleMap>
           <div className="absolute top-3 right-3 flex flex-col gap-2">
             <Button onClick={handleRecenter} className="shadow-lg h-10 w-10 bg-background/90 backdrop-blur-md border-2 p-0"><LocateFixed className="size-5" /></Button>
@@ -883,10 +900,4 @@ export default function VesselTrackerPage() {
       </Dialog>
     </div>
   );
-}
-
-export function VesselTracker() {
-  const { user, isUserLoading } = useUserHook();
-  if (isUserLoading) return <Skeleton className="h-48 w-full" />;
-  return <VesselTrackerPage />;
 }
