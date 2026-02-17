@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useUser as useUserHook, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where, getDoc } from 'firebase/firestore';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -96,7 +96,7 @@ export default function VesselTrackerPage() {
   const { toast } = useToast();
   const { isLoaded, loadError } = useGoogleMaps();
 
-  const [mode, setMode] = useState<'sender' | 'receiver'>('sender');
+  const [mode, setMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
   
   const [isSharing, setIsSharing] = useState(false);
@@ -314,6 +314,22 @@ export default function VesselTrackerPage() {
     await updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: newPrefs }).catch(() => {});
   };
 
+  const handleSaveSmsSettings = async () => {
+    if (!user || !firestore) return;
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            emergencyContact: emergencyContact,
+            vesselSmsMessage: vesselSmsMessage,
+            isEmergencyEnabled: isEmergencyEnabled,
+            isCustomMessageEnabled: isCustomMessageEnabled
+        });
+        toast({ title: "Paramètres SMS sauvegardés" });
+    } catch (e) {
+        console.error(e);
+        toast({ variant: 'destructive', title: "Erreur sauvegarde SMS" });
+    }
+  };
+
   useEffect(() => {
     if (!followedVessels) return;
 
@@ -389,7 +405,7 @@ export default function VesselTrackerPage() {
             const label = vessel.eventLabel || statusLabels[currentStatus] || currentStatus;
             addToHistory(label);
             
-            if (mode === 'receiver' && lastStatus && statusChanged && vesselPrefs.isNotifyEnabled) {
+            if (mode !== 'sender' && lastStatus && statusChanged && vesselPrefs.isNotifyEnabled) {
                 const soundKey = (currentStatus === 'returning' || currentStatus === 'landed') ? 'moving' : currentStatus;
                 if (vesselPrefs.notifySettings[soundKey as keyof typeof vesselPrefs.notifySettings]) {
                     playVesselSound(vesselPrefs.notifySounds[soundKey as keyof typeof vesselPrefs.notifySounds] || 'sonar');
@@ -401,7 +417,7 @@ export default function VesselTrackerPage() {
 
         if (batteryDroppedUnderThreshold && vesselPrefs.notifySettings.battery) {
             addToHistory(`BATTERIE FAIBLE`);
-            if (mode === 'receiver' && vesselPrefs.isNotifyEnabled) {
+            if (mode !== 'sender' && vesselPrefs.isNotifyEnabled) {
                 playVesselSound('alerte');
             }
         }
@@ -551,6 +567,7 @@ export default function VesselTrackerPage() {
         <div className="flex bg-muted/30 p-1">
           <Button variant={mode === 'sender' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => setMode('sender')}>Émetteur (A)</Button>
           <Button variant={mode === 'receiver' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => setMode('receiver')}>Récepteur (B)</Button>
+          <Button variant={mode === 'fleet' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => setMode('fleet')}>Flotte (C)</Button>
         </div>
 
         <CardContent className="p-4 space-y-4">
