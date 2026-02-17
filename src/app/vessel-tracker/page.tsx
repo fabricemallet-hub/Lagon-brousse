@@ -98,6 +98,7 @@ interface TechEntry {
     batteryLevel?: number;
     isCharging?: boolean;
     accuracy?: number;
+    statusDurationMin?: number;
 }
 
 interface TacticalEntry {
@@ -453,10 +454,22 @@ export default function VesselTrackerPage() {
 
         if (statusChanged || (timestampUpdated && !vessel.eventLabel)) {
             const label = statusLabels[currentStatus] || currentStatus;
+            const statusStart = getTimeMillis(vessel.statusChangedAt || vessel.lastActive);
+            const durationMin = Math.floor((Date.now() - statusStart) / 60000);
+
             setTechHistory(prev => {
                 const alreadyAdded = prev.length > 0 && prev[0].statusLabel === label && prev[0].vesselName === (vessel.displayName || vessel.id) && Math.abs(prev[0].time.getTime() - Date.now()) < 2000;
                 if (alreadyAdded) return prev;
-                return [{ vesselName: vessel.displayName || vessel.id, statusLabel: label, time: new Date(), pos, batteryLevel: currentBattery, isCharging: currentCharging, accuracy }, ...prev].slice(0, 50);
+                return [{ 
+                    vesselName: vessel.displayName || vessel.id, 
+                    statusLabel: label, 
+                    time: new Date(), 
+                    pos, 
+                    batteryLevel: currentBattery, 
+                    isCharging: currentCharging, 
+                    accuracy,
+                    statusDurationMin: durationMin 
+                }, ...prev].slice(0, 50);
             });
             
             if (mode !== 'sender' && lastStatus && statusChanged && vesselPrefs.isNotifyEnabled) {
@@ -932,11 +945,16 @@ export default function VesselTrackerPage() {
                                         <div className="flex flex-col gap-0.5">
                                             <div className="flex items-center gap-2">
                                                 <span className="font-black text-primary uppercase">{h.vesselName}</span>
-                                                <span className={cn("font-black uppercase", 
-                                                    h.statusLabel.includes('ASSISTANCE') ? 'text-red-600' :
-                                                    h.statusLabel.includes('MOUVEMENT') ? 'text-blue-600' : 'text-slate-500')}>
-                                                    {h.statusLabel}
-                                                </span>
+                                                <div className="flex flex-col">
+                                                    <span className={cn("font-black uppercase", 
+                                                        h.statusLabel.includes('ASSISTANCE') ? 'text-red-600' :
+                                                        h.statusLabel.includes('MOUVEMENT') ? 'text-blue-600' : 'text-slate-500')}>
+                                                        {h.statusLabel}
+                                                    </span>
+                                                    {h.statusDurationMin !== undefined && h.statusDurationMin > 0 && (
+                                                        <span className="text-[8px] font-black text-primary uppercase">ACTIF {h.statusDurationMin} MIN</span>
+                                                    )}
+                                                </div>
                                                 <span className={cn("flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-black border", h.isCharging ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-slate-50 text-slate-500 border-slate-200")}>
                                                     {h.isCharging && <Zap className="size-2.5 fill-current" />}{h.batteryLevel}%
                                                 </span>
