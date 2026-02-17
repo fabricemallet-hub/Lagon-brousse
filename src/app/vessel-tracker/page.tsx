@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -465,7 +464,9 @@ export default function VesselTrackerPage() {
                         ...lastEntry,
                         statusLabel: `${cleanBaseLabel} (MAJ ${format(new Date(), 'HH:mm')})`,
                         time: new Date(),
-                        durationMinutes: differenceInMinutes(new Date(), new Date(startTimeKey))
+                        durationMinutes: differenceInMinutes(new Date(), new Date(startTimeKey)),
+                        batteryLevel: vessel.batteryLevel,
+                        isCharging: vessel.isCharging
                     };
                     return newHistory;
                 }
@@ -656,6 +657,17 @@ export default function VesselTrackerPage() {
         const body = `[RELAIS L&B] Navire: ${targetVessel?.displayName || targetVessel?.id}\n${receiverCustomMsg}\nGPS: ${posUrl}\nPrécision: ${acc}\nHeure point: ${time}`;
         window.location.href = `sms:${receiverSmsNumber.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
     }
+  };
+
+  const saveVesselPrefs = async (newPrefs: any) => {
+    if (!user || !firestore) return;
+    setVesselPrefs(newPrefs);
+    updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: newPrefs }).catch(() => {});
+  };
+
+  const handleRemoveSavedVessel = async (id: string) => {
+    if (!user || !firestore) return;
+    updateDoc(doc(firestore, 'users', user.uid), { savedVesselIds: arrayRemove(id) }).catch(() => {});
   };
 
   if (isProfileLoading) return <div className="p-8"><Skeleton className="h-64 w-full" /></div>;
@@ -870,7 +882,7 @@ export default function VesselTrackerPage() {
                 <div className="space-y-1">
                     <Label className="text-[9px] font-black uppercase opacity-60">ID du groupe Flotte</Label>
                     <div className="flex gap-2">
-                        <Input placeholder="ENTREZ LE CODE..." fleetGroupId={fleetGroupId} onChange={e => setFleetGroupId(e.target.value)} className="font-black text-center h-12 border-2 uppercase" />
+                        <Input placeholder="ENTREZ LE CODE..." value={fleetGroupId} onChange={e => setFleetGroupId(e.target.value)} className="font-black text-center h-12 border-2 uppercase" />
                         <Button variant="default" className="h-12 px-4" onClick={handleSaveVessel}><Check className="size-4" /></Button>
                     </div>
                 </div>
@@ -939,7 +951,7 @@ export default function VesselTrackerPage() {
                         )}
                         <OverlayView position={currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                             <div className="relative">
-                                <div style={{ transform: 'translate(-50%, -50%)' }} className="size-6 bg-blue-500 border-4 border-white rounded-full shadow-lg animate-pulse" />
+                                <PulsingDot />
                                 {vesselStatus === 'stationary' && (
                                     <div style={{ transform: 'translate(-50%, -100%)' }} className="absolute -top-4 flex flex-col items-center gap-1">
                                         <div className="px-2 py-1 bg-amber-600 text-white rounded text-[8px] font-black shadow-lg">MOUILLAGE</div>
@@ -997,6 +1009,12 @@ export default function VesselTrackerPage() {
                                                     h.statusLabel.includes('TERRE') ? 'text-green-600' : 'text-slate-800')}>
                                                     {h.statusLabel}
                                                 </span>
+                                                {h.batteryLevel !== undefined && (
+                                                    <span className="flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded text-[8px] font-black text-slate-500 border border-slate-200">
+                                                        <BatteryIconComp level={h.batteryLevel} charging={h.isCharging} className="size-2.5" />
+                                                        {h.batteryLevel}%
+                                                    </span>
+                                                )}
                                             </div>
                                             <div className="flex items-center gap-2 opacity-40 font-bold">
                                                 <span>{format(h.time, 'HH:mm:ss')}</span>
@@ -1029,7 +1047,7 @@ export default function VesselTrackerPage() {
                                             </div>
                                         </div>
                                     );
-                                }) : <p className="text-center py-2 opacity-20 uppercase text-[8px] font-black italic">Aucun signal tactique</p>}
+                                }) : <p className="text-center py-2 uppercase text-[8px] font-black italic opacity-20">Aucun signal tactique</p>}
                             </div>
                         </div>
                     </AccordionContent>
