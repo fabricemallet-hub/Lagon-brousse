@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -5,7 +6,7 @@ import { useUser as useUserHook, useFirestore, useDoc, useMemoFirebase, useColle
 import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where } from 'firebase/firestore';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -61,7 +62,7 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 
-const INITIAL_CENTER = { lat: -22.27, lng: 166.45 };
+const INITIAL_CENTER = { lat: -22.27, lng: 166.44 };
 
 const TACTICAL_TYPES = [
     { id: 'oiseaux', label: 'OISEAUX', icon: Bird, color: 'bg-white text-blue-600 border-blue-600' },
@@ -622,6 +623,7 @@ export default function VesselTrackerPage() {
             <div className="space-y-6">
               {isSharing ? (
                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                    {/* EN-TÊTE BLEU DE PARTAGE ACTIF */}
                     <div className={cn("p-6 rounded-2xl shadow-xl relative overflow-hidden border-2 text-white", 
                         vesselStatus === 'landed' ? "bg-green-600 border-green-400/20" : 
                         vesselStatus === 'emergency' ? "bg-red-600 border-red-400/20 animate-pulse" :
@@ -629,7 +631,7 @@ export default function VesselTrackerPage() {
                         <Navigation className="absolute -right-4 -bottom-4 size-32 opacity-10 rotate-12" />
                         <div className="space-y-1 relative z-10">
                             <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                                <Zap className="size-3 fill-yellow-300 text-yellow-300" /> Partage actif
+                                <Zap className="size-3 fill-yellow-300 text-yellow-300" /> Partage Actif
                             </p>
                             <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">{sharingId}</h3>
                             <p className="text-xs font-bold opacity-80 mt-1 italic">{vesselNickname || 'Capitaine'}</p>
@@ -643,16 +645,7 @@ export default function VesselTrackerPage() {
                         </div>
                     </div>
 
-                    <Button 
-                        variant="destructive" 
-                        className={cn("w-full h-16 text-lg font-black shadow-2xl border-4 uppercase tracking-tighter gap-3 transition-all active:scale-95", 
-                            vesselStatus === 'emergency' && "animate-pulse border-red-400 bg-red-700")} 
-                        onClick={() => handleManualStatus('emergency', 'DEMANDE D\'ASSISTANCE')}
-                    >
-                        <ShieldAlert className="size-8" /> 
-                        {vesselStatus === 'emergency' ? "ANNULER ASSISTANCE" : "DEMANDE D'ASSISTANCE"}
-                    </Button>
-
+                    {/* SECTION SIGNALISATION MANUELLE */}
                     <div className="bg-muted/20 p-4 rounded-2xl border-2 border-dashed space-y-3">
                         <p className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest flex items-center gap-2"><Zap className="size-3" /> Signalisation manuelle</p>
                         <div className="grid grid-cols-2 gap-2">
@@ -677,6 +670,7 @@ export default function VesselTrackerPage() {
                         </div>
                     </div>
 
+                    {/* SECTION SIGNALEMENT TACTIQUE */}
                     <div className="bg-muted/20 p-4 rounded-2xl border-2 border-dashed space-y-3">
                         <p className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest flex items-center gap-2"><Fish className="size-3" /> Signalement Tactique (Flotte)</p>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -684,7 +678,7 @@ export default function VesselTrackerPage() {
                                 <Button 
                                     key={t.id} 
                                     variant="outline" 
-                                    className={cn("h-12 flex-col gap-1 p-1 border-2 font-black text-[8px] uppercase", t.color)}
+                                    className={cn("h-12 flex-col gap-1 p-1 border-2 font-black text-[8px] uppercase transition-all active:scale-95", t.color)}
                                     onClick={() => handleTacticalSignal(t.label)}
                                 >
                                     <t.icon className="size-4" />
@@ -694,9 +688,22 @@ export default function VesselTrackerPage() {
                         </div>
                     </div>
 
-                    <Button variant="destructive" className="w-full h-16 text-xs font-black uppercase tracking-widest shadow-lg rounded-xl gap-3 border-2 border-white/20" onClick={handleStopSharing}>
-                        <X className="size-5" /> Arrêter le partage / Quitter
-                    </Button>
+                    {/* GRANDS BOUTONS D'ACTION */}
+                    <div className="space-y-2">
+                        <Button 
+                            variant="destructive" 
+                            className={cn("w-full h-16 text-lg font-black shadow-2xl border-4 uppercase tracking-tighter gap-3 transition-all active:scale-95", 
+                                vesselStatus === 'emergency' && "animate-pulse border-red-400 bg-red-700")} 
+                            onClick={() => handleManualStatus('emergency', 'DEMANDE D\'ASSISTANCE')}
+                        >
+                            <ShieldAlert className="size-8" /> 
+                            {vesselStatus === 'emergency' ? "ANNULER ASSISTANCE" : "DEMANDE D'ASSISTANCE"}
+                        </Button>
+
+                        <Button variant="destructive" className="w-full h-16 text-xs font-black uppercase tracking-widest shadow-lg rounded-xl gap-3 border-2 border-white/20" onClick={handleStopSharing}>
+                            <X className="size-5" /> Arrêter le partage / Quitter
+                        </Button>
+                    </div>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -707,6 +714,7 @@ export default function VesselTrackerPage() {
                 </div>
               )}
 
+              {/* ACCORDÉONS DE RÉGLAGES ÉMETTEUR */}
               <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="sender-prefs" className="border-none">
                     <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
@@ -739,7 +747,7 @@ export default function VesselTrackerPage() {
                                 onValueChange={v => saveVesselPrefs({ ...vesselPrefs, mooringRadius: v[0] })} 
                             />
                             <p className="text-[8px] font-bold text-muted-foreground px-1 leading-tight italic">
-                                Ajustez le rayon pour éviter les fausses alertes de mouvement dues à l'évitage du navire.
+                                Ajustez le rayon pour affiner la détection automatique de l'immobilité.
                             </p>
                         </div>
 
@@ -873,7 +881,7 @@ export default function VesselTrackerPage() {
 
                         {/* Position actuelle du navire */}
                         <OverlayView position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                            <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
+                            <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 relative">
                                 <div className={cn("px-2 py-1 text-white rounded text-[10px] font-black shadow-lg border whitespace-nowrap flex items-center gap-2", 
                                     vessel.status === 'emergency' ? "bg-red-600 border-red-400 animate-pulse" : "bg-slate-900/90 border-white/20")}>
                                   <span className="truncate max-w-[120px]">
