@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useUser as useUserHook, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where, getDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where } from 'firebase/firestore';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -47,7 +47,8 @@ import {
   Phone,
   Waves,
   Bird,
-  Fish
+  Fish,
+  Copy
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -60,7 +61,7 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 
-const INITIAL_CENTER = { lat: -22.27, lng: 166.44 };
+const INITIAL_CENTER = { lat: -22.27, lng: 166.45 };
 const IMMOBILITY_THRESHOLD_METERS = 20; 
 
 const TACTICAL_TYPES = [
@@ -88,6 +89,23 @@ const PulsingDot = () => (
       <div className="size-5 rounded-full bg-blue-500 border-2 border-white relative"></div>
     </div>
 );
+
+interface TechEntry {
+    vesselName: string;
+    statusLabel: string;
+    time: Date;
+    pos: google.maps.LatLngLiteral;
+    batteryLevel?: number;
+    isCharging?: boolean;
+    accuracy?: number;
+}
+
+interface TacticalEntry {
+    vesselName: string;
+    label: string;
+    time: Date;
+    pos: google.maps.LatLngLiteral;
+}
 
 export default function VesselTrackerPage() {
   const { user } = useUserHook();
@@ -127,9 +145,13 @@ export default function VesselTrackerPage() {
     batteryThreshold: 20
   });
   
-  const [history, setHistory] = useState<{ vesselName: string, statusLabel: string, time: Date, pos: google.maps.LatLngLiteral, batteryLevel?: number, isCharging?: boolean, accuracy?: number }[]>([]);
+  // LOGS SEPARATED
+  const [techHistory, setTechHistory] = useState<TechEntry[]>([]);
+  const [tacticalHistory, setTacticalHistory] = useState<TacticalEntry[]>([]);
+
   const lastStatusesRef = useRef<Record<string, string>>({});
   const lastUpdatesRef = useRef<Record<string, number>>({});
+  const lastTacticalUpdatesRef = useRef<Record<string, number>>({});
   const lastSentStatusRef = useRef<string | null>(null);
   const lastBatteryLevelsRef = useRef<Record<string, number>>({});
   const lastChargingStatesRef = useRef<Record<string, boolean>>({});
@@ -195,9 +217,6 @@ export default function VesselTrackerPage() {
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
     
-    const newStatus = data.status || vesselStatus;
-    const statusChanged = lastSentStatusRef.current !== newStatus;
-
     const update = async () => {
         let batteryInfo = {};
         if ('getBattery' in navigator) {
@@ -215,15 +234,14 @@ export default function VesselTrackerPage() {
             ...data 
         };
 
-        if (statusChanged || lastSentStatusRef.current === null || data.eventLabel) {
+        if (data.status || data.eventLabel) {
             updatePayload.statusChangedAt = serverTimestamp();
-            lastSentStatusRef.current = newStatus;
         }
 
         setDoc(doc(firestore, 'vessels', sharingId), updatePayload, { merge: true }).catch(() => {});
     };
     update();
-  }, [user, firestore, isSharing, sharingId, vesselNickname, vesselStatus]);
+  }, [user, firestore, isSharing, sharingId, vesselNickname]);
 
   const handleSaveVessel = async () => {
     if (!user || !firestore) return;
@@ -302,16 +320,18 @@ export default function VesselTrackerPage() {
     toast({ title: "Partage arrêté" });
   };
 
-  const handleClearHistory = async () => {
-    setHistory([]);
+  const handleClearHistory = async (type: 'tech' | 'tactical') => {
+    if (type === 'tech') setTechHistory([]);
+    else setTacticalHistory([]);
+
     if (!firestore || !user) return;
     try {
         if (isSharing) {
             await updateDoc(doc(firestore, 'vessels', sharingId), {
-                historyClearedAt: serverTimestamp()
+                [type === 'tech' ? 'historyClearedAt' : 'tacticalClearedAt']: serverTimestamp()
             });
         }
-        toast({ title: "Historique effacé" });
+        toast({ title: "Journal effacé" });
     } catch (e) {}
   };
 
@@ -357,25 +377,29 @@ export default function VesselTrackerPage() {
         };
 
         const timeKey = getTimeMillis(statusTime);
-        const clearTimeKey = getTimeMillis(vessel.historyClearedAt);
+        const techClearTime = getTimeMillis(vessel.historyClearedAt);
+        const tactClearTime = getTimeMillis(vessel.tacticalClearedAt);
 
-        if (clearTimeKey > (lastClearTimesRef.current[vessel.id] || 0)) {
-            setHistory(prev => prev.filter(h => h.vesselName !== (vessel.displayName || vessel.id)));
-            lastClearTimesRef.current[vessel.id] = clearTimeKey;
+        // CLEAR LOGS IF SIGNALED BY SENDER
+        if (techClearTime > (lastClearTimesRef.current[vessel.id + '_tech'] || 0)) {
+            setTechHistory(prev => prev.filter(h => h.vesselName !== (vessel.displayName || vessel.id)));
+            lastClearTimesRef.current[vessel.id + '_tech'] = techClearTime;
+        }
+        if (tactClearTime > (lastClearTimesRef.current[vessel.id + '_tact'] || 0)) {
+            setTacticalHistory(prev => prev.filter(h => h.vesselName !== (vessel.displayName || vessel.id)));
+            lastClearTimesRef.current[vessel.id + '_tact'] = tactClearTime;
         }
 
         if (timeKey === 0) return;
         
         const lastStatus = lastStatusesRef.current[vessel.id];
         const lastUpdate = lastUpdatesRef.current[vessel.id] || 0;
+        const lastTacticalUpdate = lastTacticalUpdatesRef.current[vessel.id] || 0;
         const lastBattery = lastBatteryLevelsRef.current[vessel.id] ?? 100;
         const lastCharging = lastChargingStatesRef.current[vessel.id] ?? false;
         
         const statusChanged = lastStatus !== currentStatus;
         const timestampUpdated = timeKey > lastUpdate;
-        const batteryDroppedUnderThreshold = lastBattery >= (vesselPrefs.batteryThreshold || 20) && currentBattery < (vesselPrefs.batteryThreshold || 20);
-        const chargingStateChanged = lastCharging !== currentCharging;
-
         const pos = { 
             lat: vessel.location?.latitude || INITIAL_CENTER.lat, 
             lng: vessel.location?.longitude || INITIAL_CENTER.lng 
@@ -390,28 +414,27 @@ export default function VesselTrackerPage() {
             emergency: 'DEMANDE D\'ASSISTANCE'
         };
 
-        const addToHistory = (label: string) => {
-            setHistory(prev => {
-                const alreadyAdded = prev.length > 0 && 
-                                   prev[0].statusLabel === label && 
-                                   prev[0].vesselName === (vessel.displayName || vessel.id) && 
-                                   Math.abs(prev[0].time.getTime() - Date.now()) < 2000;
-                if (alreadyAdded) return prev;
-                return [{ 
-                    vesselName: vessel.displayName || vessel.id, 
-                    statusLabel: label, 
-                    time: new Date(), 
-                    pos,
-                    batteryLevel: currentBattery,
-                    isCharging: currentCharging,
-                    accuracy
-                }, ...prev].slice(0, 50);
-            });
-        };
+        // HANDLE TACTICAL EVENTS (FISH/BIRDS)
+        if (vessel.eventLabel && timeKey > lastTacticalUpdate) {
+            const isSpecies = TACTICAL_TYPES.some(t => t.label === vessel.eventLabel);
+            if (isSpecies) {
+                setTacticalHistory(prev => {
+                    const already = prev.length > 0 && prev[0].label === vessel.eventLabel && prev[0].vesselName === (vessel.displayName || vessel.id) && Math.abs(prev[0].time.getTime() - Date.now()) < 5000;
+                    if (already) return prev;
+                    return [{ vesselName: vessel.displayName || vessel.id, label: vessel.eventLabel!, time: new Date(), pos }, ...prev].slice(0, 50);
+                });
+                lastTacticalUpdatesRef.current[vessel.id] = timeKey;
+            }
+        }
 
-        if (statusChanged || timestampUpdated) {
-            const label = vessel.eventLabel || statusLabels[currentStatus] || currentStatus;
-            addToHistory(label);
+        // HANDLE TECHNICAL STATUS CHANGES
+        if (statusChanged || (timestampUpdated && !vessel.eventLabel)) {
+            const label = statusLabels[currentStatus] || currentStatus;
+            setTechHistory(prev => {
+                const already = prev.length > 0 && prev[0].statusLabel === label && prev[0].vesselName === (vessel.displayName || vessel.id) && Math.abs(prev[0].time.getTime() - Date.now()) < 2000;
+                if (already) return prev;
+                return [{ vesselName: vessel.displayName || vessel.id, statusLabel: label, time: new Date(), pos, batteryLevel: currentBattery, isCharging: currentCharging, accuracy }, ...prev].slice(0, 50);
+            });
             
             if (mode !== 'sender' && lastStatus && statusChanged && vesselPrefs.isNotifyEnabled) {
                 const soundKey = (currentStatus === 'returning' || currentStatus === 'landed') ? 'moving' : currentStatus;
@@ -423,22 +446,16 @@ export default function VesselTrackerPage() {
             lastUpdatesRef.current[vessel.id] = timeKey;
         }
 
-        if (batteryDroppedUnderThreshold && vesselPrefs.notifySettings.battery) {
-            addToHistory(`BATTERIE FAIBLE`);
-            if (mode !== 'sender' && vesselPrefs.isNotifyEnabled) {
-                playVesselSound('alerte');
-            }
-        }
-
-        if (chargingStateChanged) {
-            const label = currentCharging ? "BATTERIE EN CHARGE" : "DÉCONNECTÉ DU SECTEUR";
-            addToHistory(label);
+        // BATTERY DROPPED
+        const batteryDropped = lastBattery >= (vesselPrefs.batteryThreshold || 20) && currentBattery < (vesselPrefs.batteryThreshold || 20);
+        if (batteryDropped && vesselPrefs.notifySettings.battery) {
+            if (mode !== 'sender' && vesselPrefs.isNotifyEnabled) playVesselSound('alerte');
         }
 
         lastBatteryLevelsRef.current[vessel.id] = currentBattery;
         lastChargingStatesRef.current[vessel.id] = currentCharging;
     });
-  }, [followedVessels, mode, vesselPrefs, playVesselSound, toast]);
+  }, [followedVessels, mode, vesselPrefs, playVesselSound]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
@@ -829,39 +846,79 @@ export default function VesselTrackerPage() {
                 <Button variant="destructive" className="flex-1 h-14 font-black uppercase shadow-lg gap-3 text-xs" onClick={() => sendEmergencySms('MAYDAY')}><ShieldAlert className="size-5" /> MAYDAY</Button>
                 <Button variant="secondary" className="flex-1 h-14 font-black uppercase shadow-lg gap-3 text-xs border-2 border-primary/20" onClick={() => sendEmergencySms('PAN PAN')}><AlertTriangle className="size-5 text-primary" /> PAN PAN</Button>
             </div>
-            <div className="border rounded-xl bg-muted/10 overflow-hidden">
-                <Accordion type="single" collapsible className="w-full">
-                    <AccordionItem value="history" className="border-none">
-                        <div className="flex items-center justify-between px-3 h-12">
-                            <AccordionTrigger className="flex-1 text-[10px] font-black uppercase hover:no-underline py-0"><History className="size-3 mr-2"/> Journal Technique</AccordionTrigger>
-                            <Button variant="ghost" size="sm" className="h-7 px-2 text-[8px] font-black text-destructive" onClick={handleClearHistory}><Trash2 className="size-3 mr-1" /> Effacer</Button>
-                        </div>
-                        <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide px-3">
-                            {history.map((h, i) => (
-                                <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm">
-                                    <div className="flex flex-col gap-0.5">
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-black text-primary uppercase">{h.vesselName}</span>
-                                            <span className={cn("font-black uppercase", 
-                                                h.statusLabel.includes('ASSISTANCE') || h.statusLabel.includes('DÉTRESSE') ? 'text-red-600 animate-pulse' :
-                                                h.statusLabel.includes('MOUVEMENT') ? 'text-blue-600' : 'text-slate-500')}>
-                                                {h.statusLabel}
-                                            </span>
-                                            <span className={cn("flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-black border", h.isCharging ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-slate-50 text-slate-500 border-slate-200")}>
-                                                {h.isCharging && <Zap className="size-2.5 fill-current" />}{h.batteryLevel}%
-                                            </span>
+            
+            <div className="grid grid-cols-1 gap-2">
+                <div className="border rounded-xl bg-muted/10 overflow-hidden">
+                    <Accordion type="single" collapsible className="w-full">
+                        <AccordionItem value="history-tech" className="border-none">
+                            <div className="flex items-center justify-between px-3 h-12">
+                                <AccordionTrigger className="flex-1 text-[10px] font-black uppercase hover:no-underline py-0"><Settings className="size-3 mr-2"/> Journal Technique</AccordionTrigger>
+                                <Button variant="ghost" size="sm" className="h-7 px-2 text-[8px] font-black text-destructive" onClick={() => handleClearHistory('tech')}><Trash2 className="size-3 mr-1" /> Effacer</Button>
+                            </div>
+                            <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide px-3">
+                                {techHistory.map((h, i) => (
+                                    <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm">
+                                        <div className="flex flex-col gap-0.5">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-black text-primary uppercase">{h.vesselName}</span>
+                                                <span className={cn("font-black uppercase", 
+                                                    h.statusLabel.includes('ASSISTANCE') ? 'text-red-600' :
+                                                    h.statusLabel.includes('MOUVEMENT') ? 'text-blue-600' : 'text-slate-500')}>
+                                                    {h.statusLabel}
+                                                </span>
+                                                <span className={cn("flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-black border", h.isCharging ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-slate-50 text-slate-500 border-slate-200")}>
+                                                    {h.isCharging && <Zap className="size-2.5 fill-current" />}{h.batteryLevel}%
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2 font-bold opacity-40">
+                                                <span>{format(h.time, 'HH:mm:ss')}</span>
+                                                {h.accuracy !== undefined && <span>• +/- {h.accuracy}m</span>}
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-2 font-bold opacity-40">
-                                            <span>{format(h.time, 'HH:mm:ss')}</span>
-                                            {h.accuracy !== undefined && <span>• +/- {h.accuracy}m</span>}
+                                        <Button variant="ghost" size="sm" className="h-8 border-2 px-3 text-[9px] font-black uppercase gap-1" onClick={() => { map?.panTo(h.pos); map?.setZoom(17); }}>GPS</Button>
+                                    </div>
+                                ))}
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
+                </div>
+
+                <div className="border rounded-xl bg-primary/5 overflow-hidden">
+                    <Accordion type="single" collapsible className="w-full">
+                        <AccordionItem value="history-tactical" className="border-none">
+                            <div className="flex items-center justify-between px-3 h-12">
+                                <AccordionTrigger className="flex-1 text-[10px] font-black uppercase hover:no-underline py-0"><Fish className="size-3 mr-2"/> Journal Tactique</AccordionTrigger>
+                                <Button variant="ghost" size="sm" className="h-7 px-2 text-[8px] font-black text-destructive" onClick={() => handleClearHistory('tactical')}><Trash2 className="size-3 mr-1" /> Effacer</Button>
+                            </div>
+                            <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide px-3">
+                                {tacticalHistory.map((h, i) => (
+                                    <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm border-primary/20">
+                                        <div className="flex flex-col gap-0.5">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-black text-primary uppercase">{h.vesselName}</span>
+                                                <Badge className="bg-primary text-white text-[8px] font-black h-4 px-1">{h.label}</Badge>
+                                            </div>
+                                            <div className="flex items-center gap-2 font-bold opacity-40">
+                                                <span>{format(h.time, 'HH:mm:ss')}</span>
+                                                <span className="text-[8px] font-mono">{h.pos.lat.toFixed(5)}, {h.pos.lng.toFixed(5)}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-1">
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 border-2" onClick={() => { 
+                                                navigator.clipboard.writeText(`${h.pos.lat.toFixed(6)}, ${h.pos.lng.toFixed(6)}`);
+                                                toast({ title: "Coordonnées copiées" });
+                                            }}>
+                                                <Copy className="size-3.5" />
+                                            </Button>
+                                            <Button variant="ghost" size="sm" className="h-8 border-2 px-3 text-[9px] font-black uppercase gap-1" onClick={() => { map?.panTo(h.pos); map?.setZoom(17); }}>GPS</Button>
                                         </div>
                                     </div>
-                                    <Button variant="ghost" size="sm" className="h-8 border-2 px-3 text-[9px] font-black uppercase gap-1" onClick={() => { map?.panTo(h.pos); map?.setZoom(17); }}>GPS</Button>
-                                </div>
-                            ))}
-                        </AccordionContent>
-                    </AccordionItem>
-                </Accordion>
+                                ))}
+                                {tacticalHistory.length === 0 && <p className="text-center py-4 text-[9px] font-bold opacity-30 uppercase italic">Aucun signalement tactique</p>}
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
+                </div>
             </div>
         </div>
       </Card>
