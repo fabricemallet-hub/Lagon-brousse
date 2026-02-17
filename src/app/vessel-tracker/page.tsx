@@ -600,6 +600,10 @@ export default function VesselTrackerPage() {
                 </div>
             </div>
         </div>
+
+        <Button onClick={handleSaveVessel} className="w-full h-14 font-black uppercase tracking-widest shadow-xl text-xs gap-3">
+            <Save className="size-5" /> Enregistrer les préférences
+        </Button>
     </div>
   );
 
