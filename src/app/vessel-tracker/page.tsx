@@ -141,8 +141,6 @@ export default function VesselTrackerPage() {
   const lastStatusesRef = useRef<Record<string, string>>({});
   const lastUpdatesRef = useRef<Record<string, number>>({});
   const lastSentStatusRef = useRef<string | null>(null);
-  const lastBatteryLevelsRef = useRef<Record<string, number>>({});
-  const lastClearTimesRef = useRef<Record<string, number>>({});
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
@@ -377,7 +375,7 @@ export default function VesselTrackerPage() {
         }
     });
     if (newEntries.length > 0) setHistory(prev => [...newEntries, ...prev].slice(0, 50));
-  }, [followedVessels, mode, vesselPrefs, playVesselSound, labels]);
+  }, [followedVessels, mode, vesselPrefs, playVesselSound]);
 
   useEffect(() => {
     const shouldRunGps = (mode === 'sender' && isSharing) || (mode === 'receiver' && isReceiverGpsActive);
