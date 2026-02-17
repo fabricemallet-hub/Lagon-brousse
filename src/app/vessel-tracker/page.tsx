@@ -50,7 +50,8 @@ import {
   Bird,
   Fish,
   Copy,
-  Compass
+  Compass,
+  VolumeX
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -144,6 +145,7 @@ export default function VesselTrackerPage() {
     vesselVolume: 0.8,
     notifySettings: { moving: true, stationary: true, offline: true, battery: true, emergency: true },
     notifySounds: { moving: '', stationary: '', offline: '', battery: '', emergency: '' },
+    notifyLoops: { moving: false, stationary: false, offline: false, battery: false, emergency: false },
     isWatchEnabled: false,
     watchDuration: 60,
     watchSound: '',
@@ -162,6 +164,9 @@ export default function VesselTrackerPage() {
   const lastBatteryLevelsRef = useRef<Record<string, number>>({});
   const lastChargingStatesRef = useRef<Record<string, boolean>>({});
   const lastClearTimesRef = useRef<Record<string, number>>({});
+
+  const activeAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [showLoopAlert, setShowLoopAlert] = useState(false);
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
@@ -195,15 +200,36 @@ export default function VesselTrackerPage() {
     ).map(s => ({ id: s.id, label: s.label, url: s.url }));
   }, [dbSounds]);
 
-  const playVesselSound = useCallback((soundId: string) => {
+  const stopAllSounds = useCallback(() => {
+    if (activeAudioRef.current) {
+        activeAudioRef.current.pause();
+        activeAudioRef.current = null;
+    }
+    setShowLoopAlert(false);
+  }, []);
+
+  const playVesselSound = useCallback((soundId: string, forceLoop: boolean = false) => {
     if (!vesselPrefs.isNotifyEnabled) return;
-    // Fallback: If empty, try 'sonar' or the first available sound
+    
+    // Arrêter le son précédent
+    if (activeAudioRef.current) {
+        activeAudioRef.current.pause();
+        activeAudioRef.current = null;
+    }
+
     const targetSound = soundId || 'sonar';
     const sound = availableSounds.find(s => s.id === targetSound || s.label.toLowerCase() === targetSound.toLowerCase());
     
     if (sound) {
       const audio = new Audio(sound.url);
       audio.volume = vesselPrefs.vesselVolume;
+      audio.loop = forceLoop;
+      activeAudioRef.current = audio;
+      
+      if (forceLoop) {
+          setShowLoopAlert(true);
+      }
+
       audio.play().catch(e => console.warn("Audio play blocked or failed:", e));
     }
   }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, availableSounds]);
@@ -488,12 +514,11 @@ export default function VesselTrackerPage() {
                 }, ...prev].slice(0, 50);
             });
             
-            // Notification logic: If it's a different boat or we are a receiver, play sound
-            // Skip sound for our own boat ONLY if we just triggered it manually
             if (lastStatus && statusChanged && vesselPrefs.isNotifyEnabled) {
                 const soundKey = (currentStatus === 'returning' || currentStatus === 'landed') ? 'moving' : currentStatus;
                 if (vesselPrefs.notifySettings[soundKey as keyof typeof vesselPrefs.notifySettings]) {
-                    playVesselSound(vesselPrefs.notifySounds[soundKey as keyof typeof vesselPrefs.notifySounds] || 'sonar');
+                    const isLoop = !!vesselPrefs.notifyLoops?.[soundKey as keyof typeof vesselPrefs.notifyLoops];
+                    playVesselSound(vesselPrefs.notifySounds[soundKey as keyof typeof vesselPrefs.notifySounds] || 'sonar', isLoop);
                 }
             }
             lastStatusesRef.current[vessel.id] = currentStatus;
@@ -503,7 +528,10 @@ export default function VesselTrackerPage() {
 
         const batteryDropped = lastBattery >= (vesselPrefs.batteryThreshold || 20) && currentBattery < (vesselPrefs.batteryThreshold || 20);
         if (batteryDropped && vesselPrefs.notifySettings.battery) {
-            if (vesselPrefs.isNotifyEnabled) playVesselSound('alerte');
+            if (vesselPrefs.isNotifyEnabled) {
+                const isLoop = !!vesselPrefs.notifyLoops?.battery;
+                playVesselSound('alerte', isLoop);
+            }
         }
 
         lastBatteryLevelsRef.current[vessel.id] = currentBattery;
@@ -569,11 +597,9 @@ export default function VesselTrackerPage() {
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
   }, [isSharing, mode, anchorPos, updateVesselInFirestore, map, toast, vesselStatus, vesselPrefs.mooringRadius]);
 
-  // Intervalle de mise à jour forcée pour l'émetteur (toutes les minutes)
   useEffect(() => {
     if (!isSharing || mode !== 'sender') return;
     const interval = setInterval(() => {
-      // Force la MAJ Firestore pour faire tourner le temps "Actif x min" même à l'arrêt
       updateVesselInFirestore({}); 
     }, 60000);
     return () => clearInterval(interval);
@@ -619,7 +645,14 @@ export default function VesselTrackerPage() {
   const activeVesselInfo = useMemo(() => {
     const v = followedVessels?.find(v => v.id === sharingId);
     if (!v) return null;
-    const statusStart = v.statusChangedAt ? (typeof v.statusChangedAt.toMillis === 'function' ? v.statusChangedAt.toMillis() : v.statusChangedAt.seconds * 1000) : 0;
+    const getTimeMillis = (t: any) => {
+        if (!t) return 0;
+        if (typeof t.toMillis === 'function') return t.toMillis();
+        if (typeof t.getTime === 'function') return t.getTime();
+        if (t.seconds) return t.seconds * 1000;
+        return 0;
+    };
+    const statusStart = getTimeMillis(v.statusChangedAt || v.lastActive);
     const duration = statusStart > 0 ? Math.floor((Date.now() - statusStart) / 60000) : 0;
     return { ...v, durationMin: duration };
   }, [followedVessels, sharingId]);
@@ -721,12 +754,21 @@ export default function VesselTrackerPage() {
                         <div className="flex items-center gap-2"><Bell className={cn("size-3", ev.color)} /><span className="text-[10px] font-black uppercase">{ev.label}</span></div>
                         <Switch checked={vesselPrefs.notifySettings[ev.key as keyof typeof vesselPrefs.notifySettings]} onCheckedChange={v => saveVesselPrefs({ ...vesselPrefs, notifySettings: { ...vesselPrefs.notifySettings, [ev.key]: v } })} className="scale-75" />
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-center">
                         <Select disabled={!vesselPrefs.notifySettings[ev.key as keyof typeof vesselPrefs.notifySettings]} value={vesselPrefs.notifySounds[ev.key as keyof typeof vesselPrefs.notifySounds]} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, notifySounds: { ...vesselPrefs.notifySounds, [ev.key]: v } })}>
                             <SelectTrigger className="h-8 text-[9px] font-black uppercase flex-1"><SelectValue placeholder="Son..." /></SelectTrigger>
                             <SelectContent>{availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] font-black uppercase">{s.label}</SelectItem>)}</SelectContent>
                         </Select>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 border" onClick={() => playVesselSound(vesselPrefs.notifySounds[ev.key as keyof typeof vesselPrefs.notifySounds])}><Play className="size-3" /></Button>
+                        <div className="flex items-center gap-2 bg-muted/10 px-2 py-1 rounded-lg border">
+                            <span className="text-[8px] font-black uppercase opacity-60">Boucle</span>
+                            <Switch 
+                                checked={!!vesselPrefs.notifyLoops?.[ev.key]} 
+                                onCheckedChange={v => saveVesselPrefs({ ...vesselPrefs, notifyLoops: { ...vesselPrefs.notifyLoops, [ev.key]: v } })} 
+                                className="scale-50"
+                                disabled={!vesselPrefs.notifySettings[ev.key as keyof typeof vesselPrefs.notifySettings]}
+                            />
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 border" onClick={() => playVesselSound(vesselPrefs.notifySounds[ev.key as keyof typeof vesselPrefs.notifySounds], !!vesselPrefs.notifyLoops?.[ev.key])}><Play className="size-3" /></Button>
                     </div>
                 </div>
             ))}
@@ -736,6 +778,28 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
+      {showLoopAlert && (
+          <div className="fixed top-0 left-0 right-0 z-[200] p-4 bg-red-600 text-white shadow-2xl animate-in slide-in-from-top duration-500">
+              <div className="max-w-md mx-auto flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                      <div className="p-2 bg-white/20 rounded-full animate-pulse">
+                          <Volume2 className="size-6" />
+                      </div>
+                      <div className="flex flex-col">
+                          <span className="text-sm font-black uppercase tracking-tighter">Alarme Active (Boucle)</span>
+                          <span className="text-[10px] font-bold opacity-80 uppercase leading-none">Veuillez prendre connaissance de l'alerte</span>
+                      </div>
+                  </div>
+                  <Button 
+                    onClick={stopAllSounds} 
+                    className="bg-white text-red-600 hover:bg-white/90 font-black uppercase text-xs h-12 px-6 shadow-lg gap-2"
+                  >
+                      <VolumeX className="size-4" /> ARRÊTER LE SON
+                  </Button>
+              </div>
+          </div>
+      )}
+
       <Card className="border-2 shadow-sm overflow-hidden">
         <div className="flex bg-muted/30 p-1">
           <Button variant={mode === 'sender' ? 'default' : 'ghost'} className="flex-1 font-black uppercase text-[10px] h-12" onClick={() => setMode('sender')}>Émetteur (A)</Button>
@@ -851,7 +915,7 @@ export default function VesselTrackerPage() {
                     <AccordionContent className="pt-4 space-y-4">
                         <div className="space-y-1">
                             <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Surnom du capitaine / navire</Label>
-                            <Input placeholder="EX: CAPITAINE NEMO" value={vesselNickname} onChange={e => setNickname(e.target.value)} className="font-bold h-12 border-2 uppercase" />
+                            <Input placeholder="EX: CAPITAINE NEMO" value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} className="font-bold h-12 border-2 uppercase" />
                         </div>
                         <div className="space-y-1">
                             <Label className="text-[9px] font-black uppercase ml-1 opacity-60">ID du navire (Partage)</Label>
