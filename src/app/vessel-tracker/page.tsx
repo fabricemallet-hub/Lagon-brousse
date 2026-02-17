@@ -105,7 +105,7 @@ export default function VesselTrackerPage() {
   const { toast } = useToast();
   const { isLoaded, loadError } = useGoogleMaps();
 
-  const [mode, setMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
+  const [mode, setMode] = useState<'sender' | 'receiver' | 'fleet' | 'both'>('sender');
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
   const [fleetGroupId, setFleetGroupId] = useState('');
   
@@ -950,6 +950,26 @@ export default function VesselTrackerPage() {
                                             <Label className="text-[9px] font-black uppercase text-blue-600 ml-1">ID du groupe Flotte (C)</Label>
                                             <Input placeholder="ID EX: ABCD" value={fleetGroupId} onChange={e => setFleetGroupId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest bg-white" />
                                         </div>
+
+                                        <div className="space-y-4 p-4 border-2 rounded-2xl bg-blue-50/30 border-blue-100">
+                                            <div className="flex items-center justify-between">
+                                                <div className="space-y-0.5">
+                                                    <Label className="text-xs font-black uppercase text-blue-800">Rayon de Mouillage</Label>
+                                                    <p className="text-[9px] font-bold text-blue-600/60 uppercase">Ajuste la détection de dérive</p>
+                                                </div>
+                                                <Badge variant="outline" className="font-black bg-white">{vesselPrefs.mooringRadius || 20}m</Badge>
+                                            </div>
+                                            <Slider 
+                                                value={[vesselPrefs.mooringRadius || 20]} 
+                                                min={10} max={200} step={5}
+                                                onValueChange={v => saveVesselPrefs({ ...vesselPrefs, mooringRadius: v[0] })} 
+                                            />
+                                            <div className="flex justify-between text-[8px] font-black uppercase opacity-40 px-1">
+                                                <span>10m</span>
+                                                <span>200m</span>
+                                            </div>
+                                        </div>
+
                                         <Button onClick={handleSaveVessel} className="w-full h-14 font-black uppercase tracking-widest shadow-xl gap-2">
                                             <Save className="size-5" /> Enregistrer mes identifiants
                                         </Button>
