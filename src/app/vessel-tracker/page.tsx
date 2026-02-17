@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -247,15 +246,11 @@ export default function VesselTrackerPage() {
       setIsEmergencyEnabled(userProfile.isEmergencyEnabled ?? true);
       setIsCustomMessageEnabled(userProfile.isCustomMessageEnabled ?? true);
       const savedNickname = userProfile.vesselNickname || userProfile.displayName || user?.displayName || user?.email?.split('@')[0] || '';
-      if (!vesselNickname) setNickname(savedNickname);
+      if (!vesselNickname) setVesselNickname(savedNickname);
       if (userProfile.lastVesselId && !customSharingId) setCustomSharingId(userProfile.lastVesselId);
       if (userProfile.fleetGroupId && !fleetGroupId) setFleetGroupId(userProfile.fleetGroupId);
     }
   }, [userProfile, user]);
-
-  const setNickname = (val: string) => {
-    setVesselNickname(val);
-  };
 
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
@@ -604,7 +599,7 @@ export default function VesselTrackerPage() {
         }
     });
     if (newEntries.length > 0) setHistory(prev => [...newEntries, ...prev].slice(0, 20));
-  }, [followedVessels, mode, vesselPrefs, playVesselSound, labels]);
+  }, [followedVessels, mode, vesselPrefs, playVesselSound]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
@@ -651,10 +646,6 @@ export default function VesselTrackerPage() {
     const posUrl = `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
     const body = `${vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : ""}${isCustomMessageEnabled ? vesselSmsMessage : "Assistance requise."} [${type}] Position : ${posUrl}`;
     window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
-  };
-
-  const handleSavePreferences = () => {
-    handleSaveVessel();
   };
 
   const SoundSettingsGrid = () => (
@@ -726,7 +717,7 @@ export default function VesselTrackerPage() {
                 </div>
             </div>
             
-            <Button onClick={handleSavePreferences} className="w-full h-12 font-black uppercase tracking-widest shadow-lg text-[10px] gap-2 mt-4 bg-primary text-white">
+            <Button onClick={handleSaveVessel} className="w-full h-12 font-black uppercase tracking-widest shadow-lg text-[10px] gap-2 mt-4 bg-primary text-white">
                 <Save className="size-4" /> Enregistrer les préférences
             </Button>
         </div>
@@ -920,7 +911,7 @@ export default function VesselTrackerPage() {
                                 <Label className="text-sm font-black uppercase">Mode Fantôme</Label>
                             </div>
                             <p className="text-[9px] font-bold text-slate-400 uppercase leading-tight">
-                                Votre position GPS est masquée sur la carte du Récepteur B et de la Flotte C. Vous restez invisible tout en recevant leurs alertes.
+                                Votre position GPS est masquée sur la carte du Récepteur B et de la Flotte C. Vous restez invisible tout en recevant les alertes des autres membres de la flotte.
                             </p>
                         </div>
                         <Switch 
