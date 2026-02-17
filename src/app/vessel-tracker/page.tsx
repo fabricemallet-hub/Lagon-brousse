@@ -117,7 +117,6 @@ export default function VesselTrackerPage() {
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
   const [fleetGroupId, setFleetGroupId] = useState('');
   const [isSharing, setIsSharing] = useState(false);
-  const [isGhostMode, setIsGhostMode] = useState(false);
   const [emergencyContact, setEmergencyContact] = useState('');
   const [customSharingId, setCustomSharingId] = useState('');
   const [vesselNickname, setVesselNickname] = useState('');
@@ -1010,9 +1009,13 @@ export default function VesselTrackerPage() {
                                                     {h.statusLabel}
                                                 </span>
                                                 {h.batteryLevel !== undefined && (
-                                                    <span className="flex items-center gap-1 bg-slate-50 px-1.5 py-0.5 rounded text-[8px] font-black text-slate-500 border border-slate-200">
+                                                    <span className={cn(
+                                                        "flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-black border transition-all",
+                                                        h.isCharging ? "bg-blue-50 text-blue-600 border-blue-200" : "bg-slate-50 text-slate-500 border-slate-200"
+                                                    )}>
                                                         <BatteryIconComp level={h.batteryLevel} charging={h.isCharging} className="size-2.5" />
                                                         {h.batteryLevel}%
+                                                        {h.isCharging && <Zap className="size-2 fill-current" />}
                                                     </span>
                                                 )}
                                             </div>
