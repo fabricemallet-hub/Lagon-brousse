@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -106,6 +105,7 @@ export default function VesselTrackerPage() {
 
   // GPS et Carte
   const [currentPos, setCurrentPos] = useState<google.maps.LatLngLiteral | null>(null);
+  const [userAccuracy, setUserAccuracy] = useState<number | null>(null);
   const [anchorPos, setAnchorPos] = useState<google.maps.LatLngLiteral | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
   const [map, setMap] = useState<google.maps.Map | null>(null);
@@ -294,15 +294,22 @@ export default function VesselTrackerPage() {
     if (!isEmergencyEnabled || !emergencyContact) { toast({ variant: "destructive", title: "Config d'urgence incomplète" }); return; }
     const pos = mode === 'sender' ? currentPos : (followedVessels?.find(v => v.isSharing)?.location ? { lat: followedVessels.find(v => v.isSharing)!.location!.latitude, lng: followedVessels.find(v => v.isSharing)!.location!.longitude } : null);
     const posUrl = pos ? `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}` : "[GPS EN COURS...]";
-    const body = `[${vesselNickname.toUpperCase()}] ${isCustomMessageEnabled ? vesselSmsMessage : "Besoin assistance immédiate."} [${type}] Position : ${posUrl}`;
+    
+    const timeStr = format(new Date(), 'HH:mm');
+    const accuracyStr = userAccuracy ? ` (+/- ${userAccuracy}m)` : "";
+    
+    const body = `[${vesselNickname.toUpperCase()}] ${isCustomMessageEnabled ? vesselSmsMessage : "Besoin assistance immédiate."} [${type}] à ${timeStr}. Position${accuracyStr} : ${posUrl}`;
     window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
 
   const smsPreview = useMemo(() => {
     const nicknamePrefix = vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : "";
     const customText = (isCustomMessageEnabled && vesselSmsMessage) ? vesselSmsMessage : "Requiert assistance immédiate.";
-    return `${nicknamePrefix}${customText} [MAYDAY] Position : https://www.google.com/maps?q=-22.27,166.45`;
-  }, [vesselSmsMessage, isCustomMessageEnabled, vesselNickname]);
+    const timeStr = format(new Date(), 'HH:mm');
+    const accuracyStr = userAccuracy ? ` (+/- ${userAccuracy}m)` : "";
+    
+    return `${nicknamePrefix}${customText} [MAYDAY] à ${timeStr}. Position${accuracyStr} : https://www.google.com/maps?q=-22.27,166.45`;
+  }, [vesselSmsMessage, isCustomMessageEnabled, vesselNickname, userAccuracy]);
 
   // GPS Monitor
   useEffect(() => {
@@ -315,6 +322,8 @@ export default function VesselTrackerPage() {
         const newPos = { lat: position.coords.latitude, lng: position.coords.longitude };
         const accuracy = Math.round(position.coords.accuracy);
         setCurrentPos(newPos);
+        setUserAccuracy(accuracy);
+        
         if (shouldPanOnNextFix.current && map) { map.panTo(newPos); map.setZoom(15); shouldPanOnNextFix.current = false; }
         
         if (vesselStatus !== 'returning' && vesselStatus !== 'landed') {
@@ -324,7 +333,6 @@ export default function VesselTrackerPage() {
               return; 
             }
             const dist = getDistance(newPos.lat, newPos.lng, anchorPos.lat, anchorPos.lng);
-            // Ignorer le bruit GPS : si le mouvement est inférieur à la précision, on considère qu'on n'a pas bougé
             const isMoving = dist > IMMOBILITY_THRESHOLD_METERS && dist > accuracy * 0.8;
 
             if (isMoving) {
@@ -502,7 +510,7 @@ export default function VesselTrackerPage() {
                 <AccordionItem value="sender-ids" className="border-none">
                     <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/5 rounded-xl"><Settings className="size-4 text-primary" /><span className="text-[10px] font-black uppercase">Identité & IDs</span></AccordionTrigger>
                     <AccordionContent className="pt-4 space-y-4">
-                        <div className="space-y-1.5"><Label className="text-[9px] font-black uppercase opacity-60 ml-1">Mon Surnom</Label><Input value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} placeholder="CAPITAINE..." className="font-black h-12 border-2 uppercase" /></div>
+                        <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Mon Surnom</Label><Input value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} placeholder="CAPITAINE..." className="font-black h-12 border-2 uppercase" /></div>
                         <div className="space-y-1.5"><Label className="text-[9px] font-black uppercase opacity-60 ml-1">ID Navire (B)</Label>
                             <div className="flex gap-2">
                                 <Input placeholder="BATEAU-1" value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} className="font-mono h-12 border-2 uppercase flex-1" />
@@ -533,7 +541,7 @@ export default function VesselTrackerPage() {
                     <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-orange-50/50 border-2 border-orange-100/50 rounded-xl"><Smartphone className="size-4 text-orange-600" /><span className="text-[10px] font-black uppercase text-orange-800">Réglages d'Urgence (SMS)</span></AccordionTrigger>
                     <AccordionContent className="pt-4 space-y-4">
                         <div className="space-y-4 p-4 border-2 rounded-2xl bg-card shadow-inner">
-                            <div className="flex items-center justify-between border-b border-dashed pb-3"><div className="space-y-0.5"><Label className="text-xs font-black uppercase text-orange-800">Service d'Urgence</Label><p className="text-[9px] font-bold text-orange-600/60 uppercase">Activer le contact SMS</p></div><Switch checked={isEmergencyEnabled} onCheckedChange={setIsEmergencyEnabled} /></div>
+                            <div className="flex items-center justify-between border-b border-dashed pb-3 mb-2"><div className="space-y-0.5"><Label className="text-xs font-black uppercase text-orange-800">Service d'Urgence</Label><p className="text-[9px] font-bold text-orange-600/60 uppercase">Activer le contact SMS</p></div><Switch checked={isEmergencyEnabled} onCheckedChange={setIsEmergencyEnabled} /></div>
                             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Numéro du contact à terre</Label><Input placeholder="Ex: 77 12 34" value={emergencyContact} onChange={e => setEmergencyContact(e.target.value)} className="h-12 border-2 font-black text-lg" /></div>
                             <div className="space-y-1.5">
                                 <div className="flex items-center justify-between mb-1"><Label className="text-[10px] font-black uppercase opacity-60">Message personnalisé</Label><Switch checked={isCustomMessageEnabled} onCheckedChange={setIsCustomMessageEnabled} className="scale-75" /></div>
