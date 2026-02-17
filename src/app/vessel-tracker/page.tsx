@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -52,7 +51,8 @@ import {
   Bell,
   Fish,
   Users,
-  ChevronDown
+  ChevronDown,
+  Pencil
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -421,6 +421,18 @@ export default function VesselTrackerPage() {
     toast({ title: "Prise signalée !" });
   };
 
+  const handleDeleteMarker = async (marker: any) => {
+    if (!user || !firestore) return;
+    const vesselId = marker.vesselId || sharingId;
+    if (vesselId === sharingId) {
+        updateDoc(doc(firestore, 'vessels', sharingId), {
+            huntingMarkers: arrayRemove(marker)
+        });
+    } else {
+        setLocallyClearedMarkerIds(prev => [...prev, marker.id]);
+    }
+  };
+
   useEffect(() => {
     if (!isSharing || mode !== 'sender') {
         setSecondsUntilUpdate(60);
@@ -576,6 +588,13 @@ export default function VesselTrackerPage() {
     window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
 
+  const handleRemoveSavedVessel = (id: string) => {
+    if (!user || !firestore) return;
+    updateDoc(doc(firestore, 'users', user.uid), {
+        savedVesselIds: arrayRemove(id)
+    });
+  };
+
   const filteredHistory = useMemo(() => {
     return history.filter(h => mode !== 'sender' || h.vesselId === sharingId);
   }, [history, mode, sharingId]);
@@ -608,7 +627,7 @@ export default function VesselTrackerPage() {
         <CardContent className="p-4 space-y-4">
           {mode === 'sender' ? (
             <div className="space-y-6">
-              {isSharing ? (
+              {isSharing || isTargetMenuOpen ? (
                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
                     {sharingTarget !== 'none' && !isTargetMenuOpen ? (
                         <div className="flex items-center justify-between p-4 border-2 rounded-2xl bg-primary/5 border-primary/20 shadow-sm">
@@ -658,27 +677,31 @@ export default function VesselTrackerPage() {
                         </div>
                     )}
 
-                    <div className="grid grid-cols-2 gap-2">
-                        <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatus('returning')} disabled={vesselStatus === 'returning'}>
-                            <Navigation className="size-4 text-blue-600" /> Retour Maison
-                        </Button>
-                        <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatus('landed')} disabled={vesselStatus === 'landed'}>
-                            <Home className="size-4 text-green-600" /> Home (À terre)
-                        </Button>
-                    </div>
+                    {isSharing && (
+                        <>
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatus('returning')} disabled={vesselStatus === 'returning'}>
+                                    <Navigation className="size-4 text-blue-600" /> Retour Maison
+                                </Button>
+                                <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatus('landed')} disabled={vesselStatus === 'landed'}>
+                                    <Home className="size-4 text-green-600" /> Home (À terre)
+                                </Button>
+                            </div>
 
-                    <div className="flex gap-2">
-                        <Button className="flex-1 h-14 font-black uppercase bg-slate-800 text-white text-[10px] gap-2 shadow-lg" onClick={handleSignalBirds}>
-                            <Bird className="size-4" /> Signaler Oiseaux
-                        </Button>
-                        <Button className="flex-1 h-14 font-black uppercase bg-blue-600 text-white text-[10px] gap-2 shadow-lg" onClick={() => setIsCatchDialogOpen(true)}>
-                            <Fish className="size-4" /> Signaler Prise
-                        </Button>
-                    </div>
+                            <div className="flex gap-2">
+                                <Button className="flex-1 h-14 font-black uppercase bg-slate-800 text-white text-[10px] gap-2 shadow-lg" onClick={handleSignalBirds}>
+                                    <Bird className="size-4" /> Signaler Oiseaux
+                                </Button>
+                                <Button className="flex-1 h-14 font-black uppercase bg-blue-600 text-white text-[10px] gap-2 shadow-lg" onClick={() => setIsCatchDialogOpen(true)}>
+                                    <Fish className="size-4" /> Signaler Prise
+                                </Button>
+                            </div>
 
-                    <Button variant="destructive" className="w-full h-16 text-xs font-black uppercase tracking-widest shadow-lg rounded-xl gap-3 border-2 border-white/20" onClick={handleStopSharing}>
-                        <X className="size-5" /> Arrêter le partage
-                    </Button>
+                            <Button variant="destructive" className="w-full h-16 text-xs font-black uppercase tracking-widest shadow-lg rounded-xl gap-3 border-2 border-white/20" onClick={handleStopSharing}>
+                                <X className="size-5" /> Arrêter le partage
+                            </Button>
+                        </>
+                    )}
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -819,7 +842,7 @@ export default function VesselTrackerPage() {
                                         <div className={cn("p-2 rounded-lg", isActive ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>{isActive ? <Navigation className="size-4" /> : <WifiOff className="size-4" />}</div>
                                         <div className="flex flex-col"><span className="font-black text-xs uppercase">{v?.displayName || id}</span><span className="text-[8px] font-bold uppercase opacity-60">{isActive ? 'En ligne' : 'Déconnecté'}</span></div>
                                     </div>
-                                    <Button variant="ghost" size="icon" onClick={() => handleRemoveSavedVessel(id)} className="size-8 text-destructive/40 hover:text-destructive border-2"><Trash2 className="size-3" /></Button>
+                                    <Button variant="ghost" size="icon" className="size-8 text-destructive/40 hover:text-destructive border-2" onClick={() => handleRemoveSavedVessel(id)}><Trash2 className="size-3" /></Button>
                                 </div>
                             )
                         })}
@@ -1019,10 +1042,10 @@ export default function VesselTrackerPage() {
                                                 <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase border-2 px-3 gap-2" onClick={() => { map?.panTo({ lat: m.lat, lng: m.lng }); map?.setZoom(17); }}>
                                                     <LocateFixed className="size-3 text-primary" /> GPS
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive border-2" onClick={() => handleRemoveSavedVessel(m.id)}><Trash2 className="size-3.5" /></Button>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive border-2" onClick={() => handleDeleteMarker(m)}><Trash2 className="size-3.5" /></Button>
                                             </div>
                                         </div>
-                                    )) : <div className="text-center py-6 opacity-20 uppercase text-[9px] font-black italic">Aucun signal tactique</div>}
+                                    )) : <div className="text-center py-10 opacity-40 uppercase text-[10px] font-black italic">Aucun signal tactique</div>}
                                 </div>
                             </div>
                         </AccordionContent>
