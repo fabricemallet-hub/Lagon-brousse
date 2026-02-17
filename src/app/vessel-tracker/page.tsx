@@ -523,8 +523,9 @@ export default function VesselTrackerPage() {
     window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
 
-  if (loadError) return <div className="p-4 text-destructive">Erreur Google Maps.</div>;
-  if (!isLoaded) return <Skeleton className="h-96 w-full" />;
+  const handleSavePreferences = () => {
+    handleSaveVessel();
+  };
 
   const SoundSettingsGrid = () => (
     <div className="space-y-6">
@@ -594,6 +595,10 @@ export default function VesselTrackerPage() {
                     </div>
                 </div>
             </div>
+            
+            <Button onClick={handleSavePreferences} className="w-full h-12 font-black uppercase tracking-widest shadow-lg text-[10px] gap-2 mt-4 bg-primary text-white">
+                <Save className="size-4" /> Enregistrer les préférences
+            </Button>
         </div>
 
         <div className="p-4 border-2 rounded-2xl bg-orange-50/30 border-orange-100 space-y-4">
@@ -631,7 +636,7 @@ export default function VesselTrackerPage() {
             <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                     <Label className="text-xs font-black uppercase text-red-800">Seuil Batterie Faible</Label>
-                    <p className="text-[9px] font-bold text-red-600/60 uppercase">Alerte niveau bas batterie smartphone</p>
+                    <p className="text-[9px] font-bold text-red-600/60 uppercase">Alerte journal de bord</p>
                 </div>
                 <Badge variant="outline" className="font-black bg-white">{vesselPrefs.batteryThreshold || 20}%</Badge>
             </div>
@@ -649,7 +654,7 @@ export default function VesselTrackerPage() {
         </div>
 
         <Button onClick={handleSaveVessel} className="w-full h-14 font-black uppercase tracking-widest shadow-xl text-xs gap-3">
-            <Save className="size-5" /> Enregistrer les préférences
+            <Save className="size-5" /> Enregistrer toutes les préférences
         </Button>
     </div>
   );
@@ -761,18 +766,17 @@ export default function VesselTrackerPage() {
                                 <span className="text-[10px] font-black uppercase">Identité & Flotte</span>
                             </AccordionTrigger>
                             <AccordionContent className="pt-4 space-y-4">
-                                <div className="space-y-1">
+                                <div className="space-y-2">
                                     <Label className="text-[9px] font-black uppercase ml-1 opacity-60">ID du navire (Partage)</Label>
-                                    <div className="flex gap-2">
-                                        <Input placeholder="ID EX: BATEAU-1" value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest flex-grow" />
-                                        <Button variant="outline" size="icon" className="h-12 w-12 border-2 shrink-0" onClick={handleSaveVessel}>
-                                            <Save className="size-4" />
-                                        </Button>
-                                    </div>
+                                    <Input placeholder="ID EX: BATEAU-1" value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest w-full" />
+                                    <Button variant="default" className="w-full h-12 font-black uppercase text-[10px] tracking-widest gap-2 shadow-lg" onClick={handleSaveVessel}>
+                                        <Save className="size-4" />
+                                        Enregistrement et validation
+                                    </Button>
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-[9px] font-black uppercase ml-1 opacity-60">ID de Flotte (Optionnel)</Label>
-                                    <Input placeholder="EX: ASSOCIATION-XYZ" value={fleetGroupId} onChange={e => setFleetGroupId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest bg-blue-50/50" />
+                                    <Input placeholder="EX: ASSOCIATION-XYZ" value={fleetGroupId} onChange={e => setFleetGroupId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest flex-grow bg-blue-50/50" />
                                     <div className="flex items-center justify-between p-3 bg-blue-50/30 rounded-xl border border-blue-100 mt-2">
                                         <Label className="text-[10px] font-black uppercase text-blue-800">Partager avec la flotte</Label>
                                         <Switch checked={isPositionSharedWithGroup} onCheckedChange={setIsPositionSharedWithGroup} className="scale-75" />
@@ -892,7 +896,7 @@ export default function VesselTrackerPage() {
                                 <div className="flex flex-col">
                                     <span className="font-black text-xs uppercase">{v.displayName}</span>
                                     <Badge variant="outline" className={cn("text-[7px] font-black uppercase h-4 px-1 border-blue-200", 
-                                        v.status === 'emergency' ? "bg-red-500 text-white" : "text-blue-600")}>
+                                        v.status === 'emergency' ? "bg-red-50 text-white" : "text-blue-600")}>
                                         {v.status === 'emergency' ? 'ASSISTANCE' : v.status}
                                     </Badge>
                                 </div>
