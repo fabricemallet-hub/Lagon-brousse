@@ -874,7 +874,7 @@ export default function VesselTrackerPage() {
                         <div className="grid grid-cols-2 gap-2">
                             <Button 
                                 variant={vesselStatus === 'returning' ? 'default' : 'outline'} 
-                                className={cn("h-14 font-black uppercase text-[10px] border-2 transition-all active:scale-95 gap-2", 
+                                className={cn("h-14 font-black uppercase text-[10px] border-2 transition-all active:scale-[0.98] gap-2", 
                                     vesselStatus === 'returning' ? "bg-blue-600 text-white border-blue-400" : "bg-background border-slate-200")} 
                                 onClick={() => handleManualStatus('returning')}
                             >
@@ -883,7 +883,7 @@ export default function VesselTrackerPage() {
                             </Button>
                             <Button 
                                 variant={vesselStatus === 'landed' ? 'default' : 'outline'} 
-                                className={cn("h-14 font-black uppercase text-[10px] border-2 transition-all active:scale-95 gap-2", 
+                                className={cn("h-14 font-black uppercase text-[10px] border-2 transition-all active:scale-[0.98] gap-2", 
                                     vesselStatus === 'landed' ? "bg-green-600 text-white border-green-400" : "bg-background border-slate-200")} 
                                 onClick={() => handleManualStatus('landed')}
                             >
@@ -952,13 +952,13 @@ export default function VesselTrackerPage() {
                     </AccordionTrigger>
                     <AccordionContent className="pt-4 space-y-4">
                         <div className="space-y-1">
-                            <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Surnom du capitaine / navire</Label>
+                            <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Surnom du capitaine / navire</Label>
                             <Input placeholder="EX: CAPITAINE NEMO" value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} className="font-bold h-12 border-2 uppercase" />
                         </div>
                         <div className="space-y-1">
-                            <Label className="text-[9px] font-black uppercase ml-1 opacity-60">ID du navire (Partage)</Label>
+                            <Label className="text-[10px] font-black uppercase ml-1 opacity-60">ID du navire (Partage)</Label>
                             <div className="flex gap-2">
-                                <Input placeholder="ID EX: BATEAU-1" value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest flex-1" />
+                                <Input placeholder="ID EX: BATEAU-1" value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest flex-1 bg-muted/20" />
                                 <Button variant="outline" size="icon" className="h-12 w-12 border-2" onClick={handleSaveVessel}><Save className="size-4" /></Button>
                             </div>
                         </div>
@@ -1032,10 +1032,19 @@ export default function VesselTrackerPage() {
           ) : (
             <div className="space-y-4">
               <div className="space-y-1">
-                <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Suivre le navire ID</Label>
+                <Label className="text-[9px] font-black uppercase ml-1 opacity-60">
+                    {mode === 'receiver' ? 'SUIVRE LE NAVIRE ID' : 'ID GROUPE FLOTTE C'}
+                </Label>
                 <div className="flex gap-2">
-                    <Input placeholder="ID EX: BATEAU-1" value={vesselIdToFollow} onChange={e => setVesselIdToFollow(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest flex-1" />
-                    <Button variant="default" className="h-12 px-4 font-black uppercase text-[10px]" onClick={handleSaveVessel} disabled={!vesselIdToFollow.trim()}><Check className="size-4" /></Button>
+                    <Input 
+                        placeholder={mode === 'receiver' ? "ID EX: BATEAU-1" : "ID GROUPE EX: SUD-NC"} 
+                        value={vesselIdToFollow} 
+                        onChange={e => setVesselIdToFollow(e.target.value)} 
+                        className="font-black text-center h-12 border-2 uppercase tracking-widest flex-1 bg-muted/20" 
+                    />
+                    <Button variant="outline" className="h-12 w-12 border-2 shrink-0" onClick={handleSaveVessel} disabled={!vesselIdToFollow.trim()}>
+                        <Save className="size-4" />
+                    </Button>
                 </div>
               </div>
 
