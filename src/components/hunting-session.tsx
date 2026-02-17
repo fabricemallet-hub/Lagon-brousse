@@ -44,6 +44,7 @@ import {
   Mountain,
   Save,
   Trash2,
+  Pencil,
   Target,
   LocateFixed,
   MapPin,
@@ -440,7 +441,7 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
       const querySnapshot = await getDocs(q);
       const sessions = querySnapshot.docs
         .map(doc => ({ ...doc.data(), id: doc.id } as WithId<HuntingSession>))
-        .filter(s => s.organizerId === user.uid && (s.sessionType || 'chasse') === sessionType);
+        .filter(s => s.organizerId === user.uid && (s.sessionType || 'chasse' || 'peche') === sessionType);
       sessions.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
       setMySessions(sessions.slice(0, 5));
     } catch (e) {
@@ -555,37 +556,51 @@ function HuntingSessionContent({ sessionType = 'chasse' }: HuntingSessionProps) 
     return () => { if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current); };
   }, [isParticipating, session, isGpsActive, startTracking]);
 
-  const handleCreateSession = () => {
+  const handleCreateSession = async () => {
     if (!user || !firestore) return;
     setIsSessionLoading(true);
+    
     const code = createCode.trim() ? createCode.trim().toUpperCase() : `${sessionType === 'chasse' ? 'CH' : 'PE'}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24);
-    
-    const sessionData = { organizerId: user.uid, sessionType, createdAt: serverTimestamp(), expiresAt: Timestamp.fromDate(expiresAt) };
     const sessionRef = doc(firestore, 'hunting_sessions', code);
-    
-    setDoc(sessionRef, sessionData)
-      .then(() => {
-        const participantData: any = { 
-            id: user.uid, displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor, baseStatus: '', isGibierEnVue: false, updatedAt: serverTimestamp() 
-        };
-        if (isAngleActive) {
-            participantData.shootingAngle = { center: shootingAngle, spread: shootingSpread, distance: shootingDistance, isActive: true };
-        }
-        const participantRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
-        setDoc(participantRef, participantData).catch(() => {});
 
-        setSession({ id: code, ...sessionData } as any);
-        setIsParticipating(true);
-        fetchMySessions();
+    try {
+      // VERIFICATION D'UNICITÉ DU CODE
+      const snap = await getDoc(sessionRef);
+      if (snap.exists()) {
+        toast({ 
+          variant: 'destructive', 
+          title: 'Code déjà utilisé', 
+          description: 'Ce code de session est déjà actif. Veuillez en choisir un autre.' 
+        });
         setIsSessionLoading(false);
-        toast({ title: 'Session créée !', description: `Code : ${code}` });
-      })
-      .catch(() => {
-        setIsSessionLoading(false);
-        toast({ variant: 'destructive', title: 'Erreur création' });
-      });
+        return;
+      }
+
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 24);
+      
+      const sessionData = { organizerId: user.uid, sessionType, createdAt: serverTimestamp(), expiresAt: Timestamp.fromDate(expiresAt) };
+      
+      await setDoc(sessionRef, sessionData);
+      
+      const participantData: any = { 
+          id: user.uid, displayName: nickname, mapIcon: selectedIcon, mapColor: selectedColor, baseStatus: '', isGibierEnVue: false, updatedAt: serverTimestamp() 
+      };
+      if (isAngleActive) {
+          participantData.shootingAngle = { center: shootingAngle, spread: shootingSpread, distance: shootingDistance, isActive: true };
+      }
+      const participantRef = doc(firestore, 'hunting_sessions', code, 'participants', user.uid);
+      await setDoc(participantRef, participantData);
+
+      setSession({ id: code, ...sessionData } as any);
+      setIsParticipating(true);
+      fetchMySessions();
+      setIsSessionLoading(false);
+      toast({ title: 'Session créée !', description: `Code : ${code}` });
+    } catch (e) {
+      setIsSessionLoading(false);
+      toast({ variant: 'destructive', title: 'Erreur création' });
+    }
   };
   
   const handleJoinSession = () => {
