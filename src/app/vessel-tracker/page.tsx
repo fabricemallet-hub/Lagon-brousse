@@ -74,7 +74,7 @@ const TACTICAL_TYPES = [
     { id: 'tazard', label: 'TAZARD', icon: Fish, color: 'bg-slate-500 text-white border-slate-500' },
     { id: 'wahoo', label: 'WAHOO', icon: Fish, color: 'bg-cyan-600 text-white border-cyan-600' },
     { id: 'bonite', label: 'BONITE', icon: Fish, color: 'bg-indigo-600 text-white border-indigo-600' },
-    { id: 'sardines', label: 'SARDINES', icon: Fish, color: 'bg-teal-500 text-white border-teal-500' },
+    { id: 'sardines', label: 'SARDINES', icon: Waves, color: 'bg-teal-500 text-white border-teal-500' },
 ];
 
 const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
@@ -706,7 +706,7 @@ export default function VesselTrackerPage() {
                     <div className="flex gap-2 flex-1 justify-end items-center">
                         <Select 
                             value={vesselPrefs.watchSound} 
-                            onValueChange={v => saveVesselPrefs({ ...vesselPrefs, watchSound: v })}
+                            onValueChange={v => setVesselPrefs(prev => ({ ...prev, watchSound: v }))}
                         >
                             <SelectTrigger className="h-9 text-[10px] font-black uppercase w-32 bg-white border-orange-200">
                                 <SelectValue placeholder="Choisir..." />
@@ -1221,3 +1221,5 @@ export default function VesselTrackerPage() {
     </div>
   );
 }
+
+    
