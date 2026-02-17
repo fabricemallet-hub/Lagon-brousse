@@ -97,6 +97,7 @@ export default function VesselTrackerPage() {
   const { toast } = useToast();
   const { isLoaded, loadError } = useGoogleMaps();
 
+  // --- ÉTATS DU COMPOSANT ---
   const [mode, setMode] = useState<'sender' | 'receiver' | 'fleet' | 'both'>('sender');
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
   const [fleetGroupId, setFleetGroupId] = useState('');
@@ -132,6 +133,7 @@ export default function VesselTrackerPage() {
   const isFirstFixRef = useRef<boolean>(true);
   const lastMinutePosRef = useRef<google.maps.LatLngLiteral | null>(null);
   const [secondsUntilUpdate, setSecondsUntilUpdate] = useState(60);
+  const [userAccuracy, setUserAccuracy] = useState<number | null>(null);
 
   const [isCatchDialogOpen, setIsCatchDialogOpen] = useState(false);
   const [locallyClearedMarkerIds, setLocallyClearedMarkerIds] = useState<string[]>([]);
@@ -252,24 +254,6 @@ export default function VesselTrackerPage() {
     }
   }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, vesselPrefs.repeatSettings, availableSounds]);
 
-  useEffect(() => {
-    if (userProfile) {
-      if (userProfile.vesselPrefs) setVesselPrefs(userProfile.vesselPrefs);
-      if (userProfile.emergencyContact) setEmergencyContact(userProfile.emergencyContact);
-      if (userProfile.receiverSmsContact) setReceiverSmsContact(userProfile.receiverSmsContact);
-      if (userProfile.receiverCallContact) setReceiverCallContact(userProfile.receiverCallContact);
-      if (userProfile.receiverSmsMessage) setReceiverSmsMessage(userProfile.receiverSmsMessage);
-      if (userProfile.vesselSmsMessage) setVesselSmsMessage(userProfile.vesselSmsMessage);
-      setIsEmergencyEnabled(userProfile.isEmergencyEnabled ?? true);
-      setIsCustomMessageEnabled(userProfile.isCustomMessageEnabled ?? true);
-      setIsGhostMode(userProfile.isGhostMode ?? false);
-      setVesselNickname(userProfile.vesselNickname || '');
-      setCustomSharingId(userProfile.lastVesselId || '');
-      if (userProfile.vesselSharingTarget) setSharingTarget(userProfile.vesselSharingTarget);
-      if (userProfile.fleetGroupId) setFleetGroupId(userProfile.fleetGroupId);
-    }
-  }, [userProfile]);
-
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
     
@@ -308,6 +292,24 @@ export default function VesselTrackerPage() {
     };
     update();
   }, [user, firestore, isSharing, sharingId, vesselNickname, currentPos, userAccuracy, vesselPrefs.mooringRadius, fleetGroupId, isGhostMode]);
+
+  useEffect(() => {
+    if (userProfile) {
+      if (userProfile.vesselPrefs) setVesselPrefs(userProfile.vesselPrefs);
+      if (userProfile.emergencyContact) setEmergencyContact(userProfile.emergencyContact);
+      if (userProfile.receiverSmsContact) setReceiverSmsContact(userProfile.receiverSmsContact);
+      if (userProfile.receiverCallContact) setReceiverCallContact(userProfile.receiverCallContact);
+      if (userProfile.receiverSmsMessage) setReceiverSmsMessage(userProfile.receiverSmsMessage);
+      if (userProfile.vesselSmsMessage) setVesselSmsMessage(userProfile.vesselSmsMessage);
+      setIsEmergencyEnabled(userProfile.isEmergencyEnabled ?? true);
+      setIsCustomMessageEnabled(userProfile.isCustomMessageEnabled ?? true);
+      setIsGhostMode(userProfile.isGhostMode ?? false);
+      setVesselNickname(userProfile.vesselNickname || '');
+      setCustomSharingId(userProfile.lastVesselId || '');
+      if (userProfile.vesselSharingTarget) setSharingTarget(userProfile.vesselSharingTarget);
+      if (userProfile.fleetGroupId) setFleetGroupId(userProfile.fleetGroupId);
+    }
+  }, [userProfile]);
 
   const handleSaveVessel = () => {
     if (!user || !firestore) return;
@@ -466,8 +468,6 @@ export default function VesselTrackerPage() {
     );
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
   }, [isSharing, mode, updateVesselInFirestore, map, toast]);
-
-  const [userAccuracy, setUserAccuracy] = useState<number | null>(null);
 
   const handleManualToggle = (st: VesselStatus['status'], label: string) => {
     if (vesselStatus !== st) {
