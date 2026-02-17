@@ -51,7 +51,8 @@ import {
   Repeat,
   Bird,
   Fish,
-  Flame
+  Flame,
+  ChevronDown
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -126,6 +127,12 @@ export default function VesselTrackerPage() {
   const watchIdRef = useRef<number | null>(null);
   const shouldPanOnNextFix = useRef(false);
   const lastSentStatusRef = useRef<string | null>(null);
+
+  // Receiver Specific
+  const [receiverSmsNumber, setReceiverSmsNumber] = useState('');
+  const [receiverCallNumber, setReceiverCallNumber] = useState('');
+  const [receiverCustomMsg, setReceiverSmsMessage] = useState('Requiert assistance immédiate.');
+  const [vesselIdForRelay, setVesselIdForRelay] = useState('');
 
   const [activeLoopingAlert, setActiveLoopingAlert] = useState<{
     type: string;
@@ -279,6 +286,11 @@ export default function VesselTrackerPage() {
       setVesselNickname(userProfile.vesselNickname || '');
       setCustomSharingId(userProfile.lastVesselId || '');
       if (userProfile.fleetGroupId) setFleetGroupId(userProfile.fleetGroupId);
+      
+      // Receiver Relay Prefs
+      if (userProfile.receiverSmsNumber) setReceiverSmsNumber(userProfile.receiverSmsNumber);
+      if (userProfile.receiverCallNumber) setReceiverCallNumber(userProfile.receiverCallNumber);
+      if (userProfile.receiverCustomMsg) setReceiverSmsMessage(userProfile.receiverCustomMsg);
     }
   }, [userProfile]);
 
@@ -296,7 +308,10 @@ export default function VesselTrackerPage() {
         vesselPrefs: vesselPrefs,
         isGhostMode: isGhostMode,
         vesselNickname: vesselNickname,
-        emergencyContact
+        emergencyContact,
+        receiverSmsNumber,
+        receiverCallNumber,
+        receiverCustomMsg: receiverCustomMsg
     }).then(() => { 
         toast({ title: "Paramètres enregistrés" }); 
     });
@@ -519,6 +534,33 @@ export default function VesselTrackerPage() {
     return () => clearInterval(interval);
   }, [isSharing, mode, vesselStatus, updateVesselInFirestore]);
 
+  // Emergency Handlers
+  const sendEmergencySms = (type: 'SOS' | 'MAYDAY' | 'PAN PAN') => {
+    if (!emergencyContact) { toast({ variant: "destructive", title: "Numéro requis" }); return; }
+    const posUrl = currentPos ? `https://www.google.com/maps?q=${currentPos.lat.toFixed(6)},${currentPos.lng.toFixed(6)}` : "[RECHERCHE GPS...]";
+    const body = `[${vesselNickname || 'URGENCE'}] ${type} ! Requiert assistance. Position : ${posUrl}`;
+    window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
+  };
+
+  const handleReceiverRelay = (type: 'SMS' | 'CALL') => {
+    const targetVessel = followedVessels?.find(v => v.id === vesselIdForRelay);
+    if (!targetVessel && type === 'SMS') { toast({ variant: "destructive", title: "Navire non sélectionné" }); return; }
+
+    if (type === 'CALL') {
+        if (!receiverCallNumber) { toast({ variant: "destructive", title: "Numéro d'appel non configuré" }); return; }
+        window.location.href = `tel:${receiverCallNumber.replace(/\s/g, '')}`;
+    } else {
+        if (!receiverSmsNumber) { toast({ variant: "destructive", title: "Numéro SMS non configuré" }); return; }
+        const pos = targetVessel?.location;
+        const posUrl = pos ? `https://www.google.com/maps?q=${pos.latitude.toFixed(6)},${pos.longitude.toFixed(6)}` : "[INCONNU]";
+        const acc = targetVessel?.accuracy ? `+/- ${targetVessel.accuracy}m` : "Inconnue";
+        const time = targetVessel?.lastActive ? format(targetVessel.lastActive.toDate(), 'HH:mm') : "--:--";
+        
+        const body = `[RELAIS L&B] Navire: ${targetVessel?.displayName || targetVessel?.id}\n${receiverCustomMsg}\nGPS: ${posUrl}\nPrécision: ${acc}\nHeure point: ${time}`;
+        window.location.href = `sms:${receiverSmsNumber.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
+    }
+  };
+
   if (isProfileLoading) return <div className="p-8"><Skeleton className="h-64 w-full" /></div>;
 
   return (
@@ -585,9 +627,6 @@ export default function VesselTrackerPage() {
                                     <Button variant="outline" className="h-14 flex-col gap-1 border-2 font-black uppercase text-[9px] bg-white text-primary border-primary/10" onClick={() => addTacticalMarker('THON', 'thon')}>
                                         <Fish className="size-5" /> Thon
                                     </Button>
-                                    <Button variant="outline" className="h-14 flex-col gap-1 border-2 font-black uppercase text-[9px] bg-white text-slate-800 border-slate-100" onClick={() => addTacticalMarker('MARLIN', 'marlin')}>
-                                        <Zap className="size-5 text-yellow-500" /> Marlin
-                                    </Button>
                                     <Button variant="outline" className="h-14 flex-col gap-1 border-2 font-black uppercase text-[9px] bg-white text-orange-600 border-orange-100" onClick={() => addTacticalMarker('MAHI MAHI', 'mahimahi')}>
                                         <Fish className="size-5" /> Mahi Mahi
                                     </Button>
@@ -629,7 +668,7 @@ export default function VesselTrackerPage() {
                     </AccordionTrigger>
                     <AccordionContent className="pt-4 space-y-6">
                         <div className="space-y-4">
-                            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Surnom</Label><Input value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} className="h-12 border-2 font-black text-center uppercase" /></div>
+                            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Surnom</Label><Input value={vesselNickname} onChange={e => setNickname(e.target.value)} className="h-12 border-2 font-black text-center uppercase" /></div>
                             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">ID Navire (B)</Label><Input value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} className="h-12 border-2 font-black text-center uppercase" /></div>
                             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">ID Groupe Flotte (C)</Label><Input value={fleetGroupId} onChange={e => setFleetGroupId(e.target.value)} className="h-12 border-2 font-black text-center uppercase" /></div>
                             
@@ -642,22 +681,6 @@ export default function VesselTrackerPage() {
                                 <Save className="size-5 mr-2" /> Enregistrer mes Identifiants
                             </Button>
                         </div>
-
-                        {userProfile?.vesselIdHistory && userProfile.vesselIdHistory.length > 0 && (
-                            <div className="space-y-2 border-t pt-4">
-                                <p className="text-[9px] font-black uppercase opacity-40 ml-1">Historique des IDs</p>
-                                <div className="flex flex-wrap gap-2">
-                                    {userProfile.vesselIdHistory.map(id => (
-                                        <div key={id} className="flex items-center bg-white border-2 rounded-lg pl-3 pr-1 py-1 gap-2 shadow-sm">
-                                            <span className="text-[10px] font-black uppercase cursor-pointer" onClick={() => { setCustomSharingId(id); setFleetGroupId(id); }}>{id}</span>
-                                            <Button variant="ghost" size="icon" className="size-6 text-destructive/40" onClick={() => updateDoc(doc(firestore!, 'users', user!.uid), { vesselIdHistory: arrayRemove(id) })}>
-                                                <X className="size-3" />
-                                            </Button>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
                     </AccordionContent>
                 </AccordionItem>
               </Accordion>
@@ -671,6 +694,49 @@ export default function VesselTrackerPage() {
                         <Button variant="default" className="h-12 px-4" onClick={handleSaveVessel}><Check className="size-4" /></Button>
                     </div>
                 </div>
+
+                <Accordion type="single" collapsible className="w-full">
+                    <AccordionItem value="receiver-relay" className="border-none">
+                        <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-orange-50/50 border-2 border-orange-100/50 rounded-xl">
+                            <ShieldAlert className="size-4 text-orange-600" />
+                            <span className="text-[10px] font-black uppercase text-orange-800">Relais Secours & SMS</span>
+                        </AccordionTrigger>
+                        <AccordionContent className="pt-4 space-y-6">
+                            <div className="space-y-4 p-4 border-2 rounded-2xl bg-card shadow-inner">
+                                <div className="space-y-1.5">
+                                    <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Navire à secourir (Relais)</Label>
+                                    <Select value={vesselIdForRelay} onValueChange={setVesselIdForRelay}>
+                                        <SelectTrigger className="h-12 border-2 bg-white font-black uppercase text-xs">
+                                            <SelectValue placeholder="Choisir navire..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {followedVessels?.filter(v => v.isSharing).map(v => (
+                                                <SelectItem key={v.id} value={v.id} className="text-[10px] font-black uppercase">{v.displayName || v.id}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Numéro Appel</Label>
+                                        <Input value={receiverCallNumber} onChange={e => setReceiverCallNumber(e.target.value)} placeholder="196, 18, 15..." className="h-10 border-2 font-black text-center" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Numéro SMS</Label>
+                                        <Input value={receiverSmsNumber} onChange={e => setReceiverSmsNumber(e.target.value)} placeholder="Mobile relais..." className="h-10 border-2 font-black text-center" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Message perso (Relais)</Label>
+                                    <Textarea value={receiverCustomMsg} onChange={e => setReceiverSmsMessage(e.target.value)} className="border-2 min-h-[80px] text-xs font-medium" />
+                                </div>
+                                <Button onClick={handleSaveVessel} className="w-full h-10 font-black uppercase text-[9px] tracking-widest gap-2">
+                                    <Save className="size-3" /> Sauver les réglages relais
+                                </Button>
+                            </div>
+                        </AccordionContent>
+                    </AccordionItem>
+                </Accordion>
                 
                 <Accordion type="single" collapsible className="w-full">
                     <AccordionItem value="receiver-settings" className="border-none">
@@ -724,6 +790,22 @@ export default function VesselTrackerPage() {
           <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
                 {followedVessels?.filter(v => v.isSharing).map(vessel => (
                     <React.Fragment key={vessel.id}>
+                        {vessel.status === 'stationary' && vessel.location && (
+                            <Circle 
+                                center={{ lat: vessel.location.latitude, lng: vessel.location.longitude }}
+                                radius={vessel.mooringRadius || 20}
+                                options={{
+                                    fillColor: '#3b82f6',
+                                    fillOpacity: 0.1,
+                                    strokeColor: '#3b82f6',
+                                    strokeOpacity: 0.5,
+                                    strokeWeight: 2,
+                                    clickable: false,
+                                    editable: false,
+                                    zIndex: 1
+                                }}
+                            />
+                        )}
                         <OverlayView position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                             <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
                                 <div className="px-2 py-1 bg-slate-900/90 text-white rounded text-[10px] font-black shadow-lg flex items-center gap-2">
@@ -761,6 +843,19 @@ export default function VesselTrackerPage() {
         </div>
 
         <div className="bg-card p-4 flex flex-col gap-4 border-t-2">
+            <div className="flex gap-2">
+                {mode === 'sender' ? (
+                    <>
+                        <Button variant="destructive" className="flex-1 h-14 font-black uppercase rounded-xl shadow-lg gap-3 text-xs" onClick={() => sendEmergencySms('MAYDAY')}><ShieldAlert className="size-5" /> MAYDAY</Button>
+                        <Button variant="secondary" className="flex-1 h-14 font-black uppercase rounded-xl shadow-lg gap-3 text-xs border-2 border-primary/20" onClick={() => sendEmergencySms('PAN PAN')}><AlertTriangle className="size-5 text-primary" /> PAN PAN</Button>
+                    </>
+                ) : (
+                    <>
+                        <Button variant="destructive" className="flex-1 h-14 font-black uppercase rounded-xl shadow-lg gap-3 text-xs" onClick={() => handleReceiverRelay('CALL')}><ShieldAlert className="size-5" /> APPEL SECOURS</Button>
+                        <Button variant="secondary" className="flex-1 h-14 font-black uppercase rounded-xl shadow-lg gap-3 text-xs border-2 border-primary/20" onClick={() => handleReceiverRelay('SMS')}><Smartphone className="size-5 text-primary" /> ENVOI SMS</Button>
+                    </>
+                )}
+            </div>
             <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="history" className="border-none">
                     <div className="flex items-center justify-between px-3 h-12 bg-muted/10 rounded-xl">
@@ -769,7 +864,6 @@ export default function VesselTrackerPage() {
                     </div>
                     <AccordionContent className="space-y-2 pt-4 px-1 max-h-64 overflow-y-auto">
                         <div className="space-y-4">
-                            {/* SECTION TECHNIQUE */}
                             <div className="space-y-2">
                                 <p className="text-[9px] font-black uppercase text-muted-foreground ml-1">Technique (Statuts)</p>
                                 {history.length > 0 ? history.map((h, i) => (
@@ -789,7 +883,6 @@ export default function VesselTrackerPage() {
                                 )) : <p className="text-center py-2 opacity-20 uppercase text-[8px] font-black italic">Aucun mouvement</p>}
                             </div>
 
-                            {/* SECTION TACTIQUE */}
                             <div className="space-y-2 border-t pt-4">
                                 <div className="flex justify-between items-center px-1">
                                     <p className="text-[9px] font-black uppercase text-primary">Tactique (Oiseaux & Prises)</p>
@@ -832,7 +925,6 @@ export default function VesselTrackerPage() {
         </CardContent>
       </Card>
 
-      {/* SECTION SONS GLOBALE */}
       <Card className="border-2 border-primary/10 bg-muted/5">
         <Accordion type="single" collapsible className="w-full">
             <AccordionItem value="global-sounds" className="border-none">
