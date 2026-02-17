@@ -123,7 +123,7 @@ export default function VesselTrackerPage() {
   const { toast } = useToast();
   const { isLoaded, loadError } = useGoogleMaps();
 
-  const [mode, setMode] = useState<'sender' | 'receiver' | 'fleet' | 'both'>('sender');
+  const [mode, setMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
   
   const [isSharing, setIsSharing] = useState(false);
@@ -729,8 +729,6 @@ export default function VesselTrackerPage() {
                     <span>24h</span>
                 </div>
 
-                <Separator className="border-t-2 border-dashed border-orange-100 bg-transparent h-0" />
-
                 <div className="flex items-center justify-between gap-4">
                     <span className="text-[10px] font-black uppercase text-orange-800/60">Son de l'alarme</span>
                     <div className="flex gap-2 flex-1 justify-end items-center">
@@ -745,7 +743,7 @@ export default function VesselTrackerPage() {
                                 {availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] uppercase font-black">{s.label}</SelectItem>)}
                             </SelectContent>
                         </Select>
-                        <Button variant="ghost" size="icon" className="h-9 w-9 text-orange-600 border border-orange-200 hover:bg-orange-50" onClick={() => playVesselSound(vesselPrefs.watchSound, true)}>
+                        <Button variant="ghost" size="icon" className="h-9 w-9 text-orange-600 border border-orange-200" onClick={() => playVesselSound(vesselPrefs.watchSound, true)}>
                             <Play className="size-4" />
                         </Button>
                     </div>
@@ -753,8 +751,25 @@ export default function VesselTrackerPage() {
             </div>
         </div>
 
+        <div className="space-y-4 p-4 border-2 rounded-2xl bg-red-50/30 border-red-100 shadow-sm">
+            <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                    <Label className="text-xs font-black uppercase text-red-800">Seuil Batterie Faible</Label>
+                    <p className="text-[9px] font-bold text-red-600/60 uppercase">Alerte journal de bord</p>
+                </div>
+                <Badge variant="outline" className="font-black bg-white border-red-200 text-red-800 h-7 px-3 text-xs">{vesselPrefs.batteryThreshold || 20}%</Badge>
+            </div>
+            <Slider 
+                value={[vesselPrefs.batteryThreshold || 20]} 
+                min={5} 
+                max={50} 
+                step={5}
+                onValueChange={v => saveVesselPrefs({ ...vesselPrefs, batteryThreshold: v[0] })} 
+            />
+        </div>
+
         <div className="grid gap-3 pt-4 border-t border-dashed">
-            <p className="text-[10px] font-black uppercase text-muted-foreground ml-1">Réglages sons individuels</p>
+            <p className="text-[10px] font-black uppercase text-muted-foreground ml-1">Sons individuels</p>
             {[
                 { key: 'moving', label: 'Mouvement', color: 'text-blue-600' },
                 { key: 'stationary', label: 'Mouillage', color: 'text-amber-600' },
@@ -931,7 +946,7 @@ export default function VesselTrackerPage() {
 
               <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="sender-prefs" className="border-none">
-                    <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
+                    <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/5 rounded-xl">
                         <Settings className="size-4 text-primary" />
                         <span className="text-[10px] font-black uppercase">Identité & IDS</span>
                     </AccordionTrigger>
@@ -1006,7 +1021,7 @@ export default function VesselTrackerPage() {
                 </AccordionItem>
 
                 <AccordionItem value="sender-sounds" className="border-none mt-2">
-                    <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
+                    <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/5 rounded-xl">
                         <Volume2 className="size-4 text-primary" />
                         <span className="text-[10px] font-black uppercase">Notifications & Sons</span>
                     </AccordionTrigger>
@@ -1055,7 +1070,7 @@ export default function VesselTrackerPage() {
 
               <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="receiver-settings" className="border-none">
-                  <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
+                  <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/5 rounded-xl">
                     <Settings className="size-4 text-primary" />
                     <span className="text-[10px] font-black uppercase">Notifications & Sons</span>
                   </AccordionTrigger>
@@ -1189,7 +1204,10 @@ export default function VesselTrackerPage() {
                                                     <span className={cn("font-black uppercase text-[10px] leading-none", 
                                                         h.statusLabel.includes('ASSISTANCE') ? 'text-red-600' :
                                                         h.statusLabel.includes('MOUVEMENT') ? 'text-blue-600' :
-                                                        h.statusLabel.includes('MOUILLAGE') ? 'text-orange-600' : 'text-slate-800')}>
+                                                        h.statusLabel.includes('MOUILLAGE') ? 'text-orange-600' :
+                                                        h.statusLabel.includes('RETOUR') ? 'text-indigo-600' :
+                                                        h.statusLabel.includes('TERRE') ? 'text-green-600' :
+                                                        'text-slate-800')}>
                                                         {h.statusLabel}
                                                     </span>
                                                     {h.statusDurationMin !== undefined && (
@@ -1267,14 +1285,12 @@ export default function VesselTrackerPage() {
                 </div>
             </div>
 
-            {/* ANNUAIRE MARITIME NC - AJOUTÉ ICI */}
             <Card className="border-2 bg-slate-50/50 shadow-sm rounded-2xl overflow-hidden mt-2">
                 <div className="p-3 border-b bg-muted/20 flex items-center gap-2">
                     <Phone className="size-4 text-primary" />
                     <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">Annuaire Maritime NC</h3>
                 </div>
                 <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-6">
-                    {/* URGENCES */}
                     <div className="space-y-3">
                         <h4 className="text-[10px] font-black uppercase text-red-600 flex items-center gap-2 border-b border-red-100 pb-1">
                             <ShieldAlert className="size-3" /> Urgences
@@ -1295,7 +1311,6 @@ export default function VesselTrackerPage() {
                         </div>
                     </div>
 
-                    {/* SERVICES */}
                     <div className="space-y-3">
                         <h4 className="text-[10px] font-black uppercase text-blue-600 flex items-center gap-2 border-b border-blue-100 pb-1">
                             <Waves className="size-3" /> Services
@@ -1310,7 +1325,6 @@ export default function VesselTrackerPage() {
                         </div>
                     </div>
 
-                    {/* PORTS & MARINAS */}
                     <div className="space-y-3">
                         <h4 className="text-[10px] font-black uppercase text-indigo-600 flex items-center gap-2 border-b border-indigo-100 pb-1">
                             <Ship className="size-3" /> Ports & Marinas
