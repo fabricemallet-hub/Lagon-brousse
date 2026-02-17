@@ -493,7 +493,7 @@ export default function VesselTrackerPage() {
         const timestampUpdated = timeKey > lastUpdate;
         const minutePassed = durationMin > lastHistMin;
 
-        if (statusChanged || (minutePassed && isSharingActive) || (timestampUpdated && !vessel.eventLabel && statusChanged)) {
+        if (statusChanged || (minutePassed && isSharingActive)) {
             const label = statusLabels[currentStatus] || currentStatus;
 
             setTechHistory(prev => {
@@ -718,7 +718,7 @@ export default function VesselTrackerPage() {
                                 {availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] uppercase font-black">{s.label}</SelectItem>)}
                             </SelectContent>
                         </Select>
-                        <Button variant="ghost" size="icon" className="h-9 w-9 text-orange-600 border border-orange-200 hover:bg-orange-50" onClick={() => playVesselSound(vesselPrefs.watchSound)}>
+                        <Button variant="ghost" size="icon" className="h-9 w-9 text-orange-600 border border-orange-200 hover:bg-orange-50" onClick={() => playVesselSound(vesselPrefs.watchSound, true)}>
                             <Play className="size-4" />
                         </Button>
                     </div>
@@ -779,15 +779,15 @@ export default function VesselTrackerPage() {
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
       {showLoopAlert && (
-          <div className="fixed top-0 left-0 right-0 z-[200] p-4 bg-red-600 text-white shadow-2xl animate-in slide-in-from-top duration-500">
+          <div className="fixed top-0 left-0 right-0 z-[999] p-4 bg-red-600 text-white shadow-2xl animate-in slide-in-from-top duration-500">
               <div className="max-w-md mx-auto flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                       <div className="p-2 bg-white/20 rounded-full animate-pulse">
                           <Volume2 className="size-6" />
                       </div>
                       <div className="flex flex-col">
-                          <span className="text-sm font-black uppercase tracking-tighter">Alarme Active (Boucle)</span>
-                          <span className="text-[10px] font-bold opacity-80 uppercase leading-none">Veuillez prendre connaissance de l'alerte</span>
+                          <span className="text-sm font-black uppercase tracking-tighter">Alarme Active</span>
+                          <span className="text-[10px] font-bold opacity-80 uppercase leading-none">Signal en boucle</span>
                       </div>
                   </div>
                   <Button 
