@@ -86,7 +86,7 @@ const statusLabels: Record<string, string> = {
     offline: 'SIGNAL PERDU',
     returning: 'RETOUR MAISON',
     landed: 'À TERRE (HOME)',
-    emergency: 'DEMANDE D\'ASSISTANCE'
+    emergency: 'DEMANDE ASSISTANCE'
 };
 
 const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
@@ -150,9 +150,10 @@ export default function VesselTrackerPage() {
     mooringRadius: 20
   });
   
-  const [history, setHistory] = useState<{ vesselId: string, vesselName: string, statusLabel: string, time: Date, pos: google.maps.LatLngLiteral, batteryLevel?: number, isCharging?: boolean, durationMinutes?: number }[]>([]);
+  const [history, setHistory] = useState<{ vesselId: string, vesselName: string, statusLabel: string, statusCategory: string, time: Date, pos: google.maps.LatLngLiteral, batteryLevel?: number, isCharging?: boolean, durationMinutes?: number }[]>([]);
   const lastStatusesRef = useRef<Record<string, string>>({});
   const lastUpdatesRef = useRef<Record<string, number>>({});
+  const lastSentStatusRef = useRef<string | null>(null);
   const lastClearTimesRef = useRef<Record<string, number>>({});
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
@@ -262,8 +263,10 @@ export default function VesselTrackerPage() {
             ...data 
         };
 
-        if (data.status || data.eventLabel) {
+        // ONLY update statusChangedAt if it's a REAL state change
+        if (data.status && data.status !== lastSentStatusRef.current) {
             updatePayload.statusChangedAt = serverTimestamp();
+            lastSentStatusRef.current = data.status;
         }
 
         if (!updatePayload.location && currentPos) {
@@ -308,17 +311,12 @@ export default function VesselTrackerPage() {
     });
   };
 
-  const handleRemoveIdFromHistory = (id: string, type: 'vessel' | 'group') => {
-    const updated = idHistory.filter(h => !(h.id === id && h.type === type));
-    setIdHistory(updated);
-    localStorage.setItem('lb_vessel_id_history', JSON.stringify(updated));
-  };
-
   const handleStopSharing = () => {
     if (!user || !firestore) return;
     setIsSharing(false);
     setSharingTarget('none');
     setIsTargetMenuOpen(false);
+    lastSentStatusRef.current = null;
     const vesselRef = doc(firestore, 'vessels', sharingId);
     setDoc(vesselRef, { isSharing: false, lastActive: serverTimestamp() }, { merge: true })
       .then(() => {
@@ -407,8 +405,14 @@ export default function VesselTrackerPage() {
         handleManualStatus(st, label);
     } else {
         const revertTo = preManualStatus || 'moving';
-        handleManualStatus(revertTo, 'ERREUR INVOLONTAIRE');
-        setPreManualStatus(null);
+        // 1. Log error first
+        updateVesselInFirestore({ eventLabel: 'ERREUR INVOLONTAIRE' });
+        // 2. Revert after small delay
+        setTimeout(() => {
+            setVesselStatus(revertTo);
+            updateVesselInFirestore({ status: revertTo, eventLabel: `${statusLabels[revertTo]} (REPRISE)` });
+            setPreManualStatus(null);
+        }, 500);
     }
   };
 
@@ -420,8 +424,12 @@ export default function VesselTrackerPage() {
         sendEmergencySms('MAYDAY');
     } else {
         const revertTo = preManualStatus || 'moving';
-        handleManualStatus(revertTo, 'ERREUR INVOLONTAIRE');
-        setPreManualStatus(null);
+        updateVesselInFirestore({ eventLabel: 'ERREUR INVOLONTAIRE' });
+        setTimeout(() => {
+            setVesselStatus(revertTo);
+            updateVesselInFirestore({ status: revertTo, eventLabel: `${statusLabels[revertTo]} (REPRISE)` });
+            setPreManualStatus(null);
+        }, 500);
     }
   };
 
@@ -559,8 +567,15 @@ export default function VesselTrackerPage() {
     followedVessels.forEach(vessel => {
         const isSharingActive = vessel.isSharing === true;
         const currentStatus = isSharingActive ? (vessel.status || 'moving') : 'offline';
-        const timeKey = vessel.statusChangedAt?.toMillis ? vessel.statusChangedAt.toMillis() : (vessel.statusChangedAt?.seconds ? vessel.statusChangedAt.seconds * 1000 : 0);
-        const clearTimeKey = vessel.historyClearedAt?.toMillis ? vessel.historyClearedAt.toMillis() : (vessel.historyClearedAt?.seconds ? vessel.historyClearedAt.seconds * 1000 : 0);
+        const getTimeMillis = (t: any) => {
+            if (!t) return 0;
+            if (typeof t.toMillis === 'function') return t.toMillis();
+            if (t.seconds) return t.seconds * 1000;
+            return 0;
+        };
+
+        const timeKey = getTimeMillis(vessel.statusChangedAt || vessel.lastActive);
+        const clearTimeKey = getTimeMillis(vessel.historyClearedAt);
 
         if (clearTimeKey > (lastClearTimesRef.current[vessel.id] || 0)) {
             setHistory(prev => prev.filter(h => h.vesselId !== vessel.id));
@@ -572,33 +587,53 @@ export default function VesselTrackerPage() {
         const lastStatus = lastStatusesRef.current[vessel.id];
         const lastUpdate = lastUpdatesRef.current[vessel.id] || 0;
 
-        if (lastStatus !== currentStatus || timeKey > lastUpdate) {
-            const pos = { lat: vessel.location?.latitude || INITIAL_CENTER.lat, lng: vessel.location?.longitude || INITIAL_CENTER.lng };
-            const label = vessel.eventLabel || statusLabels[currentStatus] || currentStatus.toUpperCase();
-            const duration = differenceInMinutes(new Date(), new Date(timeKey));
-            
-            newEntries.push({ 
-                vesselId: vessel.id,
-                vesselName: vessel.displayName || vessel.id, 
-                statusLabel: label, 
-                time: new Date(timeKey), 
-                pos, 
-                batteryLevel: vessel.batteryLevel, 
-                isCharging: vessel.isCharging,
-                durationMinutes: duration 
-            });
+        const pos = { lat: vessel.location?.latitude || INITIAL_CENTER.lat, lng: vessel.location?.longitude || INITIAL_CENTER.lng };
+        const label = vessel.eventLabel || statusLabels[currentStatus] || currentStatus.toUpperCase();
+        
+        setHistory(prev => {
+            const lastEntryIdx = prev.findIndex(h => h.vesselId === vessel.id);
+            const lastEntry = lastEntryIdx !== -1 ? prev[lastEntryIdx] : null;
 
-            if (mode !== 'sender' && lastStatus && lastStatus !== currentStatus && vesselPrefs.isNotifyEnabled) {
-                const soundKey = (currentStatus === 'returning' || currentStatus === 'landed') ? 'moving' : (currentStatus === 'emergency' ? 'emergency' : currentStatus);
-                if (vesselPrefs.notifySettings[soundKey as keyof typeof vesselPrefs.notifySettings]) {
-                    playVesselSound(vesselPrefs.notifySounds[soundKey as keyof typeof vesselPrefs.notifySounds] || 'sonar');
-                }
+            // Increment duration and update MAJ time if same category
+            if (lastEntry && lastEntry.statusCategory === currentStatus && !label.includes('ERREUR')) {
+                const newHistory = [...prev];
+                newHistory[lastEntryIdx] = {
+                    ...lastEntry,
+                    statusLabel: label,
+                    time: new Date(),
+                    durationMinutes: differenceInMinutes(new Date(), new Date(timeKey))
+                };
+                return newHistory;
             }
-            lastStatusesRef.current[vessel.id] = currentStatus;
-            lastUpdatesRef.current[vessel.id] = timeKey;
-        }
+
+            // New status or error event
+            if (lastStatus !== currentStatus || timeKey > lastUpdate || label.includes('ERREUR')) {
+                if (mode !== 'sender' && lastStatus && lastStatus !== currentStatus && vesselPrefs.isNotifyEnabled) {
+                    const soundKey = (currentStatus === 'returning' || currentStatus === 'landed') ? 'moving' : (currentStatus === 'emergency' ? 'emergency' : currentStatus);
+                    if (vesselPrefs.notifySettings[soundKey as keyof typeof vesselPrefs.notifySettings]) {
+                        playVesselSound(vesselPrefs.notifySounds[soundKey as keyof typeof vesselPrefs.notifySounds] || 'sonar');
+                    }
+                }
+                
+                const newEntry = { 
+                    vesselId: vessel.id,
+                    vesselName: vessel.displayName || vessel.id, 
+                    statusLabel: label, 
+                    statusCategory: currentStatus,
+                    time: new Date(), 
+                    pos, 
+                    batteryLevel: vessel.batteryLevel, 
+                    isCharging: vessel.isCharging,
+                    durationMinutes: differenceInMinutes(new Date(), new Date(timeKey)) 
+                };
+                return [newEntry, ...prev].slice(0, 50);
+            }
+            return prev;
+        });
+
+        lastStatusesRef.current[vessel.id] = currentStatus;
+        lastUpdatesRef.current[vessel.id] = timeKey;
     });
-    if (newEntries.length > 0) setHistory(prev => [...newEntries, ...prev].slice(0, 50));
   }, [followedVessels, mode, vesselPrefs, playVesselSound]);
 
   useEffect(() => {
@@ -925,6 +960,59 @@ export default function VesselTrackerPage() {
                         })}
                     </div>
                 )}
+
+                <Accordion type="single" collapsible className="w-full">
+                    <AccordionItem value="receiver-settings" className="border-none">
+                        <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
+                            <Settings className="size-4 text-primary" />
+                            <span className="text-[10px] font-black uppercase">Veille Stratégique & Batterie</span>
+                        </AccordionTrigger>
+                        <AccordionContent className="pt-4 space-y-6">
+                            <div className="space-y-4 p-4 border-2 rounded-2xl bg-orange-50/30 border-orange-100">
+                                <div className="flex items-center justify-between">
+                                    <div className="space-y-0.5">
+                                        <Label className="text-xs font-black uppercase text-orange-800">Veille Stratégique</Label>
+                                        <p className="text-[9px] font-bold text-orange-600/60 uppercase">Alerte si immobile trop longtemps</p>
+                                    </div>
+                                    <Switch 
+                                        checked={vesselPrefs.isWatchEnabled} 
+                                        onCheckedChange={v => saveVesselPrefs({ ...vesselPrefs, isWatchEnabled: v })} 
+                                        className="touch-manipulation"
+                                    />
+                                </div>
+                                
+                                <div className={cn("space-y-4 pt-2 border-t border-orange-100 transition-opacity", !vesselPrefs.isWatchEnabled && "opacity-40")}>
+                                    <div className="flex justify-between items-center px-1">
+                                        <Label className="text-[10px] font-black uppercase text-orange-800/60">Seuil d'immobilité</Label>
+                                        <Badge variant="outline" className="font-black bg-white">{vesselPrefs.watchDuration >= 60 ? `${Math.floor(vesselPrefs.watchDuration / 60)}h` : `${vesselPrefs.watchDuration} min`}</Badge>
+                                    </div>
+                                    <Slider 
+                                        value={[vesselPrefs.watchDuration || 60]} 
+                                        min={60} max={1440} step={60}
+                                        onValueChange={v => saveVesselPrefs({ ...vesselPrefs, watchDuration: v[0] })} 
+                                        disabled={!vesselPrefs.isWatchEnabled}
+                                    />
+                                    <div className="flex justify-between text-[8px] font-black uppercase opacity-40 px-1"><span>1h</span><span>24h</span></div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4 p-4 border-2 rounded-2xl bg-red-50/30 border-red-100">
+                                <div className="flex items-center justify-between">
+                                    <div className="space-y-0.5">
+                                        <Label className="text-xs font-black uppercase text-red-800">Seuil Batterie Faible</Label>
+                                        <p className="text-[9px] font-bold text-red-600/60 uppercase">Alerte journal de bord</p>
+                                    </div>
+                                    <Badge variant="outline" className="font-black">{vesselPrefs.batteryThreshold || 20}%</Badge>
+                                </div>
+                                <Slider 
+                                    value={[vesselPrefs.batteryThreshold || 20]} 
+                                    min={5} max={50} step={5}
+                                    onValueChange={v => saveVesselPrefs({ ...vesselPrefs, batteryThreshold: v[0] })} 
+                                />
+                            </div>
+                        </AccordionContent>
+                    </AccordionItem>
+                </Accordion>
             </div>
           ) : (
             <div className="space-y-4">
