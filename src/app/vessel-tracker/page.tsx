@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -393,12 +392,18 @@ export default function VesselTrackerPage() {
 
   const handleRecenter = () => {
     let pos = currentPosRef.current;
-    if (!pos) { const activeVessel = followedVessels?.find(v => v.isSharing && !v.isPositionHidden); if (activeVessel?.location) pos = { lat: activeVessel.location.latitude, lng: activeVessel.location.longitude }; }
+    if (!pos) { 
+        const activeVessel = followedVessels?.find(v => v.isSharing && !v.isPositionHidden); 
+        if (activeVessel && activeVessel.location) {
+            pos = { lat: activeVessel.location.latitude, lng: activeVessel.location.longitude };
+        }
+    }
     if (pos && map) { map.panTo(pos); map.setZoom(15); } else { shouldPanOnNextFix.current = true; if (mode === 'receiver') setIsReceiverGpsActive(true); }
   };
 
   const sendEmergencySms = (type: string) => {
-    const pos = currentPosRef.current || (followedVessels?.find(v => v.isSharing && !v.isPositionHidden)?.location ? { lat: followedVessels.find(v => v.isSharing)!.location!.latitude, lng: followedVessels.find(v => v.isSharing)!.location!.longitude } : null);
+    const activeVessel = followedVessels?.find(v => v.isSharing && !v.isPositionHidden);
+    const pos = currentPosRef.current || (activeVessel?.location ? { lat: activeVessel.location.latitude, lng: activeVessel.location.longitude } : null);
     if (!pos) { toast({ variant: "destructive", title: "GPS non verrouillé" }); return; }
     const posUrl = `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
     const body = `${vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : ""}${isCustomMessageEnabled ? vesselSmsMessage : "Assistance requise."} [${type}] Position : ${posUrl}`;
@@ -875,7 +880,7 @@ export default function VesselTrackerPage() {
                                     )}>{h.vesselName} - {h.statusLabel}</span>
                                     <span className="text-[8px] font-bold opacity-40 uppercase">{format(h.time, 'HH:mm:ss')} {h.accuracy ? `• +/-${h.accuracy}m` : ''}</span>
                                 </div>
-                                {h.pos && <Button variant="outline" size="sm" className="h-8 text-[9px] font-black border-2" onClick={() => { map?.panTo(h.pos!); map?.setZoom(17); }}><MapPin className="size-3 text-primary" /> GPS</Button>}
+                                {h.pos && <Button variant="outline" size="sm" className="h-8 text-[9px] font-black border-2" onClick={() => { if (h.pos && map) { map.panTo(h.pos); map.setZoom(17); } }}><MapPin className="size-3 text-primary" /> GPS</Button>}
                             </div>
                         )) : <div className="text-center py-10 opacity-40 uppercase text-[10px] font-black italic">pas d'affichage dans l'historique</div>}
                     </AccordionContent>
