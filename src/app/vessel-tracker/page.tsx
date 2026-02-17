@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -592,8 +593,13 @@ export default function VesselTrackerPage() {
             updateVesselInFirestore({ accuracy });
         }
       },
-      () => toast({ variant: "destructive", title: "Erreur GPS" }),
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      (err) => {
+        let msg = "Impossible de récupérer votre position.";
+        if (err.code === 1) msg = "Accès GPS refusé. Veuillez autoriser la localisation.";
+        else if (err.code === 3) return; // Silent timeout to avoid spam
+        toast({ variant: "destructive", title: "Erreur GPS", description: msg });
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 }
     );
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
   }, [isSharing, mode, anchorPos, updateVesselInFirestore, map, toast, vesselStatus, vesselPrefs.mooringRadius]);
