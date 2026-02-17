@@ -886,7 +886,7 @@ export default function VesselTrackerPage() {
                 {followedVessels?.flatMap(v => v.huntingMarkers || []).map(m => (
                     <OverlayView key={m.id} position={{ lat: m.lat, lng: m.lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                         <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
-                            <div className="px-2 py-1 rounded bg-blue-600 text-white text-[8px] font-black shadow-lg uppercase whitespace-nowrap">{format(new Date(m.time), 'HH:mm')}</div>
+                            <div className="px-2 py-1 rounded bg-blue-600 text-white text-[8px] font-black shadow-lg uppercase whitespace-nowrap">{format(new Date(m.time), 'HH:mm:ss')}</div>
                             <div className="p-1.5 bg-white rounded-full border-2 border-blue-600 shadow-md text-blue-600"><Bird className="size-3" /></div>
                         </div>
                     </OverlayView>
