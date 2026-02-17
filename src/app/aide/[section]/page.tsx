@@ -127,20 +127,20 @@ const sectionContent: Record<string, {
     title: 'Boat Tracker',
     icon: Navigation,
     color: 'bg-blue-600',
-    role: "Un système de sécurité maritime haute-fidélité conçu pour partager votre position GPS, votre statut d'activité et votre niveau de batterie avec vos proches restés à terre.",
+    role: "Un système de sécurité maritime haute-fidélité conçu pour partager votre position GPS, votre statut d'activité et mutualiser les infos de pêche au sein d'une flotte.",
     steps: [
-      "Émetteur (A) - Identité : Configurez un ID et votre surnom de navire. Ce surnom est inclus automatiquement au début de vos SMS d'urgence.",
-      "Émetteur (A) - Angle de Sécurité : Activez votre 'Angle de Tir / Sécurité' pour surveiller une zone précise. Réglez la direction (-180° à +180°) et la portée jusqu'à 2km.",
-      "Émetteur (A) - Signaux Tactiques : Utilisez 'DEMANDE ASSISTANCE' pour une alerte rouge clignotante immédiate.",
-      "Récepteur (B) - Flotte & Suivi : Saisissez l'ID d'un navire pour l'ajouter. Vous visualisez son angle de surveillance en bleu clair sur la carte.",
-      "Récepteur (B) - Sécurité Mutualisée : En activant votre GPS, si vous entrez dans l'angle du navire suivi, une alerte sonore retentit sur les deux appareils.",
-      "Récepteur (B) - Veille Stratégique : Configurez une alerte d'immobilité (1h à 24h).",
-      "Journal de Bord : Consultez l'historique incluant les changements de batterie et de statuts."
+      "Émetteur (A) - Détection Auto : Activez le partage. Un décompte rouge de 30s s'affiche pour qualifier votre statut initial (Mouillage ou Mouvement).",
+      "Émetteur (A) - Zone de Sécurité : Réglez votre 'Rayon de Mouillage' (10m à 100m). Si vous sortez du cercle bleu, l'app vous repasse automatiquement en 'Mouvement'.",
+      "Émetteur (A) - Signaux Tactiques : Signalez une urgence (MAYDAY), un regroupement d'oiseaux ou une prise de poisson (Marlin, Thon...) via les boutons dédiés.",
+      "Récepteur (B) - Suivi Privé : Suivez un navire spécifique via son ID. Configurez une 'Veille Stratégique' (Alarme si immobile trop longtemps).",
+      "Flotte (C) - Mode Communautaire : Rejoignez un ID de groupe (ex: CLUB-PECHE). Vous visualisez tous les membres et les alertes de la flotte en temps réel.",
+      "Journal de Bord : Consultez l'historique incluant la précision GPS (+/- Xm) et les changements de batterie.",
+      "Copie GPS : Cliquez sur 'Copier' dans l'historique pour récupérer les coordonnées exactes d'un événement."
     ],
     tips: [
-      "Surnom SMS : Votre surnom de navire (ex: [TITANIC]) est ajouté automatiquement au début du SMS pour une identification immédiate par les secours.",
-      "Angle de Sécurité : Utilisez-le pour délimiter une zone de pêche ou une direction de surveillance. La portée s'adapte automatiquement au zoom de la carte.",
-      "Batterie : Une alerte automatique retentit chez le récepteur si la batterie du navire descend sous les 20%."
+      "Rayon de Mouillage : Augmentez le rayon par temps venteux pour éviter les fausses alertes de 'Mouvement' dues à l'évitage du bateau.",
+      "Surnom SMS : Votre surnom de navire est inclus automatiquement dans le SMS d'urgence pour une identification immédiate par les secours.",
+      "Signal Prise : Dans le mode Flotte (C), signaler une prise affiche une icône de poisson colorée visible par tout le groupe."
     ]
   },
   'pro-dashboard': {
