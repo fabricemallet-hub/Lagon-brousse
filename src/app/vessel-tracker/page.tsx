@@ -80,10 +80,11 @@ const statusLabels: Record<string, string> = {
 const tacticalIcons: Record<string, any> = {
     bird: Bird,
     fish: Fish,
-    marlin: Fish,
+    marlin: Zap,
     thon: Fish,
     tazard: Fish,
     wahoo: Fish,
+    mahimahi: Fish,
     fire: Flame
 };
 
@@ -578,14 +579,20 @@ export default function VesselTrackerPage() {
                                     <Button variant="outline" className="h-14 flex-col gap-1 border-2 font-black uppercase text-[9px] bg-white text-blue-600 border-blue-100" onClick={() => addTacticalMarker('OISEAUX', 'bird')}>
                                         <Bird className="size-5" /> Oiseaux
                                     </Button>
-                                    <Button variant="outline" className="h-14 flex-col gap-1 border-2 font-black uppercase text-[9px] bg-white text-primary border-primary/10" onClick={() => addTacticalMarker('POISSON', 'fish')}>
-                                        <Fish className="size-5" /> Poisson
+                                    <Button variant="outline" className="h-14 flex-col gap-1 border-2 font-black uppercase text-[9px] bg-white text-primary border-primary/10" onClick={() => addTacticalMarker('THON', 'thon')}>
+                                        <Fish className="size-5" /> Thon
                                     </Button>
                                     <Button variant="outline" className="h-14 flex-col gap-1 border-2 font-black uppercase text-[9px] bg-white text-slate-800 border-slate-100" onClick={() => addTacticalMarker('MARLIN', 'marlin')}>
                                         <Zap className="size-5 text-yellow-500" /> Marlin
                                     </Button>
-                                    <Button variant="outline" className="h-14 flex-col gap-1 border-2 font-black uppercase text-[9px] bg-white text-orange-600 border-orange-100" onClick={() => addTacticalMarker('BOUCHE ENFER', 'fire')}>
-                                        <Flame className="size-5" /> Bouche Enfer
+                                    <Button variant="outline" className="h-14 flex-col gap-1 border-2 font-black uppercase text-[9px] bg-white text-orange-600 border-orange-100" onClick={() => addTacticalMarker('MAHI MAHI', 'mahimahi')}>
+                                        <Fish className="size-5" /> Mahi Mahi
+                                    </Button>
+                                    <Button variant="outline" className="h-14 flex-col gap-1 border-2 font-black uppercase text-[9px] bg-white text-primary border-primary/10" onClick={() => addTacticalMarker('TAZARD', 'tazard')}>
+                                        <Fish className="size-5" /> Tazard
+                                    </Button>
+                                    <Button variant="outline" className="h-14 flex-col gap-1 border-2 font-black uppercase text-[9px] bg-white text-primary border-primary/10" onClick={() => addTacticalMarker('WAHOO', 'wahoo')}>
+                                        <Fish className="size-5" /> Wahoo
                                     </Button>
                                 </div>
                                 <Button variant="ghost" className="w-full h-10 font-black uppercase text-[8px] text-destructive/60 hover:text-destructive border-2 border-dashed border-destructive/10" onClick={handleClearTactical}>
@@ -595,19 +602,26 @@ export default function VesselTrackerPage() {
                         </AccordionItem>
                     </Accordion>
 
-                    <Button variant="destructive" className="w-full h-16 text-xs font-black uppercase tracking-widest shadow-lg rounded-xl gap-3 border-2 border-white/20" onClick={handleStopSharing}><X className="size-5" /> Arrêter le partage</Button>
+                    <Button variant="destructive" className="w-full h-16 text-xs font-black uppercase tracking-widest shadow-lg rounded-xl gap-3 border-2 border-white/20" onClick={handleStopSharing}>
+                        <X className="size-5" /> Arrêter le partage
+                    </Button>
                 </div>
               ) : (
-                <Button onClick={() => setIsSharing(true)} className="w-full h-16 font-black uppercase tracking-widest shadow-xl text-base gap-3"><Zap className="size-6 fill-white" /> Lancer le Partage</Button>
+                <Button onClick={() => setIsSharing(true)} className="w-full h-16 font-black uppercase tracking-widest shadow-xl text-base gap-3">
+                    <Zap className="size-6 fill-white" /> Lancer le Partage
+                </Button>
               )}
               
               <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="sender-prefs" className="border-none">
-                    <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/5 rounded-xl"><Settings className="size-4" /><span className="text-[10px] font-black uppercase">Identité & IDs</span></AccordionTrigger>
+                    <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/5 rounded-xl">
+                        <Settings className="size-4" />
+                        <span className="text-[10px] font-black uppercase">Identité & IDs</span>
+                    </AccordionTrigger>
                     <AccordionContent className="pt-4 space-y-6">
                         <div className="space-y-4">
-                            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">Surnom</Label><Input value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} className="h-12 border-2 font-black text-center uppercase" /></div>
-                            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">ID Navire (B)</Label><Input value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} className="h-12 border-2 font-black text-center uppercase" /></div>
+                            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">Surnom</Label><Input value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} className="h-12 border-2 font-black text-center uppercase" /></div>
+                            <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase ml-1 opacity-60">ID Navire (B)</Label><Input value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} className="h-12 border-2 font-black text-center uppercase" /></div>
                             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60">ID Groupe Flotte (C)</Label><Input value={fleetGroupId} onChange={e => setFleetGroupId(e.target.value)} className="h-12 border-2 font-black text-center uppercase" /></div>
                             
                             <div className="space-y-3 pt-2">
@@ -615,7 +629,9 @@ export default function VesselTrackerPage() {
                                 <Slider value={[vesselPrefs.mooringRadius]} min={10} max={200} step={5} onValueChange={v => setVesselPrefs({...vesselPrefs, mooringRadius: v[0]})} />
                             </div>
 
-                            <Button onClick={handleSaveVessel} className="w-full h-14 font-black uppercase tracking-widest shadow-xl text-base"><Save className="size-5 mr-2" /> Enregistrer mes Identifiants</Button>
+                            <Button onClick={handleSaveVessel} className="w-full h-14 font-black uppercase tracking-widest shadow-xl text-base">
+                                <Save className="size-5 mr-2" /> Enregistrer mes Identifiants
+                            </Button>
                         </div>
 
                         {userProfile?.vesselIdHistory && userProfile.vesselIdHistory.length > 0 && (
@@ -625,7 +641,9 @@ export default function VesselTrackerPage() {
                                     {userProfile.vesselIdHistory.map(id => (
                                         <div key={id} className="flex items-center bg-white border-2 rounded-lg pl-3 pr-1 py-1 gap-2 shadow-sm">
                                             <span className="text-[10px] font-black uppercase cursor-pointer" onClick={() => { setCustomSharingId(id); setFleetGroupId(id); }}>{id}</span>
-                                            <Button variant="ghost" size="icon" className="size-6 text-destructive/40" onClick={() => updateDoc(doc(firestore!, 'users', user!.uid), { vesselIdHistory: arrayRemove(id) })}><X className="size-3" /></Button>
+                                            <Button variant="ghost" size="icon" className="size-6 text-destructive/40" onClick={() => updateDoc(doc(firestore!, 'users', user!.uid), { vesselIdHistory: arrayRemove(id) })}>
+                                                <X className="size-3" />
+                                            </Button>
                                         </div>
                                     ))}
                                 </div>
@@ -712,7 +730,7 @@ export default function VesselTrackerPage() {
                             <OverlayView key={m.id} position={{ lat: m.lat, lng: m.lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                 <div style={{ transform: 'translate(-50%, -50%)' }} className="flex flex-col items-center">
                                     <div className="p-1.5 rounded-full bg-white border-2 border-primary shadow-lg animate-in zoom-in-50">
-                                        <Fish className="size-3 text-primary" />
+                                        {vessel.eventLabel?.toLowerCase().includes('oiseau') ? <Bird className="size-3 text-primary" /> : <Fish className="size-3 text-primary" />}
                                     </div>
                                 </div>
                             </OverlayView>
