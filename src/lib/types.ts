@@ -371,6 +371,7 @@ export interface HuntingMarker {
   lat: number;
   lng: number;
   time: string;
+  label?: string;
 }
 
 export interface VesselStatus {
@@ -386,6 +387,7 @@ export interface VesselStatus {
   statusChangedAt?: any;
   eventLabel?: string;
   historyClearedAt?: any;
+  tacticalClearedAt?: any;
   huntingMarkers?: HuntingMarker[];
   isPositionHidden?: boolean;
   isPrivateHidden?: boolean;
@@ -471,7 +473,7 @@ export interface SpotShare {
 export interface AccessToken {
   id: string;
   status: 'active' | 'redeemed';
-  duration_months: number;
+  durationMonths: number;
   createdAt: any;
   redeemedBy?: string;
   redeemedAt?: any;

@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -339,7 +338,8 @@ export default function VesselTrackerPage() {
         id: Math.random().toString(36).substring(7),
         lat: currentPos.lat,
         lng: currentPos.lng,
-        time: new Date().toISOString()
+        time: new Date().toISOString(),
+        label: label.toUpperCase()
     };
 
     updateDoc(doc(firestore, 'vessels', sharingId), {
@@ -384,12 +384,12 @@ export default function VesselTrackerPage() {
             vessel.huntingMarkers.forEach(m => {
                 setTacticalHistory(prev => {
                     if (prev.some(h => h.id === m.id)) return prev;
-                    const type = vessel.eventLabel?.toLowerCase().includes('oiseau') ? 'bird' : 
-                                vessel.eventLabel?.toLowerCase().includes('sardine') ? 'sardines' : 'fish';
+                    const type = m.label?.toLowerCase().includes('oiseau') ? 'bird' : 
+                                m.label?.toLowerCase().includes('sardine') ? 'sardines' : 'fish';
                     return [{
                         id: m.id,
                         vesselName: vessel.displayName || vessel.id,
-                        label: vessel.eventLabel || 'SIGNAL TACTIQUE',
+                        label: m.label || 'SIGNAL TACTIQUE',
                         type,
                         time: new Date(m.time),
                         pos: { lat: m.lat, lng: m.lng }
@@ -694,7 +694,7 @@ export default function VesselTrackerPage() {
                                 </div>
                                 <div className="space-y-4 pt-2 border-t border-orange-100">
                                     <div className="flex justify-between items-center"><Label className="text-[10px] font-black uppercase text-orange-800/60">Seuil d'immobilité</Label><Badge variant="outline" className="font-black bg-white">{vesselPrefs.watchDuration >= 60 ? `${Math.floor(vesselPrefs.watchDuration / 60)}h` : `${vesselPrefs.watchDuration} min`}</Badge></div>
-                                    <Slider value={[vesselPrefs.watchDuration || 60]} min={60} max={1440} step={60} onValueChange={v => saveVesselPrefs({...vesselPrefs, watchDuration: v[0]})} />
+                                    <Slider value={[vesselPrefs.watchDuration || 60]} min={60} max={1440} step={60} onValueChange={v => setVesselPrefs({...vesselPrefs, watchDuration: v[0]})} />
                                 </div>
                             </div>
                         </AccordionContent>
@@ -737,10 +737,15 @@ export default function VesselTrackerPage() {
                         </OverlayView>
                         {vessel.huntingMarkers?.map(m => (
                             <OverlayView key={m.id} position={{ lat: m.lat, lng: m.lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                                <div style={{ transform: 'translate(-50%, -50%)' }} className="flex flex-col items-center">
+                                <div style={{ transform: 'translate(-50%, -50%)' }} className="flex flex-col items-center gap-0.5">
+                                    {m.label && (
+                                        <div className="px-1.5 py-0.5 bg-white/90 backdrop-blur-sm border rounded text-[7px] font-black uppercase shadow-sm mb-0.5 whitespace-nowrap">
+                                            {m.label}
+                                        </div>
+                                    )}
                                     <div className="p-1.5 rounded-full bg-white border-2 border-primary shadow-lg animate-in zoom-in-50">
-                                        {vessel.eventLabel?.toLowerCase().includes('oiseau') ? <Bird className="size-3 text-primary" /> : 
-                                         vessel.eventLabel?.toLowerCase().includes('sardine') ? <Waves className="size-3 text-primary" /> :
+                                        {m.label?.toLowerCase().includes('oiseau') ? <Bird className="size-3 text-primary" /> : 
+                                         m.label?.toLowerCase().includes('sardine') ? <Waves className="size-3 text-primary" /> :
                                          <Fish className="size-3 text-primary" />}
                                     </div>
                                 </div>
