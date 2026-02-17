@@ -387,6 +387,7 @@ export interface VesselStatus {
   huntingMarkers?: HuntingMarker[];
   isPositionHidden?: boolean;
   accuracy?: number;
+  mooringRadius?: number;
   shootingAngle?: ShootingAngle;
 }
 

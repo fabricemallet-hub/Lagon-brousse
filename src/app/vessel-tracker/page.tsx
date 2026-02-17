@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -80,6 +81,17 @@ const PulsingDot = () => (
     </div>
 );
 
+type HistoryEntry = {
+    vesselName: string;
+    statusLabel: string;
+    time: Date;
+    pos: google.maps.LatLngLiteral;
+    batteryLevel?: number;
+    isCharging?: boolean;
+    accuracy?: number;
+    mooringRadius?: number;
+};
+
 export default function VesselTrackerPage() {
   const { user } = useUserHook();
   const firestore = useFirestore();
@@ -123,7 +135,7 @@ export default function VesselTrackerPage() {
     mooringRadius: 20
   });
   
-  const [history, setHistory] = useState<{ vesselName: string, statusLabel: string, time: Date, pos: google.maps.LatLngLiteral, batteryLevel?: number, isCharging?: boolean }[]>([]);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const lastStatusesRef = useRef<Record<string, string>>({});
   const lastUpdatesRef = useRef<Record<string, number>>({});
   const lastSentStatusRef = useRef<string | null>(null);
@@ -349,7 +361,7 @@ export default function VesselTrackerPage() {
 
   useEffect(() => {
     if (!followedVessels) return;
-    const newEntries: any[] = [];
+    const newEntries: HistoryEntry[] = [];
     followedVessels.forEach(vessel => {
         const isSharingActive = vessel.isSharing === true;
         const currentStatus = isSharingActive ? (vessel.status || 'moving') : 'offline';
@@ -373,7 +385,16 @@ export default function VesselTrackerPage() {
 
             const label = vessel.eventLabel || statusLabels[currentStatus] || currentStatus.toUpperCase();
             
-            newEntries.push({ vesselName: vessel.displayName || vessel.id, statusLabel: label, time: new Date(timeKey), pos, batteryLevel: vessel.batteryLevel, isCharging: vessel.isCharging });
+            newEntries.push({ 
+                vesselName: vessel.displayName || vessel.id, 
+                statusLabel: label, 
+                time: new Date(timeKey), 
+                pos, 
+                batteryLevel: vessel.batteryLevel, 
+                isCharging: vessel.isCharging,
+                accuracy: vessel.accuracy,
+                mooringRadius: vessel.mooringRadius
+            });
 
             if (mode === 'receiver' && lastStatus && lastStatus !== currentStatus && vesselPrefs.isNotifyEnabled) {
                 const soundKey = (currentStatus === 'returning' || currentStatus === 'landed') ? 'moving' : currentStatus;
@@ -394,6 +415,7 @@ export default function VesselTrackerPage() {
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         const newPos = { lat: position.coords.latitude, lng: position.coords.longitude };
+        const accuracy = Math.round(position.coords.accuracy);
         setCurrentPos(newPos);
         if (shouldPanOnNextFix.current && map) { map.panTo(newPos); map.setZoom(15); shouldPanOnNextFix.current = false; }
         
@@ -402,7 +424,7 @@ export default function VesselTrackerPage() {
                 setAnchorPos(newPos); 
                 immobilityStartTime.current = Date.now();
                 isFirstFixRef.current = false; 
-                updateVesselInFirestore({ status: 'moving', isSharing: true, eventLabel: 'LANCEMENT EN COURS' });
+                updateVesselInFirestore({ status: 'moving', isSharing: true, eventLabel: 'LANCEMENT EN COURS', accuracy });
                 return; 
             }
             
@@ -414,17 +436,17 @@ export default function VesselTrackerPage() {
                     setVesselStatus('moving');
                     setAnchorPos(newPos);
                     immobilityStartTime.current = Date.now();
-                    updateVesselInFirestore({ status: 'moving', eventLabel: 'REPRISE DE MOUVEMENT (SORTIE ZONE)' });
+                    updateVesselInFirestore({ status: 'moving', eventLabel: 'REPRISE DE MOUVEMENT (SORTIE ZONE)', accuracy });
                 } else if (vesselStatus === 'moving' && dist > currentRadius) {
                     setAnchorPos(newPos);
                     immobilityStartTime.current = Date.now();
-                    updateVesselInFirestore({});
+                    updateVesselInFirestore({ accuracy });
                 } else {
-                    updateVesselInFirestore({});
+                    updateVesselInFirestore({ accuracy });
                 }
             }
         } else {
-            updateVesselInFirestore({});
+            updateVesselInFirestore({ accuracy });
         }
       },
       () => toast({ variant: "destructive", title: "Erreur GPS" }),
@@ -738,7 +760,7 @@ export default function VesselTrackerPage() {
                                                 h.statusLabel.includes('RETOUR') ? 'border-indigo-500 text-indigo-600 bg-indigo-50' :
                                                 h.statusLabel.includes('TERRE') ? 'border-green-500 text-green-600 bg-green-50' :
                                                 'border-primary text-primary bg-primary/5'
-                                            )}>{h.statusLabel}</Badge>
+                                            )}>{h.statusLabel} {h.statusLabel.includes('MOUILLAGE') && h.mooringRadius ? `(${h.mooringRadius}m)` : ''}</Badge>
                                             {h.batteryLevel !== undefined && (
                                                 <span className="flex items-center gap-1 bg-slate-100 px-1.5 py-0.5 rounded text-[8px] font-black text-slate-500 border border-slate-200">
                                                     <BatteryIconComp level={h.batteryLevel} charging={h.isCharging} className="size-2.5" />
@@ -746,7 +768,10 @@ export default function VesselTrackerPage() {
                                                 </span>
                                             )}
                                           </div>
-                                          <span className="text-[9px] font-bold opacity-40 uppercase">{format(h.time, 'HH:mm:ss')}</span>
+                                          <div className="flex items-center gap-2 text-[9px] font-bold opacity-40 uppercase">
+                                            <span>{format(h.time, 'HH:mm:ss')}</span>
+                                            {h.accuracy !== undefined && <span>• +/- {h.accuracy}m GPS</span>}
+                                          </div>
                                         </div>
                                         <div className="flex gap-1">
                                             <Button variant="ghost" size="icon" className="h-8 w-8 text-primary border-2" onClick={() => {
