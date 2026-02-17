@@ -53,7 +53,8 @@ import {
   Fish,
   Users,
   ChevronDown,
-  Pencil
+  Pencil,
+  Repeat
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -137,11 +138,23 @@ export default function VesselTrackerPage() {
 
   const [idHistory, setIdHistory] = useState<{ id: string, type: 'vessel' | 'group' }[]>([]);
 
-  const [vesselPrefs, setVesselPrefs] = useState<NonNullable<UserAccount['vesselPrefs']>>({
+  // Alert Loop State
+  const [activeLoopingAlert, setActiveLoopingAlert] = useState<{
+    type: string;
+    vesselName?: string;
+    title: string;
+    message: string;
+    color: string;
+    icon: any;
+  } | null>(null);
+  const loopingAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const [vesselPrefs, setVesselPrefs] = useState<any>({
     isNotifyEnabled: true,
     vesselVolume: 0.8,
     notifySettings: { moving: true, stationary: true, offline: true, emergency: true, birds: true },
     notifySounds: { moving: '', stationary: '', offline: '', emergency: '', birds: '', watch: '', battery: '' },
+    repeatSettings: { moving: false, stationary: false, offline: false, emergency: true, watch: true, battery: false },
     isWatchEnabled: false,
     watchType: 'stationary',
     watchDuration: 60,
@@ -208,15 +221,51 @@ export default function VesselTrackerPage() {
     ).map(s => ({ id: s.id, label: s.label, url: s.url }));
   }, [dbSounds]);
 
-  const playVesselSound = useCallback((soundId: string) => {
+  const stopLoopingAlert = () => {
+    if (loopingAudioRef.current) {
+        loopingAudioRef.current.pause();
+        loopingAudioRef.current = null;
+    }
+    setActiveLoopingAlert(null);
+  };
+
+  const playVesselSound = useCallback((soundId: string, type?: string, vesselName?: string) => {
     if (!vesselPrefs.isNotifyEnabled) return;
     const sound = availableSounds.find(s => s.id === soundId || s.label === soundId);
-    if (sound) {
-      const audio = new Audio(sound.url);
-      audio.volume = vesselPrefs.vesselVolume;
-      audio.play().catch(() => {});
+    if (!sound) return;
+
+    // Repetition check
+    if (type && vesselPrefs.repeatSettings?.[type]) {
+        // If an alert is already looping, don't start another one or stop current
+        if (loopingAudioRef.current) {
+            loopingAudioRef.current.pause();
+        }
+
+        const audio = new Audio(sound.url);
+        audio.volume = vesselPrefs.vesselVolume;
+        audio.loop = true;
+        loopingAudioRef.current = audio;
+        
+        // Define Vignette Appearance
+        const alertConfigs: Record<string, any> = {
+            moving: { title: 'MOUVEMENT DÉTECTÉ', message: 'Le navire fait route.', color: 'bg-blue-600', icon: Navigation },
+            stationary: { title: 'MOUILLAGE DÉTECTÉ', message: 'Le navire est maintenant immobile.', color: 'bg-amber-600', icon: Anchor },
+            offline: { title: 'SIGNAL PERDU', message: 'Le navire ne répond plus au réseau.', color: 'bg-red-600', icon: WifiOff },
+            emergency: { title: 'URGENCE / MAYDAY', message: 'DEMANDE D\'ASSISTANCE IMMÉDIATE !', color: 'bg-red-700', icon: ShieldAlert },
+            watch: { title: 'VEILLE STRATÉGIQUE', message: 'Le navire est immobile depuis trop longtemps.', color: 'bg-orange-600', icon: Clock },
+            battery: { title: 'BATTERIE FAIBLE', message: 'Niveau de batterie critique détecté.', color: 'bg-red-500', icon: BatteryLow },
+        };
+
+        const config = alertConfigs[type] || { title: 'ALERTE NAVIRE', message: 'Événement détecté.', color: 'bg-slate-800', icon: Bell };
+        setActiveLoopingAlert({ ...config, type, vesselName });
+        
+        audio.play().catch(e => console.error("Audio play blocked", e));
+    } else {
+        const audio = new Audio(sound.url);
+        audio.volume = vesselPrefs.vesselVolume;
+        audio.play().catch(() => {});
     }
-  }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, availableSounds]);
+  }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, vesselPrefs.repeatSettings, availableSounds]);
 
   useEffect(() => {
     const saved = localStorage.getItem('lb_vessel_id_history');
@@ -263,7 +312,6 @@ export default function VesselTrackerPage() {
             ...data 
         };
 
-        // ONLY update statusChangedAt if it's a REAL state change
         if (data.status && data.status !== lastSentStatusRef.current) {
             updatePayload.statusChangedAt = serverTimestamp();
             lastSentStatusRef.current = data.status;
@@ -405,9 +453,7 @@ export default function VesselTrackerPage() {
         handleManualStatus(st, label);
     } else {
         const revertTo = preManualStatus || 'moving';
-        // 1. Log error first
         updateVesselInFirestore({ eventLabel: 'ERREUR INVOLONTAIRE' });
-        // 2. Revert after small delay
         setTimeout(() => {
             setVesselStatus(revertTo);
             updateVesselInFirestore({ status: revertTo, eventLabel: `${statusLabels[revertTo]} (REPRISE)` });
@@ -569,7 +615,6 @@ export default function VesselTrackerPage() {
 
   useEffect(() => {
     if (!followedVessels) return;
-    const newEntries: any[] = [];
     followedVessels.forEach(vessel => {
         const isSharingActive = vessel.isSharing === true;
         const currentStatus = isSharingActive ? (vessel.status || 'moving') : 'offline';
@@ -600,7 +645,6 @@ export default function VesselTrackerPage() {
             const lastEntryIdx = prev.findIndex(h => h.vesselId === vessel.id);
             const lastEntry = lastEntryIdx !== -1 ? prev[lastEntryIdx] : null;
 
-            // Increment duration and update MAJ time if same category
             if (lastEntry && lastEntry.statusCategory === currentStatus && !label.includes('ERREUR')) {
                 const newHistory = [...prev];
                 newHistory[lastEntryIdx] = {
@@ -609,15 +653,23 @@ export default function VesselTrackerPage() {
                     time: new Date(),
                     durationMinutes: differenceInMinutes(new Date(), new Date(timeKey))
                 };
+                
+                // Trigger Watch alert if enabled and duration exceeded
+                if (mode === 'receiver' && vesselPrefs.isWatchEnabled && newHistory[lastEntryIdx].durationMinutes! >= (vesselPrefs.watchDuration || 60)) {
+                    // Only play once per hour if already triggered? Or just repeat if loop enabled.
+                    if (!activeLoopingAlert || activeLoopingAlert.type !== 'watch') {
+                        playVesselSound(vesselPrefs.notifySounds.watch || 'alerte', 'watch', vessel.displayName || vessel.id);
+                    }
+                }
+
                 return newHistory;
             }
 
-            // New status or error event
             if (lastStatus !== currentStatus || timeKey > lastUpdate || label.includes('ERREUR')) {
                 if (mode !== 'sender' && lastStatus && lastStatus !== currentStatus && vesselPrefs.isNotifyEnabled) {
                     const soundKey = (currentStatus === 'returning' || currentStatus === 'landed') ? 'moving' : (currentStatus === 'emergency' ? 'emergency' : currentStatus);
                     if (vesselPrefs.notifySettings[soundKey as keyof typeof vesselPrefs.notifySettings]) {
-                        playVesselSound(vesselPrefs.notifySounds[soundKey as keyof typeof vesselPrefs.notifySounds] || 'sonar');
+                        playVesselSound(vesselPrefs.notifySounds[soundKey as keyof typeof vesselPrefs.notifySounds] || 'sonar', soundKey, vessel.displayName || vessel.id);
                     }
                 }
                 
@@ -632,6 +684,12 @@ export default function VesselTrackerPage() {
                     isCharging: vessel.isCharging,
                     durationMinutes: differenceInMinutes(new Date(), new Date(timeKey)) 
                 };
+
+                // Trigger battery alert
+                if (mode === 'receiver' && vessel.batteryLevel !== undefined && vessel.batteryLevel <= (vesselPrefs.batteryThreshold || 20) && !vessel.isCharging) {
+                    playVesselSound(vesselPrefs.notifySounds.battery || 'battery', 'battery', vessel.displayName || vessel.id);
+                }
+
                 return [newEntry, ...prev].slice(0, 50);
             }
             return prev;
@@ -640,7 +698,7 @@ export default function VesselTrackerPage() {
         lastStatusesRef.current[vessel.id] = currentStatus;
         lastUpdatesRef.current[vessel.id] = timeKey;
     });
-  }, [followedVessels, mode, vesselPrefs, playVesselSound]);
+  }, [followedVessels, mode, vesselPrefs, playVesselSound, activeLoopingAlert]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
@@ -705,6 +763,40 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
+      {/* ALERTE VIGNETTE (LOOPING) */}
+      {activeLoopingAlert && (
+        <div className={cn("fixed inset-0 z-[300] flex items-center justify-center p-6 animate-in fade-in duration-300", activeLoopingAlert.color)}>
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+            <Card className="relative w-full max-w-md border-4 border-white shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden rounded-[2.5rem]">
+                <div className="absolute top-0 right-0 p-10 opacity-10 -translate-y-4 translate-x-4">
+                    <activeLoopingAlert.icon className="size-48" />
+                </div>
+                <CardHeader className="text-center pt-10 pb-6 relative z-10">
+                    <div className="mx-auto size-20 rounded-full bg-white/20 flex items-center justify-center border-4 border-white mb-4 animate-pulse">
+                        <activeLoopingAlert.icon className="size-10 text-white" />
+                    </div>
+                    <CardTitle className="text-2xl font-black uppercase text-white tracking-tighter leading-tight drop-shadow-md">
+                        {activeLoopingAlert.title}
+                    </CardTitle>
+                    <CardDescription className="text-white/80 font-bold uppercase text-xs mt-2 tracking-widest">
+                        Navire : {activeLoopingAlert.vesselName || 'Inconnu'}
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="text-center pb-10 px-8 relative z-10">
+                    <p className="text-white font-medium leading-relaxed italic mb-8">
+                        "{activeLoopingAlert.message}"
+                    </p>
+                    <Button 
+                        onClick={stopLoopingAlert}
+                        className="w-full h-20 text-lg font-black uppercase tracking-widest bg-white text-slate-900 hover:bg-slate-100 shadow-2xl rounded-2xl gap-3"
+                    >
+                        <Check className="size-8" /> COUPER L'ALARME
+                    </Button>
+                </CardContent>
+            </Card>
+        </div>
+      )}
+
       {isSharing && mode === 'sender' && (
           <button 
             onClick={handleForceGpsUpdate}
@@ -969,7 +1061,7 @@ export default function VesselTrackerPage() {
 
                 <Accordion type="single" collapsible className="w-full">
                     <AccordionItem value="receiver-settings" className="border-none">
-                        <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
+                        <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/5 rounded-xl">
                             <Settings className="size-4 text-primary" />
                             <span className="text-[10px] font-black uppercase">Veille Stratégique & Batterie</span>
                         </AccordionTrigger>
@@ -1008,12 +1100,23 @@ export default function VesselTrackerPage() {
                                                 onValueChange={v => saveVesselPrefs({ ...vesselPrefs, notifySounds: { ...vesselPrefs.notifySounds, watch: v } })}
                                                 disabled={!vesselPrefs.isWatchEnabled}
                                             >
-                                                <SelectTrigger className="h-9 text-[10px] font-black uppercase bg-white border-2"><SelectValue placeholder="Choisir un son..." /></SelectTrigger>
+                                                <SelectTrigger className="h-9 text-[10px] font-black uppercase bg-white border-2 flex-1"><SelectValue placeholder="Choisir un son..." /></SelectTrigger>
                                                 <SelectContent>
                                                     {availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] font-black uppercase">{s.label}</SelectItem>)}
                                                 </SelectContent>
                                             </Select>
-                                            <Button variant="outline" size="icon" className="h-9 w-9 border-2 bg-white" onClick={() => playVesselSound(vesselPrefs.notifySounds.watch || '')} disabled={!vesselPrefs.isWatchEnabled}><Play className="size-3" /></Button>
+                                            <Button 
+                                                variant="outline" 
+                                                size="icon" 
+                                                className={cn("h-9 w-9 border-2 bg-white", vesselPrefs.repeatSettings?.watch ? "text-primary border-primary/20" : "text-muted-foreground opacity-40")}
+                                                onClick={() => {
+                                                    const newRepeat = { ...vesselPrefs.repeatSettings, watch: !vesselPrefs.repeatSettings?.watch };
+                                                    saveVesselPrefs({ ...vesselPrefs, repeatSettings: newRepeat });
+                                                }}
+                                            >
+                                                <Repeat className="size-3.5" />
+                                            </Button>
+                                            <Button variant="outline" size="icon" className="h-9 w-9 border-2 bg-white" onClick={() => playVesselSound(vesselPrefs.notifySounds.watch || '', 'watch', 'Test')} disabled={!vesselPrefs.isWatchEnabled}><Play className="size-3" /></Button>
                                         </div>
                                     </div>
                                 </div>
@@ -1039,12 +1142,23 @@ export default function VesselTrackerPage() {
                                             value={vesselPrefs.notifySounds.battery || ''} 
                                             onValueChange={v => saveVesselPrefs({ ...vesselPrefs, notifySounds: { ...vesselPrefs.notifySounds, battery: v } })}
                                         >
-                                            <SelectTrigger className="h-9 text-[10px] font-black uppercase bg-white border-2"><SelectValue placeholder="Choisir un son..." /></SelectTrigger>
+                                            <SelectTrigger className="h-9 text-[10px] font-black uppercase bg-white border-2 flex-1"><SelectValue placeholder="Choisir un son..." /></SelectTrigger>
                                             <SelectContent>
                                                 {availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] font-black uppercase">{s.label}</SelectItem>)}
                                             </SelectContent>
                                         </Select>
-                                        <Button variant="outline" size="icon" className="h-9 w-9 border-2 bg-white" onClick={() => playVesselSound(vesselPrefs.notifySounds.battery || '')}><Play className="size-3" /></Button>
+                                        <Button 
+                                            variant="outline" 
+                                            size="icon" 
+                                            className={cn("h-9 w-9 border-2 bg-white", vesselPrefs.repeatSettings?.battery ? "text-primary border-primary/20" : "text-muted-foreground opacity-40")}
+                                            onClick={() => {
+                                                const newRepeat = { ...vesselPrefs.repeatSettings, battery: !vesselPrefs.repeatSettings?.battery };
+                                                saveVesselPrefs({ ...vesselPrefs, repeatSettings: newRepeat });
+                                            }}
+                                        >
+                                            <Repeat className="size-3.5" />
+                                        </Button>
+                                        <Button variant="outline" size="icon" className="h-9 w-9 border-2 bg-white" onClick={() => playVesselSound(vesselPrefs.notifySounds.battery || '', 'battery', 'Test')}><Play className="size-3" /></Button>
                                     </div>
                                 </div>
                             </div>
@@ -1095,22 +1209,34 @@ export default function VesselTrackerPage() {
                       <Slider value={[vesselPrefs.vesselVolume * 100]} max={100} step={1} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, vesselVolume: v[0] / 100 })} />
                     </div>
                     <div className="grid gap-3">
-                      {['moving', 'stationary', 'offline', 'emergency', 'watch', 'battery'].map(key => (
+                      {[
+                        { key: 'moving', label: 'MOUVEMENT' },
+                        { key: 'stationary', label: 'MOUILLAGE' },
+                        { key: 'offline', label: 'SIGNAL PERDU' },
+                        { key: 'emergency', label: 'URGENCE' },
+                        { key: 'watch', label: 'VEILLE STRAT.' },
+                        { key: 'battery', label: 'BATTERIE' }
+                      ].map(({key, label}) => (
                         <div key={key} className="flex items-center justify-between gap-2">
-                          <span className="text-[10px] font-bold uppercase flex-1">
-                            {key === 'moving' ? 'Mouvement' : 
-                             key === 'stationary' ? 'Mouillage' : 
-                             key === 'offline' ? 'Signal Perdu' : 
-                             key === 'emergency' ? 'Urgence' :
-                             key === 'watch' ? 'Veille Strat.' : 'Batterie'}
-                          </span>
+                          <span className="text-[10px] font-bold uppercase flex-1">{label}</span>
                           <Select value={vesselPrefs.notifySounds[key as keyof typeof vesselPrefs.notifySounds] || ''} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, notifySounds: { ...vesselPrefs.notifySounds, [key]: v } })}>
                             <SelectTrigger className="h-8 text-[9px] font-black uppercase w-32 bg-muted/30"><SelectValue placeholder="Son..." /></SelectTrigger>
                             <SelectContent>
                               {availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] font-black uppercase">{s.label}</SelectItem>)}
                             </SelectContent>
                           </Select>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => playVesselSound(vesselPrefs.notifySounds[key as keyof typeof vesselPrefs.notifySounds] || '')}><Play className="size-3" /></Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className={cn("h-8 w-8 rounded-full", vesselPrefs.repeatSettings?.[key] ? "text-primary bg-primary/10" : "text-muted-foreground opacity-40")}
+                            onClick={() => {
+                                const newRepeat = { ...vesselPrefs.repeatSettings, [key]: !vesselPrefs.repeatSettings?.[key] };
+                                saveVesselPrefs({ ...vesselPrefs, repeatSettings: newRepeat });
+                            }}
+                          >
+                            <Repeat className="size-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => playVesselSound(vesselPrefs.notifySounds[key as keyof typeof vesselPrefs.notifySounds] || '', key, 'Test')}><Play className="size-3" /></Button>
                         </div>
                       ))}
                     </div>
@@ -1181,8 +1307,8 @@ export default function VesselTrackerPage() {
                 })}
           </GoogleMap>
           <div className="absolute top-3 right-3 flex flex-col gap-2">
-            <Button onClick={handleRecenter} className="shadow-lg h-10 w-10 bg-background/90 backdrop-blur-md border-2 p-0"><LocateFixed className="size-5" /></Button>
-            <Button size="icon" className="shadow-lg h-10 w-10 bg-background/90 backdrop-blur-md border-2" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}</Button>
+            <button onClick={handleRecenter} className="shadow-lg h-10 w-10 bg-background/90 backdrop-blur-md border-2 p-0 flex items-center justify-center rounded-md"><LocateFixed className="size-5 text-primary" /></button>
+            <button onClick={() => setIsFullscreen(!isFullscreen)} className="shadow-lg h-10 w-10 bg-background/90 backdrop-blur-md border-2 flex items-center justify-center rounded-md">{isFullscreen ? <Shrink className="size-5 text-primary" /> : <Expand className="size-5 text-primary" />}</button>
           </div>
         </div>
 
