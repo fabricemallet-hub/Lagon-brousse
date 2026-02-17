@@ -378,7 +378,7 @@ export default function VesselTrackerPage() {
         
         const lastStatus = lastStatusesRef.current[vessel.id];
         const statusChanged = lastStatus !== currentStatus;
-        const timestampUpdated = timeKey > (lastUpdatesRef.current[vessel.id] || 0);
+        const timestampUpdated = timeKey > lastUpdatesRef.current[vessel.id];
         const batteryAlert = (lastBatteryLevelsRef.current[vessel.id] ?? 100) >= vesselPrefs.batteryThreshold && currentBattery < vesselPrefs.batteryThreshold;
 
         const addToHistory = (label: string) => {
@@ -393,7 +393,7 @@ export default function VesselTrackerPage() {
             }, ...prev].slice(0, 50));
         };
 
-        if (statusChanged || timestampUpdated) {
+        if (statusChanged || (timestampUpdated && vessel.eventLabel)) {
             const label = vessel.eventLabel || { moving: 'MOUVEMENT', stationary: 'MOUILLAGE', offline: 'SIGNAL PERDU', returning: 'RETOUR MAISON', landed: 'À TERRE' }[currentStatus] || currentStatus;
             addToHistory(label);
             
@@ -604,7 +604,6 @@ export default function VesselTrackerPage() {
                 {followedVessels?.filter(v => v.isSharing).map(vessel => {
                     const isOwn = vessel.id === sharingId;
                     const isModeFleet = mode === 'fleet';
-                    // Si mode flotte et mode fantôme activé sur un autre navire, on ne l'affiche pas
                     if (isModeFleet && vessel.isGhostMode && !isOwn) return null;
                     if (isOwn && mode === 'sender') return null;
                     
