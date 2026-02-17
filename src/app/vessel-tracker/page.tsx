@@ -141,7 +141,7 @@ export default function VesselTrackerPage() {
     isNotifyEnabled: true,
     vesselVolume: 0.8,
     notifySettings: { moving: true, stationary: true, offline: true, emergency: true, birds: true },
-    notifySounds: { moving: '', stationary: '', offline: '', emergency: '', birds: '' },
+    notifySounds: { moving: '', stationary: '', offline: '', emergency: '', birds: '', watch: '', battery: '' },
     isWatchEnabled: false,
     watchType: 'stationary',
     watchDuration: 60,
@@ -514,6 +514,12 @@ export default function VesselTrackerPage() {
 
     lastMinutePosRef.current = currentPos;
     toast({ title: "Point GPS forcé", description: "Position synchronisée avec succès." });
+  };
+
+  const handleRemoveIdFromHistory = (id: string, type: 'vessel' | 'group') => {
+    const updated = idHistory.filter(h => !(h.id === id && h.type === type));
+    setIdHistory(updated);
+    localStorage.setItem('lb_vessel_id_history', JSON.stringify(updated));
   };
 
   useEffect(() => {
@@ -993,6 +999,23 @@ export default function VesselTrackerPage() {
                                         disabled={!vesselPrefs.isWatchEnabled}
                                     />
                                     <div className="flex justify-between text-[8px] font-black uppercase opacity-40 px-1"><span>1h</span><span>24h</span></div>
+                                    
+                                    <div className="space-y-1.5 pt-2 border-t border-dashed border-orange-200">
+                                        <Label className="text-[9px] font-black uppercase text-orange-800/60">Son de l'alerte</Label>
+                                        <div className="flex gap-2">
+                                            <Select 
+                                                value={vesselPrefs.notifySounds.watch || ''} 
+                                                onValueChange={v => saveVesselPrefs({ ...vesselPrefs, notifySounds: { ...vesselPrefs.notifySounds, watch: v } })}
+                                                disabled={!vesselPrefs.isWatchEnabled}
+                                            >
+                                                <SelectTrigger className="h-9 text-[10px] font-black uppercase bg-white border-2"><SelectValue placeholder="Choisir un son..." /></SelectTrigger>
+                                                <SelectContent>
+                                                    {availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] font-black uppercase">{s.label}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                            <Button variant="outline" size="icon" className="h-9 w-9 border-2 bg-white" onClick={() => playVesselSound(vesselPrefs.notifySounds.watch || '')} disabled={!vesselPrefs.isWatchEnabled}><Play className="size-3" /></Button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1009,6 +1032,21 @@ export default function VesselTrackerPage() {
                                     min={5} max={50} step={5}
                                     onValueChange={v => saveVesselPrefs({ ...vesselPrefs, batteryThreshold: v[0] })} 
                                 />
+                                <div className="space-y-1.5 pt-2 border-t border-dashed border-red-200">
+                                    <Label className="text-[9px] font-black uppercase text-red-800/60">Son de l'alerte batterie</Label>
+                                    <div className="flex gap-2">
+                                        <Select 
+                                            value={vesselPrefs.notifySounds.battery || ''} 
+                                            onValueChange={v => saveVesselPrefs({ ...vesselPrefs, notifySounds: { ...vesselPrefs.notifySounds, battery: v } })}
+                                        >
+                                            <SelectTrigger className="h-9 text-[10px] font-black uppercase bg-white border-2"><SelectValue placeholder="Choisir un son..." /></SelectTrigger>
+                                            <SelectContent>
+                                                {availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] font-black uppercase">{s.label}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                        <Button variant="outline" size="icon" className="h-9 w-9 border-2 bg-white" onClick={() => playVesselSound(vesselPrefs.notifySounds.battery || '')}><Play className="size-3" /></Button>
+                                    </div>
+                                </div>
                             </div>
                         </AccordionContent>
                     </AccordionItem>
@@ -1057,16 +1095,22 @@ export default function VesselTrackerPage() {
                       <Slider value={[vesselPrefs.vesselVolume * 100]} max={100} step={1} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, vesselVolume: v[0] / 100 })} />
                     </div>
                     <div className="grid gap-3">
-                      {['moving', 'stationary', 'offline', 'emergency'].map(key => (
+                      {['moving', 'stationary', 'offline', 'emergency', 'watch', 'battery'].map(key => (
                         <div key={key} className="flex items-center justify-between gap-2">
-                          <span className="text-[10px] font-bold uppercase flex-1">{key === 'moving' ? 'Mouvement' : key === 'stationary' ? 'Mouillage' : key === 'offline' ? 'Signal Perdu' : 'Urgence'}</span>
-                          <Select value={vesselPrefs.notifySounds[key as keyof typeof vesselPrefs.notifySounds]} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, notifySounds: { ...vesselPrefs.notifySounds, [key]: v } })}>
+                          <span className="text-[10px] font-bold uppercase flex-1">
+                            {key === 'moving' ? 'Mouvement' : 
+                             key === 'stationary' ? 'Mouillage' : 
+                             key === 'offline' ? 'Signal Perdu' : 
+                             key === 'emergency' ? 'Urgence' :
+                             key === 'watch' ? 'Veille Strat.' : 'Batterie'}
+                          </span>
+                          <Select value={vesselPrefs.notifySounds[key as keyof typeof vesselPrefs.notifySounds] || ''} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, notifySounds: { ...vesselPrefs.notifySounds, [key]: v } })}>
                             <SelectTrigger className="h-8 text-[9px] font-black uppercase w-32 bg-muted/30"><SelectValue placeholder="Son..." /></SelectTrigger>
                             <SelectContent>
                               {availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] font-black uppercase">{s.label}</SelectItem>)}
                             </SelectContent>
                           </Select>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => playVesselSound(vesselPrefs.notifySounds[key as keyof typeof vesselPrefs.notifySounds])}><Play className="size-3" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => playVesselSound(vesselPrefs.notifySounds[key as keyof typeof vesselPrefs.notifySounds] || '')}><Play className="size-3" /></Button>
                         </div>
                       ))}
                     </div>
@@ -1127,7 +1171,7 @@ export default function VesselTrackerPage() {
                                 </div>
                                 <div className={cn(
                                     "p-1.5 rounded-full border-2 border-white shadow-lg",
-                                    marker.type ? "bg-blue-600" : "bg-orange-500"
+                                    marker.type ? "bg-blue-600" : "bg-orange-50"
                                 )}>
                                     {marker.type ? <Fish className="size-3 text-white" /> : <Bird className="size-3 text-white" />}
                                 </div>
