@@ -272,6 +272,7 @@ export default function VesselTrackerPage() {
     const statusChanged = newStatus !== lastSentStatusRef.current;
     const isManualTrigger = data.eventLabel && data.eventLabel.includes('FORCÉ');
 
+    // On réduit la fréquence d'envoi à 60s si rien ne change pour éviter de saturer Firestore
     if (!statusChanged && !forceImmediate && !isManualTrigger && (now - lastSentTimeRef.current < 60000)) {
         return;
     }
@@ -533,8 +534,12 @@ export default function VesselTrackerPage() {
         }
 
         const dist = getDistance(newPos.lat, newPos.lng, currentAnchor.lat, currentAnchor.lng);
+        
+        // LOGIQUE DE FILTRAGE DES MOUVEMENTS GPS (ANTI-BRUIT)
+        // On ne considère un mouvement que s'il dépasse le rayon ET la précision du signal (marge d'erreur)
+        const isActuallyMoving = dist > radius && dist > (accuracy * 0.5);
 
-        if (dist > radius) {
+        if (isActuallyMoving) {
             immobilityStartTime.current = null;
             setAnchorPos(newPos);
             
@@ -545,12 +550,15 @@ export default function VesselTrackerPage() {
                 updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng } });
             }
         } else {
+            // Le bateau est stable (à l'intérieur du rayon ou du bruit GPS)
             if (!immobilityStartTime.current) {
                 immobilityStartTime.current = Date.now();
+                // On signale l'analyse d'immobilité pour retour visuel
                 updateVesselInFirestore({ eventLabel: 'ANALYSE IMMOBILITÉ...' }, false);
             }
 
-            if (Date.now() - immobilityStartTime.current > 20000) {
+            // Si stable depuis plus de 15 secondes (seuil réduit pour réactivité)
+            if (Date.now() - immobilityStartTime.current > 15000) {
                 if (currentStatus !== 'stationary') {
                     setVesselStatus('stationary');
                     updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng }, status: 'stationary', eventLabel: null }, true);
