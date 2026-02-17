@@ -56,7 +56,7 @@ import {
   Pencil
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
-import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
+import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -125,6 +125,7 @@ export default function VesselTrackerPage() {
   const [currentPos, setCurrentPos] = useState<google.maps.LatLngLiteral | null>(null);
   const [anchorPos, setAnchorPos] = useState<google.maps.LatLngLiteral | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
+  const [preEmergencyStatus, setPreEmergencyStatus] = useState<VesselStatus['status'] | null>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const isFirstFixRef = useRef<boolean>(true);
@@ -398,6 +399,19 @@ export default function VesselTrackerPage() {
     }
     updateVesselInFirestore({ status: st, eventLabel: label || null });
     toast({ title: label || 'Statut mis à jour' });
+  };
+
+  const handleEmergencyToggle = () => {
+    if (vesselStatus !== 'emergency') {
+        setPreEmergencyStatus(vesselStatus);
+        handleManualStatus('emergency', 'DEMANDE ASSISTANCE (PROBLÈME)');
+        if (isGhostMode) handleGhostModeToggle(false);
+        sendEmergencySms('MAYDAY');
+    } else {
+        const revertTo = preEmergencyStatus || 'moving';
+        handleManualStatus(revertTo, 'ERREUR INVOLONTAIRE');
+        setPreEmergencyStatus(null);
+    }
   };
 
   const handleSignalBirds = () => {
@@ -713,14 +727,14 @@ export default function VesselTrackerPage() {
                         <>
                             <Button 
                                 variant="destructive" 
-                                className="w-full h-14 font-black uppercase text-[11px] gap-3 shadow-lg border-2 border-white/20 bg-red-400 hover:bg-red-500"
-                                onClick={() => {
-                                    handleManualStatus('emergency', 'DEMANDE ASSISTANCE (PROBLÈME)');
-                                    if (isGhostMode) handleGhostModeToggle(false);
-                                    sendEmergencySms('MAYDAY');
-                                }}
+                                className={cn(
+                                    "w-full h-14 font-black uppercase text-[11px] gap-3 shadow-lg border-2 border-white/20 transition-all",
+                                    vesselStatus === 'emergency' ? "bg-slate-800 hover:bg-slate-900 border-red-500" : "bg-red-400 hover:bg-red-500"
+                                )}
+                                onClick={handleEmergencyToggle}
                             >
-                                <AlertCircle className="size-5" /> DEMANDE ASSISTANCE (PROBLÈME)
+                                <AlertCircle className={cn("size-5", vesselStatus === 'emergency' && "animate-pulse")} /> 
+                                {vesselStatus === 'emergency' ? "ANNULER L'ASSISTANCE (ERREUR)" : "DEMANDE ASSISTANCE (PROBLÈME)"}
                             </Button>
 
                             <div className="grid grid-cols-2 gap-2">
