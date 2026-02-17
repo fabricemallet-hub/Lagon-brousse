@@ -1,9 +1,8 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useUser as useUserHook, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where, getDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where, getDoc, deleteDoc } from 'firebase/firestore';
 import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -54,7 +53,8 @@ import {
   Fish,
   Users,
   Target,
-  ChevronDown
+  ChevronDown,
+  Pencil
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -101,6 +101,7 @@ export default function VesselTrackerPage() {
   
   const [isSharing, setIsSharing] = useState(false);
   const [sharingTarget, setSharingTarget] = useState<'none' | 'receiver' | 'fleet' | 'both'>('none');
+  const [isTargetMenuOpen, setIsTargetMenuOpen] = useState(false);
   const [isGhostMode, setIsGhostMode] = useState(false);
   const [emergencyContact, setEmergencyContact] = useState('');
   const [isEmergencyEnabled, setIsEmergencyEnabled] = useState(true);
@@ -265,6 +266,7 @@ export default function VesselTrackerPage() {
 
   const handleSharingTargetChange = (target: 'none' | 'receiver' | 'fleet' | 'both') => {
     setSharingTarget(target);
+    setIsTargetMenuOpen(false);
     if (target === 'none') {
         handleStopSharing();
     } else {
@@ -393,6 +395,7 @@ export default function VesselTrackerPage() {
     if (!user || !firestore) return;
     setIsSharing(false);
     setSharingTarget('none');
+    setIsTargetMenuOpen(false);
     const vesselRef = doc(firestore, 'vessels', sharingId);
     setDoc(vesselRef, { isSharing: false, lastActive: serverTimestamp() }, { merge: true })
       .then(() => {
@@ -599,37 +602,55 @@ export default function VesselTrackerPage() {
             <div className="space-y-6">
               {isSharing ? (
                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                    <div className="space-y-3 p-4 border-2 rounded-3xl bg-primary/5 border-primary/10 shadow-inner">
-                        <div className="flex flex-col gap-1 px-1">
-                            <Label className="text-sm font-black uppercase text-primary">Cibles du partage</Label>
-                            <p className="text-[9px] font-bold text-muted-foreground uppercase">Choisissez avec qui partager votre position</p>
+                    {/* STATUS DU PARTAGE COMPACT SI PAS EN MODIF */}
+                    {sharingTarget !== 'none' && !isTargetMenuOpen ? (
+                        <div className="flex items-center justify-between p-4 border-2 rounded-2xl bg-primary/5 border-primary/20 shadow-sm">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-primary text-white rounded-lg"><Zap className="size-4 fill-white" /></div>
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] font-black uppercase text-primary">Partage Actif</span>
+                                    <span className="text-xs font-bold uppercase">
+                                        {sharingTarget === 'receiver' ? 'Récepteur B' : sharingTarget === 'fleet' ? 'Flotte C' : 'Total (B + C)'}
+                                    </span>
+                                </div>
+                            </div>
+                            <Button variant="ghost" size="sm" onClick={() => setIsTargetMenuOpen(true)} className="h-8 text-[9px] font-black uppercase border-2 gap-1 px-3">
+                                <Pencil className="size-3" /> Modifier
+                            </Button>
                         </div>
-                        
-                        <div className="grid grid-cols-2 gap-2 mt-2">
-                            {[
-                                { id: 'none', label: 'Désactivé', icon: '❌', desc: 'Off' },
-                                { id: 'receiver', label: 'Récepteur B', icon: '👤', desc: 'Privé' },
-                                { id: 'fleet', label: 'Flotte C', icon: '🌊', desc: 'Groupe' },
-                                { id: 'both', label: 'B + C', icon: '🛡️', desc: 'Total' }
-                            ].map((option) => (
-                                <button
-                                    key={option.id}
-                                    type="button"
-                                    onClick={() => handleSharingTargetChange(option.id as any)}
-                                    className={cn(
-                                        "flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all active:scale-95 shadow-sm h-20",
-                                        sharingTarget === option.id 
-                                            ? "bg-primary text-white border-primary ring-2 ring-primary/20" 
-                                            : "bg-white border-slate-100 text-slate-600 hover:border-primary/20"
-                                    )}
-                                >
-                                    <span className="text-xl mb-1">{option.icon}</span>
-                                    <span className="text-[10px] font-black uppercase leading-tight text-center">{option.label}</span>
-                                    <span className={cn("text-[7px] font-bold uppercase mt-1 opacity-50", sharingTarget === option.id ? "text-white/70" : "")}>{option.desc}</span>
-                                </button>
-                            ))}
+                    ) : (
+                        <div className="space-y-3 p-4 border-2 rounded-3xl bg-primary/5 border-primary/10 shadow-inner animate-in slide-in-from-top-2">
+                            <div className="flex flex-col gap-1 px-1">
+                                <Label className="text-sm font-black uppercase text-primary">Cibles du partage</Label>
+                                <p className="text-[9px] font-bold text-muted-foreground uppercase">Choisissez avec qui partager votre position</p>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                                {[
+                                    { id: 'none', label: 'Désactivé', icon: '❌', desc: 'Off' },
+                                    { id: 'receiver', label: 'Récepteur B', icon: '👤', desc: 'Privé' },
+                                    { id: 'fleet', label: 'Flotte C', icon: '🌊', desc: 'Groupe' },
+                                    { id: 'both', label: 'B + C', icon: '🛡️', desc: 'Total' }
+                                ].map((option) => (
+                                    <button
+                                        key={option.id}
+                                        type="button"
+                                        onClick={() => handleSharingTargetChange(option.id as any)}
+                                        className={cn(
+                                            "flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all active:scale-95 shadow-sm h-20",
+                                            sharingTarget === option.id 
+                                                ? "bg-primary text-white border-primary ring-2 ring-primary/20" 
+                                                : "bg-white border-slate-100 text-slate-600 hover:border-primary/20"
+                                        )}
+                                    >
+                                        <span className="text-xl mb-1">{option.icon}</span>
+                                        <span className="text-[10px] font-black uppercase leading-tight text-center">{option.label}</span>
+                                        <span className={cn("text-[7px] font-bold uppercase mt-1 opacity-50", sharingTarget === option.id ? "text-white/70" : "")}>{option.desc}</span>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-2">
                         <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatus('returning')} disabled={vesselStatus === 'returning'}>
@@ -659,7 +680,7 @@ export default function VesselTrackerPage() {
                         <Navigation className="size-12 text-primary" />
                         <p className="font-black uppercase tracking-widest text-xs">Partage Inactif</p>
                     </div>
-                    <Button onClick={() => handleSharingTargetChange('both')} className="w-full h-16 font-black uppercase tracking-widest shadow-xl text-base gap-3">
+                    <Button onClick={() => { setIsTargetMenuOpen(true); setIsSharing(true); }} className="w-full h-16 font-black uppercase tracking-widest shadow-xl text-base gap-3">
                         <Zap className="size-6 fill-white" /> Lancer le Partage
                     </Button>
                 </div>
@@ -756,7 +777,6 @@ export default function VesselTrackerPage() {
 
                 {/* TACTICAL MARKERS (BIRDS & FISH) */}
                 {tacticalMarkers.map(marker => {
-                    // If we are in sender mode, only show our own markers
                     if (mode === 'sender' && marker.vesselId !== sharingId) return null;
                     
                     return (
