@@ -112,7 +112,7 @@ export default function VesselTrackerPage() {
   const { toast } = useToast();
   const { isLoaded, loadError } = useGoogleMaps();
 
-  // --- ÉTATS DU COMPOSANT (Remontés pour éviter ReferenceError) ---
+  // --- ÉTATS DU COMPOSANT ---
   const [mode, setMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
   const [fleetGroupId, setFleetGroupId] = useState('');
@@ -875,7 +875,10 @@ export default function VesselTrackerPage() {
                     </div>
                 </div>
                 <div className="flex items-center justify-between p-4 border-2 rounded-2xl bg-muted/5">
-                    <div className="space-y-0.5"><Label className="text-xs font-black uppercase">Mode Fantôme</Label><p className="text-[9px] font-bold text-muted-foreground uppercase">Devenir invisible pour le groupe</p></div>
+                    <div className="space-y-0.5">
+                        <Label className="text-xs font-black uppercase">Mode Fantôme</Label>
+                        <p className="text-[9px] font-bold text-muted-foreground uppercase">Masque la position du navire sur la carte uniquement pour la Flotte C</p>
+                    </div>
                     <Switch checked={isGhostMode} onCheckedChange={setIsGhostMode} />
                 </div>
             </div>
@@ -886,7 +889,14 @@ export default function VesselTrackerPage() {
       <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all", isFullscreen && "fixed inset-0 z-[150] w-screen h-screen rounded-none")}>
         <div className={cn("relative bg-muted/20", isFullscreen ? "flex-grow" : "h-[350px]")}>
           <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
-                {followedVessels?.filter(v => v.isSharing && (v.id !== sharingId || mode !== 'sender')).map(vessel => (
+                {followedVessels?.filter(v => {
+                    if (!v.isSharing) return false;
+                    // Ne pas s'afficher comme "navire distant" si on est l'émetteur (le point bleu suffit)
+                    if (v.id === sharingId && mode === 'sender') return false;
+                    // Masquer les navires en mode fantôme si on est en mode flotte, sauf si c'est moi
+                    if (mode === 'fleet' && v.isGhostMode && v.userId !== user?.uid) return false;
+                    return true;
+                }).map(vessel => (
                     <React.Fragment key={vessel.id}>
                         {(vessel.status === 'stationary' || vessel.status === 'drifting') && vessel.location && (
                             <Circle 
