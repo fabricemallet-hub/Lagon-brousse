@@ -47,7 +47,8 @@ import {
   Clock,
   EyeOff,
   Sparkles,
-  Copy
+  Copy,
+  Ruler
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -61,7 +62,6 @@ import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
-const IMMOBILITY_THRESHOLD_METERS = 20; 
 const EMPTY_IDS: string[] = [];
 
 const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
@@ -119,7 +119,8 @@ export default function VesselTrackerPage() {
     watchType: 'stationary',
     watchDuration: 60,
     watchSound: '',
-    batteryThreshold: 20
+    batteryThreshold: 20,
+    mooringRadius: 20
   });
   
   const [history, setHistory] = useState<{ vesselName: string, statusLabel: string, time: Date, pos: google.maps.LatLngLiteral, batteryLevel?: number, isCharging?: boolean }[]>([]);
@@ -172,7 +173,7 @@ export default function VesselTrackerPage() {
 
   useEffect(() => {
     if (userProfile) {
-      if (userProfile.vesselPrefs) setVesselPrefs(userProfile.vesselPrefs);
+      if (userProfile.vesselPrefs) setVesselPrefs({ ...vesselPrefs, ...userProfile.vesselPrefs });
       if (userProfile.emergencyContact) setEmergencyContact(userProfile.emergencyContact);
       if (userProfile.vesselSmsMessage) setVesselSmsMessage(userProfile.vesselSmsMessage);
       setIsEmergencyEnabled(userProfile.isEmergencyEnabled ?? true);
@@ -199,6 +200,7 @@ export default function VesselTrackerPage() {
             displayName: vesselNickname || user.displayName || 'Capitaine', 
             isSharing: data.isSharing !== undefined ? data.isSharing : isSharing, 
             lastActive: serverTimestamp(),
+            mooringRadius: vesselPrefs.mooringRadius || 20,
             ...batteryInfo,
             ...data 
         };
@@ -215,14 +217,20 @@ export default function VesselTrackerPage() {
         setDoc(vesselRef, updatePayload, { merge: true }).catch(() => {});
     };
     update();
-  }, [user, firestore, isSharing, sharingId, vesselNickname, currentPos]);
+  }, [user, firestore, isSharing, sharingId, vesselNickname, currentPos, vesselPrefs.mooringRadius]);
 
   const handleSaveVessel = () => {
     if (!user || !firestore) return;
     const cleanId = (vesselIdToFollow || customSharingId).trim().toUpperCase();
     const userRef = doc(firestore, 'users', user.uid);
-    updateDoc(userRef, { savedVesselIds: cleanId ? arrayUnion(cleanId) : savedVesselIds, lastVesselId: cleanId || customSharingId })
-      .then(() => { if (vesselIdToFollow) setVesselIdToFollow(''); toast({ title: "ID enregistré" }); });
+    updateDoc(userRef, { 
+        savedVesselIds: cleanId ? arrayUnion(cleanId) : savedVesselIds, 
+        lastVesselId: cleanId || customSharingId,
+        vesselPrefs: vesselPrefs
+    }).then(() => { 
+        if (vesselIdToFollow) setVesselIdToFollow(''); 
+        toast({ title: "ID et Préférences enregistrés" }); 
+    });
   };
 
   const handleRemoveSavedVessel = (id: string) => {
@@ -325,7 +333,7 @@ export default function VesselTrackerPage() {
       if (timeSinceStart >= 30000 && vesselStatus === 'moving') {
         if (currentPos && anchorPos) {
           const dist = getDistance(currentPos.lat, currentPos.lng, anchorPos.lat, anchorPos.lng);
-          if (dist <= IMMOBILITY_THRESHOLD_METERS) {
+          if (dist <= (vesselPrefs.mooringRadius || 20)) {
             handleManualStatus('stationary', 'AU MOUILLAGE (DÉTECTION AUTO)');
           } else {
             setAnchorPos(currentPos);
@@ -337,7 +345,7 @@ export default function VesselTrackerPage() {
     }, 1000); 
 
     return () => clearInterval(interval);
-  }, [isSharing, mode, vesselStatus, currentPos, anchorPos]);
+  }, [isSharing, mode, vesselStatus, currentPos, anchorPos, vesselPrefs.mooringRadius]);
 
   useEffect(() => {
     if (!followedVessels) return;
@@ -365,7 +373,7 @@ export default function VesselTrackerPage() {
 
             const label = vessel.eventLabel || statusLabels[currentStatus] || currentStatus.toUpperCase();
             
-            newEntries.push({ vesselName: vessel.displayName || vessel.id, statusLabel: label, time: new Date(), pos, batteryLevel: vessel.batteryLevel, isCharging: vessel.isCharging });
+            newEntries.push({ vesselName: vessel.displayName || vessel.id, statusLabel: label, time: new Date(timeKey), pos, batteryLevel: vessel.batteryLevel, isCharging: vessel.isCharging });
 
             if (mode === 'receiver' && lastStatus && lastStatus !== currentStatus && vesselPrefs.isNotifyEnabled) {
                 const soundKey = (currentStatus === 'returning' || currentStatus === 'landed') ? 'moving' : currentStatus;
@@ -400,13 +408,14 @@ export default function VesselTrackerPage() {
             
             if (anchorPos) {
                 const dist = getDistance(newPos.lat, newPos.lng, anchorPos.lat, anchorPos.lng);
+                const currentRadius = vesselPrefs.mooringRadius || 20;
                 
-                if (vesselStatus === 'stationary' && dist > IMMOBILITY_THRESHOLD_METERS) {
+                if (vesselStatus === 'stationary' && dist > currentRadius) {
                     setVesselStatus('moving');
                     setAnchorPos(newPos);
                     immobilityStartTime.current = Date.now();
                     updateVesselInFirestore({ status: 'moving', eventLabel: 'REPRISE DE MOUVEMENT (SORTIE ZONE)' });
-                } else if (vesselStatus === 'moving' && dist > IMMOBILITY_THRESHOLD_METERS) {
+                } else if (vesselStatus === 'moving' && dist > currentRadius) {
                     setAnchorPos(newPos);
                     immobilityStartTime.current = Date.now();
                     updateVesselInFirestore({});
@@ -422,7 +431,7 @@ export default function VesselTrackerPage() {
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
-  }, [isSharing, mode, anchorPos, updateVesselInFirestore, map, toast, vesselStatus]);
+  }, [isSharing, mode, anchorPos, updateVesselInFirestore, map, toast, vesselStatus, vesselPrefs.mooringRadius]);
 
   const handleRecenter = () => {
     const pos = currentPos || (followedVessels?.find(v => v.isSharing)?.location ? { lat: followedVessels.find(v => v.isSharing)!.location.latitude, lng: followedVessels.find(v => v.isSharing)!.location.longitude } : null);
@@ -542,6 +551,22 @@ export default function VesselTrackerPage() {
                                     <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Surnom du capitaine / navire</Label>
                                     <Input placeholder="EX: CAPITAINE NEMO" value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} className="font-bold text-center h-12 border-2 uppercase flex-grow w-full" />
                                 </div>
+                                <div className="space-y-4 p-4 border-2 rounded-2xl bg-primary/5 border-dashed">
+                                    <div className="flex justify-between items-center px-1">
+                                        <Label className="text-[10px] font-black uppercase opacity-60 flex items-center gap-2">
+                                            <Ruler className="size-3 text-primary" /> Rayon de Mouillage
+                                        </Label>
+                                        <Badge variant="outline" className="bg-white font-black">{vesselPrefs.mooringRadius || 20}m</Badge>
+                                    </div>
+                                    <Slider 
+                                        value={[vesselPrefs.mooringRadius || 20]} 
+                                        min={10} 
+                                        max={100} 
+                                        step={5} 
+                                        onValueChange={v => saveVesselPrefs({ ...vesselPrefs, mooringRadius: v[0] })} 
+                                    />
+                                    <p className="text-[8px] font-bold text-muted-foreground uppercase text-center">Zone de détection automatique d'immobilité</p>
+                                </div>
                             </AccordionContent>
                         </AccordionItem>
 
@@ -618,18 +643,18 @@ export default function VesselTrackerPage() {
                         {vessel.status === 'stationary' && vessel.location && (
                             <Circle
                                 center={{ lat: vessel.location.latitude, lng: vessel.location.longitude }}
-                                radius={20}
+                                radius={vessel.mooringRadius || 20}
                                 options={{
                                     fillColor: '#3b82f6',
-                                    fillOpacity: 0.2,
+                                    fillOpacity: 0.3,
                                     strokeColor: '#3b82f6',
-                                    strokeOpacity: 0.5,
-                                    strokeWeight: 1,
+                                    strokeOpacity: 0.8,
+                                    strokeWeight: 2,
                                     clickable: false,
                                     editable: false,
                                     draggable: false,
                                     visible: true,
-                                    zIndex: 1
+                                    zIndex: 100
                                 }}
                             />
                         )}
@@ -643,7 +668,7 @@ export default function VesselTrackerPage() {
                                 <div className={cn("p-2 rounded-full border-2 border-white shadow-xl", 
                                     vessel.status === 'moving' ? "bg-blue-600" : 
                                     vessel.status === 'emergency' ? "bg-red-600 animate-pulse" : 
-                                    vessel.status === 'stationary' ? "bg-amber-600" :
+                                    vessel.status === 'stationary' ? "bg-amber-600" : 
                                     vessel.status === 'returning' ? "bg-indigo-600" :
                                     vessel.status === 'landed' ? "bg-green-600" : "bg-slate-600")}>
                                   {vessel.status === 'stationary' ? <Anchor className="size-5 text-white" /> : 
@@ -661,18 +686,18 @@ export default function VesselTrackerPage() {
                         {vesselStatus === 'stationary' && anchorPos && (
                             <Circle
                                 center={anchorPos}
-                                radius={20}
+                                radius={vesselPrefs.mooringRadius || 20}
                                 options={{
                                     fillColor: '#3b82f6',
-                                    fillOpacity: 0.2,
+                                    fillOpacity: 0.3,
                                     strokeColor: '#3b82f6',
-                                    strokeOpacity: 0.5,
-                                    strokeWeight: 1,
+                                    strokeOpacity: 0.8,
+                                    strokeWeight: 2,
                                     clickable: false,
                                     editable: false,
                                     draggable: false,
                                     visible: true,
-                                    zIndex: 1
+                                    zIndex: 100
                                 }}
                             />
                         )}
