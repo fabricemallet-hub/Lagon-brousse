@@ -51,10 +51,7 @@ import {
   Ruler,
   Bell,
   Fish,
-  Users,
-  Target,
-  ChevronDown,
-  Pencil
+  Users
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -202,6 +199,20 @@ export default function VesselTrackerPage() {
     }
   }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, availableSounds]);
 
+  useEffect(() => {
+    if (userProfile) {
+      if (userProfile.vesselPrefs) setVesselPrefs(userProfile.vesselPrefs);
+      if (userProfile.emergencyContact) setEmergencyContact(userProfile.emergencyContact);
+      if (userProfile.vesselSmsMessage) setVesselSmsMessage(userProfile.vesselSmsMessage);
+      setIsEmergencyEnabled(userProfile.isEmergencyEnabled ?? true);
+      setIsCustomMessageEnabled(userProfile.isCustomMessageEnabled ?? true);
+      setIsGhostMode(userProfile.isGhostMode ?? false);
+      setVesselNickname(userProfile.vesselNickname || '');
+      setCustomSharingId(userProfile.lastVesselId || '');
+      if (userProfile.vesselSharingTarget) setSharingTarget(userProfile.vesselSharingTarget);
+    }
+  }, [userProfile]);
+
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
     
@@ -246,13 +257,10 @@ export default function VesselTrackerPage() {
         handleStopSharing();
     } else {
         setIsSharing(true);
-        const isPosHidden = target === 'receiver';
-        const isPrivHidden = target === 'fleet';
-        
         updateVesselInFirestore({ 
             isSharing: true, 
-            isPositionHidden: isPosHidden,
-            isPrivateHidden: isPrivHidden 
+            isPositionHidden: target === 'receiver',
+            isPrivateHidden: target === 'fleet' 
         });
 
         if (user && firestore) {
@@ -294,7 +302,11 @@ export default function VesselTrackerPage() {
         vesselPrefs: vesselPrefs,
         vesselSharingTarget: sharingTarget,
         isGhostMode: isGhostMode,
-        vesselNickname: vesselNickname
+        vesselNickname: vesselNickname,
+        emergencyContact,
+        vesselSmsMessage,
+        isEmergencyEnabled,
+        isCustomMessageEnabled
     }).then(() => { 
         if (vesselIdToFollow) setVesselIdToFollow(''); 
         toast({ title: "Paramètres enregistrés" }); 
@@ -404,7 +416,6 @@ export default function VesselTrackerPage() {
     return tacticalMarkers.filter(m => mode !== 'sender' || m.vesselId === sharingId);
   }, [tacticalMarkers, mode, sharingId]);
 
-  // EFFET POUR LE DÉCOMPTE VISUEL ET LES MAJ GPS MINUTE PAR MINUTE
   useEffect(() => {
     if (!isSharing || mode !== 'sender') {
         setSecondsUntilUpdate(60);
@@ -414,7 +425,6 @@ export default function VesselTrackerPage() {
     const interval = setInterval(() => {
         setSecondsUntilUpdate(prev => {
             if (prev <= 1) {
-                // MISE À JOUR FORCEE TOUTES LES MINUTES
                 let statusToUpdate = vesselStatus;
                 let labelToUpdate = null;
 
@@ -646,6 +656,70 @@ export default function VesselTrackerPage() {
                     <Button onClick={() => setIsTargetMenuOpen(true)} className="w-full h-16 font-black uppercase tracking-widest shadow-xl text-base gap-3">
                         <Zap className="size-6 fill-white" /> Lancer le Partage
                     </Button>
+
+                    {/* CONFIGURATION AVANT PARTAGE */}
+                    <Accordion type="single" collapsible className="w-full">
+                        <AccordionItem value="sender-prefs" className="border-none">
+                            <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
+                                <Settings className="size-4 text-primary" />
+                                <span className="text-[10px] font-black uppercase">Identité & Surnom</span>
+                            </AccordionTrigger>
+                            <AccordionContent className="pt-4 space-y-4">
+                                <div className="space-y-1">
+                                    <Label className="text-[9px] font-black uppercase ml-1 opacity-60">ID du navire (Partage)</Label>
+                                    <div className="flex gap-2">
+                                        <Input placeholder="ID EX: BATEAU-1" value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest flex-grow" />
+                                        <Button variant="outline" size="icon" className="h-12 w-12 border-2 shrink-0" onClick={handleSaveVessel}>
+                                            <Save className="size-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Surnom du capitaine / navire</Label>
+                                    <Input 
+                                        placeholder="EX: CAPITAINE NEMO" 
+                                        value={vesselNickname} 
+                                        onChange={e => setVesselNickname(e.target.value)} 
+                                        className="font-bold text-center h-12 border-2 uppercase flex-grow w-full" 
+                                    />
+                                </div>
+                                <Button variant={wakeLock ? "secondary" : "outline"} className="w-full h-12 font-black uppercase text-[10px] tracking-widest border-2 gap-2" onClick={toggleWakeLock}>
+                                    <Zap className={cn("size-4", wakeLock && "fill-primary")} />
+                                    {wakeLock ? "MODE ÉVEIL ACTIF" : "ACTIVER MODE ÉVEIL"}
+                                </Button>
+                            </AccordionContent>
+                        </AccordionItem>
+
+                        <AccordionItem value="sms-settings" className="border-none mt-2">
+                            <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-orange-50/50 border-2 border-orange-100/50 rounded-xl">
+                                <Smartphone className="size-4 text-orange-600" />
+                                <span className="text-[10px] font-black uppercase text-orange-800">Réglages d'Urgence (SMS)</span>
+                            </AccordionTrigger>
+                            <AccordionContent className="pt-4 space-y-4">
+                                <div className="space-y-1.5">
+                                    <Label className="text-[9px] font-black uppercase text-muted-foreground ml-1">Numéro d'urgence (Contact à terre)</Label>
+                                    <Input 
+                                        placeholder="Ex: 77 12 34" 
+                                        value={emergencyContact} 
+                                        onChange={e => setEmergencyContact(e.target.value)} 
+                                        className="h-12 border-2 font-black text-lg" 
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1">Message de détresse personnalisé</Label>
+                                    <Textarea 
+                                        placeholder="Ex: Problème moteur, demande assistance." 
+                                        value={vesselSmsMessage} 
+                                        onChange={e => setVesselSmsMessage(e.target.value)} 
+                                        className="border-2 font-medium min-h-[80px]"
+                                    />
+                                </div>
+                                <Button onClick={handleSaveVessel} className="w-full h-12 font-black uppercase text-[10px] tracking-widest gap-2 shadow-md">
+                                    <Save className="size-4" /> Enregistrer mes réglages
+                                </Button>
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
                 </div>
               )}
             </div>
@@ -693,12 +767,51 @@ export default function VesselTrackerPage() {
                         </div>
                         <Switch checked={isGhostMode} onCheckedChange={handleGhostModeToggle} />
                     </div>
-                    <div className="p-3 bg-white/5 border border-white/10 rounded-xl text-[9px] font-medium leading-relaxed italic text-slate-300">
-                        "En activant ce mode, votre navire n'apparaît plus sur les cartes des autres membres de la flotte. Vous continuez cependant à recevoir leurs signaux tactiques."
-                    </div>
                 </div>
             </div>
           )}
+
+          {/* RÉGLAGES SONS COMMUNS */}
+          <Accordion type="single" collapsible className="w-full">
+            <AccordionItem value="sound-prefs" className="border-none">
+              <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
+                <Bell className="size-4 text-primary" />
+                <span className="text-[10px] font-black uppercase">Notifications Sonores</span>
+              </AccordionTrigger>
+              <AccordionContent className="pt-4 space-y-6">
+                <div className="space-y-4 p-4 border-2 rounded-2xl bg-card shadow-inner">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-xs font-black uppercase">Sons actifs</Label>
+                      <p className="text-[9px] font-bold text-muted-foreground uppercase">Alertes audio en direct</p>
+                    </div>
+                    <Switch checked={vesselPrefs.isNotifyEnabled} onCheckedChange={v => saveVesselPrefs({ ...vesselPrefs, isNotifyEnabled: v })} />
+                  </div>
+
+                  <div className={cn("space-y-4", !vesselPrefs.isNotifyEnabled && "opacity-40 pointer-events-none")}>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase opacity-60">Volume ({Math.round(vesselPrefs.vesselVolume * 100)}%)</Label>
+                      <Slider value={[vesselPrefs.vesselVolume * 100]} max={100} step={1} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, vesselVolume: v[0] / 100 })} />
+                    </div>
+                    <div className="grid gap-3">
+                      {['moving', 'stationary', 'offline', 'emergency'].map(key => (
+                        <div key={key} className="flex items-center justify-between gap-2">
+                          <span className="text-[9px] font-bold uppercase flex-1">{key}</span>
+                          <Select value={vesselPrefs.notifySounds[key as keyof typeof vesselPrefs.notifySounds]} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, notifySounds: { ...vesselPrefs.notifySounds, [key]: v } })}>
+                            <SelectTrigger className="h-8 text-[9px] font-black uppercase w-32 bg-muted/30"><SelectValue placeholder="Son..." /></SelectTrigger>
+                            <SelectContent>
+                              {availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] font-black uppercase">{s.label}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => playVesselSound(vesselPrefs.notifySounds[key as keyof typeof vesselPrefs.notifySounds])}><Play className="size-3" /></Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </CardContent>
       </Card>
 
