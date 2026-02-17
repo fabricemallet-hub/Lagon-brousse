@@ -37,7 +37,9 @@ import {
   Smartphone,
   Mail,
   Bell,
-  Package
+  Package,
+  EyeOff,
+  RefreshCw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -127,20 +129,20 @@ const sectionContent: Record<string, {
     title: 'Boat Tracker',
     icon: Navigation,
     color: 'bg-blue-600',
-    role: "Un système de sécurité maritime haute-fidélité conçu pour partager votre position GPS, votre statut d'activité et mutualiser les infos de pêche au sein d'une flotte.",
+    role: "Un système de sécurité maritime haute-fidélité conçu pour partager votre position GPS, surveiller la dérive et mutualiser les infos de pêche au sein d'une flotte.",
     steps: [
-      "Émetteur (A) - Détection Auto : Activez le partage. Un décompte rouge de 30s s'affiche pour qualifier votre statut initial (Mouillage ou Mouvement).",
-      "Émetteur (A) - Zone de Sécurité : Réglez votre 'Rayon de Mouillage' (10m à 100m). Si vous sortez du cercle bleu, l'app vous repasse automatiquement en 'Mouvement'.",
-      "Émetteur (A) - Signaux Tactiques : Signalez une urgence (MAYDAY), un regroupement d'oiseaux ou une prise de poisson (Marlin, Thon...) via les boutons dédiés.",
-      "Récepteur (B) - Suivi Privé : Suivez un navire spécifique via son ID. Configurez une 'Veille Stratégique' (Alarme si immobile trop longtemps).",
-      "Flotte (C) - Mode Communautaire : Rejoignez un ID de groupe (ex: CLUB-PECHE). Vous visualisez tous les membres et les alertes de la flotte en temps réel.",
-      "Journal de Bord : Consultez l'historique incluant la précision GPS (+/- Xm) et les changements de batterie.",
-      "Copie GPS : Cliquez sur 'Copier' dans l'historique pour récupérer les coordonnées exactes d'un événement."
+      "Émetteur (A) - Détection Auto : Activez le partage. Le système envoie un point GPS toutes les minutes et analyse vos mouvements.",
+      "Statut Dérive : L'app détecte automatiquement si vous dérivez (mouvement lent entre 20m et 100m/min) et alerte vos contacts.",
+      "Mode Fantôme : Masquez votre navire sur les cartes distantes pour naviguer discrètement tout en recevant les alertes des autres.",
+      "Override Secours : En cas de 'Demande d'Assistance', le mode Fantôme est annulé pour permettre votre localisation immédiate.",
+      "Récepteur (B) - Veille Stratégique : Configurez une alarme sonore si un navire suivi reste immobile au-delà d'un temps défini.",
+      "Flotte (C) - Partage Tactique : Rejoignez un groupe pour partager oiseaux et prises (Marlin, Thon, etc.) avec icônes colorées.",
+      "Gestion des Journaux : Statuts (mouvements) et Tactique (pêche) sont séparés pour un nettoyage précis des données."
     ],
     tips: [
-      "Rayon de Mouillage : Augmentez le rayon par temps venteux pour éviter les fausses alertes de 'Mouvement' dues à l'évitage du bateau.",
-      "Surnom SMS : Votre surnom de navire est inclus automatiquement dans le SMS d'urgence pour une identification immédiate par les secours.",
-      "Signal Prise : Dans le mode Flotte (C), signaler une prise affiche une icône de poisson colorée visible par tout le groupe."
+      "Mise à jour Minute : Le point GPS est forcé toutes les 60s pour garantir une précision maximale dans l'historique.",
+      "Reset Global : Seul l'émetteur A peut vider l'historique pour tout le monde. Les récepteurs ne vident que leur vue locale.",
+      "Rayon de Mouillage : Ajustez le cercle bleu (10-100m) selon le vent pour éviter les fausses alertes de mouvement."
     ]
   },
   'pro-dashboard': {
