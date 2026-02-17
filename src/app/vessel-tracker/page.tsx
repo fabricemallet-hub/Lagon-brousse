@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -78,6 +79,16 @@ const FISH_TYPES = [
   { id: 'Autres', label: 'Autres', color: '#000000' }
 ];
 
+const statusLabels: Record<string, string> = { 
+    moving: 'EN MOUVEMENT', 
+    stationary: 'AU MOUILLAGE', 
+    drifting: 'À LA DÉRIVE',
+    offline: 'SIGNAL PERDU',
+    returning: 'RETOUR MAISON',
+    landed: 'À TERRE (HOME)',
+    emergency: 'DEMANDE D\'ASSISTANCE'
+};
+
 const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
   if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
   const props = { className: cn("size-4", className) };
@@ -123,7 +134,6 @@ export default function VesselTrackerPage() {
   const [isCatchDialogOpen, setIsCatchDialogOpen] = useState(false);
   const [locallyClearedMarkerIds, setLocallyClearedMarkerIds] = useState<string[]>([]);
 
-  // État pour l'historique local des identifiants
   const [idHistory, setIdHistory] = useState<{ id: string, type: 'vessel' | 'group' }[]>([]);
 
   const [vesselPrefs, setVesselPrefs] = useState<NonNullable<UserAccount['vesselPrefs']>>({
@@ -206,7 +216,6 @@ export default function VesselTrackerPage() {
     }
   }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, availableSounds]);
 
-  // Charger l'historique local des IDs
   useEffect(() => {
     const saved = localStorage.getItem('lb_vessel_id_history');
     if (saved) {
@@ -272,7 +281,7 @@ export default function VesselTrackerPage() {
     setSecondsUntilUpdate(60);
     
     let statusToUpdate = vesselStatus;
-    let labelToUpdate = `MAJ GPS FORCÉE à ${format(new Date(), 'HH:mm:ss')}`;
+    let labelToUpdate = null;
 
     if (currentPos && lastMinutePosRef.current) {
         const distInMinute = getDistance(currentPos.lat, currentPos.lng, lastMinutePosRef.current.lat, lastMinutePosRef.current.lng);
@@ -283,16 +292,18 @@ export default function VesselTrackerPage() {
                 statusToUpdate = 'stationary';
             } else if (distInMinute < 100) {
                 statusToUpdate = 'drifting';
-                labelToUpdate = 'BATEAU À LA DÉRIVE (FORCÉ)';
+                labelToUpdate = 'À LA DÉRIVE';
             } else {
                 statusToUpdate = 'moving';
             }
         }
     }
 
+    const finalLabel = labelToUpdate || `${statusLabels[statusToUpdate]} (MAJ FORCÉE ${format(new Date(), 'HH:mm')})`;
+    setVesselStatus(statusToUpdate);
     updateVesselInFirestore({ 
         status: statusToUpdate,
-        eventLabel: labelToUpdate
+        eventLabel: finalLabel
     });
 
     lastMinutePosRef.current = currentPos;
@@ -486,16 +497,18 @@ export default function VesselTrackerPage() {
                             statusToUpdate = 'stationary';
                         } else if (distInMinute < 100) {
                             statusToUpdate = 'drifting';
-                            labelToUpdate = 'BATEAU À LA DÉRIVE';
+                            labelToUpdate = 'À LA DÉRIVE';
                         } else {
                             statusToUpdate = 'moving';
                         }
                     }
                 }
 
+                const finalLabel = labelToUpdate || `${statusLabels[statusToUpdate]} (MAJ ${format(new Date(), 'HH:mm')})`;
+                setVesselStatus(statusToUpdate);
                 updateVesselInFirestore({ 
                     status: statusToUpdate,
-                    eventLabel: labelToUpdate || `MAJ GPS à ${format(new Date(), 'HH:mm')}`
+                    eventLabel: finalLabel
                 });
 
                 lastMinutePosRef.current = currentPos;
@@ -529,17 +542,6 @@ export default function VesselTrackerPage() {
 
         if (lastStatus !== currentStatus || timeKey > lastUpdate) {
             const pos = { lat: vessel.location?.latitude || INITIAL_CENTER.lat, lng: vessel.location?.longitude || INITIAL_CENTER.lng };
-            
-            const statusLabels: Record<string, string> = { 
-                moving: 'EN MOUVEMENT', 
-                stationary: 'AU MOUILLAGE', 
-                drifting: 'À LA DÉRIVE',
-                offline: 'SIGNAL PERDU',
-                returning: 'RETOUR MAISON',
-                landed: 'À TERRE (HOME)',
-                emergency: 'DEMANDE D\'ASSISTANCE'
-            };
-
             const label = vessel.eventLabel || statusLabels[currentStatus] || currentStatus.toUpperCase();
             const duration = differenceInMinutes(new Date(), new Date(timeKey));
             
@@ -583,7 +585,8 @@ export default function VesselTrackerPage() {
                 setAnchorPos(newPos); 
                 lastMinutePosRef.current = newPos;
                 isFirstFixRef.current = false; 
-                updateVesselInFirestore({ status: 'moving', isSharing: true, eventLabel: `DÉMARRAGE À ${format(new Date(), 'HH:mm')}` });
+                const startLabel = `${statusLabels['moving']} (DÉMARRAGE À ${format(new Date(), 'HH:mm')})`;
+                updateVesselInFirestore({ status: 'moving', isSharing: true, eventLabel: startLabel });
                 return; 
             }
         }
