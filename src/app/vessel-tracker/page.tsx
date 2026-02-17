@@ -112,7 +112,6 @@ export default function VesselTrackerPage() {
   const immobilityStartTime = useRef<number | null>(null);
   const isFirstFixRef = useRef<boolean>(true);
 
-  // Sync ref with state for use in callbacks without re-triggering effects
   useEffect(() => {
     vesselStatusRef.current = vesselStatus;
   }, [vesselStatus]);
@@ -385,28 +384,44 @@ export default function VesselTrackerPage() {
         if (shouldPanOnNextFix.current && map) { map.panTo(newPos); map.setZoom(15); shouldPanOnNextFix.current = false; }
         
         if (mode === 'sender') {
-            if (isFirstFixRef.current) { anchorPosRef.current = newPos; updateVesselInFirestore({ status: 'moving', isSharing: true }); immobilityStartTime.current = Date.now(); isFirstFixRef.current = false; return; }
-            if (currentVesselStatus !== 'returning' && currentVesselStatus !== 'landed' && currentVesselStatus !== 'emergency') {
-                const dist = getDistance(newPos.lat, newPos.lng, anchorPosRef.current!.lat, anchorPosRef.current!.lng);
-                if (dist > IMMOBILITY_THRESHOLD_METERS) { 
-                    setVesselStatus('moving'); 
-                    anchorPosRef.current = newPos; 
-                    immobilityStartTime.current = null; 
-                    updateVesselInFirestore({ status: 'moving' }); 
+            if (isFirstFixRef.current) { 
+                anchorPosRef.current = newPos; 
+                immobilityStartTime.current = Date.now();
+                isFirstFixRef.current = false; 
+                updateVesselInFirestore({ status: 'moving', isSharing: true });
+                return; 
+            }
+            
+            const dist = getDistance(newPos.lat, newPos.lng, anchorPosRef.current!.lat, anchorPosRef.current!.lng);
+            
+            if (dist > IMMOBILITY_THRESHOLD_METERS) {
+                // On a bougé de plus de 20m par rapport au point de référence
+                if (currentVesselStatus !== 'returning' && currentVesselStatus !== 'landed' && currentVesselStatus !== 'emergency') {
+                    setVesselStatus('moving');
+                    updateVesselInFirestore({ status: 'moving' });
                 }
-                else if (Date.now() - (immobilityStartTime.current || 0) > 30000 && currentVesselStatus !== 'stationary') { 
-                    setVesselStatus('stationary'); 
-                    updateVesselInFirestore({ status: 'stationary' }); 
+                anchorPosRef.current = newPos;
+                immobilityStartTime.current = Date.now(); // On relance le chrono de 30s
+            } else {
+                // On est toujours dans la zone des 20m
+                const idleTime = Date.now() - (immobilityStartTime.current || Date.now());
+                if (idleTime > 30000) {
+                    // Ça fait plus de 30s qu'on n'a pas bougé de plus de 20m
+                    if (currentVesselStatus !== 'stationary' && currentVesselStatus !== 'returning' && currentVesselStatus !== 'landed' && currentVesselStatus !== 'emergency') {
+                        setVesselStatus('stationary');
+                        updateVesselInFirestore({ status: 'stationary' });
+                    }
                 }
-                else updateVesselInFirestore({});
-            } else updateVesselInFirestore({});
+            }
+            // Mise à jour régulière de la position
+            updateVesselInFirestore({});
         }
       },
       () => toast({ variant: "destructive", title: "Erreur GPS" }),
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
-  }, [isSharing, isReceiverGpsActive, mode, updateVesselInFirestore, map, toast]); // Removed vesselStatus to prevent constant restarts
+  }, [isSharing, isReceiverGpsActive, mode, updateVesselInFirestore, map, toast]);
 
   const handleRecenter = () => {
     let pos = currentPosRef.current;
@@ -610,7 +625,7 @@ export default function VesselTrackerPage() {
                                   <div className={cn("p-2 rounded-lg", isActive ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>{isActive ? <Navigation className="size-4" /> : <WifiOff className="size-4" />}</div>
                                   <div className="flex flex-col"><span className="font-black text-xs uppercase">{vessel?.displayName || id}</span><span className="text-[8px] font-bold uppercase">{isActive ? 'En ligne' : 'OFF'}</span></div>
                               </div>
-                              <div className="flex items-center gap-2">{isActive && <BatteryIconComp level={vessel?.batteryLevel} charging={vessel?.isCharging} />}<Button variant="ghost" size="icon" onClick={() => handleRemoveSavedVessel(id)} className="size-8 text-destructive/40 border-2"><Trash2 className="size-3" /></Button></div>
+                              <div className="flex items-center gap-2">{isActive && <BatteryIconComp level={vessel?.batteryLevel} charging={vessel?.isCharging} />}<Button variant="ghost" size="icon" className="size-8 text-destructive/40 border-2"><Trash2 className="size-3" /></Button></div>
                           </div>
                       );
                   })}
@@ -894,7 +909,11 @@ export default function VesselTrackerPage() {
                                 </div>
                                 {h.pos && <Button variant="outline" size="sm" className="h-8 text-[9px] font-black border-2" onClick={() => { if (h.pos && map) { map.panTo(h.pos); map.setZoom(17); } }}><MapPin className="size-3 text-primary" /> GPS</Button>}
                             </div>
-                        )) : <div className="text-center py-10 opacity-40 uppercase text-[10px] font-black italic">pas d'affichage dans l'historique</div>}
+                        )) : (
+                            <div className="text-center py-10 opacity-40 uppercase text-[10px] font-black italic">
+                                pas d'affichage dans l'historique
+                            </div>
+                        )}
                     </AccordionContent>
                 </AccordionItem>
             </Accordion>
