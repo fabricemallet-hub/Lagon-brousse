@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -456,11 +457,11 @@ export default function VesselTrackerPage() {
         if (timeKey === 0) return;
         
         const lastStatus = lastStatusesRef.current[vessel.id];
+        const statusChanged = lastStatus !== currentStatus;
         const lastUpdate = lastUpdatesRef.current[vessel.id] || 0;
         const pos = { lat: vessel.location?.latitude || INITIAL_CENTER.lat, lng: vessel.location?.longitude || INITIAL_CENTER.lng };
         
         const baseLabel = vessel.eventLabel || statusLabels[currentStatus] || currentStatus.toUpperCase();
-        const statusChanged = lastStatus !== currentStatus;
         
         const isManualAction = baseLabel.includes('FORCÉE') || baseLabel.includes('ERREUR') || baseLabel.includes('ASSISTANCE') || baseLabel.includes('REPRISE') || baseLabel.includes('TACTIQUE');
 
@@ -520,7 +521,7 @@ export default function VesselTrackerPage() {
         }
 
         // --- VEILLE STRATÉGIQUE (IMMOBILITÉ TROP LONGUE) ---
-        if (mode !== 'sender' && vesselPrefs.isWatchEnabled && currentStatus === 'stationary' && startTimeKey > 0) {
+        if (mode !== 'sender' && vesselPrefs.isWatchEnabled && vesselPrefs.notifySettings.watch && currentStatus === 'stationary' && startTimeKey > 0) {
             const minutesStationary = (Date.now() - startTimeKey) / 60000;
             if (minutesStationary >= vesselPrefs.watchDuration) {
                 if (!activeLoopingAlert || activeLoopingAlert.type !== 'watch' || activeLoopingAlert.vesselName !== (vessel.displayName || vessel.id)) {
@@ -532,7 +533,7 @@ export default function VesselTrackerPage() {
         // --- BATTERIE FAIBLE ---
         const currentBattery = vessel.batteryLevel ?? 100;
         const lastBattery = lastBatteryLevelsRef.current[vessel.id] ?? 100;
-        if (mode !== 'sender' && lastBattery >= vesselPrefs.batteryThreshold && currentBattery < vesselPrefs.batteryThreshold) {
+        if (mode !== 'sender' && vesselPrefs.notifySettings.battery && lastBattery >= vesselPrefs.batteryThreshold && currentBattery < vesselPrefs.batteryThreshold) {
             playVesselSound(vesselPrefs.notifySounds.battery || 'alerte', 'battery', vessel.displayName || vessel.id);
             toast({ variant: 'destructive', title: "Batterie Critique", description: `${vessel.displayName || vessel.id} : ${currentBattery}%` });
         }
@@ -699,7 +700,7 @@ export default function VesselTrackerPage() {
         if (!receiverSmsNumber) { toast({ variant: "destructive", title: "Numéro SMS non configuré" }); return; }
         const pos = targetVessel?.location;
         const posUrl = pos ? `https://www.google.com/maps?q=${pos.latitude.toFixed(6)},${pos.longitude.toFixed(6)}` : "[INCONNU]";
-        const acc = targetVessel?.accuracy ? `+/- ${targetVessel.accuracy}m` : "Inconnue";
+        const acc = targetVessel?.accuracy ? `+/- ${targetVessel.accuracy}m` : "Inconnu";
         const time = targetVessel?.lastActive ? format(targetVessel.lastActive.toDate(), 'HH:mm') : "--:--";
         const body = `[RELAIS L&B] Navire: ${targetVessel?.displayName || targetVessel?.id}\n${receiverCustomMsg}\nGPS: ${posUrl}\nPrécision: ${acc}\nHeure point: ${time}`;
         window.location.href = `sms:${receiverSmsNumber.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
@@ -737,25 +738,36 @@ export default function VesselTrackerPage() {
                         { key: 'watch', label: 'Veille Stratégique' },
                         { key: 'battery', label: 'Batterie Faible' }
                     ].map(item => (
-                        <div key={item.key} className="flex items-center justify-between gap-2 p-2 bg-white rounded-xl border-2 shadow-sm">
-                            <div className="flex flex-col flex-1 min-w-0">
-                                <span className="text-[10px] font-black uppercase truncate">{item.label}</span>
+                        <div key={item.key} className={cn("flex flex-col gap-2 p-3 bg-white rounded-xl border-2 shadow-sm transition-opacity", !vesselPrefs.notifySettings[item.key] && "opacity-60")}>
+                            <div className="flex items-center justify-between gap-2 border-b border-dashed pb-2">
+                                <div className="flex items-center gap-2">
+                                    <Switch 
+                                        checked={vesselPrefs.notifySettings[item.key]} 
+                                        onCheckedChange={v => saveVesselPrefs({ ...vesselPrefs, notifySettings: { ...vesselPrefs.notifySettings, [item.key]: v } })}
+                                        className="scale-75"
+                                    />
+                                    <span className="text-[10px] font-black uppercase truncate">{item.label}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <button 
+                                        className={cn("size-7 flex items-center justify-center rounded-lg border-2 transition-all active:scale-90", vesselPrefs.repeatSettings?.[item.key] ? "text-primary border-primary bg-primary/5" : "text-muted-foreground border-transparent")}
+                                        onClick={() => saveVesselPrefs({ ...vesselPrefs, repeatSettings: { ...vesselPrefs.repeatSettings, [item.key]: !vesselPrefs.repeatSettings?.[item.key] } })}
+                                        title="Répéter l'alerte (Boucle)"
+                                    >
+                                        <Repeat className="size-3.5" />
+                                    </button>
+                                    <Button variant="ghost" size="icon" className="size-7" onClick={() => playVesselSound(vesselPrefs.notifySounds[item.key])}><Play className="size-3.5" /></Button>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
                                 <Select 
                                     value={vesselPrefs.notifySounds[item.key]} 
-                                    onValueChange={v => setVesselPrefs({ ...vesselPrefs, notifySounds: { ...vesselPrefs.notifySounds, [item.key]: v } })}
+                                    disabled={!vesselPrefs.notifySettings[item.key]}
+                                    onValueChange={v => saveVesselPrefs({ ...vesselPrefs, notifySounds: { ...vesselPrefs.notifySounds, [item.key]: v } })}
                                 >
-                                    <SelectTrigger className="h-8 text-[9px] font-black uppercase border-none bg-transparent p-0 mt-1"><SelectValue placeholder="Choisir..." /></SelectTrigger>
+                                    <SelectTrigger className="h-8 text-[9px] font-black uppercase border-none bg-muted/20 px-2 rounded-lg flex-1"><SelectValue placeholder="Choisir son..." /></SelectTrigger>
                                     <SelectContent>{availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] uppercase font-black">{s.label}</SelectItem>)}</SelectContent>
                                 </Select>
-                            </div>
-                            <div className="flex items-center gap-1">
-                                <button 
-                                    className={cn("size-8 flex items-center justify-center rounded-lg border-2 transition-all active:scale-90", vesselPrefs.repeatSettings?.[item.key] ? "text-primary border-primary bg-primary/5" : "text-muted-foreground border-transparent")}
-                                    onClick={() => saveVesselPrefs({ ...vesselPrefs, repeatSettings: { ...vesselPrefs.repeatSettings, [item.key]: !vesselPrefs.repeatSettings?.[item.key] } })}
-                                >
-                                    <Repeat className="size-4" />
-                                </button>
-                                <Button variant="ghost" size="icon" className="size-8" onClick={() => playVesselSound(vesselPrefs.notifySounds[item.key])}><Play className="size-4" /></Button>
                             </div>
                         </div>
                     ))}
