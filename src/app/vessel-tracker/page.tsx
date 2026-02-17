@@ -143,6 +143,7 @@ export default function VesselTrackerPage() {
   const lastStatusesRef = useRef<Record<string, string>>({});
   const lastUpdatesRef = useRef<Record<string, number>>({});
   const lastSentStatusRef = useRef<string | null>(null);
+  const lastClearTimesRef = useRef<Record<string, number>>({});
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
@@ -377,6 +378,20 @@ export default function VesselTrackerPage() {
     }
   };
 
+  const handleClearHuntingHistory = () => {
+    if (!firestore || !user) return;
+    if (isSharing && mode === 'sender') {
+        // Clear Firestore for owner
+        updateDoc(doc(firestore, 'vessels', sharingId), {
+            huntingMarkers: []
+        }).then(() => toast({ title: "Signalements tactiques supprimés" }));
+    } else {
+        // Local hide for follower
+        setLocallyClearedMarkerIds(prev => [...prev, ...tacticalMarkers.map(m => m.id)]);
+        toast({ title: "Journal tactique masqué" });
+    }
+  };
+
   const handleStopSharing = () => {
     if (!user || !firestore) return;
     setIsSharing(false);
@@ -426,14 +441,12 @@ export default function VesselTrackerPage() {
     return `${nicknamePrefix}${customText} [MAYDAY/PAN PAN] Position : https://www.google.com/maps?q=-22.27,166.45`;
   }, [vesselSmsMessage, isCustomMessageEnabled, vesselNickname]);
 
-  // INTERVALLE DE MAJ FORCEE ET EVALUATION STATUT (DRIVE)
   useEffect(() => {
     if (!isSharing || mode !== 'sender') return;
 
     const interval = setInterval(() => {
         const now = Date.now();
         
-        // 1. Analyse du statut et Dérive
         if (currentPos && lastMinutePosRef.current) {
             const distInMinute = getDistance(currentPos.lat, currentPos.lng, lastMinutePosRef.current.lat, lastMinutePosRef.current.lng);
             const radius = vesselPrefs.mooringRadius || 20;
@@ -449,7 +462,6 @@ export default function VesselTrackerPage() {
             }
         }
         
-        // 2. Mise à jour forcée Firestore (toutes les minutes)
         if (now - lastForcedUpdateTimeRef.current >= 60000) {
             updateVesselInFirestore({ 
                 eventLabel: `MAJ DU POINT GPS à ${format(new Date(), 'HH:mm')}`
@@ -564,7 +576,6 @@ export default function VesselTrackerPage() {
     const pos = currentPos || (followedVessels?.find(v => v.isSharing && v.id === sharingId)?.location ? { lat: followedVessels.find(v => v.isSharing && v.id === sharingId)!.location!.latitude, lng: followedVessels.find(v => v.isSharing && v.id === sharingId)!.location!.longitude } : null);
     if (!pos) { toast({ variant: "destructive", title: "GPS non verrouillé" }); return; }
     
-    // OVERRIDE MODE FANTÔME POUR SECOURS
     if (isGhostMode) {
         setIsGhostMode(false);
         updateVesselInFirestore({ isGhostMode: false, status: 'emergency', eventLabel: 'DEMANDE D\'ASSISTANCE (MAYDAY)' });
@@ -723,7 +734,7 @@ export default function VesselTrackerPage() {
                     const isSelf = vessel.id === sharingId;
                     if (mode === 'sender' && !isSelf) return null;
                     if (vessel.isGhostMode && !isSelf && vessel.status !== 'emergency') return null;
-                    if (vessel.isGhostMode && isSelf) return null; // Invisible même pour soi si activé, sauf en secours
+                    if (vessel.isGhostMode && isSelf) return null;
 
                     return (
                         <React.Fragment key={vessel.id}>
@@ -872,4 +883,10 @@ export default function VesselTrackerPage() {
       </Dialog>
     </div>
   );
+}
+
+export function VesselTracker() {
+  const { user, isUserLoading } = useUserHook();
+  if (isUserLoading) return <Skeleton className="h-48 w-full" />;
+  return <VesselTrackerPage />;
 }
