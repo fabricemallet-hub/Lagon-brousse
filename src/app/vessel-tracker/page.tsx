@@ -143,9 +143,9 @@ export default function VesselTrackerPage() {
   const [vesselPrefs, setVesselPrefs] = useState<NonNullable<UserAccount['vesselPrefs']>>({
     isNotifyEnabled: true,
     vesselVolume: 0.8,
-    notifySettings: { moving: true, stationary: true, offline: true, battery: true, emergency: true },
-    notifySounds: { moving: '', stationary: '', offline: '', battery: '', emergency: '' },
-    notifyLoops: { moving: false, stationary: false, offline: false, battery: false, emergency: false },
+    notifySettings: { moving: true, stationary: true, offline: true, battery: true, emergency: true, tactical: true },
+    notifySounds: { moving: '', stationary: '', offline: '', battery: '', emergency: '', tactical: '' },
+    notifyLoops: { moving: false, stationary: false, offline: false, battery: false, emergency: false, tactical: false },
     isWatchEnabled: false,
     watchDuration: 60,
     watchSound: '',
@@ -363,7 +363,10 @@ export default function VesselTrackerPage() {
         huntingMarkers: arrayUnion(newMarker) as any
     });
     
-    playVesselSound('sonar');
+    if (vesselPrefs.notifySettings.tactical) {
+        const isLoop = !!vesselPrefs.notifyLoops?.tactical;
+        playVesselSound(vesselPrefs.notifySounds.tactical || 'sonar', isLoop);
+    }
     toast({ title: "Signalement envoyé", description: label });
   };
 
@@ -459,6 +462,12 @@ export default function VesselTrackerPage() {
                         }, ...prev].slice(0, 50);
                     });
                     lastTacticalUpdatesRef.current[marker.id] = markerTime;
+                    
+                    // Alerte sonore tactique pour la flotte
+                    if (vessel.id !== sharingId && vesselPrefs.notifySettings.tactical) {
+                        const isLoop = !!vesselPrefs.notifyLoops?.tactical;
+                        playVesselSound(vesselPrefs.notifySounds.tactical || 'sonar', isLoop);
+                    }
                 }
             });
         }
@@ -527,14 +536,14 @@ export default function VesselTrackerPage() {
         if (batteryDropped && vesselPrefs.notifySettings.battery) {
             if (vesselPrefs.isNotifyEnabled) {
                 const isLoop = !!vesselPrefs.notifyLoops?.battery;
-                playVesselSound('alerte', isLoop);
+                playVesselSound(vesselPrefs.notifySounds.battery || 'alerte', isLoop);
             }
         }
 
         lastBatteryLevelsRef.current[vessel.id] = currentBattery;
         lastChargingStatesRef.current[vessel.id] = currentCharging;
     });
-  }, [followedVessels, vesselPrefs, playVesselSound]);
+  }, [followedVessels, vesselPrefs, playVesselSound, sharingId]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
@@ -723,28 +732,15 @@ export default function VesselTrackerPage() {
             </div>
         </div>
 
-        <div className="space-y-4 p-4 border-2 rounded-2xl bg-red-50/30 border-red-100 shadow-sm">
-            <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                    <Label className="text-xs font-black uppercase text-red-800">Seuil Batterie Faible</Label>
-                    <p className="text-[9px] font-bold text-red-600/60 uppercase">Alerte niveau bas batterie smartphone</p>
-                </div>
-                <Badge variant="outline" className="font-black border-red-200 bg-white text-red-800 h-7 px-3 text-xs">{vesselPrefs.batteryThreshold || 20}%</Badge>
-            </div>
-            <Slider value={[vesselPrefs.batteryThreshold || 20]} min={5} max={50} step={5} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, batteryThreshold: v[0] })} />
-            <div className="flex justify-between text-[8px] font-black uppercase opacity-40 px-1">
-                <span>5%</span>
-                <span>50%</span>
-            </div>
-        </div>
-
         <div className="grid gap-3 pt-4 border-t border-dashed">
             <p className="text-[10px] font-black uppercase text-muted-foreground ml-1">Réglages sons individuels</p>
             {[
                 { key: 'moving', label: 'Mouvement', color: 'text-blue-600' },
                 { key: 'stationary', label: 'Mouillage', color: 'text-amber-600' },
                 { key: 'offline', label: 'Signal Perdu', color: 'text-red-600' },
-                { key: 'emergency', label: 'Assistance', color: 'text-red-600' }
+                { key: 'emergency', label: 'Assistance', color: 'text-red-600' },
+                { key: 'tactical', label: 'Signalement Tactique', color: 'text-primary' },
+                { key: 'battery', label: 'Batterie Faible', color: 'text-red-600' }
             ].map(ev => (
                 <div key={ev.key} className={cn("p-3 rounded-xl border-2 flex flex-col gap-3 transition-all", vesselPrefs.notifySettings[ev.key as keyof typeof vesselPrefs.notifySettings] ? "bg-white" : "bg-muted/30 opacity-60")}>
                     <div className="flex items-center justify-between">
@@ -1221,5 +1217,3 @@ export default function VesselTrackerPage() {
     </div>
   );
 }
-
-    
