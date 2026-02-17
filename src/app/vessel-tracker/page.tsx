@@ -266,9 +266,9 @@ export default function VesselTrackerPage() {
     }
     
     if (st === 'moving' || st === 'emergency') { 
-        immobilityStartTime.current = null; 
-        anchorPosRef.current = null; 
-        setCountdown(null);
+        immobilityStartTime.current = Date.now(); 
+        anchorPosRef.current = currentPosRef.current; 
+        setCountdown(30);
     } else if (st === 'stationary') {
         if (currentPosRef.current) anchorPosRef.current = currentPosRef.current;
         setCountdown(null);
@@ -340,14 +340,26 @@ export default function VesselTrackerPage() {
     return `${nicknamePrefix}${customText} [MAYDAY/PAN PAN] Position : https://www.google.com/maps?q=-22.27,166.45`;
   }, [vesselSmsMessage, isCustomMessageEnabled, vesselNickname]);
 
+  const labels = useMemo(() => ({
+    title: "Vessel Tracker",
+    status1: "Au Mouillage",
+    status2: "En Dérive",
+    alertBtn: "DEMANDE ASSISTANCE",
+    alertTitle: "URGENCE !",
+    alertDesc: "Demande assistance !",
+  }), []);
+
   // --- LOGIQUE DE SURVEILLANCE ACTIVE DES 30 SECONDES ---
   useEffect(() => {
-    if (mode !== 'sender' || !isSharing || !immobilityStartTime.current || vesselStatus !== 'moving') {
+    if (mode !== 'sender' || !isSharing || vesselStatus !== 'moving') {
         setCountdown(null);
         return;
     }
 
     const interval = setInterval(() => {
+      // Si on n'a pas encore démarré le chrono, on ne fait rien
+      if (!immobilityStartTime.current) return;
+
       const timeSinceStart = Date.now() - (immobilityStartTime.current || 0);
       const remaining = Math.max(0, Math.ceil((30000 - timeSinceStart) / 1000));
       
@@ -372,7 +384,7 @@ export default function VesselTrackerPage() {
         }
         setCountdown(null);
       }
-    }, 1000); // Mise à jour toutes les secondes pour le décompte
+    }, 1000); 
 
     return () => clearInterval(interval);
   }, [isSharing, mode, vesselStatus]);
@@ -439,7 +451,7 @@ export default function VesselTrackerPage() {
         if (mode === 'sender') {
             if (isFirstFixRef.current) { 
                 anchorPosRef.current = newPos; 
-                immobilityStartTime.current = Date.now();
+                if (!immobilityStartTime.current) immobilityStartTime.current = Date.now();
                 isFirstFixRef.current = false; 
                 updateVesselInFirestore({ 
                     status: 'moving', 
@@ -579,7 +591,14 @@ export default function VesselTrackerPage() {
                 <div className="space-y-4">
                     <div className="flex items-center justify-between p-4 border-2 rounded-2xl bg-primary/5 border-primary/10">
                         <Label className="text-sm font-black uppercase">Partager ma position</Label>
-                        <Switch checked={isSharing} onCheckedChange={setIsSharing} />
+                        <Switch checked={isSharing} onCheckedChange={(val) => {
+                            if (val) {
+                                setIsSharing(true);
+                                immobilityStartTime.current = Date.now(); // Start countdown timer immediately
+                            } else {
+                                handleStopSharing();
+                            }
+                        }} />
                     </div>
 
                     <Accordion type="single" collapsible className="w-full">
@@ -692,7 +711,7 @@ export default function VesselTrackerPage() {
                                   <div className={cn("p-2 rounded-lg", isActive ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>{isActive ? <Navigation className="size-4" /> : <WifiOff className="size-4" />}</div>
                                   <div className="flex flex-col"><span className="font-black text-xs uppercase">{vessel?.displayName || id}</span><span className="text-[8px] font-bold uppercase">{isActive ? 'En ligne' : 'OFF'}</span></div>
                               </div>
-                              <div className="flex items-center gap-2">{isActive && <BatteryIconComp level={vessel?.batteryLevel} charging={vessel?.isCharging} />}<Button variant="ghost" size="icon" className="size-8 text-destructive/40 border-2"><Trash2 className="size-3" /></Button></div>
+                              <div className="flex items-center gap-2">{isActive && <BatteryIconComp level={vessel?.batteryLevel} charging={vessel?.isCharging} />}<Button variant="ghost" size="icon" className="size-8 text-destructive/40 border-2" onClick={(e) => { e.stopPropagation(); handleRemoveSavedVessel(id); }}><Trash2 className="size-3" /></Button></div>
                           </div>
                       );
                   })}
@@ -874,7 +893,7 @@ export default function VesselTrackerPage() {
                                             {availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] uppercase font-black">{s.label}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
-                                    <Button variant="ghost" size="icon" className="h-9 w-9 border-2 border-red-100 shrink-0 bg-white text-red-600" onClick={() => playVesselSound(vesselPrefs.batterySound)}>
+                                    <Button variant="ghost" size="icon" className="h-9 w-9 border-2 border-red-100 shrink-0 bg-white text-orange-600" onClick={() => playVesselSound(vesselPrefs.batterySound)}>
                                         <Play className="size-3" />
                                     </Button>
                                 </div>
