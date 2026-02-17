@@ -84,6 +84,7 @@ export interface UserAccount {
   address?: string;
   contactLocation?: { latitude: number; longitude: number };
   ridet?: string;
+  vesselSharingTarget?: 'none' | 'receiver' | 'fleet' | 'both';
   shootingAngle?: {
       center: number;
       spread: number;
@@ -386,6 +387,7 @@ export interface VesselStatus {
   historyClearedAt?: any;
   huntingMarkers?: HuntingMarker[];
   isPositionHidden?: boolean;
+  isPrivateHidden?: boolean;
   accuracy?: number;
   mooringRadius?: number;
   shootingAngle?: ShootingAngle;
@@ -467,7 +469,7 @@ export interface SpotShare {
 export interface AccessToken {
   id: string;
   status: 'active' | 'redeemed';
-  durationMonths: number;
+  duration_months: number;
   createdAt: any;
   redeemedBy?: string;
   redeemedAt?: any;
