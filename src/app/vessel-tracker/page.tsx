@@ -53,7 +53,8 @@ import {
   Bell,
   Fish,
   Users,
-  Target
+  Target,
+  ChevronDown
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -173,20 +174,37 @@ export default function VesselTrackerPage() {
 
   const savedVesselIds = userProfile?.savedVesselIds || [];
   
-  const vesselsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    
-    if (mode === 'fleet' && fleetGroupId) {
-        return query(collection(firestore, 'vessels'), where('groupId', '==', fleetGroupId.toUpperCase()));
-    }
-
-    const queryIds = [...savedVesselIds];
-    if (isSharing && !queryIds.includes(sharingId) && sharingId) queryIds.push(sharingId);
-    if (queryIds.length === 0) return null;
-    return query(collection(firestore, 'vessels'), where('id', 'in', queryIds.slice(0, 10)));
-  }, [firestore, savedVesselIds, sharingId, isSharing, mode, fleetGroupId]);
+  // --- QUERIES UNIFIÉES POUR LA CARTE ET LES ALERTES ---
   
-  const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
+  // 1. Navires suivis individuellement (Mode B)
+  const privateVesselsQuery = useMemoFirebase(() => {
+    if (!firestore || savedVesselIds.length === 0) return null;
+    return query(collection(firestore, 'vessels'), where('id', 'in', savedVesselIds.slice(0, 10)));
+  }, [firestore, savedVesselIds]);
+  const { data: privateVessels } = useCollection<VesselStatus>(privateVesselsQuery);
+
+  // 2. Navires de la flotte (Mode C)
+  const fleetVesselsQuery = useMemoFirebase(() => {
+    if (!firestore || !fleetGroupId) return null;
+    return query(collection(firestore, 'vessels'), where('groupId', '==', fleetGroupId.toUpperCase()));
+  }, [firestore, fleetGroupId]);
+  const { data: fleetVessels } = useCollection<VesselStatus>(fleetVesselsQuery);
+
+  // 3. Auto-suivi (Mon propre navire)
+  const selfVesselRef = useMemoFirebase(() => {
+    if (!firestore || !sharingId) return null;
+    return doc(firestore, 'vessels', sharingId);
+  }, [firestore, sharingId]);
+  const { data: selfVesselData } = useDoc<VesselStatus>(selfVesselRef);
+
+  // Fusionner tout pour la carte et les alertes
+  const followedVessels = useMemo(() => {
+    const map = new Map<string, VesselStatus>();
+    privateVessels?.forEach(v => map.set(v.id, v));
+    fleetVessels?.forEach(v => map.set(v.id, v));
+    if (selfVesselData) map.set(selfVesselData.id, selfVesselData);
+    return Array.from(map.values());
+  }, [privateVessels, fleetVessels, selfVesselData]);
 
   const tacticalMarkers = useMemo(() => {
     if (!followedVessels) return [];
@@ -324,6 +342,10 @@ export default function VesselTrackerPage() {
         isGhostMode: isGhostMode
     }).then(() => { 
         if (vesselIdToFollow) setVesselIdToFollow(''); 
+        // Si on rejoint une flotte, on met à jour notre navire immédiatement dans Firestore
+        if (isSharing) {
+            updateVesselInFirestore({ groupId: cleanGroupId });
+        }
         toast({ title: "Paramètres enregistrés" }); 
     });
   };
@@ -418,7 +440,7 @@ export default function VesselTrackerPage() {
         // Émetteur A : Trigger la suppression globale via historyClearedAt
         updateDoc(doc(firestore, 'vessels', sharingId), { historyClearedAt: serverTimestamp() }).then(() => toast({ title: "Journal de bord réinitialisé (Global)" }));
     } else {
-        // Récepteur B ou Flotte C : Local seulement (déjà fait par setHistory([]))
+        // Récepteur B ou Flotte C : Local seulement
         toast({ title: "Journal de bord vidé (Local)" });
     }
   };
@@ -596,7 +618,7 @@ export default function VesselTrackerPage() {
       (err) => {
         let msg = "Impossible de récupérer votre position.";
         if (err.code === 1) msg = "Accès GPS refusé. Veuillez autoriser la localisation.";
-        else if (err.code === 3) return; // Silent timeout to avoid spam
+        else if (err.code === 3) return; // Silent timeout
         toast({ variant: "destructive", title: "Erreur GPS", description: msg });
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 }
@@ -605,12 +627,12 @@ export default function VesselTrackerPage() {
   }, [isSharing, mode, anchorPos, updateVesselInFirestore, map, toast, vesselStatus, vesselPrefs.mooringRadius]);
 
   const handleRecenter = () => {
-    const pos = currentPos || (followedVessels?.find(v => v.isSharing)?.location ? { lat: followedVessels.find(v => v.isSharing)!.location.latitude, lng: followedVessels.find(v => v.isSharing)!.location.longitude } : null);
+    const pos = currentPos || (followedVessels?.find(v => v.isSharing && v.id === sharingId)?.location ? { lat: followedVessels.find(v => v.isSharing && v.id === sharingId)!.location!.latitude, lng: followedVessels.find(v => v.isSharing && v.id === sharingId)!.location!.longitude } : null);
     if (pos && map) { map.panTo(pos); map.setZoom(15); } else { shouldPanOnNextFix.current = true; }
   };
 
   const sendEmergencySms = (type: string) => {
-    const pos = currentPos || (followedVessels?.find(v => v.isSharing)?.location ? { lat: followedVessels.find(v => v.isSharing)!.location.latitude, lng: followedVessels.find(v => v.isSharing)!.location.longitude } : null);
+    const pos = currentPos || (followedVessels?.find(v => v.isSharing && v.id === sharingId)?.location ? { lat: followedVessels.find(v => v.isSharing && v.id === sharingId)!.location!.latitude, lng: followedVessels.find(v => v.isSharing && v.id === sharingId)!.location!.longitude } : null);
     if (!pos) { toast({ variant: "destructive", title: "GPS non verrouillé" }); return; }
     const posUrl = `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
     const body = `${vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : ""}${isCustomMessageEnabled ? vesselSmsMessage : "Assistance requise."} [${type}] Position : ${posUrl}`;
@@ -1018,7 +1040,7 @@ export default function VesselTrackerPage() {
                 </div>
 
                 <div className="grid gap-2">
-                    {followedVessels?.filter(v => v.groupId === fleetGroupId.toUpperCase() && v.id !== sharingId && !v.isPositionHidden && !v.isGhostMode).map(v => (
+                    {followedVessels?.filter(v => v.groupId === fleetGroupId.toUpperCase() && v.id !== sharingId && v.isSharing === true && !v.isPositionHidden && !v.isGhostMode).map(v => (
                         <div key={v.id} className="flex items-center justify-between p-3 border-2 border-blue-100 bg-blue-50/30 rounded-xl shadow-sm cursor-pointer active:scale-[0.98] transition-all" onClick={() => { if (v.location && map) { map.panTo({ lat: v.location.latitude, lng: v.location.longitude }); map.setZoom(15); } }}>
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-blue-600 text-white rounded-lg"><Navigation className="size-4" /></div>
@@ -1033,9 +1055,12 @@ export default function VesselTrackerPage() {
                             <BatteryIconComp level={v.batteryLevel} charging={v.isCharging} />
                         </div>
                     ))}
-                    {(!followedVessels || followedVessels.filter(v => v.groupId === fleetGroupId.toUpperCase() && v.id !== sharingId && !v.isPositionHidden && !v.isGhostMode).length === 0) && fleetGroupId && (
-                        <div className="text-center py-10 border-2 border-dashed rounded-xl opacity-30">
-                            <p className="text-[10px] font-black uppercase tracking-widest">Aucun autre navire visible</p>
+                    {(!followedVessels || followedVessels.filter(v => v.groupId === fleetGroupId.toUpperCase() && v.id !== sharingId && v.isSharing === true && !v.isPositionHidden && !v.isGhostMode).length === 0) && fleetGroupId && (
+                        <div className="text-center py-10 border-2 border-dashed rounded-xl opacity-30 flex flex-col items-center gap-2">
+                            <AlertCircle className="size-5 text-muted-foreground" />
+                            <p className="text-[10px] font-black uppercase tracking-widest leading-tight">
+                                Aucun navire actif dans le groupe {fleetGroupId.toUpperCase()}
+                            </p>
                         </div>
                     )}
                 </div>
@@ -1049,12 +1074,12 @@ export default function VesselTrackerPage() {
           <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
                 {followedVessels?.filter(v => {
                     // Émetteur A : Toujours voir son propre navire même en mode fantôme
-                    if (mode === 'sender' && v.id === sharingId && isSharing) return true;
+                    if (v.id === sharingId && isSharing) return true;
                     
                     // Récepteur B et Flotte C : Suivre les règles de masquage
                     return v.isSharing && !v.isGhostMode && (
-                        (mode === 'receiver' && !v.isPrivateHidden) || 
-                        (mode === 'fleet' && !v.isPositionHidden)
+                        (savedVesselIds.includes(v.id) && !v.isPrivateHidden) || 
+                        (v.groupId === fleetGroupId?.toUpperCase() && !v.isPositionHidden)
                     );
                 }).map(vessel => (
                     <React.Fragment key={vessel.id}>
