@@ -99,13 +99,20 @@ const BatteryIconComp = ({ level, charging, className }: { level?: number, charg
   return <BatteryFull {...props} className={cn(props.className, "text-green-600")} />;
 };
 
+const PulsingDot = () => (
+    <div className="absolute" style={{ transform: 'translate(-50%, -50%)' }}>
+      <div className="size-5 rounded-full bg-blue-500 opacity-75 animate-ping absolute"></div>
+      <div className="size-5 rounded-full bg-blue-500 border-2 border-white relative"></div>
+    </div>
+);
+
 export default function VesselTrackerPage() {
   const { user } = useUserHook();
   const firestore = useFirestore();
   const { toast } = useToast();
   const { isLoaded, loadError } = useGoogleMaps();
 
-  // --- ÉTATS DU COMPOSANT ---
+  // --- ÉTATS DU COMPOSANT (Remontés pour éviter ReferenceError) ---
   const [mode, setMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
   const [fleetGroupId, setFleetGroupId] = useState('');
@@ -253,11 +260,6 @@ export default function VesselTrackerPage() {
     }
   }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, vesselPrefs.repeatSettings, availableSounds]);
 
-  /**
-   * Envoi des données vers Firestore avec throttling pour éviter de saturer le réseau
-   * On envoie la position max toutes les 60s SI le statut ne change pas.
-   * On envoie INSTANTANÉMENT si le statut change.
-   */
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>, forceImmediate = false) => {
     if (!user || !firestore) return;
     const activeSharing = data.isSharing !== undefined ? data.isSharing : isSharingRef.current;
@@ -268,7 +270,6 @@ export default function VesselTrackerPage() {
     const statusChanged = newStatus !== lastSentStatusRef.current;
     const isManualTrigger = data.eventLabel && data.eventLabel.includes('FORCÉ');
 
-    // Throttling : Si même statut et pas forcé, on attend 60s entre deux points GPS
     if (!statusChanged && !forceImmediate && !isManualTrigger && (now - lastSentTimeRef.current < 60000)) {
         return;
     }
@@ -295,7 +296,6 @@ export default function VesselTrackerPage() {
             ...data 
         };
 
-        // Mise à jour du chrono de début de statut si changement réel
         if (data.isSharing === true || statusChanged) {
             updatePayload.statusChangedAt = serverTimestamp();
             lastSentStatusRef.current = newStatus;
@@ -495,10 +495,6 @@ export default function VesselTrackerPage() {
     });
   }, [followedVessels, mode, vesselPrefs, playVesselSound]);
 
-  /**
-   * ALGORITHME DE SURVEILLANCE GPS (ÉMETTEUR)
-   * Détection automatique : Mouvement vs Mouillage
-   */
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) return;
     
@@ -521,26 +517,22 @@ export default function VesselTrackerPage() {
         const currentStatus = vesselStatusRef.current;
         const currentAnchor = anchorPosRef.current;
 
-        // --- CAS 1 : MODES MANUELS (Priorité Absolue) ---
         if (currentStatus === 'returning' || currentStatus === 'landed' || currentStatus === 'emergency') {
             updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng } });
             return;
         }
 
-        // --- CAS 2 : INITIALISATION ANCRE ---
         if (!currentAnchor) {
             setAnchorPos(newPos);
             updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng }, status: 'moving' }, true);
             return;
         }
 
-        // --- CAS 3 : CALCUL DE LA DISTANCE PAR RAPPORT À L'ANCRE ---
         const dist = getDistance(newPos.lat, newPos.lng, currentAnchor.lat, currentAnchor.lng);
 
         if (dist > radius) {
-            // MOUVEMENT RÉEL DÉTECTÉ (SORTIE DU CERCLE)
             immobilityStartTime.current = null;
-            setAnchorPos(newPos); // On déplace l'ancre sur la nouvelle position
+            setAnchorPos(newPos);
             
             if (currentStatus !== 'moving') {
                 setVesselStatus('moving');
@@ -549,14 +541,11 @@ export default function VesselTrackerPage() {
                 updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng } });
             }
         } else {
-            // IMMOBILITÉ POTENTIELLE (DANS LE CERCLE)
             if (!immobilityStartTime.current) {
                 immobilityStartTime.current = Date.now();
-                // Feedback silencieux dans le journal pour confirmer la surveillance
                 updateVesselInFirestore({ eventLabel: 'ANALYSE IMMOBILITÉ...' }, false);
             }
 
-            // Seuil de confirmation : 20 secondes d'immobilité dans le cercle
             if (Date.now() - immobilityStartTime.current > 20000) {
                 if (currentStatus !== 'stationary') {
                     setVesselStatus('stationary');
@@ -565,7 +554,6 @@ export default function VesselTrackerPage() {
                     updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng } });
                 }
             } else {
-                // On met à jour la position sans changer le statut 'moving'
                 updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng } });
             }
         }
@@ -895,7 +883,7 @@ export default function VesselTrackerPage() {
         </CardContent>
       </Card>
 
-      <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all", isFullscreen && "fixed inset-0 z-[100] w-screen h-screen rounded-none")}>
+      <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all", isFullscreen && "fixed inset-0 z-[150] w-screen h-screen rounded-none")}>
         <div className={cn("relative bg-muted/20", isFullscreen ? "flex-grow" : "h-[350px]")}>
           <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
                 {followedVessels?.filter(v => v.isSharing && (v.id !== sharingId || mode !== 'sender')).map(vessel => (
