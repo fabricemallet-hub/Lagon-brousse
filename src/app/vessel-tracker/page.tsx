@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -45,7 +46,8 @@ import {
   Bird,
   AlertCircle,
   Clock,
-  EyeOff
+  EyeOff,
+  Sparkles
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -111,6 +113,9 @@ export default function VesselTrackerPage() {
   const watchIdRef = useRef<number | null>(null);
   const immobilityStartTime = useRef<number | null>(null);
   const isFirstFixRef = useRef<boolean>(true);
+
+  // Minuteur de décompte (30s)
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   useEffect(() => {
     vesselStatusRef.current = vesselStatus;
@@ -263,9 +268,10 @@ export default function VesselTrackerPage() {
     if (st === 'moving' || st === 'emergency') { 
         immobilityStartTime.current = null; 
         anchorPosRef.current = null; 
+        setCountdown(null);
     } else if (st === 'stationary') {
-        // On marque le point actuel comme ancre si on force le mouillage
         if (currentPosRef.current) anchorPosRef.current = currentPosRef.current;
+        setCountdown(null);
     }
     toast({ title: label || (st === 'emergency' ? 'ALERTE ASSISTANCE' : 'Statut mis à jour') });
   };
@@ -295,6 +301,7 @@ export default function VesselTrackerPage() {
       .then(() => {
         if (watchIdRef.current) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
         setCurrentPos(null); currentPosRef.current = null; anchorPosRef.current = null; lastSentStatusRef.current = null; isFirstFixRef.current = true; immobilityStartTime.current = null;
+        setCountdown(null);
         toast({ title: "Partage arrêté" });
       });
   };
@@ -335,12 +342,18 @@ export default function VesselTrackerPage() {
 
   // --- LOGIQUE DE SURVEILLANCE ACTIVE DES 30 SECONDES ---
   useEffect(() => {
-    if (mode !== 'sender' || !isSharing || !immobilityStartTime.current || vesselStatus !== 'moving') return;
+    if (mode !== 'sender' || !isSharing || !immobilityStartTime.current || vesselStatus !== 'moving') {
+        setCountdown(null);
+        return;
+    }
 
     const interval = setInterval(() => {
       const timeSinceStart = Date.now() - (immobilityStartTime.current || 0);
+      const remaining = Math.max(0, Math.ceil((30000 - timeSinceStart) / 1000));
       
-      // Si on a atteint 30s et qu'on est toujours en mode "moving" (LANCEMENT)
+      setCountdown(remaining);
+      
+      // Si on a atteint 30s et qu'on est toujours en mode "moving"
       if (timeSinceStart >= 30000) {
         if (currentPosRef.current && anchorPosRef.current) {
           const distFromAnchor = getDistance(currentPosRef.current.lat, currentPosRef.current.lng, anchorPosRef.current.lat, anchorPosRef.current.lng);
@@ -355,11 +368,11 @@ export default function VesselTrackerPage() {
             immobilityStartTime.current = Date.now();
           }
         } else if (anchorPosRef.current) {
-            // On a une ancre mais pas de nouveau fix GPS (Immobile parfait)
             handleManualStatus('stationary', 'AU MOUILLAGE (DÉTECTION AUTO)');
         }
+        setCountdown(null);
       }
-    }, 5000); // On vérifie toutes les 5s
+    }, 1000); // Mise à jour toutes les secondes pour le décompte
 
     return () => clearInterval(interval);
   }, [isSharing, mode, vesselStatus]);
@@ -420,8 +433,6 @@ export default function VesselTrackerPage() {
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         const newPos = { lat: position.coords.latitude, lng: position.coords.longitude };
-        const currentVesselStatus = vesselStatusRef.current;
-        
         setCurrentPos(newPos); currentPosRef.current = newPos; currentAccuracyRef.current = Math.round(position.coords.accuracy);
         if (shouldPanOnNextFix.current && map) { map.panTo(newPos); map.setZoom(15); shouldPanOnNextFix.current = false; }
         
@@ -440,8 +451,8 @@ export default function VesselTrackerPage() {
             
             const distFromAnchor = getDistance(newPos.lat, newPos.lng, anchorPosRef.current!.lat, anchorPosRef.current!.lng);
             
-            // Si on bouge de plus de 20m, on reset l'ancre et le timer de 30s
             if (distFromAnchor > IMMOBILITY_THRESHOLD_METERS) {
+                const currentVesselStatus = vesselStatusRef.current;
                 if (currentVesselStatus !== 'returning' && currentVesselStatus !== 'landed' && currentVesselStatus !== 'emergency') {
                     if (currentVesselStatus !== 'moving') {
                         setVesselStatus('moving');
@@ -504,6 +515,24 @@ export default function VesselTrackerPage() {
                             <h3 className="text-4xl font-black uppercase tracking-tighter">{sharingId}</h3>
                             <p className="text-xs font-bold opacity-80 mt-1 italic">{vesselNickname || 'Capitaine'}</p>
                         </div>
+
+                        {/* COMPTE À REBOURS DE QUALIFICATION */}
+                        {countdown !== null && countdown > 0 && (
+                            <div className="mt-6 p-4 bg-white/10 rounded-3xl border-2 border-white/20 flex flex-col items-center justify-center relative z-10 animate-in zoom-in-95">
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60 mb-1 flex items-center gap-2">
+                                    <RefreshCw className="size-3 animate-spin" /> Analyse du statut...
+                                </p>
+                                <p className="text-7xl font-black text-red-500 drop-shadow-[0_0_20px_rgba(239,68,68,0.9)] leading-none my-2 font-mono">
+                                    {countdown}
+                                </p>
+                                <div className="flex gap-1.5 mt-1">
+                                    <div className="size-1.5 rounded-full bg-red-500 animate-pulse" />
+                                    <div className="size-1.5 rounded-full bg-red-500 animate-pulse delay-150" />
+                                    <div className="size-1.5 rounded-full bg-red-500 animate-pulse delay-300" />
+                                </div>
+                            </div>
+                        )}
+
                         <div className="mt-6 flex items-center gap-2 relative z-10">
                             <Badge className="bg-white/20 border-white/30 text-white font-black uppercase text-[9px] h-6 px-3">ALERTE ACTIVE</Badge>
                             <span className="text-[10px] font-black uppercase tracking-widest text-white/70 flex items-center gap-1.5"><ShieldAlert className="size-3" /> ASSISTANCE</span>
