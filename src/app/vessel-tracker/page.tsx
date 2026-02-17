@@ -60,7 +60,7 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 
-const INITIAL_CENTER = { lat: -22.27, lng: 166.45 };
+const INITIAL_CENTER = { lat: -22.27, lng: 166.44 };
 const IMMOBILITY_THRESHOLD_METERS = 20; 
 
 const TACTICAL_TYPES = [
@@ -258,15 +258,23 @@ export default function VesselTrackerPage() {
   };
 
   const handleManualStatus = (st: VesselStatus['status'], label?: string) => {
-    setVesselStatus(st);
-    updateVesselInFirestore({ status: st, eventLabel: label || null });
+    const isDeactivating = vesselStatus === st;
+    const nextStatus = isDeactivating ? 'moving' : st;
+    const nextLabel = isDeactivating ? null : (label || null);
+
+    setVesselStatus(nextStatus);
+    updateVesselInFirestore({ status: nextStatus, eventLabel: nextLabel });
     
-    if (st === 'moving') {
+    if (nextStatus === 'moving') {
         immobilityStartTime.current = null;
         setAnchorPos(null);
     }
     
-    toast({ title: label || (st === 'returning' ? 'Retour Maison' : st === 'landed' ? 'À terre' : 'Mode Auto') });
+    toast({ 
+        title: isDeactivating 
+            ? "Mode Normal (Auto) Réactivé" 
+            : (label || (st === 'returning' ? 'Retour Maison' : st === 'landed' ? 'À terre' : st === 'emergency' ? 'Demande d\'assistance' : 'Mode Auto')) 
+    });
   };
 
   const handleTacticalSignal = (label: string) => {
@@ -599,21 +607,34 @@ export default function VesselTrackerPage() {
 
                     <Button 
                         variant="destructive" 
-                        className={cn("w-full h-16 text-lg font-black shadow-2xl border-4 uppercase tracking-tighter gap-3", 
+                        className={cn("w-full h-16 text-lg font-black shadow-2xl border-4 uppercase tracking-tighter gap-3 transition-all active:scale-95", 
                             vesselStatus === 'emergency' && "animate-pulse border-red-400 bg-red-700")} 
-                        onClick={() => handleManualStatus(vesselStatus === 'emergency' ? 'moving' : 'emergency', vesselStatus === 'emergency' ? 'ASSISTANCE ANNULÉE' : 'DEMANDE D\'ASSISTANCE')}
+                        onClick={() => handleManualStatus('emergency', 'DEMANDE D\'ASSISTANCE')}
                     >
-                        <ShieldAlert className="size-8" /> {vesselStatus === 'emergency' ? "ANNULER ASSISTANCE" : "DEMANDE D'ASSISTANCE"}
+                        <ShieldAlert className="size-8" /> 
+                        {vesselStatus === 'emergency' ? "ANNULER ASSISTANCE" : "DEMANDE D'ASSISTANCE"}
                     </Button>
 
                     <div className="bg-muted/20 p-4 rounded-2xl border-2 border-dashed space-y-3">
                         <p className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest flex items-center gap-2"><Zap className="size-3" /> Signalisation manuelle</p>
                         <div className="grid grid-cols-2 gap-2">
-                            <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatus('returning')} disabled={vesselStatus === 'returning'}>
-                                <Navigation className="size-4 text-blue-600" /> Retour Maison
+                            <Button 
+                                variant={vesselStatus === 'returning' ? 'default' : 'outline'} 
+                                className={cn("h-14 font-black uppercase text-[10px] border-2 transition-all active:scale-95 gap-2", 
+                                    vesselStatus === 'returning' ? "bg-blue-600 text-white border-blue-400" : "bg-background border-slate-200")} 
+                                onClick={() => handleManualStatus('returning')}
+                            >
+                                <Navigation className={cn("size-4", vesselStatus === 'returning' ? "text-white" : "text-blue-600")} /> 
+                                {vesselStatus === 'returning' ? "ANNULER RETOUR" : "Retour Maison"}
                             </Button>
-                            <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatus('landed')} disabled={vesselStatus === 'landed'}>
-                                <Home className="size-4 text-green-600" /> Home (À terre)
+                            <Button 
+                                variant={vesselStatus === 'landed' ? 'default' : 'outline'} 
+                                className={cn("h-14 font-black uppercase text-[10px] border-2 transition-all active:scale-95 gap-2", 
+                                    vesselStatus === 'landed' ? "bg-green-600 text-white border-green-400" : "bg-background border-slate-200")} 
+                                onClick={() => handleManualStatus('landed')}
+                            >
+                                <Home className={cn("size-4", vesselStatus === 'landed' ? "text-white" : "text-green-600")} /> 
+                                {vesselStatus === 'landed' ? "ANNULER HOME" : "Home (À terre)"}
                             </Button>
                         </div>
                     </div>
