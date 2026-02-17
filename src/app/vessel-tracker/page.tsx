@@ -51,7 +51,8 @@ import {
   Ruler,
   Bell,
   Fish,
-  Users
+  Users,
+  ChevronDown
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -115,13 +116,15 @@ export default function VesselTrackerPage() {
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const watchIdRef = useRef<number | null>(null);
-  const immobilityStartTime = useRef<number | null>(null);
   const isFirstFixRef = useRef<boolean>(true);
   const lastMinutePosRef = useRef<google.maps.LatLngLiteral | null>(null);
   const [secondsUntilUpdate, setSecondsUntilUpdate] = useState(60);
 
   const [isCatchDialogOpen, setIsCatchDialogOpen] = useState(false);
   const [locallyClearedMarkerIds, setLocallyClearedMarkerIds] = useState<string[]>([]);
+
+  // État pour l'historique local des identifiants
+  const [idHistory, setIdHistory] = useState<{ id: string, type: 'vessel' | 'group' }[]>([]);
 
   const [vesselPrefs, setVesselPrefs] = useState<NonNullable<UserAccount['vesselPrefs']>>({
     isNotifyEnabled: true,
@@ -139,7 +142,6 @@ export default function VesselTrackerPage() {
   const [history, setHistory] = useState<{ vesselId: string, vesselName: string, statusLabel: string, time: Date, pos: google.maps.LatLngLiteral, batteryLevel?: number, isCharging?: boolean, durationMinutes?: number }[]>([]);
   const lastStatusesRef = useRef<Record<string, string>>({});
   const lastUpdatesRef = useRef<Record<string, number>>({});
-  const lastSentStatusRef = useRef<string | null>(null);
   const lastClearTimesRef = useRef<Record<string, number>>({});
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
@@ -155,12 +157,10 @@ export default function VesselTrackerPage() {
   const vesselsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     
-    // Si on est en mode Flotte (C), on cherche par GroupID
     if (mode === 'fleet' && fleetGroupId) {
         return query(collection(firestore, 'vessels'), where('groupId', '==', fleetGroupId.trim().toUpperCase()));
     }
 
-    // Sinon (Émetteur ou Récepteur), on cherche par liste d'IDs
     const queryIds = [...savedVesselIds];
     if (isSharing && !queryIds.includes(sharingId)) {
         queryIds.push(sharingId);
@@ -205,6 +205,14 @@ export default function VesselTrackerPage() {
       audio.play().catch(() => {});
     }
   }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, availableSounds]);
+
+  // Charger l'historique local des IDs
+  useEffect(() => {
+    const saved = localStorage.getItem('lb_vessel_id_history');
+    if (saved) {
+        try { setIdHistory(JSON.parse(saved)); } catch (e) { console.error(e); }
+    }
+  }, []);
 
   useEffect(() => {
     if (userProfile) {
@@ -258,6 +266,85 @@ export default function VesselTrackerPage() {
     update();
   }, [user, firestore, isSharing, sharingId, vesselNickname, currentPos, vesselPrefs.mooringRadius, fleetGroupId, isGhostMode]);
 
+  const handleSaveVessel = () => {
+    if (!user || !firestore) return;
+    const cleanId = customSharingId.trim().toUpperCase();
+    const cleanGroupId = fleetGroupId.trim().toUpperCase();
+    
+    updateDoc(doc(firestore, 'users', user.uid), { 
+        lastVesselId: cleanId,
+        fleetGroupId: cleanGroupId,
+        vesselPrefs: vesselPrefs,
+        vesselSharingTarget: sharingTarget,
+        isGhostMode: isGhostMode,
+        vesselNickname: vesselNickname,
+        emergencyContact,
+        vesselSmsMessage,
+        isEmergencyEnabled,
+        isCustomMessageEnabled
+    }).then(() => { 
+        // Mise à jour de l'historique local
+        const newHistory = [...idHistory];
+        if (cleanId && !newHistory.some(h => h.id === cleanId && h.type === 'vessel')) {
+            newHistory.unshift({ id: cleanId, type: 'vessel' });
+        }
+        if (cleanGroupId && !newHistory.some(h => h.id === cleanGroupId && h.type === 'group')) {
+            newHistory.unshift({ id: cleanGroupId, type: 'group' });
+        }
+        const limitedHistory = newHistory.slice(0, 10);
+        setIdHistory(limitedHistory);
+        localStorage.setItem('lb_vessel_id_history', JSON.stringify(limitedHistory));
+
+        toast({ title: "Identifiants enregistrés" }); 
+    });
+  };
+
+  const handleRemoveIdFromHistory = (id: string, type: 'vessel' | 'group') => {
+    const updated = idHistory.filter(h => !(h.id === id && h.type === type));
+    setIdHistory(updated);
+    localStorage.setItem('lb_vessel_id_history', JSON.stringify(updated));
+  };
+
+  const handleStopSharing = () => {
+    if (!user || !firestore) return;
+    setIsSharing(false);
+    setSharingTarget('none');
+    setIsTargetMenuOpen(false);
+    const vesselRef = doc(firestore, 'vessels', sharingId);
+    setDoc(vesselRef, { isSharing: false, lastActive: serverTimestamp() }, { merge: true })
+      .then(() => {
+        if (watchIdRef.current) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
+        setCurrentPos(null); setAnchorPos(null); isFirstFixRef.current = true;
+        toast({ title: "Partage arrêté" });
+      });
+  };
+
+  const handleClearHistory = () => {
+    setHistory([]);
+    if (isSharing && firestore && user) {
+        updateDoc(doc(firestore, 'vessels', sharingId), { historyClearedAt: serverTimestamp() });
+    }
+    toast({ title: "Historique vidé" });
+  };
+
+  const handleClearHuntingHistory = () => {
+    if (!firestore || !user) return;
+    if (isSharing && mode === 'sender') {
+        updateDoc(doc(firestore, 'vessels', sharingId), {
+            huntingMarkers: []
+        }).then(() => toast({ title: "Signalements tactiques supprimés" }));
+    } else {
+        setLocallyClearedMarkerIds(prev => [...prev, ...tacticalMarkers.map(m => m.id)]);
+        toast({ title: "Journal tactique masqué" });
+    }
+  };
+
+  const saveVesselPrefs = (newPrefs: typeof vesselPrefs) => {
+    if (!user || !firestore) return;
+    setVesselPrefs(newPrefs);
+    updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: newPrefs }).catch(() => {});
+  };
+
   const handleSharingTargetChange = (target: 'none' | 'receiver' | 'fleet' | 'both') => {
     setSharingTarget(target);
     setIsTargetMenuOpen(false);
@@ -292,38 +379,10 @@ export default function VesselTrackerPage() {
   const handleManualStatus = (st: VesselStatus['status'], label?: string) => {
     setVesselStatus(st);
     if (st === 'moving') {
-        immobilityStartTime.current = Date.now();
         setAnchorPos(currentPos);
     }
     updateVesselInFirestore({ status: st, eventLabel: label || null });
     toast({ title: label || 'Statut mis à jour' });
-  };
-
-  const handleSaveVessel = () => {
-    if (!user || !firestore) return;
-    const cleanId = (vesselIdToFollow || customSharingId).trim().toUpperCase();
-    const cleanGroupId = fleetGroupId.trim().toUpperCase();
-    updateDoc(doc(firestore, 'users', user.uid), { 
-        savedVesselIds: cleanId ? arrayUnion(cleanId) : savedVesselIds, 
-        lastVesselId: cleanId || customSharingId,
-        fleetGroupId: cleanGroupId,
-        vesselPrefs: vesselPrefs,
-        vesselSharingTarget: sharingTarget,
-        isGhostMode: isGhostMode,
-        vesselNickname: vesselNickname,
-        emergencyContact,
-        vesselSmsMessage,
-        isEmergencyEnabled,
-        isCustomMessageEnabled
-    }).then(() => { 
-        if (vesselIdToFollow) setVesselIdToFollow(''); 
-        toast({ title: "Paramètres enregistrés" }); 
-    });
-  };
-
-  const handleRemoveSavedVessel = (id: string) => {
-    if (!user || !firestore) return;
-    updateDoc(doc(firestore, 'users', user.uid), { savedVesselIds: arrayRemove(id) }).then(() => toast({ title: "Navire retiré" }));
   };
 
   const handleSignalBirds = () => {
@@ -361,68 +420,6 @@ export default function VesselTrackerPage() {
     setIsCatchDialogOpen(false);
     toast({ title: "Prise signalée !" });
   };
-
-  const handleClearHuntingHistory = () => {
-    if (!firestore || !user) return;
-    if (isSharing && mode === 'sender') {
-        updateDoc(doc(firestore, 'vessels', sharingId), {
-            huntingMarkers: []
-        }).then(() => toast({ title: "Signalements tactiques supprimés" }));
-    } else {
-        setLocallyClearedMarkerIds(prev => [...prev, ...tacticalMarkers.map(m => m.id)]);
-        toast({ title: "Journal tactique masqué" });
-    }
-  };
-
-  const handleStopSharing = () => {
-    if (!user || !firestore) return;
-    setIsSharing(false);
-    setSharingTarget('none');
-    setIsTargetMenuOpen(false);
-    const vesselRef = doc(firestore, 'vessels', sharingId);
-    setDoc(vesselRef, { isSharing: false, lastActive: serverTimestamp() }, { merge: true })
-      .then(() => {
-        if (watchIdRef.current) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
-        setCurrentPos(null); setAnchorPos(null); lastSentStatusRef.current = null; isFirstFixRef.current = true;
-        toast({ title: "Partage arrêté" });
-      });
-  };
-
-  const handleClearHistory = () => {
-    setHistory([]);
-    if (isSharing && firestore && user) {
-        updateDoc(doc(firestore, 'vessels', sharingId), { historyClearedAt: serverTimestamp() });
-    }
-    toast({ title: "Historique vidé" });
-  };
-
-  const saveVesselPrefs = (newPrefs: typeof vesselPrefs) => {
-    if (!user || !firestore) return;
-    setVesselPrefs(newPrefs);
-    updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: newPrefs }).catch(() => {});
-  };
-
-  const sendEmergencySms = (type: string) => {
-    const pos = currentPos || (selfVesselData?.location ? { lat: selfVesselData.location.latitude, lng: selfVesselData.location.longitude } : null);
-    if (!pos) { toast({ variant: "destructive", title: "GPS non verrouillé" }); return; }
-    
-    if (isGhostMode) {
-        setIsGhostMode(false);
-        updateVesselInFirestore({ isGhostMode: false, status: 'emergency', eventLabel: 'DEMANDE D\'ASSISTANCE (MAYDAY)' });
-    }
-
-    const posUrl = `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
-    const body = `${vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : ""}${isCustomMessageEnabled ? vesselSmsMessage : "Assistance requise."} [${type}] Position : ${posUrl}`;
-    window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
-  };
-
-  const filteredHistory = useMemo(() => {
-    return history.filter(h => mode !== 'sender' || h.vesselId === sharingId);
-  }, [history, mode, sharingId]);
-
-  const filteredTactical = useMemo(() => {
-    return tacticalMarkers.filter(m => mode !== 'sender' || m.vesselId === sharingId);
-  }, [tacticalMarkers, mode, sharingId]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender') {
@@ -565,13 +562,27 @@ export default function VesselTrackerPage() {
     if (pos && map) { map.panTo(pos); map.setZoom(15); } else { shouldPanOnNextFix.current = true; }
   };
 
-  const handleDeleteMarker = (marker: any) => {
-    if (isSharing && marker.vesselId === sharingId) {
-        updateDoc(doc(firestore!, 'vessels', sharingId), { huntingMarkers: arrayRemove(marker) });
-    } else {
-        setLocallyClearedMarkerIds(prev => [...prev, marker.id]);
+  const sendEmergencySms = (type: string) => {
+    const pos = currentPos || (selfVesselData?.location ? { lat: selfVesselData.location.latitude, lng: selfVesselData.location.longitude } : null);
+    if (!pos) { toast({ variant: "destructive", title: "GPS non verrouillé" }); return; }
+    
+    if (isGhostMode) {
+        setIsGhostMode(false);
+        updateVesselInFirestore({ isGhostMode: false, status: 'emergency', eventLabel: 'DEMANDE D\'ASSISTANCE (MAYDAY)' });
     }
+
+    const posUrl = `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
+    const body = `${vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : ""}${isCustomMessageEnabled ? vesselSmsMessage : "Assistance requise."} [${type}] Position : ${posUrl}`;
+    window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
+
+  const filteredHistory = useMemo(() => {
+    return history.filter(h => mode !== 'sender' || h.vesselId === sharingId);
+  }, [history, mode, sharingId]);
+
+  const filteredTactical = useMemo(() => {
+    return tacticalMarkers.filter(m => mode !== 'sender' || m.vesselId === sharingId);
+  }, [tacticalMarkers, mode, sharingId]);
 
   const smsPreview = useMemo(() => {
     const nicknamePrefix = vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : "";
@@ -681,29 +692,65 @@ export default function VesselTrackerPage() {
 
                     <Accordion type="single" collapsible className="w-full">
                         <AccordionItem value="sender-prefs" className="border-none">
-                            <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
+                            <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/5 rounded-xl">
                                 <Settings className="size-4 text-primary" />
                                 <span className="text-[10px] font-black uppercase">Identité & Surnom</span>
                             </AccordionTrigger>
-                            <AccordionContent className="pt-4 space-y-4">
-                                <div className="space-y-1">
-                                    <Label className="text-[9px] font-black uppercase ml-1 opacity-60">ID du navire (Partage)</Label>
-                                    <div className="flex gap-2">
-                                        <Input placeholder="ID EX: BATEAU-1" value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest flex-grow" />
-                                        <Button variant="outline" size="icon" className="h-12 w-12 border-2 shrink-0" onClick={handleSaveVessel}>
-                                            <Save className="size-4" />
+                            <AccordionContent className="pt-4 space-y-6">
+                                <div className="space-y-4">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Surnom du capitaine / navire</Label>
+                                        <Input 
+                                            placeholder="EX: CAPITAINE NEMO" 
+                                            value={vesselNickname} 
+                                            onChange={e => setVesselNickname(e.target.value)} 
+                                            className="font-bold text-center h-12 border-2 uppercase w-full" 
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 gap-4 p-4 bg-primary/5 border-2 rounded-2xl border-dashed">
+                                        <div className="space-y-1.5">
+                                            <Label className="text-[9px] font-black uppercase text-primary ml-1">ID du navire (Partage)</Label>
+                                            <Input placeholder="ID EX: BATEAU-1" value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest bg-white" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-[9px] font-black uppercase text-blue-600 ml-1">ID du groupe Flotte (C)</Label>
+                                            <Input placeholder="ID EX: ABCD" value={fleetGroupId} onChange={e => setFleetGroupId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest bg-white" />
+                                        </div>
+                                        <Button onClick={handleSaveVessel} className="w-full h-14 font-black uppercase tracking-widest shadow-xl gap-2">
+                                            <Save className="size-5" /> Enregistrer mes identifiants
                                         </Button>
                                     </div>
+
+                                    {idHistory.length > 0 && (
+                                        <div className="space-y-2">
+                                            <p className="text-[9px] font-black uppercase text-muted-foreground ml-1">Identifiants récents</p>
+                                            <div className="grid gap-2">
+                                                {idHistory.map((item, idx) => (
+                                                    <div key={`${item.id}-${idx}`} className="flex items-center justify-between p-3 bg-white border rounded-xl shadow-sm">
+                                                        <button 
+                                                            className="flex-1 text-left flex items-center gap-2"
+                                                            onClick={() => {
+                                                                if (item.type === 'vessel') setCustomSharingId(item.id);
+                                                                else setFleetGroupId(item.id);
+                                                                toast({ title: "ID Sélectionné" });
+                                                            }}
+                                                        >
+                                                            <Badge variant="outline" className={cn("text-[7px] font-black uppercase h-4", item.type === 'vessel' ? "text-primary border-primary/20" : "text-blue-600 border-blue-200")}>
+                                                                {item.type === 'vessel' ? 'NAV' : 'GRP'}
+                                                            </Badge>
+                                                            <span className="font-black text-xs uppercase tracking-wider">{item.id}</span>
+                                                        </button>
+                                                        <Button variant="ghost" size="icon" className="size-8 text-destructive/40 hover:text-destructive" onClick={() => handleRemoveIdFromHistory(item.id, item.type)}>
+                                                            <Trash2 className="size-3.5" />
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                                <div className="space-y-1">
-                                    <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Surnom du capitaine / navire</Label>
-                                    <Input 
-                                        placeholder="EX: CAPITAINE NEMO" 
-                                        value={vesselNickname} 
-                                        onChange={e => setVesselNickname(e.target.value)} 
-                                        className="font-bold text-center h-12 border-2 uppercase flex-grow w-full" 
-                                    />
-                                </div>
+
                                 <Button variant={wakeLock ? "secondary" : "outline"} className="w-full h-12 font-black uppercase text-[10px] tracking-widest border-2 gap-2" onClick={toggleWakeLock}>
                                     <Zap className={cn("size-4", wakeLock && "fill-primary")} />
                                     {wakeLock ? "MODE ÉVEIL ACTIF" : "ACTIVER MODE ÉVEIL"}
@@ -758,7 +805,7 @@ export default function VesselTrackerPage() {
                     <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Suivre le navire ID</Label>
                     <div className="flex gap-2">
                         <Input placeholder="ENTREZ L'ID..." value={vesselIdToFollow} onChange={e => setVesselIdToFollow(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest" />
-                        <Button variant="default" className="h-12 px-4 font-black uppercase text-[10px] shrink-0" onClick={handleSaveVessel} disabled={!vesselIdToFollow.trim()}><Check className="size-4" /></Button>
+                        <Button variant="default" className="h-12 px-4 font-black uppercase text-[10px] shrink-0" onClick={() => { handleSaveVessel(); setVesselIdToFollow(''); }} disabled={!vesselIdToFollow.trim()}><Check className="size-4" /></Button>
                     </div>
                 </div>
                 {savedVesselIds.length > 0 && (
@@ -802,7 +849,7 @@ export default function VesselTrackerPage() {
 
           <Accordion type="single" collapsible className="w-full">
             <AccordionItem value="sound-prefs" className="border-none">
-              <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
+              <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/5 rounded-xl">
                 <Bell className="size-4 text-primary" />
                 <span className="text-[10px] font-black uppercase">Notifications Sonores</span>
               </AccordionTrigger>
@@ -824,7 +871,7 @@ export default function VesselTrackerPage() {
                     <div className="grid gap-3">
                       {['moving', 'stationary', 'offline', 'emergency'].map(key => (
                         <div key={key} className="flex items-center justify-between gap-2">
-                          <span className="text-[9px] font-bold uppercase flex-1">{key === 'moving' ? 'Mouvement' : key === 'stationary' ? 'Mouillage' : key === 'offline' ? 'Signal Perdu' : 'Urgence'}</span>
+                          <span className="text-[10px] font-bold uppercase flex-1">{key === 'moving' ? 'Mouvement' : key === 'stationary' ? 'Mouillage' : key === 'offline' ? 'Signal Perdu' : 'Urgence'}</span>
                           <Select value={vesselPrefs.notifySounds[key as keyof typeof vesselPrefs.notifySounds]} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, notifySounds: { ...vesselPrefs.notifySounds, [key]: v } })}>
                             <SelectTrigger className="h-8 text-[9px] font-black uppercase w-32 bg-muted/30"><SelectValue placeholder="Son..." /></SelectTrigger>
                             <SelectContent>
@@ -972,7 +1019,7 @@ export default function VesselTrackerPage() {
                                                 <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase border-2 px-3 gap-2" onClick={() => { map?.panTo({ lat: m.lat, lng: m.lng }); map?.setZoom(17); }}>
                                                     <LocateFixed className="size-3 text-primary" /> GPS
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive border-2" onClick={() => handleDeleteMarker(m)}><Trash2 className="size-3.5" /></Button>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive border-2" onClick={() => handleRemoveSavedVessel(m.id)}><Trash2 className="size-3.5" /></Button>
                                             </div>
                                         </div>
                                     )) : <div className="text-center py-6 opacity-20 uppercase text-[9px] font-black italic">Aucun signal tactique</div>}
