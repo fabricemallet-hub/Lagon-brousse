@@ -117,7 +117,7 @@ export default function VesselTrackerPage() {
   const { toast } = useToast();
   const { isLoaded, loadError } = useGoogleMaps();
 
-  const [mode, setMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
+  const [mode, setMode] = useState<'sender' | 'receiver' | 'fleet' | 'both'>('sender');
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
   
   const [isSharing, setIsSharing] = useState(false);
@@ -156,6 +156,7 @@ export default function VesselTrackerPage() {
 
   const lastStatusesRef = useRef<Record<string, string>>({});
   const lastUpdatesRef = useRef<Record<string, number>>({});
+  const lastHistoryMinutesRef = useRef<Record<string, number>>({});
   const lastTacticalUpdatesRef = useRef<Record<string, number>>({});
   const lastSentStatusRef = useRef<string | null>(null);
   const lastBatteryLevelsRef = useRef<Record<string, number>>({});
@@ -437,9 +438,8 @@ export default function VesselTrackerPage() {
         const lastStatus = lastStatusesRef.current[vessel.id];
         const lastUpdate = lastUpdatesRef.current[vessel.id] || 0;
         const lastBattery = lastBatteryLevelsRef.current[vessel.id] ?? 100;
+        const lastHistMin = lastHistoryMinutesRef.current[vessel.id] ?? -1;
         
-        const statusChanged = lastStatus !== currentStatus;
-        const timestampUpdated = timeKey > lastUpdate;
         const pos = { 
             lat: vessel.location?.latitude || INITIAL_CENTER.lat, 
             lng: vessel.location?.longitude || INITIAL_CENTER.lng 
@@ -454,13 +454,21 @@ export default function VesselTrackerPage() {
             emergency: 'DEMANDE D\'ASSISTANCE'
         };
 
-        if (statusChanged || (timestampUpdated && !vessel.eventLabel)) {
+        const statusStart = getTimeMillis(vessel.statusChangedAt || vessel.lastActive);
+        const durationMin = statusStart > 0 ? Math.floor((Date.now() - statusStart) / 60000) : 0;
+
+        const statusChanged = lastStatus !== currentStatus;
+        const timestampUpdated = timeKey > lastUpdate;
+        const minutePassed = durationMin > lastHistMin;
+
+        if (statusChanged || (minutePassed && isSharingActive) || (timestampUpdated && !vessel.eventLabel && statusChanged)) {
             const label = statusLabels[currentStatus] || currentStatus;
-            const statusStart = getTimeMillis(vessel.statusChangedAt || vessel.lastActive);
-            const durationMin = Math.floor((Date.now() - statusStart) / 60000);
 
             setTechHistory(prev => {
-                const alreadyAdded = prev.length > 0 && prev[0].statusLabel === label && prev[0].vesselName === (vessel.displayName || vessel.id) && Math.abs(prev[0].time.getTime() - Date.now()) < 2000;
+                const alreadyAdded = prev.length > 0 && 
+                                   prev[0].statusLabel === label && 
+                                   prev[0].vesselName === (vessel.displayName || vessel.id) && 
+                                   Math.abs(prev[0].time.getTime() - Date.now()) < 5000;
                 if (alreadyAdded) return prev;
                 return [{ 
                     vesselName: vessel.displayName || vessel.id, 
@@ -482,6 +490,7 @@ export default function VesselTrackerPage() {
             }
             lastStatusesRef.current[vessel.id] = currentStatus;
             lastUpdatesRef.current[vessel.id] = timeKey;
+            lastHistoryMinutesRef.current[vessel.id] = durationMin;
         }
 
         const batteryDropped = lastBattery >= (vesselPrefs.batteryThreshold || 20) && currentBattery < (vesselPrefs.batteryThreshold || 20);
@@ -551,6 +560,16 @@ export default function VesselTrackerPage() {
     );
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
   }, [isSharing, mode, anchorPos, updateVesselInFirestore, map, toast, vesselStatus, vesselPrefs.mooringRadius]);
+
+  // Intervalle de mise à jour forcée pour l'émetteur (toutes les minutes)
+  useEffect(() => {
+    if (!isSharing || mode !== 'sender') return;
+    const interval = setInterval(() => {
+      // Force la MAJ Firestore pour faire tourner le temps "Actif x min" même à l'arrêt
+      updateVesselInFirestore({}); 
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [isSharing, mode, updateVesselInFirestore]);
 
   const toggleWakeLock = async () => {
     if (!('wakeLock' in navigator)) return;
@@ -829,7 +848,7 @@ export default function VesselTrackerPage() {
                     <AccordionContent className="pt-4 space-y-4">
                         <div className="space-y-1">
                             <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Surnom du capitaine / navire</Label>
-                            <Input placeholder="EX: CAPITAINE NEMO" value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} className="font-bold h-12 border-2 uppercase" />
+                            <Input placeholder="EX: CAPITAINE NEMO" value={vesselNickname} onChange={e => setNickname(e.target.value)} className="font-bold h-12 border-2 uppercase" />
                         </div>
                         <div className="space-y-1">
                             <Label className="text-[9px] font-black uppercase ml-1 opacity-60">ID du navire (Partage)</Label>
@@ -1071,24 +1090,26 @@ export default function VesselTrackerPage() {
                             <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide px-3">
                                 {techHistory.map((h, i) => (
                                     <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm">
-                                        <div className="flex flex-col gap-0.5">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-black text-primary uppercase">{h.vesselName}</span>
-                                                <div className="flex flex-col">
-                                                    <span className={cn("font-black uppercase", 
+                                        <div className="flex flex-col gap-1.5">
+                                            <div className="flex items-center gap-4">
+                                                <span className="font-black text-primary uppercase text-[10px] leading-none">{h.vesselName}</span>
+                                                <div className="flex flex-col gap-0.5">
+                                                    <span className={cn("font-black uppercase text-[10px] leading-none", 
                                                         h.statusLabel.includes('ASSISTANCE') ? 'text-red-600' :
-                                                        h.statusLabel.includes('MOUVEMENT') ? 'text-blue-600' : 'text-slate-500')}>
+                                                        h.statusLabel.includes('MOUVEMENT') ? 'text-blue-600' : 'text-slate-800')}>
                                                         {h.statusLabel}
                                                     </span>
                                                     {h.statusDurationMin !== undefined && (
-                                                        <span className="text-[8px] font-black text-primary uppercase">ACTIF {h.statusDurationMin} MIN</span>
+                                                        <span className="text-[8px] font-black text-primary uppercase leading-none">ACTIF {h.statusDurationMin} MIN</span>
                                                     )}
                                                 </div>
-                                                <span className={cn("flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-black border", h.isCharging ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-slate-50 text-slate-500 border-slate-200")}>
-                                                    {h.isCharging && <Zap className="size-2.5 fill-current" />}{h.batteryLevel}%
-                                                </span>
+                                                {h.batteryLevel !== undefined && (
+                                                    <span className={cn("flex items-center gap-1 px-1.5 py-1 rounded-md text-[8px] font-black border shadow-sm", h.isCharging ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-slate-50 text-slate-500 border-slate-200")}>
+                                                        <BatteryIconComp level={h.batteryLevel} charging={h.isCharging} className="size-2.5" />{h.batteryLevel}%
+                                                    </span>
+                                                )}
                                             </div>
-                                            <div className="flex items-center gap-2 font-bold opacity-40">
+                                            <div className="flex items-center gap-2 font-bold text-muted-foreground/60 uppercase text-[9px]">
                                                 <span>{format(h.time, 'HH:mm:ss')}</span>
                                                 {h.accuracy !== undefined && <span>• +/- {h.accuracy}m</span>}
                                             </div>
