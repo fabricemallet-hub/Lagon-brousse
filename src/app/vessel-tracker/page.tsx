@@ -197,11 +197,14 @@ export default function VesselTrackerPage() {
 
   const playVesselSound = useCallback((soundId: string) => {
     if (!vesselPrefs.isNotifyEnabled) return;
-    const sound = availableSounds.find(s => s.id === soundId || s.label === soundId);
+    // Fallback: If empty, try 'sonar' or the first available sound
+    const targetSound = soundId || 'sonar';
+    const sound = availableSounds.find(s => s.id === targetSound || s.label.toLowerCase() === targetSound.toLowerCase());
+    
     if (sound) {
       const audio = new Audio(sound.url);
       audio.volume = vesselPrefs.vesselVolume;
-      audio.play().catch(() => {});
+      audio.play().catch(e => console.warn("Audio play blocked or failed:", e));
     }
   }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, availableSounds]);
 
@@ -306,6 +309,9 @@ export default function VesselTrackerPage() {
     setVesselStatus(nextStatus);
     updateVesselInFirestore({ status: nextStatus, eventLabel: nextLabel });
     
+    // Play feedback sound for the sender
+    playVesselSound('sonar');
+
     if (nextStatus === 'moving') {
         immobilityStartTime.current = null;
         setAnchorPos(null);
@@ -482,7 +488,9 @@ export default function VesselTrackerPage() {
                 }, ...prev].slice(0, 50);
             });
             
-            if (mode !== 'sender' && lastStatus && statusChanged && vesselPrefs.isNotifyEnabled) {
+            // Notification logic: If it's a different boat or we are a receiver, play sound
+            // Skip sound for our own boat ONLY if we just triggered it manually
+            if (lastStatus && statusChanged && vesselPrefs.isNotifyEnabled) {
                 const soundKey = (currentStatus === 'returning' || currentStatus === 'landed') ? 'moving' : currentStatus;
                 if (vesselPrefs.notifySettings[soundKey as keyof typeof vesselPrefs.notifySettings]) {
                     playVesselSound(vesselPrefs.notifySounds[soundKey as keyof typeof vesselPrefs.notifySounds] || 'sonar');
@@ -495,13 +503,13 @@ export default function VesselTrackerPage() {
 
         const batteryDropped = lastBattery >= (vesselPrefs.batteryThreshold || 20) && currentBattery < (vesselPrefs.batteryThreshold || 20);
         if (batteryDropped && vesselPrefs.notifySettings.battery) {
-            if (mode !== 'sender' && vesselPrefs.isNotifyEnabled) playVesselSound('alerte');
+            if (vesselPrefs.isNotifyEnabled) playVesselSound('alerte');
         }
 
         lastBatteryLevelsRef.current[vessel.id] = currentBattery;
         lastChargingStatesRef.current[vessel.id] = currentCharging;
     });
-  }, [followedVessels, mode, vesselPrefs, playVesselSound]);
+  }, [followedVessels, vesselPrefs, playVesselSound]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
@@ -628,7 +636,6 @@ export default function VesselTrackerPage() {
             <Slider value={[vesselPrefs.vesselVolume * 100]} max={100} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, vesselVolume: v[0] / 100 })} />
         </div>
 
-        {/* VEILLE STRATÉGIQUE SECTION */}
         <div className="space-y-4 p-4 border-2 rounded-2xl bg-orange-50/30 border-orange-100 shadow-sm">
             <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
@@ -683,13 +690,9 @@ export default function VesselTrackerPage() {
                         </Button>
                     </div>
                 </div>
-                <p className="text-[8px] font-bold text-orange-800/40 italic leading-tight text-center">
-                    Note : l'alarme de veille jouera en boucle jusqu'à validation manuelle de votre part.
-                </p>
             </div>
         </div>
 
-        {/* BATTERIE FAIBLE SECTION */}
         <div className="space-y-4 p-4 border-2 rounded-2xl bg-red-50/30 border-red-100 shadow-sm">
             <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
@@ -870,9 +873,6 @@ export default function VesselTrackerPage() {
                                 step={5} 
                                 onValueChange={v => saveVesselPrefs({ ...vesselPrefs, mooringRadius: v[0] })} 
                             />
-                            <p className="text-[8px] font-bold text-muted-foreground px-1 leading-tight italic">
-                                Ajustez le rayon pour affiner la détection automatique de l'immobilité.
-                            </p>
                         </div>
 
                         {vesselIdHistory.length > 0 && (
@@ -985,7 +985,6 @@ export default function VesselTrackerPage() {
           <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
                 {followedVessels?.filter(v => v.isSharing).map(vessel => (
                     <React.Fragment key={`vessel-group-${vessel.id}`}>
-                        {/* Cercle de mouillage pour le navire suivi */}
                         {vessel.status === 'stationary' && vessel.anchorLocation && (
                             <Circle
                                 center={{ lat: vessel.anchorLocation.latitude, lng: vessel.anchorLocation.longitude }}
@@ -1003,7 +1002,6 @@ export default function VesselTrackerPage() {
                             />
                         )}
 
-                        {/* Marqueurs tactiques fixes pour ce navire */}
                         {vessel.huntingMarkers?.map(marker => {
                             const type = TACTICAL_TYPES.find(t => t.label === marker.label);
                             const Icon = type?.icon || Fish;
@@ -1021,7 +1019,6 @@ export default function VesselTrackerPage() {
                             );
                         })}
 
-                        {/* Position actuelle du navire */}
                         <OverlayView position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                             <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 relative">
                                 <div className={cn("px-2 py-1 text-white rounded text-[10px] font-black shadow-lg border whitespace-nowrap flex items-center gap-2", 
@@ -1047,7 +1044,6 @@ export default function VesselTrackerPage() {
                     </React.Fragment>
                 ))}
 
-                {/* Cercle de mouillage pour l'émetteur actuel */}
                 {mode === 'sender' && vesselStatus === 'stationary' && anchorPos && (
                     <Circle
                         center={anchorPos}
