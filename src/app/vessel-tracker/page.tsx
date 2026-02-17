@@ -61,6 +61,7 @@ import { fr } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
+import { locations } from '@/lib/locations';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -89,19 +90,6 @@ const PulsingDot = () => (
       <div className="size-5 rounded-full bg-blue-500 border-2 border-white relative"></div>
     </div>
 );
-
-const getClosestCommune = (lat: number, lng: number) => {
-    let closestName = 'Inconnue';
-    let minDistance = Infinity;
-    Object.entries(locations).forEach(([name, coords]) => {
-        const dist = getDistance(lat, lng, coords.lat, coords.lon);
-        if (dist < minDistance) {
-            minDistance = dist;
-            closestName = name;
-        }
-    });
-    return closestName;
-};
 
 interface TechEntry {
     vesselName: string;
@@ -320,10 +308,9 @@ export default function VesselTrackerPage() {
         setAnchorPos(null);
     }
     
+    const labelTitle = label || (st === 'returning' ? 'Retour Maison' : st === 'landed' ? 'À terre' : st === 'emergency' ? 'Demande d\'assistance' : 'Mode Auto');
     toast({ 
-        title: isDeactivating 
-            ? "Mode Normal (Auto) Réactivé" 
-            : (label || (st === 'returning' ? 'Retour Maison' : st === 'landed' ? 'À terre' : st === 'emergency' ? 'Demande d\'assistance' : 'Mode Auto')) 
+        title: isDeactivating ? "Mode Normal (Auto) Réactivé" : labelTitle
     });
   };
 
@@ -600,6 +587,14 @@ export default function VesselTrackerPage() {
     return `${nicknamePrefix}${customText} [MAYDAY] à ${timeStr}. Position${accuracyStr} : https://www.google.com/maps?q=-22.27,166.45`;
   }, [vesselSmsMessage, isCustomMessageEnabled, vesselNickname, userAccuracy]);
 
+  const activeVesselInfo = useMemo(() => {
+    const v = followedVessels?.find(v => v.id === sharingId);
+    if (!v) return null;
+    const statusStart = v.statusChangedAt ? (typeof v.statusChangedAt.toMillis === 'function' ? v.statusChangedAt.toMillis() : v.statusChangedAt.seconds * 1000) : 0;
+    const duration = statusStart > 0 ? Math.floor((Date.now() - statusStart) / 60000) : 0;
+    return { ...v, durationMin: duration };
+  }, [followedVessels, sharingId]);
+
   const NotificationSettingsUI = () => (
     <div className="space-y-4 p-4 border-2 rounded-2xl bg-card shadow-inner">
         <div className="flex items-center justify-between border-b border-dashed pb-3">
@@ -666,12 +661,19 @@ export default function VesselTrackerPage() {
                             <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">{sharingId}</h3>
                             <p className="text-xs font-bold opacity-80 mt-1 italic">{vesselNickname || 'Capitaine'}</p>
                         </div>
-                        <div className="mt-8 flex items-center gap-3 relative z-10">
-                            <Badge variant="outline" className="bg-green-500/30 border-green-200 text-white font-black text-[10px] px-3 h-6 animate-pulse">EN LIGNE</Badge>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-white/80 flex items-center gap-2">
-                                {vesselStatus === 'moving' ? <Move className="size-3" /> : vesselStatus === 'returning' ? <Navigation className="size-3" /> : vesselStatus === 'landed' ? <Home className="size-3" /> : vesselStatus === 'emergency' ? <ShieldAlert className="size-3" /> : <Anchor className="size-3" />}
-                                {vesselStatus === 'moving' ? 'En mouvement' : vesselStatus === 'returning' ? 'Retour Maison' : vesselStatus === 'landed' ? 'À terre' : vesselStatus === 'emergency' ? 'EN DÉTRESSE' : 'Au mouillage'}
-                            </span>
+                        <div className="mt-8 space-y-3 relative z-10">
+                            <div className="flex items-center gap-3">
+                                <Badge variant="outline" className="bg-green-500/30 border-green-200 text-white font-black text-[10px] px-3 h-6 animate-pulse">EN LIGNE</Badge>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-white/80 flex items-center gap-2">
+                                    {vesselStatus === 'moving' ? <Move className="size-3" /> : vesselStatus === 'returning' ? <Navigation className="size-3" /> : vesselStatus === 'landed' ? <Home className="size-3" /> : vesselStatus === 'emergency' ? <ShieldAlert className="size-3" /> : <Anchor className="size-3" />}
+                                    {vesselStatus === 'moving' ? 'En mouvement' : vesselStatus === 'returning' ? 'Retour Maison' : vesselStatus === 'landed' ? 'À terre' : vesselStatus === 'emergency' ? 'EN DÉTRESSE' : 'Au mouillage'}
+                                </span>
+                            </div>
+                            {activeVesselInfo && (
+                                <div className="flex flex-col pl-1">
+                                    <span className="text-[10px] font-black uppercase text-blue-200">ACTIF {activeVesselInfo.durationMin} MIN</span>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -1001,7 +1003,7 @@ export default function VesselTrackerPage() {
                                                         h.statusLabel.includes('MOUVEMENT') ? 'text-blue-600' : 'text-slate-500')}>
                                                         {h.statusLabel}
                                                     </span>
-                                                    {h.statusDurationMin !== undefined && h.statusDurationMin > 0 && (
+                                                    {h.statusDurationMin !== undefined && (
                                                         <span className="text-[8px] font-black text-primary uppercase">ACTIF {h.statusDurationMin} MIN</span>
                                                     )}
                                                 </div>
