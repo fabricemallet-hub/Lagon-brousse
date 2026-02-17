@@ -253,9 +253,19 @@ export default function VesselTrackerPage() {
   };
 
   const handleManualStatus = (st: VesselStatus['status'], label?: string) => {
-    setVesselStatus(st);
-    updateVesselInFirestore({ status: st, eventLabel: label || null });
-    if (st === 'moving' || st === 'emergency') { immobilityStartTime.current = null; anchorPosRef.current = null; }
+    if (label === 'ERREUR - REPRISE MODE AUTO') {
+        isFirstFixRef.current = true;
+        setVesselStatus('moving');
+        updateVesselInFirestore({ status: 'moving', eventLabel: label });
+    } else {
+        setVesselStatus(st);
+        updateVesselInFirestore({ status: st, eventLabel: label || null });
+    }
+    
+    if (st === 'moving' || st === 'emergency') { 
+        immobilityStartTime.current = null; 
+        anchorPosRef.current = null; 
+    }
     toast({ title: label || (st === 'emergency' ? 'ALERTE ASSISTANCE' : 'Statut mis à jour') });
   };
 
@@ -367,7 +377,7 @@ export default function VesselTrackerPage() {
         }
     });
     if (newEntries.length > 0) setHistory(prev => [...newEntries, ...prev].slice(0, 50));
-  }, [followedVessels, mode, vesselPrefs, playVesselSound]);
+  }, [followedVessels, mode, vesselPrefs, playVesselSound, labels]);
 
   useEffect(() => {
     const shouldRunGps = (mode === 'sender' && isSharing) || (mode === 'receiver' && isReceiverGpsActive);
@@ -388,32 +398,41 @@ export default function VesselTrackerPage() {
                 anchorPosRef.current = newPos; 
                 immobilityStartTime.current = Date.now();
                 isFirstFixRef.current = false; 
-                updateVesselInFirestore({ status: 'moving', isSharing: true });
+                updateVesselInFirestore({ 
+                    status: 'moving', 
+                    isSharing: true, 
+                    eventLabel: 'LANCEMENT EN COURS' 
+                });
                 return; 
             }
             
-            const dist = getDistance(newPos.lat, newPos.lng, anchorPosRef.current!.lat, anchorPosRef.current!.lng);
+            const timeSinceStart = Date.now() - (immobilityStartTime.current || 0);
+            const distFromAnchor = getDistance(newPos.lat, newPos.lng, anchorPosRef.current!.lat, anchorPosRef.current!.lng);
             
-            if (dist > IMMOBILITY_THRESHOLD_METERS) {
-                // On a bougé de plus de 20m par rapport au point de référence
-                if (currentVesselStatus !== 'returning' && currentVesselStatus !== 'landed' && currentVesselStatus !== 'emergency') {
-                    setVesselStatus('moving');
-                    updateVesselInFirestore({ status: 'moving' });
-                }
-                anchorPosRef.current = newPos;
-                immobilityStartTime.current = Date.now(); // On relance le chrono de 30s
-            } else {
-                // On est toujours dans la zone des 20m
-                const idleTime = Date.now() - (immobilityStartTime.current || Date.now());
-                if (idleTime > 30000) {
-                    // Ça fait plus de 30s qu'on n'a pas bougé de plus de 20m
-                    if (currentVesselStatus !== 'stationary' && currentVesselStatus !== 'returning' && currentVesselStatus !== 'landed' && currentVesselStatus !== 'emergency') {
-                        setVesselStatus('stationary');
-                        updateVesselInFirestore({ status: 'stationary' });
+            if (currentVesselStatus !== 'returning' && currentVesselStatus !== 'landed' && currentVesselStatus !== 'emergency') {
+                if (timeSinceStart >= 30000) {
+                    if (distFromAnchor > IMMOBILITY_THRESHOLD_METERS) {
+                        if (currentVesselStatus !== 'moving') {
+                            setVesselStatus('moving');
+                            updateVesselInFirestore({ status: 'moving' });
+                        }
+                        anchorPosRef.current = newPos;
+                        immobilityStartTime.current = Date.now();
+                    } else {
+                        if (currentVesselStatus !== 'stationary') {
+                            setVesselStatus('stationary');
+                            updateVesselInFirestore({ status: 'stationary' });
+                        }
                     }
+                } else if (distFromAnchor > IMMOBILITY_THRESHOLD_METERS) {
+                    if (currentVesselStatus !== 'moving') {
+                        setVesselStatus('moving');
+                        updateVesselInFirestore({ status: 'moving' });
+                    }
+                    anchorPosRef.current = newPos;
+                    immobilityStartTime.current = Date.now();
                 }
             }
-            // Mise à jour régulière de la position
             updateVesselInFirestore({});
         }
       },
@@ -835,7 +854,14 @@ export default function VesselTrackerPage() {
                                 vessel.status === 'returning' ? "bg-indigo-600 border-indigo-400" :
                                 "bg-slate-900/90 border-white/20")}>
                               <span>{vessel.displayName || vessel.id}</span>
-                              <span className="text-[8px] border-l pl-2 border-white/20">
+                              <span className={cn(
+                                "text-[8px] font-black border-l pl-2 border-white/20",
+                                vessel.status === 'emergency' ? "text-red-200" : 
+                                vessel.status === 'landed' ? "text-green-200" :
+                                vessel.status === 'stationary' ? "text-amber-200" :
+                                vessel.status === 'returning' ? "text-indigo-200" :
+                                "text-blue-200"
+                              )}>
                                 {vessel.status === 'emergency' ? 'SOS' : 
                                  vessel.status === 'moving' ? 'MOUV' : 
                                  vessel.status === 'stationary' ? 'MOUIL' : 
@@ -903,6 +929,7 @@ export default function VesselTrackerPage() {
                                         h.statusLabel.includes('MOUILLAGE') ? 'text-amber-600' :
                                         h.statusLabel.includes('RETOUR') ? 'text-indigo-600' :
                                         h.statusLabel.includes('TERRE') ? 'text-green-600' :
+                                        h.statusLabel.includes('LANCEMENT') ? 'text-blue-400 animate-pulse' :
                                         'text-primary'
                                     )}>{h.vesselName} - {h.statusLabel}</span>
                                     <span className="text-[8px] font-bold opacity-40 uppercase">{format(h.time, 'HH:mm:ss')} {h.accuracy ? `• +/-${h.accuracy}m` : ''}</span>
