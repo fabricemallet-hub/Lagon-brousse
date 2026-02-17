@@ -62,7 +62,7 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 
-const INITIAL_CENTER = { lat: -22.27, lng: 166.44 };
+const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
 const TACTICAL_TYPES = [
     { id: 'oiseaux', label: 'OISEAUX', icon: Bird, color: 'bg-white text-blue-600 border-blue-600' },
@@ -89,6 +89,19 @@ const PulsingDot = () => (
       <div className="size-5 rounded-full bg-blue-500 border-2 border-white relative"></div>
     </div>
 );
+
+const getClosestCommune = (lat: number, lng: number) => {
+    let closestName = 'Inconnue';
+    let minDistance = Infinity;
+    Object.entries(locations).forEach(([name, coords]) => {
+        const dist = getDistance(lat, lng, coords.lat, coords.lon);
+        if (dist < minDistance) {
+            minDistance = dist;
+            closestName = name;
+        }
+    });
+    return closestName;
+};
 
 interface TechEntry {
     vesselName: string;
@@ -490,7 +503,7 @@ export default function VesselTrackerPage() {
         lastBatteryLevelsRef.current[vessel.id] = currentBattery;
         lastChargingStatesRef.current[vessel.id] = currentCharging;
     });
-  }, [followedVessels, mode, vesselPrefs, playVesselSound, labels]);
+  }, [followedVessels, mode, vesselPrefs, playVesselSound]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
@@ -821,7 +834,7 @@ export default function VesselTrackerPage() {
               <div className="space-y-1">
                 <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Suivre le navire ID</Label>
                 <div className="flex gap-2">
-                    <Input placeholder="ENTREZ L'ID..." value={vesselIdToFollow} onChange={e => setVesselIdToFollow(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest flex-1" />
+                    <Input placeholder="ID EX: BATEAU-1" value={vesselIdToFollow} onChange={e => setVesselIdToFollow(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest flex-1" />
                     <Button variant="default" className="h-12 px-4 font-black uppercase text-[10px]" onClick={handleSaveVessel} disabled={!vesselIdToFollow.trim()}><Check className="size-4" /></Button>
                 </div>
               </div>
