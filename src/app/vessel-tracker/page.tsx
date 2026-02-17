@@ -52,7 +52,9 @@ import {
   Bird,
   Fish,
   Flame,
-  ChevronDown
+  ChevronDown,
+  Users,
+  Ship
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -93,7 +95,7 @@ const tacticalIcons: Record<string, any> = {
 const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
   if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
   const props = { className: cn("size-4", className) };
-  if (charging) return <BatteryCharging {...props} className={cn(props.className, "text-blue-500")} />;
+  if (charging) return <BatteryCharging {...props} className={cn(props.className, "text-blue-50")} />;
   if (level <= 10) return <BatteryLow {...props} className={cn(props.className, "text-red-600")} />;
   if (level <= 40) return <BatteryMedium {...props} className={cn(props.className, "text-orange-500")} />;
   return <BatteryFull {...props} className={cn(props.className, "text-green-600")} />;
@@ -350,6 +352,14 @@ export default function VesselTrackerPage() {
     }).then(() => { toast({ title: "Paramètres enregistrés" }); });
   };
 
+  const handleRemoveFromHistory = (idToRemove: string) => {
+    if (!user || !firestore) return;
+    const newHist = (userProfile?.vesselIdHistory || []).filter(id => id !== idToRemove);
+    updateDoc(doc(firestore, 'users', user.uid), { 
+        vesselIdHistory: newHist 
+    }).then(() => toast({ title: "ID supprimé de l'historique" }));
+  };
+
   const handleStopSharing = () => {
     if (!user || !firestore) return;
     setIsSharing(false);
@@ -568,9 +578,9 @@ export default function VesselTrackerPage() {
             return;
         }
 
+        const dist = getDistance(newPos.lat, newPos.lng, currentAnchor.lat, currentAnchor.lng);
         // Filtre intelligent : on ignore les mouvements inférieurs à la précision GPS
         const isActuallyMoving = dist > radius && dist > (accuracy * 0.8);
-        const dist = getDistance(newPos.lat, newPos.lng, currentAnchor.lat, currentAnchor.lng);
 
         if (isActuallyMoving) {
             immobilityStartTime.current = null;
@@ -819,6 +829,44 @@ export default function VesselTrackerPage() {
                             <Button onClick={handleSaveVessel} className="w-full h-14 font-black uppercase tracking-widest shadow-xl text-base">
                                 <Save className="size-5 mr-2" /> Enregistrer mes Identifiants
                             </Button>
+
+                            {userProfile?.vesselIdHistory && userProfile.vesselIdHistory.length > 0 && (
+                                <div className="pt-4 border-t border-dashed">
+                                    <p className="text-[10px] font-black uppercase text-muted-foreground mb-3 tracking-widest flex items-center gap-2">
+                                        <History className="size-3" /> Historique des IDs utilisés
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {userProfile.vesselIdHistory.map(id => (
+                                            <div key={id} className="flex items-center bg-white border-2 rounded-xl pl-3 pr-1 py-1 gap-2 shadow-sm group">
+                                                <span className="text-[10px] font-black text-slate-700">{id}</span>
+                                                <div className="flex gap-0.5">
+                                                    <button 
+                                                        onClick={() => setCustomSharingId(id)}
+                                                        className="p-1.5 hover:bg-primary/10 rounded-lg text-primary transition-colors"
+                                                        title="Charger comme ID Navire"
+                                                    >
+                                                        <Ship className="size-3" />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => setFleetGroupId(id)}
+                                                        className="p-1.5 hover:bg-indigo-100 rounded-lg text-indigo-600 transition-colors"
+                                                        title="Charger comme ID Flotte"
+                                                    >
+                                                        <Users className="size-3" />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleRemoveFromHistory(id)}
+                                                        className="p-1.5 hover:bg-red-50 rounded-lg text-destructive/40 hover:text-destructive transition-colors"
+                                                        title="Supprimer"
+                                                    >
+                                                        <X className="size-3" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </AccordionContent>
                 </AccordionItem>
