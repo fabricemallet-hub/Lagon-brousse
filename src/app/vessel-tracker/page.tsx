@@ -122,6 +122,7 @@ export default function VesselTrackerPage() {
   const [vesselNickname, setVesselNickname] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [wakeLock, setWakeLock] = useState<any>(null);
+  const [isGhostMode, setIsGhostMode] = useState(false);
   
   const [currentPos, setCurrentPos] = useState<google.maps.LatLngLiteral | null>(null);
   const [anchorPos, setAnchorPos] = useState<google.maps.LatLngLiteral | null>(null);
@@ -142,12 +143,14 @@ export default function VesselTrackerPage() {
   const vesselStatusRef = useRef(vesselStatus);
   const anchorPosRef = useRef(anchorPos);
   const isSharingRef = useRef(isSharing);
+  const isGhostModeRef = useRef(isGhostMode);
 
   useEffect(() => { currentPosRef.current = currentPos; }, [currentPos]);
   useEffect(() => { userAccuracyRef.current = userAccuracy; }, [userAccuracy]);
   useEffect(() => { vesselStatusRef.current = vesselStatus; }, [vesselStatus]);
   useEffect(() => { anchorPosRef.current = anchorPos; }, [anchorPos]);
   useEffect(() => { isSharingRef.current = isSharing; }, [isSharing]);
+  useEffect(() => { isGhostModeRef.current = isGhostMode; }, [isGhostMode]);
 
   const [receiverSmsNumber, setReceiverSmsNumber] = useState('');
   const [receiverCallNumber, setReceiverCallNumber] = useState('');
@@ -288,7 +291,7 @@ export default function VesselTrackerPage() {
             lastActive: serverTimestamp(),
             mooringRadius: vesselPrefs.mooringRadius || 20,
             groupId: fleetGroupId ? fleetGroupId.toUpperCase() : null,
-            isGhostMode: isGhostMode,
+            isGhostMode: isGhostModeRef.current,
             accuracy: userAccuracyRef.current || null,
             status: newStatus,
             ...batteryInfo,
@@ -310,7 +313,7 @@ export default function VesselTrackerPage() {
         }).catch(() => {});
     };
     update();
-  }, [user, firestore, sharingId, vesselNickname, vesselPrefs.mooringRadius, fleetGroupId, isGhostMode]);
+  }, [user, firestore, sharingId, vesselNickname, vesselPrefs.mooringRadius, fleetGroupId]);
 
   useEffect(() => {
     if (userProfile) {
@@ -892,9 +895,7 @@ export default function VesselTrackerPage() {
           <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
                 {followedVessels?.filter(v => {
                     if (!v.isSharing) return false;
-                    // Ne pas s'afficher comme "navire distant" si on est l'émetteur (le point bleu suffit)
                     if (v.id === sharingId && mode === 'sender') return false;
-                    // Masquer les navires en mode fantôme si on est en mode flotte, sauf si c'est moi
                     if (mode === 'fleet' && v.isGhostMode && v.userId !== user?.uid) return false;
                     return true;
                 }).map(vessel => (
