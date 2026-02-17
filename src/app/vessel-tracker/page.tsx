@@ -97,6 +97,7 @@ const PulsingDot = () => (
 );
 
 type HistoryEntry = {
+    vesselId: string;
     vesselName: string;
     statusLabel: string;
     time: Date;
@@ -173,8 +174,6 @@ export default function VesselTrackerPage() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
   const savedVesselIds = userProfile?.savedVesselIds || [];
-  
-  // --- QUERIES UNIFIÉES POUR LA CARTE ET LES ALERTES ---
   
   const privateVesselsQuery = useMemoFirebase(() => {
     if (!firestore || savedVesselIds.length === 0) return null;
@@ -530,6 +529,7 @@ export default function VesselTrackerPage() {
             const label = vessel.eventLabel || statusLabels[currentStatus] || currentStatus.toUpperCase();
             
             newEntries.push({ 
+                vesselId: vessel.id,
                 vesselName: vessel.displayName || vessel.id, 
                 statusLabel: label, 
                 time: new Date(timeKey), 
@@ -759,6 +759,14 @@ export default function VesselTrackerPage() {
         </Button>
     </div>
   );
+
+  const filteredHistory = useMemo(() => {
+    return history.filter(h => mode !== 'sender' || h.vesselId === sharingId);
+  }, [history, mode, sharingId]);
+
+  const filteredTactical = useMemo(() => {
+    return tacticalMarkers.filter(m => mode !== 'sender' || m.vesselId === sharingId);
+  }, [tacticalMarkers, mode, sharingId]);
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
@@ -1194,9 +1202,9 @@ export default function VesselTrackerPage() {
                             <Button variant="ghost" size="sm" className="h-7 px-2 text-[8px] font-black text-destructive" onClick={handleClearHistory}><Trash2 className="size-3 mr-1" /> Reset</Button>
                         </div>
                         <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide">
-                            {history.length > 0 ? (
+                            {filteredHistory.length > 0 ? (
                                 <div className="space-y-2 px-3">
-                                    {history.map((h, i) => (
+                                    {filteredHistory.map((h, i) => (
                                         <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm animate-in fade-in slide-in-from-left-2">
                                             <div className="flex flex-col gap-0.5">
                                               <div className="flex items-center gap-2">
@@ -1249,9 +1257,9 @@ export default function VesselTrackerPage() {
                             <Button variant="ghost" size="sm" className="h-7 px-2 text-[8px] font-black text-destructive" onClick={handleClearHuntingHistory}><Trash2 className="size-3 mr-1" /> Reset</Button>
                         </div>
                         <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide">
-                            {tacticalMarkers.length > 0 ? (
+                            {filteredTactical.length > 0 ? (
                                 <div className="space-y-2 px-3">
-                                    {tacticalMarkers.map((m, i) => {
+                                    {filteredTactical.map((m, i) => {
                                         const isCatch = (m as any).type !== undefined;
                                         return (
                                             <div key={m.id} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm animate-in fade-in slide-in-from-left-2">
