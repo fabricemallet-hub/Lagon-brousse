@@ -266,6 +266,39 @@ export default function VesselTrackerPage() {
     update();
   }, [user, firestore, isSharing, sharingId, vesselNickname, currentPos, vesselPrefs.mooringRadius, fleetGroupId, isGhostMode]);
 
+  const handleForceGpsUpdate = () => {
+    if (!isSharing || mode !== 'sender') return;
+    
+    setSecondsUntilUpdate(60);
+    
+    let statusToUpdate = vesselStatus;
+    let labelToUpdate = `MAJ GPS FORCÉE à ${format(new Date(), 'HH:mm:ss')}`;
+
+    if (currentPos && lastMinutePosRef.current) {
+        const distInMinute = getDistance(currentPos.lat, currentPos.lng, lastMinutePosRef.current.lat, lastMinutePosRef.current.lng);
+        const radius = vesselPrefs.mooringRadius || 20;
+        
+        if (vesselStatus !== 'returning' && vesselStatus !== 'landed' && vesselStatus !== 'emergency') {
+            if (distInMinute <= radius) {
+                statusToUpdate = 'stationary';
+            } else if (distInMinute < 100) {
+                statusToUpdate = 'drifting';
+                labelToUpdate = 'BATEAU À LA DÉRIVE (FORCÉ)';
+            } else {
+                statusToUpdate = 'moving';
+            }
+        }
+    }
+
+    updateVesselInFirestore({ 
+        status: statusToUpdate,
+        eventLabel: labelToUpdate
+    });
+
+    lastMinutePosRef.current = currentPos;
+    toast({ title: "Point GPS forcé", description: "Position synchronisée avec succès." });
+  };
+
   const handleSaveVessel = () => {
     if (!user || !firestore) return;
     const cleanId = customSharingId.trim().toUpperCase();
@@ -283,7 +316,6 @@ export default function VesselTrackerPage() {
         isEmergencyEnabled,
         isCustomMessageEnabled
     }).then(() => { 
-        // Mise à jour de l'historique local
         const newHistory = [...idHistory];
         if (cleanId && !newHistory.some(h => h.id === cleanId && h.type === 'vessel')) {
             newHistory.unshift({ id: cleanId, type: 'vessel' });
@@ -612,9 +644,13 @@ export default function VesselTrackerPage() {
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
       {isSharing && mode === 'sender' && (
-          <div className="bg-primary text-white text-[10px] font-black uppercase py-1.5 px-4 rounded-full shadow-lg flex items-center gap-2 animate-pulse mx-auto w-fit border-2 border-white/20">
-              <RefreshCw className="size-3" /> MAJ GPS DANS {secondsUntilUpdate}S
-          </div>
+          <button 
+            onClick={handleForceGpsUpdate}
+            className="bg-primary hover:bg-primary/90 text-white text-[10px] font-black uppercase py-1.5 px-4 rounded-full shadow-lg flex items-center gap-2 transition-all active:scale-95 mx-auto w-fit border-2 border-white/20 cursor-pointer"
+          >
+              <RefreshCw className={cn("size-3", secondsUntilUpdate < 5 && "animate-spin")} /> 
+              MAJ GPS DANS {secondsUntilUpdate}S
+          </button>
       )}
 
       <Card className="border-2 shadow-sm overflow-hidden">
