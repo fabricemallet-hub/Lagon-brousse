@@ -150,7 +150,7 @@ export default function VesselTrackerPage() {
   }, [user, firestore]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
 
-  const savedVesselIds = useMemo(() => userProfile?.savedVesselIds || EMPTY_IDS, [userProfile?.savedVesselIds]);
+  const savedVesselIds = userProfile?.savedVesselIds || EMPTY_IDS;
   
   const vesselsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -263,6 +263,9 @@ export default function VesselTrackerPage() {
     if (st === 'moving' || st === 'emergency') { 
         immobilityStartTime.current = null; 
         anchorPosRef.current = null; 
+    } else if (st === 'stationary') {
+        // On marque le point actuel comme ancre si on force le mouillage
+        if (currentPosRef.current) anchorPosRef.current = currentPosRef.current;
     }
     toast({ title: label || (st === 'emergency' ? 'ALERTE ASSISTANCE' : 'Statut mis à jour') });
   };
@@ -291,7 +294,7 @@ export default function VesselTrackerPage() {
     setDoc(vesselRef, { isSharing: false, lastActive: serverTimestamp(), statusChangedAt: serverTimestamp() }, { merge: true })
       .then(() => {
         if (watchIdRef.current) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
-        setCurrentPos(null); currentPosRef.current = null; anchorPosRef.current = null; lastSentStatusRef.current = null; isFirstFixRef.current = true;
+        setCurrentPos(null); currentPosRef.current = null; anchorPosRef.current = null; lastSentStatusRef.current = null; isFirstFixRef.current = true; immobilityStartTime.current = null;
         toast({ title: "Partage arrêté" });
       });
   };
@@ -329,6 +332,37 @@ export default function VesselTrackerPage() {
     const customText = (isCustomMessageEnabled && vesselSmsMessage) ? vesselSmsMessage : "Requiert assistance immédiate.";
     return `${nicknamePrefix}${customText} [MAYDAY/PAN PAN] Position : https://www.google.com/maps?q=-22.27,166.45`;
   }, [vesselSmsMessage, isCustomMessageEnabled, vesselNickname]);
+
+  // --- LOGIQUE DE SURVEILLANCE ACTIVE DES 30 SECONDES ---
+  useEffect(() => {
+    if (mode !== 'sender' || !isSharing || !immobilityStartTime.current || vesselStatus !== 'moving') return;
+
+    const interval = setInterval(() => {
+      const timeSinceStart = Date.now() - (immobilityStartTime.current || 0);
+      
+      // Si on a atteint 30s et qu'on est toujours en mode "moving" (LANCEMENT)
+      if (timeSinceStart >= 30000) {
+        if (currentPosRef.current && anchorPosRef.current) {
+          const distFromAnchor = getDistance(currentPosRef.current.lat, currentPosRef.current.lng, anchorPosRef.current.lat, anchorPosRef.current.lng);
+          
+          if (distFromAnchor <= IMMOBILITY_THRESHOLD_METERS) {
+            // IMMOBILE -> PASSAGE AU MOUILLAGE
+            handleManualStatus('stationary', 'AU MOUILLAGE (DÉTECTION AUTO)');
+          } else {
+            // EN MOUVEMENT -> CONFIRMATION MOUVEMENT
+            handleManualStatus('moving', 'EN MOUVEMENT (DÉTECTION AUTO)');
+            anchorPosRef.current = currentPosRef.current;
+            immobilityStartTime.current = Date.now();
+          }
+        } else if (anchorPosRef.current) {
+            // On a une ancre mais pas de nouveau fix GPS (Immobile parfait)
+            handleManualStatus('stationary', 'AU MOUILLAGE (DÉTECTION AUTO)');
+        }
+      }
+    }, 5000); // On vérifie toutes les 5s
+
+    return () => clearInterval(interval);
+  }, [isSharing, mode, vesselStatus]);
 
   useEffect(() => {
     if (!followedVessels) return;
@@ -404,33 +438,20 @@ export default function VesselTrackerPage() {
                 return; 
             }
             
-            const timeSinceStart = Date.now() - (immobilityStartTime.current || 0);
             const distFromAnchor = getDistance(newPos.lat, newPos.lng, anchorPosRef.current!.lat, anchorPosRef.current!.lng);
             
-            if (currentVesselStatus !== 'returning' && currentVesselStatus !== 'landed' && currentVesselStatus !== 'emergency') {
-                if (timeSinceStart >= 30000) {
-                    if (distFromAnchor > IMMOBILITY_THRESHOLD_METERS) {
-                        if (currentVesselStatus !== 'moving') {
-                            setVesselStatus('moving');
-                            updateVesselInFirestore({ status: 'moving' });
-                        }
-                        anchorPosRef.current = newPos;
-                        immobilityStartTime.current = Date.now();
-                    } else {
-                        if (currentVesselStatus !== 'stationary') {
-                            setVesselStatus('stationary');
-                            updateVesselInFirestore({ status: 'stationary' });
-                        }
-                    }
-                } else if (distFromAnchor > IMMOBILITY_THRESHOLD_METERS) {
+            // Si on bouge de plus de 20m, on reset l'ancre et le timer de 30s
+            if (distFromAnchor > IMMOBILITY_THRESHOLD_METERS) {
+                if (currentVesselStatus !== 'returning' && currentVesselStatus !== 'landed' && currentVesselStatus !== 'emergency') {
                     if (currentVesselStatus !== 'moving') {
                         setVesselStatus('moving');
                         updateVesselInFirestore({ status: 'moving' });
                     }
-                    anchorPosRef.current = newPos;
-                    immobilityStartTime.current = Date.now();
                 }
+                anchorPosRef.current = newPos;
+                immobilityStartTime.current = Date.now();
             }
+            
             updateVesselInFirestore({});
         }
       },
