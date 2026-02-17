@@ -466,7 +466,8 @@ export default function VesselTrackerPage() {
                         time: new Date(),
                         durationMinutes: differenceInMinutes(new Date(), new Date(startTimeKey)),
                         batteryLevel: vessel.batteryLevel,
-                        isCharging: vessel.isCharging
+                        isCharging: vessel.isCharging,
+                        accuracy: vessel.accuracy
                     };
                     return newHistory;
                 }
@@ -482,7 +483,8 @@ export default function VesselTrackerPage() {
                         batteryLevel: vessel.batteryLevel, 
                         isCharging: vessel.isCharging,
                         durationMinutes: differenceInMinutes(new Date(), new Date(startTimeKey)),
-                        statusStartTime: startTimeKey
+                        statusStartTime: startTimeKey,
+                        accuracy: vessel.accuracy
                     };
                     return [newEntry, ...prev].slice(0, 50);
                 }
@@ -1017,6 +1019,7 @@ export default function VesselTrackerPage() {
                                             <div className="flex items-center gap-2 opacity-40 font-bold">
                                                 <span>{format(h.time, 'HH:mm:ss')}</span>
                                                 {h.durationMinutes !== undefined && <span>• {h.durationMinutes} min</span>}
+                                                {h.accuracy !== undefined && <span className="text-[8px] font-black text-primary/60 uppercase">• +/- {h.accuracy}m</span>}
                                             </div>
                                         </div>
                                         <Button variant="ghost" size="sm" className="h-8 text-[9px] border-2 px-3" onClick={() => { map?.panTo(h.pos); map?.setZoom(17); }}><MapPin className="size-3 mr-1" /> GPS</Button>
