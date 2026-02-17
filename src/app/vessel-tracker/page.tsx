@@ -477,7 +477,7 @@ export default function VesselTrackerPage() {
         lastStatusesRef.current[vessel.id] = currentStatus;
         lastUpdatesRef.current[vessel.id] = timeKey;
     });
-  }, [followedVessels, mode, vesselPrefs, playVesselSound, labels]);
+  }, [followedVessels, mode, vesselPrefs, playVesselSound]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) return;
@@ -794,11 +794,14 @@ export default function VesselTrackerPage() {
                         <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/5 rounded-xl"><Settings className="size-4" /><span className="text-[10px] font-black uppercase">Notifications & Veille</span></AccordionTrigger>
                         <AccordionContent className="pt-4 space-y-6">
                             <div className="space-y-4 p-4 border-2 rounded-2xl bg-card shadow-inner">
-                                <div className="flex items-center justify-between">
-                                    <div className="space-y-0.5"><Label className="text-xs font-black uppercase">Alertes Sonores</Label><p className="text-[9px] font-bold text-muted-foreground uppercase">Activer les signaux audio</p></div>
+                                <div className="flex items-center gap-2 border-b border-dashed pb-3 mb-2">
+                                    <div className="space-y-0.5 flex-1">
+                                        <Label className="text-xs font-black uppercase">Alertes Sonores</Label>
+                                        <p className="text-[9px] font-bold text-muted-foreground uppercase">Activer les signaux audio</p>
+                                    </div>
                                     <Switch checked={vesselPrefs.isNotifyEnabled} onCheckedChange={v => saveVesselPrefs({...vesselPrefs, isNotifyEnabled: v})} />
                                 </div>
-                                <div className="space-y-3 border-t border-dashed pt-4">
+                                <div className="space-y-3">
                                     <Label className="text-[10px] font-black uppercase opacity-60 flex items-center gap-2"><Volume2 className="size-3" /> Volume ({Math.round(vesselPrefs.vesselVolume * 100)}%)</Label>
                                     <Slider value={[vesselPrefs.vesselVolume * 100]} max={100} onValueChange={v => saveVesselPrefs({...vesselPrefs, vesselVolume: v[0] / 100})} />
                                 </div>
