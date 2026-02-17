@@ -176,28 +176,24 @@ export default function VesselTrackerPage() {
   
   // --- QUERIES UNIFIÉES POUR LA CARTE ET LES ALERTES ---
   
-  // 1. Navires suivis individuellement (Mode B)
   const privateVesselsQuery = useMemoFirebase(() => {
     if (!firestore || savedVesselIds.length === 0) return null;
     return query(collection(firestore, 'vessels'), where('id', 'in', savedVesselIds.slice(0, 10)));
   }, [firestore, savedVesselIds]);
   const { data: privateVessels } = useCollection<VesselStatus>(privateVesselsQuery);
 
-  // 2. Navires de la flotte (Mode C)
   const fleetVesselsQuery = useMemoFirebase(() => {
     if (!firestore || !fleetGroupId) return null;
     return query(collection(firestore, 'vessels'), where('groupId', '==', fleetGroupId.toUpperCase()));
   }, [firestore, fleetGroupId]);
   const { data: fleetVessels } = useCollection<VesselStatus>(fleetVesselsQuery);
 
-  // 3. Auto-suivi (Mon propre navire)
   const selfVesselRef = useMemoFirebase(() => {
     if (!firestore || !sharingId) return null;
     return doc(firestore, 'vessels', sharingId);
   }, [firestore, sharingId]);
   const { data: selfVesselData } = useDoc<VesselStatus>(selfVesselRef);
 
-  // Fusionner tout pour la carte et les alertes
   const followedVessels = useMemo(() => {
     const map = new Map<string, VesselStatus>();
     privateVessels?.forEach(v => map.set(v.id, v));
@@ -297,8 +293,8 @@ export default function VesselTrackerPage() {
         handleStopSharing();
     } else {
         setIsSharing(true);
-        const isPosHidden = target === 'receiver'; // Hide from group if only receiver
-        const isPrivHidden = target === 'fleet'; // Hide from private B if only fleet
+        const isPosHidden = target === 'receiver';
+        const isPrivHidden = target === 'fleet';
         
         setIsPositionSharedWithGroup(!isPosHidden);
         
@@ -342,7 +338,6 @@ export default function VesselTrackerPage() {
         isGhostMode: isGhostMode
     }).then(() => { 
         if (vesselIdToFollow) setVesselIdToFollow(''); 
-        // Si on rejoint une flotte, on met à jour notre navire immédiatement dans Firestore
         if (isSharing) {
             updateVesselInFirestore({ groupId: cleanGroupId });
         }
@@ -393,27 +388,21 @@ export default function VesselTrackerPage() {
 
   const handleDeleteMarker = (marker: any) => {
     if (!firestore || !user) return;
-    
-    // Si je suis l'émetteur et que c'est mon point : suppression globale sur le serveur
     if (isSharing && marker.vesselId === sharingId) {
         updateDoc(doc(firestore, 'vessels', sharingId), {
             huntingMarkers: arrayRemove(marker)
         }).then(() => toast({ title: "Point retiré (Global)" }));
     } else {
-        // Sinon (Récepteur B ou Flotte C) : suppression locale uniquement
         setLocallyClearedMarkerIds(prev => [...prev, marker.id]);
         toast({ title: "Point masqué (Local)" });
     }
   };
 
   const handleClearHuntingHistory = () => {
-    setLocallyClearedMarkerIds([]); // On reset les masquages locaux si on veut tout revoir
-    
+    setLocallyClearedMarkerIds([]);
     if (isSharing && firestore && user) {
-        // Émetteur A : Suppression globale
         updateDoc(doc(firestore, 'vessels', sharingId), { huntingMarkers: [] }).then(() => toast({ title: "Journal tactique réinitialisé (Global)" }));
     } else {
-        // Récepteur B ou Flotte C : Suppression locale
         const currentIds = tacticalMarkers.map(m => m.id);
         setLocallyClearedMarkerIds(prev => [...prev, ...currentIds]);
         toast({ title: "Journal tactique vidé (Local)" });
@@ -437,10 +426,8 @@ export default function VesselTrackerPage() {
   const handleClearHistory = () => {
     setHistory([]);
     if (isSharing && firestore && user) {
-        // Émetteur A : Trigger la suppression globale via historyClearedAt
         updateDoc(doc(firestore, 'vessels', sharingId), { historyClearedAt: serverTimestamp() }).then(() => toast({ title: "Journal de bord réinitialisé (Global)" }));
     } else {
-        // Récepteur B ou Flotte C : Local seulement
         toast({ title: "Journal de bord vidé (Local)" });
     }
   };
@@ -518,7 +505,6 @@ export default function VesselTrackerPage() {
         const timeKey = vessel.statusChangedAt?.toMillis ? vessel.statusChangedAt.toMillis() : (vessel.statusChangedAt?.seconds ? vessel.statusChangedAt.seconds * 1000 : 0);
         const clearTimeKey = vessel.historyClearedAt?.toMillis ? vessel.historyClearedAt.toMillis() : (vessel.historyClearedAt?.seconds ? vessel.historyClearedAt.seconds * 1000 : 0);
 
-        // Si l'émetteur a vidé le journal, on vide localement pour ce navire
         if (clearTimeKey > (lastUpdatesRef.current[vessel.id + '_clear'] || 0)) {
             setHistory(prev => prev.filter(h => h.vesselName !== (vessel.displayName || vessel.id)));
             lastUpdatesRef.current[vessel.id + '_clear'] = clearTimeKey;
@@ -618,7 +604,6 @@ export default function VesselTrackerPage() {
       (err) => {
         let msg = "Impossible de récupérer votre position.";
         if (err.code === 1) msg = "Accès GPS refusé. Veuillez autoriser la localisation.";
-        else if (err.code === 3) return; // Silent timeout
         toast({ variant: "destructive", title: "Erreur GPS", description: msg });
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 }
@@ -1003,9 +988,10 @@ export default function VesselTrackerPage() {
               <div className="grid gap-2">
                   {savedVesselIds.map(id => {
                       const vessel = followedVessels?.find(v => v.id === id);
-                      const isActive = vessel?.isSharing === true && !vessel.isPrivateHidden && !vessel.isGhostMode;
+                      const isDistressed = vessel?.status === 'emergency';
+                      const isActive = vessel?.isSharing === true && !vessel.isPrivateHidden && (!vessel.isGhostMode || isDistressed);
                       return (
-                          <div key={id} className={cn("flex items-center justify-between p-3 border-2 rounded-xl transition-all shadow-sm cursor-pointer", vessel?.status === 'emergency' ? "bg-red-50 border-red-500 animate-pulse" : isActive ? "bg-primary/5 border-primary/20" : "bg-muted/5 opacity-60")} onClick={() => { if (isActive && vessel?.location && map) { map.panTo({ lat: vessel.location.latitude, lng: vessel.location.longitude }); map.setZoom(15); } }}>
+                          <div key={id} className={cn("flex items-center justify-between p-3 border-2 rounded-xl transition-all shadow-sm cursor-pointer", isDistressed ? "bg-red-50 border-red-500 animate-pulse" : isActive ? "bg-primary/5 border-primary/20" : "bg-muted/5 opacity-60")} onClick={() => { if (isActive && vessel?.location && map) { map.panTo({ lat: vessel.location.latitude, lng: vessel.location.longitude }); map.setZoom(15); } }}>
                               <div className="flex items-center gap-3">
                                   <div className={cn("p-2 rounded-lg", isActive ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>{isActive ? <Navigation className="size-4" /> : <WifiOff className="size-4" />}</div>
                                   <div className="flex flex-col"><span className="font-black text-xs uppercase">{vessel?.displayName || id}</span><span className="text-[8px] font-bold uppercase">{isActive ? 'En ligne' : 'OFF'}</span></div>
@@ -1036,26 +1022,50 @@ export default function VesselTrackerPage() {
                         <Input placeholder="EX: CLUB-PECHE-NC" value={fleetGroupId} onChange={e => setFleetGroupId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest flex-grow bg-blue-50/50" />
                         <Button variant="default" className="h-12 px-4 font-black uppercase text-[10px]" onClick={handleSaveVessel} disabled={!fleetGroupId.trim()}><Check className="size-4" /></Button>
                     </div>
-                    <p className="text-[8px] font-bold text-muted-foreground italic px-1 mt-1">Connectez-vous pour voir les autres navires, les oiseaux et les prises du groupe.</p>
+                </div>
+
+                <div className="flex items-center justify-between p-4 border-2 rounded-2xl bg-slate-900 text-white shadow-lg mb-4">
+                    <div className="flex flex-col gap-1 flex-1 pr-4">
+                        <div className="flex items-center gap-2">
+                            <EyeOff className="size-4 text-primary" />
+                            <Label className="text-sm font-black uppercase">Mode Fantôme</Label>
+                        </div>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase leading-tight">
+                            Masque votre position GPS pour les autres membres de la flotte.
+                        </p>
+                    </div>
+                    <Switch 
+                        checked={isGhostMode} 
+                        onCheckedChange={(val) => {
+                            setIsGhostMode(val);
+                            updateVesselInFirestore({ isGhostMode: val });
+                            if (user && firestore) {
+                                updateDoc(doc(firestore, 'users', user.uid), { isGhostMode: val });
+                            }
+                            toast({ title: val ? "Mode Fantôme activé" : "Mode Fantôme désactivé" });
+                        }} 
+                    />
                 </div>
 
                 <div className="grid gap-2">
-                    {followedVessels?.filter(v => v.groupId === fleetGroupId.toUpperCase() && v.id !== sharingId && v.isSharing === true && !v.isPositionHidden && !v.isGhostMode).map(v => (
+                    {followedVessels?.filter(v => v.groupId === fleetGroupId.toUpperCase() && v.id !== sharingId && v.isSharing === true && !v.isPositionHidden && (!v.isGhostMode || v.status === 'emergency')).map(v => (
                         <div key={v.id} className="flex items-center justify-between p-3 border-2 border-blue-100 bg-blue-50/30 rounded-xl shadow-sm cursor-pointer active:scale-[0.98] transition-all" onClick={() => { if (v.location && map) { map.panTo({ lat: v.location.latitude, lng: v.location.longitude }); map.setZoom(15); } }}>
                             <div className="flex items-center gap-3">
-                                <div className="p-2 bg-blue-600 text-white rounded-lg"><Navigation className="size-4" /></div>
+                                <div className={cn("p-2 rounded-lg", v.status === 'emergency' ? "bg-red-600 text-white animate-pulse" : "bg-blue-600 text-white")}>
+                                    {v.status === 'emergency' ? <ShieldAlert className="size-4" /> : <Navigation className="size-4" />}
+                                </div>
                                 <div className="flex flex-col">
                                     <span className="font-black text-xs uppercase">{v.displayName}</span>
                                     <Badge variant="outline" className={cn("text-[7px] font-black uppercase h-4 px-1 border-blue-200", 
-                                        v.status === 'emergency' ? "bg-red-50 text-white" : "text-blue-600")}>
-                                        {v.status === 'emergency' ? 'ASSISTANCE' : v.status}
+                                        v.status === 'emergency' ? "bg-red-500 text-white border-none" : "text-blue-600")}>
+                                        {v.status === 'emergency' ? 'ASSISTANCE !' : v.status}
                                     </Badge>
                                 </div>
                             </div>
                             <BatteryIconComp level={v.batteryLevel} charging={v.isCharging} />
                         </div>
                     ))}
-                    {(!followedVessels || followedVessels.filter(v => v.groupId === fleetGroupId.toUpperCase() && v.id !== sharingId && v.isSharing === true && !v.isPositionHidden && !v.isGhostMode).length === 0) && fleetGroupId && (
+                    {(!followedVessels || followedVessels.filter(v => v.groupId === fleetGroupId.toUpperCase() && v.id !== sharingId && v.isSharing === true && !v.isPositionHidden && (!v.isGhostMode || v.status === 'emergency')).length === 0) && fleetGroupId && (
                         <div className="text-center py-10 border-2 border-dashed rounded-xl opacity-30 flex flex-col items-center gap-2">
                             <AlertCircle className="size-5 text-muted-foreground" />
                             <p className="text-[10px] font-black uppercase tracking-widest leading-tight">
@@ -1073,11 +1083,17 @@ export default function VesselTrackerPage() {
         <div className={cn("relative bg-muted/20", isFullscreen ? "flex-grow" : "h-[300px]")}>
           <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
                 {followedVessels?.filter(v => {
-                    // Émetteur A : Toujours voir son propre navire même en mode fantôme
-                    if (v.id === sharingId && isSharing) return true;
+                    // Émetteur A : Ne voir QUE son propre navire si mode A est actif
+                    if (mode === 'sender') return v.id === sharingId && isSharing;
                     
-                    // Récepteur B et Flotte C : Suivre les règles de masquage
-                    return v.isSharing && !v.isGhostMode && (
+                    // Récepteur B et Flotte C : Suivre les règles de masquage avec exception URGENCE
+                    const isDistressed = v.status === 'emergency';
+                    const isMe = v.id === sharingId;
+                    
+                    // Si mode Fantôme activé, cacher le navire sur la carte locale aussi (demande utilisateur)
+                    if (isMe && isGhostMode && !isDistressed) return false;
+
+                    return v.isSharing && (isDistressed || !v.isGhostMode) && (
                         (savedVesselIds.includes(v.id) && !v.isPrivateHidden) || 
                         (v.groupId === fleetGroupId?.toUpperCase() && !v.isPositionHidden)
                     );
