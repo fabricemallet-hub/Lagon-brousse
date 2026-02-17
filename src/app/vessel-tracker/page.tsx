@@ -129,6 +129,7 @@ export default function VesselTrackerPage() {
   const watchIdRef = useRef<number | null>(null);
   const shouldPanOnNextFix = useRef(false);
   const lastSentStatusRef = useRef<string | null>(null);
+  const lastSentTimeRef = useRef<number>(0);
   const immobilityStartTime = useRef<number | null>(null);
 
   const currentPosRef = useRef(currentPos);
@@ -253,11 +254,26 @@ export default function VesselTrackerPage() {
     }
   }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, vesselPrefs.repeatSettings, availableSounds]);
 
-  const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
+  /**
+   * Envoi des données vers Firestore avec throttling pour éviter de saturer le réseau
+   * On envoie la position max toutes les 60s SI le statut ne change pas.
+   * On envoie INSTANTANÉMENT si le statut change.
+   */
+  const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>, forceImmediate = false) => {
     if (!user || !firestore) return;
     const activeSharing = data.isSharing !== undefined ? data.isSharing : isSharingRef.current;
     if (!activeSharing && data.isSharing !== false) return;
     
+    const now = Date.now();
+    const newStatus = data.status || vesselStatusRef.current;
+    const statusChanged = newStatus !== lastSentStatusRef.current;
+    const isManualTrigger = data.eventLabel && data.eventLabel.includes('FORCÉ');
+
+    // Throttling : Si même statut et pas forcé, on attend 60s entre deux points GPS
+    if (!statusChanged && !forceImmediate && !isManualTrigger && (now - lastSentTimeRef.current < 60000)) {
+        return;
+    }
+
     const update = async () => {
         let batteryInfo = {};
         if ('getBattery' in navigator) {
@@ -265,7 +281,6 @@ export default function VesselTrackerPage() {
             batteryInfo = { batteryLevel: Math.round(b.level * 100), isCharging: b.charging };
         }
 
-        const newStatus = data.status || vesselStatusRef.current;
         const updatePayload: any = { 
             id: sharingId,
             userId: user.uid, 
@@ -281,8 +296,8 @@ export default function VesselTrackerPage() {
             ...data 
         };
 
-        // On force statusChangedAt si c'est le début du partage ou si le statut change
-        if (data.isSharing === true || (data.status && data.status !== lastSentStatusRef.current)) {
+        // Mise à jour du chrono de début de statut si changement réel
+        if (data.isSharing === true || statusChanged) {
             updatePayload.statusChangedAt = serverTimestamp();
             lastSentStatusRef.current = newStatus;
         }
@@ -292,7 +307,9 @@ export default function VesselTrackerPage() {
         }
 
         const vesselRef = doc(firestore, 'vessels', sharingId);
-        setDoc(vesselRef, updatePayload, { merge: true }).catch(() => {});
+        setDoc(vesselRef, updatePayload, { merge: true }).then(() => {
+            lastSentTimeRef.current = Date.now();
+        }).catch(() => {});
     };
     update();
   }, [user, firestore, sharingId, vesselNickname, vesselPrefs.mooringRadius, fleetGroupId, isGhostMode]);
@@ -477,47 +494,77 @@ export default function VesselTrackerPage() {
     });
   }, [followedVessels, mode, vesselPrefs, playVesselSound]);
 
+  /**
+   * ALGORITHME DE SURVEILLANCE GPS (ÉMETTEUR)
+   * Détection automatique : Mouvement vs Mouillage
+   */
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) return;
+    
     const radius = vesselPrefs.mooringRadius || 20;
+    
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         const newPos = { lat: position.coords.latitude, lng: position.coords.longitude };
         const accuracy = Math.round(position.coords.accuracy);
+        
         setCurrentPos(newPos);
         setUserAccuracy(accuracy);
-        if (shouldPanOnNextFix.current && map) { map.panTo(newPos); map.setZoom(15); shouldPanOnNextFix.current = false; }
+        
+        if (shouldPanOnNextFix.current && map) { 
+            map.panTo(newPos); 
+            map.setZoom(15); 
+            shouldPanOnNextFix.current = false; 
+        }
+
         const currentStatus = vesselStatusRef.current;
         const currentAnchor = anchorPosRef.current;
+
+        // --- CAS 1 : MODES MANUELS (Priorité Absolue) ---
         if (currentStatus === 'returning' || currentStatus === 'landed' || currentStatus === 'emergency') {
             updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng } });
             return;
         }
+
+        // --- CAS 2 : INITIALISATION ANCRE ---
         if (!currentAnchor) {
             setAnchorPos(newPos);
-            updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng }, status: 'moving' });
+            updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng }, status: 'moving' }, true);
             return;
         }
+
+        // --- CAS 3 : CALCUL DE LA DISTANCE PAR RAPPORT À L'ANCRE ---
         const dist = getDistance(newPos.lat, newPos.lng, currentAnchor.lat, currentAnchor.lng);
+
         if (dist > radius) {
+            // MOUVEMENT RÉEL DÉTECTÉ (SORTIE DU CERCLE)
             immobilityStartTime.current = null;
-            setAnchorPos(newPos);
+            setAnchorPos(newPos); // On déplace l'ancre sur la nouvelle position
+            
             if (currentStatus !== 'moving') {
                 setVesselStatus('moving');
-                updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng }, status: 'moving', eventLabel: null });
+                updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng }, status: 'moving', eventLabel: null }, true);
             } else {
                 updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng } });
             }
         } else {
-            if (!immobilityStartTime.current) immobilityStartTime.current = Date.now();
-            if (Date.now() - immobilityStartTime.current > 30000) {
+            // IMMOBILITÉ POTENTIELLE (DANS LE CERCLE)
+            if (!immobilityStartTime.current) {
+                immobilityStartTime.current = Date.now();
+                // Feedback silencieux dans le journal pour confirmer la surveillance
+                updateVesselInFirestore({ eventLabel: 'ANALYSE IMMOBILITÉ...' }, false);
+            }
+
+            // Seuil de confirmation : 20 secondes d'immobilité dans le cercle
+            if (Date.now() - immobilityStartTime.current > 20000) {
                 if (currentStatus !== 'stationary') {
                     setVesselStatus('stationary');
-                    updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng }, status: 'stationary', eventLabel: null });
+                    updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng }, status: 'stationary', eventLabel: null }, true);
                 } else {
                     updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng } });
                 }
             } else {
+                // On met à jour la position sans changer le statut 'moving'
                 updateVesselInFirestore({ location: { latitude: newPos.lat, longitude: newPos.lng } });
             }
         }
@@ -525,6 +572,7 @@ export default function VesselTrackerPage() {
       () => toast({ variant: "destructive", title: "Erreur GPS" }),
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
+
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
   }, [isSharing, mode, map, toast, vesselPrefs.mooringRadius, updateVesselInFirestore]);
 
@@ -532,13 +580,13 @@ export default function VesselTrackerPage() {
     if (vesselStatus !== st) {
         setPreManualStatus(vesselStatus);
         setVesselStatus(st);
-        updateVesselInFirestore({ status: st, eventLabel: label });
+        updateVesselInFirestore({ status: st, eventLabel: label }, true);
     } else {
         const revertTo = preManualStatus || 'moving';
-        updateVesselInFirestore({ eventLabel: 'ERREUR INVOLONTAIRE' });
+        updateVesselInFirestore({ eventLabel: 'ERREUR INVOLONTAIRE' }, true);
         setTimeout(() => {
             setVesselStatus(revertTo);
-            updateVesselInFirestore({ status: revertTo, eventLabel: `${statusLabels[revertTo]} (REPRISE)` });
+            updateVesselInFirestore({ status: revertTo, eventLabel: `${statusLabels[revertTo]} (REPRISE)` }, true);
             setPreManualStatus(null);
         }, 500);
     }
@@ -548,14 +596,14 @@ export default function VesselTrackerPage() {
     if (vesselStatus !== 'emergency') {
         setPreManualStatus(vesselStatus);
         setVesselStatus('emergency');
-        updateVesselInFirestore({ status: 'emergency', eventLabel: 'DEMANDE ASSISTANCE (PROBLÈME)' });
+        updateVesselInFirestore({ status: 'emergency', eventLabel: 'DEMANDE ASSISTANCE (PROBLÈME)' }, true);
         if (isGhostMode) setIsGhostMode(false);
     } else {
         const revertTo = preManualStatus || 'moving';
-        updateVesselInFirestore({ eventLabel: 'ERREUR INVOLONTAIRE' });
+        updateVesselInFirestore({ eventLabel: 'ERREUR INVOLONTAIRE' }, true);
         setTimeout(() => {
             setVesselStatus(revertTo);
-            updateVesselInFirestore({ status: revertTo, eventLabel: `${statusLabels[revertTo]} (REPRISE)` });
+            updateVesselInFirestore({ status: revertTo, eventLabel: `${statusLabels[revertTo]} (REPRISE)` }, true);
             setPreManualStatus(null);
         }, 500);
     }
@@ -568,7 +616,7 @@ export default function VesselTrackerPage() {
   const handleForceGpsUpdate = () => {
     if (!isSharing || mode !== 'sender') return;
     setSecondsUntilUpdate(60);
-    updateVesselInFirestore({ eventLabel: `${statusLabels[vesselStatus]} (POINT FORCÉ)` });
+    updateVesselInFirestore({ eventLabel: `${statusLabels[vesselStatus]} (POINT FORCÉ)` }, true);
     toast({ title: "Point GPS forcé" });
   };
 
@@ -822,7 +870,7 @@ export default function VesselTrackerPage() {
                 <div className="space-y-1">
                     <Label className="text-[9px] font-black uppercase opacity-60">ID du groupe Flotte</Label>
                     <div className="flex gap-2">
-                        <Input placeholder="ENTREZ LE CODE..." value={fleetGroupId} onChange={e => setFleetGroupId(e.target.value)} className="font-black text-center h-12 border-2 uppercase" />
+                        <Input placeholder="ENTREZ LE CODE..." fleetGroupId={fleetGroupId} onChange={e => setFleetGroupId(e.target.value)} className="font-black text-center h-12 border-2 uppercase" />
                         <Button variant="default" className="h-12 px-4" onClick={handleSaveVessel}><Check className="size-4" /></Button>
                     </div>
                 </div>
@@ -838,7 +886,7 @@ export default function VesselTrackerPage() {
       <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all", isFullscreen && "fixed inset-0 z-[100] w-screen h-screen rounded-none")}>
         <div className={cn("relative bg-muted/20", isFullscreen ? "flex-grow" : "h-[350px]")}>
           <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
-                {followedVessels?.filter(v => v.isSharing).map(vessel => (
+                {followedVessels?.filter(v => v.isSharing && (v.id !== sharingId || mode !== 'sender')).map(vessel => (
                     <React.Fragment key={vessel.id}>
                         {(vessel.status === 'stationary' || vessel.status === 'drifting') && vessel.location && (
                             <Circle 
@@ -879,9 +927,30 @@ export default function VesselTrackerPage() {
                     </React.Fragment>
                 ))}
                 {mode === 'sender' && currentPos && (
-                    <OverlayView position={currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                        <div style={{ transform: 'translate(-50%, -50%)' }} className="size-6 bg-blue-500 border-4 border-white rounded-full shadow-lg animate-pulse" />
-                    </OverlayView>
+                    <>
+                        {vesselStatus === 'stationary' && anchorPos && (
+                            <Circle 
+                                center={anchorPos}
+                                radius={vesselPrefs.mooringRadius || 20}
+                                options={{
+                                    fillColor: '#3b82f6', fillOpacity: 0.1, strokeColor: '#3b82f6', strokeOpacity: 0.5, strokeWeight: 2, clickable: false, editable: false, zIndex: 1
+                                }}
+                            />
+                        )}
+                        <OverlayView position={currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                            <div className="relative">
+                                <div style={{ transform: 'translate(-50%, -50%)' }} className="size-6 bg-blue-500 border-4 border-white rounded-full shadow-lg animate-pulse" />
+                                {vesselStatus === 'stationary' && (
+                                    <div style={{ transform: 'translate(-50%, -100%)' }} className="absolute -top-4 flex flex-col items-center gap-1">
+                                        <div className="px-2 py-1 bg-amber-600 text-white rounded text-[8px] font-black shadow-lg">MOUILLAGE</div>
+                                        <div className="p-1.5 bg-amber-600 rounded-full border-2 border-white shadow-xl">
+                                            <Anchor className="size-3 text-white" />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </OverlayView>
+                    </>
                 )}
           </GoogleMap>
           <div className="absolute top-3 right-3 flex flex-col gap-2">
@@ -921,6 +990,7 @@ export default function VesselTrackerPage() {
                                                 <span className="font-black text-primary">{h.vesselName}</span>
                                                 <span className={cn("font-black uppercase", 
                                                     h.statusLabel.includes('ERREUR') ? 'text-orange-600' : 
+                                                    h.statusLabel.includes('ANALYSE') ? 'text-blue-400 animate-pulse' :
                                                     h.statusLabel.includes('MOUILLAGE') ? 'text-amber-600' :
                                                     h.statusLabel.includes('MOUVEMENT') ? 'text-blue-600' :
                                                     h.statusLabel.includes('RETOUR') ? 'text-indigo-600' :
