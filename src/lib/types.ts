@@ -372,6 +372,7 @@ export interface HuntingMarker {
   lng: number;
   time: string;
   label?: string;
+  photoUrl?: string;
 }
 
 export interface VesselStatus {

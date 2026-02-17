@@ -51,7 +51,10 @@ import {
   Fish,
   Copy,
   Compass,
-  VolumeX
+  VolumeX,
+  Camera,
+  ImageIcon,
+  Maximize2
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -64,6 +67,7 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -110,6 +114,7 @@ interface TacticalEntry {
     label: string;
     time: Date;
     pos: google.maps.LatLngLiteral;
+    photoUrl?: string;
 }
 
 export default function VesselTrackerPage() {
@@ -139,6 +144,7 @@ export default function VesselTrackerPage() {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const immobilityStartTime = useRef<number | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const [vesselPrefs, setVesselPrefs] = useState<NonNullable<UserAccount['vesselPrefs']>>({
     isNotifyEnabled: true,
@@ -155,6 +161,7 @@ export default function VesselTrackerPage() {
   
   const [techHistory, setTechHistory] = useState<TechEntry[]>([]);
   const [tacticalHistory, setTacticalHistory] = useState<TacticalEntry[]>([]);
+  const [fullscreenImage, setFullscreenImage] = useState<{url: string, title: string} | null>(null);
 
   const lastStatusesRef = useRef<Record<string, string>>({});
   const lastUpdatesRef = useRef<Record<string, number>>({});
@@ -347,7 +354,7 @@ export default function VesselTrackerPage() {
     });
   };
 
-  const handleTacticalSignal = (label: string) => {
+  const handleTacticalSignal = (label: string, photoUrl?: string) => {
     if (!user || !firestore || !currentPos) return;
     
     const newMarker: HuntingMarker = {
@@ -355,11 +362,12 @@ export default function VesselTrackerPage() {
         lat: currentPos.lat,
         lng: currentPos.lng,
         time: new Date().toISOString(),
-        label: label
+        label: label,
+        photoUrl: photoUrl
     };
 
     updateVesselInFirestore({ 
-        eventLabel: label,
+        eventLabel: photoUrl ? 'PRISE PHOTO' : label,
         huntingMarkers: arrayUnion(newMarker) as any
     });
     
@@ -367,7 +375,20 @@ export default function VesselTrackerPage() {
         const isLoop = !!vesselPrefs.notifyLoops?.tactical;
         playVesselSound(vesselPrefs.notifySounds.tactical || 'sonar', isLoop);
     }
-    toast({ title: "Signalement envoyé", description: label });
+    toast({ title: photoUrl ? "Photo partagée !" : "Signalement envoyé", description: label });
+  };
+
+  const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentPos) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        const base64 = event.target?.result as string;
+        handleTacticalSignal('PRISE', base64);
+    };
+    reader.readAsDataURL(file);
+    if (photoInputRef.current) photoInputRef.current.value = '';
   };
 
   const handleStopSharing = async () => {
@@ -458,12 +479,12 @@ export default function VesselTrackerPage() {
                             vesselName: vessel.displayName || vessel.id, 
                             label: marker.label!, 
                             time: new Date(marker.time), 
-                            pos: { lat: marker.lat, lng: marker.lng } 
+                            pos: { lat: marker.lat, lng: marker.lng },
+                            photoUrl: marker.photoUrl
                         }, ...prev].slice(0, 50);
                     });
                     lastTacticalUpdatesRef.current[marker.id] = markerTime;
                     
-                    // Alerte sonore tactique pour la flotte
                     if (vessel.id !== sharingId && vesselPrefs.notifySettings.tactical) {
                         const isLoop = !!vesselPrefs.notifyLoops?.tactical;
                         playVesselSound(vesselPrefs.notifySounds.tactical || 'sonar', isLoop);
@@ -871,6 +892,15 @@ export default function VesselTrackerPage() {
                                     {t.label}
                                 </Button>
                             ))}
+                            <Button 
+                                variant="outline" 
+                                className="h-12 flex-col gap-1 p-1 border-2 font-black text-[8px] uppercase transition-all active:scale-95 bg-teal-600 text-white border-teal-400"
+                                onClick={() => photoInputRef.current?.click()}
+                            >
+                                <Camera className="size-4" />
+                                PRISE
+                            </Button>
+                            <input type="file" accept="image/*" capture="environment" ref={photoInputRef} className="hidden" onChange={handlePhotoCapture} />
                         </div>
                     </div>
 
@@ -1039,7 +1069,7 @@ export default function VesselTrackerPage() {
 
       <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all", isFullscreen && "fixed inset-0 z-[100] w-screen h-screen rounded-none")}>
         <div className={cn("relative bg-muted/20", isFullscreen ? "flex-grow" : "h-[300px]")}>
-          <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
+          <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} options={{ disableDefaultUI: true, zoomControl: false, mapTypeControl: false, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
                 {followedVessels?.filter(v => v.isSharing).map(vessel => (
                     <React.Fragment key={`vessel-group-${vessel.id}`}>
                         {vessel.status === 'stationary' && vessel.anchorLocation && (
@@ -1061,14 +1091,23 @@ export default function VesselTrackerPage() {
 
                         {vessel.huntingMarkers?.map(marker => {
                             const type = TACTICAL_TYPES.find(t => t.label === marker.label);
-                            const Icon = type?.icon || Fish;
+                            const Icon = marker.photoUrl ? Camera : (type?.icon || Fish);
                             return (
                                 <OverlayView key={marker.id} position={{ lat: marker.lat, lng: marker.lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                                    <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-0.5">
-                                        <div className={cn("px-1.5 py-0.5 rounded text-[8px] font-black text-white shadow-md border whitespace-nowrap", type?.color || "bg-slate-800 border-white/20")}>
+                                    <div 
+                                        style={{ transform: 'translate(-50%, -100%)' }} 
+                                        className="flex flex-col items-center gap-0.5 cursor-pointer group"
+                                        onClick={(e) => {
+                                            if (marker.photoUrl) {
+                                                e.stopPropagation();
+                                                setFullscreenImage({ url: marker.photoUrl, title: marker.label || 'PRISE' });
+                                            }
+                                        }}
+                                    >
+                                        <div className={cn("px-1.5 py-0.5 rounded text-[8px] font-black text-white shadow-md border whitespace-nowrap", marker.photoUrl ? "bg-teal-600 border-teal-200" : (type?.color || "bg-slate-800 border-white/20"))}>
                                             {marker.label?.toUpperCase()}
                                         </div>
-                                        <div className={cn("p-1 rounded-full border-2 border-white shadow-lg", type?.color || "bg-slate-800")}>
+                                        <div className={cn("p-1 rounded-full border-2 border-white shadow-lg", marker.photoUrl ? "bg-teal-600" : (type?.color || "bg-slate-800"))}>
                                             <Icon className="size-3 text-current" />
                                         </div>
                                     </div>
@@ -1185,17 +1224,31 @@ export default function VesselTrackerPage() {
                             <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide px-3">
                                 {tacticalHistory.map((h, i) => (
                                     <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm border-primary/20">
-                                        <div className="flex flex-col gap-0.5">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-black text-primary uppercase">{h.vesselName}</span>
-                                                <Badge className="bg-primary text-white text-[8px] font-black h-4 px-1">{h.label}</Badge>
-                                            </div>
-                                            <div className="flex items-center gap-2 font-bold opacity-40">
-                                                <span>{format(h.time, 'HH:mm:ss')}</span>
-                                                <span className="text-[8px] font-mono">{h.pos.lat.toFixed(5)}, {h.pos.lng.toFixed(5)}</span>
+                                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                                            {h.photoUrl ? (
+                                                <div 
+                                                    className="size-10 rounded-lg bg-teal-50 border border-teal-100 overflow-hidden shrink-0 cursor-pointer"
+                                                    onClick={() => setFullscreenImage({ url: h.photoUrl!, title: h.label })}
+                                                >
+                                                    <img src={h.photoUrl} className="w-full h-full object-cover" alt="" />
+                                                </div>
+                                            ) : (
+                                                <div className="size-10 rounded-lg bg-slate-50 border flex items-center justify-center shrink-0">
+                                                    {React.createElement(TACTICAL_TYPES.find(t => t.label === h.label)?.icon || Fish, { className: "size-5 opacity-20" })}
+                                                </div>
+                                            )}
+                                            <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-black text-primary uppercase truncate">{h.vesselName}</span>
+                                                    <Badge className={cn("text-[8px] font-black h-4 px-1", h.photoUrl ? "bg-teal-600" : "bg-primary")}>{h.label}</Badge>
+                                                </div>
+                                                <div className="flex items-center gap-2 font-bold opacity-40">
+                                                    <span>{format(h.time, 'HH:mm:ss')}</span>
+                                                    <span className="text-[8px] font-mono">{h.pos.lat.toFixed(5)}, {h.pos.lng.toFixed(5)}</span>
+                                                </div>
                                             </div>
                                         </div>
-                                        <div className="flex gap-1">
+                                        <div className="flex gap-1 shrink-0">
                                             <Button variant="ghost" size="icon" className="h-8 w-8 border-2" onClick={() => { 
                                                 navigator.clipboard.writeText(`${h.pos.lat.toFixed(6)}, ${h.pos.lng.toFixed(6)}`);
                                                 toast({ title: "Coordonnées copiées" });
@@ -1214,6 +1267,20 @@ export default function VesselTrackerPage() {
             </div>
         </div>
       </Card>
+
+      <Dialog open={!!fullscreenImage} onOpenChange={(o) => !o && setFullscreenImage(null)}>
+        <DialogContent className="max-w-[95vw] w-full p-0 bg-black border-none rounded-3xl overflow-hidden shadow-2xl z-[200]">
+          <div className="relative w-full h-[80vh] flex flex-col">
+            <button onClick={() => setFullscreenImage(null)} className="absolute top-4 right-4 z-[210] p-2 bg-white/10 hover:bg-white/20 rounded-full text-white backdrop-blur-md shadow-lg"><X className="size-6" /></button>
+            <div className="flex-1 w-full relative flex items-center justify-center">
+              {fullscreenImage && <img src={fullscreenImage.url} className="max-w-full max-h-full object-contain animate-in zoom-in-95 duration-300" alt="" />}
+            </div>
+            <div className="p-6 bg-gradient-to-t from-black/90 to-transparent shrink-0">
+              <DialogHeader><DialogTitle className="text-white font-black uppercase tracking-tighter text-xl text-center">{fullscreenImage?.title}</DialogTitle></DialogHeader>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
