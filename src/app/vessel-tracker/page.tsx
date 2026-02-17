@@ -51,7 +51,7 @@ import {
   Copy
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
-import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
+import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -101,6 +101,7 @@ interface TechEntry {
 }
 
 interface TacticalEntry {
+    id: string;
     vesselName: string;
     label: string;
     time: Date;
@@ -145,7 +146,6 @@ export default function VesselTrackerPage() {
     batteryThreshold: 20
   });
   
-  // LOGS SEPARATED
   const [techHistory, setTechHistory] = useState<TechEntry[]>([]);
   const [tacticalHistory, setTacticalHistory] = useState<TacticalEntry[]>([]);
 
@@ -296,7 +296,21 @@ export default function VesselTrackerPage() {
   };
 
   const handleTacticalSignal = (label: string) => {
-    updateVesselInFirestore({ eventLabel: label });
+    if (!user || !firestore || !currentPos) return;
+    
+    const newMarker: HuntingMarker = {
+        id: Math.random().toString(36).substring(2, 9),
+        lat: currentPos.lat,
+        lng: currentPos.lng,
+        time: new Date().toISOString(),
+        label: label
+    };
+
+    updateVesselInFirestore({ 
+        eventLabel: label,
+        huntingMarkers: arrayUnion(newMarker) as any
+    });
+    
     playVesselSound('sonar');
     toast({ title: "Signalement envoyé", description: label });
   };
@@ -327,9 +341,14 @@ export default function VesselTrackerPage() {
     if (!firestore || !user) return;
     try {
         if (isSharing) {
-            await updateDoc(doc(firestore, 'vessels', sharingId), {
+            const updatePayload: any = {
                 [type === 'tech' ? 'historyClearedAt' : 'tacticalClearedAt']: serverTimestamp()
-            });
+            };
+            if (type === 'tactical') {
+                updatePayload.huntingMarkers = [];
+                updatePayload.eventLabel = null;
+            }
+            await updateDoc(doc(firestore, 'vessels', sharingId), updatePayload);
         }
         toast({ title: "Journal effacé" });
     } catch (e) {}
@@ -380,7 +399,6 @@ export default function VesselTrackerPage() {
         const techClearTime = getTimeMillis(vessel.historyClearedAt);
         const tactClearTime = getTimeMillis(vessel.tacticalClearedAt);
 
-        // CLEAR LOGS IF SIGNALED BY SENDER
         if (techClearTime > (lastClearTimesRef.current[vessel.id + '_tech'] || 0)) {
             setTechHistory(prev => prev.filter(h => h.vesselName !== (vessel.displayName || vessel.id)));
             lastClearTimesRef.current[vessel.id + '_tech'] = techClearTime;
@@ -390,13 +408,30 @@ export default function VesselTrackerPage() {
             lastClearTimesRef.current[vessel.id + '_tact'] = tactClearTime;
         }
 
+        if (vessel.huntingMarkers) {
+            vessel.huntingMarkers.forEach(marker => {
+                const markerTime = new Date(marker.time).getTime();
+                if (markerTime > (lastTacticalUpdatesRef.current[marker.id] || 0) && markerTime > tactClearTime) {
+                    setTacticalHistory(prev => {
+                        if (prev.some(h => h.id === marker.id)) return prev;
+                        return [{ 
+                            id: marker.id,
+                            vesselName: vessel.displayName || vessel.id, 
+                            label: marker.label!, 
+                            time: new Date(marker.time), 
+                            pos: { lat: marker.lat, lng: marker.lng } 
+                        }, ...prev].slice(0, 50);
+                    });
+                    lastTacticalUpdatesRef.current[marker.id] = markerTime;
+                }
+            });
+        }
+
         if (timeKey === 0) return;
         
         const lastStatus = lastStatusesRef.current[vessel.id];
         const lastUpdate = lastUpdatesRef.current[vessel.id] || 0;
-        const lastTacticalUpdate = lastTacticalUpdatesRef.current[vessel.id] || 0;
         const lastBattery = lastBatteryLevelsRef.current[vessel.id] ?? 100;
-        const lastCharging = lastChargingStatesRef.current[vessel.id] ?? false;
         
         const statusChanged = lastStatus !== currentStatus;
         const timestampUpdated = timeKey > lastUpdate;
@@ -414,25 +449,11 @@ export default function VesselTrackerPage() {
             emergency: 'DEMANDE D\'ASSISTANCE'
         };
 
-        // HANDLE TACTICAL EVENTS (FISH/BIRDS)
-        if (vessel.eventLabel && timeKey > lastTacticalUpdate) {
-            const isSpecies = TACTICAL_TYPES.some(t => t.label === vessel.eventLabel);
-            if (isSpecies) {
-                setTacticalHistory(prev => {
-                    const already = prev.length > 0 && prev[0].label === vessel.eventLabel && prev[0].vesselName === (vessel.displayName || vessel.id) && Math.abs(prev[0].time.getTime() - Date.now()) < 5000;
-                    if (already) return prev;
-                    return [{ vesselName: vessel.displayName || vessel.id, label: vessel.eventLabel!, time: new Date(), pos }, ...prev].slice(0, 50);
-                });
-                lastTacticalUpdatesRef.current[vessel.id] = timeKey;
-            }
-        }
-
-        // HANDLE TECHNICAL STATUS CHANGES
         if (statusChanged || (timestampUpdated && !vessel.eventLabel)) {
             const label = statusLabels[currentStatus] || currentStatus;
             setTechHistory(prev => {
-                const already = prev.length > 0 && prev[0].statusLabel === label && prev[0].vesselName === (vessel.displayName || vessel.id) && Math.abs(prev[0].time.getTime() - Date.now()) < 2000;
-                if (already) return prev;
+                const alreadyAdded = prev.length > 0 && prev[0].statusLabel === label && prev[0].vesselName === (vessel.displayName || vessel.id) && Math.abs(prev[0].time.getTime() - Date.now()) < 2000;
+                if (alreadyAdded) return prev;
                 return [{ vesselName: vessel.displayName || vessel.id, statusLabel: label, time: new Date(), pos, batteryLevel: currentBattery, isCharging: currentCharging, accuracy }, ...prev].slice(0, 50);
             });
             
@@ -446,7 +467,6 @@ export default function VesselTrackerPage() {
             lastUpdatesRef.current[vessel.id] = timeKey;
         }
 
-        // BATTERY DROPPED
         const batteryDropped = lastBattery >= (vesselPrefs.batteryThreshold || 20) && currentBattery < (vesselPrefs.batteryThreshold || 20);
         if (batteryDropped && vesselPrefs.notifySettings.battery) {
             if (mode !== 'sender' && vesselPrefs.isNotifyEnabled) playVesselSound('alerte');
@@ -575,7 +595,7 @@ export default function VesselTrackerPage() {
                             <SelectTrigger className="h-8 text-[9px] font-black uppercase flex-1"><SelectValue placeholder="Son..." /></SelectTrigger>
                             <SelectContent>{availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] font-black uppercase">{s.label}</SelectItem>)}</SelectContent>
                         </Select>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 border" onClick={() => playVesselSound(vesselPrefs.notifySounds[ev.key as keyof typeof vesselPrefs.notifySounds])}><Play className="size-3" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 border" onClick={() => playVesselSound(vesselPrefs.notifySounds[ev.key as keyof typeof vesselPrefs.notifySounds] || 'sonar')}><Play className="size-3" /></Button>
                     </div>
                 </div>
             ))}
@@ -813,25 +833,49 @@ export default function VesselTrackerPage() {
         <div className={cn("relative bg-muted/20", isFullscreen ? "flex-grow" : "h-[300px]")}>
           <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
                 {followedVessels?.filter(v => v.isSharing).map(vessel => (
-                    <OverlayView key={vessel.id} position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                    <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
-                        <div className={cn("px-2 py-1 text-white rounded text-[10px] font-black shadow-lg border whitespace-nowrap flex items-center gap-2", 
-                            vessel.status === 'emergency' ? "bg-red-600 border-red-400 animate-pulse" : "bg-slate-900/90 border-white/20")}>
-                          <span className="truncate max-w-[80px]">{vessel.status === 'emergency' ? '!!! URGENCE !!!' : (vessel.displayName || vessel.id)}</span>
-                          <BatteryIconComp level={vessel.batteryLevel} charging={vessel.isCharging} className="size-2.5" />
-                        </div>
-                        <div className={cn("p-2 rounded-full border-2 border-white shadow-xl transition-all", 
-                            vessel.status === 'moving' ? "bg-blue-600" : 
-                            vessel.status === 'returning' ? "bg-indigo-600" :
-                            vessel.status === 'landed' ? "bg-green-600" : 
-                            vessel.status === 'emergency' ? "bg-red-600 animate-pulse scale-125 ring-4 ring-red-500/50" :
-                            "bg-amber-600")}>
-                          {vessel.status === 'stationary' ? <Anchor className="size-5 text-white" /> : 
-                           vessel.status === 'emergency' ? <ShieldAlert className="size-5 text-white" /> :
-                           <Navigation className="size-5 text-white" />}
-                        </div>
-                    </div>
-                    </OverlayView>
+                    <React.Fragment key={`vessel-group-${vessel.id}`}>
+                        {/* Marqueurs tactiques fixes pour ce navire */}
+                        {vessel.huntingMarkers?.map(marker => {
+                            const type = TACTICAL_TYPES.find(t => t.label === marker.label);
+                            const Icon = type?.icon || Fish;
+                            return (
+                                <OverlayView key={marker.id} position={{ lat: marker.lat, lng: marker.lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                                    <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-0.5">
+                                        <div className={cn("px-1.5 py-0.5 rounded text-[8px] font-black text-white shadow-md border whitespace-nowrap", type?.color || "bg-slate-800 border-white/20")}>
+                                            {marker.label?.toUpperCase()}
+                                        </div>
+                                        <div className={cn("p-1 rounded-full border-2 border-white shadow-lg", type?.color || "bg-slate-800")}>
+                                            <Icon className="size-3 text-current" />
+                                        </div>
+                                    </div>
+                                </OverlayView>
+                            );
+                        })}
+
+                        {/* Position actuelle du navire */}
+                        <OverlayView position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                            <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
+                                <div className={cn("px-2 py-1 text-white rounded text-[10px] font-black shadow-lg border whitespace-nowrap flex items-center gap-2", 
+                                    vessel.status === 'emergency' ? "bg-red-600 border-red-400 animate-pulse" : "bg-slate-900/90 border-white/20")}>
+                                  <span className="truncate max-w-[120px]">
+                                    {vessel.status === 'emergency' ? '!!! URGENCE !!!' : (vessel.displayName || vessel.id)}
+                                    {vessel.eventLabel && ` | ${vessel.eventLabel}`}
+                                  </span>
+                                  <BatteryIconComp level={vessel.batteryLevel} charging={vessel.isCharging} className="size-2.5" />
+                                </div>
+                                <div className={cn("p-2 rounded-full border-2 border-white shadow-xl transition-all", 
+                                    vessel.status === 'moving' ? "bg-blue-600" : 
+                                    vessel.status === 'returning' ? "bg-indigo-600" :
+                                    vessel.status === 'landed' ? "bg-green-600" : 
+                                    vessel.status === 'emergency' ? "bg-red-600 animate-pulse scale-125 ring-4 ring-red-500/50" :
+                                    "bg-amber-600")}>
+                                  {vessel.status === 'stationary' ? <Anchor className="size-5 text-white" /> : 
+                                   vessel.status === 'emergency' ? <ShieldAlert className="size-5 text-white" /> :
+                                   <Navigation className="size-5 text-white" />}
+                                </div>
+                            </div>
+                        </OverlayView>
+                    </React.Fragment>
                 ))}
                 {mode === 'sender' && currentPos && <OverlayView position={currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}><PulsingDot /></OverlayView>}
           </GoogleMap>
