@@ -61,7 +61,7 @@ import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { format } from 'date-fns';
+import { format, differenceInMinutes, differenceInSeconds } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
@@ -106,6 +106,8 @@ type HistoryEntry = {
     isCharging?: boolean;
     accuracy?: number;
     mooringRadius?: number;
+    durationMinutes?: number;
+    updateLabel?: string;
 };
 
 export default function VesselTrackerPage() {
@@ -139,6 +141,8 @@ export default function VesselTrackerPage() {
   const watchIdRef = useRef<number | null>(null);
   const immobilityStartTime = useRef<number | null>(null);
   const isFirstFixRef = useRef<boolean>(true);
+  const lastMinutePosRef = useRef<google.maps.LatLngLiteral | null>(null);
+  const lastForcedUpdateTimeRef = useRef<number>(0);
 
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isCatchDialogOpen, setIsCatchDialogOpen] = useState(false);
@@ -243,11 +247,15 @@ export default function VesselTrackerPage() {
       setIsEmergencyEnabled(userProfile.isEmergencyEnabled ?? true);
       setIsCustomMessageEnabled(userProfile.isCustomMessageEnabled ?? true);
       const savedNickname = userProfile.vesselNickname || userProfile.displayName || user?.displayName || user?.email?.split('@')[0] || '';
-      if (!vesselNickname) setVesselNickname(savedNickname);
+      if (!vesselNickname) setNickname(savedNickname);
       if (userProfile.lastVesselId && !customSharingId) setCustomSharingId(userProfile.lastVesselId);
       if (userProfile.fleetGroupId && !fleetGroupId) setFleetGroupId(userProfile.fleetGroupId);
     }
   }, [userProfile, user]);
+
+  const setNickname = (val: string) => {
+    setVesselNickname(val);
+  };
 
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
@@ -334,7 +342,8 @@ export default function VesselTrackerPage() {
         fleetGroupId: cleanGroupId,
         vesselPrefs: vesselPrefs,
         vesselSharingTarget: sharingTarget,
-        isGhostMode: isGhostMode
+        isGhostMode: isGhostMode,
+        vesselNickname: vesselNickname
     }).then(() => { 
         if (vesselIdToFollow) setVesselIdToFollow(''); 
         if (isSharing) {
@@ -459,41 +468,66 @@ export default function VesselTrackerPage() {
     return `${nicknamePrefix}${customText} [MAYDAY/PAN PAN] Position : https://www.google.com/maps?q=-22.27,166.45`;
   }, [vesselSmsMessage, isCustomMessageEnabled, vesselNickname]);
 
+  // INTERVALLE DE MAJ FORCEE ET EVALUATION STATUT (DRIVE)
   useEffect(() => {
-    if (!isSharing || mode !== 'sender') {
-        setCountdown(null);
-        return;
-    }
+    if (!isSharing || mode !== 'sender') return;
 
     const interval = setInterval(() => {
-      if (!immobilityStartTime.current) return;
+        const now = Date.now();
+        
+        // 1. Analyse du statut et Dérive
+        if (currentPos && lastMinutePosRef.current) {
+            const distInMinute = getDistance(currentPos.lat, currentPos.lng, lastMinutePosRef.current.lat, lastMinutePosRef.current.lng);
+            const radius = vesselPrefs.mooringRadius || 20;
+            
+            let newStatus = vesselStatus;
+            let label = null;
 
-      const timeSinceStart = Date.now() - immobilityStartTime.current;
-      const remaining = Math.max(0, Math.ceil((30000 - timeSinceStart) / 1000));
-      
-      if (vesselStatus === 'moving') {
-        setCountdown(remaining);
-      } else {
-        setCountdown(null);
-      }
-      
-      if (timeSinceStart >= 30000 && vesselStatus === 'moving') {
-        if (currentPos && anchorPos) {
-          const dist = getDistance(currentPos.lat, currentPos.lng, anchorPos.lat, anchorPos.lng);
-          if (dist <= (vesselPrefs.mooringRadius || 20)) {
-            handleManualStatus('stationary', 'AU MOUILLAGE (DÉTECTION AUTO)');
-          } else {
-            setAnchorPos(currentPos);
-            immobilityStartTime.current = Date.now();
-            handleManualStatus('moving', 'EN MOUVEMENT (DÉTECTION AUTO)');
-          }
+            if (vesselStatus !== 'returning' && vesselStatus !== 'landed' && vesselStatus !== 'emergency') {
+                if (distInMinute <= radius) {
+                    newStatus = 'stationary';
+                } else if (distInMinute < 100) {
+                    newStatus = 'drifting';
+                    label = 'BATEAU À LA DÉRIVE';
+                } else {
+                    newStatus = 'moving';
+                }
+
+                if (newStatus !== vesselStatus) {
+                    handleManualStatus(newStatus as any, label || undefined);
+                }
+            }
         }
-        setCountdown(null);
-      }
-    }, 1000); 
+        
+        // 2. Mise à jour forcée Firestore (toutes les minutes)
+        if (now - lastForcedUpdateTimeRef.current >= 60000) {
+            updateVesselInFirestore({ 
+                eventLabel: `MAJ DU POINT GPS à ${format(new Date(), 'HH:mm')}`
+            });
+            lastMinutePosRef.current = currentPos;
+            lastForcedUpdateTimeRef.current = now;
+        }
+
+        // 3. Décompte détection auto
+        if (immobilityStartTime.current && vesselStatus === 'moving') {
+            const timeSinceStart = now - immobilityStartTime.current;
+            const remaining = Math.max(0, Math.ceil((30000 - timeSinceStart) / 1000));
+            setCountdown(remaining > 0 ? remaining : null);
+            
+            if (timeSinceStart >= 30000) {
+                if (currentPos && anchorPos) {
+                    const dist = getDistance(currentPos.lat, currentPos.lng, anchorPos.lat, anchorPos.lng);
+                    if (dist <= (vesselPrefs.mooringRadius || 20)) {
+                        handleManualStatus('stationary', 'AU MOUILLAGE (DÉTECTION AUTO)');
+                    }
+                }
+                setCountdown(null);
+            }
+        }
+    }, 1000);
 
     return () => clearInterval(interval);
-  }, [isSharing, mode, vesselStatus, currentPos, anchorPos, vesselPrefs.mooringRadius]);
+  }, [isSharing, mode, vesselStatus, currentPos, anchorPos, vesselPrefs.mooringRadius, updateVesselInFirestore]);
 
   useEffect(() => {
     if (!followedVessels) return;
@@ -520,6 +554,7 @@ export default function VesselTrackerPage() {
             const statusLabels: Record<string, string> = { 
                 moving: 'EN MOUVEMENT', 
                 stationary: 'AU MOUILLAGE', 
+                drifting: 'À LA DÉRIVE',
                 offline: 'SIGNAL PERDU',
                 returning: 'RETOUR MAISON',
                 landed: 'À TERRE (HOME)',
@@ -527,6 +562,7 @@ export default function VesselTrackerPage() {
             };
 
             const label = vessel.eventLabel || statusLabels[currentStatus] || currentStatus.toUpperCase();
+            const duration = differenceInMinutes(new Date(), new Date(timeKey));
             
             newEntries.push({ 
                 vesselId: vessel.id,
@@ -537,12 +573,23 @@ export default function VesselTrackerPage() {
                 batteryLevel: vessel.batteryLevel, 
                 isCharging: vessel.isCharging,
                 accuracy: vessel.accuracy,
-                mooringRadius: vessel.mooringRadius
+                mooringRadius: vessel.mooringRadius,
+                durationMinutes: duration,
+                updateLabel: `MAJ à ${format(new Date(timeKey), 'HH:mm')}`
             });
+
+            // Veille Stratégique pour Récepteur B
+            if (mode === 'receiver' && vessel.status === 'stationary' && vesselPrefs.isWatchEnabled) {
+                if (duration >= vesselPrefs.watchDuration) {
+                    playVesselSound(vesselPrefs.watchSound || 'emergency');
+                    toast({ variant: 'destructive', title: "VEILLE STRATÉGIQUE", description: `${vessel.displayName} immobile depuis ${duration} min` });
+                }
+            }
 
             if (mode !== 'sender' && lastStatus && lastStatus !== currentStatus && vesselPrefs.isNotifyEnabled) {
                 let soundKey = '';
                 if (currentStatus === 'emergency') soundKey = 'emergency';
+                else if (currentStatus === 'drifting') soundKey = 'stationary';
                 else if (vessel.eventLabel?.includes('OISEAUX')) soundKey = 'birds';
                 else if (vessel.eventLabel?.includes('PRISE')) soundKey = 'birds';
                 else if (currentStatus === 'returning' || currentStatus === 'landed') soundKey = 'moving';
@@ -557,7 +604,7 @@ export default function VesselTrackerPage() {
         }
     });
     if (newEntries.length > 0) setHistory(prev => [...newEntries, ...prev].slice(0, 20));
-  }, [followedVessels, mode, vesselPrefs, playVesselSound]);
+  }, [followedVessels, mode, vesselPrefs, playVesselSound, labels]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
@@ -575,41 +622,23 @@ export default function VesselTrackerPage() {
             if (isFirstFixRef.current) { 
                 setAnchorPos(newPos); 
                 immobilityStartTime.current = Date.now();
+                lastMinutePosRef.current = newPos;
                 isFirstFixRef.current = false; 
                 updateVesselInFirestore({ status: 'moving', isSharing: true, eventLabel: 'LANCEMENT EN COURS', accuracy });
                 return; 
             }
-            
-            if (anchorPos) {
-                const dist = getDistance(newPos.lat, newPos.lng, anchorPos.lat, anchorPos.lng);
-                const currentRadius = vesselPrefs.mooringRadius || 20;
-                
-                if (vesselStatus === 'stationary' && dist > currentRadius) {
-                    setVesselStatus('moving');
-                    setAnchorPos(newPos);
-                    immobilityStartTime.current = Date.now();
-                    updateVesselInFirestore({ status: 'moving', eventLabel: 'REPRISE DE MOUVEMENT (SORTIE ZONE)', accuracy });
-                } else if (vesselStatus === 'moving' && dist > currentRadius) {
-                    setAnchorPos(newPos);
-                    immobilityStartTime.current = Date.now();
-                    updateVesselInFirestore({ accuracy });
-                } else {
-                    updateVesselInFirestore({ accuracy });
-                }
-            }
+            updateVesselInFirestore({ accuracy });
         } else {
             updateVesselInFirestore({ accuracy });
         }
       },
       (err) => {
-        let msg = "Impossible de récupérer votre position.";
-        if (err.code === 1) msg = "Accès GPS refusé. Veuillez autoriser la localisation.";
-        toast({ variant: "destructive", title: "Erreur GPS", description: msg });
+        toast({ variant: "destructive", title: "Erreur GPS", description: "Vérifiez vos réglages GPS." });
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 }
     );
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
-  }, [isSharing, mode, anchorPos, updateVesselInFirestore, map, toast, vesselStatus, vesselPrefs.mooringRadius]);
+  }, [isSharing, mode, updateVesselInFirestore, map, toast, vesselStatus]);
 
   const handleRecenter = () => {
     const pos = currentPos || (followedVessels?.find(v => v.isSharing && v.id === sharingId)?.location ? { lat: followedVessels.find(v => v.isSharing && v.id === sharingId)!.location!.latitude, lng: followedVessels.find(v => v.isSharing && v.id === sharingId)!.location!.longitude } : null);
@@ -928,7 +957,7 @@ export default function VesselTrackerPage() {
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Surnom du capitaine / navire</Label>
-                                    <Input placeholder="EX: CAPITAINE NEMO" value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} className="font-bold text-center h-12 border-2 uppercase flex-grow w-full" />
+                                    <Input placeholder="EX: CAPITAINE NEMO" value={vesselNickname} onChange={e => setNickname(e.target.value)} className="font-bold text-center h-12 border-2 uppercase flex-grow w-full" />
                                 </div>
                                 <div className="space-y-4 p-4 border-2 rounded-2xl bg-primary/5 border-dashed">
                                     <div className="flex justify-between items-center px-1">
@@ -1091,16 +1120,10 @@ export default function VesselTrackerPage() {
         <div className={cn("relative bg-muted/20", isFullscreen ? "flex-grow" : "h-[300px]")}>
           <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
                 {followedVessels?.filter(v => {
-                    // Émetteur A : Ne voir QUE son propre navire si mode A est actif
                     if (mode === 'sender') return v.id === sharingId && isSharing;
-                    
-                    // Récepteur B et Flotte C : Suivre les règles de masquage avec exception URGENCE
                     const isDistressed = v.status === 'emergency';
                     const isMe = v.id === sharingId;
-                    
-                    // Si mode Fantôme activé, cacher le navire sur la carte locale aussi (demande utilisateur)
                     if (isMe && isGhostMode && !isDistressed) return false;
-
                     return v.isSharing && (isDistressed || !v.isGhostMode) && (
                         (savedVesselIds.includes(v.id) && !v.isPrivateHidden) || 
                         (v.groupId === fleetGroupId?.toUpperCase() && !v.isPositionHidden)
@@ -1136,12 +1159,14 @@ export default function VesselTrackerPage() {
                                     vessel.status === 'moving' ? "bg-blue-600" : 
                                     vessel.status === 'emergency' ? "bg-red-600 animate-pulse" : 
                                     vessel.status === 'stationary' ? "bg-amber-600" : 
+                                    vessel.status === 'drifting' ? "bg-orange-600" :
                                     vessel.status === 'returning' ? "bg-indigo-600" :
                                     vessel.status === 'landed' ? "bg-green-600" : "bg-slate-600")}>
                                   {vessel.status === 'stationary' ? <Anchor className="size-5 text-white" /> : 
                                    vessel.status === 'returning' ? <Ship className="size-5 text-white" /> : 
                                    vessel.status === 'landed' ? <Home className="size-5 text-white" /> : 
                                    vessel.status === 'emergency' ? <ShieldAlert className="size-5 text-white" /> :
+                                   vessel.status === 'drifting' ? <RefreshCw className="size-5 text-white" /> :
                                    <Navigation className="size-5 text-white" />}
                                 </div>
                             </div>
@@ -1211,11 +1236,12 @@ export default function VesselTrackerPage() {
                                                 <span className="font-black text-primary">{h.vesselName}</span>
                                                 <Badge variant="outline" className={cn("text-[8px] font-black uppercase h-4 px-1.5", 
                                                     h.statusLabel.includes('URGENCE') ? 'border-red-500 text-red-600 bg-red-50' :
+                                                    h.statusLabel.includes('DÉRIVE') ? 'border-orange-500 text-orange-600 bg-orange-50' :
                                                     h.statusLabel.includes('MOUILLAGE') ? 'border-amber-500 text-amber-600 bg-amber-50' :
                                                     h.statusLabel.includes('RETOUR') ? 'border-indigo-500 text-indigo-600 bg-indigo-50' :
                                                     h.statusLabel.includes('TERRE') ? 'border-green-500 text-green-600 bg-green-50' :
                                                     'border-primary text-primary bg-primary/5'
-                                                )}>{h.statusLabel} {h.statusLabel.includes('MOUILLAGE') && h.mooringRadius ? `(${h.mooringRadius}m)` : ''}</Badge>
+                                                )}>{h.statusLabel}</Badge>
                                                 {h.batteryLevel !== undefined && (
                                                     <span className="flex items-center gap-1 bg-slate-100 px-1.5 py-0.5 rounded text-[8px] font-black text-slate-500 border border-slate-200">
                                                         <BatteryIconComp level={h.batteryLevel} charging={h.isCharging} className="size-2.5" />
@@ -1224,7 +1250,8 @@ export default function VesselTrackerPage() {
                                                 )}
                                               </div>
                                               <div className="flex items-center gap-2 text-[9px] font-bold opacity-40 uppercase">
-                                                <span>{format(h.time, 'HH:mm:ss')}</span>
+                                                <span>{h.updateLabel}</span>
+                                                {h.durationMinutes !== undefined && <span>• Actif depuis {h.durationMinutes} min</span>}
                                                 {h.accuracy !== undefined && <span>• +/- {h.accuracy}m GPS</span>}
                                               </div>
                                             </div>
