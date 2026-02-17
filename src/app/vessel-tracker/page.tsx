@@ -231,6 +231,17 @@ export default function VesselTrackerPage() {
     update();
   }, [user, firestore, isSharing, sharingId, vesselNickname, currentPos, vesselPrefs.mooringRadius]);
 
+  const handleManualStatus = (st: VesselStatus['status'], label?: string) => {
+    setVesselStatus(st);
+    if (st === 'moving' || label === 'ERREUR - REPRISE MODE AUTO') {
+        immobilityStartTime.current = Date.now();
+        setAnchorPos(currentPos);
+        isFirstFixRef.current = label === 'ERREUR - REPRISE MODE AUTO';
+    }
+    updateVesselInFirestore({ status: st, eventLabel: label || null });
+    toast({ title: label || 'Statut mis à jour' });
+  };
+
   const handleSaveVessel = () => {
     if (!user || !firestore) return;
     const cleanId = (vesselIdToFollow || customSharingId).trim().toUpperCase();
@@ -248,17 +259,6 @@ export default function VesselTrackerPage() {
   const handleRemoveSavedVessel = (id: string) => {
     if (!user || !firestore) return;
     updateDoc(doc(firestore, 'users', user.uid), { savedVesselIds: arrayRemove(id) }).then(() => toast({ title: "Navire retiré" }));
-  };
-
-  const handleManualStatus = (st: VesselStatus['status'], label?: string) => {
-    setVesselStatus(st);
-    if (st === 'moving' || label === 'ERREUR - REPRISE MODE AUTO') {
-        immobilityStartTime.current = Date.now();
-        setAnchorPos(currentPos);
-        isFirstFixRef.current = label === 'ERREUR - REPRISE MODE AUTO';
-    }
-    updateVesselInFirestore({ status: st, eventLabel: label || null });
-    toast({ title: label || 'Statut mis à jour' });
   };
 
   const handleSignalBirds = () => {
@@ -350,6 +350,7 @@ export default function VesselTrackerPage() {
           } else {
             setAnchorPos(currentPos);
             immobilityStartTime.current = Date.now();
+            handleManualStatus('moving', 'EN MOUVEMENT (DÉTECTION AUTO)');
           }
         }
         setCountdown(null);
