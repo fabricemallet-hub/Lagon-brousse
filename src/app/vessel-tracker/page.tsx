@@ -218,6 +218,10 @@ export default function VesselTrackerPage() {
             ...data 
         };
 
+        if (data.status || data.eventLabel) {
+            updatePayload.statusChangedAt = serverTimestamp();
+        }
+
         if (!effectiveHidePos && !updatePayload.location && currentPosRef.current) {
             updatePayload.location = { latitude: currentPosRef.current.lat, longitude: currentPosRef.current.lng };
         } else if (effectiveHidePos) {
@@ -271,7 +275,7 @@ export default function VesselTrackerPage() {
     setIsSharing(false);
     setIsReceiverGpsActive(false);
     const vesselRef = doc(firestore, 'vessels', sharingId);
-    setDoc(vesselRef, { isSharing: false, lastActive: serverTimestamp() }, { merge: true })
+    setDoc(vesselRef, { isSharing: false, lastActive: serverTimestamp(), statusChangedAt: serverTimestamp() }, { merge: true })
       .then(() => {
         if (watchIdRef.current) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
         setCurrentPos(null); currentPosRef.current = null; anchorPosRef.current = null; lastSentStatusRef.current = null; isFirstFixRef.current = true;
@@ -321,10 +325,34 @@ export default function VesselTrackerPage() {
         const currentStatus = isSharingActive ? (vessel.status || 'moving') : 'offline';
         const timeKey = vessel.statusChangedAt?.toMillis ? vessel.statusChangedAt.toMillis() : (vessel.statusChangedAt?.seconds ? vessel.statusChangedAt.seconds * 1000 : 0);
         if (timeKey === 0) return;
+        
         const lastStatus = lastStatusesRef.current[vessel.id];
-        if (lastStatus !== currentStatus || timeKey > (lastUpdatesRef.current[vessel.id] || 0)) {
+        const lastUpdate = lastUpdatesRef.current[vessel.id] || 0;
+
+        if (lastStatus !== currentStatus || timeKey > lastUpdate) {
             const pos = vessel.isPositionHidden ? null : { lat: vessel.location?.latitude || INITIAL_CENTER.lat, lng: vessel.location?.longitude || INITIAL_CENTER.lng };
-            newEntries.push({ vesselName: vessel.displayName || vessel.id, statusLabel: vessel.eventLabel || currentStatus.toUpperCase(), time: new Date(), pos, batteryLevel: vessel.batteryLevel, isCharging: vessel.isCharging, accuracy: vessel.accuracy });
+            
+            const statusLabels: Record<string, string> = { 
+                moving: 'EN MOUVEMENT', 
+                stationary: 'AU MOUILLAGE', 
+                offline: 'SIGNAL PERDU',
+                returning: 'RETOUR MAISON',
+                landed: 'À TERRE (HOME)',
+                emergency: 'URGENCE - ASSISTANCE'
+            };
+
+            const label = vessel.eventLabel || statusLabels[currentStatus] || currentStatus.toUpperCase();
+            
+            newEntries.push({ 
+                vesselName: vessel.displayName || vessel.id, 
+                statusLabel: label, 
+                time: new Date(), 
+                pos, 
+                batteryLevel: vessel.batteryLevel, 
+                isCharging: vessel.isCharging, 
+                accuracy: vessel.accuracy 
+            });
+
             if (mode === 'receiver' && lastStatus && lastStatus !== currentStatus && vesselPrefs.isNotifyEnabled) {
                 const soundKey = (currentStatus === 'returning' || currentStatus === 'landed') ? 'moving' : currentStatus;
                 if (vesselPrefs.notifySettings[soundKey as keyof typeof vesselPrefs.notifySettings]) playVesselSound(vesselPrefs.notifySounds[soundKey as keyof typeof vesselPrefs.notifySounds] || 'sonar');
@@ -422,7 +450,7 @@ export default function VesselTrackerPage() {
 
                         <div className="grid grid-cols-2 gap-2">
                             <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatus('returning')}>
-                                <Navigation className="size-4 text-blue-600" /> Retour Maison
+                                <Ship className="size-4 text-indigo-600" /> Retour Maison
                             </Button>
                             <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatus('landed')}>
                                 <Home className="size-4 text-green-600" /> Home (À terre)
@@ -768,12 +796,34 @@ export default function VesselTrackerPage() {
                 {followedVessels?.map(vessel => vessel.isSharing && vessel.location && (
                     <OverlayView key={`vessel-render-${vessel.id}`} position={{ lat: vessel.location.latitude, lng: vessel.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                         <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
-                            <div className={cn("px-2 py-1 rounded text-[10px] font-black text-white shadow-lg border whitespace-nowrap flex items-center gap-2", vessel.status === 'emergency' ? "bg-red-600 border-red-400" : "bg-slate-900/90 border-white/20")}>
+                            <div className={cn("px-2 py-1 rounded text-[10px] font-black text-white shadow-lg border whitespace-nowrap flex items-center gap-2", 
+                                vessel.status === 'emergency' ? "bg-red-600 border-red-400" : 
+                                vessel.status === 'landed' ? "bg-green-600 border-green-400" :
+                                vessel.status === 'stationary' ? "bg-amber-600 border-amber-400" :
+                                vessel.status === 'returning' ? "bg-indigo-600 border-indigo-400" :
+                                "bg-slate-900/90 border-white/20")}>
                               <span>{vessel.displayName || vessel.id}</span>
-                              {vessel.status === 'emergency' && <span className="ml-1 animate-pulse text-[8px] border-l pl-2 border-white/30">URGENCE</span>}
+                              <span className="text-[8px] border-l pl-2 border-white/20">
+                                {vessel.status === 'emergency' ? 'SOS' : 
+                                 vessel.status === 'moving' ? 'MOUV' : 
+                                 vessel.status === 'stationary' ? 'MOUIL' : 
+                                 vessel.status === 'returning' ? 'RETOUR' : 
+                                 vessel.status === 'landed' ? 'HOME' : 'OFF'}
+                              </span>
                               <BatteryIconComp level={vessel.batteryLevel} charging={vessel.isCharging} />
                             </div>
-                            <div className={cn("p-2 rounded-full border-2 border-white shadow-xl", vessel.status === 'moving' ? "bg-blue-600" : vessel.status === 'emergency' ? "bg-red-600 animate-pulse" : "bg-amber-600")}><Navigation className="size-5 text-white" /></div>
+                            <div className={cn("p-2 rounded-full border-2 border-white shadow-xl", 
+                                vessel.status === 'moving' ? "bg-blue-600" : 
+                                vessel.status === 'emergency' ? "bg-red-600 animate-pulse" : 
+                                vessel.status === 'stationary' ? "bg-amber-600" :
+                                vessel.status === 'returning' ? "bg-indigo-600" :
+                                vessel.status === 'landed' ? "bg-green-600" : "bg-slate-600")}>
+                                {vessel.status === 'stationary' ? <Anchor className="size-5 text-white" /> : 
+                                 vessel.status === 'returning' ? <Ship className="size-5 text-white" /> : 
+                                 vessel.status === 'landed' ? <Home className="size-5 text-white" /> : 
+                                 vessel.status === 'emergency' ? <ShieldAlert className="size-5 text-white" /> :
+                                 <Navigation className="size-5 text-white" />}
+                            </div>
                         </div>
                     </OverlayView>
                 ))}
@@ -816,7 +866,13 @@ export default function VesselTrackerPage() {
                         {history.length > 0 ? history.map((h, i) => (
                             <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 shadow-sm animate-in fade-in">
                                 <div className="flex flex-col gap-0.5">
-                                    <span className="font-black text-primary uppercase text-[10px]">{h.vesselName} - {h.statusLabel}</span>
+                                    <span className={cn("font-black uppercase text-[10px]", 
+                                        h.statusLabel.includes('URGENCE') ? 'text-red-600' :
+                                        h.statusLabel.includes('MOUILLAGE') ? 'text-amber-600' :
+                                        h.statusLabel.includes('RETOUR') ? 'text-indigo-600' :
+                                        h.statusLabel.includes('TERRE') ? 'text-green-600' :
+                                        'text-primary'
+                                    )}>{h.vesselName} - {h.statusLabel}</span>
                                     <span className="text-[8px] font-bold opacity-40 uppercase">{format(h.time, 'HH:mm:ss')} {h.accuracy ? `• +/-${h.accuracy}m` : ''}</span>
                                 </div>
                                 {h.pos && <Button variant="outline" size="sm" className="h-8 text-[9px] font-black border-2" onClick={() => { map?.panTo(h.pos!); map?.setZoom(17); }}><MapPin className="size-3 text-primary" /> GPS</Button>}
