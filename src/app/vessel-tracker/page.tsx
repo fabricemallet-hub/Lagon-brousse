@@ -275,41 +275,6 @@ export default function VesselTrackerPage() {
     update();
   }, [user, firestore, isSharing, sharingId, vesselNickname, currentPos, vesselPrefs.mooringRadius, fleetGroupId, isGhostMode]);
 
-  const handleForceGpsUpdate = () => {
-    if (!isSharing || mode !== 'sender') return;
-    
-    setSecondsUntilUpdate(60);
-    
-    let statusToUpdate = vesselStatus;
-    let labelToUpdate = null;
-
-    if (currentPos && lastMinutePosRef.current) {
-        const distInMinute = getDistance(currentPos.lat, currentPos.lng, lastMinutePosRef.current.lat, lastMinutePosRef.current.lng);
-        const radius = vesselPrefs.mooringRadius || 20;
-        
-        if (vesselStatus !== 'returning' && vesselStatus !== 'landed' && vesselStatus !== 'emergency') {
-            if (distInMinute <= radius) {
-                statusToUpdate = 'stationary';
-            } else if (distInMinute < 100) {
-                statusToUpdate = 'drifting';
-                labelToUpdate = 'À LA DÉRIVE';
-            } else {
-                statusToUpdate = 'moving';
-            }
-        }
-    }
-
-    const finalLabel = labelToUpdate || `${statusLabels[statusToUpdate]} (MAJ FORCÉE ${format(new Date(), 'HH:mm')})`;
-    setVesselStatus(statusToUpdate);
-    updateVesselInFirestore({ 
-        status: statusToUpdate,
-        eventLabel: finalLabel
-    });
-
-    lastMinutePosRef.current = currentPos;
-    toast({ title: "Point GPS forcé", description: "Position synchronisée avec succès." });
-  };
-
   const handleSaveVessel = () => {
     if (!user || !firestore) return;
     const cleanId = customSharingId.trim().toUpperCase();
@@ -386,6 +351,13 @@ export default function VesselTrackerPage() {
     if (!user || !firestore) return;
     setVesselPrefs(newPrefs);
     updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: newPrefs }).catch(() => {});
+  };
+
+  const sendEmergencySms = (type: string) => {
+    const pos = currentPos || (selfVesselData?.location ? { lat: selfVesselData.location.latitude, lng: selfVesselData.location.longitude } : null);
+    const posUrl = pos ? `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}` : "Position inconnue";
+    const body = `${vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : ""}${isCustomMessageEnabled ? vesselSmsMessage : "Assistance requise."} [${type}] Position : ${posUrl}`;
+    window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
 
   const handleSharingTargetChange = (target: 'none' | 'receiver' | 'fleet' | 'both') => {
@@ -466,14 +438,49 @@ export default function VesselTrackerPage() {
 
   const handleDeleteMarker = async (marker: any) => {
     if (!user || !firestore) return;
-    const vesselId = marker.vesselId || sharingId;
-    if (vesselId === sharingId) {
+    const vId = marker.vesselId || sharingId;
+    if (vId === sharingId) {
         updateDoc(doc(firestore, 'vessels', sharingId), {
             huntingMarkers: arrayRemove(marker)
         });
     } else {
         setLocallyClearedMarkerIds(prev => [...prev, marker.id]);
     }
+  };
+
+  const handleForceGpsUpdate = () => {
+    if (!isSharing || mode !== 'sender') return;
+    
+    setSecondsUntilUpdate(60);
+    
+    let statusToUpdate = vesselStatus;
+    let labelToUpdate = null;
+
+    if (currentPos && lastMinutePosRef.current) {
+        const distInMinute = getDistance(currentPos.lat, currentPos.lng, lastMinutePosRef.current.lat, lastMinutePosRef.current.lng);
+        const radius = vesselPrefs.mooringRadius || 20;
+        
+        if (vesselStatus !== 'returning' && vesselStatus !== 'landed' && vesselStatus !== 'emergency') {
+            if (distInMinute <= radius) {
+                statusToUpdate = 'stationary';
+            } else if (distInMinute < 100) {
+                statusToUpdate = 'drifting';
+                labelToUpdate = 'À LA DÉRIVE';
+            } else {
+                statusToUpdate = 'moving';
+            }
+        }
+    }
+
+    const finalLabel = labelToUpdate || `${statusLabels[statusToUpdate]} (MAJ FORCÉE ${format(new Date(), 'HH:mm')})`;
+    setVesselStatus(statusToUpdate);
+    updateVesselInFirestore({ 
+        status: statusToUpdate,
+        eventLabel: finalLabel
+    });
+
+    lastMinutePosRef.current = currentPos;
+    toast({ title: "Point GPS forcé", description: "Position synchronisée avec succès." });
   };
 
   useEffect(() => {
@@ -609,20 +616,6 @@ export default function VesselTrackerPage() {
     if (pos && map) { map.panTo(pos); map.setZoom(15); } else { shouldPanOnNextFix.current = true; }
   };
 
-  const sendEmergencySms = (type: string) => {
-    const pos = currentPos || (selfVesselData?.location ? { lat: selfVesselData.location.latitude, lng: selfVesselData.location.longitude } : null);
-    if (!pos) { toast({ variant: "destructive", title: "GPS non verrouillé" }); return; }
-    
-    if (isGhostMode) {
-        setIsGhostMode(false);
-        updateVesselInFirestore({ isGhostMode: false, status: 'emergency', eventLabel: 'DEMANDE D\'ASSISTANCE (MAYDAY)' });
-    }
-
-    const posUrl = `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
-    const body = `${vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : ""}${isCustomMessageEnabled ? vesselSmsMessage : "Assistance requise."} [${type}] Position : ${posUrl}`;
-    window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
-  };
-
   const handleRemoveSavedVessel = (id: string) => {
     if (!user || !firestore) return;
     updateDoc(doc(firestore, 'users', user.uid), {
@@ -718,6 +711,18 @@ export default function VesselTrackerPage() {
 
                     {isSharing && (
                         <>
+                            <Button 
+                                variant="destructive" 
+                                className="w-full h-14 font-black uppercase text-[11px] gap-3 shadow-lg border-2 border-white/20 bg-red-400 hover:bg-red-500"
+                                onClick={() => {
+                                    handleManualStatus('emergency', 'DEMANDE ASSISTANCE (PROBLÈME)');
+                                    if (isGhostMode) handleGhostModeToggle(false);
+                                    sendEmergencySms('MAYDAY');
+                                }}
+                            >
+                                <AlertCircle className="size-5" /> DEMANDE ASSISTANCE (PROBLÈME)
+                            </Button>
+
                             <div className="grid grid-cols-2 gap-2">
                                 <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatus('returning')} disabled={vesselStatus === 'returning'}>
                                     <Navigation className="size-4 text-blue-600" /> Retour Maison
