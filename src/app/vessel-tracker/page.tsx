@@ -154,13 +154,20 @@ export default function VesselTrackerPage() {
   
   const vesselsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
+    
+    // Si on est en mode Flotte (C), on cherche par GroupID
+    if (mode === 'fleet' && fleetGroupId) {
+        return query(collection(firestore, 'vessels'), where('groupId', '==', fleetGroupId.trim().toUpperCase()));
+    }
+
+    // Sinon (Émetteur ou Récepteur), on cherche par liste d'IDs
     const queryIds = [...savedVesselIds];
     if (isSharing && !queryIds.includes(sharingId)) {
         queryIds.push(sharingId);
     }
     if (queryIds.length === 0) return null;
     return query(collection(firestore, 'vessels'), where('id', 'in', queryIds.slice(0, 10)));
-  }, [firestore, savedVesselIds, sharingId, isSharing]);
+  }, [firestore, savedVesselIds, sharingId, isSharing, mode, fleetGroupId]);
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
@@ -210,6 +217,7 @@ export default function VesselTrackerPage() {
       setVesselNickname(userProfile.vesselNickname || '');
       setCustomSharingId(userProfile.lastVesselId || '');
       if (userProfile.vesselSharingTarget) setSharingTarget(userProfile.vesselSharingTarget);
+      if (userProfile.fleetGroupId) setFleetGroupId(userProfile.fleetGroupId);
     }
   }, [userProfile]);
 
@@ -557,6 +565,20 @@ export default function VesselTrackerPage() {
     if (pos && map) { map.panTo(pos); map.setZoom(15); } else { shouldPanOnNextFix.current = true; }
   };
 
+  const handleDeleteMarker = (marker: any) => {
+    if (isSharing && marker.vesselId === sharingId) {
+        updateDoc(doc(firestore!, 'vessels', sharingId), { huntingMarkers: arrayRemove(marker) });
+    } else {
+        setLocallyClearedMarkerIds(prev => [...prev, marker.id]);
+    }
+  };
+
+  const smsPreview = useMemo(() => {
+    const nicknamePrefix = vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : "";
+    const customText = (isCustomMessageEnabled && vesselSmsMessage) ? vesselSmsMessage : "Requiert assistance immédiate.";
+    return `${nicknamePrefix}${customText} [MAYDAY/PAN PAN] Position : https://www.google.com/maps?q=-22.27,166.45`;
+  }, [vesselSmsMessage, isCustomMessageEnabled, vesselNickname]);
+
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
       {isSharing && mode === 'sender' && (
@@ -657,7 +679,6 @@ export default function VesselTrackerPage() {
                         <Zap className="size-6 fill-white" /> Lancer le Partage
                     </Button>
 
-                    {/* CONFIGURATION AVANT PARTAGE */}
                     <Accordion type="single" collapsible className="w-full">
                         <AccordionItem value="sender-prefs" className="border-none">
                             <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
@@ -714,6 +735,14 @@ export default function VesselTrackerPage() {
                                         className="border-2 font-medium min-h-[80px]"
                                     />
                                 </div>
+                                <div className="space-y-2 pt-2 border-t border-dashed">
+                                    <p className="text-[9px] font-black uppercase text-primary flex items-center gap-2 ml-1">
+                                        <Eye className="size-3" /> Visualisation du SMS envoyé :
+                                    </p>
+                                    <div className="p-3 bg-muted/30 rounded-xl border-2 italic text-[10px] font-medium leading-relaxed text-slate-600">
+                                        "{smsPreview}"
+                                    </div>
+                                </div>
                                 <Button onClick={handleSaveVessel} className="w-full h-12 font-black uppercase text-[10px] tracking-widest gap-2 shadow-md">
                                     <Save className="size-4" /> Enregistrer mes réglages
                                 </Button>
@@ -755,7 +784,7 @@ export default function VesselTrackerPage() {
                 <div className="space-y-1">
                     <Label className="text-[9px] font-black uppercase ml-1 opacity-60">ID du groupe Flotte (ex: ABCD)</Label>
                     <div className="flex gap-2">
-                        <Input placeholder="ENTREZ L'ID..." value={fleetGroupId} onChange={e => setFleetGroupId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest" />
+                        <Input placeholder="ENTREZ L'ID DU GROUPE..." value={fleetGroupId} onChange={e => setFleetGroupId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest w-full" />
                         <Button variant="default" className="h-12 px-4 font-black uppercase text-[10px] shrink-0" onClick={handleSaveVessel} disabled={!fleetGroupId.trim()}><Check className="size-4" /></Button>
                     </div>
                 </div>
@@ -771,7 +800,6 @@ export default function VesselTrackerPage() {
             </div>
           )}
 
-          {/* RÉGLAGES SONS COMMUNS */}
           <Accordion type="single" collapsible className="w-full">
             <AccordionItem value="sound-prefs" className="border-none">
               <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
@@ -796,7 +824,7 @@ export default function VesselTrackerPage() {
                     <div className="grid gap-3">
                       {['moving', 'stationary', 'offline', 'emergency'].map(key => (
                         <div key={key} className="flex items-center justify-between gap-2">
-                          <span className="text-[9px] font-bold uppercase flex-1">{key}</span>
+                          <span className="text-[9px] font-bold uppercase flex-1">{key === 'moving' ? 'Mouvement' : key === 'stationary' ? 'Mouillage' : key === 'offline' ? 'Signal Perdu' : 'Urgence'}</span>
                           <Select value={vesselPrefs.notifySounds[key as keyof typeof vesselPrefs.notifySounds]} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, notifySounds: { ...vesselPrefs.notifySounds, [key]: v } })}>
                             <SelectTrigger className="h-8 text-[9px] font-black uppercase w-32 bg-muted/30"><SelectValue placeholder="Son..." /></SelectTrigger>
                             <SelectContent>
@@ -944,13 +972,7 @@ export default function VesselTrackerPage() {
                                                 <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase border-2 px-3 gap-2" onClick={() => { map?.panTo({ lat: m.lat, lng: m.lng }); map?.setZoom(17); }}>
                                                     <LocateFixed className="size-3 text-primary" /> GPS
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive border-2" onClick={() => {
-                                                    if (isSharing && m.vesselId === sharingId) {
-                                                        updateDoc(doc(firestore!, 'vessels', sharingId), { huntingMarkers: arrayRemove(m) });
-                                                    } else {
-                                                        setLocallyClearedMarkerIds(prev => [...prev, m.id]);
-                                                    }
-                                                }}><Trash2 className="size-3.5" /></Button>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive border-2" onClick={() => handleDeleteMarker(m)}><Trash2 className="size-3.5" /></Button>
                                             </div>
                                         </div>
                                     )) : <div className="text-center py-6 opacity-20 uppercase text-[9px] font-black italic">Aucun signal tactique</div>}
