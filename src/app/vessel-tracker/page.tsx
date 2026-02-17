@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -405,7 +404,7 @@ export default function VesselTrackerPage() {
             lastUpdatesRef.current[vessel.id] = timeKey;
         }
     });
-    if (newEntries.length > 0) setHistory(prev => [...newEntries, ...prev].slice(0, 50));
+    if (newEntries.length > 0) setHistory(prev => [...newEntries, ...prev].slice(0, 20));
   }, [followedVessels, mode, vesselPrefs, playVesselSound]);
 
   useEffect(() => {
