@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -87,13 +88,6 @@ const BatteryIconComp = ({ level, charging, className }: { level?: number, charg
   if (level <= 40) return <BatteryMedium {...props} className={cn(props.className, "text-orange-500")} />;
   return <BatteryFull {...props} className={cn(props.className, "text-green-600")} />;
 };
-
-const PulsingDot = () => (
-    <div className="absolute" style={{ transform: 'translate(-50%, -50%)' }}>
-      <div className="size-5 rounded-full bg-blue-500 opacity-75 animate-ping absolute"></div>
-      <div className="size-5 rounded-full bg-blue-500 border-2 border-white relative"></div>
-    </div>
-);
 
 type HistoryEntry = {
     vesselId: string;
@@ -948,7 +942,7 @@ export default function VesselTrackerPage() {
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Surnom du capitaine / navire</Label>
-                                    <Input placeholder="EX: CAPITAINE NEMO" value={vesselNickname} onChange={e => setNickname(e.target.value)} className="font-bold text-center h-12 border-2 uppercase flex-grow w-full" />
+                                    <Input placeholder="EX: CAPITAINE NEMO" value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} className="font-bold text-center h-12 border-2 uppercase flex-grow w-full" />
                                 </div>
                                 <div className="space-y-4 p-4 border-2 rounded-2xl bg-primary/5 border-dashed">
                                     <div className="flex justify-between items-center px-1">
@@ -1192,11 +1186,6 @@ export default function VesselTrackerPage() {
                         })}
                     </React.Fragment>
                 ))}
-                {mode === 'sender' && currentPos && (
-                    <OverlayView position={currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                        <PulsingDot />
-                    </OverlayView>
-                )}
           </GoogleMap>
           <div className="absolute top-3 right-3 flex flex-col gap-2">
             <Button onClick={handleRecenter} className="shadow-lg h-10 w-10 bg-background/90 backdrop-blur-md border-2 p-0"><LocateFixed className="size-5" /></Button>

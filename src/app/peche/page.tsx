@@ -33,12 +33,6 @@ const FishingLogCard = dynamic(() => import('@/components/ui/fishing-log-card').
   loading: () => <Skeleton className="h-64 w-full" />
 });
 
-// Import dynamique de la session de groupe
-const HuntingSessionCard = dynamic(() => import('@/components/hunting-session').then(mod => mod.HuntingSessionCard), { 
-  ssr: false,
-  loading: () => <Skeleton className="h-64 w-full" />
-});
-
 function PecheSkeleton() {
   return (
      <div className="space-y-6 w-full max-w-full">
@@ -106,7 +100,7 @@ export default function PechePage() {
       </Card>
 
       <Tabs defaultValue="forecast" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 gap-2 h-auto mb-8 bg-transparent p-0 border-none">
+        <TabsList className="grid w-full grid-cols-2 gap-2 h-auto mb-8 bg-transparent p-0 border-none">
           <TabsTrigger 
             value="forecast" 
             className="group flex flex-col items-center justify-center gap-2 py-4 rounded-[2rem] border-2 transition-all data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:border-primary data-[state=active]:shadow-xl data-[state=inactive]:bg-white data-[state=inactive]:border-slate-100 active:scale-95"
@@ -125,16 +119,6 @@ export default function PechePage() {
               <MapIcon className="size-5" />
             </div>
             <span className="font-black uppercase text-[9px] tracking-widest leading-none">Carnet</span>
-          </TabsTrigger>
-
-          <TabsTrigger 
-            value="group" 
-            className="group flex flex-col items-center justify-center gap-2 py-4 rounded-[2rem] border-2 transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:border-blue-600 data-[state=active]:shadow-xl data-[state=inactive]:bg-white data-[state=inactive]:border-blue-50 active:scale-95"
-          >
-            <div className="p-2 rounded-xl bg-blue-50 text-blue-600 group-data-[state=active]:bg-white/20 group-data-[state=active]:text-white transition-colors">
-              <Users className="size-5" />
-            </div>
-            <span className="font-black uppercase text-[9px] tracking-widest leading-none">Session</span>
           </TabsTrigger>
         </TabsList>
 
@@ -284,10 +268,6 @@ export default function PechePage() {
 
         <TabsContent value="log" className="animate-in fade-in duration-300">
           <FishingLogCard data={data} />
-        </TabsContent>
-
-        <TabsContent value="group" className="animate-in fade-in duration-300">
-          <HuntingSessionCard sessionType="peche" />
         </TabsContent>
       </Tabs>
     </div>
