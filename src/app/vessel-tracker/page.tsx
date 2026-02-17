@@ -54,7 +54,8 @@ import {
   Users,
   ChevronDown,
   Pencil,
-  Repeat
+  Repeat,
+  Info
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -67,6 +68,7 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -1043,7 +1045,7 @@ export default function VesselTrackerPage() {
                                         "{smsPreview}"
                                     </div>
                                 </div>
-                                <Button onClick={handleSaveVessel} className="w-full h-12 font-black uppercase text-[10px] tracking-widest gap-2 shadow-md">
+                                <Button onClick={handleSaveVessel} className="w-full h-12 font-black uppercase tracking-widest gap-2 shadow-md">
                                     <Save className="size-4" /> Enregistrer mes réglages
                                 </Button>
                             </AccordionContent>
@@ -1410,31 +1412,52 @@ export default function VesselTrackerPage() {
         </div>
       </Card>
 
-      <Dialog open={isCatchDialogOpen} onOpenChange={setIsCatchDialogOpen}>
-        <DialogContent className="max-w-md rounded-2xl">
-            <DialogHeader>
-                <DialogTitle className="font-black uppercase tracking-tight flex items-center gap-2">
-                    <Fish className="size-5 text-primary" /> Signaler une Prise
-                </DialogTitle>
-                <DialogDescription className="text-xs font-bold uppercase">Quel poisson avez-vous pêché ?</DialogDescription>
-            </DialogHeader>
-            <div className="py-6 grid grid-cols-2 gap-2">
-                {FISH_TYPES.map(fish => (
-                    <Button 
-                        key={fish.id} 
-                        onClick={() => handleSignalCatch(fish.id)}
-                        className="h-16 font-black uppercase text-xs shadow-md border-2 border-white/20"
-                        style={{ backgroundColor: fish.color }}
-                    >
-                        {fish.label}
-                    </Button>
-                ))}
+      {/* Emergency Numbers Section */}
+      <Card className="border-2 border-red-100 bg-red-50/10 shadow-none">
+        <CardHeader className="p-4 pb-2 border-b border-red-100">
+          <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-red-800">
+            <ShieldAlert className="size-4 text-red-600" /> Numéros d'Urgence (NC)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="divide-y divide-red-100">
+            {/* SECOURS EN MER (MRCC) */}
+            <div className="p-4 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-black uppercase text-slate-700">Secours en Mer (MRCC)</span>
+                <a href="tel:196" className="text-sm font-black text-red-600 hover:underline">196 (OU VHF 16)</a>
+              </div>
+              <div className="p-3 bg-red-50/50 border border-red-100 rounded-xl flex gap-3">
+                <Info className="size-4 text-red-600 shrink-0 mt-0.5" />
+                <p className="text-[9px] leading-relaxed italic text-red-900 font-medium">
+                  Rappelons qu'en mer, c'est le <strong>CANAL 16</strong> de la VHF qui est le moyen le plus approprié pour donner l'alerte et communiquer avec les sauveteurs, le 196 étant plutôt destiné aux appels effectués depuis la terre ferme.
+                </p>
+              </div>
             </div>
-            <DialogFooter>
-                <Button variant="ghost" onClick={() => setIsCatchDialogOpen(false)} className="w-full font-black uppercase text-[10px]">Annuler</Button>
-            </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
+            {/* SAPEURS-POMPIERS */}
+            <div className="p-4 flex justify-between items-center">
+              <span className="text-[10px] font-black uppercase text-slate-700">Sapeurs-Pompiers</span>
+              <a href="tel:18" className="text-sm font-black text-slate-900 hover:underline">18</a>
+            </div>
+
+            {/* SAMU */}
+            <div className="p-4 flex justify-between items-center">
+              <span className="text-[10px] font-black uppercase text-slate-700">Urgences Santé / SAMU</span>
+              <div className="flex flex-col items-end">
+                <a href="tel:15" className="text-sm font-black text-slate-900 hover:underline">15</a>
+                <a href="tel:+687787725" className="text-[10px] font-bold text-slate-500 hover:underline">+687 78.77.25</a>
+              </div>
+            </div>
+
+            {/* SNSM NOUMÉA */}
+            <div className="p-4 flex justify-between items-center">
+              <span className="text-[10px] font-black uppercase text-slate-700">SNSM Nouméa</span>
+              <a href="tel:252312" className="text-sm font-black text-slate-900 hover:underline">25.23.12</a>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
