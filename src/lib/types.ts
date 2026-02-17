@@ -85,6 +85,7 @@ export interface UserAccount {
   contactLocation?: { latitude: number; longitude: number };
   ridet?: string;
   vesselSharingTarget?: 'none' | 'receiver' | 'fleet' | 'both';
+  isGhostMode?: boolean;
   shootingAngle?: {
       center: number;
       spread: number;
@@ -388,6 +389,7 @@ export interface VesselStatus {
   huntingMarkers?: HuntingMarker[];
   isPositionHidden?: boolean;
   isPrivateHidden?: boolean;
+  isGhostMode?: boolean;
   accuracy?: number;
   mooringRadius?: number;
   shootingAngle?: ShootingAngle;

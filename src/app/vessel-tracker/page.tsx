@@ -118,6 +118,7 @@ export default function VesselTrackerPage() {
   const [isSharing, setIsSharing] = useState(false);
   const [sharingTarget, setSharingTarget] = useState<'none' | 'receiver' | 'fleet' | 'both'>('none');
   const [isPositionSharedWithGroup, setIsPositionSharedWithGroup] = useState(true);
+  const [isGhostMode, setIsGhostMode] = useState(false);
   const [emergencyContact, setEmergencyContact] = useState('');
   const [isEmergencyEnabled, setIsEmergencyEnabled] = useState(true);
   const [isCustomMessageEnabled, setIsCustomMessageEnabled] = useState(true);
@@ -222,6 +223,7 @@ export default function VesselTrackerPage() {
       if (userProfile.vesselPrefs) setVesselPrefs({ ...vesselPrefs, ...userProfile.vesselPrefs });
       if (userProfile.vesselSharingTarget) setSharingTarget(userProfile.vesselSharingTarget);
       if (userProfile.vesselSharingTarget && userProfile.vesselSharingTarget !== 'none') setIsSharing(true);
+      if (userProfile.isGhostMode !== undefined) setIsGhostMode(userProfile.isGhostMode);
       if (userProfile.emergencyContact) setEmergencyContact(userProfile.emergencyContact);
       if (userProfile.vesselSmsMessage) setVesselSmsMessage(userProfile.vesselSmsMessage);
       setIsEmergencyEnabled(userProfile.isEmergencyEnabled ?? true);
@@ -251,6 +253,7 @@ export default function VesselTrackerPage() {
             lastActive: serverTimestamp(),
             mooringRadius: vesselPrefs.mooringRadius || 20,
             groupId: fleetGroupId ? fleetGroupId.toUpperCase() : null,
+            isGhostMode: data.isGhostMode !== undefined ? data.isGhostMode : isGhostMode,
             ...batteryInfo,
             ...data 
         };
@@ -267,18 +270,17 @@ export default function VesselTrackerPage() {
         setDoc(vesselRef, updatePayload, { merge: true }).catch(() => {});
     };
     update();
-  }, [user, firestore, isSharing, sharingId, vesselNickname, currentPos, vesselPrefs.mooringRadius, fleetGroupId]);
+  }, [user, firestore, isSharing, sharingId, vesselNickname, currentPos, vesselPrefs.mooringRadius, fleetGroupId, isGhostMode]);
 
   const handleSharingTargetChange = (target: 'none' | 'receiver' | 'fleet' | 'both') => {
     setSharingTarget(target);
     if (target === 'none') {
         handleStopSharing();
     } else {
-        const isSharingNow = true;
+        setIsSharing(true);
         const isPosHidden = target === 'receiver'; // Hide from group if only receiver
         const isPrivHidden = target === 'fleet'; // Hide from private B if only fleet
         
-        setIsSharing(true);
         setIsPositionSharedWithGroup(!isPosHidden);
         
         updateVesselInFirestore({ 
@@ -317,7 +319,8 @@ export default function VesselTrackerPage() {
         lastVesselId: cleanId || customSharingId,
         fleetGroupId: cleanGroupId,
         vesselPrefs: vesselPrefs,
-        vesselSharingTarget: sharingTarget
+        vesselSharingTarget: sharingTarget,
+        isGhostMode: isGhostMode
     }).then(() => { 
         if (vesselIdToFollow) setVesselIdToFollow(''); 
         toast({ title: "Paramètres enregistrés" }); 
@@ -860,6 +863,29 @@ export default function VesselTrackerPage() {
                         </Select>
                     </div>
 
+                    <div className="flex items-center justify-between p-4 border-2 rounded-2xl bg-slate-900 text-white shadow-lg">
+                        <div className="flex flex-col gap-1 flex-1 pr-4">
+                            <div className="flex items-center gap-2">
+                                <EyeOff className="size-4 text-primary" />
+                                <Label className="text-sm font-black uppercase">Mode Fantôme</Label>
+                            </div>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase leading-tight">
+                                Votre position GPS est masquée sur la carte du Récepteur B et de la Flotte C. Vous restez invisible tout en recevant leurs alertes.
+                            </p>
+                        </div>
+                        <Switch 
+                            checked={isGhostMode} 
+                            onCheckedChange={(val) => {
+                                setIsGhostMode(val);
+                                updateVesselInFirestore({ isGhostMode: val });
+                                if (user && firestore) {
+                                    updateDoc(doc(firestore, 'users', user.uid), { isGhostMode: val });
+                                }
+                                toast({ title: val ? "Mode Fantôme activé" : "Mode Fantôme désactivé" });
+                            }} 
+                        />
+                    </div>
+
                     <Accordion type="single" collapsible className="w-full">
                         <AccordionItem value="sender-prefs" className="border-none">
                             <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
@@ -949,7 +975,7 @@ export default function VesselTrackerPage() {
               <div className="grid gap-2">
                   {savedVesselIds.map(id => {
                       const vessel = followedVessels?.find(v => v.id === id);
-                      const isActive = vessel?.isSharing === true && !vessel.isPrivateHidden;
+                      const isActive = vessel?.isSharing === true && !vessel.isPrivateHidden && !vessel.isGhostMode;
                       return (
                           <div key={id} className={cn("flex items-center justify-between p-3 border-2 rounded-xl transition-all shadow-sm cursor-pointer", vessel?.status === 'emergency' ? "bg-red-50 border-red-500 animate-pulse" : isActive ? "bg-primary/5 border-primary/20" : "bg-muted/5 opacity-60")} onClick={() => { if (isActive && vessel?.location && map) { map.panTo({ lat: vessel.location.latitude, lng: vessel.location.longitude }); map.setZoom(15); } }}>
                               <div className="flex items-center gap-3">
@@ -986,7 +1012,7 @@ export default function VesselTrackerPage() {
                 </div>
 
                 <div className="grid gap-2">
-                    {followedVessels?.filter(v => v.groupId === fleetGroupId.toUpperCase() && v.id !== sharingId && !v.isPositionHidden).map(v => (
+                    {followedVessels?.filter(v => v.groupId === fleetGroupId.toUpperCase() && v.id !== sharingId && !v.isPositionHidden && !v.isGhostMode).map(v => (
                         <div key={v.id} className="flex items-center justify-between p-3 border-2 border-blue-100 bg-blue-50/30 rounded-xl shadow-sm cursor-pointer active:scale-[0.98] transition-all" onClick={() => { if (v.location && map) { map.panTo({ lat: v.location.latitude, lng: v.location.longitude }); map.setZoom(15); } }}>
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-blue-600 text-white rounded-lg"><Navigation className="size-4" /></div>
@@ -1001,7 +1027,7 @@ export default function VesselTrackerPage() {
                             <BatteryIconComp level={v.batteryLevel} charging={v.isCharging} />
                         </div>
                     ))}
-                    {(!followedVessels || followedVessels.filter(v => v.groupId === fleetGroupId.toUpperCase() && v.id !== sharingId && !v.isPositionHidden).length === 0) && fleetGroupId && (
+                    {(!followedVessels || followedVessels.filter(v => v.groupId === fleetGroupId.toUpperCase() && v.id !== sharingId && !v.isPositionHidden && !v.isGhostMode).length === 0) && fleetGroupId && (
                         <div className="text-center py-10 border-2 border-dashed rounded-xl opacity-30">
                             <p className="text-[10px] font-black uppercase tracking-widest">Aucun autre navire visible</p>
                         </div>
@@ -1015,7 +1041,7 @@ export default function VesselTrackerPage() {
       <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all", isFullscreen && "fixed inset-0 z-[100] w-screen h-screen rounded-none")}>
         <div className={cn("relative bg-muted/20", isFullscreen ? "flex-grow" : "h-[300px]")}>
           <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
-                {followedVessels?.filter(v => v.isSharing && ((mode === 'receiver' && !v.isPrivateHidden) || (mode === 'fleet' && !v.isPositionHidden))).map(vessel => (
+                {followedVessels?.filter(v => v.isSharing && !v.isGhostMode && ((mode === 'receiver' && !v.isPrivateHidden) || (mode === 'fleet' && !v.isPositionHidden))).map(vessel => (
                     <React.Fragment key={vessel.id}>
                         {vessel.status === 'stationary' && vessel.location && (
                             <Circle
