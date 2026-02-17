@@ -62,7 +62,6 @@ import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 
 const INITIAL_CENTER = { lat: -22.27, lng: 166.45 };
-const IMMOBILITY_THRESHOLD_METERS = 20; 
 
 const TACTICAL_TYPES = [
     { id: 'oiseaux', label: 'OISEAUX', icon: Bird, color: 'bg-white text-blue-600 border-blue-600' },
@@ -143,7 +142,8 @@ export default function VesselTrackerPage() {
     notifySounds: { moving: '', stationary: '', offline: '', battery: '', emergency: '' },
     isWatchEnabled: false,
     watchDuration: 60,
-    batteryThreshold: 20
+    batteryThreshold: 20,
+    mooringRadius: 20
   });
   
   const [techHistory, setTechHistory] = useState<TechEntry[]>([]);
@@ -230,6 +230,7 @@ export default function VesselTrackerPage() {
             displayName: vesselNickname || user.displayName || 'Capitaine', 
             isSharing: data.isSharing !== undefined ? data.isSharing : isSharing, 
             lastActive: serverTimestamp(),
+            mooringRadius: vesselPrefs.mooringRadius || 20,
             ...batteryInfo,
             ...data 
         };
@@ -241,7 +242,7 @@ export default function VesselTrackerPage() {
         setDoc(doc(firestore, 'vessels', sharingId), updatePayload, { merge: true }).catch(() => {});
     };
     update();
-  }, [user, firestore, isSharing, sharingId, vesselNickname]);
+  }, [user, firestore, isSharing, sharingId, vesselNickname, vesselPrefs.mooringRadius]);
 
   const handleSaveVessel = async () => {
     if (!user || !firestore) return;
@@ -501,7 +502,7 @@ export default function VesselTrackerPage() {
             }
             
             const distFromAnchor = getDistance(newPos.lat, newPos.lng, anchorPos.lat, anchorPos.lng);
-            const isMoving = distFromAnchor > IMMOBILITY_THRESHOLD_METERS && distFromAnchor > accuracy * 0.8;
+            const isMoving = distFromAnchor > (vesselPrefs.mooringRadius || 20) && distFromAnchor > accuracy * 0.8;
 
             if (isMoving) {
               setVesselStatus('moving'); 
@@ -528,7 +529,7 @@ export default function VesselTrackerPage() {
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
-  }, [isSharing, mode, anchorPos, updateVesselInFirestore, map, toast, vesselStatus]);
+  }, [isSharing, mode, anchorPos, updateVesselInFirestore, map, toast, vesselStatus, vesselPrefs.mooringRadius]);
 
   const toggleWakeLock = async () => {
     if (!('wakeLock' in navigator)) return;
@@ -710,7 +711,7 @@ export default function VesselTrackerPage() {
                 <AccordionItem value="sender-prefs" className="border-none">
                     <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
                         <Settings className="size-4 text-primary" />
-                        <span className="text-[10px] font-black uppercase">Identité & IDs</span>
+                        <span className="text-[10px] font-black uppercase">Identité & IDS</span>
                     </AccordionTrigger>
                     <AccordionContent className="pt-4 space-y-4">
                         <div className="space-y-1">
@@ -724,6 +725,24 @@ export default function VesselTrackerPage() {
                                 <Button variant="outline" size="icon" className="h-12 w-12 border-2" onClick={handleSaveVessel}><Save className="size-4" /></Button>
                             </div>
                         </div>
+
+                        <div className="space-y-3 pt-2 border-t border-dashed">
+                            <div className="flex justify-between items-center px-1">
+                                <Label className="text-[10px] font-black uppercase opacity-60">Rayon de mouillage (m)</Label>
+                                <Badge variant="outline" className="font-black text-[10px] bg-white">{vesselPrefs.mooringRadius || 20}m</Badge>
+                            </div>
+                            <Slider 
+                                value={[vesselPrefs.mooringRadius || 20]} 
+                                min={10} 
+                                max={200} 
+                                step={5} 
+                                onValueChange={v => saveVesselPrefs({ ...vesselPrefs, mooringRadius: v[0] })} 
+                            />
+                            <p className="text-[8px] font-bold text-muted-foreground px-1 leading-tight italic">
+                                Ajustez le rayon pour éviter les fausses alertes de mouvement dues à l'évitage du navire.
+                            </p>
+                        </div>
+
                         {vesselIdHistory.length > 0 && (
                             <div className="space-y-2 pt-2 border-t border-dashed">
                                 <p className="text-[10px] font-black uppercase text-muted-foreground ml-1">Historique des IDs</p>
@@ -756,7 +775,7 @@ export default function VesselTrackerPage() {
                             <div className="space-y-1.5"><Label className="text-[10px] font-black uppercase opacity-60 ml-1">Numéro du contact à terre</Label><Input placeholder="Ex: 77 12 34" value={emergencyContact} onChange={e => setEmergencyContact(e.target.value)} className="h-12 border-2 font-black text-lg" /></div>
                             <div className="space-y-1.5">
                                 <div className="flex items-center justify-between mb-1"><Label className="text-[10px] font-black uppercase opacity-60">Message personnalisé</Label><Switch checked={isCustomMessageEnabled} onCheckedChange={setIsCustomMessageEnabled} className="scale-75" /></div>
-                                <Textarea placeholder="Ex: Problème moteur, besoin aide." value={vesselSmsMessage} onChange={e => setVesselSmsMessage(e.target.value)} className="border-2 font-medium min-h-[80px]" disabled={!isCustomMessageEnabled} />
+                                <Textarea placeholder="Ex: Problème moteur, besoin aide." value={vesselSmsMessage} onChange={e => setVesselSmsMessage(e.target.value)} className="border-2 font-medium min-h-[120px]" disabled={!isCustomMessageEnabled} />
                             </div>
                             <div className="space-y-2 pt-2 border-t border-dashed">
                                 <p className="text-[9px] font-black uppercase text-primary flex items-center gap-2 ml-1"><Eye className="size-3" /> Aperçu du message :</p>
