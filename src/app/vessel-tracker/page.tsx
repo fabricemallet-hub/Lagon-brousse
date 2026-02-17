@@ -51,7 +51,8 @@ import {
   Ruler,
   Bell,
   Fish,
-  Users
+  Users,
+  Target
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -323,6 +324,18 @@ export default function VesselTrackerPage() {
     toast({ title: "PRISE SIGNALÉE !", description: fishType });
   };
 
+  const handleDeleteMarker = (marker: any) => {
+    if (!firestore || !user || !isSharing) return;
+    updateDoc(doc(firestore, 'vessels', sharingId), {
+        huntingMarkers: arrayRemove(marker)
+    }).then(() => toast({ title: "Point retiré" }));
+  };
+
+  const handleClearHuntingHistory = () => {
+    if (!firestore || !user || !isSharing) return;
+    updateDoc(doc(firestore, 'vessels', sharingId), { huntingMarkers: [] }).then(() => toast({ title: "Journal tactique réinitialisé" }));
+  };
+
   const handleStopSharing = () => {
     if (!user || !firestore) return;
     setIsSharing(false);
@@ -339,7 +352,7 @@ export default function VesselTrackerPage() {
   const handleClearHistory = () => {
     setHistory([]);
     if (!firestore || !user || !isSharing) return;
-    updateDoc(doc(firestore, 'vessels', sharingId), { historyClearedAt: serverTimestamp(), huntingMarkers: [] }).then(() => toast({ title: "Journal réinitialisé" }));
+    updateDoc(doc(firestore, 'vessels', sharingId), { historyClearedAt: serverTimestamp() }).then(() => toast({ title: "Journal de bord réinitialisé" }));
   };
 
   const saveVesselPrefs = (newPrefs: typeof vesselPrefs) => {
@@ -1026,60 +1039,113 @@ export default function VesselTrackerPage() {
                 <Button variant="destructive" className="flex-1 h-14 font-black uppercase rounded-xl shadow-lg gap-3 text-xs" onClick={() => sendEmergencySms('MAYDAY')}><ShieldAlert className="size-5" /> MAYDAY</Button>
                 <Button variant="secondary" className="flex-1 h-14 font-black uppercase rounded-xl shadow-lg gap-3 text-xs border-2 border-primary/20" onClick={() => sendEmergencySms('PAN PAN')}><AlertTriangle className="size-5 text-primary" /> PAN PAN</Button>
             </div>
-            <Accordion type="single" collapsible className="w-full border rounded-xl bg-muted/10">
-                <AccordionItem value="history" className="border-none">
-                    <div className="flex items-center justify-between px-3 h-12">
-                        <AccordionTrigger className="flex-1 text-[10px] font-black uppercase hover:no-underline py-0"><History className="size-3 mr-2"/> Journal de bord</AccordionTrigger>
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-[8px] font-black text-destructive" onClick={handleClearHistory}><Trash2 className="size-3 mr-1" /> Reset</Button>
-                    </div>
-                    <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide">
-                        {history.length > 0 ? (
-                            <div className="space-y-2 px-3">
-                                {history.map((h, i) => (
-                                    <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm animate-in fade-in slide-in-from-left-2">
-                                        <div className="flex flex-col gap-0.5">
-                                          <div className="flex items-center gap-2">
-                                            <span className="font-black text-primary">{h.vesselName}</span>
-                                            <Badge variant="outline" className={cn("text-[8px] font-black uppercase h-4 px-1.5", 
-                                                h.statusLabel.includes('URGENCE') ? 'border-red-500 text-red-600 bg-red-50' :
-                                                h.statusLabel.includes('MOUILLAGE') ? 'border-amber-500 text-amber-600 bg-amber-50' :
-                                                h.statusLabel.includes('RETOUR') ? 'border-indigo-500 text-indigo-600 bg-indigo-50' :
-                                                h.statusLabel.includes('TERRE') ? 'border-green-500 text-green-600 bg-green-50' :
-                                                'border-primary text-primary bg-primary/5'
-                                            )}>{h.statusLabel} {h.statusLabel.includes('MOUILLAGE') && h.mooringRadius ? `(${h.mooringRadius}m)` : ''}</Badge>
-                                            {h.batteryLevel !== undefined && (
-                                                <span className="flex items-center gap-1 bg-slate-100 px-1.5 py-0.5 rounded text-[8px] font-black text-slate-500 border border-slate-200">
-                                                    <BatteryIconComp level={h.batteryLevel} charging={h.isCharging} className="size-2.5" />
-                                                    {h.batteryLevel}%
-                                                </span>
-                                            )}
-                                          </div>
-                                          <div className="flex items-center gap-2 text-[9px] font-bold opacity-40 uppercase">
-                                            <span>{format(h.time, 'HH:mm:ss')}</span>
-                                            {h.accuracy !== undefined && <span>• +/- {h.accuracy}m GPS</span>}
-                                          </div>
+            
+            <div className="space-y-2">
+                <Accordion type="single" collapsible className="w-full border rounded-xl bg-muted/10">
+                    <AccordionItem value="history" className="border-none">
+                        <div className="flex items-center justify-between px-3 h-12">
+                            <AccordionTrigger className="flex-1 text-[10px] font-black uppercase hover:no-underline py-0"><History className="size-3 mr-2"/> Journal de bord (Statuts)</AccordionTrigger>
+                            <Button variant="ghost" size="sm" className="h-7 px-2 text-[8px] font-black text-destructive" onClick={handleClearHistory}><Trash2 className="size-3 mr-1" /> Reset</Button>
+                        </div>
+                        <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide">
+                            {history.length > 0 ? (
+                                <div className="space-y-2 px-3">
+                                    {history.map((h, i) => (
+                                        <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm animate-in fade-in slide-in-from-left-2">
+                                            <div className="flex flex-col gap-0.5">
+                                              <div className="flex items-center gap-2">
+                                                <span className="font-black text-primary">{h.vesselName}</span>
+                                                <Badge variant="outline" className={cn("text-[8px] font-black uppercase h-4 px-1.5", 
+                                                    h.statusLabel.includes('URGENCE') ? 'border-red-500 text-red-600 bg-red-50' :
+                                                    h.statusLabel.includes('MOUILLAGE') ? 'border-amber-500 text-amber-600 bg-amber-50' :
+                                                    h.statusLabel.includes('RETOUR') ? 'border-indigo-500 text-indigo-600 bg-indigo-50' :
+                                                    h.statusLabel.includes('TERRE') ? 'border-green-500 text-green-600 bg-green-50' :
+                                                    'border-primary text-primary bg-primary/5'
+                                                )}>{h.statusLabel} {h.statusLabel.includes('MOUILLAGE') && h.mooringRadius ? `(${h.mooringRadius}m)` : ''}</Badge>
+                                                {h.batteryLevel !== undefined && (
+                                                    <span className="flex items-center gap-1 bg-slate-100 px-1.5 py-0.5 rounded text-[8px] font-black text-slate-500 border border-slate-200">
+                                                        <BatteryIconComp level={h.batteryLevel} charging={h.isCharging} className="size-2.5" />
+                                                        {h.batteryLevel}%
+                                                    </span>
+                                                )}
+                                              </div>
+                                              <div className="flex items-center gap-2 text-[9px] font-bold opacity-40 uppercase">
+                                                <span>{format(h.time, 'HH:mm:ss')}</span>
+                                                {h.accuracy !== undefined && <span>• +/- {h.accuracy}m GPS</span>}
+                                              </div>
+                                            </div>
+                                            <div className="flex gap-1">
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary border-2" onClick={() => {
+                                                    const coords = `${h.pos.lat.toFixed(6)},${h.pos.lng.toFixed(6)}`;
+                                                    navigator.clipboard.writeText(coords);
+                                                    toast({ title: "Point GPS copié", description: coords });
+                                                }}>
+                                                    <Copy className="size-3.5" />
+                                                </Button>
+                                                <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase border-2 px-3 gap-2" onClick={() => { if (h.pos && map) { map.panTo(h.pos); map.setZoom(17); } }}>
+                                                  <MapPin className="size-3 text-primary" /> GPS
+                                                </Button>
+                                            </div>
                                         </div>
-                                        <div className="flex gap-1">
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary border-2" onClick={() => {
-                                                const coords = `${h.pos.lat.toFixed(6)},${h.pos.lng.toFixed(6)}`;
-                                                navigator.clipboard.writeText(coords);
-                                                toast({ title: "Point GPS copié", description: coords });
-                                            }}>
-                                                <Copy className="size-3.5" />
-                                            </Button>
-                                            <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase border-2 px-3 gap-2" onClick={() => { if (h.pos && map) { map.panTo(h.pos); map.setZoom(17); } }}>
-                                              <MapPin className="size-3 text-primary" /> GPS
-                                            </Button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-center py-10 opacity-40 uppercase text-[10px] font-black italic">pas d'affichage dans l'historique</div>
-                        )}
-                    </AccordionContent>
-                </AccordionItem>
-            </Accordion>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-10 opacity-40 uppercase text-[10px] font-black italic">pas d'affichage dans l'historique</div>
+                            )}
+                        </AccordionContent>
+                    </AccordionItem>
+                </Accordion>
+
+                <Accordion type="single" collapsible className="w-full border rounded-xl bg-muted/10">
+                    <AccordionItem value="hunting-history" className="border-none">
+                        <div className="flex items-center justify-between px-3 h-12">
+                            <AccordionTrigger className="flex-1 text-[10px] font-black uppercase hover:no-underline py-0"><Target className="size-3 mr-2"/> Journal Tactique (Oiseaux & Prises)</AccordionTrigger>
+                            <Button variant="ghost" size="sm" className="h-7 px-2 text-[8px] font-black text-destructive" onClick={handleClearHuntingHistory}><Trash2 className="size-3 mr-1" /> Reset</Button>
+                        </div>
+                        <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide">
+                            {followedVessels?.some(v => v.huntingMarkers && v.huntingMarkers.length > 0) ? (
+                                <div className="space-y-2 px-3">
+                                    {followedVessels.flatMap(v => (v.huntingMarkers || []).map(m => ({ ...m, vesselId: v.id, vesselName: v.displayName }))).sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0, 20).map((m, i) => {
+                                        const isCatch = (m as any).type !== undefined;
+                                        return (
+                                            <div key={m.id} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm animate-in fade-in slide-in-from-left-2">
+                                                <div className="flex flex-col gap-0.5">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-black text-primary">{m.vesselName}</span>
+                                                        <Badge variant={isCatch ? "default" : "outline"} className={cn("text-[8px] font-black uppercase h-4 px-1.5", isCatch ? "bg-emerald-600 border-none" : "border-blue-500 text-blue-600 bg-blue-50")}>
+                                                            {isCatch ? `PRISE : ${(m as any).type}` : 'OISEAUX'}
+                                                        </Badge>
+                                                    </div>
+                                                    <span className="text-[9px] font-bold opacity-40 uppercase">{format(new Date(m.time), 'HH:mm:ss')}</span>
+                                                </div>
+                                                <div className="flex gap-1">
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary border-2" onClick={() => {
+                                                        const coords = `${m.lat.toFixed(6)},${m.lng.toFixed(6)}`;
+                                                        navigator.clipboard.writeText(coords);
+                                                        toast({ title: "Point GPS copié", description: coords });
+                                                    }}>
+                                                        <Copy className="size-3.5" />
+                                                    </Button>
+                                                    <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase border-2 px-3 gap-2" onClick={() => { if (map) { map.panTo({ lat: m.lat, lng: m.lng }); map.setZoom(17); } }}>
+                                                        <LocateFixed className="size-3 text-primary" /> GPS
+                                                    </Button>
+                                                    {isSharing && m.vesselId === sharingId && (
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive border-2" onClick={() => handleDeleteMarker(m)}>
+                                                            <Trash2 className="size-3.5" />
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="text-center py-10 opacity-40 uppercase text-[10px] font-black italic">Aucun signal tactique</div>
+                            )}
+                        </AccordionContent>
+                    </AccordionItem>
+                </Accordion>
+            </div>
         </div>
       </Card>
 
