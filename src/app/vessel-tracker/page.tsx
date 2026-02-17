@@ -1,9 +1,8 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useUser as useUserHook, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where, deleteDoc, getDoc, addDoc, getDocs, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where, deleteDoc, getDoc, addDoc } from 'firebase/firestore';
 import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -93,6 +92,8 @@ const tacticalIcons: Record<string, any> = {
     fire: Flame
 };
 
+// --- HELPER COMPONENTS (OUTSIDE MAIN COMPONENT) ---
+
 const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
   if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
   const props = { className: cn("size-4", className) };
@@ -109,13 +110,112 @@ const PulsingDot = () => (
     </div>
 );
 
+const NotificationsSection = ({ 
+  vesselPrefs, 
+  saveVesselPrefs, 
+  availableSounds, 
+  playVesselSound, 
+  showBattery 
+}: { 
+  vesselPrefs: any, 
+  saveVesselPrefs: (p: any) => void, 
+  availableSounds: any[], 
+  playVesselSound: (s: string, t?: string, vn?: string) => void,
+  showBattery: boolean
+}) => (
+  <div className="space-y-6">
+      <div className="space-y-4 p-4 border-2 rounded-2xl bg-card shadow-inner">
+          <div className="flex items-center justify-between border-b border-dashed pb-3 mb-2">
+              <div className="space-y-0.5 flex-1">
+                  <Label className="text-xs font-black uppercase">Alertes Sonores</Label>
+                  <p className="text-[9px] font-bold text-muted-foreground uppercase">Activer les signaux audio</p>
+              </div>
+              <Switch checked={vesselPrefs.isNotifyEnabled} onCheckedChange={v => saveVesselPrefs({...vesselPrefs, isNotifyEnabled: v})} />
+          </div>
+          <div className="space-y-3">
+              <Label className="text-[10px] font-black uppercase opacity-60 flex items-center gap-2"><Volume2 className="size-3" /> Volume ({Math.round(vesselPrefs.vesselVolume * 100)}%)</Label>
+              <Slider value={[vesselPrefs.vesselVolume * 100]} max={100} onValueChange={v => saveVesselPrefs({...vesselPrefs, vesselVolume: v[0] / 100})} />
+          </div>
+          <div className="space-y-4 pt-4 border-t border-dashed">
+              <p className="text-[9px] font-black uppercase text-muted-foreground">Sons par événement</p>
+              <div className="grid gap-3">
+                  {[
+                      { key: 'moving', label: 'Mouvement' },
+                      { key: 'stationary', label: 'Mouillage' },
+                      { key: 'offline', label: 'Signal Perdu' },
+                      { key: 'emergency', label: 'Urgence / SOS' },
+                      { key: 'watch', label: 'Veille Stratégique' },
+                      { key: 'battery', label: 'Batterie Faible' }
+                  ].map(item => (
+                      <div key={item.key} className={cn("flex flex-col gap-2 p-3 bg-white rounded-xl border-2 shadow-sm transition-opacity", !vesselPrefs.notifySettings[item.key] && "opacity-60")}>
+                          <div className="flex items-center justify-between gap-2 border-b border-dashed pb-2">
+                              <div className="flex items-center gap-2">
+                                  <Switch 
+                                      checked={vesselPrefs.notifySettings[item.key]} 
+                                      onCheckedChange={v => saveVesselPrefs({ ...vesselPrefs, notifySettings: { ...vesselPrefs.notifySettings, [item.key]: v } })}
+                                      className="scale-75"
+                                  />
+                                  <span className="text-[10px] font-black uppercase truncate">{item.label}</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                  <button 
+                                      className={cn("size-7 flex items-center justify-center rounded-lg border-2 transition-all active:scale-90", vesselPrefs.repeatSettings?.[item.key] ? "text-primary border-primary bg-primary/5" : "text-muted-foreground border-transparent")}
+                                      onClick={() => saveVesselPrefs({ ...vesselPrefs, repeatSettings: { ...vesselPrefs.repeatSettings, [item.key]: !vesselPrefs.repeatSettings?.[item.key] } })}
+                                      title="Répéter l'alerte (Boucle)"
+                                  >
+                                      <Repeat className="size-3.5" />
+                                  </button>
+                                  <Button variant="ghost" size="icon" className="size-7" onClick={() => playVesselSound(vesselPrefs.notifySounds[item.key])}><Play className="size-3.5" /></Button>
+                              </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                              <Select 
+                                  value={vesselPrefs.notifySounds[item.key]} 
+                                  disabled={!vesselPrefs.notifySettings[item.key]}
+                                  onValueChange={v => saveVesselPrefs({ ...vesselPrefs, notifySounds: { ...vesselPrefs.notifySounds, [item.key]: v } })}
+                              >
+                                  <SelectTrigger className="h-8 text-[9px] font-black uppercase border-none bg-muted/20 px-2 rounded-lg flex-1"><SelectValue placeholder="Choisir son..." /></SelectTrigger>
+                                  <SelectContent>{availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] uppercase font-black">{s.label}</SelectItem>)}</SelectContent>
+                              </Select>
+                          </div>
+                      </div>
+                  ))}
+              </div>
+          </div>
+      </div>
+
+      <div className="space-y-4 p-4 border-2 rounded-2xl bg-orange-50/30 border-orange-100">
+          <div className="flex items-center justify-between">
+              <div className="space-y-0.5"><Label className="text-xs font-black uppercase text-orange-800">Veille Stratégique</Label><p className="text-[9px] font-bold text-orange-600/60 uppercase">Alarme si immobile trop longtemps</p></div>
+              <Switch checked={vesselPrefs.isWatchEnabled} onCheckedChange={v => saveVesselPrefs({...vesselPrefs, isWatchEnabled: v})} />
+          </div>
+          <div className="space-y-4 pt-2 border-t border-orange-100">
+              <div className="flex justify-between items-center"><Label className="text-[10px] font-black uppercase text-orange-800/60">Seuil d'immobilité</Label><Badge variant="outline" className="font-black bg-white">{vesselPrefs.watchDuration >= 60 ? `${Math.floor(vesselPrefs.watchDuration / 60)}h` : `${vesselPrefs.watchDuration} min`}</Badge></div>
+              <Slider value={[vesselPrefs.watchDuration || 60]} min={60} max={1440} step={60} onValueChange={v => saveVesselPrefs({...vesselPrefs, watchDuration: v[0]})} />
+          </div>
+      </div>
+
+      {showBattery && (
+          <div className="space-y-4 p-4 border-2 rounded-2xl bg-red-50/30 border-red-100">
+              <div className="flex items-center justify-between">
+                  <div className="space-y-0.5"><Label className="text-xs font-black uppercase text-red-800">Seuil Batterie Faible</Label><p className="text-[9px] font-bold text-red-600/60 uppercase">Alerte journal de bord</p></div>
+                  <Badge variant="outline" className="font-black bg-white">{vesselPrefs.batteryThreshold || 20}%</Badge>
+              </div>
+              <Slider value={[vesselPrefs.batteryThreshold || 20]} min={5} max={50} step={5} onValueChange={v => saveVesselPrefs({...vesselPrefs, batteryThreshold: v[0]})} />
+          </div>
+      )}
+  </div>
+);
+
+// --- MAIN COMPONENT ---
+
 export default function VesselTrackerPage() {
   const { user } = useUserHook();
   const firestore = useFirestore();
   const { toast } = useToast();
   const { isLoaded, loadError } = useGoogleMaps();
 
-  // --- ÉTATS DU COMPOSANT ---
+  // States
   const [mode, setMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
   const [fleetGroupId, setFleetGroupId] = useState('');
@@ -707,97 +807,27 @@ export default function VesselTrackerPage() {
     }
   };
 
-  const saveVesselPrefs = async (newPrefs: any) => {
+  const saveVesselPrefsCallback = async (newPrefs: any) => {
     if (!user || !firestore) return;
     setVesselPrefs(newPrefs);
     updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: newPrefs }).catch(() => {});
   };
 
-  const NotificationsSection = ({ title, showBattery = true }: { title: string, showBattery?: boolean }) => (
-    <div className="space-y-6">
-        <div className="space-y-4 p-4 border-2 rounded-2xl bg-card shadow-inner">
-            <div className="flex items-center justify-between border-b border-dashed pb-3 mb-2">
-                <div className="space-y-0.5 flex-1">
-                    <Label className="text-xs font-black uppercase">Alertes Sonores</Label>
-                    <p className="text-[9px] font-bold text-muted-foreground uppercase">Activer les signaux audio</p>
-                </div>
-                <Switch checked={vesselPrefs.isNotifyEnabled} onCheckedChange={v => saveVesselPrefs({...vesselPrefs, isNotifyEnabled: v})} />
-            </div>
-            <div className="space-y-3">
-                <Label className="text-[10px] font-black uppercase opacity-60 flex items-center gap-2"><Volume2 className="size-3" /> Volume ({Math.round(vesselPrefs.vesselVolume * 100)}%)</Label>
-                <Slider value={[vesselPrefs.vesselVolume * 100]} max={100} onValueChange={v => saveVesselPrefs({...vesselPrefs, vesselVolume: v[0] / 100})} />
-            </div>
-            <div className="space-y-4 pt-4 border-t border-dashed">
-                <p className="text-[9px] font-black uppercase text-muted-foreground">Sons par événement</p>
-                <div className="grid gap-3">
-                    {[
-                        { key: 'moving', label: 'Mouvement' },
-                        { key: 'stationary', label: 'Mouillage' },
-                        { key: 'offline', label: 'Signal Perdu' },
-                        { key: 'emergency', label: 'Urgence / SOS' },
-                        { key: 'watch', label: 'Veille Stratégique' },
-                        { key: 'battery', label: 'Batterie Faible' }
-                    ].map(item => (
-                        <div key={item.key} className={cn("flex flex-col gap-2 p-3 bg-white rounded-xl border-2 shadow-sm transition-opacity", !vesselPrefs.notifySettings[item.key] && "opacity-60")}>
-                            <div className="flex items-center justify-between gap-2 border-b border-dashed pb-2">
-                                <div className="flex items-center gap-2">
-                                    <Switch 
-                                        checked={vesselPrefs.notifySettings[item.key]} 
-                                        onCheckedChange={v => saveVesselPrefs({ ...vesselPrefs, notifySettings: { ...vesselPrefs.notifySettings, [item.key]: v } })}
-                                        className="scale-75"
-                                    />
-                                    <span className="text-[10px] font-black uppercase truncate">{item.label}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <button 
-                                        className={cn("size-7 flex items-center justify-center rounded-lg border-2 transition-all active:scale-90", vesselPrefs.repeatSettings?.[item.key] ? "text-primary border-primary bg-primary/5" : "text-muted-foreground border-transparent")}
-                                        onClick={() => saveVesselPrefs({ ...vesselPrefs, repeatSettings: { ...vesselPrefs.repeatSettings, [item.key]: !vesselPrefs.repeatSettings?.[item.key] } })}
-                                        title="Répéter l'alerte (Boucle)"
-                                    >
-                                        <Repeat className="size-3.5" />
-                                    </button>
-                                    <Button variant="ghost" size="icon" className="size-7" onClick={() => playVesselSound(vesselPrefs.notifySounds[item.key])}><Play className="size-3.5" /></Button>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Select 
-                                    value={vesselPrefs.notifySounds[item.key]} 
-                                    disabled={!vesselPrefs.notifySettings[item.key]}
-                                    onValueChange={v => saveVesselPrefs({ ...vesselPrefs, notifySounds: { ...vesselPrefs.notifySounds, [item.key]: v } })}
-                                >
-                                    <SelectTrigger className="h-8 text-[9px] font-black uppercase border-none bg-muted/20 px-2 rounded-lg flex-1"><SelectValue placeholder="Choisir son..." /></SelectTrigger>
-                                    <SelectContent>{availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] uppercase font-black">{s.label}</SelectItem>)}</SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </div>
+  const resetManualHistoryClear = () => {
+    setHistory([]);
+    if (isSharing && firestore && user) {
+        updateDoc(doc(firestore, 'vessels', sharingId), { historyClearedAt: serverTimestamp() });
+    }
+    toast({ title: "Historique vidé" });
+  };
 
-        <div className="space-y-4 p-4 border-2 rounded-2xl bg-orange-50/30 border-orange-100">
-            <div className="flex items-center justify-between">
-                <div className="space-y-0.5"><Label className="text-xs font-black uppercase text-orange-800">Veille Stratégique</Label><p className="text-[9px] font-bold text-orange-600/60 uppercase">Alarme si immobile trop longtemps</p></div>
-                <Switch checked={vesselPrefs.isWatchEnabled} onCheckedChange={v => saveVesselPrefs({...vesselPrefs, isWatchEnabled: v})} />
-            </div>
-            <div className="space-y-4 pt-2 border-t border-orange-100">
-                <div className="flex justify-between items-center"><Label className="text-[10px] font-black uppercase text-orange-800/60">Seuil d'immobilité</Label><Badge variant="outline" className="font-black bg-white">{vesselPrefs.watchDuration >= 60 ? `${Math.floor(vesselPrefs.watchDuration / 60)}h` : `${vesselPrefs.watchDuration} min`}</Badge></div>
-                <Slider value={[vesselPrefs.watchDuration || 60]} min={60} max={1440} step={60} onValueChange={v => saveVesselPrefs({...vesselPrefs, watchDuration: v[0]})} />
-            </div>
-        </div>
-
-        {showBattery && (
-            <div className="space-y-4 p-4 border-2 rounded-2xl bg-red-50/30 border-red-100">
-                <div className="flex items-center justify-between">
-                    <div className="space-y-0.5"><Label className="text-xs font-black uppercase text-red-800">Seuil Batterie Faible</Label><p className="text-[9px] font-bold text-red-600/60 uppercase">Alerte journal de bord</p></div>
-                    <Badge variant="outline" className="font-black bg-white">{vesselPrefs.batteryThreshold || 20}%</Badge>
-                </div>
-                <Slider value={[vesselPrefs.batteryThreshold || 20]} min={5} max={50} step={5} onValueChange={v => saveVesselPrefs({...vesselPrefs, batteryThreshold: v[0]})} />
-            </div>
-        )}
-        <Button onClick={handleSaveVessel} className="w-full h-12 font-black uppercase text-[10px] tracking-widest"><Save className="size-4 mr-2" /> Sauver les préférences</Button>
-    </div>
-  );
+  const resetManualTacticalClear = () => {
+    setTacticalHistory([]);
+    if (isSharing && firestore && user) {
+        updateDoc(doc(firestore, 'vessels', sharingId), { tacticalClearedAt: serverTimestamp(), huntingMarkers: [] });
+    }
+    toast({ title: "Reset Tactique effectué" });
+  };
 
   if (isProfileLoading) return <div className="p-8"><Skeleton className="h-64 w-full" /></div>;
 
@@ -881,7 +911,7 @@ export default function VesselTrackerPage() {
                                         <Waves className="size-5" /> Sardines
                                     </Button>
                                 </div>
-                                <Button variant="ghost" className="w-full h-10 font-black uppercase text-[8px] text-destructive/60 hover:text-destructive border-2 border-dashed border-destructive/10" onClick={handleClearTactical}>
+                                <Button variant="ghost" className="w-full h-10 font-black uppercase text-[8px] text-destructive/60 hover:text-destructive border-2 border-dashed border-destructive/10" onClick={resetManualTacticalClear}>
                                     <Trash2 className="size-3 mr-1" /> Reset Tactique (Vider la carte)
                                 </Button>
                             </AccordionContent>
@@ -964,7 +994,13 @@ export default function VesselTrackerPage() {
                         <span className="text-[10px] font-black uppercase">Notifications & Veille</span>
                     </AccordionTrigger>
                     <AccordionContent className="pt-4">
-                        <NotificationsSection title="Mes Réglages Alertes" showBattery={true} />
+                        <NotificationsSection 
+                          vesselPrefs={vesselPrefs} 
+                          saveVesselPrefs={saveVesselPrefsCallback}
+                          availableSounds={availableSounds}
+                          playVesselSound={playVesselSound}
+                          showBattery={true} 
+                        />
                     </AccordionContent>
                 </AccordionItem>
               </Accordion>
@@ -1027,7 +1063,13 @@ export default function VesselTrackerPage() {
                             <span className="text-[10px] font-black uppercase">Notifications & Veille</span>
                         </AccordionTrigger>
                         <AccordionContent className="pt-4">
-                            <NotificationsSection title="Réglages de Veille" showBattery={true} />
+                            <NotificationsSection 
+                              vesselPrefs={vesselPrefs} 
+                              saveVesselPrefs={saveVesselPrefsCallback}
+                              availableSounds={availableSounds}
+                              playVesselSound={playVesselSound}
+                              showBattery={true} 
+                            />
                         </AccordionContent>
                     </AccordionItem>
                 </Accordion>
@@ -1056,7 +1098,13 @@ export default function VesselTrackerPage() {
                             <span className="text-[10px] font-black uppercase">Notifications & Veille Flotte</span>
                         </AccordionTrigger>
                         <AccordionContent className="pt-4">
-                            <NotificationsSection title="Réglages Alertes Flotte" showBattery={true} />
+                            <NotificationsSection 
+                              vesselPrefs={vesselPrefs} 
+                              saveVesselPrefs={saveVesselPrefsCallback}
+                              availableSounds={availableSounds}
+                              playVesselSound={playVesselSound}
+                              showBattery={true} 
+                            />
                         </AccordionContent>
                     </AccordionItem>
                 </Accordion>
@@ -1164,7 +1212,7 @@ export default function VesselTrackerPage() {
                 <AccordionItem value="history" className="border-none">
                     <div className="flex items-center justify-between px-3 h-12 bg-muted/10 rounded-xl">
                         <AccordionTrigger className="flex-1 text-[10px] font-black uppercase hover:no-underline py-0">Journal de bord unifié</AccordionTrigger>
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-[8px] font-black text-destructive" onClick={handleClearHistory}><Trash2 className="size-3 mr-1" /> Effacer</Button>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-[8px] font-black text-destructive" onClick={resetManualHistoryClear}><Trash2 className="size-3 mr-1" /> Effacer</Button>
                     </div>
                     <AccordionContent className="space-y-2 pt-4 px-1 max-h-64 overflow-y-auto">
                         <div className="space-y-4">
@@ -1208,7 +1256,7 @@ export default function VesselTrackerPage() {
                             <div className="space-y-2 border-t pt-4">
                                 <div className="flex justify-between items-center px-1">
                                     <p className="text-[9px] font-black uppercase text-primary">Tactique (Oiseaux & Prises)</p>
-                                    <Button variant="ghost" className="h-6 text-[8px] font-black text-destructive" onClick={handleClearTactical}>Reset Tactique</Button>
+                                    <Button variant="ghost" className="h-6 text-[8px] font-black text-destructive" onClick={resetManualTacticalClear}>Reset Tactique</Button>
                                 </div>
                                 {tacticalHistory.length > 0 ? tacticalHistory.map((h, i) => {
                                     const Icon = tacticalIcons[h.type] || Fish;

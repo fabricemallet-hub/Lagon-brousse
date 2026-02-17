@@ -46,7 +46,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
-      <body className={cn('font-body antialiased', 'min-h-screen bg-background font-sans overflow-x-hidden')}>
+      <body className={cn('font-body antialiased', 'min-h-screen bg-background font-sans overflow-x-hidden pt-[env(safe-area-inset-top)]')}>
         <Suspense fallback={null}>
           <RootProviders>{children}</RootProviders>
         </Suspense>
