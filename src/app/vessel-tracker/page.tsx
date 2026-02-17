@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -169,7 +170,7 @@ export default function VesselTrackerPage() {
     mooringRadius: 20
   });
   
-  const [history, setHistory] = useState<{ vesselId: string, vesselName: string, statusLabel: string, statusCategory: string, time: Date, pos: google.maps.LatLngLiteral, batteryLevel?: number, isCharging?: boolean, durationMinutes?: number, accuracy?: number }[]>([]);
+  const [history, setHistory] = useState<{ vesselId: string, vesselName: string, statusLabel: string, statusCategory: string, time: Date, pos: google.maps.LatLngLiteral, batteryLevel?: number, isCharging?: boolean, durationMinutes?: number, accuracy?: number, statusStartTime?: number }[]>([]);
   const [tacticalHistory, setTacticalHistory] = useState<{ id: string, vesselName: string, label: string, type: string, time: Date, pos: google.maps.LatLngLiteral }[]>([]);
   
   const lastStatusesRef = useRef<Record<string, string>>({});
@@ -278,12 +279,10 @@ export default function VesselTrackerPage() {
             ...data 
         };
 
+        // On ne met à jour statusChangedAt que si le statut réel change
         if (data.status && data.status !== lastSentStatusRef.current) {
             updatePayload.statusChangedAt = serverTimestamp();
             lastSentStatusRef.current = data.status;
-        } else if (data.eventLabel) {
-            // Mise à jour temporelle pour forcer l'affichage dans l'historique technique même sans changement de statut
-            updatePayload.statusChangedAt = serverTimestamp();
         }
 
         if (!updatePayload.location && currentPosRef.current) {
@@ -391,7 +390,8 @@ export default function VesselTrackerPage() {
             return 0;
         };
 
-        const timeKey = getTimeMillis(vessel.statusChangedAt || vessel.lastActive);
+        const timeKey = getTimeMillis(vessel.lastActive);
+        const startTimeKey = getTimeMillis(vessel.statusChangedAt || vessel.lastActive);
         const clearTimeKey = getTimeMillis(vessel.historyClearedAt);
         const tacticalClearKey = getTimeMillis(vessel.tacticalClearedAt);
 
@@ -428,38 +428,45 @@ export default function VesselTrackerPage() {
         const lastStatus = lastStatusesRef.current[vessel.id];
         const lastUpdate = lastUpdatesRef.current[vessel.id] || 0;
         const pos = { lat: vessel.location?.latitude || INITIAL_CENTER.lat, lng: vessel.location?.longitude || INITIAL_CENTER.lng };
-        const label = vessel.eventLabel || statusLabels[currentStatus] || currentStatus.toUpperCase();
         
-        if (!label.includes('TACTIQUE')) {
+        // On construit l'étiquette de base sans mention de MAJ pour éviter les répétitions
+        const baseLabel = vessel.eventLabel || statusLabels[currentStatus] || currentStatus.toUpperCase();
+        
+        if (!baseLabel.includes('TACTIQUE')) {
             setHistory(prev => {
                 const lastEntryIdx = prev.findIndex(h => h.vesselId === vessel.id);
                 const lastEntry = lastEntryIdx !== -1 ? prev[lastEntryIdx] : null;
 
-                const isManualAction = label.includes('FORCÉE') || label.includes('ERREUR') || label.includes('ASSISTANCE') || label.includes('REPRISE');
+                const isManualAction = baseLabel.includes('FORCÉE') || baseLabel.includes('ERREUR') || baseLabel.includes('ASSISTANCE') || baseLabel.includes('REPRISE');
                 const wasManualAction = lastEntry?.statusLabel.includes('FORCÉE') || lastEntry?.statusLabel.includes('ERREUR') || lastEntry?.statusLabel.includes('ASSISTANCE') || lastEntry?.statusLabel.includes('REPRISE');
 
+                // FUSION DES LIGNES IDENTIQUES
                 if (lastEntry && lastEntry.statusCategory === currentStatus && !isManualAction && !wasManualAction) {
                     const newHistory = [...prev];
+                    // Nettoyer l'étiquette de toute mention MAJ précédente pour ne pas les cumuler
+                    const cleanBaseLabel = lastEntry.statusLabel.split(' (MAJ')[0];
                     newHistory[lastEntryIdx] = {
                         ...lastEntry,
-                        statusLabel: label + ` (MAJ ${format(new Date(), 'HH:mm')})`,
+                        statusLabel: `${cleanBaseLabel} (MAJ ${format(new Date(), 'HH:mm')})`,
                         time: new Date(),
-                        durationMinutes: differenceInMinutes(new Date(), new Date(timeKey))
+                        durationMinutes: differenceInMinutes(new Date(), new Date(startTimeKey))
                     };
                     return newHistory;
                 }
 
+                // NOUVELLE LIGNE
                 if (lastStatus !== currentStatus || timeKey > lastUpdate || isManualAction) {
                     const newEntry = { 
                         vesselId: vessel.id,
                         vesselName: vessel.displayName || vessel.id, 
-                        statusLabel: label, 
+                        statusLabel: baseLabel, 
                         statusCategory: currentStatus,
                         time: new Date(), 
                         pos, 
                         batteryLevel: vessel.batteryLevel, 
                         isCharging: vessel.isCharging,
-                        durationMinutes: differenceInMinutes(new Date(), new Date(timeKey))
+                        durationMinutes: differenceInMinutes(new Date(), new Date(startTimeKey)),
+                        statusStartTime: startTimeKey
                     };
                     return [newEntry, ...prev].slice(0, 50);
                 }
@@ -470,7 +477,7 @@ export default function VesselTrackerPage() {
         lastStatusesRef.current[vessel.id] = currentStatus;
         lastUpdatesRef.current[vessel.id] = timeKey;
     });
-  }, [followedVessels, mode, vesselPrefs, playVesselSound]);
+  }, [followedVessels, mode, vesselPrefs, playVesselSound, labels]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) return;
@@ -563,7 +570,8 @@ export default function VesselTrackerPage() {
   const handleForceGpsUpdate = () => {
     if (!isSharing || mode !== 'sender') return;
     setSecondsUntilUpdate(60);
-    updateVesselInFirestore({ eventLabel: `${statusLabels[vesselStatus]} (MAJ FORCÉE)` });
+    // On force un label d'événement pour créer une ligne dans le journal
+    updateVesselInFirestore({ eventLabel: `${statusLabels[vesselStatus]} (POINT FORCÉ)` });
     toast({ title: "Point GPS forcé" });
   };
 
@@ -572,7 +580,8 @@ export default function VesselTrackerPage() {
     const interval = setInterval(() => {
         setSecondsUntilUpdate(prev => {
             if (prev <= 1) {
-                updateVesselInFirestore({ eventLabel: `${statusLabels[vesselStatus]} (MAJ ${format(new Date(), 'HH:mm')})` });
+                // MAJ automatique sans étiquette d'événement pour fusionner dans le journal
+                updateVesselInFirestore({ eventLabel: null });
                 return 60;
             }
             return prev - 1;
@@ -981,14 +990,12 @@ export default function VesselTrackerPage() {
                                     </Select>
                                 </div>
                                 <div className="flex items-center gap-1">
-                                    <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        className={cn("size-8 rounded-lg", vesselPrefs.repeatSettings?.[item.key] ? "text-primary bg-primary/10" : "text-muted-foreground")}
+                                    <button 
+                                        className={cn("size-8 flex items-center justify-center rounded-lg border-2 transition-all active:scale-90", vesselPrefs.repeatSettings?.[item.key] ? "text-primary border-primary bg-primary/5" : "text-muted-foreground border-transparent")}
                                         onClick={() => setVesselPrefs({ ...vesselPrefs, repeatSettings: { ...vesselPrefs.repeatSettings, [item.key]: !vesselPrefs.repeatSettings?.[item.key] } })}
                                     >
                                         <Repeat className="size-4" />
-                                    </Button>
+                                    </button>
                                     <Button variant="ghost" size="icon" className="size-8" onClick={() => playVesselSound(vesselPrefs.notifySounds[item.key])}><Play className="size-4" /></Button>
                                 </div>
                             </div>
