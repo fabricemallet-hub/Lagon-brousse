@@ -379,6 +379,7 @@ export interface VesselStatus {
   userId: string;
   displayName: string;
   location: { latitude: number; longitude: number; } | null;
+  anchorLocation?: { latitude: number; longitude: number; } | null;
   status: 'moving' | 'stationary' | 'offline' | 'returning' | 'landed' | 'emergency' | 'drifting';
   lastActive: any;
   isSharing: boolean;

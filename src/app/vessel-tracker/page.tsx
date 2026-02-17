@@ -4,9 +4,9 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useUser as useUserHook, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where } from 'firebase/firestore';
-import { GoogleMap, OverlayView } from '@react-google-maps/api';
+import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -201,21 +201,6 @@ export default function VesselTrackerPage() {
     }
   }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, availableSounds]);
 
-  useEffect(() => {
-    if (userProfile) {
-      if (userProfile.vesselPrefs) setVesselPrefs(prev => ({ ...prev, ...userProfile.vesselPrefs }));
-      if (userProfile.emergencyContact) setEmergencyContact(userProfile.emergencyContact);
-      if (userProfile.vesselSmsMessage) setVesselSmsMessage(userProfile.vesselSmsMessage);
-      setIsEmergencyEnabled(userProfile.isEmergencyEnabled ?? true);
-      setIsCustomMessageEnabled(userProfile.isCustomMessageEnabled ?? true);
-      
-      const savedNickname = userProfile.vesselNickname || userProfile.displayName || user?.displayName || user?.email?.split('@')[0] || '';
-      if (!vesselNickname) setVesselNickname(savedNickname);
-      
-      if (userProfile.lastVesselId && !customSharingId) setCustomSharingId(userProfile.lastVesselId);
-    }
-  }, [userProfile, user]);
-
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
     
@@ -245,6 +230,37 @@ export default function VesselTrackerPage() {
     };
     update();
   }, [user, firestore, isSharing, sharingId, vesselNickname, vesselPrefs.mooringRadius]);
+
+  const handleSaveSmsSettings = async () => {
+    if (!user || !firestore) return;
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            emergencyContact: emergencyContact,
+            vesselSmsMessage: vesselSmsMessage,
+            isEmergencyEnabled: isEmergencyEnabled,
+            isCustomMessageEnabled: isCustomMessageEnabled
+        });
+        toast({ title: "Paramètres SMS sauvegardés" });
+    } catch (e) {
+        console.error(e);
+        toast({ variant: 'destructive', title: "Erreur sauvegarde SMS" });
+    }
+  };
+
+  useEffect(() => {
+    if (userProfile) {
+      if (userProfile.vesselPrefs) setVesselPrefs(prev => ({ ...prev, ...userProfile.vesselPrefs }));
+      if (userProfile.emergencyContact) setEmergencyContact(userProfile.emergencyContact);
+      if (userProfile.vesselSmsMessage) setVesselSmsMessage(userProfile.vesselSmsMessage);
+      setIsEmergencyEnabled(userProfile.isEmergencyEnabled ?? true);
+      setIsCustomMessageEnabled(userProfile.isCustomMessageEnabled ?? true);
+      
+      const savedNickname = userProfile.vesselNickname || userProfile.displayName || user?.displayName || user?.email?.split('@')[0] || '';
+      if (!vesselNickname) setVesselNickname(savedNickname);
+      
+      if (userProfile.lastVesselId && !customSharingId) setCustomSharingId(userProfile.lastVesselId);
+    }
+  }, [userProfile, user]);
 
   const handleSaveVessel = async () => {
     if (!user || !firestore) return;
@@ -363,22 +379,6 @@ export default function VesselTrackerPage() {
     await updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: newPrefs }).catch(() => {});
   };
 
-  const handleSaveSmsSettings = async () => {
-    if (!user || !firestore) return;
-    try {
-        await updateDoc(doc(firestore, 'users', user.uid), {
-            emergencyContact: emergencyContact,
-            vesselSmsMessage: vesselSmsMessage,
-            isEmergencyEnabled: isEmergencyEnabled,
-            isCustomMessageEnabled: isCustomMessageEnabled
-        });
-        toast({ title: "Paramètres SMS sauvegardés" });
-    } catch (e) {
-        console.error(e);
-        toast({ variant: 'destructive', title: "Erreur sauvegarde SMS" });
-    }
-  };
-
   useEffect(() => {
     if (!followedVessels) return;
 
@@ -490,7 +490,7 @@ export default function VesselTrackerPage() {
         lastBatteryLevelsRef.current[vessel.id] = currentBattery;
         lastChargingStatesRef.current[vessel.id] = currentCharging;
     });
-  }, [followedVessels, mode, vesselPrefs, playVesselSound]);
+  }, [followedVessels, mode, vesselPrefs, playVesselSound, labels]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
@@ -522,7 +522,7 @@ export default function VesselTrackerPage() {
               setVesselStatus('moving'); 
               setAnchorPos(newPos); 
               immobilityStartTime.current = null;
-              updateVesselInFirestore({ location: { latitude, longitude }, status: 'moving', isSharing: true, eventLabel: null, accuracy: roundedAccuracy });
+              updateVesselInFirestore({ location: { latitude, longitude }, status: 'moving', isSharing: true, eventLabel: null, accuracy: roundedAccuracy, anchorLocation: null });
             } else {
               if (!immobilityStartTime.current) {
                   immobilityStartTime.current = Date.now();
@@ -530,7 +530,12 @@ export default function VesselTrackerPage() {
               }
               if (Date.now() - immobilityStartTime.current > 15000 && vesselStatus !== 'stationary') {
                 setVesselStatus('stationary'); 
-                updateVesselInFirestore({ status: 'stationary', eventLabel: null, accuracy: roundedAccuracy });
+                updateVesselInFirestore({ 
+                    status: 'stationary', 
+                    eventLabel: null, 
+                    accuracy: roundedAccuracy,
+                    anchorLocation: { latitude: anchorPos.lat, longitude: anchorPos.lng }
+                });
               } else {
                 updateVesselInFirestore({ location: { latitude, longitude }, accuracy: roundedAccuracy });
               }
@@ -636,7 +641,6 @@ export default function VesselTrackerPage() {
             <div className="space-y-6">
               {isSharing ? (
                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                    {/* EN-TÊTE BLEU DE PARTAGE ACTIF */}
                     <div className={cn("p-6 rounded-2xl shadow-xl relative overflow-hidden border-2 text-white", 
                         vesselStatus === 'landed' ? "bg-green-600 border-green-400/20" : 
                         vesselStatus === 'emergency' ? "bg-red-600 border-red-400/20 animate-pulse" :
@@ -658,7 +662,6 @@ export default function VesselTrackerPage() {
                         </div>
                     </div>
 
-                    {/* SECTION SIGNALISATION MANUELLE */}
                     <div className="bg-muted/20 p-4 rounded-2xl border-2 border-dashed space-y-3">
                         <p className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest flex items-center gap-2"><Zap className="size-3" /> Signalisation manuelle</p>
                         <div className="grid grid-cols-2 gap-2">
@@ -683,7 +686,6 @@ export default function VesselTrackerPage() {
                         </div>
                     </div>
 
-                    {/* SECTION SIGNALEMENT TACTIQUE */}
                     <div className="bg-muted/20 p-4 rounded-2xl border-2 border-dashed space-y-3">
                         <p className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest flex items-center gap-2"><Fish className="size-3" /> Signalement Tactique (Flotte)</p>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -701,7 +703,6 @@ export default function VesselTrackerPage() {
                         </div>
                     </div>
 
-                    {/* GRANDS BOUTONS D'ACTION */}
                     <div className="space-y-2">
                         <Button 
                             variant="destructive" 
@@ -727,7 +728,6 @@ export default function VesselTrackerPage() {
                 </div>
               )}
 
-              {/* ACCORDÉONS DE RÉGLAGES ÉMETTEUR */}
               <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="sender-prefs" className="border-none">
                     <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
@@ -874,6 +874,24 @@ export default function VesselTrackerPage() {
           <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
                 {followedVessels?.filter(v => v.isSharing).map(vessel => (
                     <React.Fragment key={`vessel-group-${vessel.id}`}>
+                        {/* Cercle de mouillage pour le navire suivi */}
+                        {vessel.status === 'stationary' && vessel.anchorLocation && (
+                            <Circle
+                                center={{ lat: vessel.anchorLocation.latitude, lng: vessel.anchorLocation.longitude }}
+                                radius={vessel.mooringRadius || 20}
+                                options={{
+                                    fillColor: '#3b82f6',
+                                    fillOpacity: 0.1,
+                                    strokeColor: '#3b82f6',
+                                    strokeOpacity: 0.5,
+                                    strokeWeight: 2,
+                                    clickable: false,
+                                    editable: false,
+                                    zIndex: 1
+                                }}
+                            />
+                        )}
+
                         {/* Marqueurs tactiques fixes pour ce navire */}
                         {vessel.huntingMarkers?.map(marker => {
                             const type = TACTICAL_TYPES.find(t => t.label === marker.label);
@@ -917,6 +935,25 @@ export default function VesselTrackerPage() {
                         </OverlayView>
                     </React.Fragment>
                 ))}
+
+                {/* Cercle de mouillage pour l'émetteur actuel */}
+                {mode === 'sender' && vesselStatus === 'stationary' && anchorPos && (
+                    <Circle
+                        center={anchorPos}
+                        radius={vesselPrefs.mooringRadius || 20}
+                        options={{
+                            fillColor: '#3b82f6',
+                            fillOpacity: 0.1,
+                            strokeColor: '#3b82f6',
+                            strokeOpacity: 0.5,
+                            strokeWeight: 2,
+                            clickable: false,
+                            editable: false,
+                            zIndex: 1
+                        }}
+                    />
+                )}
+
                 {mode === 'sender' && currentPos && <OverlayView position={currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}><PulsingDot /></OverlayView>}
           </GoogleMap>
           <div className="absolute top-3 right-3 flex flex-col gap-2">
