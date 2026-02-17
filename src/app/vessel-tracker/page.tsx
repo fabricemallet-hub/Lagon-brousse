@@ -450,6 +450,7 @@ export default function VesselTrackerPage() {
         const pos = { lat: vessel.location?.latitude || INITIAL_CENTER.lat, lng: vessel.location?.longitude || INITIAL_CENTER.lng };
         
         const baseLabel = vessel.eventLabel || statusLabels[currentStatus] || currentStatus.toUpperCase();
+        const statusChanged = lastStatus !== currentStatus;
         
         const isManualAction = baseLabel.includes('FORCÉE') || baseLabel.includes('ERREUR') || baseLabel.includes('ASSISTANCE') || baseLabel.includes('REPRISE') || baseLabel.includes('TACTIQUE');
 
@@ -475,7 +476,7 @@ export default function VesselTrackerPage() {
                     return newHistory;
                 }
 
-                if (lastStatus !== currentStatus || timeKey > lastUpdate || isManualAction) {
+                if (statusChanged || timeKey > lastUpdate || isManualAction) {
                     const newEntry = { 
                         vesselId: vessel.id,
                         vesselName: vessel.displayName || vessel.id, 
@@ -530,7 +531,7 @@ export default function VesselTrackerPage() {
         lastUpdatesRef.current[vessel.id] = timeKey;
         lastBatteryLevelsRef.current[vessel.id] = currentBattery;
     });
-  }, [followedVessels, mode, vesselPrefs, playVesselSound, activeLoopingAlert]);
+  }, [followedVessels, mode, vesselPrefs, playVesselSound, activeLoopingAlert, toast]);
 
   const lastBatteryLevelsRef = useRef<Record<string, number>>({});
 
@@ -567,8 +568,9 @@ export default function VesselTrackerPage() {
             return;
         }
 
+        // Filtre intelligent : on ignore les mouvements inférieurs à la précision GPS
+        const isActuallyMoving = dist > radius && dist > (accuracy * 0.8);
         const dist = getDistance(newPos.lat, newPos.lng, currentAnchor.lat, currentAnchor.lng);
-        const isActuallyMoving = dist > radius && dist > (accuracy * 0.5);
 
         if (isActuallyMoving) {
             immobilityStartTime.current = null;
