@@ -129,6 +129,8 @@ export default function VesselTrackerPage() {
   const [userAccuracy, setUserAccuracy] = useState<number | null>(null);
   const [anchorPos, setAnchorPos] = useState<google.maps.LatLngLiteral | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
+  const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [mapZoom, setMapZoom] = useState<number>(10);
   
   const watchIdRef = useRef<number | null>(null);
   const vesselStatusRef = useRef<VesselStatus['status']>('moving');
@@ -142,7 +144,6 @@ export default function VesselTrackerPage() {
   const immobilityStartTime = useRef<number | null>(null);
   const lastFixTimeRef = useRef<number>(Date.now());
 
-  const [map, setMap] = useState<google.maps.Map | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const [vesselPrefs, setVesselPrefs] = useState<NonNullable<UserAccount['vesselPrefs']>>({
@@ -175,7 +176,6 @@ export default function VesselTrackerPage() {
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
-  // INITIALISATION DES SONS (DÉPLACÉ EN HAUT POUR ÉVITER LES ERREURS DE RÉFÉRENCE)
   const soundsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
@@ -211,8 +211,7 @@ export default function VesselTrackerPage() {
         activeAudioRef.current = null;
     }
 
-    const targetSound = soundId || 'sonar';
-    const sound = availableSounds.find(s => s.id === targetSound || s.label.toLowerCase() === targetSound.toLowerCase());
+    const sound = availableSounds.find(s => s.id === soundId || s.label.toLowerCase() === soundId.toLowerCase());
     
     if (sound) {
       const audio = new Audio(sound.url);
@@ -359,7 +358,6 @@ export default function VesselTrackerPage() {
             
             if (currentStatus !== 'returning' && currentStatus !== 'landed' && currentStatus !== 'emergency') {
                 if (!anchorPosRef.current) { 
-                  // Phase d'observation initiale
                   anchorPosRef.current = newPos; 
                   immobilityStartTime.current = Date.now();
                   setAnchorPos(newPos);
@@ -370,7 +368,6 @@ export default function VesselTrackerPage() {
                 const distFromAnchor = getDistance(newPos.lat, newPos.lng, anchorPosRef.current.lat, anchorPosRef.current.lng);
                 
                 if (currentStatus === 'stationary' || currentStatus === 'drifting') {
-                    // SI ON EST AU MOUILLAGE : L'ANCRE EST FIXE.
                     if (distFromAnchor > 100) {
                         setVesselStatus('moving');
                         anchorPosRef.current = null;
@@ -400,7 +397,6 @@ export default function VesselTrackerPage() {
                         }
                     } 
                     else {
-                        // Toujours au mouillage dans le cercle
                         if (currentStatus !== 'stationary') {
                             setVesselStatus('stationary');
                             updateVesselInFirestore({ 
@@ -414,7 +410,6 @@ export default function VesselTrackerPage() {
                         }
                     }
                 } else {
-                    // MODE NAVIGATION : On cherche la stabilité pour jeter l'ancre
                     const hasMovedSignificantly = distFromAnchor > (prefs.mooringRadius || 20);
 
                     if (hasMovedSignificantly) {
@@ -759,7 +754,10 @@ export default function VesselTrackerPage() {
                             <div className="flex justify-between items-center"><Label className="text-[10px] font-black uppercase opacity-60">Rayon de mouillage (m)</Label><Badge variant="outline" className="font-black text-[10px]">{vesselPrefs.mooringRadius || 20}m</Badge></div>
                             <Slider value={[vesselPrefs.mooringRadius || 20]} min={10} max={200} step={5} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, mooringRadius: v[0] })} />
                         </div>
-                        <Button variant={wakeLock ? "secondary" : "outline"} className="w-full h-12 font-black uppercase text-[10px] border-2 gap-2" onClick={toggleWakeLock}><Zap className={cn("size-4", wakeLock && "fill-primary")} />{wakeLock ? "MODE ÉVEIL ACTIF" : "ACTIVER MODE ÉVEIL"}</Button>
+                        <Button variant={wakeLock ? "secondary" : "outline"} className="w-full h-12 font-black uppercase text-[10px] border-2 gap-2" onClick={toggleWakeLock}>
+                            <Zap className={cn("size-4", wakeLock && "fill-primary")} />
+                            {wakeLock ? "MODE ÉVEIL ACTIF" : "ACTIVER MODE ÉVEIL"}
+                        </Button>
                     </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="sender-sounds" className="border-none mt-2">
