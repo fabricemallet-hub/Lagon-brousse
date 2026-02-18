@@ -190,16 +190,16 @@ export default function VesselTrackerPage() {
   const vesselsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     
-    // Si on est en mode Flotte, on veut voir TOUS les bateaux du groupe
+    // Si on est en mode Flotte, on suit le fleetId saisi dans le champ
     if (mode === 'fleet' && vesselIdToFollow) {
         return query(collection(firestore, 'vessels'), where('fleetId', '==', vesselIdToFollow.trim().toUpperCase()));
     }
 
-    // Sinon (Sender ou Receiver), on suit des IDs précis
-    if (savedVesselIds.length === 0 && !isSharing) return null;
-    
+    // En mode Émetteur ou Récepteur, on suit les IDs précis
     const queryIds = [...savedVesselIds];
     if (isSharing && !queryIds.includes(sharingId)) queryIds.push(sharingId);
+    
+    if (queryIds.length === 0) return null;
     return query(collection(firestore, 'vessels'), where('id', 'in', queryIds.slice(0, 10)));
   }, [firestore, savedVesselIds, sharingId, isSharing, mode, vesselIdToFollow]);
   
@@ -345,6 +345,13 @@ export default function VesselTrackerPage() {
   const handleSaveVesselToList = async () => {
     if (!user || !firestore || !vesselIdToFollow.trim()) return;
     const cleanId = vesselIdToFollow.trim().toUpperCase();
+    
+    // Si on est en mode Flotte, on ne sauvegarde pas dans savedVesselIds (qui est pour le suivi individuel B)
+    if (mode === 'fleet') {
+        handleSaveId(cleanId, 'fleet');
+        return;
+    }
+
     try {
         await updateDoc(doc(firestore, 'users', user.uid), {
             savedVesselIds: arrayUnion(cleanId)
@@ -1107,34 +1114,62 @@ export default function VesselTrackerPage() {
                 </div>
               </div>
 
-              {savedVesselIds.length > 0 && (
-                <div className="space-y-3">
-                    <Label className="text-[9px] font-black uppercase ml-1 opacity-40">Ma Flotte ({followedVessels?.filter(v => v.isSharing).length || 0})</Label>
-                    <div className="grid gap-2">
-                        {savedVesselIds.map(id => {
-                            const vessel = followedVessels?.find(v => v.id === id);
-                            const isActive = vessel?.isSharing === true;
-                            return (
-                                <div key={id} className={cn("flex items-center justify-between p-3 border-2 rounded-xl bg-white shadow-sm", isActive ? "border-primary/20 bg-primary/5" : "opacity-60")}>
+              <div className="space-y-3">
+                <Label className="text-[9px] font-black uppercase ml-1 opacity-40">
+                    {mode === 'fleet' ? 'Membres du Groupe' : 'Ma Flotte'} ({followedVessels?.filter(v => v.isSharing).length || 0})
+                </Label>
+                <div className="grid gap-2">
+                    {mode === 'fleet' ? (
+                        <>
+                            {followedVessels?.map(vessel => (
+                                <div key={vessel.id} className={cn("flex items-center justify-between p-3 border-2 rounded-xl bg-white shadow-sm border-primary/20 bg-primary/5")}>
                                     <div className="flex items-center gap-3">
-                                        <div className={cn("p-2 rounded-lg", isActive ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>
-                                            {isActive ? <Navigation className="size-4" /> : <WifiOff className="size-4" />}
+                                        <div className="p-2 rounded-lg bg-primary text-white">
+                                            <Navigation className="size-4" />
                                         </div>
                                         <div className="flex flex-col">
-                                            <span className="font-black text-xs uppercase">{vessel?.displayName || id}</span>
-                                            <span className="text-[8px] font-bold uppercase opacity-60">{isActive ? 'En ligne' : 'Déconnecté'}</span>
+                                            <span className="font-black text-xs uppercase">{vessel.displayName}</span>
+                                            <span className="text-[8px] font-bold uppercase opacity-60">En ligne</span>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        {isActive && <BatteryIconComp level={vessel?.batteryLevel} charging={vessel?.isCharging} />}
-                                        <Button variant="ghost" size="icon" onClick={() => handleRemoveSavedVessel(id)} className="size-8 text-destructive/40 hover:text-destructive border-2"><Trash2 className="size-3" /></Button>
+                                        <BatteryIconComp level={vessel.batteryLevel} charging={vessel.isCharging} />
                                     </div>
                                 </div>
-                            );
-                        })}
-                    </div>
+                            ))}
+                            {(!followedVessels || followedVessels.length === 0) && (
+                                <div className="text-center py-8 border-2 border-dashed rounded-xl opacity-40">
+                                    <p className="text-[10px] font-black uppercase tracking-widest">Aucun navire actif dans ce groupe</p>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            {savedVesselIds.map(id => {
+                                const vessel = followedVessels?.find(v => v.id === id);
+                                const isActive = vessel?.isSharing === true;
+                                return (
+                                    <div key={id} className={cn("flex items-center justify-between p-3 border-2 rounded-xl bg-white shadow-sm", isActive ? "border-primary/20 bg-primary/5" : "opacity-60")}>
+                                        <div className="flex items-center gap-3">
+                                            <div className={cn("p-2 rounded-lg", isActive ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>
+                                                {isActive ? <Navigation className="size-4" /> : <WifiOff className="size-4" />}
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="font-black text-xs uppercase">{vessel?.displayName || id}</span>
+                                                <span className="text-[8px] font-bold uppercase opacity-60">{isActive ? 'En ligne' : 'Déconnecté'}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {isActive && <BatteryIconComp level={vessel?.batteryLevel} charging={vessel?.isCharging} />}
+                                            <Button variant="ghost" size="icon" onClick={() => handleRemoveSavedVessel(id)} className="size-8 text-destructive/40 hover:text-destructive border-2"><Trash2 className="size-3" /></Button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </>
+                    )}
                 </div>
-              )}
+              </div>
 
               <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="receiver-settings" className="border-none">
@@ -1269,7 +1304,7 @@ export default function VesselTrackerPage() {
                                             <div className="flex items-center gap-4">
                                                 <span className="font-black text-primary uppercase text-[10px] leading-none">{h.vesselName}</span>
                                                 <div className="flex flex-col gap-0.5">
-                                                    <span className={cn("font-black uppercase text-[10px] leading-none", 
+                                                    <span className={cn("font-black uppercase text-[10px] masonry-break-words", 
                                                         h.statusLabel.includes('ASSISTANCE') ? 'text-red-600' :
                                                         h.statusLabel.includes('MOUVEMENT') ? 'text-blue-600' :
                                                         h.statusLabel.includes('MOUILLAGE') ? 'text-orange-600' :
