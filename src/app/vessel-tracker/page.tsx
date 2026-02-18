@@ -949,7 +949,47 @@ export default function VesselTrackerPage() {
                 </div>
                 <div className="border rounded-xl bg-primary/5 overflow-hidden">
                     <Accordion type="single" collapsible className="w-full">
-                        <AccordionItem value="history-tactical" className="border-none"><div className="flex items-center justify-between px-3 h-12"><AccordionTrigger className="flex-1 text-[10px] font-black uppercase hover:no-underline py-0"><Fish className="size-3 mr-2"/> Journal Tactique</AccordionTrigger><Button variant="ghost" size="sm" className="h-7 px-2 text-[8px] font-black text-destructive" onClick={() => handleClearHistory('tactical')}>Effacer</Button></div><AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide px-3">{tacticalHistory.map((h, i) => (<div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm border-primary/20"><div className="flex items-center gap-3 flex-1 min-w-0">{h.photoUrl ? (<div className="size-10 rounded-lg bg-teal-50 border overflow-hidden shrink-0 cursor-pointer" onClick={() => setFullscreenImage({ url: h.photoUrl!, title: h.label })}><img src={h.photoUrl} className="w-full h-full object-cover" /></div>) : (<div className="size-10 rounded-lg bg-slate-50 border flex items-center justify-center shrink-0">{React.createElement(TACTICAL_TYPES.find(t => t.label === h.label)?.icon || Fish, { className: "size-5 opacity-20" })}</div>)}<div className="flex flex-col gap-0.5 min-w-0 flex-1"><div className="flex items-center gap-2"><span className="font-black text-primary truncate">{h.vesselName}</span><Badge className={cn("text-[8px] font-black h-4 px-1", h.photoUrl ? "bg-teal-600" : "bg-primary")}>{h.label}</Badge></div><div className="flex items-center gap-2 font-bold opacity-40"><span>{format(h.time, 'HH:mm:ss')}</span><span className="text-[8px] font-mono">{h.pos.lat.toFixed(5)}, {h.pos.lng.toFixed(5)}</span></div></div></div><div className="flex gap-1 shrink-0"><Button variant="ghost" size="icon" className="h-8 w-8 border-2" onClick={() => { navigator.clipboard.writeText(`${h.pos.lat.toFixed(6)}, ${h.pos.lng.toFixed(6)}`); toast({ title: "Copié" }); }}><Copy className="size-3.5" /></Button><Button variant="ghost" size="sm" className="h-8 border-2 px-3 text-[9px] font-black uppercase" onClick={() => { map?.panTo(h.pos); map?.setZoom(17); }}>GPS</Button></div></div>))}</AccordionContent></AccordionItem>
+                        <AccordionItem value="history-tactical" className="border-none">
+                            <div className="flex items-center justify-between px-3 h-12">
+                                <AccordionTrigger className="flex-1 text-[10px] font-black uppercase hover:no-underline py-0">
+                                    <Fish className="size-3 mr-2"/> Journal Tactique
+                                </AccordionTrigger>
+                                <Button variant="ghost" size="sm" className="h-7 px-2 text-[8px] font-black text-destructive" onClick={() => handleClearHistory('tactical')}>Effacer</Button>
+                            </div>
+                            <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide px-3">
+                                {tacticalHistory.map((h, i) => (
+                                    <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm border-primary/20">
+                                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                                            {h.photoUrl ? (
+                                                <div className="size-10 rounded-lg bg-teal-50 border overflow-hidden shrink-0 cursor-pointer" onClick={() => setFullscreenImage({ url: h.photoUrl!, title: h.label })}>
+                                                    <img src={h.photoUrl} className="w-full h-full object-cover" />
+                                                </div>
+                                            ) : (
+                                                <div className="size-10 rounded-lg bg-slate-50 border flex items-center justify-center shrink-0">
+                                                    {React.createElement(TACTICAL_TYPES.find(t => t.label === h.label)?.icon || Fish, { className: "size-5 opacity-20" })}
+                                                </div>
+                                            )}
+                                            <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-black text-primary truncate">{h.vesselName}</span>
+                                                    <Badge className={cn("text-[8px] font-black h-4 px-1", h.photoUrl ? "bg-teal-600" : "bg-primary")}>{h.label}</Badge>
+                                                </div>
+                                                <div className="flex items-center gap-2 font-bold opacity-40">
+                                                    <span>{format(h.time, 'HH:mm:ss')}</span>
+                                                    <span className="text-[8px] font-mono">{h.pos.lat.toFixed(5)}, {h.pos.lng.toFixed(5)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-1 shrink-0">
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 border-2" onClick={() => { navigator.clipboard.writeText(`${h.pos.lat.toFixed(6)}, ${h.pos.lng.toFixed(6)}`); toast({ title: "Copié" }); }}>
+                                                <Copy className="size-3.5" />
+                                            </Button>
+                                            <Button variant="ghost" size="sm" className="h-8 border-2 px-3 text-[9px] font-black uppercase" onClick={() => { map?.panTo(h.pos); map?.setZoom(17); }}>GPS</Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </AccordionContent>
+                        </AccordionItem>
                     </Accordion>
                 </div>
             </div>
