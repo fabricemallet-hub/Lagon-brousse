@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, where, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, where, deleteDoc, getDoc } from 'firebase/firestore';
 import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -55,7 +55,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
-import { format, differenceInMinutes, differenceInSeconds } from 'date-fns';
+import { format, differenceInMinutes } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { fetchWindyWeather } from '@/lib/windy-api';
@@ -108,7 +108,6 @@ export default function VesselTrackerPage() {
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
   const watchIdRef = useRef<number | null>(null);
-  const lastSentPosRef = useRef<{ lat: number; lng: number } | null>(null);
   const shouldPanOnNextFix = useRef<boolean>(false);
   const immobilityStartTime = useRef<number | null>(null);
   const driftStartTime = useRef<number | null>(null);
@@ -158,15 +157,9 @@ export default function VesselTrackerPage() {
     ).map(s => ({ id: s.id, label: s.label, url: s.url }));
   }, [dbSounds]);
 
-  const playStatusSound = useCallback((statusOrType: string) => {
-    // Logic for playing sounds based on status
-  }, []);
-
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
     
-    console.log(`[Tracker] Sync Firestore pour ${sharingId}`, data);
-
     const update = async () => {
         let batteryInfo: any = {};
         if ('getBattery' in navigator) {
@@ -295,6 +288,23 @@ export default function VesselTrackerPage() {
     }
   };
 
+  const handleClearTechnical = () => {
+    setTechnicalLog([]);
+    toast({ title: "Journal technique effacé" });
+  };
+
+  const handleClearTactical = async () => {
+    if (!user || !firestore) return;
+    try {
+        await updateDoc(doc(firestore, 'vessels', sharingId), {
+            huntingMarkers: []
+        });
+        toast({ title: "Journal tactique effacé" });
+    } catch (e) {
+        console.error(e);
+    }
+  };
+
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
       if (watchIdRef.current !== null) { 
@@ -304,12 +314,19 @@ export default function VesselTrackerPage() {
       return;
     }
 
+    console.log(`[Tracker] Lancement de watchPosition pour ${sharingId}`);
+
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude, accuracy } = position.coords;
         const newPos = { lat: latitude, lng: longitude };
         
-        if (accuracy > 500) return;
+        console.log(`[Tracker] GPS Fix : Lat: ${latitude}, Lng: ${longitude} (Précision: ${accuracy}m)`);
+
+        if (accuracy > 500) {
+            console.warn(`[Tracker] Précision insuffisante (>500m), point ignoré.`);
+            return;
+        }
 
         setCurrentPos(newPos);
 
@@ -322,7 +339,6 @@ export default function VesselTrackerPage() {
                 const distFromAnchor = getDistance(latitude, longitude, anchorPos.lat, anchorPos.lng);
                 
                 if (distFromAnchor > 100) {
-                    // SEUIL NAVIGATION (> 100m)
                     setVesselStatus('moving');
                     setAnchorPos(null);
                     immobilityStartTime.current = null;
@@ -330,7 +346,6 @@ export default function VesselTrackerPage() {
                     updateVesselInFirestore({ location: { latitude, longitude }, status: 'moving', eventLabel: null, accuracy: Math.round(accuracy) });
                     addToTechnicalLog('EN MOUVEMENT', newPos);
                 } else if (distFromAnchor > mooringRadius) {
-                    // SEUIL DÉRIVE (> Rayon mais < 100m)
                     if (!driftStartTime.current) driftStartTime.current = Date.now();
                     if (Date.now() - driftStartTime.current > 60000 && vesselStatus !== 'drifting') {
                         setVesselStatus('drifting');
@@ -338,7 +353,6 @@ export default function VesselTrackerPage() {
                         addToTechnicalLog('À LA DÉRIVE !', newPos);
                     }
                 } else {
-                    // ZONE VERTE (< Rayon)
                     driftStartTime.current = null;
                     if (!immobilityStartTime.current) immobilityStartTime.current = Date.now();
                     if (Date.now() - immobilityStartTime.current > 30000 && vesselStatus !== 'stationary') {
@@ -361,7 +375,7 @@ export default function VesselTrackerPage() {
             shouldPanOnNextFix.current = false;
         }
       },
-      (err) => console.error(err),
+      (err) => console.error(`[Tracker] Erreur Géolocalisation:`, err),
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
 
@@ -601,7 +615,10 @@ export default function VesselTrackerPage() {
 
             <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="tech-log" className="border rounded-xl px-3 bg-muted/5 mb-2">
-                    <AccordionTrigger className="text-[10px] font-black uppercase hover:no-underline py-3">JOURNAL TECHNIQUE</AccordionTrigger>
+                    <div className="flex items-center justify-between">
+                        <AccordionTrigger className="flex-1 text-[10px] font-black uppercase hover:no-underline py-3">JOURNAL TECHNIQUE</AccordionTrigger>
+                        <Button variant="ghost" size="sm" onClick={handleClearTechnical} className="h-7 text-destructive text-[8px] font-black uppercase">Effacer</Button>
+                    </div>
                     <AccordionContent className="pb-4 space-y-2">
                         {technicalLog.map((log, i) => (
                             <div key={i} className="p-2 bg-white border-2 rounded-lg text-[9px] flex justify-between items-center">
@@ -612,7 +629,10 @@ export default function VesselTrackerPage() {
                     </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="tactical-log" className="border rounded-xl px-3 bg-muted/5">
-                    <div className="flex items-center justify-between"><AccordionTrigger className="flex-1 text-[10px] font-black uppercase hover:no-underline py-3">JOURNAL TACTIQUE</AccordionTrigger><Button variant="ghost" size="sm" onClick={handleClearTactical} className="h-7 text-destructive text-[8px] font-black uppercase">Effacer</Button></div>
+                    <div className="flex items-center justify-between">
+                        <AccordionTrigger className="flex-1 text-[10px] font-black uppercase hover:no-underline py-3">JOURNAL TACTIQUE</AccordionTrigger>
+                        <Button variant="ghost" size="sm" onClick={handleClearTactical} className="h-7 text-destructive text-[8px] font-black uppercase">Effacer</Button>
+                    </div>
                     <AccordionContent className="pb-4 space-y-2">
                         {tacticalMarkers.map((m, i) => (
                             <div key={i} className="p-2 bg-white border-2 rounded-lg text-[9px] flex justify-between items-center">
