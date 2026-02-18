@@ -54,7 +54,6 @@ import {
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
@@ -104,15 +103,6 @@ export default function VesselTrackerPage() {
   const [emergencyContact, setEmergencyContact] = useState('');
   const [vesselSmsMessage, setVesselSmsMessage] = useState('');
 
-  const [vesselPrefs, setVesselPrefs] = useState<any>({
-    isNotifyEnabled: true,
-    vesselVolume: 0.8,
-    notifySettings: { moving: true, stationary: true, offline: true, assistance: true, tactical: true, battery: true },
-    notifySounds: { moving: '', stationary: '', offline: '', assistance: '', tactical: '', battery: '' },
-    notifyLoops: { moving: false, stationary: false, offline: false, assistance: true, tactical: true, battery: false },
-    batteryThreshold: 20
-  });
-
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
   const watchIdRef = useRef<number | null>(null);
@@ -137,6 +127,9 @@ export default function VesselTrackerPage() {
 
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
+    
+    console.log(`[Tracker] Envoi des données vers Firestore pour l'ID: ${sharingId}`, data);
+
     const update = async () => {
         let batteryInfo: any = {};
         if ('getBattery' in navigator) {
@@ -163,7 +156,10 @@ export default function VesselTrackerPage() {
             updatePayload.anchorLocation = { latitude: anchorPos.lat, longitude: anchorPos.lng };
         }
 
-        setDoc(doc(firestore, 'vessels', sharingId), updatePayload, { merge: true }).catch(() => {});
+        setDoc(doc(firestore, 'vessels', sharingId), updatePayload, { merge: true })
+            .then(() => console.log(`[Tracker] Mise à jour Firestore réussie pour ${sharingId}`))
+            .catch((err) => console.error(`[Tracker] Erreur Firestore pour ${sharingId}:`, err));
+        
         setNextSyncSeconds(60);
     };
     update();
@@ -190,6 +186,7 @@ export default function VesselTrackerPage() {
 
   const handleStopSharing = async () => {
     if (!user || !firestore) return;
+    console.log(`[Tracker] Arrêt du partage pour l'ID: ${sharingId}`);
     setIsSharing(false);
     await updateDoc(doc(firestore, 'vessels', sharingId), { isSharing: false, lastActive: serverTimestamp() });
     if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
@@ -198,6 +195,7 @@ export default function VesselTrackerPage() {
   };
 
   const handleManualStatusToggle = (st: VesselStatus['status'], label: string) => {
+    console.log(`[Tracker] Statut manuel activé : ${st} (${label})`);
     setVesselStatus(st);
     const updates: any = { status: st, eventLabel: label };
     if (st === 'emergency') updates.isGhostMode = false;
@@ -216,7 +214,7 @@ export default function VesselTrackerPage() {
     toast({ title: label });
   };
 
-  const handleAddTacticalMarker = (type: string, icon: any) => {
+  const handleAddTacticalMarker = (type: string) => {
     if (!currentPos || !firestore) return;
     const marker: HuntingMarker = {
         id: Math.random().toString(36).substring(7),
@@ -225,11 +223,13 @@ export default function VesselTrackerPage() {
         time: format(new Date(), 'HH:mm'),
         label: type
     };
+    console.log(`[Tracker] Signalement tactique ajouté : ${type}`, marker);
     updateVesselInFirestore({ huntingMarkers: arrayUnion(marker) });
     toast({ title: `${type} signalé !`, description: "Point GPS enregistré." });
   };
 
   const handleClearTactical = () => {
+    console.log(`[Tracker] Effacement du journal tactique`);
     updateVesselInFirestore({ huntingMarkers: [] });
     toast({ title: "Journal tactique effacé" });
   };
@@ -240,20 +240,33 @@ export default function VesselTrackerPage() {
     const posUrl = `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
     const name = vesselNickname || sharingId;
     const body = `[LB-NC] ${type} : ${name}. ${vesselSmsMessage || "Assistance requise."}. Carte : ${posUrl}`;
+    console.log(`[Tracker] Envoi SMS d'urgence : ${type}`);
     window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
-      if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
+      if (watchIdRef.current !== null) { 
+        console.log("[Tracker] Nettoyage watchPosition");
+        navigator.geolocation.clearWatch(watchIdRef.current); 
+        watchIdRef.current = null; 
+      }
       return;
     }
+
+    console.log(`[Tracker] Lancement de watchPosition pour l'émetteur: ${sharingId}`);
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude, accuracy } = position.coords;
         const newPos = { lat: latitude, lng: longitude };
-        if (accuracy > 30) return;
+        
+        console.log(`[Tracker] GPS Fix reçu : Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)} (Précision: ${accuracy.toFixed(1)}m)`);
+
+        if (accuracy > 50) {
+            console.warn("[Tracker] Précision GPS insuffisante (>50m), point ignoré.");
+            return;
+        }
 
         const lastSent = lastSentPosRef.current;
         const distMoved = lastSent ? getDistance(latitude, longitude, lastSent.lat, lastSent.lng) : 100;
@@ -272,12 +285,15 @@ export default function VesselTrackerPage() {
             shouldPanOnNextFix.current = false;
         }
       },
-      (err) => console.warn(err),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      (err) => {
+          console.error("[Tracker] Erreur Géolocalisation:", err.message);
+          toast({ variant: "destructive", title: "Erreur GPS", description: err.message });
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
 
     return () => { if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current); };
-  }, [isSharing, mode, isFollowing, map, updateVesselInFirestore]);
+  }, [isSharing, mode, isFollowing, map, updateVesselInFirestore, sharingId, toast]);
 
   const getVesselIconInfo = (status: string) => {
     switch (status) {
@@ -340,10 +356,10 @@ export default function VesselTrackerPage() {
                     <div className="p-4 bg-muted/20 rounded-2xl border-2 border-dashed space-y-3">
                         <p className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2 px-1"><Zap className="size-3" /> Signalement Tactique</p>
                         <div className="grid grid-cols-4 gap-2">
-                            <Button variant="outline" size="icon" className="h-12 w-full border-2 bg-white" onClick={() => handleAddTacticalMarker('OISEAUX', Bird)}><Bird className="size-5 text-sky-500" /></Button>
-                            <Button variant="outline" size="icon" className="h-12 w-full border-2 bg-white" onClick={() => handleAddTacticalMarker('MARLIN/THON', Fish)}><Fish className="size-5 text-blue-600" /></Button>
-                            <Button variant="outline" size="icon" className="h-12 w-full border-2 bg-white" onClick={() => handleAddTacticalMarker('SARDINES', Waves)}><Waves className="size-5 text-cyan-400" /></Button>
-                            <Button variant="outline" size="icon" className="h-12 w-full border-2 bg-white" onClick={() => handleAddTacticalMarker('PRISE', Camera)}><Camera className="size-5 text-orange-500" /></Button>
+                            <Button variant="outline" size="icon" className="h-12 w-full border-2 bg-white" onClick={() => handleAddTacticalMarker('OISEAUX')}><Bird className="size-5 text-sky-500" /></Button>
+                            <Button variant="outline" size="icon" className="h-12 w-full border-2 bg-white" onClick={() => handleAddTacticalMarker('MARLIN/THON')}><Fish className="size-5 text-blue-600" /></Button>
+                            <Button variant="outline" size="icon" className="h-12 w-full border-2 bg-white" onClick={() => handleAddTacticalMarker('SARDINES')}><Waves className="size-5 text-cyan-400" /></Button>
+                            <Button variant="outline" size="icon" className="h-12 w-full border-2 bg-white" onClick={() => handleAddTacticalMarker('PRISE')}><Camera className="size-5 text-orange-500" /></Button>
                         </div>
                         <Button variant="ghost" className="w-full h-8 text-[8px] font-black uppercase text-destructive" onClick={handleClearTactical}>Effacer le journal tactique</Button>
                     </div>
@@ -360,7 +376,7 @@ export default function VesselTrackerPage() {
             <div className="space-y-4">
                 <p className="text-[10px] font-black uppercase text-muted-foreground ml-1">Navires suivis</p>
                 <div className="grid gap-2">
-                    {followedVessels?.filter(v => v.isSharing && v.id !== sharingId).map(v => (
+                    {followedVessels?.filter(v => v.isSharing && v.location).map(v => (
                         <div key={v.id} className="p-3 border-2 rounded-xl flex items-center justify-between bg-card">
                             <div className="flex items-center gap-3">
                                 <Navigation className="size-4 text-primary" />
@@ -376,7 +392,10 @@ export default function VesselTrackerPage() {
       </Card>
 
       <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all", isFullscreen && "fixed inset-0 z-[100] w-screen h-screen rounded-none")}>
-        <div className={cn("relative bg-muted/20", isFullscreen ? "flex-grow" : "h-[450px]")}>
+        <div 
+            className={cn("relative bg-muted/20", isFullscreen ? "flex-grow" : "h-[450px]")}
+            style={{ minHeight: isFullscreen ? '100dvh' : '450px' }}
+        >
           {isLoaded ? (
             <GoogleMap 
               mapContainerStyle={{ width: '100%', height: '100%' }}
@@ -387,7 +406,8 @@ export default function VesselTrackerPage() {
               options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
             >
                   {followedVessels?.filter(v => v.isSharing && v.location).map(vessel => {
-                      const isOffline = (Date.now() - (vessel.lastActive?.toMillis?.() || 0) > 70000);
+                      const lastActiveMillis = vessel.lastActive?.toMillis?.() || Date.now();
+                      const isOffline = (Date.now() - lastActiveMillis > 70000);
                       const statusInfo = getVesselIconInfo(isOffline ? 'offline' : vessel.status);
                       
                       return (
@@ -444,7 +464,7 @@ export default function VesselTrackerPage() {
           ) : (
             <div className="flex flex-col items-center justify-center h-full bg-slate-100 text-muted-foreground gap-4">
                 <AlertCircle className="size-12 opacity-20" />
-                <p className="text-xs font-black uppercase">Service Google Maps en attente...</p>
+                <p className="text-xs font-black uppercase text-center">Service Google Maps en attente...<br/>Vérifiez votre connexion.</p>
             </div>
           )}
           

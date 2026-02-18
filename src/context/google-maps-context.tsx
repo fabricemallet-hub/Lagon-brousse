@@ -16,7 +16,7 @@ const GoogleMapsContext = createContext<GoogleMapsContextType | undefined>(
 );
 
 export function GoogleMapsProvider({ children }: { children: ReactNode }) {
-  // CLÉ API VÉRIFIÉE : AIzaSyDs6qQO274Ro2RD4lVkr8KztsZIecP-ZDk
+  // CLÉ API VÉRIFIÉE
   const googleMapsApiKey = "AIzaSyDs6qQO274Ro2RD4lVkr8KztsZIecP-ZDk";
 
   const { isLoaded, loadError } = useJsApiLoader({
