@@ -401,6 +401,10 @@ export interface VesselStatus {
   mooringRadius?: number;
   shootingAngle?: ShootingAngle;
   fleetId?: string;
+  windSpeed?: number;
+  windDir?: number;
+  wavesHeight?: number;
+  lastWeatherUpdate?: any;
 }
 
 export interface SoundLibraryEntry {

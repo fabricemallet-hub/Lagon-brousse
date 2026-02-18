@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -69,6 +68,7 @@ import { fr } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
+import { fetchWindyWeather } from '@/lib/windy-api';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -165,6 +165,8 @@ export default function VesselTrackerPage() {
   }, [firestore, savedVesselIds, sharingId, isSharing]);
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
+
+  const myVessel = useMemo(() => followedVessels?.find(v => v.id === sharingId), [followedVessels, sharingId]);
 
   const fleetVesselsQuery = useMemoFirebase(() => {
     if (!firestore || !fleetId) return null;
@@ -283,6 +285,35 @@ export default function VesselTrackerPage() {
     update();
   }, [user, firestore, isSharing, isGhostMode, sharingId, vesselNickname, fleetId, mooringRadius, anchorPos]);
 
+  // --- LOGIQUE MÉTÉO WINDY ---
+  useEffect(() => {
+    if (!isSharing || mode !== 'sender' || !currentPos || !firestore) return;
+
+    const checkAndUpdateWeather = async () => {
+        const now = Date.now();
+        const lastUpdate = myVessel?.lastWeatherUpdate?.toMillis?.() || 0;
+        const cooldown = 3 * 60 * 60 * 1000; // 3 heures
+
+        if (now - lastUpdate > cooldown) {
+            const weather = await fetchWindyWeather(currentPos.lat, currentPos.lng);
+            if (weather.success) {
+                updateVesselInFirestore({
+                    windSpeed: weather.windSpeed,
+                    windDir: weather.windDir,
+                    wavesHeight: weather.wavesHeight,
+                    lastWeatherUpdate: serverTimestamp()
+                });
+                toast({ title: "Météo mise à jour", description: `Vent: ${weather.windSpeed}nd, Mer: ${weather.wavesHeight}m` });
+            }
+        }
+    };
+
+    // On vérifie seulement lors de la synchro minute pour économiser les appels
+    if (nextSyncSeconds === 60) {
+        checkAndUpdateWeather();
+    }
+  }, [isSharing, mode, currentPos, firestore, myVessel, nextSyncSeconds, updateVesselInFirestore, toast]);
+
   // Initialisation des réglages depuis le profil
   useEffect(() => {
     if (userProfile && !isSharing) {
@@ -362,7 +393,6 @@ export default function VesselTrackerPage() {
         setNextSyncSeconds(prev => {
             if (prev <= 1) {
                 if (currentPos) {
-                    // La synchro minute ne doit pas redéfinir l'ancre ou changer le statut technique
                     updateVesselInFirestore({ 
                         location: { latitude: currentPos.lat, longitude: currentPos.lng }, 
                         accuracy: Math.round(lastAccuracyRef.current) 
@@ -398,7 +428,6 @@ export default function VesselTrackerPage() {
         setVesselStatus('stabilizing');
         updateLog(vesselNickname || 'MOI', 'LANCEMENT EN COURS', currentPos || INITIAL_CENTER);
         
-        // Stabilisation technique initiale (30s)
         await new Promise(r => setTimeout(r, 30000));
         
         if (!currentPos) { setVesselStatus('moving'); return; }
@@ -415,7 +444,6 @@ export default function VesselTrackerPage() {
         setVesselStatus(initialStatus);
         updateVesselInFirestore({ status: initialStatus });
 
-        // Watchdog de surveillance (chaque minute)
         statusCycleRef.current = setInterval(() => {
             if (!currentPos || !anchorPos) return;
             
@@ -424,7 +452,6 @@ export default function VesselTrackerPage() {
             setVesselStatus(currentStatus => {
                 if (['returning', 'landed', 'emergency'].includes(currentStatus)) return currentStatus;
 
-                // 1. REPRISE DU MOUVEMENT (> 100m)
                 if (dist > 100) {
                     setAnchorPos(null);
                     outOfBoundsCheckRef.current = false;
@@ -433,27 +460,23 @@ export default function VesselTrackerPage() {
                     return 'moving';
                 }
 
-                // 2. DÉTECTION DE DÉRIVE (Entre mooringRadius et 100m)
                 if (dist > mooringRadius) {
-                    // Si on était déjà "out" au cycle précédent -> Confirme la DÉRIVE
                     if (outOfBoundsCheckRef.current) {
                         updateVesselInFirestore({ status: 'drifting' });
                         return 'drifting';
                     } else {
-                        // Premier constat de sortie -> On attend 1 min (prochaine vérification)
                         outOfBoundsCheckRef.current = true;
                         return currentStatus;
                     }
                 }
 
-                // 3. RETOUR DANS LA ZONE OU STABILITÉ
                 outOfBoundsCheckRef.current = false;
                 if (currentStatus !== 'stationary') {
                     updateVesselInFirestore({ status: 'stationary' });
                 }
                 return 'stationary';
             });
-        }, 60000); // Surveillance chaque minute
+        }, 60000);
     };
 
     startTrackingLoop();
@@ -662,6 +685,22 @@ export default function VesselTrackerPage() {
                         </div>
                     </div>
 
+                    {myVessel?.windSpeed !== undefined && (
+                        <div className="p-4 bg-blue-600 text-white rounded-2xl flex items-center justify-around border-2 border-white/20 shadow-lg animate-in zoom-in-95">
+                            <div className="flex flex-col items-center">
+                                <Wind className="size-5 mb-1" />
+                                <span className="text-lg font-black">{myVessel.windSpeed}nd</span>
+                                <span className="text-[8px] font-bold uppercase opacity-60">Vent local</span>
+                            </div>
+                            <div className="w-px h-10 bg-white/20" />
+                            <div className="flex flex-col items-center">
+                                <Waves className="size-5 mb-1" />
+                                <span className="text-lg font-black">{myVessel.wavesHeight}m</span>
+                                <span className="text-[8px] font-bold uppercase opacity-60">Houle</span>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="bg-muted/10 p-4 rounded-2xl border-2 border-dashed space-y-3">
                         <p className="text-[9px] font-black uppercase text-muted-foreground flex items-center gap-2"><Zap className="size-3" /> Signalement Tactique</p>
                         <div className="grid grid-cols-4 gap-2">
@@ -829,15 +868,30 @@ export default function VesselTrackerPage() {
                             const isOffline = !v || !v.isSharing || (Date.now() - (v.lastActive?.toMillis() || 0) > 70000);
                             return (
                                 <Card key={id} className={cn("overflow-hidden border-2 shadow-sm transition-all", isOffline ? "bg-red-50 border-red-200 animate-pulse" : "bg-white")}>
-                                    <div className="p-4 flex items-center justify-between">
-                                        <div className="flex items-center gap-4 min-w-0">
-                                            <div className={cn("size-12 rounded-xl flex items-center justify-center shrink-0 border-2", isOffline ? "bg-red-100 border-red-300 text-red-600" : "bg-primary/5 border-primary/20 text-primary")}>{isOffline ? <WifiOff className="size-6" /> : <Navigation className="size-6" />}</div>
-                                            <div className="flex flex-col min-w-0">
-                                                <div className="flex items-center gap-2"><span className="font-black text-sm uppercase truncate text-slate-800">{v?.displayName || id}</span>{v?.isGhostMode && <Badge variant="outline" className="text-[7px] h-3.5 px-1 font-black uppercase bg-slate-50">FANTÔME</Badge>}</div>
-                                                <span className={cn("text-[9px] font-black uppercase tracking-widest", isOffline ? "text-red-600" : "text-green-600")}>{isOffline ? 'SIGNAL PERDU' : (v?.status === 'stationary' ? 'AU MOUILLAGE' : 'MOUVEMENT')}</span>
+                                    <div className="p-4 flex flex-col gap-2">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-4 min-w-0">
+                                                <div className={cn("size-12 rounded-xl flex items-center justify-center shrink-0 border-2", isOffline ? "bg-red-100 border-red-300 text-red-600" : "bg-primary/5 border-primary/20 text-primary")}>{isOffline ? <WifiOff className="size-6" /> : <Navigation className="size-6" />}</div>
+                                                <div className="flex flex-col min-w-0">
+                                                    <div className="flex items-center gap-2"><span className="font-black text-sm uppercase truncate text-slate-800">{v?.displayName || id}</span>{v?.isGhostMode && <Badge variant="outline" className="text-[7px] h-3.5 px-1 font-black uppercase bg-slate-50">FANTÔME</Badge>}</div>
+                                                    <span className={cn("text-[9px] font-black uppercase tracking-widest", isOffline ? "text-red-600" : "text-green-600")}>{isOffline ? 'SIGNAL PERDU' : (v?.status === 'stationary' ? 'AU MOUILLAGE' : 'MOUVEMENT')}</span>
+                                                </div>
                                             </div>
+                                            <div className="flex items-center gap-2"><BatteryIconComp level={v?.batteryLevel} charging={v?.isCharging} />{mode === 'receiver' && <Button variant="ghost" size="icon" className="size-10 text-destructive/20 hover:text-destructive rounded-xl" onClick={() => handleRemoveSavedVesselManual(id)}><Trash2 className="size-5" /></Button>}</div>
                                         </div>
-                                        <div className="flex items-center gap-2"><BatteryIconComp level={v?.batteryLevel} charging={v?.isCharging} />{mode === 'receiver' && <Button variant="ghost" size="icon" className="size-10 text-destructive/20 hover:text-destructive rounded-xl" onClick={() => handleRemoveSavedVesselManual(id)}><Trash2 className="size-5" /></Button>}</div>
+                                        
+                                        {v?.windSpeed !== undefined && !isOffline && (
+                                            <div className="flex items-center gap-4 px-2 py-1 bg-blue-50 border border-blue-100 rounded-lg">
+                                                <div className="flex items-center gap-1.5 text-blue-700">
+                                                    <Wind className="size-3" />
+                                                    <span className="text-[10px] font-black">{v.windSpeed}nd</span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 text-blue-700">
+                                                    <Waves className="size-3" />
+                                                    <span className="text-[10px] font-black">{v.wavesHeight}m</span>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                     {v && v.isSharing && mode === 'receiver' && (
                                         <div className="px-4 pb-4 grid grid-cols-2 gap-2"><Button variant="outline" size="sm" className="h-10 text-[9px] font-black uppercase border-2 gap-2 shadow-sm" onClick={() => sendEmergencySms('MAYDAY', v)}><ShieldAlert className="size-4 text-red-600" /> APPEL SECOURS</Button><Button variant="outline" size="sm" className="h-10 text-[9px] font-black uppercase border-2 gap-2 shadow-sm" onClick={() => sendEmergencySms('PAN PAN', v)}><Smartphone className="size-4 text-primary" /> ENVOI SMS</Button></div>
@@ -855,7 +909,6 @@ export default function VesselTrackerPage() {
       <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all", isFullscreen && "fixed inset-0 z-[100] w-screen h-screen rounded-none")}>
         <div className={cn("relative bg-muted/20", isFullscreen ? "flex-grow" : "h-[450px]")}>
           <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} onDragStart={() => setIsFollowing(false)} options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
-                {/* 1. Rendu des ancres et cercles */}
                 {followedVessels?.filter(v => v.isSharing && v.anchorLocation).map(v => {
                     if (mode === 'fleet' && v.isGhostMode && v.status !== 'emergency' && v.id !== sharingId) return null;
                     return (
@@ -870,7 +923,6 @@ export default function VesselTrackerPage() {
                     );
                 })}
 
-                {/* 2. Marqueurs Navires (Distants) */}
                 {followedVessels?.filter(v => v.isSharing && v.location && v.id !== sharingId).map(vessel => {
                     const isOffline = (Date.now() - (vessel.lastActive?.toMillis() || 0) > 70000);
                     if (mode === 'fleet' && vessel.isGhostMode && vessel.status !== 'emergency') return null;
@@ -890,7 +942,6 @@ export default function VesselTrackerPage() {
                     );
                 })}
 
-                {/* 3. Journal Tactique (Markers) */}
                 {tacticalMarkers.map(m => (
                     <OverlayView key={`tactical-${m.id}`} position={{ lat: m.lat, lng: m.lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                         <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 z-10">
@@ -900,7 +951,6 @@ export default function VesselTrackerPage() {
                     </OverlayView>
                 ))}
 
-                {/* 4. Mon Point Bleu (GPS Local) */}
                 {mode === 'sender' && currentPos && (
                     <OverlayView position={currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                         <div className="z-30"><PulsingDot /></div>
