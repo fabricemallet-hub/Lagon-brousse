@@ -62,7 +62,7 @@ import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { format, differenceInMinutes, differenceInSeconds } from 'date-fns';
+import { format, differenceInMinutes } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
@@ -769,37 +769,97 @@ export default function VesselTrackerPage() {
           )}
 
           {mode === 'receiver' && (
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Suivre le navire ID</Label>
+            <div className="space-y-8">
+              <div className="space-y-4">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Suivre le navire ID</Label>
                 <div className="flex gap-2">
-                    <Input placeholder="ID EX: BATEAU-1" value={vesselIdToFollow} onChange={e => setVesselIdToFollow(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest flex-1" />
-                    <Button variant="default" className="h-12 px-4 font-black uppercase text-[10px] shrink-0" onClick={handleSaveVessel} disabled={!vesselIdToFollow.trim()}><Check className="size-4" /></Button>
+                    <Input 
+                        placeholder="ID EX: BATEAU-1" 
+                        value={vesselIdToFollow} 
+                        onChange={e => setVesselIdToFollow(e.target.value.toUpperCase())} 
+                        className="font-black text-center h-16 border-2 uppercase tracking-[0.2em] text-lg bg-muted/5 flex-1" 
+                    />
+                    <Button 
+                        variant="outline" 
+                        className="h-16 w-16 border-2 shrink-0 shadow-sm" 
+                        onClick={handleSaveVessel} 
+                        disabled={!vesselIdToFollow.trim()}
+                    >
+                        <Save className="size-6 text-slate-400" />
+                    </Button>
                 </div>
               </div>
-              <div className="space-y-3">
-                <Label className="text-[9px] font-black uppercase ml-1 opacity-40">Ma Flotte Suivie</Label>
-                <div className="grid gap-2">
+
+              <div className="space-y-4">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">
+                    Ma Flotte ({savedVesselIds.length})
+                </Label>
+                <div className="grid gap-3">
                     {savedVesselIds.map(id => {
                         const v = followedVessels?.find(v => v.id === id);
                         const isActive = v?.isSharing === true;
+                        const isOffline = !isActive || v?.status === 'offline';
+                        
                         return (
-                            <div key={id} className={cn("flex items-center justify-between p-3 border-2 rounded-xl bg-white shadow-sm", isActive ? "border-primary/20 bg-primary/5" : "opacity-60")}>
-                                <div className="flex items-center gap-3">
-                                    <div className={cn("p-2 rounded-lg", isActive ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>
-                                        {isActive ? <Navigation className="size-4" /> : <WifiOff className="size-4" />}
+                            <div key={id} className="flex items-center justify-between p-4 border-2 rounded-2xl bg-white shadow-sm hover:border-primary/30 transition-all group">
+                                <div className="flex items-center gap-4 min-w-0">
+                                    <div className={cn("size-12 rounded-xl flex items-center justify-center shrink-0 border-2", 
+                                        isOffline ? "bg-muted/10 border-muted text-muted-foreground" : "bg-primary/5 border-primary/20 text-primary")}>
+                                        {isOffline ? <WifiOff className="size-6" /> : <Navigation className="size-6" />}
                                     </div>
-                                    <div className="flex flex-col">
-                                        <span className="font-black text-xs">{v?.displayName || id}</span>
-                                        <span className="text-[8px] font-bold uppercase opacity-60">{isActive ? (v?.status === 'stationary' ? 'Mouillage' : v?.status === 'drifting' ? 'DÉRIVE !' : 'En ligne') : 'Déconnecté'}</span>
+                                    <div className="flex flex-col min-w-0">
+                                        <span className="font-black text-sm uppercase tracking-tight truncate text-slate-800">{v?.displayName || id}</span>
+                                        <span className={cn("text-[9px] font-black uppercase tracking-widest", 
+                                            isOffline ? "text-red-500" : "text-green-600")}>
+                                            {isOffline ? 'SIGNAL PERDU' : (v?.status === 'stationary' ? 'AU MOUILLAGE' : 'EN MOUVEMENT')}
+                                        </span>
                                     </div>
                                 </div>
-                                <Button variant="ghost" size="icon" className="size-8 text-destructive/40" onClick={() => handleRemoveSavedVessel(id)}><Trash2 className="size-3" /></Button>
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="size-10 text-destructive/20 hover:text-destructive hover:bg-red-50 border-2 border-transparent hover:border-red-100 rounded-xl" 
+                                    onClick={() => handleRemoveSavedVessel(id)}
+                                >
+                                    <Trash2 className="size-5" />
+                                </Button>
                             </div>
                         );
                     })}
+                    {savedVesselIds.length === 0 && (
+                        <div className="text-center py-10 border-2 border-dashed rounded-3xl opacity-30">
+                            <Ship className="size-8 mx-auto mb-2" />
+                            <p className="text-[10px] font-black uppercase">Aucun navire dans votre flotte</p>
+                        </div>
+                    )}
                 </div>
               </div>
+
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="receiver-sounds" className="border-none">
+                    <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/5 rounded-xl border-2">
+                        <Settings className="size-4 text-primary" />
+                        <span className="text-[10px] font-black uppercase text-slate-800">Notifications & Sons</span>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-4">
+                        <div className="space-y-6">
+                            <div className="flex items-center justify-between p-1 px-2">
+                                <div className="space-y-0.5">
+                                    <h4 className="text-xs font-black uppercase text-slate-800">Alertes Audio</h4>
+                                    <p className="text-[8px] font-bold text-muted-foreground uppercase">Activation globale</p>
+                                </div>
+                                <Switch checked={vesselPrefs.isNotifyEnabled} onCheckedChange={v => saveVesselPrefs({ ...vesselPrefs, isNotifyEnabled: v })} />
+                            </div>
+                            <div className="space-y-3 px-1">
+                                <Label className="text-[9px] font-black uppercase opacity-60 flex items-center gap-2">
+                                    <Volume2 className="size-3" /> Volume ({Math.round(vesselPrefs.vesselVolume * 100)}%)
+                                </Label>
+                                <Slider value={[vesselPrefs.vesselVolume * 100]} max={100} step={1} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, vesselVolume: v[0] / 100 })} />
+                            </div>
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             </div>
           )}
 
