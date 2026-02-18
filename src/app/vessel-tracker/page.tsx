@@ -79,6 +79,7 @@ const TACTICAL_TYPES = [
     { id: 'wahoo', label: 'WAHOO', icon: Fish, color: 'bg-cyan-600 text-white border-cyan-600' },
     { id: 'bonite', label: 'BONITE', icon: Fish, color: 'bg-indigo-600 text-white border-indigo-600' },
     { id: 'sardines', label: 'SARDINES', icon: Waves, color: 'bg-teal-500 text-white border-teal-500' },
+    { id: 'prise', label: 'PRISE', icon: Camera, color: 'bg-teal-600 text-white border-teal-400', isPhoto: true },
 ];
 
 const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
@@ -180,6 +181,14 @@ export default function VesselTrackerPage() {
   const [showLoopAlert, setShowLoopAlert] = useState(false);
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
+
+  const labels = useMemo(() => ({
+    status1: 'AU MOUILLAGE',
+    status2: 'EN MOUVEMENT',
+    alertBtn: 'SIGNALER PRISE',
+    alertTitle: 'PRISE SIGNALÉE !',
+    alertDesc: 'Un poisson a été repéré !'
+  }), []);
 
   const userDocRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -964,20 +973,12 @@ export default function VesselTrackerPage() {
                                     key={t.id} 
                                     variant="outline" 
                                     className={cn("h-12 flex-col gap-1 p-1 border-2 font-black text-[8px] uppercase transition-all active:scale-95", t.color)}
-                                    onClick={() => handleTacticalSignal(t.label)}
+                                    onClick={() => t.isPhoto ? photoInputRef.current?.click() : handleTacticalSignal(t.label)}
                                 >
                                     <t.icon className="size-4" />
                                     {t.label}
                                 </Button>
                             ))}
-                            <Button 
-                                variant="outline" 
-                                className="h-12 flex-col gap-1 p-1 border-2 font-black text-[8px] uppercase transition-all active:scale-95 bg-teal-600 text-white border-teal-400"
-                                onClick={() => photoInputRef.current?.click()}
-                            >
-                                <Camera className="size-4" />
-                                PRISE
-                            </Button>
                             <input type="file" accept="image/*" capture="environment" ref={photoInputRef} className="hidden" onChange={handlePhotoCapture} />
                         </div>
                     </div>
