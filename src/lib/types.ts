@@ -68,7 +68,10 @@ export interface UserAccount {
   cgvAcceptedAt?: string;
   cgvVersionSeen?: number;
   savedVesselIds?: string[];
+  vesselIdHistory?: string[];
+  fleetIdHistory?: string[];
   lastVesselId?: string;
+  lastFleetId?: string;
   isEmergencyEnabled?: boolean;
   isCustomMessageEnabled?: boolean;
   emergencyContact?: string;
@@ -397,6 +400,7 @@ export interface VesselStatus {
   accuracy?: number;
   mooringRadius?: number;
   shootingAngle?: ShootingAngle;
+  fleetId?: string;
 }
 
 export interface SoundLibraryEntry {
