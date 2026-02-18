@@ -64,16 +64,16 @@ const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
 const PulsingDot = () => (
     <div className="absolute" style={{ transform: 'translate(-50%, -50%)', zIndex: 100 }}>
-      <div className="size-5 rounded-full bg-blue-500 opacity-75 animate-ping absolute"></div>
-      <div className="size-5 rounded-full bg-blue-500 border-2 border-white relative shadow-lg"></div>
+      <div className="size-6 rounded-full bg-blue-500 opacity-75 animate-ping absolute"></div>
+      <div className="size-6 rounded-full bg-blue-500 border-4 border-white relative shadow-2xl"></div>
     </div>
 );
 
-const BatteryStatusIcon = ({ level, charging }: { level: number; charging: boolean }) => {
-  const props = { className: 'w-3 h-3' };
+const BatteryStatusIcon = ({ level, charging, size = 4 }: { level: number; charging: boolean, size?: number }) => {
+  const props = { className: `w-${size} h-${size}` };
   if (charging) return <BatteryCharging {...props} className="text-blue-500" />;
   if (level < 20) return <BatteryLow {...props} className="text-red-500" />;
-  if (level < 60) return <BatteryMedium {...props} className="text-amber-500" />;
+  if (level < 60) return <BatteryMedium {...props} className="text-orange-500" />;
   return <BatteryFull {...props} className="text-green-500" />;
 };
 
@@ -192,7 +192,6 @@ export default function VesselTrackerPage() {
             updatePayload.anchorLocation = null;
         }
 
-        // Logic Windy Cooldown (3h)
         const lastUpdate = currentVesselData?.lastWeatherUpdate?.toMillis?.() || 0;
         const now = Date.now();
         if (now - lastUpdate > 3 * 3600 * 1000 && currentPos) {
@@ -586,7 +585,9 @@ export default function VesselTrackerPage() {
                                         options={{ fillColor: '#3b82f6', fillOpacity: 0.15, strokeColor: '#3b82f6', strokeOpacity: 0.5, strokeWeight: 1 }} 
                                     />
                                     <OverlayView position={{ lat: vessel.anchorLocation.latitude, lng: vessel.anchorLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                                        <div style={{ transform: 'translate(-50%, -50%)' }} className="z-10"><Anchor className="size-8 text-orange-500 drop-shadow-md stroke-[2.5]" /></div>
+                                        <div style={{ transform: 'translate(-50%, -50%)' }} className="z-10">
+                                            <Anchor className="size-10 text-orange-500 drop-shadow-2xl stroke-[3] scale-125" />
+                                        </div>
                                     </OverlayView>
                                 </>
                               )}
@@ -594,40 +595,53 @@ export default function VesselTrackerPage() {
                                   <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 z-50">
                                       {/* LABEL PRINCIPAL : NOM | STATUT */}
                                       <div className={cn(
-                                          "px-2.5 py-1.5 backdrop-blur-md rounded-lg text-[10px] font-black shadow-xl border-2 whitespace-nowrap flex items-center gap-2", 
+                                          "px-3 py-2 backdrop-blur-md rounded-lg text-[11px] font-black shadow-2xl border-2 whitespace-nowrap flex items-center gap-2 mb-1", 
                                           isOffline ? "bg-red-600 text-white animate-pulse border-white/40" : "bg-white/95 text-slate-900 border-primary/20"
                                       )}>
-                                          <span className="truncate max-w-[100px]">{vessel.displayName}</span>
+                                          <span className="truncate max-w-[120px]">{vessel.displayName}</span>
                                           <span className={cn("border-l-2 pl-2", isOffline ? "text-white/60" : "text-primary/60")}>{statusInfo.label}</span>
                                       </div>
 
                                       {/* ICONES DE NAVIGATION / MOUVEMENT */}
                                       {isMe && mode === 'sender' ? <PulsingDot /> : (
-                                          <div className={cn("p-2.5 rounded-full border-2 border-white shadow-2xl scale-110", statusInfo.color)}>
-                                              {React.createElement(statusInfo.icon, { className: "size-6 text-white drop-shadow-sm" })}
+                                          <div className={cn("p-3 rounded-full border-4 border-white shadow-2xl scale-125", statusInfo.color)}>
+                                              {React.createElement(statusInfo.icon, { className: "size-7 text-white drop-shadow-sm" })}
                                           </div>
                                       )}
 
-                                      {/* BULLES D'ÉTAT (BATTERIE & MÉTÉO) */}
-                                      <div className="flex flex-col gap-1 mt-1">
-                                          {/* BATTERIE BULLE */}
-                                          {(isCharging || battery < 20) && (
-                                              <div className={cn(
-                                                  "px-2 py-0.5 rounded-full text-[8px] font-black uppercase flex items-center gap-1.5 shadow-lg border-2",
-                                                  isCharging ? "bg-blue-600 text-white border-blue-400" : "bg-red-600 text-white border-red-400 animate-pulse"
-                                              )}>
-                                                  <BatteryStatusIcon level={battery} charging={isCharging} />
-                                                  <span>{isCharging ? 'EN CHARGE' : 'BATTERIE FAIBLE'} ({battery}%)</span>
+                                      {/* ÉTAGES DE BULLES D'ÉTAT (BATTERIE & MÉTÉO) */}
+                                      <div className="flex flex-col items-center gap-1.5 mt-2">
+                                          {/* BATTERIE BULLE - TOUJOURS VISIBLE SI DATA */}
+                                          <div className={cn(
+                                              "px-2.5 py-1 rounded-full text-[9px] font-black uppercase flex items-center gap-2 shadow-xl border-2 bg-white",
+                                              battery < 20 ? "text-red-600 border-red-200" : battery < 60 ? "text-orange-600 border-orange-100" : "text-green-600 border-green-100"
+                                          )}>
+                                              <BatteryStatusIcon level={battery} charging={isCharging} size={3.5} />
+                                              <span>{battery}%</span>
+                                          </div>
+
+                                          {/* BULLES ALERTE / CHARGE SUPPLÉMENTAIRES */}
+                                          {isCharging && (
+                                              <div className="px-3 py-1 rounded-full bg-blue-600 text-white text-[8px] font-black uppercase shadow-lg border-2 border-blue-400 flex items-center gap-1 animate-in zoom-in-95">
+                                                  <Zap className="size-3 fill-white" /> EN CHARGE
+                                              </div>
+                                          )}
+                                          
+                                          {battery < 20 && !isCharging && (
+                                              <div className="px-3 py-1 rounded-full bg-red-600 text-white text-[8px] font-black uppercase shadow-lg border-2 border-red-400 flex items-center gap-1 animate-pulse">
+                                                  <AlertTriangle className="size-3" /> BATTERIE FAIBLE
                                               </div>
                                           )}
 
-                                          {/* MÉTÉO WINDY BULLE */}
+                                          {/* MÉTÉO WINDY BULLE - VISIBILITÉ FORCÉE */}
                                           {vessel.windSpeed !== undefined && (
-                                              <div className="bg-slate-900/90 backdrop-blur-md text-white px-2 py-1 rounded-full text-[8px] font-black shadow-lg border border-white/20 flex items-center gap-2">
-                                                  <div className="flex items-center gap-1"><Waves className="size-3 text-blue-400" /> {vessel.windSpeed}ND</div>
-                                                  {vessel.wavesHeight !== undefined && (
-                                                      <div className="border-l border-white/20 pl-2 flex items-center gap-1"><Waves className="size-3 text-cyan-400" /> {vessel.wavesHeight.toFixed(1)}m</div>
-                                                  )}
+                                              <div className="bg-slate-900/90 backdrop-blur-md text-white px-3 py-1.5 rounded-2xl text-[9px] font-black shadow-2xl border-2 border-white/20 flex flex-col items-center gap-1 animate-in slide-in-from-bottom-2">
+                                                  <div className="flex items-center gap-3">
+                                                      <div className="flex items-center gap-1.5"><Waves className="size-3 text-blue-400" /> {vessel.windSpeed} ND</div>
+                                                      {vessel.wavesHeight !== undefined && (
+                                                          <div className="border-l border-white/20 pl-2 flex items-center gap-1.5"><Waves className="size-3 text-cyan-400" /> {vessel.wavesHeight.toFixed(1)}m</div>
+                                                      )}
+                                                  </div>
                                               </div>
                                           )}
                                       </div>
