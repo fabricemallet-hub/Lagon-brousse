@@ -144,7 +144,6 @@ export default function VesselTrackerPage() {
   const watchIdRef = useRef<number | null>(null);
   const lastFixTimestampRef = useRef<number>(Date.now());
   const lastSentPosRef = useRef<google.maps.LatLngLiteral | null>(null);
-  const driftConfirmationRef = useRef<boolean>(false);
   const activeAudiosRef = useRef<Record<string, HTMLAudioElement>>({});
   const shouldPanOnNextFix = useRef<boolean>(false);
 
@@ -199,7 +198,7 @@ export default function VesselTrackerPage() {
 
   const handleRecenter = useCallback(() => {
     setIsFollowing(true);
-    let target = null;
+    let target: google.maps.LatLngLiteral | null = null;
     if (mode === 'sender' && currentPos) {
       target = currentPos;
     } else if (mode === 'receiver' || mode === 'fleet') {
@@ -315,11 +314,11 @@ export default function VesselTrackerPage() {
     toast({ title: label });
   };
 
-  const sendEmergencySms = (type: 'MAYDAY' | 'PAN PAN', vessel?: VesselStatus) => {
+  const sendEmergencySms = (type: 'MAYDAY' | 'PAN PAN') => {
     if (!emergencyContact) { toast({ variant: "destructive", title: "Contact requis" }); return; }
-    const pos = vessel?.location ? { lat: vessel.location.latitude, lng: vessel.location.longitude } : (currentPos || INITIAL_CENTER);
+    const pos = currentPos || INITIAL_CENTER;
     const posUrl = `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
-    const name = vessel?.displayName || vesselNickname || sharingId;
+    const name = vesselNickname || sharingId;
     const body = `[LB-NC] ${type} : ${name}. ${vesselSmsMessage || "Assistance requise."}. Carte : ${posUrl}`;
     window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
@@ -455,10 +454,10 @@ export default function VesselTrackerPage() {
                                 <span className="text-[10px] font-black uppercase">Pont de Test Manuel (Debug)</span>
                             </AccordionTrigger>
                             <AccordionContent className="pt-4 grid grid-cols-2 gap-2">
-                                <Button variant="outline" className="h-10 text-[8px] font-black uppercase border-orange-200" onClick={() => { setAnchorPos(currentPos); handleManualStatusToggle('stationary', 'DEBUG: FORCE MOUILLAGE'); }}>FORCE MOUILLAGE</Button>
+                                <Button variant="outline" className="h-10 text-[8px] font-black uppercase border-orange-200" onClick={() => { handleManualStatusToggle('stationary', 'DEBUG: FORCE MOUILLAGE'); }}>FORCE MOUILLAGE</Button>
                                 <Button variant="outline" className="h-10 text-[8px] font-black uppercase border-orange-400" onClick={() => handleManualStatusToggle('drifting', 'DEBUG: FORCE DÉRIVE')}>FORCE DÉRIVE</Button>
                                 <Button variant="outline" className="h-10 text-[8px] font-black uppercase border-red-200" onClick={() => handleManualStatusToggle('offline', 'DEBUG: FORCE SIGNAL PERDU')}>FORCE SIGNAL PERDU</Button>
-                                <Button variant="outline" className="h-10 text-[8px] font-black uppercase border-blue-200" onClick={() => { setAnchorPos(null); handleManualStatusToggle('moving', 'DEBUG: FORCE MOUVEMENT'); }}>FORCE MOUVEMENT</Button>
+                                <Button variant="outline" className="h-10 text-[8px] font-black uppercase border-blue-200" onClick={() => { handleManualStatusToggle('moving', 'DEBUG: FORCE MOUVEMENT'); }}>FORCE MOUVEMENT</Button>
                             </AccordionContent>
                         </AccordionItem>
                     </Accordion>
