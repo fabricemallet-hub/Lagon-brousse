@@ -39,7 +39,8 @@ import {
   Fish,
   Waves,
   Camera,
-  ChevronDown
+  ChevronDown,
+  Bug
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -248,6 +249,23 @@ export default function VesselTrackerPage() {
     toast({ title: `${type} signalé !`, description: "Point GPS enregistré." });
   };
 
+  const handleSendTestPoint = (lat: number, lng: number) => {
+    if (!user || !firestore) return;
+    const newPos = { lat, lng };
+    setCurrentPos(newPos);
+    updateVesselInFirestore({ 
+        location: { latitude: lat, longitude: lng }, 
+        isSharing: true,
+        status: 'moving',
+        accuracy: 1
+    });
+    if (map) {
+        map.panTo(newPos);
+        map.setZoom(15);
+    }
+    toast({ title: "Point de test envoyé", description: `Lat: ${lat}, Lng: ${lng}` });
+  };
+
   const sendEmergencySms = (type: 'MAYDAY' | 'PAN PAN') => {
     if (!emergencyContact) { toast({ variant: "destructive", title: "Contact requis" }); return; }
     const pos = currentPos || INITIAL_CENTER;
@@ -382,7 +400,7 @@ export default function VesselTrackerPage() {
                 <div className="space-y-6 animate-in fade-in slide-in-from-top-2">
                     <div className="p-6 rounded-2xl shadow-xl relative overflow-hidden bg-primary text-white">
                         <Navigation className="absolute -right-4 -bottom-4 size-32 opacity-10 rotate-12" />
-                        <div className="space-y-1 relative z-10">
+                        <div className="space-y-1 relative z-10 text-white">
                             <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2"><Zap className="size-3 fill-yellow-300 text-yellow-300" /> PARTAGE ACTIF</p>
                             <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">{sharingId}</h3>
                             <p className="text-xs font-bold opacity-80 mt-1 italic">{vesselNickname || 'koolapik'}</p>
@@ -513,6 +531,27 @@ export default function VesselTrackerPage() {
                                 </div>
                             </AccordionContent>
                         </AccordionItem>
+
+                        {/* PONT DE TEST MANUEL */}
+                        <AccordionItem value="test-bench" className="bg-purple-50/30 border-purple-100 border rounded-lg">
+                            <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 h-12">
+                                <Bug className="size-4 text-purple-600" />
+                                <span className="text-[10px] font-black uppercase text-purple-800">PONT DE TEST (ADMIN)</span>
+                            </AccordionTrigger>
+                            <AccordionContent className="p-4 space-y-4">
+                                <div className="space-y-3">
+                                    <p className="text-[10px] font-black uppercase text-muted-foreground ml-1">Simulation de points GPS</p>
+                                    <div className="grid grid-cols-1 gap-2">
+                                        <Button variant="outline" className="h-10 font-black uppercase text-[10px] border-2 bg-white" onClick={() => handleSendTestPoint(-22.27, 166.45)}>Point Test : Nouméa</Button>
+                                        <Button variant="outline" className="h-10 font-black uppercase text-[10px] border-2 bg-white" onClick={() => handleSendTestPoint(-21.56, 165.48)}>Point Test : Bourail</Button>
+                                        <Button variant="outline" className="h-10 font-black uppercase text-[10px] border-2 bg-white" onClick={() => handleSendTestPoint(-21.05, 164.86)}>Point Test : Koné</Button>
+                                    </div>
+                                </div>
+                                <Button className="w-full h-12 bg-purple-600 hover:bg-purple-700 text-white font-black uppercase text-[10px] gap-2 shadow-lg" onClick={() => updateVesselInFirestore({ isSharing: true })}>
+                                    <RefreshCw className="size-4" /> FORCER SYNC FIRESTORE
+                                </Button>
+                            </AccordionContent>
+                        </AccordionItem>
                     </Accordion>
                 </div>
               )}
@@ -540,7 +579,6 @@ export default function VesselTrackerPage() {
                                 </Button>
                             </div>
                             
-                            {/* WEATHER INFO FOR RECEIVER */}
                             {(v.windSpeed !== undefined || v.wavesHeight !== undefined) && (
                                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-dashed">
                                     <div className="flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-xl border border-blue-100">
