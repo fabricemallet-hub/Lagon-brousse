@@ -263,10 +263,13 @@ export default function VesselTrackerPage() {
         
         console.log(`[Tracker] GPS Fix reçu : Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)} (Précision: ${accuracy.toFixed(1)}m)`);
 
-        if (accuracy > 50) {
-            console.warn("[Tracker] Précision GPS insuffisante (>50m), point ignoré.");
+        // TOLÉRANCE ACCRUE : On accepte jusqu'à 500m au lieu de 50m pour ne pas bloquer l'utilisateur
+        if (accuracy > 500) {
+            console.warn("[Tracker] Précision GPS insuffisante (>500m), point ignoré.");
             return;
         }
+
+        console.log("[Tracker] Point GPS accepté. Mise à jour Firestore...");
 
         const lastSent = lastSentPosRef.current;
         const distMoved = lastSent ? getDistance(latitude, longitude, lastSent.lat, lastSent.lng) : 100;
