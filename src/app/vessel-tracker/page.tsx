@@ -54,7 +54,8 @@ import {
   Camera,
   MessageSquare,
   Phone,
-  Ship
+  Ship,
+  Timer
 } from 'lucide-react';
 import { 
   Dialog, 
@@ -142,7 +143,10 @@ export default function VesselTrackerPage() {
     notifySettings: { moving: true, stationary: true, offline: true },
     notifySounds: { moving: '', stationary: '', offline: '' },
     mooringRadius: 20,
-    batteryThreshold: 20
+    batteryThreshold: 20,
+    isWatchEnabled: false,
+    watchDuration: 60, // in minutes
+    watchSound: ''
   });
 
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -441,6 +445,34 @@ export default function VesselTrackerPage() {
     await updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: newPrefs }).catch(() => {});
   };
 
+  const handleSaveVessel = async () => {
+    if (!user || !firestore) return;
+    const cleanId = (vesselIdToFollow || customSharingId).trim().toUpperCase();
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            savedVesselIds: cleanId ? arrayUnion(cleanId) : savedVesselIds,
+            lastVesselId: cleanId || customSharingId,
+            vesselNickname: vesselNickname
+        });
+        if (vesselIdToFollow) setVesselIdToFollow('');
+        toast({ title: "ID enregistré" });
+    } catch (e) {
+        toast({ variant: 'destructive', title: "Erreur sauvegarde" });
+    }
+  };
+
+  const handleRemoveSavedVessel = async (id: string) => {
+    if (!user || !firestore) return;
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            savedVesselIds: arrayRemove(id)
+        });
+        toast({ title: "Navire retiré de la liste" });
+    } catch (e) {
+        console.error(e);
+    }
+  };
+
   const smsPreview = useMemo(() => {
     const nicknamePrefix = vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : "";
     const customText = (isCustomMessageEnabled && vesselSmsMessage) ? vesselSmsMessage : "Requiert assistance immédiate.";
@@ -525,15 +557,15 @@ export default function VesselTrackerPage() {
                             <Switch checked={isGhostMode} onCheckedChange={setIsGhostMode} />
                         </div>
                         <div className="space-y-1.5">
-                            <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Surnom du navire</Label>
+                            <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Surnom du navire</Label>
                             <Input value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} className="font-black text-center h-12 border-2 uppercase" />
                         </div>
                         <div className="space-y-1.5">
-                            <Label className="text-[9px] font-black uppercase ml-1 opacity-60">ID Navire (Individuel)</Label>
+                            <Label className="text-[10px] font-black uppercase ml-1 opacity-60">ID Navire (Individuel)</Label>
                             <Input value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest" />
                         </div>
                         <div className="space-y-1.5">
-                            <Label className="text-[9px] font-black uppercase ml-1 opacity-60">ID Groupe Flotte C (Collectif)</Label>
+                            <Label className="text-[10px] font-black uppercase ml-1 opacity-60">ID Groupe Flotte C (Collectif)</Label>
                             <Input value={customFleetId} onChange={e => setCustomFleetId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest" />
                         </div>
                         <div className="space-y-4 pt-2">
@@ -547,7 +579,7 @@ export default function VesselTrackerPage() {
                 </AccordionItem>
 
                 <AccordionItem value="sms-settings" className="border-none">
-                    <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-orange-50/20 rounded-xl border border-orange-100">
+                    <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-orange-50/50 rounded-xl border border-orange-100">
                         <Smartphone className="size-4 text-orange-600" />
                         <span className="text-[10px] font-black uppercase text-orange-800">Réglages d'Urgence (SMS)</span>
                     </AccordionTrigger>
@@ -590,35 +622,121 @@ export default function VesselTrackerPage() {
                         <span className="text-[10px] font-black uppercase">Notifications & Sons</span>
                     </AccordionTrigger>
                     <AccordionContent className="pt-4 space-y-6">
-                        <div className="space-y-4 p-4 border-2 rounded-2xl bg-card shadow-inner">
-                            <div className="flex items-center justify-between">
+                        <div className="space-y-6">
+                            <div className="flex items-center justify-between p-1 px-2">
                                 <div className="space-y-0.5">
-                                    <Label className="text-xs font-black uppercase">Alertes Sonores</Label>
-                                    <p className="text-[9px] font-bold text-muted-foreground uppercase">Activer les signaux audio</p>
+                                    <h4 className="text-xs font-black uppercase text-slate-800">Alertes Audio</h4>
+                                    <p className="text-[8px] font-bold text-muted-foreground uppercase">Activer les signaux sonores globaux</p>
                                 </div>
                                 <Switch checked={vesselPrefs.isNotifyEnabled} onCheckedChange={v => saveVesselPrefs({ ...vesselPrefs, isNotifyEnabled: v })} />
                             </div>
-                            <div className="space-y-3 pt-2 border-t border-dashed">
-                                <Label className="text-[10px] font-black uppercase opacity-60 flex items-center gap-2">
-                                    <Volume2 className="size-3" /> Volume des alertes ({Math.round(vesselPrefs.vesselVolume * 100)}%)
-                                </Label>
-                                <Slider value={[vesselPrefs.vesselVolume * 100]} max={100} step={1} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, vesselVolume: v[0] / 100 })} />
-                            </div>
-                            <div className="space-y-4 pt-4 border-t border-dashed">
-                                <p className="text-[9px] font-black uppercase text-muted-foreground">Sons par événement</p>
-                                <div className="grid gap-3">
-                                    {['moving', 'stationary', 'offline'].map(key => (
-                                        <div key={key} className="flex items-center justify-between gap-4">
-                                            <span className="text-[10px] font-bold uppercase flex-1">{key === 'moving' ? 'Mouvement' : key === 'stationary' ? 'Mouillage' : 'Signal Perdu'}</span>
-                                            <Select value={vesselPrefs.notifySounds[key]} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, notifySounds: { ...vesselPrefs.notifySounds, [key]: v } })}>
-                                                <SelectTrigger className="h-8 text-[9px] font-black uppercase w-32 bg-muted/30"><SelectValue placeholder="Choisir..." /></SelectTrigger>
-                                                <SelectContent>
-                                                    {availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] font-black uppercase">{s.label}</SelectItem>)}
-                                                </SelectContent>
-                                            </Select>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => playVesselSound(vesselPrefs.notifySounds[key])}><Play className="size-3" /></Button>
+
+                            <div className={cn("space-y-6 transition-opacity", !vesselPrefs.isNotifyEnabled && "opacity-40 pointer-events-none")}>
+                                <div className="space-y-3 px-1">
+                                    <Label className="text-[9px] font-black uppercase opacity-60 flex items-center gap-2">
+                                        <Volume2 className="size-3" /> Volume ({Math.round(vesselPrefs.vesselVolume * 100)}%)
+                                    </Label>
+                                    <Slider value={[vesselPrefs.vesselVolume * 100]} max={100} step={1} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, vesselVolume: v[0] / 100 })} />
+                                </div>
+
+                                <Card className="border-2 border-orange-100 bg-orange-50/20 rounded-2xl overflow-hidden shadow-sm">
+                                    <div className="p-4 flex flex-col gap-4">
+                                        <div className="flex items-center justify-between">
+                                            <div className="space-y-0.5">
+                                                <h4 className="text-xs font-black uppercase text-orange-800">Veille Stratégique</h4>
+                                                <p className="text-[8px] font-bold text-orange-600/60 uppercase">Alarme si immobile (Mouillage) trop longtemps</p>
+                                            </div>
+                                            <Switch checked={vesselPrefs.isWatchEnabled} onCheckedChange={v => saveVesselPrefs({ ...vesselPrefs, isWatchEnabled: v })} />
                                         </div>
-                                    ))}
+                                        
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between items-center px-1">
+                                                <Label className="text-[9px] font-black uppercase text-orange-800/60">Seuil d'immobilité</Label>
+                                                <Badge variant="outline" className="font-black bg-white h-6 px-2 text-[10px]">{Math.floor(vesselPrefs.watchDuration / 60)}h</Badge>
+                                            </div>
+                                            <Slider 
+                                                value={[vesselPrefs.watchDuration]} 
+                                                min={60} max={1440} step={60}
+                                                onValueChange={v => saveVesselPrefs({ ...vesselPrefs, watchDuration: v[0] })} 
+                                            />
+                                            <div className="flex justify-between text-[7px] font-black uppercase opacity-30 px-1">
+                                                <span>1h</span>
+                                                <span>24h</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between gap-4 pt-2 border-t border-orange-100/50">
+                                            <span className="text-[9px] font-black uppercase text-orange-800/60">Son de l'alarme</span>
+                                            <div className="flex items-center gap-2">
+                                                <Select value={vesselPrefs.watchSound} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, watchSound: v })}>
+                                                    <SelectTrigger className="h-8 text-[9px] font-black uppercase w-32 bg-white border-orange-200">
+                                                        <SelectValue placeholder="Choisir..." />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] uppercase font-black">{s.label}</SelectItem>)}
+                                                    </SelectContent>
+                                                </Select>
+                                                <Button variant="outline" size="icon" className="h-8 w-8 border-orange-200 text-orange-600 bg-white" onClick={() => playVesselSound(vesselPrefs.watchSound)}><Play className="size-3" /></Button>
+                                            </div>
+                                        </div>
+                                        <p className="text-[7px] font-bold text-center text-orange-600/40 italic">Note : l'alarme de veille jouera en boucle jusqu'à validation manuelle de votre part.</p>
+                                    </div>
+                                </Card>
+
+                                <Card className="border-2 border-red-100 bg-red-50/20 rounded-2xl overflow-hidden shadow-sm">
+                                    <div className="p-4 space-y-4">
+                                        <div className="flex justify-between items-center">
+                                            <div className="space-y-0.5">
+                                                <h4 className="text-xs font-black uppercase text-red-800">Seuil Batterie Faible</h4>
+                                                <p className="text-[8px] font-bold text-red-600/60 uppercase">Alerte niveau bas batterie smartphone</p>
+                                            </div>
+                                            <Badge variant="outline" className="font-black bg-white text-red-600 border-red-200 h-6 px-2 text-[10px]">{vesselPrefs.batteryThreshold}%</Badge>
+                                        </div>
+                                        <Slider 
+                                            value={[vesselPrefs.batteryThreshold]} 
+                                            min={5} max={50} step={5}
+                                            onValueChange={v => saveVesselPrefs({ ...vesselPrefs, batteryThreshold: v[0] })} 
+                                        />
+                                        <div className="flex justify-between text-[7px] font-black uppercase opacity-30 px-1">
+                                            <span>5%</span>
+                                            <span>50%</span>
+                                        </div>
+                                    </div>
+                                </Card>
+
+                                <div className="space-y-4 pt-4 border-t border-dashed">
+                                    <p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest px-1">Réglages sons individuels</p>
+                                    <div className="grid gap-3">
+                                        {[
+                                            { key: 'moving', label: 'MOUVEMENT', icon: Navigation },
+                                            { key: 'stationary', label: 'MOUILLAGE', icon: Anchor }
+                                        ].map(item => (
+                                            <div key={item.key} className="p-3 bg-muted/10 rounded-xl border-2 flex flex-col gap-3">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <item.icon className="size-3.5 text-primary opacity-40" />
+                                                        <span className="text-[10px] font-black uppercase">{item.label}</span>
+                                                    </div>
+                                                    <Switch 
+                                                        checked={vesselPrefs.notifySettings[item.key as keyof typeof vesselPrefs.notifySettings]} 
+                                                        onCheckedChange={v => saveVesselPrefs({ ...vesselPrefs, notifySettings: { ...vesselPrefs.notifySettings, [item.key]: v } })} 
+                                                        className="scale-75"
+                                                    />
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Select value={vesselPrefs.notifySounds[item.key as keyof typeof vesselPrefs.notifySounds]} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, notifySounds: { ...vesselPrefs.notifySounds, [item.key]: v } })}>
+                                                        <SelectTrigger className="h-9 text-[10px] font-black uppercase flex-1 bg-white">
+                                                            <SelectValue placeholder="Choisir..." />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {availableSounds.map(s => <SelectItem key={s.id} value={s.id} className="text-[10px] font-black uppercase">{s.label}</SelectItem>)}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <Button variant="outline" size="icon" className="h-9 w-9 border-2 bg-white" onClick={() => playVesselSound(vesselPrefs.notifySounds[item.key as keyof typeof vesselPrefs.notifySounds])}><Play className="size-4" /></Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         </div>
