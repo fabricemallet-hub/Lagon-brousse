@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -65,6 +66,7 @@ import { fr } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -170,35 +172,6 @@ export default function VesselTrackerPage() {
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
-  const userDocRef = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return doc(firestore, 'users', user.uid);
-  }, [user, firestore]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
-
-  const savedVesselIds = userProfile?.savedVesselIds || [];
-  const vesselsQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    const queryIds = [...savedVesselIds];
-    if (isSharing && !queryIds.includes(sharingId)) queryIds.push(sharingId);
-    if (queryIds.length === 0) return null;
-    return query(collection(firestore, 'vessels'), where('id', 'in', queryIds.slice(0, 10)));
-  }, [firestore, user, savedVesselIds, sharingId, isSharing]);
-  const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
-
-  const soundsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
-  }, [firestore]);
-  const { data: dbSounds } = useCollection<SoundLibraryEntry>(soundsQuery);
-
-  const availableSounds = useMemo(() => {
-    if (!dbSounds) return [];
-    return dbSounds.filter(s => 
-      !s.categories || s.categories.includes('Vessel') || s.categories.includes('General')
-    ).map(s => ({ id: s.id, label: s.label, url: s.url }));
-  }, [dbSounds]);
-
   const toggleWakeLock = async () => {
     if (!('wakeLock' in navigator)) return;
     if (wakeLock) { try { await wakeLock.release(); setWakeLock(null); } catch (e) { setWakeLock(null); } }
@@ -285,6 +258,35 @@ export default function VesselTrackerPage() {
     update();
   }, [user, firestore]);
 
+  const userDocRef = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [user, firestore]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
+
+  const savedVesselIds = userProfile?.savedVesselIds || [];
+  const vesselsQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    const queryIds = [...savedVesselIds];
+    if (isSharing && !queryIds.includes(sharingId)) queryIds.push(sharingId);
+    if (queryIds.length === 0) return null;
+    return query(collection(firestore, 'vessels'), where('id', 'in', queryIds.slice(0, 10)));
+  }, [firestore, user, savedVesselIds, sharingId, isSharing]);
+  const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
+
+  const soundsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
+  }, [firestore]);
+  const { data: dbSounds } = useCollection<SoundLibraryEntry>(soundsQuery);
+
+  const availableSounds = useMemo(() => {
+    if (!dbSounds) return [];
+    return dbSounds.filter(s => 
+      !s.categories || s.categories.includes('Vessel') || s.categories.includes('General')
+    ).map(s => ({ id: s.id, label: s.label, url: s.url }));
+  }, [dbSounds]);
+
   useEffect(() => {
     if (userProfile) {
       if (userProfile.vesselPrefs) setVesselPrefs(userProfile.vesselPrefs);
@@ -365,8 +367,8 @@ export default function VesselTrackerPage() {
                 if (currentStatus === 'stationary' || currentStatus === 'drifting') {
                     if (distFromAnchor > 100) {
                         setVesselStatus('moving');
-                        anchorPosRef.current = newPos;
-                        setAnchorPos(newPos);
+                        anchorPosRef.current = null;
+                        setAnchorPos(null);
                         immobilityStartTime.current = null;
                         updateVesselInFirestore({ 
                             location: { latitude, longitude }, 
@@ -698,7 +700,7 @@ export default function VesselTrackerPage() {
                         <Navigation className="absolute -right-4 -bottom-4 size-32 opacity-10 rotate-12" />
                         <div className="space-y-1 relative z-10">
                             <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2"><Zap className="size-3 fill-yellow-300 text-yellow-300" /> Partage Actif</p>
-                            <h3 className="text-3xl font-black tracking-tighter leading-none">{sharingId}</h3>
+                            <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">{sharingId}</h3>
                             <p className="text-xs font-bold opacity-80 mt-1 italic">{vesselNickname || 'Capitaine'}</p>
                         </div>
                         <div className="mt-8 space-y-3 relative z-10">
@@ -723,7 +725,9 @@ export default function VesselTrackerPage() {
                             <input type="file" accept="image/*" capture="environment" ref={photoInputRef} className="hidden" onChange={handlePhotoCapture} />
                         </div>
                     </div>
-                    <Button variant="destructive" className="w-full h-16 text-xs font-black uppercase shadow-lg gap-3" onClick={handleStopSharing}><X className="size-5" /> Arrêter le partage</Button>
+                    <Button variant="destructive" className="w-full h-16 text-xs font-black uppercase shadow-lg gap-3" onClick={handleStopSharing}>
+                        <X className="size-5" /> Arrêter le partage
+                    </Button>
                 </div>
               ) : (
                 <div className="flex items-center justify-between p-4 border-2 rounded-2xl bg-primary/5 border-primary/10">
@@ -866,11 +870,107 @@ export default function VesselTrackerPage() {
               {fullscreenImage && <img src={fullscreenImage.url} className="max-w-full max-h-full object-contain animate-in zoom-in-95 duration-300" />}
             </div>
             <div className="p-6 bg-gradient-to-t from-black/90 to-transparent shrink-0">
-              <DialogHeader><DialogTitle className="text-white font-black uppercase tracking-tighter text-xl text-center">{fullscreenImage?.title}</DialogTitle></DialogHeader>
+              <DialogHeader className="sr-only">
+                <DialogTitle>{fullscreenImage?.title}</DialogTitle>
+                <DialogDescription>Vue détaillée de la prise</DialogDescription>
+              </DialogHeader>
+              <p className="text-white font-black uppercase tracking-tighter text-xl text-center">{fullscreenImage?.title}</p>
             </div>
           </div>
         </DialogContent>
       </Dialog>
+
+      <Card className="border-2 bg-muted/10 shadow-none">
+        <CardHeader className="p-4 pb-2 border-b">
+          <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
+            <Phone className="size-4 text-primary" /> Annuaire Maritime NC
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="space-y-3">
+            <h4 className="text-[10px] font-black uppercase text-red-600 flex items-center gap-2 border-b pb-1">
+              <ShieldAlert className="size-3" /> Urgences
+            </h4>
+            <div className="space-y-2">
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">CROSS / COSS (Mer)</span>
+                <div className="flex gap-4">
+                    <a href="tel:196" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                        <Phone className="size-3" /> 196
+                    </a>
+                    <a href="tel:112" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                        <Phone className="size-3" /> 112
+                    </a>
+                </div>
+                <span className="text-[8px] font-bold text-red-600 uppercase mt-1">Veille VHF : Canal 16</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">SAMU / SOS Médecins</span>
+                <div className="flex flex-col gap-1">
+                    <a href="tel:15" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                        <Phone className="size-3" /> 15
+                    </a>
+                    <a href="tel:+687787725" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                        <Smartphone className="size-3" /> 78 77 25
+                    </a>
+                </div>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">Pompiers (Terre)</span>
+                <a href="tel:18" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                  <Phone className="size-3" /> 18
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h4 className="text-[10px] font-black uppercase text-blue-600 flex items-center gap-2 border-b pb-1">
+              <Waves className="size-3" /> Surveillance & Services
+            </h4>
+            <div className="space-y-2">
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">Gendarmerie Maritime</span>
+                <a href="tel:294036" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                  <Phone className="size-3" /> 29 40 36
+                </a>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">Protection du lagon</span>
+                <a href="tel:243255" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                  <Phone className="size-3" /> 24 32 55
+                </a>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">Météo Marine</span>
+                <a href="tel:366736" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                  <Phone className="size-3" /> 36 67 36
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h4 className="text-[10px] font-black uppercase text-indigo-600 flex items-center gap-2 border-b pb-1">
+              <Ship className="size-3" /> Ports & Marinas
+            </h4>
+            <div className="space-y-2">
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">Port Autonome (VHF 12)</span>
+                <a href="tel:255000" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                  <Phone className="size-3" /> 25 50 00
+                </a>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">Port Moselle (VHF 67)</span>
+                <a href="tel:277197" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                  <Phone className="size-3" /> 27 71 97
+                </a>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
