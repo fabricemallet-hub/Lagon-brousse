@@ -53,7 +53,8 @@ import {
   Camera,
   ImageIcon,
   Maximize2,
-  Users
+  Users,
+  Ghost
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -105,6 +106,7 @@ interface TechEntry {
     isCharging?: boolean;
     accuracy?: number;
     statusDurationMin?: number;
+    vesselId: string;
 }
 
 interface TacticalEntry {
@@ -114,6 +116,7 @@ interface TacticalEntry {
     time: Date;
     pos: google.maps.LatLngLiteral;
     photoUrl?: string;
+    vesselId: string;
 }
 
 export default function VesselTrackerPage() {
@@ -126,6 +129,7 @@ export default function VesselTrackerPage() {
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
   
   const [isSharing, setIsSharing] = useState(false);
+  const [isGhostMode, setIsGhostMode] = useState(false);
   const [emergencyContact, setEmergencyContact] = useState('');
   const [isEmergencyEnabled, setIsEmergencyEnabled] = useState(true);
   const [isCustomMessageEnabled, setIsCustomMessageEnabled] = useState(true);
@@ -190,12 +194,10 @@ export default function VesselTrackerPage() {
   const vesselsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     
-    // Si on est en mode Flotte, on suit le fleetId saisi dans le champ
     if (mode === 'fleet' && vesselIdToFollow) {
         return query(collection(firestore, 'vessels'), where('fleetId', '==', vesselIdToFollow.trim().toUpperCase()));
     }
 
-    // En mode Émetteur ou Récepteur, on suit les IDs précis
     const queryIds = [...savedVesselIds];
     if (isSharing && !queryIds.includes(sharingId)) queryIds.push(sharingId);
     
@@ -266,6 +268,7 @@ export default function VesselTrackerPage() {
             userId: user.uid, 
             displayName: vesselNickname || user.displayName || 'Capitaine', 
             isSharing: data.isSharing !== undefined ? data.isSharing : isSharing, 
+            isGhostMode: data.isGhostMode !== undefined ? data.isGhostMode : isGhostMode,
             lastActive: serverTimestamp(),
             mooringRadius: vesselPrefs.mooringRadius || 20,
             fleetId: customFleetId.trim().toUpperCase() || null,
@@ -280,7 +283,7 @@ export default function VesselTrackerPage() {
         setDoc(doc(firestore, 'vessels', sharingId), updatePayload, { merge: true }).catch(() => {});
     };
     update();
-  }, [user, firestore, isSharing, sharingId, vesselNickname, vesselPrefs.mooringRadius, customFleetId]);
+  }, [user, firestore, isSharing, isGhostMode, sharingId, vesselNickname, vesselPrefs.mooringRadius, customFleetId]);
 
   const handleSaveId = async (idValue: string, type: 'vessel' | 'fleet') => {
     if (!user || !firestore || !idValue.trim()) return;
@@ -333,6 +336,7 @@ export default function VesselTrackerPage() {
       if (userProfile.vesselSmsMessage) setVesselSmsMessage(userProfile.vesselSmsMessage);
       setIsEmergencyEnabled(userProfile.isEmergencyEnabled ?? true);
       setIsCustomMessageEnabled(userProfile.isCustomMessageEnabled ?? true);
+      setIsGhostMode(userProfile.isGhostMode ?? false);
       
       const savedNickname = userProfile.vesselNickname || userProfile.displayName || user?.displayName || user?.email?.split('@')[0] || '';
       if (!vesselNickname) setVesselNickname(savedNickname);
@@ -346,7 +350,6 @@ export default function VesselTrackerPage() {
     if (!user || !firestore || !vesselIdToFollow.trim()) return;
     const cleanId = vesselIdToFollow.trim().toUpperCase();
     
-    // Si on est en mode Flotte, on ne sauvegarde pas dans savedVesselIds (qui est pour le suivi individuel B)
     if (mode === 'fleet') {
         handleSaveId(cleanId, 'fleet');
         return;
@@ -488,6 +491,8 @@ export default function VesselTrackerPage() {
         const currentBattery = vessel.batteryLevel ?? 100;
         const currentCharging = vessel.isCharging ?? false;
         const accuracy = vessel.accuracy || 0;
+        const isGhost = vessel.isGhostMode === true;
+        const isSelf = vessel.id === sharingId;
         
         const getTimeMillis = (t: any) => {
             if (!t) return 0;
@@ -502,15 +507,16 @@ export default function VesselTrackerPage() {
         const tactClearTime = getTimeMillis(vessel.tacticalClearedAt);
 
         if (techClearTime > (lastClearTimesRef.current[vessel.id + '_tech'] || 0)) {
-            setTechHistory(prev => prev.filter(h => h.vesselName !== (vessel.displayName || vessel.id)));
+            setTechHistory(prev => prev.filter(h => h.vesselId !== vessel.id));
             lastClearTimesRef.current[vessel.id + '_tech'] = techClearTime;
         }
         if (tactClearTime > (lastClearTimesRef.current[vessel.id + '_tact'] || 0)) {
-            setTacticalHistory(prev => prev.filter(h => h.vesselName !== (vessel.displayName || vessel.id)));
+            setTacticalHistory(prev => prev.filter(h => h.vesselId !== vessel.id));
             lastClearTimesRef.current[vessel.id + '_tact'] = tactClearTime;
         }
 
-        if (vessel.huntingMarkers) {
+        // TACTICAL JOURNAL: Ghost Mode hides tactical markers too, unless emergency
+        if ((!isGhost || currentStatus === 'emergency' || isSelf) && vessel.huntingMarkers) {
             vessel.huntingMarkers.forEach(marker => {
                 const markerTime = new Date(marker.time).getTime();
                 if (markerTime > (lastTacticalUpdatesRef.current[marker.id] || 0) && markerTime > tactClearTime) {
@@ -518,6 +524,7 @@ export default function VesselTrackerPage() {
                         if (prev.some(h => h.id === marker.id)) return prev;
                         return [{ 
                             id: marker.id,
+                            vesselId: vessel.id,
                             vesselName: vessel.displayName || vessel.id, 
                             label: marker.label!, 
                             time: new Date(marker.time), 
@@ -527,7 +534,7 @@ export default function VesselTrackerPage() {
                     });
                     lastTacticalUpdatesRef.current[marker.id] = markerTime;
                     
-                    if (vessel.id !== sharingId && vesselPrefs.notifySettings.tactical) {
+                    if (!isSelf && vesselPrefs.notifySettings.tactical) {
                         const isLoop = !!vesselPrefs.notifyLoops?.tactical;
                         playVesselSound(vesselPrefs.notifySounds.tactical || 'sonar', isLoop);
                     }
@@ -537,6 +544,9 @@ export default function VesselTrackerPage() {
 
         if (timeKey === 0) return;
         
+        // TECHNICAL JOURNAL: Skip if ghost and not emergency
+        if (isGhost && currentStatus !== 'emergency' && !isSelf) return;
+
         const lastStatus = lastStatusesRef.current[vessel.id];
         const lastUpdate = lastUpdatesRef.current[vessel.id] || 0;
         const lastBattery = lastBatteryLevelsRef.current[vessel.id] ?? 100;
@@ -563,15 +573,21 @@ export default function VesselTrackerPage() {
         const minutePassed = durationMin > lastHistMin;
 
         if (statusChanged || (minutePassed && isSharingActive)) {
-            const label = statusLabels[currentStatus] || currentStatus;
+            let label = statusLabels[currentStatus] || currentStatus;
+            
+            // Special tag if visibility restored via emergency
+            if (isGhost && currentStatus === 'emergency') {
+                label = "DEMANDE D'ASSISTANCE (REPRISE VISIBILITÉ)";
+            }
 
             setTechHistory(prev => {
                 const alreadyAdded = prev.length > 0 && 
                                    prev[0].statusLabel === label && 
-                                   prev[0].vesselName === (vessel.displayName || vessel.id) && 
+                                   prev[0].vesselId === vessel.id && 
                                    Math.abs(prev[0].time.getTime() - Date.now()) < 5000;
                 if (alreadyAdded) return prev;
                 return [{ 
+                    vesselId: vessel.id,
                     vesselName: vessel.displayName || vessel.id, 
                     statusLabel: label, 
                     time: new Date(), 
@@ -583,7 +599,7 @@ export default function VesselTrackerPage() {
                 }, ...prev].slice(0, 50);
             });
             
-            if (lastStatus && statusChanged && vesselPrefs.isNotifyEnabled) {
+            if (lastStatus && statusChanged && vesselPrefs.isNotifyEnabled && !isSelf) {
                 const soundKey = (currentStatus === 'returning' || currentStatus === 'landed') ? 'moving' : currentStatus;
                 if (vesselPrefs.notifySettings[soundKey as keyof typeof vesselPrefs.notifySettings]) {
                     const isLoop = !!vesselPrefs.notifyLoops?.[soundKey as keyof typeof vesselPrefs.notifyLoops];
@@ -596,7 +612,7 @@ export default function VesselTrackerPage() {
         }
 
         const batteryDropped = lastBattery >= (vesselPrefs.batteryThreshold || 20) && currentBattery < (vesselPrefs.batteryThreshold || 20);
-        if (batteryDropped && vesselPrefs.notifySettings.battery) {
+        if (batteryDropped && vesselPrefs.notifySettings.battery && !isSelf) {
             if (vesselPrefs.isNotifyEnabled) {
                 const isLoop = !!vesselPrefs.notifyLoops?.battery;
                 playVesselSound(vesselPrefs.notifySounds.battery || 'alerte', isLoop);
@@ -889,9 +905,12 @@ export default function VesselTrackerPage() {
                         "bg-primary border-primary-foreground/20")}>
                         <Navigation className="absolute -right-4 -bottom-4 size-32 opacity-10 rotate-12" />
                         <div className="space-y-1 relative z-10">
-                            <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                                <Zap className="size-3 fill-yellow-300 text-yellow-300" /> Partage Actif
-                            </p>
+                            <div className="flex items-center justify-between">
+                                <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                                    <Zap className="size-3 fill-yellow-300 text-yellow-300" /> Partage Actif
+                                </p>
+                                {isGhostMode && <Badge variant="outline" className="bg-black/20 text-white border-white/30 text-[8px] font-black uppercase gap-1"><Ghost className="size-2.5"/> Fantôme</Badge>}
+                            </div>
                             <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">{sharingId}</h3>
                             <p className="text-xs font-bold opacity-80 mt-1 italic">{vesselNickname || 'Capitaine'}</p>
                         </div>
@@ -993,6 +1012,23 @@ export default function VesselTrackerPage() {
                         <span className="text-[10px] font-black uppercase">Identité & IDS</span>
                     </AccordionTrigger>
                     <AccordionContent className="pt-4 space-y-6">
+                        <div className="p-4 border-2 border-dashed rounded-2xl bg-slate-50 flex items-center justify-between">
+                            <div className="space-y-0.5">
+                                <Label className="text-xs font-black uppercase flex items-center gap-2">
+                                    <Ghost className="size-4 text-slate-600" /> Mode Fantôme
+                                </Label>
+                                <p className="text-[9px] font-bold text-muted-foreground uppercase">Masquer ma position sur les cartes distantes</p>
+                            </div>
+                            <Switch 
+                                checked={isGhostMode} 
+                                onCheckedChange={(v) => {
+                                    setIsGhostMode(v);
+                                    if (user && firestore) updateDoc(doc(firestore, 'users', user.uid), { isGhostMode: v });
+                                    if (isSharing) updateVesselInFirestore({ isGhostMode: v });
+                                }} 
+                            />
+                        </div>
+
                         <div className="space-y-1.5">
                             <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Surnom du capitaine / navire</Label>
                             <Input placeholder="EX: CAPITAINE NEMO" value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} className="font-bold h-12 border-2 uppercase bg-muted/20 text-center" />
@@ -1121,7 +1157,7 @@ export default function VesselTrackerPage() {
                 <div className="grid gap-2">
                     {mode === 'fleet' ? (
                         <>
-                            {followedVessels?.map(vessel => (
+                            {followedVessels?.filter(v => !v.isGhostMode || v.status === 'emergency').map(vessel => (
                                 <div key={vessel.id} className={cn("flex items-center justify-between p-3 border-2 rounded-xl bg-white shadow-sm border-primary/20 bg-primary/5")}>
                                     <div className="flex items-center gap-3">
                                         <div className="p-2 rounded-lg bg-primary text-white">
@@ -1137,9 +1173,9 @@ export default function VesselTrackerPage() {
                                     </div>
                                 </div>
                             ))}
-                            {(!followedVessels || followedVessels.length === 0) && (
+                            {(!followedVessels || followedVessels.filter(v => !v.isGhostMode || v.status === 'emergency').length === 0) && (
                                 <div className="text-center py-8 border-2 border-dashed rounded-xl opacity-40">
-                                    <p className="text-[10px] font-black uppercase tracking-widest">Aucun navire actif dans ce groupe</p>
+                                    <p className="text-[10px] font-black uppercase tracking-widest">Aucun navire visible dans ce groupe</p>
                                 </div>
                             )}
                         </>
@@ -1147,7 +1183,9 @@ export default function VesselTrackerPage() {
                         <>
                             {savedVesselIds.map(id => {
                                 const vessel = followedVessels?.find(v => v.id === id);
-                                const isActive = vessel?.isSharing === true;
+                                const isGhost = vessel?.isGhostMode === true;
+                                const isEmergency = vessel?.status === 'emergency';
+                                const isActive = vessel?.isSharing === true && (!isGhost || isEmergency);
                                 return (
                                     <div key={id} className={cn("flex items-center justify-between p-3 border-2 rounded-xl bg-white shadow-sm", isActive ? "border-primary/20 bg-primary/5" : "opacity-60")}>
                                         <div className="flex items-center gap-3">
@@ -1156,7 +1194,9 @@ export default function VesselTrackerPage() {
                                             </div>
                                             <div className="flex flex-col">
                                                 <span className="font-black text-xs uppercase">{vessel?.displayName || id}</span>
-                                                <span className="text-[8px] font-bold uppercase opacity-60">{isActive ? 'En ligne' : 'Déconnecté'}</span>
+                                                <span className="text-[8px] font-bold uppercase opacity-60">
+                                                    {isActive ? 'En ligne' : (isGhost && !isEmergency ? 'FANTÔME' : 'Déconnecté')}
+                                                </span>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -1188,7 +1228,7 @@ export default function VesselTrackerPage() {
       <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all", isFullscreen && "fixed inset-0 z-[100] w-screen h-screen rounded-none")}>
         <div className={cn("relative bg-muted/20", isFullscreen ? "flex-grow" : "h-[300px]")}>
           <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} options={{ disableDefaultUI: true, zoomControl: false, mapTypeControl: false, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
-                {followedVessels?.filter(v => v.isSharing).map(vessel => (
+                {followedVessels?.filter(v => v.isSharing && (!v.isGhostMode || v.status === 'emergency' || v.id === sharingId)).map(vessel => (
                     <React.Fragment key={`vessel-group-${vessel.id}`}>
                         {vessel.status === 'stationary' && vessel.anchorLocation && (
                             <Circle
@@ -1240,6 +1280,7 @@ export default function VesselTrackerPage() {
                                   <span className="truncate max-w-[120px]">
                                     {vessel.status === 'emergency' ? '!!! URGENCE !!!' : (vessel.displayName || vessel.id)}
                                     {vessel.eventLabel && ` | ${vessel.eventLabel}`}
+                                    {vessel.isGhostMode && vessel.id === sharingId && " (FANTÔME)"}
                                   </span>
                                   <BatteryIconComp level={vessel.batteryLevel} charging={vessel.isCharging} className="size-2.5" />
                                 </div>
