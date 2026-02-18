@@ -77,17 +77,6 @@ import {
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
-const TACTICAL_TYPES = [
-    { id: 'oiseaux', label: 'OISEAUX', icon: Bird, color: 'bg-white text-blue-600 border-blue-600' },
-    { id: 'marlin', label: 'MARLIN', icon: Fish, color: 'bg-blue-900 text-white border-blue-900' },
-    { id: 'thon', label: 'THON', icon: Fish, color: 'bg-red-600 text-white border-red-600' },
-    { id: 'tazard', label: 'TAZARD', icon: Fish, color: 'bg-slate-500 text-white border-slate-500' },
-    { id: 'wahoo', label: 'WAHOO', icon: Fish, color: 'bg-cyan-600 text-white border-cyan-600' },
-    { id: 'bonite', label: 'BONITE', icon: Fish, color: 'bg-indigo-600 text-white border-indigo-600' },
-    { id: 'sardines', label: 'SARDINES', icon: Waves, color: 'bg-teal-500 text-white border-teal-500' },
-    { id: 'prise', label: 'PRISE', icon: Camera, color: 'bg-teal-600 text-white border-teal-400', isPhoto: true },
-];
-
 const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
   if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
   const props = { className: cn("size-4", className) };
@@ -122,34 +111,30 @@ export default function VesselTrackerPage() {
   const { toast } = useToast();
   const { isLoaded, loadError } = useGoogleMaps();
 
+  // 1. ÉTATS DE BASE
   const [mode, setMode] = useState<'sender' | 'receiver' | 'fleet' | 'both'>('sender');
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
-  
   const [isSharing, setIsSharing] = useState(false);
   const [isGhostMode, setIsGhostMode] = useState(false);
   const [isStabilizing, setIsStabilizing] = useState(false);
+  const [vesselNickname, setVesselNickname] = useState('');
+  const [customSharingId, setCustomSharingId] = useState('');
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [mapZoom, setMapZoom] = useState<number>(10);
+  const [wakeLock, setWakeLock] = useState<any>(null);
   const [emergencyContact, setEmergencyContact] = useState('');
   const [isEmergencyEnabled, setIsEmergencyEnabled] = useState(true);
   const [isCustomMessageEnabled, setIsCustomMessageEnabled] = useState(true);
   const [vesselSmsMessage, setVesselSmsMessage] = useState('');
-  const [customSharingId, setCustomSharingId] = useState('');
-  const [vesselNickname, setVesselNickname] = useState('');
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [wakeLock, setWakeLock] = useState<any>(null);
-  const [mapZoom, setMapZoom] = useState<number>(10);
-  const shouldPanOnNextFix = useRef(false);
-
+  
   const [currentPos, setCurrentPos] = useState<google.maps.LatLngLiteral | null>(null);
   const [userAccuracy, setUserAccuracy] = useState<number | null>(null);
   const [anchorPos, setAnchorPos] = useState<google.maps.LatLngLiteral | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  
-  const watchIdRef = useRef<number | null>(null);
-  const lastFixTimeRef = useRef<number>(Date.now());
-  const stabilizationRef = useRef<{ p1: google.maps.LatLngLiteral | null, start: number }>({ p1: null, start: 0 });
-  const nextCheckTimeRef = useRef<number>(0);
+  const [techHistory, setTechHistory] = useState<TechHistoryEntry[]>([]);
+  const [fullscreenImage, setFullscreenImage] = useState<{url: string, title: string} | null>(null);
+  const [showLoopAlert, setShowLoopAlert] = useState(false);
 
   const [vesselPrefs, setVesselPrefs] = useState<NonNullable<UserAccount['vesselPrefs']>>({
     isNotifyEnabled: true,
@@ -163,21 +148,45 @@ export default function VesselTrackerPage() {
     batteryThreshold: 20,
     mooringRadius: 20
   });
-  
-  const [techHistory, setTechHistory] = useState<TechHistoryEntry[]>([]);
-  const [tacticalHistory, setTacticalHistory] = useState<{ id: string, vesselName: string, label: string, time: Date, pos: google.maps.LatLngLiteral, photoUrl?: string, vesselId: string }[]>([]);
-  const [fullscreenImage, setFullscreenImage] = useState<{url: string, title: string} | null>(null);
 
+  // 2. REFS DE STABILITÉ (Crucial pour éviter les boucles infinies)
+  const isSharingRef = useRef(isSharing);
+  const vesselStatusRef = useRef(vesselStatus);
+  const lastActiveStatusRef = useRef(vesselStatus);
+  const anchorPosRef = useRef(anchorPos);
+  const vesselNicknameRef = useRef(vesselNickname);
+  const isGhostModeRef = useRef(isGhostMode);
+  const vesselPrefsRef = useRef(vesselPrefs);
+  const watchIdRef = useRef<number | null>(null);
+  const lastFixTimeRef = useRef<number>(Date.now());
+  const stabilizationRef = useRef<{ p1: google.maps.LatLngLiteral | null, start: number }>({ p1: null, start: 0 });
+  const nextCheckTimeRef = useRef<number>(0);
   const lastStatusesRef = useRef<Record<string, string>>({});
   const lastUpdatesRef = useRef<Record<string, number>>({});
-  const lastTacticalUpdatesRef = useRef<Record<string, number>>({});
   const lastSentStatusRef = useRef<string | null>(null);
   const lastClearTimesRef = useRef<Record<string, number>>({});
-
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
-  const [showLoopAlert, setShowLoopAlert] = useState(false);
+  const shouldPanOnNextFix = useRef(false);
 
+  // 3. RÉCUPÉRATION DES DONNÉES (Définies tôt pour éviter les ReferenceError)
+  const userDocRef = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [user, firestore]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
+
+  const savedVesselIds = userProfile?.savedVesselIds || [];
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
+
+  const vesselsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    // On suit les navires enregistrés + soi-même si on partage
+    const queryIds = [...savedVesselIds];
+    if (isSharing && !queryIds.includes(sharingId)) queryIds.push(sharingId);
+    if (queryIds.length === 0) return null;
+    return query(collection(firestore, 'vessels'), where('id', 'in', queryIds.slice(0, 10)));
+  }, [firestore, savedVesselIds, sharingId, isSharing]);
+  const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
   const soundsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -192,6 +201,17 @@ export default function VesselTrackerPage() {
     ).map(s => ({ id: s.id, label: s.label, url: s.url }));
   }, [dbSounds]);
 
+  // Sync des refs
+  useEffect(() => {
+    isSharingRef.current = isSharing;
+    vesselStatusRef.current = vesselStatus;
+    anchorPosRef.current = anchorPos;
+    vesselNicknameRef.current = vesselNickname;
+    isGhostModeRef.current = isGhostMode;
+    vesselPrefsRef.current = vesselPrefs;
+  }, [isSharing, vesselStatus, anchorPos, vesselNickname, isGhostMode, vesselPrefs]);
+
+  // 4. FONCTIONS UTILITAIRES
   const toggleWakeLock = async () => {
     if (!('wakeLock' in navigator)) return;
     if (wakeLock) { try { await wakeLock.release(); setWakeLock(null); } catch (e) { setWakeLock(null); } }
@@ -220,32 +240,9 @@ export default function VesselTrackerPage() {
     }
   }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, availableSounds]);
 
-  // REFS FOR UPDATER (To avoid Effect loops)
-  const isSharingRef = useRef(isSharing);
-  const vesselStatusRef = useRef(vesselStatus);
-  const lastActiveStatusRef = useRef(vesselStatus);
-  const anchorPosRef = useRef(anchorPos);
-  const vesselNicknameRef = useRef(vesselNickname);
-  const isGhostModeRef = useRef(isGhostMode);
-  const vesselPrefsRef = useRef(vesselPrefs);
-
-  useEffect(() => {
-    isSharingRef.current = isSharing;
-    vesselStatusRef.current = vesselStatus;
-    anchorPosRef.current = anchorPos;
-    vesselNicknameRef.current = vesselNickname;
-    isGhostModeRef.current = isGhostMode;
-    vesselPrefsRef.current = vesselPrefs;
-  }, [isSharing, vesselStatus, anchorPos, vesselNickname, isGhostMode, vesselPrefs]);
-
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || (!isSharingRef.current && data.isSharing !== false)) return;
     
-    const currentId = sharingId;
-    const currentNickname = vesselNicknameRef.current;
-    const currentGhostMode = isGhostModeRef.current;
-    const currentPrefs = vesselPrefsRef.current;
-
     const update = async () => {
         let batteryInfo: any = {};
         if ('getBattery' in navigator) {
@@ -257,13 +254,13 @@ export default function VesselTrackerPage() {
         }
 
         const updatePayload: any = { 
-            id: currentId,
+            id: sharingId,
             userId: user.uid, 
-            displayName: currentNickname || user.displayName || 'Capitaine', 
+            displayName: vesselNicknameRef.current || user.displayName || 'Capitaine', 
             isSharing: data.isSharing !== undefined ? data.isSharing : isSharingRef.current, 
-            isGhostMode: data.isGhostMode !== undefined ? data.isGhostMode : currentGhostMode,
+            isGhostMode: data.isGhostMode !== undefined ? data.isGhostMode : isGhostModeRef.current,
             lastActive: serverTimestamp(),
-            mooringRadius: currentPrefs.mooringRadius || 20,
+            mooringRadius: vesselPrefsRef.current.mooringRadius || 20,
             ...batteryInfo,
             ...data 
         };
@@ -272,12 +269,12 @@ export default function VesselTrackerPage() {
             updatePayload.statusChangedAt = serverTimestamp();
         }
 
-        setDoc(doc(firestore, 'vessels', currentId), updatePayload, { merge: true }).catch(() => {});
+        setDoc(doc(firestore, 'vessels', sharingId), updatePayload, { merge: true }).catch(() => {});
     };
     update();
   }, [user, firestore, sharingId]);
 
-  // STABLE WATCHER (Doesn't depend on status or prefs to avoid clear/restart)
+  // 5. LOGIQUE SENSEUR ET SIGNAL
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
       if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
@@ -297,9 +294,7 @@ export default function VesselTrackerPage() {
             const newPos = { lat: latitude, lng: longitude };
             const roundedAccuracy = Math.round(accuracy);
             
-            // Verrouille le contact capteur dès qu'on reçoit une info
             lastFixTimeRef.current = Date.now();
-            
             setCurrentPos(newPos);
             setUserAccuracy(roundedAccuracy);
 
@@ -307,18 +302,16 @@ export default function VesselTrackerPage() {
             const currentStatus = vesselStatusRef.current;
             const currentMooringRadius = vesselPrefsRef.current.mooringRadius || 20;
 
-            // --- REPRISE SI SIGNAL PERDU ---
             if (currentStatus === 'offline') {
                 if (roundedAccuracy < 20) {
                     const recoveredStatus = lastActiveStatusRef.current || 'moving';
                     setVesselStatus(recoveredStatus);
-                    updateVesselInFirestore({ status: recoveredStatus, eventLabel: null, location: { latitude, longitude }, accuracy: roundedAccuracy });
+                    updateVesselInFirestore({ status: recoveredStatus, eventLabel: 'SIGNAL RETROUVÉ', location: { latitude, longitude }, accuracy: roundedAccuracy });
                     toast({ title: "Signal Rétabli", description: `Précision : ${roundedAccuracy}m` });
                 }
                 return;
             }
 
-            // --- PHASE STABILISATION 10s ---
             if (now - stabilizationRef.current.start < 10000) {
                 if (!stabilizationRef.current.p1 && roundedAccuracy < 50) stabilizationRef.current.p1 = newPos;
                 if (now - stabilizationRef.current.start > 9000 && stabilizationRef.current.p1) {
@@ -340,7 +333,6 @@ export default function VesselTrackerPage() {
                 return;
             }
 
-            // --- CYCLE VÉRIFICATION 30s ---
             if (now > nextCheckTimeRef.current) {
                 if (currentStatus !== 'returning' && currentStatus !== 'landed' && currentStatus !== 'emergency') {
                     if (anchorPosRef.current) {
@@ -364,8 +356,6 @@ export default function VesselTrackerPage() {
                             }
                         }
                     } else {
-                        // Pas d'ancre, on check si on s'est arrêté (30s sans bouger déjà géré par intervalle)
-                        // On enregistre simplement la position
                         updateVesselInFirestore({ location: { latitude, longitude }, accuracy: roundedAccuracy });
                     }
                 } else {
@@ -380,9 +370,9 @@ export default function VesselTrackerPage() {
           { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
     }
-  }, [isSharing, mode, map, updateVesselInFirestore, toast]);
+  }, [isSharing, mode, updateVesselInFirestore, toast]);
 
-  // WATCHDOG : Surveillance de la fraîcheur du signal
+  // Watchdog Signal
   useEffect(() => {
     if (!isSharing || mode !== 'sender') return;
     const interval = setInterval(() => {
@@ -391,7 +381,6 @@ export default function VesselTrackerPage() {
       const currentStatus = vesselStatusRef.current;
       const currentAccuracy = userAccuracy || 0;
       
-      // On ignore pendant les 15s de démarrage ou stabilisation
       if (currentStatus !== 'offline' && !isStabilizing && (now - stabilizationRef.current.start > 15000)) {
           let shouldGoOffline = false;
           let reason = '';
@@ -410,34 +399,7 @@ export default function VesselTrackerPage() {
     return () => clearInterval(interval);
   }, [isSharing, mode, updateVesselInFirestore, toast, userAccuracy, isStabilizing]);
 
-  const handleStopSharing = async () => {
-    if (!user || !firestore) return;
-    setIsSharing(false);
-    await setDoc(doc(firestore, 'vessels', sharingId), { isSharing: false, lastActive: serverTimestamp(), statusChangedAt: serverTimestamp() }, { merge: true });
-    if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
-    setCurrentPos(null); anchorPosRef.current = null; setAnchorPos(null); lastSentStatusRef.current = null;
-    setIsStabilizing(false);
-    toast({ title: "Partage arrêté" });
-  };
-
-  const handleClearHistory = async () => {
-    setTechHistory([]);
-    if (!firestore || !user) return;
-    try {
-        if (isSharing) await updateDoc(doc(firestore, 'vessels', sharingId), { historyClearedAt: serverTimestamp() });
-        toast({ title: "Journal effacé" });
-    } catch (e) {}
-  };
-
-  const handleTacticalSignal = (label: string, photoUrl?: string) => {
-    if (!user || !firestore || !currentPos) return;
-    const newMarker: any = { id: Math.random().toString(36).substring(2, 9), lat: currentPos.lat, lng: currentPos.lng, time: new Date().toISOString(), label: label };
-    if (photoUrl) newMarker.photoUrl = photoUrl;
-    updateVesselInFirestore({ eventLabel: photoUrl ? 'PRISE PHOTO' : label, huntingMarkers: arrayUnion(Object.fromEntries(Object.entries(newMarker).filter(([_, v]) => v !== undefined))) as any });
-    if (vesselPrefs.notifySettings.tactical) playVesselSound(vesselPrefs.notifySounds.tactical || 'sonar', !!vesselPrefs.notifyLoops?.tactical);
-    toast({ title: photoUrl ? "Photo partagée !" : "Signalement envoyé" });
-  };
-
+  // Journal Technique Sync
   useEffect(() => {
     if (!followedVessels) return;
     followedVessels.forEach(vessel => {
@@ -475,7 +437,54 @@ export default function VesselTrackerPage() {
             lastStatusesRef.current[vessel.id] = currentStatus; lastUpdatesRef.current[vessel.id] = timeKey;
         }
     });
-  }, [followedVessels, vesselPrefs, playVesselSound, sharingId, mode]);
+  }, [followedVessels, vesselPrefs, playVesselSound, sharingId, mode, availableSounds]);
+
+  // Autres handlers
+  const handleManualStatus = (st: VesselStatus['status'], label?: string) => {
+    setVesselStatus(st);
+    updateVesselInFirestore({ status: st, eventLabel: label || null });
+    toast({ title: label || (st === 'returning' ? 'Retour Maison' : st === 'landed' ? 'À terre' : 'Statut mis à jour') });
+  };
+
+  const handleStopSharing = async () => {
+    if (!user || !firestore) return;
+    setIsSharing(false);
+    await setDoc(doc(firestore, 'vessels', sharingId), { isSharing: false, lastActive: serverTimestamp(), statusChangedAt: serverTimestamp() }, { merge: true });
+    if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
+    setCurrentPos(null); anchorPosRef.current = null; setAnchorPos(null); lastSentStatusRef.current = null;
+    setIsStabilizing(false);
+    toast({ title: "Partage arrêté" });
+  };
+
+  const handleSaveVessel = async () => {
+    if (!user || !firestore) return;
+    const cleanId = (vesselIdToFollow || customSharingId).trim().toUpperCase();
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            savedVesselIds: vesselIdToFollow.trim() ? arrayUnion(vesselIdToFollow.trim().toUpperCase()) : savedVesselIds,
+            lastVesselId: customSharingId || cleanId
+        });
+        if (vesselIdToFollow) setVesselIdToFollow('');
+        toast({ title: "Enregistré" });
+    } catch (e) {}
+  };
+
+  const handleRemoveSavedVessel = async (id: string) => {
+    if (!user || !firestore) return;
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), { savedVesselIds: arrayRemove(id) });
+        toast({ title: "Retiré" });
+    } catch (e) {}
+  };
+
+  const handleClearHistory = async () => {
+    setTechHistory([]);
+    if (!firestore || !user) return;
+    try {
+        if (isSharing) await updateDoc(doc(firestore, 'vessels', sharingId), { historyClearedAt: serverTimestamp() });
+        toast({ title: "Journal effacé" });
+    } catch (e) {}
+  };
 
   const sendEmergencySms = (type: string) => {
     if (!emergencyContact) { toast({ variant: "destructive", title: "Contact requis" }); return; }
@@ -519,6 +528,8 @@ export default function VesselTrackerPage() {
         </div>
     </div>
   );
+
+  if (isProfileLoading) return <Skeleton className="h-96 w-full" />;
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
@@ -643,7 +654,7 @@ export default function VesselTrackerPage() {
 
       <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all", isFullscreen && "fixed inset-0 z-[100] w-screen h-screen rounded-none")}>
         <div className={cn("relative bg-muted/20", isFullscreen ? "flex-grow" : "h-[300px]")}>
-          <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={mapZoom} onLoad={setMap} onZoomChanged={() => map && setMapZoom(map.getZoom() || 10)} onDragStart={() => setIsFollowing(false)} options={{ disableDefaultUI: true, zoomControl: false, mapTypeControl: false, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
+          <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={mapZoom} onLoad={setMap} onZoomChanged={() => map && setMapZoom(map.getZoom() || 10)} options={{ disableDefaultUI: true, zoomControl: false, mapTypeControl: false, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
                 {followedVessels?.filter(v => v.isSharing && (mode === 'receiver' || !v.isGhostMode || v.status === 'emergency' || v.id === sharingId)).map(vessel => (
                     <React.Fragment key={`vessel-group-${vessel.id}`}>
                         {(vessel.status === 'stationary' || vessel.status === 'drifting') && vessel.anchorLocation && (
