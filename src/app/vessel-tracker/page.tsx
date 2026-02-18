@@ -151,6 +151,14 @@ export default function VesselTrackerPage() {
   const immobilityStartTime = useRef<number | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
+  const labels = useMemo(() => ({
+    status1: 'AU MOUILLAGE',
+    status2: 'EN MOUVEMENT',
+    alertBtn: 'SIGNALER PRISE',
+    alertTitle: 'PRISE SIGNALÉE !',
+    alertDesc: 'Un poisson a été repéré !'
+  }), []);
+
   const [vesselPrefs, setVesselPrefs] = useState<NonNullable<UserAccount['vesselPrefs']>>({
     isNotifyEnabled: true,
     vesselVolume: 0.8,
@@ -182,14 +190,6 @@ export default function VesselTrackerPage() {
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
-  const labels = useMemo(() => ({
-    status1: 'AU MOUILLAGE',
-    status2: 'EN MOUVEMENT',
-    alertBtn: 'SIGNALER PRISE',
-    alertTitle: 'PRISE SIGNALÉE !',
-    alertDesc: 'Un poisson a été repéré !'
-  }), []);
-
   const userDocRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return doc(firestore, 'users', user.uid);
@@ -201,18 +201,21 @@ export default function VesselTrackerPage() {
   const fleetIdHistory = userProfile?.fleetIdHistory || [];
 
   const vesselsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
+    if (!firestore || !user) return null;
     
-    if (mode === 'fleet' && vesselIdToFollow) {
-        return query(collection(firestore, 'vessels'), where('fleetId', '==', vesselIdToFollow.trim().toUpperCase()));
-    }
-
+    // On veut toujours inclure notre propre navire si on partage
     const queryIds = [...savedVesselIds];
     if (isSharing && !queryIds.includes(sharingId)) queryIds.push(sharingId);
+
+    if (mode === 'fleet' && vesselIdToFollow) {
+        // En mode flotte, on peut faire une requête sur fleetId
+        // Mais on veut aussi voir notre propre navire s'il n'est pas encore dans cette flotte
+        return query(collection(firestore, 'vessels'), where('fleetId', '==', vesselIdToFollow.trim().toUpperCase()));
+    }
     
     if (queryIds.length === 0) return null;
     return query(collection(firestore, 'vessels'), where('id', 'in', queryIds.slice(0, 10)));
-  }, [firestore, savedVesselIds, sharingId, isSharing, mode, vesselIdToFollow]);
+  }, [firestore, user, savedVesselIds, sharingId, isSharing, mode, vesselIdToFollow]);
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
@@ -585,8 +588,6 @@ export default function VesselTrackerPage() {
 
         if (statusChanged || (minutePassed && isSharingActive)) {
             let label = statusLabels[currentStatus] || currentStatus;
-            
-            // Special tag if visibility restored via emergency in Fleet mode
             if (mode === 'fleet' && isGhost && currentStatus === 'emergency') {
                 label = "DEMANDE D'ASSISTANCE (REPRISE VISIBILITÉ)";
             }
@@ -633,7 +634,7 @@ export default function VesselTrackerPage() {
         lastBatteryLevelsRef.current[vessel.id] = currentBattery;
         lastChargingStatesRef.current[vessel.id] = currentCharging;
     });
-  }, [followedVessels, vesselPrefs, playVesselSound, sharingId, mode]);
+  }, [followedVessels, vesselPrefs, playVesselSound, sharingId, mode, labels]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
@@ -946,7 +947,7 @@ export default function VesselTrackerPage() {
                         <div className="grid grid-cols-2 gap-2">
                             <Button 
                                 variant={vesselStatus === 'returning' ? 'default' : 'outline'} 
-                                className={cn("h-14 font-black uppercase text-[10px] border-2 transition-all active:scale-[0.98] gap-2", 
+                                className={cn("h-14 font-black uppercase text-[10px] border-2 transition-all active:scale-0.98 gap-2", 
                                     vesselStatus === 'returning' ? "bg-blue-600 text-white border-blue-400" : "bg-background border-slate-200")} 
                                 onClick={() => handleManualStatus('returning')}
                             >
@@ -955,7 +956,7 @@ export default function VesselTrackerPage() {
                             </Button>
                             <Button 
                                 variant={vesselStatus === 'landed' ? 'default' : 'outline'} 
-                                className={cn("h-14 font-black uppercase text-[10px] border-2 transition-all active:scale-[0.98] gap-2", 
+                                className={cn("h-14 font-black uppercase text-[10px] border-2 transition-all active:scale-0.98 gap-2", 
                                     vesselStatus === 'landed' ? "bg-green-600 text-white border-green-400" : "bg-background border-slate-200")} 
                                 onClick={() => handleManualStatus('landed')}
                             >
