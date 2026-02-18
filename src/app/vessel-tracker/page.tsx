@@ -315,7 +315,7 @@ export default function VesselTrackerPage() {
     return () => clearInterval(interval);
   }, [isSharing, mode, currentPos, updateVesselInFirestore]);
 
-  // --- 5. STABILIZATION & CYCLE LOGIC (30s) ---
+  // --- 5. STABILIZATION & DRIFT LOGIC (30s Cycle) ---
   useEffect(() => {
     if (!isSharing || mode !== 'sender') {
         if (statusCycleRef.current) clearInterval(statusCycleRef.current);
@@ -350,22 +350,41 @@ export default function VesselTrackerPage() {
         statusCycleRef.current = setInterval(() => {
             if (!currentPos) return;
             setVesselStatus(currentStatus => {
+                // Manual overrides keep priority
                 if (['returning', 'landed', 'emergency'].includes(currentStatus)) return currentStatus;
 
                 let nextStatus = currentStatus;
                 let eventLabel = '';
-                if (currentStatus === 'stationary' && anchorPos) {
+                
+                if ((currentStatus === 'stationary' || currentStatus === 'drifting') && anchorPos) {
                     const distFromAnchor = getDistance(currentPos.lat, currentPos.lng, anchorPos.lat, anchorPos.lng);
-                    if (distFromAnchor > 100) { nextStatus = 'moving'; setAnchorPos(null); eventLabel = 'MOUVEMENT'; } 
-                    else if (distFromAnchor > mooringRadius) { nextStatus = 'drifting'; eventLabel = 'À LA DÉRIVE !'; }
-                } else if (currentStatus === 'drifting' && anchorPos) {
-                    const distFromAnchor = getDistance(currentPos.lat, currentPos.lng, anchorPos.lat, anchorPos.lng);
-                    if (distFromAnchor > 100) { nextStatus = 'moving'; setAnchorPos(null); eventLabel = 'MOUVEMENT'; } 
-                    else if (distFromAnchor < mooringRadius) { nextStatus = 'stationary'; eventLabel = 'AU MOUILLAGE'; }
+                    
+                    // IF SAILED AWAY > 100m -> Raise anchor auto
+                    if (distFromAnchor > 100) { 
+                        nextStatus = 'moving'; 
+                        setAnchorPos(null); 
+                        eventLabel = 'EN MOUVEMENT'; 
+                    } 
+                    // IF DRIFTED OUTSIDE RADIUS -> Alert
+                    else if (distFromAnchor > mooringRadius) { 
+                        nextStatus = 'drifting'; 
+                        eventLabel = 'À LA DÉRIVE !'; 
+                    }
+                    // IF BACK INSIDE RADIUS -> Stationary
+                    else {
+                        nextStatus = 'stationary';
+                        eventLabel = 'AU MOUILLAGE';
+                    }
                 } else if (currentStatus === 'moving') {
+                    // Detect if stopped (we use a simple check here since cycle is 30s)
                     if (!anchorPos) setAnchorPos(currentPos);
                     const dist = getDistance(currentPos.lat, currentPos.lng, anchorPos!.lat, anchorPos!.lng);
-                    if (dist < 20) { nextStatus = 'stationary'; eventLabel = 'AU MOUILLAGE'; }
+                    if (dist < mooringRadius) { 
+                        nextStatus = 'stationary'; 
+                        eventLabel = 'AU MOUILLAGE'; 
+                    } else {
+                        setAnchorPos(currentPos); // Move anchor reference while moving
+                    }
                 }
                 
                 const displayLabel = eventLabel || (nextStatus === 'moving' ? 'MOUVEMENT' : nextStatus === 'stationary' ? 'AU MOUILLAGE' : 'DÉRIVE');
@@ -425,7 +444,7 @@ export default function VesselTrackerPage() {
     await updateDoc(doc(firestore, 'vessels', sharingId), {
         huntingMarkers: arrayUnion(marker)
     });
-    playVesselSound(vesselPrefs.notifySounds.tactical || 'sonar', 'tactical');
+    playVesselSound(vesselPrefs.notifySounds.tactical || 'sonar');
     toast({ title: `Signalement : ${typeId}`, description: "Épinglé sur la carte." });
   };
 
@@ -444,7 +463,7 @@ export default function VesselTrackerPage() {
             photoUrl: base64
         };
         await updateDoc(doc(firestore, 'vessels', sharingId), { huntingMarkers: arrayUnion(marker) });
-        playVesselSound(vesselPrefs.notifySounds.tactical || 'sonar', 'tactical');
+        playVesselSound(vesselPrefs.notifySounds.tactical || 'sonar');
         toast({ title: "Photo partagée !" });
     };
     reader.readAsDataURL(file);
@@ -476,7 +495,7 @@ export default function VesselTrackerPage() {
     if (!user || !firestore) return;
     setIsSharing(false);
     await setDoc(doc(firestore, 'vessels', sharingId), { isSharing: false, lastActive: serverTimestamp() }, { merge: true });
-    if (watchIdRef.current) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
+    if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
     setCurrentPos(null);
     setAnchorPos(null);
     Object.values(activeAudiosRef.current).forEach(a => a.pause());
@@ -567,6 +586,7 @@ export default function VesselTrackerPage() {
                     <div className={cn("p-6 rounded-2xl shadow-xl relative overflow-hidden border-2 text-white", 
                         vesselStatus === 'offline' ? "bg-red-600 animate-pulse" : 
                         vesselStatus === 'emergency' ? "bg-red-600" :
+                        vesselStatus === 'drifting' ? "bg-orange-500 border-orange-400" :
                         vesselStatus === 'landed' ? "bg-green-600" : "bg-primary")}>
                         <Navigation className="absolute -right-4 -bottom-4 size-32 opacity-10 rotate-12" />
                         <div className="space-y-1 relative z-10">
@@ -577,7 +597,7 @@ export default function VesselTrackerPage() {
                         <div className="mt-8 flex items-center justify-between relative z-10">
                             <div className="flex items-center gap-3">
                                 <Badge variant="outline" className="bg-green-500/30 border-white/30 text-white font-black text-[10px] px-3 h-6">EN LIGNE</Badge>
-                                <span className="text-[10px] font-black uppercase tracking-widest text-white/80">
+                                <span className={cn("text-[10px] font-black uppercase tracking-widest text-white/80", vesselStatus === 'drifting' && "animate-pulse text-white")}>
                                     {vesselStatus === 'stabilizing' ? 'LANCEMENT EN COURS...' :
                                      vesselStatus === 'moving' ? 'MOUVEMENT' : 
                                      vesselStatus === 'stationary' ? 'AU MOUILLAGE' : 
@@ -882,24 +902,34 @@ export default function VesselTrackerPage() {
             onDragStart={() => setIsFollowing(false)}
             options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
           >
-                {/* Local Mooring Circle */}
+                {/* 1. LOCAL MOORING FIX (Captain A View) */}
                 {(vesselStatus === 'stationary' || vesselStatus === 'drifting') && anchorPos && (
-                    <Circle 
-                        center={anchorPos} 
-                        radius={mooringRadius} 
-                        options={{ fillColor: '#3b82f6', fillOpacity: 0.15, strokeColor: '#3b82f6', strokeWidth: 1 }} 
-                    />
+                    <>
+                        <Circle 
+                            center={anchorPos} 
+                            radius={mooringRadius} 
+                            options={{ fillColor: '#3b82f6', fillOpacity: 0.15, strokeColor: '#3b82f6', strokeWidth: 1 }} 
+                        />
+                        <OverlayView position={anchorPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                            <div style={{ transform: 'translate(-50%, -50%)' }} className="p-1.5 bg-white/90 backdrop-blur-md rounded-full shadow-lg border-2 border-orange-500">
+                                <Anchor className="size-4 text-orange-500" />
+                            </div>
+                        </OverlayView>
+                    </>
                 )}
 
+                {/* 2. FLEET & FOLLOWED VESSELS */}
                 {followedVessels?.filter(v => v.isSharing && v.location && v.id !== sharingId).map(vessel => {
                     const isOffline = (Date.now() - (vessel.lastActive?.toMillis() || 0) > 70000);
                     const isSOS = vessel.status === 'emergency';
+                    const isDrifting = vessel.status === 'drifting';
                     
                     // Filter ghosts for Fleet mode unless SOS
                     if (mode === 'fleet' && vessel.isGhostMode && !isSOS) return null;
 
                     const statusInfo = isOffline ? { label: 'OFF', color: 'bg-red-600', icon: WifiOff } : 
                                       isSOS ? { label: 'SOS', color: 'bg-red-600', icon: ShieldAlert } : 
+                                      isDrifting ? { label: 'DÉRIVE', color: 'bg-orange-500', icon: AlertTriangle } :
                                       vessel.status === 'stationary' ? { label: 'MOUIL', color: 'bg-orange-500', icon: Anchor } : 
                                       vessel.status === 'returning' ? { label: 'RETOUR', color: 'bg-indigo-600', icon: Ship } : 
                                       vessel.status === 'landed' ? { label: 'HOME', color: 'bg-green-600', icon: Home } : 
@@ -907,19 +937,26 @@ export default function VesselTrackerPage() {
                     
                     return (
                         <React.Fragment key={vessel.id}>
-                            {/* Remote Mooring Circle */}
-                            {(vessel.status === 'stationary' || vessel.status === 'drifting') && vessel.anchorLocation && (
-                                <Circle 
-                                    center={{ lat: vessel.anchorLocation.latitude, lng: vessel.anchorLocation.longitude }} 
-                                    radius={vessel.mooringRadius || 20} 
-                                    options={{ fillColor: '#3b82f6', fillOpacity: 0.15, strokeColor: '#3b82f6', strokeWidth: 1 }} 
-                                />
+                            {/* Remote Mooring Circle & Anchor */}
+                            {(vessel.status === 'stationary' || isDrifting) && vessel.anchorLocation && (
+                                <>
+                                    <Circle 
+                                        center={{ lat: vessel.anchorLocation.latitude, lng: vessel.anchorLocation.longitude }} 
+                                        radius={vessel.mooringRadius || 20} 
+                                        options={{ fillColor: '#3b82f6', fillOpacity: 0.15, strokeColor: '#3b82f6', strokeWidth: 1 }} 
+                                    />
+                                    <OverlayView position={{ lat: vessel.anchorLocation.latitude, lng: vessel.anchorLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                                        <div style={{ transform: 'translate(-50%, -50%)' }} className="p-1.5 bg-white/90 backdrop-blur-md rounded-full shadow-lg border-2 border-orange-500">
+                                            <Anchor className="size-3 text-orange-500" />
+                                        </div>
+                                    </OverlayView>
+                                </>
                             )}
                             <OverlayView position={{ lat: vessel.location.latitude, lng: vessel.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                 <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
                                     <div className={cn(
-                                        "px-2 py-1 text-white rounded text-[10px] font-black shadow-lg border whitespace-nowrap flex items-center gap-2", 
-                                        isOffline || isSOS ? statusInfo.color + " animate-pulse" : "bg-slate-900/90"
+                                        "px-2 py-1 text-white rounded text-[10px] font-black shadow-lg border whitespace-nowrap flex items-center gap-2 transition-all", 
+                                        isOffline || isSOS || isDrifting ? statusInfo.color + " animate-pulse" : "bg-slate-900/90"
                                     )}>
                                         <span className="uppercase">{statusInfo.label}</span> | {vessel.displayName || vessel.id}
                                         {vessel.accuracy && <span className="opacity-40 text-[8px]">+/-{vessel.accuracy}m</span>}
@@ -950,6 +987,7 @@ export default function VesselTrackerPage() {
                     </OverlayView>
                 ))}
 
+                {/* 3. CAPTAIN'S OWN LIVE DOT (Always on top) */}
                 {mode === 'sender' && currentPos && (
                     <OverlayView position={currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                         <PulsingDot />
