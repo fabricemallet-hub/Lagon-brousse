@@ -63,7 +63,7 @@ import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { format, differenceInMinutes, differenceInSeconds } from 'date-fns';
+import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
@@ -851,7 +851,7 @@ export default function VesselTrackerPage() {
                                             {mode === 'receiver' && <Button variant="ghost" size="icon" className="size-10 text-destructive/20 hover:text-destructive rounded-xl" onClick={() => handleRemoveSavedVessel(id)}><Trash2 className="size-5" /></Button>}
                                         </div>
                                     </div>
-                                    {isActive && mode === 'receiver' && (
+                                    {v && v.isSharing && mode === 'receiver' && (
                                         <div className="px-4 pb-4 grid grid-cols-2 gap-2">
                                             <Button variant="outline" size="sm" className="h-10 text-[9px] font-black uppercase border-2 gap-2 shadow-sm" onClick={() => { if(v) sendEmergencySms('MAYDAY', v); }}>
                                                 <ShieldAlert className="size-4 text-red-600" /> APPEL SECOURS
@@ -888,11 +888,12 @@ export default function VesselTrackerPage() {
                     // Filter ghosts for Fleet mode unless SOS
                     if (mode === 'fleet' && vessel.isGhostMode && !isSOS) return null;
 
-                    const statusLabel = isOffline ? 'OFF' : 
-                                      isSOS ? 'SOS' : 
-                                      vessel.status === 'stationary' ? 'MOUIL' : 
-                                      vessel.status === 'returning' ? 'RETOUR' : 
-                                      vessel.status === 'landed' ? 'HOME' : 'MOUV';
+                    const statusInfo = isOffline ? { label: 'OFF', color: 'bg-red-600', icon: WifiOff } : 
+                                      isSOS ? { label: 'SOS', color: 'bg-red-600', icon: ShieldAlert } : 
+                                      vessel.status === 'stationary' ? { label: 'MOUIL', color: 'bg-orange-500', icon: Anchor } : 
+                                      vessel.status === 'returning' ? { label: 'RETOUR', color: 'bg-indigo-600', icon: Ship } : 
+                                      vessel.status === 'landed' ? { label: 'HOME', color: 'bg-green-600', icon: Home } : 
+                                      { label: 'MOUV', color: 'bg-blue-600', icon: Navigation };
                     
                     return (
                         <React.Fragment key={vessel.id}>
@@ -903,23 +904,20 @@ export default function VesselTrackerPage() {
                                     options={{ fillColor: '#3b82f6', fillOpacity: 0.15, strokeColor: '#3b82f6', strokeWidth: 1 }} 
                                 />
                             )}
-                            <OverlayView position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                            <OverlayView position={{ lat: vessel.location.latitude, lng: vessel.location.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                 <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
                                     <div className={cn(
                                         "px-2 py-1 text-white rounded text-[10px] font-black shadow-lg border whitespace-nowrap flex items-center gap-2", 
-                                        isOffline ? "bg-red-600 animate-pulse" : isSOS ? "bg-red-600 animate-bounce" : "bg-slate-900/90"
+                                        isOffline || isSOS ? statusInfo.color + " animate-pulse" : "bg-slate-900/90"
                                     )}>
-                                        <span className="uppercase">{statusLabel}</span> | {vessel.displayName || vessel.id}
+                                        <span className="uppercase">{statusInfo.label}</span> | {vessel.displayName || vessel.id}
                                         {vessel.accuracy && <span className="opacity-40 text-[8px]">+/-{vessel.accuracy}m</span>}
                                     </div>
                                     <div className={cn(
                                         "p-2 rounded-full border-2 border-white shadow-xl transition-all", 
-                                        isSOS ? "bg-red-600 scale-125" : vessel.status === 'stationary' ? "bg-orange-500" : vessel.status === 'returning' ? "bg-indigo-600" : vessel.status === 'landed' ? "bg-green-600" : "bg-blue-600"
+                                        isSOS ? "bg-red-600 scale-125" : statusInfo.color
                                     )}>
-                                        {isSOS ? <ShieldAlert className="size-5 text-white" /> :
-                                         vessel.status === 'landed' ? <Home className="size-5 text-white" /> :
-                                         vessel.status === 'stationary' ? <Anchor className="size-5 text-white" /> :
-                                         <Navigation className="size-5 text-white" />}
+                                        {React.createElement(statusInfo.icon, { className: "size-5 text-white" })}
                                     </div>
                                 </div>
                             </OverlayView>
@@ -934,7 +932,7 @@ export default function VesselTrackerPage() {
                             <div className="px-2 py-1 bg-white/90 backdrop-blur-md text-black rounded-lg text-[9px] font-black shadow-lg border border-slate-200 uppercase tracking-tighter">
                                 {m.label}
                             </div>
-                            <div className="p-1.5 bg-slate-900 text-white rounded-full shadow-lg border-2 border-white">
+                            <div className={cn("p-1.5 rounded-full shadow-lg border-2 border-white", m.label === 'SARDINES' ? "bg-emerald-500" : "bg-slate-900 text-white")}>
                                 {m.label === 'SARDINES' ? <Waves className="size-3" /> : <Fish className="size-3" />}
                             </div>
                         </div>
@@ -963,8 +961,12 @@ export default function VesselTrackerPage() {
         
         <div className="bg-card p-4 flex flex-col gap-4 border-t-2">
             <div className="flex gap-2">
-                <Button variant="destructive" className="flex-1 h-14 font-black uppercase rounded-xl shadow-lg gap-3 text-xs" onClick={() => sendEmergencySms('MAYDAY')}><ShieldAlert className="size-5" /> MAYDAY</Button>
-                <Button variant="secondary" className="flex-1 h-14 font-black uppercase rounded-xl shadow-lg gap-3 text-xs border-2 border-primary/20" onClick={() => sendEmergencySms('PAN PAN')}><AlertTriangle className="size-5 text-primary" /> PAN PAN</Button>
+                <Button variant="destructive" className="flex-1 h-14 font-black uppercase rounded-xl shadow-lg gap-3 text-xs" onClick={() => sendEmergencySms('MAYDAY')}>
+                    <ShieldAlert className="size-5" /> MAYDAY
+                </Button>
+                <Button variant="secondary" className="flex-1 h-14 font-black uppercase rounded-xl shadow-lg gap-3 text-xs border-2 border-primary/20" onClick={() => sendEmergencySms('PAN PAN')}>
+                    <AlertTriangle className="size-5 text-primary" /> PAN PAN
+                </Button>
             </div>
 
             <div className="grid grid-cols-1 gap-2">
