@@ -16,17 +16,14 @@ const GoogleMapsContext = createContext<GoogleMapsContextType | undefined>(
 );
 
 export function GoogleMapsProvider({ children }: { children: ReactNode }) {
-  // CLÉ API : Assurez-vous qu'elle est définie dans .env.local 
-  // sous le nom NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-  const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  // CLÉ API : Utilisation de la clé confirmée par l'utilisateur
+  const googleMapsApiKey = "AIzaSyDs6qQO274Ro2RD4lVkr8KztsZIecP-ZDk";
 
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'lagon-brousse-google-maps',
-    googleMapsApiKey: googleMapsApiKey || "",
-    // Map ID spécifique pour le mode satellite haute fidélité
+    googleMapsApiKey: googleMapsApiKey,
     mapIds: ['satellite_id'],
     preventGoogleFontsLoading: true,
-    // On force l'utilisation du projet courant
     version: 'weekly',
   });
 
@@ -34,10 +31,6 @@ export function GoogleMapsProvider({ children }: { children: ReactNode }) {
     isLoaded,
     loadError,
   }), [isLoaded, loadError]);
-
-  if (!googleMapsApiKey && typeof window !== 'undefined') {
-    console.error("ERREUR : NEXT_PUBLIC_GOOGLE_MAPS_API_KEY est manquante dans les variables d'environnement.");
-  }
 
   return (
     <GoogleMapsContext.Provider value={value}>
@@ -47,7 +40,7 @@ export function GoogleMapsProvider({ children }: { children: ReactNode }) {
             <AlertCircle className="size-4" />
             <AlertTitle className="font-black uppercase text-xs">Erreur Google Maps</AlertTitle>
             <AlertDescription className="text-[10px] font-medium leading-relaxed">
-              Impossible de charger la carte. Vérifiez les restrictions de votre clé API (Referrer) dans la Google Cloud Console pour le projet studio-2943478321-f746e.
+              Impossible de charger la carte. Vérifiez les restrictions de votre clé API (Identity Toolkit et Maps JavaScript API) dans la Google Cloud Console pour le projet studio-2943478321-f746e.
             </AlertDescription>
           </Alert>
         </div>
