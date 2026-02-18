@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where, getDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where, deleteField } from 'firebase/firestore';
 import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -179,6 +179,19 @@ export default function VesselTrackerPage() {
     if (!dbSounds) return [];
     return dbSounds.map(s => ({ id: s.id, label: s.label, url: s.url }));
   }, [dbSounds]);
+
+  // Consolidate Tactical Markers from all followed vessels
+  const tacticalMarkers = useMemo(() => {
+    const all: (HuntingMarker & { vesselName: string })[] = [];
+    followedVessels?.forEach(v => {
+        if (v.huntingMarkers) {
+            v.huntingMarkers.forEach(m => {
+                all.push({ ...m, vesselName: v.displayName || v.id });
+            });
+        }
+    });
+    return all.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+  }, [followedVessels]);
 
   // --- 3. REFS & UTILS ---
   const watchIdRef = useRef<number | null>(null);
@@ -436,6 +449,18 @@ export default function VesselTrackerPage() {
     activeAudiosRef.current = {};
     
     toast({ title: "Partage arrêté" });
+  };
+
+  const handleClearTactical = async () => {
+    if (!user || !firestore || !isSharing) return;
+    try {
+        await updateDoc(doc(firestore, 'vessels', sharingId), {
+            huntingMarkers: deleteField()
+        });
+        toast({ title: "Journal Tactique effacé" });
+    } catch (e) {
+        console.error(e);
+    }
   };
 
   const handleSaveSmsSettings = async () => {
@@ -910,7 +935,7 @@ export default function VesselTrackerPage() {
                                         <span className="font-black text-sm uppercase tracking-tight truncate text-slate-800">{v.displayName || v.id}</span>
                                         <span className={cn("text-[9px] font-black uppercase tracking-widest", 
                                             isOffline ? "text-red-500" : "text-green-600")}>
-                                            {isOffline ? 'SIGNAL PERDU' : (v.status === 'stationary' ? 'AU MOUILLAGE' : 'EN MOUVEMENT')}
+                                            {isOffline ? 'SIGNAL PERDU' : (v?.status === 'stationary' ? 'AU MOUILLAGE' : 'EN MOUVEMENT')}
                                         </span>
                                     </div>
                                 </div>
@@ -1031,11 +1056,11 @@ export default function VesselTrackerPage() {
                 <Button variant="secondary" className="flex-1 h-14 font-black uppercase rounded-xl shadow-lg gap-3 text-xs border-2 border-primary/20" onClick={() => sendEmergencySms('PAN PAN')}><AlertTriangle className="size-5 text-primary" /> PAN PAN</Button>
             </div>
 
-            <Accordion type="single" collapsible className="w-full">
+            <Accordion type="single" collapsible className="w-full space-y-2">
                 <AccordionItem value="history" className="border-2 rounded-xl bg-muted/5 overflow-hidden px-3">
                     <div className="flex items-center justify-between h-12">
                         <AccordionTrigger className="flex-1 text-[10px] font-black uppercase hover:no-underline py-0">
-                            <div className="flex items-center gap-2"><History className="size-3"/> Journal Technique (Ligne Unique)</div>
+                            <div className="flex items-center gap-2"><Settings className="size-3"/> Journal Technique</div>
                         </AccordionTrigger>
                         <Button variant="ghost" size="sm" className="h-7 px-2 text-[8px] font-black text-destructive" onClick={() => setHistory([])}><Trash2 className="size-3 mr-1" /> Effacer</Button>
                     </div>
@@ -1053,7 +1078,36 @@ export default function VesselTrackerPage() {
                                 </div>
                                 <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase border-2 px-3" onClick={() => { map?.panTo(h.pos); map?.setZoom(17); }}><MapPin className="size-3" /> GPS</Button>
                             </div>
-                        )) : <p className="text-center text-[10px] font-bold opacity-30 py-4 italic">AUCUN ÉVÉNEMENT TECHNIQUE</p>}
+                        )) : <p className="text-center text-[10px] font-bold opacity-30 py-4 italic uppercase">Aucun événement technique</p>}
+                    </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="tactical-history" className="border-2 rounded-xl bg-muted/5 overflow-hidden px-3">
+                    <div className="flex items-center justify-between h-12">
+                        <AccordionTrigger className="flex-1 text-[10px] font-black uppercase hover:no-underline py-0">
+                            <div className="flex items-center gap-2"><Settings className="size-3"/> Journal Tactique</div>
+                        </AccordionTrigger>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-[8px] font-black text-destructive" onClick={handleClearTactical} disabled={!isSharing}><Trash2 className="size-3 mr-1" /> Effacer</Button>
+                    </div>
+                    <AccordionContent className="space-y-2 pb-4 pt-2">
+                        {tacticalMarkers.length > 0 ? tacticalMarkers.map((m, i) => (
+                            <div key={m.id} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm">
+                                <div className="flex flex-col gap-0.5">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-black text-primary uppercase">{m.vesselName}</span>
+                                        <Badge variant={m.label === 'PRISE' ? 'default' : 'secondary'} className={cn("text-[8px] font-black h-4 uppercase", m.label === 'PRISE' && "bg-emerald-600")}>
+                                            {m.label}
+                                        </Badge>
+                                    </div>
+                                    <span className="font-bold opacity-40 flex items-center gap-1.5"><Clock className="size-2.5" /> {format(new Date(m.time), 'HH:mm')}</span>
+                                </div>
+                                <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase border-2 px-3" onClick={() => { map?.panTo({ lat: m.lat, lng: m.lng }); map?.setZoom(17); }}><MapPin className="size-3" /> GPS</Button>
+                            </div>
+                        )) : (
+                            <div className="text-center py-8">
+                                <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-30">AUCUN SIGNALEMENT TACTIQUE</p>
+                            </div>
+                        )}
                     </AccordionContent>
                 </AccordionItem>
             </Accordion>
