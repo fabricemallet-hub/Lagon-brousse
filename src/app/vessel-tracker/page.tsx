@@ -60,6 +60,14 @@ const PulsingDot = () => (
     </div>
 );
 
+const BatteryIcon = ({ level, charging }: { level: number; charging: boolean }) => {
+  const props = { className: 'w-4 h-4 inline-block' };
+  if (charging) return <BatteryCharging {...props} className="text-blue-500" />;
+  if (level < 20) return <BatteryLow {...props} className="text-red-500" />;
+  if (level < 60) return <BatteryMedium {...props} className="text-amber-500" />;
+  return <BatteryFull {...props} className="text-green-500" />;
+};
+
 export default function VesselTrackerPage() {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -114,7 +122,7 @@ export default function VesselTrackerPage() {
   const activeDuration = useMemo(() => {
     if (!currentVesselData?.statusChangedAt) return "ACTIF 0 MIN";
     const start = currentVesselData.statusChangedAt.toDate();
-    const mins = differenceInMinutes(new Date(), start);
+    const mins = Math.max(0, differenceInMinutes(new Date(), start));
     return `ACTIF ${mins} MIN`;
   }, [currentVesselData]);
 
@@ -175,6 +183,14 @@ export default function VesselTrackerPage() {
     update();
   }, [user, firestore, isSharing, isGhostMode, sharingId, vesselNickname, mooringRadius, anchorPos, vesselStatus]);
 
+  const onLoad = useCallback((mapInstance: google.maps.Map) => {
+    setMap(mapInstance);
+  }, []);
+
+  const onUnmount = useCallback(() => {
+    setMap(null);
+  }, []);
+
   const handleRecenter = useCallback(() => {
     setIsFollowing(true);
     let target: { lat: number; lng: number } | null = null;
@@ -233,11 +249,6 @@ export default function VesselTrackerPage() {
     };
     updateVesselInFirestore({ huntingMarkers: arrayUnion(marker) });
     toast({ title: `${type} signalé !`, description: "Point GPS enregistré." });
-  };
-
-  const handleClearTactical = () => {
-    updateVesselInFirestore({ huntingMarkers: [] });
-    toast({ title: "Journal tactique effacé" });
   };
 
   const sendEmergencySms = (type: 'MAYDAY' | 'PAN PAN') => {
@@ -303,7 +314,7 @@ export default function VesselTrackerPage() {
     switch (status) {
         case 'moving': return { icon: Navigation, color: 'bg-blue-600', label: 'MOUV' };
         case 'stationary': return { icon: Anchor, color: 'bg-orange-500', label: 'MOUIL' };
-        case 'returning': return { icon: Ship, color: 'bg-indigo-600', label: 'RETOUR' };
+        case 'returning': return { icon: Navigation, color: 'bg-indigo-600', label: 'RETOUR' };
         case 'landed': return { icon: Home, color: 'bg-green-600', label: 'HOME' };
         case 'emergency': return { icon: ShieldAlert, color: 'bg-red-600', label: 'SOS' };
         case 'offline': return { icon: WifiOff, color: 'bg-red-600', label: 'OFF' };
@@ -345,7 +356,6 @@ export default function VesselTrackerPage() {
                 </div>
               ) : (
                 <div className="space-y-6 animate-in fade-in slide-in-from-top-2">
-                    {/* PARTAGE ACTIF HEADER (AS PER IMAGE) */}
                     <div className="p-6 rounded-2xl shadow-xl relative overflow-hidden bg-primary text-white">
                         <Navigation className="absolute -right-4 -bottom-4 size-32 opacity-10 rotate-12" />
                         <div className="space-y-1 relative z-10">
@@ -362,7 +372,6 @@ export default function VesselTrackerPage() {
                         </div>
                     </div>
 
-                    {/* SIGNALISATION MANUELLE */}
                     <div className="p-4 bg-muted/10 rounded-2xl border-2 border-dashed space-y-3">
                         <p className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest flex items-center gap-2">
                             <Zap className="size-3" /> SIGNALISATION MANUELLE
@@ -377,7 +386,6 @@ export default function VesselTrackerPage() {
                         </div>
                     </div>
 
-                    {/* SIGNALEMENT TACTIQUE (FLOTTE) - 8 BUTTONS AS PER IMAGE */}
                     <div className="p-4 bg-muted/10 rounded-2xl border-2 border-dashed space-y-4">
                         <p className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2 px-1">
                             <Settings className="size-3" /> SIGNALEMENT TACTIQUE (FLOTTE)
@@ -428,7 +436,6 @@ export default function VesselTrackerPage() {
                         </Button>
                     </div>
 
-                    {/* ACCORDEONS REGLAGES (AS PER IMAGE) */}
                     <Accordion type="single" collapsible className="w-full space-y-2">
                         <AccordionItem value="identity" className="bg-muted/30 border rounded-lg">
                             <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 h-12">
@@ -531,6 +538,7 @@ export default function VesselTrackerPage() {
               defaultCenter={INITIAL_CENTER} 
               defaultZoom={10} 
               onLoad={onLoad} 
+              onUnmount={onUnmount}
               onDragStart={() => setIsFollowing(false)} 
               options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
             >
