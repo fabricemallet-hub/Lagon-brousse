@@ -208,8 +208,6 @@ export default function VesselTrackerPage() {
     if (isSharing && !queryIds.includes(sharingId)) queryIds.push(sharingId);
 
     if (mode === 'fleet' && vesselIdToFollow) {
-        // En mode flotte, on peut faire une requête sur fleetId
-        // Mais on veut aussi voir notre propre navire s'il n'est pas encore dans cette flotte
         return query(collection(firestore, 'vessels'), where('fleetId', '==', vesselIdToFollow.trim().toUpperCase()));
     }
     
@@ -269,10 +267,15 @@ export default function VesselTrackerPage() {
     if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
     
     const update = async () => {
-        let batteryInfo = {};
+        let batteryInfo: any = {};
         if ('getBattery' in navigator) {
-            const b: any = await (navigator as any).getBattery();
-            batteryInfo = { batteryLevel: Math.round(b.level * 100), isCharging: b.charging };
+            try {
+                const b: any = await (navigator as any).getBattery();
+                batteryInfo.batteryLevel = typeof b.level === 'number' ? Math.round(b.level * 100) : 100;
+                batteryInfo.isCharging = typeof b.charging === 'boolean' ? b.charging : false;
+            } catch (e) {
+                console.warn("Battery status not available");
+            }
         }
 
         const updatePayload: any = { 
@@ -292,7 +295,14 @@ export default function VesselTrackerPage() {
             updatePayload.statusChangedAt = serverTimestamp();
         }
 
-        setDoc(doc(firestore, 'vessels', sharingId), updatePayload, { merge: true }).catch(() => {});
+        // Nettoyage critique des propriétés undefined pour éviter l'erreur Firestore
+        const cleanPayload = Object.fromEntries(
+            Object.entries(updatePayload).filter(([_, v]) => v !== undefined)
+        );
+
+        setDoc(doc(firestore, 'vessels', sharingId), cleanPayload, { merge: true }).catch((err) => {
+            console.error("Firestore Update Error:", err);
+        });
     };
     update();
   }, [user, firestore, isSharing, isGhostMode, sharingId, vesselNickname, vesselPrefs.mooringRadius, customFleetId]);
@@ -414,14 +424,17 @@ export default function VesselTrackerPage() {
   const handleTacticalSignal = (label: string, photoUrl?: string) => {
     if (!user || !firestore || !currentPos) return;
     
-    const newMarker: HuntingMarker = {
+    // Nettoyage de l'objet marker pour éviter les champs undefined qui font crasher arrayUnion
+    const newMarker: any = {
         id: Math.random().toString(36).substring(2, 9),
         lat: currentPos.lat,
         lng: currentPos.lng,
         time: new Date().toISOString(),
         label: label,
-        photoUrl: photoUrl
     };
+    if (photoUrl) {
+        newMarker.photoUrl = photoUrl;
+    }
 
     updateVesselInFirestore({ 
         eventLabel: photoUrl ? 'PRISE PHOTO' : label,
