@@ -1048,7 +1048,7 @@ export default function VesselTrackerPage() {
 
                         <div className="space-y-1.5">
                             <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Surnom du capitaine / navire</Label>
-                            <Input placeholder="EX: CAPITAINE NEMO" value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} className="font-bold h-12 border-2 uppercase bg-muted/20 text-center" />
+                            <Input placeholder="Ex: Capitaine Nemo" value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} className="font-bold h-12 border-2 bg-muted/20 text-center" />
                         </div>
                         <div className="space-y-1.5">
                             <Label className="text-[10px] font-black uppercase ml-1 opacity-60">ID du navire (Partage Individuel)</Label>
@@ -1181,7 +1181,7 @@ export default function VesselTrackerPage() {
                                             <Navigation className="size-4" />
                                         </div>
                                         <div className="flex flex-col">
-                                            <span className="font-black text-xs uppercase">{vessel.displayName}</span>
+                                            <span className="font-black text-xs">{vessel.displayName}</span>
                                             <span className="text-[8px] font-bold uppercase opacity-60">
                                                 {vessel.isSharing ? 'En ligne' : 'Déconnecté'}
                                                 {vessel.isGhostMode && vessel.id === sharingId && " (FANTÔME)"}
@@ -1213,7 +1213,7 @@ export default function VesselTrackerPage() {
                                                 {isActive ? <Navigation className="size-4" /> : <WifiOff className="size-4" />}
                                             </div>
                                             <div className="flex flex-col">
-                                                <span className="font-black text-xs uppercase">{vessel?.displayName || id}</span>
+                                                <span className="font-black text-xs tracking-tight">{vessel?.displayName || id}</span>
                                                 <span className="text-[8px] font-bold uppercase opacity-60">
                                                     {isActive ? (isGhost && !isEmergency ? 'En ligne (FANTÔME)' : 'En ligne') : 'Déconnecté'}
                                                 </span>
@@ -1247,7 +1247,7 @@ export default function VesselTrackerPage() {
 
       <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all", isFullscreen && "fixed inset-0 z-[100] w-screen h-screen rounded-none")}>
         <div className={cn("relative bg-muted/20", isFullscreen ? "flex-grow" : "h-[300px]")}>
-          <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} options={{ disableDefaultUI: true, zoomControl: false, mapTypeControl: false, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
+          <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} onZoomChanged={() => map && setMapZoom(map.getZoom() || 10)} options={{ disableDefaultUI: true, zoomControl: false, mapTypeControl: false, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
                 {followedVessels?.filter(v => v.isSharing && (mode === 'receiver' || !v.isGhostMode || v.status === 'emergency' || v.id === sharingId)).map(vessel => (
                     <React.Fragment key={`vessel-group-${vessel.id}`}>
                         {vessel.status === 'stationary' && vessel.anchorLocation && (
@@ -1363,7 +1363,7 @@ export default function VesselTrackerPage() {
                                     <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm">
                                         <div className="flex flex-col gap-1.5">
                                             <div className="flex items-center gap-4">
-                                                <span className="font-black text-primary uppercase text-[10px] leading-none">{h.vesselName}</span>
+                                                <span className="font-black text-primary text-[10px] leading-none">{h.vesselName}</span>
                                                 <div className="flex flex-col gap-0.5">
                                                     <span className={cn("font-black uppercase text-[10px] masonry-break-words", 
                                                         h.statusLabel.includes('ASSISTANCE') ? 'text-red-600' :
@@ -1422,7 +1422,7 @@ export default function VesselTrackerPage() {
                                             )}
                                             <div className="flex flex-col gap-0.5 min-w-0 flex-1">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-black text-primary uppercase truncate">{h.vesselName}</span>
+                                                    <span className="font-black text-primary truncate">{h.vesselName}</span>
                                                     <Badge className={cn("text-[8px] font-black h-4 px-1", h.photoUrl ? "bg-teal-600" : "bg-primary")}>{h.label}</Badge>
                                                 </div>
                                                 <div className="flex items-center gap-2 font-bold opacity-40">
