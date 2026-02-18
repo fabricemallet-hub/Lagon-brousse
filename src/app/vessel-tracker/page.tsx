@@ -82,16 +82,6 @@ const PulsingDot = () => (
     </div>
 );
 
-const TACTICAL_OPTIONS = [
-    { id: 'OISEAUX', label: 'OISEAUX', icon: Bird, color: 'bg-white text-blue-600 border-blue-200' },
-    { id: 'MARLIN', label: 'MARLIN', icon: Fish, color: 'bg-indigo-900 text-white border-indigo-800' },
-    { id: 'THON', label: 'THON', icon: Fish, color: 'bg-red-600 text-white border-red-50' },
-    { id: 'TAZARD', label: 'TAZARD', icon: Fish, color: 'bg-slate-600 text-white border-slate-500' },
-    { id: 'WAHOO', label: 'WAHOO', icon: Fish, color: 'bg-cyan-600 text-white border-cyan-500' },
-    { id: 'BONITE', label: 'BONITE', icon: Fish, color: 'bg-blue-600 text-white border-blue-500' },
-    { id: 'SARDINES', label: 'SARDINES', icon: Waves, color: 'bg-emerald-500 text-white border-emerald-400' },
-];
-
 export default function VesselTrackerPage() {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -127,12 +117,10 @@ export default function VesselTrackerPage() {
     batteryThreshold: 20
   });
 
-  const photoInputRef = useRef<HTMLInputElement>(null);
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
   const watchIdRef = useRef<number | null>(null);
   const lastSentPosRef = useRef<{ lat: number; lng: number } | null>(null);
-  const activeAudiosRef = useRef<Record<string, HTMLAudioElement>>({});
   const shouldPanOnNextFix = useRef<boolean>(false);
 
   const userDocRef = useMemoFirebase(() => {
@@ -150,17 +138,6 @@ export default function VesselTrackerPage() {
   }, [firestore, savedVesselIds, sharingId, isSharing]);
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
-
-  const soundsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
-  }, [firestore]);
-  const { data: dbSounds } = useCollection<SoundLibraryEntry>(soundsQuery);
-
-  const availableSounds = useMemo(() => {
-    if (!dbSounds) return [];
-    return dbSounds.map(s => ({ id: s.id, label: s.label, url: s.url }));
-  }, [dbSounds]);
 
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
@@ -343,7 +320,7 @@ export default function VesselTrackerPage() {
                         <Button variant={vesselStatus === 'returning' ? 'default' : 'outline'} className="h-14 font-black uppercase text-[10px] border-2 gap-2" onClick={() => handleManualStatusToggle('returning', 'RETOUR MAISON')}>
                             <Navigation className="size-4" /> RETOUR MAISON
                         </Button>
-                        <Button variant={vesselStatus === 'landed' ? 'default' : 'outline'} className="h-14 font-black uppercase text-[10px] border-2 gap-2" onClick={() => handleManualStatusToggle('landed', 'À TERRE (HOME)')}>
+                        <Button variant={vesselStatus === 'landed' ? 'default' : 'outline'} className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatusToggle('landed', 'À TERRE (HOME)')}>
                             <Home className="size-4" /> HOME (À TERRE)
                         </Button>
                     </div>
@@ -415,7 +392,7 @@ export default function VesselTrackerPage() {
                               )}
                               <OverlayView position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                   <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 z-20">
-                                      <div className="px-2 py-1 bg-slate-900/80 backdrop-blur-sm text-white rounded text-[10px] font-black shadow-lg border border-white/20 whitespace-nowrap flex flex-col items-center">
+                                      <div className="px-2 py-1 bg-slate-900/80 backdrop-blur-sm text-white rounded text-[10px] font-black shadow-lg border border-white/20 whitespace-nowrap flex items-center gap-2">
                                           <span>{vessel.displayName}</span>
                                       </div>
                                       <div className={cn("p-2 rounded-full border-2 border-white shadow-xl", statusInfo.color)}>
