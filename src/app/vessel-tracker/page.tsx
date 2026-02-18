@@ -107,7 +107,6 @@ export default function VesselTrackerPage() {
   const [isFollowing, setIsFollowing] = useState(true);
   
   const [customSharingId, setCustomSharingId] = useState('');
-  const [customFleetId, setCustomFleetId] = useState('');
   const [mooringRadius, setMooringRadius] = useState(20);
 
   const [currentPos, setCurrentPos] = useState<{ lat: number; lng: number } | null>(null);
@@ -130,10 +129,8 @@ export default function VesselTrackerPage() {
 
   const photoInputRef = useRef<HTMLInputElement>(null);
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
-  const fleetId = useMemo(() => customFleetId.trim().toUpperCase(), [customFleetId]);
 
   const watchIdRef = useRef<number | null>(null);
-  const lastFixTimestampRef = useRef<number>(Date.now());
   const lastSentPosRef = useRef<{ lat: number; lng: number } | null>(null);
   const activeAudiosRef = useRef<Record<string, HTMLAudioElement>>({});
   const shouldPanOnNextFix = useRef<boolean>(false);
@@ -165,21 +162,39 @@ export default function VesselTrackerPage() {
     return dbSounds.map(s => ({ id: s.id, label: s.label, url: s.url }));
   }, [dbSounds]);
 
-  const playVesselSound = useCallback((soundId: string, eventKey?: string) => {
-    if (!vesselPrefs.isNotifyEnabled) return;
-    if (eventKey && activeAudiosRef.current[eventKey]) {
-        activeAudiosRef.current[eventKey].pause();
-        delete activeAudiosRef.current[eventKey];
-    }
-    const sound = availableSounds.find(s => s.id === soundId || s.label === soundId);
-    if (sound) {
-      const audio = new Audio(sound.url);
-      audio.volume = vesselPrefs.vesselVolume;
-      const shouldLoop = eventKey ? vesselPrefs.notifyLoops?.[eventKey] : false;
-      if (shouldLoop) { audio.loop = true; activeAudiosRef.current[eventKey!] = audio; }
-      audio.play().catch(() => {});
-    }
-  }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, vesselPrefs.notifyLoops, availableSounds]);
+  const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
+    if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
+    const update = async () => {
+        let batteryInfo: any = {};
+        if ('getBattery' in navigator) {
+            try {
+                const b: any = await (navigator as any).getBattery();
+                batteryInfo.batteryLevel = Math.round(b.level * 100);
+                batteryInfo.isCharging = b.charging;
+            } catch (e) {}
+        }
+
+        const updatePayload: any = { 
+            id: sharingId,
+            userId: user.uid, 
+            displayName: vesselNickname || user.displayName || 'Capitaine', 
+            isSharing: data.isSharing !== undefined ? data.isSharing : isSharing, 
+            isGhostMode: data.isGhostMode !== undefined ? data.isGhostMode : isGhostMode,
+            lastActive: serverTimestamp(),
+            mooringRadius: mooringRadius,
+            ...batteryInfo,
+            ...data 
+        };
+        
+        if (anchorPos && (vesselStatus === 'stationary' || vesselStatus === 'drifting')) {
+            updatePayload.anchorLocation = { latitude: anchorPos.lat, longitude: anchorPos.lng };
+        }
+
+        setDoc(doc(firestore, 'vessels', sharingId), updatePayload, { merge: true }).catch(() => {});
+        setNextSyncSeconds(60);
+    };
+    update();
+  }, [user, firestore, isSharing, isGhostMode, sharingId, vesselNickname, mooringRadius, anchorPos, vesselStatus]);
 
   const handleRecenter = useCallback(() => {
     setIsFollowing(true);
@@ -199,43 +214,6 @@ export default function VesselTrackerPage() {
       shouldPanOnNextFix.current = true;
     }
   }, [mode, currentPos, followedVessels, map]);
-
-  const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
-    if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
-    const update = async () => {
-        let batteryInfo: any = {};
-        if ('getBattery' in navigator) {
-            try {
-                const b: any = await (navigator as any).getBattery();
-                batteryInfo.batteryLevel = Math.round(b.level * 100);
-                batteryInfo.isCharging = b.charging;
-            } catch (e) {}
-        }
-
-        const updatePayload: any = { 
-            id: sharingId,
-            userId: user.uid, 
-            displayName: vesselNickname || user.displayName || 'Capitaine', 
-            isSharing: data.isSharing !== undefined ? data.isSharing : isSharing, 
-            isGhostMode: data.isGhostMode !== undefined ? data.isGhostMode : isGhostMode,
-            fleetId: fleetId || null,
-            lastActive: serverTimestamp(),
-            mooringRadius: mooringRadius,
-            ...batteryInfo,
-            ...data 
-        };
-        
-        if (anchorPos && (vesselStatus === 'stationary' || vesselStatus === 'drifting')) {
-            updatePayload.anchorLocation = { latitude: anchorPos.lat, longitude: anchorPos.lng };
-        } else if (data.status === 'moving' || vesselStatus === 'moving') {
-            updatePayload.anchorLocation = null;
-        }
-
-        setDoc(doc(firestore, 'vessels', sharingId), updatePayload, { merge: true }).catch(() => {});
-        setNextSyncSeconds(60);
-    };
-    update();
-  }, [user, firestore, isSharing, isGhostMode, sharingId, vesselNickname, fleetId, mooringRadius, anchorPos, vesselStatus]);
 
   const handleStopSharing = async () => {
     if (!user || !firestore) return;
@@ -274,14 +252,6 @@ export default function VesselTrackerPage() {
     window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
 
-  const handleTacticalSignal = async (typeId: string) => {
-    if (!user || !firestore || !currentPos) return;
-    const marker: HuntingMarker = { id: Math.random().toString(36).substring(7), lat: currentPos.lat, lng: currentPos.lng, time: new Date().toISOString(), label: typeId };
-    await updateDoc(doc(firestore, 'vessels', sharingId), { huntingMarkers: arrayUnion(marker) });
-    playVesselSound(vesselPrefs.notifySounds.tactical || 'sonar');
-    toast({ title: `Signalement : ${typeId}` });
-  };
-
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
       if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
@@ -298,7 +268,6 @@ export default function VesselTrackerPage() {
         const distMoved = lastSent ? getDistance(latitude, longitude, lastSent.lat, lastSent.lng) : 100;
 
         setCurrentPos(newPos);
-        lastFixTimestampRef.current = Date.now();
 
         if (distMoved >= 10) {
             updateVesselInFirestore({ location: { latitude, longitude }, accuracy: Math.round(accuracy) });
@@ -370,21 +339,6 @@ export default function VesselTrackerPage() {
                         </div>
                     </div>
 
-                    <div className="bg-muted/10 p-4 rounded-2xl border-2 border-dashed space-y-3">
-                        <div className="grid grid-cols-4 gap-2">
-                            {TACTICAL_OPTIONS.map(opt => (
-                                <Button key={opt.id} className={cn("h-12 flex flex-col items-center justify-center p-1 border-2", opt.color)} onClick={() => handleTacticalSignal(opt.id)}>
-                                    <opt.icon className="size-4 mb-0.5" />
-                                    <span className="text-[7px] font-black">{opt.label}</span>
-                                </Button>
-                            ))}
-                            <Button className="h-12 flex flex-col items-center justify-center p-1 bg-emerald-600 text-white border-emerald-500" onClick={() => photoInputRef.current?.click()}>
-                                <Camera className="size-4 mb-0.5" />
-                                <span className="text-[7px] font-black">PRISE</span>
-                            </Button>
-                        </div>
-                    </div>
-
                     <div className="grid grid-cols-2 gap-2">
                         <Button variant={vesselStatus === 'returning' ? 'default' : 'outline'} className="h-14 font-black uppercase text-[10px] border-2 gap-2" onClick={() => handleManualStatusToggle('returning', 'RETOUR MAISON')}>
                             <Navigation className="size-4" /> RETOUR MAISON
@@ -393,21 +347,6 @@ export default function VesselTrackerPage() {
                             <Home className="size-4" /> HOME (À TERRE)
                         </Button>
                     </div>
-
-                    <Accordion type="single" collapsible className="w-full">
-                        <AccordionItem value="debug-tests" className="border-none">
-                            <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-2 px-4 bg-muted/50 rounded-xl">
-                                <AlertTriangle className="size-4 text-orange-600" />
-                                <span className="text-[10px] font-black uppercase">Pont de Test Manuel (Debug)</span>
-                            </AccordionTrigger>
-                            <AccordionContent className="pt-4 grid grid-cols-2 gap-2">
-                                <Button variant="outline" className="h-10 text-[8px] font-black uppercase border-orange-200" onClick={() => { handleManualStatusToggle('stationary', 'DEBUG: FORCE MOUILLAGE'); }}>FORCE MOUILLAGE</Button>
-                                <Button variant="outline" className="h-10 text-[8px] font-black uppercase border-orange-400" onClick={() => handleManualStatusToggle('drifting', 'DEBUG: FORCE DÉRIVE')}>FORCE DÉRIVE</Button>
-                                <Button variant="outline" className="h-10 text-[8px] font-black uppercase border-red-200" onClick={() => handleManualStatusToggle('offline', 'DEBUG: FORCE SIGNAL PERDU')}>FORCE SIGNAL PERDU</Button>
-                                <Button variant="outline" className="h-10 text-[8px] font-black uppercase border-blue-200" onClick={() => { handleManualStatusToggle('moving', 'DEBUG: FORCE MOUVEMENT'); }}>FORCE MOUVEMENT</Button>
-                            </AccordionContent>
-                        </AccordionItem>
-                    </Accordion>
 
                     <Button variant="destructive" className="w-full h-14 font-black uppercase opacity-90 gap-3" onClick={handleStopSharing}>
                         <X className="size-6" /> Arrêter le partage / Quitter
