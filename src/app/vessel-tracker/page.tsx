@@ -147,6 +147,7 @@ export default function VesselTrackerPage() {
   const [anchorPos, setAnchorPos] = useState<google.maps.LatLngLiteral | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
   const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [mapZoom, setMapZoom] = useState<number>(10);
   const watchIdRef = useRef<number | null>(null);
   const immobilityStartTime = useRef<number | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -295,7 +296,6 @@ export default function VesselTrackerPage() {
             updatePayload.statusChangedAt = serverTimestamp();
         }
 
-        // Nettoyage critique des propriétés undefined pour éviter l'erreur Firestore
         const cleanPayload = Object.fromEntries(
             Object.entries(updatePayload).filter(([_, v]) => v !== undefined)
         );
@@ -424,7 +424,6 @@ export default function VesselTrackerPage() {
   const handleTacticalSignal = (label: string, photoUrl?: string) => {
     if (!user || !firestore || !currentPos) return;
     
-    // Nettoyage de l'objet marker pour éviter les champs undefined qui font crasher arrayUnion
     const newMarker: any = {
         id: Math.random().toString(36).substring(2, 9),
         lat: currentPos.lat,
@@ -540,7 +539,6 @@ export default function VesselTrackerPage() {
             lastClearTimesRef.current[vessel.id + '_tact'] = tactClearTime;
         }
 
-        // TACTICAL JOURNAL: Visible for Receiver B OR (not Ghost AND in group) OR Self OR Emergency
         const shouldShowTactical = mode === 'receiver' || !isGhost || currentStatus === 'emergency' || isSelf;
         if (shouldShowTactical && vessel.huntingMarkers) {
             vessel.huntingMarkers.forEach(marker => {
@@ -570,7 +568,6 @@ export default function VesselTrackerPage() {
 
         if (timeKey === 0) return;
         
-        // TECHNICAL JOURNAL: Visible for Receiver B OR (not Ghost AND in group) OR Self OR Emergency
         const shouldShowTechnical = mode === 'receiver' || !isGhost || currentStatus === 'emergency' || isSelf;
         if (!shouldShowTechnical) return;
 
@@ -737,7 +734,7 @@ export default function VesselTrackerPage() {
     
     const timeStr = format(new Date(), 'HH:mm');
     const accuracyStr = userAccuracy ? ` (+/- ${userAccuracy}m)` : "";
-    const nicknamePrefix = vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : "";
+    const nicknamePrefix = vesselNickname ? `[${vesselNickname}] ` : "";
     const customText = (isCustomMessageEnabled && vesselSmsMessage) ? vesselSmsMessage : "Requiert assistance immédiate.";
     const body = `${nicknamePrefix}${customText} [${type}] à ${timeStr}. Position${accuracyStr} : ${posUrl}`;
     
@@ -747,7 +744,7 @@ export default function VesselTrackerPage() {
   const smsPreview = useMemo(() => {
     const timeStr = format(new Date(), 'HH:mm');
     const accuracyStr = userAccuracy ? ` (+/- ${userAccuracy}m)` : "";
-    const nicknamePrefix = vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : "";
+    const nicknamePrefix = vesselNickname ? `[${vesselNickname}] ` : "";
     const customText = (isCustomMessageEnabled && vesselSmsMessage) ? vesselSmsMessage : "Requiert assistance immédiate.";
     return `${nicknamePrefix}${customText} [MAYDAY] à ${timeStr}. Position${accuracyStr} : https://www.google.com/maps?q=-22.27,166.45`;
   }, [vesselSmsMessage, isCustomMessageEnabled, vesselNickname, userAccuracy]);
@@ -936,7 +933,7 @@ export default function VesselTrackerPage() {
                                 </p>
                                 {isGhostMode && <Badge variant="outline" className="bg-black/20 text-white border-white/30 text-[8px] font-black uppercase gap-1"><Ghost className="size-2.5"/> Fantôme</Badge>}
                             </div>
-                            <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">{sharingId}</h3>
+                            <h3 className="text-3xl font-black tracking-tighter leading-none">{sharingId}</h3>
                             <p className="text-xs font-bold opacity-80 mt-1 italic">{vesselNickname || 'Capitaine'}</p>
                         </div>
                         <div className="mt-8 space-y-3 relative z-10">
