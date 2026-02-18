@@ -638,7 +638,7 @@ export default function VesselTrackerPage() {
             if (lastStatus && statusChanged && vesselPrefs.isNotifyEnabled && !isSelf) {
                 const soundKey = (currentStatus === 'returning' || currentStatus === 'landed') ? 'moving' : currentStatus;
                 if (vesselPrefs.notifySettings[soundKey as keyof typeof vesselPrefs.notifySettings]) {
-                    const isLoop = !!vesselPrefs.notifyLoops?.[soundKey as keyof typeof vesselPrefs.notifyLoops];
+                    const isLoop = !!vesselPrefs.notifyLoops?.[soundKey as keyof typeof vesselPrefs.notifySettings];
                     playVesselSound(vesselPrefs.notifySounds[soundKey as keyof typeof vesselPrefs.notifySounds] || 'sonar', isLoop);
                 }
             }
@@ -675,9 +675,16 @@ export default function VesselTrackerPage() {
         setUserAccuracy(roundedAccuracy);
         lastFixTimeRef.current = Date.now();
 
+        // REPRISE DU SIGNAL : Reset de l'état offline si une position valide revient
         if (vesselStatus === 'offline') {
             setVesselStatus('moving');
-            updateVesselInFirestore({ status: 'moving', eventLabel: 'REPRISE DU SIGNAL' });
+            updateVesselInFirestore({ 
+                status: 'moving', 
+                eventLabel: 'REPRISE DU SIGNAL',
+                location: { latitude, longitude }, 
+                accuracy: roundedAccuracy 
+            });
+            toast({ title: "Signal GPS rétabli", description: "Votre position est de nouveau partagée." });
         }
 
         if ((isFollowing || shouldPanOnNextFix.current) && map) { 
