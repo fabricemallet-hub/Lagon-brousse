@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, where, deleteDoc } from 'firebase/firestore';
-import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
+import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,40 +16,29 @@ import {
   Anchor, 
   LocateFixed, 
   ShieldAlert, 
-  Save, 
   WifiOff, 
-  Move, 
   Expand, 
   Shrink, 
   Zap, 
-  AlertTriangle,
   MapPin,
   X,
   Play,
   Volume2,
   Check,
-  Trash2,
   RefreshCw,
   Settings,
   Smartphone,
   Home,
   Compass,
-  BatteryCharging,
-  BatteryLow,
-  BatteryMedium,
   BatteryFull,
+  BatteryMedium,
+  BatteryLow,
+  BatteryCharging,
   Users,
   Bird,
   Fish,
   Waves,
   Camera,
-  MessageSquare,
-  Phone,
-  Ship,
-  AlertCircle,
-  Eye,
-  EyeOff,
-  History,
   ChevronDown
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
@@ -58,7 +47,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
-import { format } from 'date-fns';
+import { format, differenceInMinutes } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
@@ -118,6 +107,17 @@ export default function VesselTrackerPage() {
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
+  const currentVesselData = useMemo(() => {
+    return followedVessels?.find(v => v.id === sharingId);
+  }, [followedVessels, sharingId]);
+
+  const activeDuration = useMemo(() => {
+    if (!currentVesselData?.statusChangedAt) return "ACTIF 0 MIN";
+    const start = currentVesselData.statusChangedAt.toDate();
+    const mins = differenceInMinutes(new Date(), start);
+    return `ACTIF ${mins} MIN`;
+  }, [currentVesselData]);
+
   const soundsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
@@ -158,6 +158,10 @@ export default function VesselTrackerPage() {
             ...data 
         };
         
+        if (data.status || data.isSharing === true) {
+            updatePayload.statusChangedAt = serverTimestamp();
+        }
+
         if (anchorPos && (vesselStatus === 'stationary' || vesselStatus === 'drifting')) {
             updatePayload.anchorLocation = { latitude: anchorPos.lat, longitude: anchorPos.lng };
         }
@@ -341,89 +345,97 @@ export default function VesselTrackerPage() {
                 </div>
               ) : (
                 <div className="space-y-6 animate-in fade-in slide-in-from-top-2">
-                    {/* STATUT HEADER */}
-                    <div className={cn("p-6 rounded-2xl shadow-xl relative overflow-hidden border-2 text-white", vesselStatus === 'landed' ? "bg-green-600" : "bg-primary")}>
+                    {/* PARTAGE ACTIF HEADER (AS PER IMAGE) */}
+                    <div className="p-6 rounded-2xl shadow-xl relative overflow-hidden bg-primary text-white">
                         <Navigation className="absolute -right-4 -bottom-4 size-32 opacity-10 rotate-12" />
                         <div className="space-y-1 relative z-10">
-                            <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2"><Zap className="size-3 fill-yellow-300 text-yellow-300" /> Partage Actif</p>
+                            <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2"><Zap className="size-3 fill-yellow-300 text-yellow-300" /> PARTAGE ACTIF</p>
                             <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">{sharingId}</h3>
-                            <p className="text-xs font-bold opacity-80 mt-1 italic">{vesselNickname || 'Capitaine'}</p>
+                            <p className="text-xs font-bold opacity-80 mt-1 italic">{vesselNickname || 'koolapik'}</p>
                         </div>
-                        <div className="mt-8 flex items-center justify-between relative z-10">
+                        <div className="mt-8 flex items-center gap-2 relative z-10">
                             <Badge variant="outline" className="bg-green-500/30 border-white/30 text-white font-black text-[10px] px-3 h-6">EN LIGNE</Badge>
-                            <Badge variant="outline" className="bg-white/10 text-white text-[9px] px-2 h-5">SYNC: {nextSyncSeconds}S</Badge>
+                            <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest ml-2">
+                                <RefreshCw className="size-3" /> EN MOUVEMENT
+                            </div>
+                            <span className="text-[9px] font-black uppercase opacity-60 ml-auto">{activeDuration}</span>
                         </div>
                     </div>
 
                     {/* SIGNALISATION MANUELLE */}
-                    <div className="space-y-3">
+                    <div className="p-4 bg-muted/10 rounded-2xl border-2 border-dashed space-y-3">
                         <p className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest flex items-center gap-2">
-                            <Zap className="size-3" /> Signalisation Manuelle
+                            <Zap className="size-3" /> SIGNALISATION MANUELLE
                         </p>
                         <div className="grid grid-cols-2 gap-2">
-                            <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-slate-50 gap-2" onClick={() => handleManualStatusToggle('returning', 'RETOUR MAISON')}>
-                                <Navigation className="size-4 text-blue-600" /> RETOUR MAISON
+                            <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => handleManualStatusToggle('returning', 'RETOUR MAISON')}>
+                                <Navigation className="size-4 text-blue-600 rotate-45" /> RETOUR MAISON
                             </Button>
-                            <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-slate-50 gap-2" onClick={() => handleManualStatusToggle('landed', 'HOME (À TERRE)')}>
+                            <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-white gap-2" onClick={() => handleManualStatusToggle('landed', 'HOME (À TERRE)')}>
                                 <Home className="size-4 text-green-600" /> HOME (À TERRE)
                             </Button>
                         </div>
                     </div>
 
-                    {/* SIGNALEMENT TACTIQUE */}
-                    <div className="p-4 bg-muted/20 rounded-2xl border-2 border-dashed space-y-4">
+                    {/* SIGNALEMENT TACTIQUE (FLOTTE) - 8 BUTTONS AS PER IMAGE */}
+                    <div className="p-4 bg-muted/10 rounded-2xl border-2 border-dashed space-y-4">
                         <p className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2 px-1">
-                            <Compass className="size-3" /> Signalement Tactique (Flotte)
+                            <Settings className="size-3" /> SIGNALEMENT TACTIQUE (FLOTTE)
                         </p>
                         <div className="grid grid-cols-4 gap-2">
-                            <Button variant="outline" className="h-12 border-2 bg-white flex flex-col items-center justify-center p-0 gap-1 group" onClick={() => handleAddTacticalMarker('OISEAUX')}>
+                            <Button variant="outline" className="h-14 border-2 border-blue-400 bg-white flex flex-col items-center justify-center p-0 gap-1" onClick={() => handleAddTacticalMarker('OISEAUX')}>
                                 <Bird className="size-4 text-blue-500" />
                                 <span className="text-[7px] font-black uppercase text-blue-600">Oiseaux</span>
                             </Button>
-                            <Button variant="outline" className="h-12 border-2 bg-blue-900 flex flex-col items-center justify-center p-0 gap-1" onClick={() => handleAddTacticalMarker('MARLIN')}>
+                            <Button variant="outline" className="h-14 border-2 border-[#1e3a8a] bg-[#1e3a8a] flex flex-col items-center justify-center p-0 gap-1" onClick={() => handleAddTacticalMarker('MARLIN')}>
                                 <Fish className="size-4 text-white" />
                                 <span className="text-[7px] font-black uppercase text-white">Marlin</span>
                             </Button>
-                            <Button variant="outline" className="h-12 border-2 bg-red-600 flex flex-col items-center justify-center p-0 gap-1" onClick={() => handleAddTacticalMarker('THON')}>
+                            <Button variant="outline" className="h-14 border-2 border-[#ef4444] bg-[#ef4444] flex flex-col items-center justify-center p-0 gap-1" onClick={() => handleAddTacticalMarker('THON')}>
                                 <Fish className="size-4 text-white" />
                                 <span className="text-[7px] font-black uppercase text-white">Thon</span>
                             </Button>
-                            <Button variant="outline" className="h-12 border-2 bg-slate-600 flex flex-col items-center justify-center p-0 gap-1" onClick={() => handleAddTacticalMarker('TAZARD')}>
+                            <Button variant="outline" className="h-14 border-2 border-[#64748b] bg-[#64748b] flex flex-col items-center justify-center p-0 gap-1" onClick={() => handleAddTacticalMarker('TAZARD')}>
                                 <Fish className="size-4 text-white" />
                                 <span className="text-[7px] font-black uppercase text-white">Tazard</span>
                             </Button>
-                            <Button variant="outline" className="h-12 border-2 bg-cyan-600 flex flex-col items-center justify-center p-0 gap-1" onClick={() => handleAddTacticalMarker('WAHOO')}>
+                            <Button variant="outline" className="h-14 border-2 border-[#0891b2] bg-[#0891b2] flex flex-col items-center justify-center p-0 gap-1" onClick={() => handleAddTacticalMarker('WAHOO')}>
                                 <Fish className="size-4 text-white" />
                                 <span className="text-[7px] font-black uppercase text-white">Wahoo</span>
                             </Button>
-                            <Button variant="outline" className="h-12 border-2 bg-yellow-500 flex flex-col items-center justify-center p-0 gap-1" onClick={() => handleAddTacticalMarker('BOSSU')}>
+                            <Button variant="outline" className="h-14 border-2 border-[#6366f1] bg-[#6366f1] flex flex-col items-center justify-center p-0 gap-1" onClick={() => handleAddTacticalMarker('BONITE')}>
                                 <Fish className="size-4 text-white" />
-                                <span className="text-[7px] font-black uppercase text-white">Bossu</span>
+                                <span className="text-[7px] font-black uppercase text-white">Bonite</span>
                             </Button>
-                            <Button variant="outline" className="h-12 border-2 bg-orange-500 flex flex-col items-center justify-center p-0 gap-1" onClick={() => handleAddTacticalMarker('BEC DE CANE')}>
-                                <Fish className="size-4 text-white" />
-                                <span className="text-[7px] font-black uppercase text-white leading-none text-center">Bec de cane</span>
+                            <Button variant="outline" className="h-14 border-2 border-[#14b8a6] bg-[#14b8a6] flex flex-col items-center justify-center p-0 gap-1" onClick={() => handleAddTacticalMarker('SARDINES')}>
+                                <Waves className="size-4 text-white" />
+                                <span className="text-[7px] font-black uppercase text-white">Sardines</span>
+                            </Button>
+                            <Button variant="outline" className="h-14 border-2 border-[#059669] bg-[#059669] flex flex-col items-center justify-center p-0 gap-1" onClick={() => handleAddTacticalMarker('PRISE')}>
+                                <Camera className="size-4 text-white" />
+                                <span className="text-[7px] font-black uppercase text-white">Prise</span>
                             </Button>
                         </div>
-                        <Button variant="ghost" className="w-full h-8 text-[8px] font-black uppercase text-destructive" onClick={handleClearTactical}>Effacer le journal tactique</Button>
                     </div>
 
-                    <Button variant="destructive" className="w-full h-14 font-black uppercase shadow-lg gap-3" onClick={() => sendEmergencySms('MAYDAY')}>
-                        <ShieldAlert className="size-6" /> DEMANDE D'ASSISTANCE
-                    </Button>
+                    <div className="space-y-2">
+                        <Button variant="destructive" className="w-full h-14 font-black uppercase shadow-lg gap-3 text-sm" onClick={() => sendEmergencySms('MAYDAY')}>
+                            <ShieldAlert className="size-6" /> DEMANDE D'ASSISTANCE
+                        </Button>
 
-                    <Button variant="destructive" className="w-full h-14 font-black uppercase opacity-80 gap-3 border-2 border-white/20" onClick={handleStopSharing}>
-                        <X className="size-6" /> Arrêter le partage / Quitter
-                    </Button>
+                        <Button variant="destructive" className="w-full h-14 font-black uppercase opacity-90 gap-3 border-2 border-white/20 text-sm" onClick={handleStopSharing}>
+                            <X className="size-6" /> ARRÊTER LE PARTAGE / QUITTER
+                        </Button>
+                    </div>
 
-                    {/* ACCORDEONS REGLAGES */}
+                    {/* ACCORDEONS REGLAGES (AS PER IMAGE) */}
                     <Accordion type="single" collapsible className="w-full space-y-2">
-                        <AccordionItem value="identity" className="border-none">
-                            <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl h-12">
+                        <AccordionItem value="identity" className="bg-muted/30 border rounded-lg">
+                            <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 h-12">
                                 <Settings className="size-4 text-primary" />
-                                <span className="text-[10px] font-black uppercase text-slate-700">Identité & Ids</span>
+                                <span className="text-[10px] font-black uppercase text-slate-700">IDENTITÉ & IDS</span>
                             </AccordionTrigger>
-                            <AccordionContent className="p-4 space-y-4 border-2 rounded-xl mt-1 border-slate-100">
+                            <AccordionContent className="p-4 space-y-4">
                                 <div className="space-y-1.5">
                                     <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Mon Surnom</Label>
                                     <Input value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} placeholder="Capitaine..." className="h-11 border-2 font-bold uppercase" />
@@ -436,12 +448,12 @@ export default function VesselTrackerPage() {
                             </AccordionContent>
                         </AccordionItem>
 
-                        <AccordionItem value="emergency" className="border-none">
-                            <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl h-12">
+                        <AccordionItem value="emergency" className="bg-orange-50/20 border-orange-100 border rounded-lg">
+                            <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 h-12">
                                 <Smartphone className="size-4 text-orange-600" />
-                                <span className="text-[10px] font-black uppercase text-slate-700">Réglages d'Urgence (SMS)</span>
+                                <span className="text-[10px] font-black uppercase text-orange-800">RÉGLAGES D'URGENCE (SMS)</span>
                             </AccordionTrigger>
-                            <AccordionContent className="p-4 space-y-4 border-2 rounded-xl mt-1 border-slate-100">
+                            <AccordionContent className="p-4 space-y-4">
                                 <div className="space-y-1.5">
                                     <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Numéro du contact à terre</Label>
                                     <Input value={emergencyContact} onChange={e => setEmergencyContact(e.target.value)} placeholder="77 12 34" className="h-11 border-2 font-black text-lg" />
@@ -454,12 +466,12 @@ export default function VesselTrackerPage() {
                             </AccordionContent>
                         </AccordionItem>
 
-                        <AccordionItem value="sounds" className="border-none">
-                            <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl h-12">
+                        <AccordionItem value="sounds" className="bg-blue-50/20 border-blue-100 border rounded-lg">
+                            <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 h-12">
                                 <Volume2 className="size-4 text-blue-600" />
-                                <span className="text-[10px] font-black uppercase text-slate-700">Notifications & Sons</span>
+                                <span className="text-[10px] font-black uppercase text-blue-800">NOTIFICATIONS & SONS</span>
                             </AccordionTrigger>
-                            <AccordionContent className="p-4 space-y-4 border-2 rounded-xl mt-1 border-slate-100">
+                            <AccordionContent className="p-4 space-y-4">
                                 <div className="flex items-center justify-between">
                                     <Label className="text-xs font-black uppercase">Sons Actifs</Label>
                                     <Switch checked={true} />
@@ -518,7 +530,7 @@ export default function VesselTrackerPage() {
               mapContainerStyle={{ width: '100%', height: '100%' }}
               defaultCenter={INITIAL_CENTER} 
               defaultZoom={10} 
-              onLoad={setMap} 
+              onLoad={onLoad} 
               onDragStart={() => setIsFollowing(false)} 
               options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
             >
@@ -559,7 +571,7 @@ export default function VesselTrackerPage() {
             </GoogleMap>
           ) : (
             <div className="flex flex-col items-center justify-center h-full bg-slate-100 text-muted-foreground gap-4">
-                <AlertCircle className="size-12 opacity-20" />
+                <RefreshCw className="size-12 opacity-20 animate-spin" />
                 <p className="text-xs font-black uppercase text-center">Chargement de la carte...</p>
             </div>
           )}
@@ -576,7 +588,7 @@ export default function VesselTrackerPage() {
                     <ShieldAlert className="size-5" /> SOS / MAYDAY
                 </Button>
                 <Button variant="secondary" className="h-14 font-black uppercase rounded-xl shadow-lg gap-3 text-xs border-2 border-primary/20" onClick={() => sendEmergencySms('PAN PAN')}>
-                    <AlertTriangle className="size-5 text-primary" /> PAN PAN
+                    <RefreshCw className="size-5 text-primary" /> PAN PAN
                 </Button>
             </div>
         </div>
