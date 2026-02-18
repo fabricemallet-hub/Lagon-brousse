@@ -196,12 +196,11 @@ export default function VesselTrackerPage() {
 
   // --- 3. REFS & UTILS ---
   const watchIdRef = useRef<number | null>(null);
-  const stabilizationPoints = useRef<google.maps.LatLngLiteral[]>([]);
-  const lastContactTimeRef = useRef<number>(Date.now());
   const statusCycleRef = useRef<NodeJS.Timeout | null>(null);
   const lastAccuracyRef = useRef<number>(0);
   const activeAudiosRef = useRef<Record<string, HTMLAudioElement>>({});
   const lastSyncTimeRef = useRef<number>(Date.now());
+  const hasInitialisedRef = useRef<boolean>(false);
 
   const playVesselSound = useCallback((soundId: string, eventKey?: string) => {
     if (!vesselPrefs.isNotifyEnabled) return;
@@ -223,14 +222,18 @@ export default function VesselTrackerPage() {
     setHistory(prev => {
         const now = new Date();
         const lastEntry = prev[0];
+        
+        // FUSION DES LIGNES IDENTIQUES : Si même navire et même statut, on met à jour la ligne existante
         if (lastEntry && lastEntry.vesselName === vName && lastEntry.statusLabel === label) {
+            const duration = Math.floor(Math.abs(now.getTime() - lastEntry.startTime.getTime()) / 60000);
             return [{
                 ...lastEntry,
                 lastUpdateTime: now,
                 pos: pos,
-                durationMinutes: Math.floor(Math.abs(now.getTime() - lastEntry.startTime.getTime()) / 60000)
+                durationMinutes: duration
             }, ...prev.slice(1)];
         } else {
+            // Nouvelle entrée car changement de statut
             return [{
                 vesselName: vName,
                 statusLabel: label,
@@ -263,10 +266,17 @@ export default function VesselTrackerPage() {
             fleetId: fleetId || null,
             lastActive: serverTimestamp(),
             mooringRadius: mooringRadius,
-            anchorLocation: anchorPos ? { latitude: anchorPos.lat, longitude: anchorPos.lng } : null,
             ...batteryInfo,
             ...data 
         };
+        
+        // Persistence de l'ancre : On ne l'écrase pas si elle est déjà définie
+        if (anchorPos) {
+            updatePayload.anchorLocation = { latitude: anchorPos.lat, longitude: anchorPos.lng };
+        } else if (data.anchorLocation === null) {
+            updatePayload.anchorLocation = null;
+        }
+
         setDoc(doc(firestore, 'vessels', sharingId), updatePayload, { merge: true }).catch(() => {});
         lastSyncTimeRef.current = Date.now();
         setNextSyncSeconds(60);
@@ -278,6 +288,7 @@ export default function VesselTrackerPage() {
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
       if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
+      hasInitialisedRef.current = false;
       return;
     }
     setSessionStartTime(new Date());
@@ -287,142 +298,133 @@ export default function VesselTrackerPage() {
         const newPos = { lat: latitude, lng: longitude };
         setCurrentPos(newPos);
         lastAccuracyRef.current = accuracy;
-        lastContactTimeRef.current = Date.now();
         
-        if (accuracy < 100 && Date.now() - lastSyncTimeRef.current > 60000) {
-            updateVesselInFirestore({ location: { latitude, longitude }, accuracy: Math.round(accuracy) });
-        }
         if (isFollowing && map) map.panTo(newPos);
       },
       (err) => console.warn(err),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
     return () => { if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current); };
-  }, [isSharing, mode, isFollowing, map, updateVesselInFirestore]);
+  }, [isSharing, mode, isFollowing, map]);
 
-  // Sync Countdown Timer
+  // Sync Countdown Timer (SILENT BACKGROUND SYNC)
   useEffect(() => {
     if (!isSharing || mode !== 'sender') return;
     const interval = setInterval(() => {
         setNextSyncSeconds(prev => {
             if (prev <= 1) {
-                if (currentPos) updateVesselInFirestore({ location: { latitude: currentPos.lat, longitude: currentPos.lng }, accuracy: Math.round(lastAccuracyRef.current) });
+                if (currentPos) {
+                    // Sync minute forcée sans changer le statut technique
+                    updateVesselInFirestore({ 
+                        location: { latitude: currentPos.lat, longitude: currentPos.lng }, 
+                        accuracy: Math.round(lastAccuracyRef.current) 
+                    });
+                    // On met à jour l'heure dans le journal sans changer le label
+                    updateLog(vesselNickname || 'MOI', vesselStatus === 'stabilizing' ? 'LANCEMENT EN COURS' : (vesselStatus === 'moving' ? 'MOUVEMENT' : vesselStatus === 'stationary' ? 'AU MOUILLAGE' : 'DÉRIVE'), currentPos);
+                }
                 return 60;
             }
             return prev - 1;
         });
     }, 1000);
     return () => clearInterval(interval);
-  }, [isSharing, mode, currentPos, updateVesselInFirestore]);
+  }, [isSharing, mode, currentPos, updateVesselInFirestore, vesselStatus, vesselNickname, updateLog]);
 
-  // --- 5. STABILIZATION & DRIFT LOGIC (30s Cycle) ---
+  // --- 5. STABILIZATION & DRIFT LOGIC (FIXED) ---
   useEffect(() => {
     if (!isSharing || mode !== 'sender') {
         if (statusCycleRef.current) clearInterval(statusCycleRef.current);
+        hasInitialisedRef.current = false;
         return;
     }
-    const startStabilization = async () => {
-        setVesselStatus('stabilizing');
-        updateLog(vesselNickname || 'MOI', 'LANCEMENT EN COURS (30s)', currentPos || INITIAL_CENTER);
-        stabilizationPoints.current = [];
-        await new Promise(r => setTimeout(r, 1000));
-        if (currentPos) stabilizationPoints.current[0] = currentPos;
-        await new Promise(r => setTimeout(r, 29000));
-        
-        if (currentPos) {
-            const p1 = stabilizationPoints.current[0];
-            const p2 = currentPos;
-            if (p1 && p2) {
-                const dist = getDistance(p1.lat, p1.lng, p2.lat, p2.lng);
-                const isStationary = dist < mooringRadius;
-                const initialStatus = isStationary ? 'stationary' : 'moving';
-                setVesselStatus(initialStatus);
-                if (isStationary) setAnchorPos(p1);
-                const label = isStationary ? 'AU MOUILLAGE' : 'MOUVEMENT';
-                updateLog(vesselNickname || 'MOI', label, p2);
-                updateVesselInFirestore({ 
-                    status: initialStatus as any, 
-                    anchorLocation: isStationary ? { latitude: p1.lat, longitude: p1.lng } : null 
-                });
-            } else { setVesselStatus('moving'); }
-        } else { setVesselStatus('moving'); }
 
+    // On évite de relancer le cycle si déjà initialisé
+    if (hasInitialisedRef.current) return;
+
+    const startTrackingLoop = async () => {
+        hasInitialisedRef.current = true;
+        setVesselStatus('stabilizing');
+        
+        // Phase initiale de 30s
+        updateLog(vesselNickname || 'MOI', 'LANCEMENT EN COURS', currentPos || INITIAL_CENTER);
+        await new Promise(r => setTimeout(r, 30000));
+        
+        if (!currentPos) { setVesselStatus('moving'); return; }
+
+        // Premier calcul après stabilisation
+        let initialStatus: VesselStatus['status'] = 'moving';
+        if (anchorPos) {
+            const dist = getDistance(currentPos.lat, currentPos.lng, anchorPos.lat, anchorPos.lng);
+            initialStatus = dist < mooringRadius ? 'stationary' : 'moving';
+        } else {
+            // Si pas d'ancre, on en crée une ici pour le test d'immobilité
+            setAnchorPos(currentPos);
+            initialStatus = 'stationary';
+        }
+
+        setVesselStatus(initialStatus);
+        const initialLabel = initialStatus === 'stationary' ? 'AU MOUILLAGE' : 'MOUVEMENT';
+        updateLog(vesselNickname || 'MOI', initialLabel, currentPos);
+        updateVesselInFirestore({ status: initialStatus });
+
+        // CYCLE TECHNIQUE (30s)
         statusCycleRef.current = setInterval(() => {
             if (!currentPos) return;
+            
             setVesselStatus(currentStatus => {
-                // Manual overrides keep priority
+                // Priorité aux modes manuels
                 if (['returning', 'landed', 'emergency'].includes(currentStatus)) return currentStatus;
 
                 let nextStatus = currentStatus;
                 let eventLabel = '';
                 
-                if ((currentStatus === 'stationary' || currentStatus === 'drifting') && anchorPos) {
+                if (anchorPos) {
                     const distFromAnchor = getDistance(currentPos.lat, currentPos.lng, anchorPos.lat, anchorPos.lng);
                     
-                    // IF SAILED AWAY > 100m -> Raise anchor auto
+                    // REPRISE DU MOUVEMENT (>100m de l'ancre initiale)
                     if (distFromAnchor > 100) { 
                         nextStatus = 'moving'; 
-                        setAnchorPos(null); 
-                        eventLabel = 'EN MOUVEMENT'; 
+                        setAnchorPos(null); // On lève l'ancre mathématiquement
+                        eventLabel = 'MOUVEMENT'; 
                     } 
-                    // IF DRIFTED OUTSIDE RADIUS -> Alert
+                    // DÉRIVE (Sortie du cercle MooringRadius)
                     else if (distFromAnchor > mooringRadius) { 
                         nextStatus = 'drifting'; 
                         eventLabel = 'À LA DÉRIVE !'; 
                     }
-                    // IF BACK INSIDE RADIUS -> Stationary
+                    // RE-STABILISATION (Retour dans le cercle)
                     else {
                         nextStatus = 'stationary';
                         eventLabel = 'AU MOUILLAGE';
                     }
-                } else if (currentStatus === 'moving') {
-                    // Detect if stopped (we use a simple check here since cycle is 30s)
-                    if (!anchorPos) setAnchorPos(currentPos);
-                    const dist = getDistance(currentPos.lat, currentPos.lng, anchorPos!.lat, anchorPos!.lng);
-                    if (dist < mooringRadius) { 
-                        nextStatus = 'stationary'; 
-                        eventLabel = 'AU MOUILLAGE'; 
-                    } else {
-                        setAnchorPos(currentPos); // Move anchor reference while moving
-                    }
+                } else {
+                    // On est en mouvement, on cherche si on s'est arrêté
+                    // On pourrait comparer avec une pos_precedente ici si besoin
+                    nextStatus = 'moving';
+                    eventLabel = 'MOUVEMENT';
                 }
                 
-                const displayLabel = eventLabel || (nextStatus === 'moving' ? 'MOUVEMENT' : nextStatus === 'stationary' ? 'AU MOUILLAGE' : 'DÉRIVE');
-                updateLog(vesselNickname || 'MOI', displayLabel, currentPos);
+                updateLog(vesselNickname || 'MOI', eventLabel, currentPos);
                 updateVesselInFirestore({ status: nextStatus as any, eventLabel: eventLabel || null });
                 return nextStatus;
             });
         }, 30000);
     };
-    startStabilization();
+
+    startTrackingLoop();
+
     return () => { if (statusCycleRef.current) clearInterval(statusCycleRef.current); };
   }, [isSharing, mode, vesselNickname, mooringRadius, anchorPos, currentPos, updateLog, updateVesselInFirestore]);
 
-  // --- 6. WATCHDOG SIGNAL (70s) ---
-  useEffect(() => {
-    if (!isSharing || mode !== 'sender') return;
-    const watchdog = setInterval(() => {
-        const now = Date.now();
-        const diffSec = (now - lastContactTimeRef.current) / 1000;
-        
-        if (vesselStatus !== 'offline' && vesselStatus !== 'stabilizing') {
-            if (diffSec > 70) {
-                setVesselStatus('offline');
-                updateLog(vesselNickname || 'MOI', 'SIGNAL PERDU (70s)', currentPos || INITIAL_CENTER);
-                updateVesselInFirestore({ status: 'offline' });
-            }
-        }
-    }, 10000);
-    return () => clearInterval(watchdog);
-  }, [isSharing, mode, vesselStatus, currentPos, vesselNickname, updateLog, updateVesselInFirestore]);
-
   const handleManualStatusToggle = (st: VesselStatus['status'], label: string) => {
     if (vesselStatus === st) {
+        // ANNULATION -> REPRISE MODE AUTO
         setVesselStatus('moving');
-        updateLog(vesselNickname || 'MOI', 'ERREUR INVOLONTAIRE (REPRISE AUTO)', currentPos || INITIAL_CENTER);
+        updateLog(vesselNickname || 'MOI', 'ERREUR INVOLONTAIRE', currentPos || INITIAL_CENTER);
         updateVesselInFirestore({ status: 'moving', isGhostMode: isGhostMode });
         toast({ title: "Mode AUTO rétabli", description: "Journal : ERREUR INVOLONTAIRE" });
     } else {
+        // ACTIVATION MANUELLE
         setVesselStatus(st);
         updateLog(vesselNickname || 'MOI', label, currentPos || INITIAL_CENTER);
         const updates: any = { status: st };
@@ -494,6 +496,7 @@ export default function VesselTrackerPage() {
   const handleStopSharing = async () => {
     if (!user || !firestore) return;
     setIsSharing(false);
+    hasInitialisedRef.current = false;
     await setDoc(doc(firestore, 'vessels', sharingId), { isSharing: false, lastActive: serverTimestamp() }, { merge: true });
     if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
     setCurrentPos(null);
