@@ -16,7 +16,7 @@ const GoogleMapsContext = createContext<GoogleMapsContextType | undefined>(
 );
 
 export function GoogleMapsProvider({ children }: { children: ReactNode }) {
-  // CLÉ API : Utilisation de la clé confirmée par l'utilisateur
+  // CLÉ API CONFIRMÉE
   const googleMapsApiKey = "AIzaSyDs6qQO274Ro2RD4lVkr8KztsZIecP-ZDk";
 
   const { isLoaded, loadError } = useJsApiLoader({
@@ -36,11 +36,12 @@ export function GoogleMapsProvider({ children }: { children: ReactNode }) {
     <GoogleMapsContext.Provider value={value}>
       {loadError && (
         <div className="fixed top-0 left-0 right-0 z-[200] p-4">
-          <Alert variant="destructive" className="shadow-2xl border-2">
+          <Alert variant="destructive" className="shadow-2xl border-2 bg-white">
             <AlertCircle className="size-4" />
-            <AlertTitle className="font-black uppercase text-xs">Erreur Google Maps</AlertTitle>
+            <AlertTitle className="font-black uppercase text-xs">Alerte Google Maps</AlertTitle>
             <AlertDescription className="text-[10px] font-medium leading-relaxed">
-              Impossible de charger la carte. Vérifiez les restrictions de votre clé API (Identity Toolkit et Maps JavaScript API) dans la Google Cloud Console pour le projet studio-2943478321-f746e.
+              Le service Google Maps signale une erreur : <strong>{loadError.message}</strong>. 
+              Cela indique généralement que la clé API est expirée, désactivée ou que le compte de facturation (Billing) associé au projet <strong>studio-2943478321-f746e</strong> est inactif.
             </AlertDescription>
           </Alert>
         </div>

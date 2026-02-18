@@ -9,7 +9,6 @@ export const metadata: Metadata = {
   title: 'Lagon & Brousse NC',
   description: 'Assistant intelligent pour le terroir calédonien (Pêche, Chasse, Jardinage)',
   applicationName: 'L&B NC',
-  manifest: '/manifest.json',
   icons: {
     icon: [
       { url: '/icon-192x192.png', sizes: '192x192', type: 'image/png' },
@@ -42,7 +41,7 @@ export default function RootLayout({
   return (
     <html lang="fr" suppressHydrationWarning>
       <head>
-        <link rel="manifest" href="/manifest.json" crossOrigin="use-credentials" />
+        {/* Next.js gère automatiquement le manifest via app/manifest.ts */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>

@@ -202,6 +202,26 @@ export default function VesselTrackerPage() {
     }
   }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, vesselPrefs.notifyLoops, availableSounds]);
 
+  const handleRecenter = useCallback(() => {
+    setIsFollowing(true);
+    let target = null;
+    if (mode === 'sender' && currentPos) {
+      target = currentPos;
+    } else if (mode === 'receiver' || mode === 'fleet') {
+      const activeVessel = followedVessels?.find(v => v.isSharing && v.location);
+      if (activeVessel?.location) {
+        target = { lat: activeVessel.location.latitude, lng: activeVessel.location.longitude };
+      }
+    }
+    if (target && map) {
+      map.panTo(target);
+      map.setZoom(15);
+    } else {
+      shouldPanOnNextFix.current = true;
+      if (mode === 'sender' && !isSharing) setIsSharing(true);
+    }
+  }, [mode, currentPos, followedVessels, map, isSharing]);
+
   const updateLog = useCallback((vName: string, label: string, pos: google.maps.LatLngLiteral) => {
     setHistory(prev => {
         const now = new Date();
@@ -269,26 +289,6 @@ export default function VesselTrackerPage() {
     };
     update();
   }, [user, firestore, isSharing, isGhostMode, sharingId, vesselNickname, fleetId, mooringRadius, anchorPos, vesselStatus, followedVessels]);
-
-  const handleRecenter = () => {
-    setIsFollowing(true);
-    let target = null;
-    if (mode === 'sender' && currentPos) {
-      target = currentPos;
-    } else if (mode === 'receiver' || mode === 'fleet') {
-      const activeVessel = followedVessels?.find(v => v.isSharing && v.location);
-      if (activeVessel?.location) {
-        target = { lat: activeVessel.location.latitude, lng: activeVessel.location.longitude };
-      }
-    }
-    if (target && map) {
-      map.panTo(target);
-      map.setZoom(15);
-    } else {
-      shouldPanOnNextFix.current = true;
-      if (mode === 'sender' && !isSharing) setIsSharing(true);
-    }
-  };
 
   const getVesselIconInfo = (status: string) => {
     switch (status) {
@@ -459,8 +459,7 @@ export default function VesselTrackerPage() {
     startDetection();
   }, [isSharing, mode, currentPos, anchorPos, mooringRadius, vesselNickname, updateVesselInFirestore, updateLog]);
 
-  if (loadError) return <div className="p-4 text-destructive">Erreur chargement Google Maps.</div>;
-  if (!isLoaded) return <Skeleton className="h-96 w-full" />;
+  if (isProfileLoading) return <Skeleton className="h-96 w-full" />;
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
@@ -705,7 +704,7 @@ export default function VesselTrackerPage() {
                                     isMe && "ring-2 ring-primary ring-offset-2")}>
                                     <div className="flex items-center gap-4 min-w-0">
                                         <div className={cn("p-2.5 rounded-xl text-white shadow-sm", isOffline ? "bg-red-600" : "bg-slate-900")}>
-                                            <Navigation className="size-5" />
+                                            {isMe ? <Navigation className="size-5" /> : <Navigation className="size-5" />}
                                         </div>
                                         <div className="flex flex-col min-w-0">
                                             <span className="font-black text-sm uppercase truncate">{v.displayName} {isMe && "(MOI)"}</span>
@@ -731,82 +730,89 @@ export default function VesselTrackerPage() {
 
       <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all", isFullscreen && "fixed inset-0 z-[100] w-screen h-screen rounded-none")}>
         <div className={cn("relative bg-muted/20", isFullscreen ? "flex-grow" : "h-[450px]")}>
-          <GoogleMap 
-            key={isFullscreen ? 'map-fullscreen' : 'map-standard'}
-            mapContainerClassName="w-full h-full" 
-            defaultCenter={INITIAL_CENTER} 
-            defaultZoom={10} 
-            onLoad={setMap} 
-            onDragStart={() => setIsFollowing(false)} 
-            options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
-          >
-                {(mode === 'sender' || mode === 'receiver' || mode === 'fleet') && followedVessels?.filter(v => v.isSharing && v.anchorLocation && (v.status === 'stationary' || v.status === 'drifting')).map(v => {
-                    if (mode === 'fleet' && v.isGhostMode && v.status !== 'emergency' && v.id !== sharingId) return null;
-                    return (
-                        <React.Fragment key={`anchor-layer-${v.id}`}>
-                            <Circle 
-                                center={{ lat: v.anchorLocation!.latitude, lng: v.anchorLocation!.longitude }} 
-                                radius={v.mooringRadius || 20} 
-                                options={{ fillColor: '#3b82f6', fillOpacity: 0.15, strokeColor: '#3b82f6', strokeWeight: 1, clickable: false }} 
-                            />
-                            <OverlayView position={{ lat: v.anchorLocation!.latitude, lng: v.anchorLocation!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                                <div style={{ transform: 'translate(-50%, -50%)' }} className="p-1 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-orange-500 z-10">
-                                    <Anchor className="size-3 text-orange-500" />
-                                </div>
-                            </OverlayView>
-                        </React.Fragment>
-                    );
-                })}
+          {isLoaded ? (
+            <GoogleMap 
+              key={isFullscreen ? 'map-fullscreen' : 'map-standard'}
+              mapContainerClassName="w-full h-full" 
+              defaultCenter={INITIAL_CENTER} 
+              defaultZoom={10} 
+              onLoad={setMap} 
+              onDragStart={() => setIsFollowing(false)} 
+              options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
+            >
+                  {(mode === 'sender' || mode === 'receiver' || mode === 'fleet') && followedVessels?.filter(v => v.isSharing && v.anchorLocation && (v.status === 'stationary' || v.status === 'drifting')).map(v => {
+                      if (mode === 'fleet' && v.isGhostMode && v.status !== 'emergency' && v.id !== sharingId) return null;
+                      return (
+                          <React.Fragment key={`anchor-layer-${v.id}`}>
+                              <Circle 
+                                  center={{ lat: v.anchorLocation!.latitude, lng: v.anchorLocation!.longitude }} 
+                                  radius={v.mooringRadius || 20} 
+                                  options={{ fillColor: '#3b82f6', fillOpacity: 0.15, strokeColor: '#3b82f6', strokeWeight: 1, clickable: false }} 
+                              />
+                              <OverlayView position={{ lat: v.anchorLocation!.latitude, lng: v.anchorLocation!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                                  <div style={{ transform: 'translate(-50%, -50%)' }} className="p-1 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-orange-500 z-10">
+                                      <Anchor className="size-3 text-orange-500" />
+                                  </div>
+                              </OverlayView>
+                          </React.Fragment>
+                      );
+                  })}
 
-                {followedVessels?.filter(v => v.isSharing && v.location && v.id !== sharingId).map(vessel => {
-                    const isOffline = (Date.now() - (vessel.lastActive?.toMillis?.() || 0) > 70000);
-                    if (mode === 'fleet' && vessel.isGhostMode && vessel.status !== 'emergency') return null;
-                    const statusInfo = getVesselIconInfo(isOffline ? 'offline' : vessel.status);
-                    
-                    return (
-                        <OverlayView key={`marker-${vessel.id}`} position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                            <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 z-20">
-                                <div className={cn(
-                                    "px-2 py-1 text-white rounded text-[10px] font-black shadow-lg border whitespace-nowrap flex flex-col items-center transition-all backdrop-blur-sm", 
-                                    isOffline || vessel.status === 'emergency' || vessel.status === 'drifting' 
-                                        ? statusInfo.color + " animate-pulse" 
-                                        : "bg-slate-900/80 border-white/20"
-                                )}>
-                                    <div className="flex items-center gap-2">
-                                        <span className="uppercase">{statusInfo.label}</span> | {vessel.displayName}
-                                    </div>
-                                    {vessel.windSpeed !== undefined && !isOffline && (
-                                        <div className="mt-0.5 border-t border-white/10 pt-0.5 flex items-center gap-2 text-[8px] font-bold text-blue-300">
-                                            <span className="flex items-center gap-0.5">💨 {vessel.windSpeed}nd</span>
-                                            <span className="flex items-center gap-0.5">🌊 {vessel.wavesHeight}m</span>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className={cn("p-2 rounded-full border-2 border-white shadow-xl transition-all", vessel.status === 'emergency' ? "bg-red-600 scale-125" : statusInfo.color)}>
-                                    {React.createElement(statusInfo.icon, { className: "size-5 text-white" })}
-                                </div>
-                            </div>
-                        </OverlayView>
-                    );
-                })}
+                  {followedVessels?.filter(v => v.isSharing && v.location && v.id !== sharingId).map(vessel => {
+                      const isOffline = (Date.now() - (vessel.lastActive?.toMillis?.() || 0) > 70000);
+                      if (mode === 'fleet' && vessel.isGhostMode && vessel.status !== 'emergency') return null;
+                      const statusInfo = getVesselIconInfo(isOffline ? 'offline' : vessel.status);
+                      
+                      return (
+                          <OverlayView key={`marker-${vessel.id}`} position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                              <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 z-20">
+                                  <div className={cn(
+                                      "px-2 py-1 text-white rounded text-[10px] font-black shadow-lg border whitespace-nowrap flex flex-col items-center transition-all backdrop-blur-sm", 
+                                      isOffline || vessel.status === 'emergency' || vessel.status === 'drifting' 
+                                          ? statusInfo.color + " animate-pulse" 
+                                          : "bg-slate-900/80 border-white/20"
+                                  )}>
+                                      <div className="flex items-center gap-2">
+                                          <span className="uppercase">{statusInfo.label}</span> | {vessel.displayName}
+                                      </div>
+                                      {vessel.windSpeed !== undefined && !isOffline && (
+                                          <div className="mt-0.5 border-t border-white/10 pt-0.5 flex items-center gap-2 text-[8px] font-bold text-blue-300">
+                                              <span className="flex items-center gap-0.5">💨 {vessel.windSpeed}nd</span>
+                                              <span className="flex items-center gap-0.5">🌊 {vessel.wavesHeight}m</span>
+                                          </div>
+                                      )}
+                                  </div>
+                                  <div className={cn("p-2 rounded-full border-2 border-white shadow-xl transition-all", vessel.status === 'emergency' ? "bg-red-600 scale-125" : statusInfo.color)}>
+                                      {React.createElement(statusInfo.icon, { className: "size-5 text-white" })}
+                                  </div>
+                              </div>
+                          </OverlayView>
+                      );
+                  })}
 
-                {tacticalMarkers.map(m => (
-                    <OverlayView key={`tactical-${m.id}`} position={{ lat: m.lat, lng: m.lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                        <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 z-10">
-                            <div className="px-2 py-1 bg-white/90 backdrop-blur-md text-slate-900 rounded-lg text-[9px] font-black shadow-lg border border-slate-200 uppercase tracking-tighter">{m.label}</div>
-                            <div className={cn("p-1.5 rounded-full shadow-lg border-2 border-white", m.label === 'SARDINES' ? "bg-emerald-500" : "bg-slate-900 text-white")}>
-                                {m.label === 'SARDINES' ? <Waves className="size-3" /> : <Fish className="size-3" />}
-                            </div>
-                        </div>
-                    </OverlayView>
-                ))}
+                  {tacticalMarkers.map(m => (
+                      <OverlayView key={`tactical-${m.id}`} position={{ lat: m.lat, lng: m.lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                          <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 z-10">
+                              <div className="px-2 py-1 bg-white/90 backdrop-blur-md text-slate-900 rounded-lg text-[9px] font-black shadow-lg border border-slate-200 uppercase tracking-tighter">{m.label}</div>
+                              <div className={cn("p-1.5 rounded-full shadow-lg border-2 border-white", m.label === 'SARDINES' ? "bg-emerald-500" : "bg-slate-900 text-white")}>
+                                  {m.label === 'SARDINES' ? <Waves className="size-3" /> : <Fish className="size-3" />}
+                              </div>
+                          </div>
+                      </OverlayView>
+                  ))}
 
-                {mode === 'sender' && currentPos && (
-                    <OverlayView position={currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                        <PulsingDot />
-                    </OverlayView>
-                )}
-          </GoogleMap>
+                  {mode === 'sender' && currentPos && (
+                      <OverlayView position={currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                          <PulsingDot />
+                      </OverlayView>
+                  )}
+            </GoogleMap>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full bg-slate-100 text-muted-foreground gap-4">
+                <AlertCircle className="size-12 opacity-20" />
+                <p className="text-xs font-black uppercase">Vérification de la clé Maps...</p>
+            </div>
+          )}
           
           <div className="absolute top-3 right-3 flex flex-col gap-2">
             <Button onClick={handleRecenter} className={cn("shadow-lg h-10 w-10 p-0 border-2", isFollowing ? "bg-primary text-white border-primary" : "bg-background/90 backdrop-blur-md text-primary")}><Compass className={cn("size-5", isFollowing && "fill-white")} /></Button>
