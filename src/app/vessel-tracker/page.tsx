@@ -66,7 +66,13 @@ import { fr } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -105,7 +111,6 @@ export default function VesselTrackerPage() {
 
   const [mode, setMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
-  const [mapZoom, setMapZoom] = useState<number>(10);
   
   const [isSharing, setIsSharing] = useState(false);
   const [isGhostMode, setIsGhostMode] = useState(false);
@@ -163,14 +168,26 @@ export default function VesselTrackerPage() {
   const lastUpdatesRef = useRef<Record<string, number>>({});
   const lastTacticalUpdatesRef = useRef<Record<string, number>>({});
   const lastSentStatusRef = useRef<string | null>(null);
-  const lastBatteryLevelsRef = useRef<Record<string, number>>({});
-  const lastChargingStatesRef = useRef<Record<string, boolean>>({});
   const lastClearTimesRef = useRef<Record<string, number>>({});
 
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
   const [showLoopAlert, setShowLoopAlert] = useState(false);
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
+
+  // INITIALISATION DES SONS (DÉPLACÉ EN HAUT POUR ÉVITER LES ERREURS DE RÉFÉRENCE)
+  const soundsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
+  }, [firestore]);
+  const { data: dbSounds } = useCollection<SoundLibraryEntry>(soundsQuery);
+
+  const availableSounds = useMemo(() => {
+    if (!dbSounds) return [];
+    return dbSounds.filter(s => 
+      !s.categories || s.categories.includes('Vessel') || s.categories.includes('General')
+    ).map(s => ({ id: s.id, label: s.label, url: s.url }));
+  }, [dbSounds]);
 
   const toggleWakeLock = async () => {
     if (!('wakeLock' in navigator)) return;
@@ -274,19 +291,6 @@ export default function VesselTrackerPage() {
   }, [firestore, user, savedVesselIds, sharingId, isSharing]);
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
-  const soundsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
-  }, [firestore]);
-  const { data: dbSounds } = useCollection<SoundLibraryEntry>(soundsQuery);
-
-  const availableSounds = useMemo(() => {
-    if (!dbSounds) return [];
-    return dbSounds.filter(s => 
-      !s.categories || s.categories.includes('Vessel') || s.categories.includes('General')
-    ).map(s => ({ id: s.id, label: s.label, url: s.url }));
-  }, [dbSounds]);
-
   useEffect(() => {
     if (userProfile) {
       if (userProfile.vesselPrefs) setVesselPrefs(userProfile.vesselPrefs);
@@ -355,6 +359,7 @@ export default function VesselTrackerPage() {
             
             if (currentStatus !== 'returning' && currentStatus !== 'landed' && currentStatus !== 'emergency') {
                 if (!anchorPosRef.current) { 
+                  // Phase d'observation initiale
                   anchorPosRef.current = newPos; 
                   immobilityStartTime.current = Date.now();
                   setAnchorPos(newPos);
@@ -365,6 +370,7 @@ export default function VesselTrackerPage() {
                 const distFromAnchor = getDistance(newPos.lat, newPos.lng, anchorPosRef.current.lat, anchorPosRef.current.lng);
                 
                 if (currentStatus === 'stationary' || currentStatus === 'drifting') {
+                    // SI ON EST AU MOUILLAGE : L'ANCRE EST FIXE.
                     if (distFromAnchor > 100) {
                         setVesselStatus('moving');
                         anchorPosRef.current = null;
@@ -394,6 +400,7 @@ export default function VesselTrackerPage() {
                         }
                     } 
                     else {
+                        // Toujours au mouillage dans le cercle
                         if (currentStatus !== 'stationary') {
                             setVesselStatus('stationary');
                             updateVesselInFirestore({ 
@@ -407,6 +414,7 @@ export default function VesselTrackerPage() {
                         }
                     }
                 } else {
+                    // MODE NAVIGATION : On cherche la stabilité pour jeter l'ancre
                     const hasMovedSignificantly = distFromAnchor > (prefs.mooringRadius || 20);
 
                     if (hasMovedSignificantly) {
