@@ -263,7 +263,7 @@ export default function VesselTrackerPage() {
         
         console.log(`[Tracker] GPS Fix reçu : Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)} (Précision: ${accuracy.toFixed(1)}m)`);
 
-        // TOLÉRANCE ACCRUE : On accepte jusqu'à 500m au lieu de 50m pour ne pas bloquer l'utilisateur
+        // TOLÉRANCE ACCRUE : On accepte jusqu'à 500m pour ne pas bloquer l'émetteur en mer
         if (accuracy > 500) {
             console.warn("[Tracker] Précision GPS insuffisante (>500m), point ignoré.");
             return;
