@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where, deleteField, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where, deleteField, Timestamp, getDoc, deleteDoc } from 'firebase/firestore';
 import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -56,7 +56,8 @@ import {
   Phone,
   Ship,
   Timer,
-  AlertCircle
+  AlertCircle,
+  Eraser
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -281,6 +282,67 @@ export default function VesselTrackerPage() {
     update();
   }, [user, firestore, isSharing, isGhostMode, sharingId, vesselNickname, fleetId, mooringRadius, anchorPos]);
 
+  // Initialisation des réglages depuis le profil
+  useEffect(() => {
+    if (userProfile && !isSharing) {
+        if (userProfile.vesselNickname) setVesselNickname(userProfile.vesselNickname);
+        if (userProfile.lastVesselId) setCustomSharingId(userProfile.lastVesselId);
+        if (userProfile.lastFleetId) setCustomFleetId(userProfile.lastFleetId);
+        if (userProfile.mooringRadius) setMooringRadius(userProfile.mooringRadius);
+        if (userProfile.vesselPrefs) setVesselPrefs(userProfile.vesselPrefs);
+        if (userProfile.emergencyContact) setEmergencyContact(userProfile.emergencyContact);
+        if (userProfile.vesselSmsMessage) setVesselSmsMessage(userProfile.vesselSmsMessage);
+        setIsEmergencyEnabled(userProfile.isEmergencyEnabled ?? true);
+        setIsCustomMessageEnabled(userProfile.isCustomMessageEnabled ?? true);
+    }
+  }, [userProfile, isSharing]);
+
+  // Sauvegarde auto du profil lors du partage
+  useEffect(() => {
+    if (isSharing && user && firestore) {
+        updateDoc(doc(firestore, 'users', user.uid), {
+            vesselNickname: vesselNickname,
+            lastVesselId: customSharingId,
+            lastFleetId: customFleetId,
+            mooringRadius: mooringRadius
+        }).catch(err => console.warn("Save profile prefs failed", err));
+    }
+  }, [isSharing, user, firestore, vesselNickname, customSharingId, customFleetId, mooringRadius]);
+
+  const handleResetIdentity = async () => {
+    if (!user || !firestore) return;
+    try {
+        // 1. Désactiver le partage si actif
+        if (isSharing) await handleStopSharing();
+
+        // 2. Nettoyer Firestore
+        const batch = writeBatch(firestore);
+        batch.update(doc(firestore, 'users', user.uid), {
+            vesselNickname: deleteField(),
+            lastVesselId: deleteField(),
+            lastFleetId: deleteField(),
+            mooringRadius: 20
+        });
+        
+        // Supprimer le navire actif pour couper la visibilité B et C
+        if (sharingId) {
+            batch.delete(doc(firestore, 'vessels', sharingId));
+        }
+        
+        await batch.commit();
+
+        // 3. Reset local
+        setVesselNickname('');
+        setCustomSharingId('');
+        setCustomFleetId('');
+        setMooringRadius(20);
+        
+        toast({ title: "Identité réinitialisée", description: "Vous êtes désormais invisible pour les tiers." });
+    } catch (e) {
+        toast({ variant: 'destructive', title: "Erreur reset" });
+    }
+  };
+
   // GPS Tracking
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
@@ -315,7 +377,8 @@ export default function VesselTrackerPage() {
                         location: { latitude: currentPos.lat, longitude: currentPos.lng }, 
                         accuracy: Math.round(lastAccuracyRef.current) 
                     });
-                    updateLog(vesselNickname || 'MOI', vesselStatus === 'stabilizing' ? 'LANCEMENT EN COURS' : (vesselStatus === 'moving' ? 'MOUVEMENT' : vesselStatus === 'stationary' ? 'AU MOUILLAGE' : (vesselStatus === 'drifting' ? 'À LA DÉRIVE !' : 'STATUT ACTIF')), currentPos);
+                    const statusLabel = vesselStatus === 'stabilizing' ? 'LANCEMENT EN COURS' : (vesselStatus === 'moving' ? 'MOUVEMENT' : vesselStatus === 'stationary' ? 'AU MOUILLAGE' : (vesselStatus === 'drifting' ? 'À LA DÉRIVE !' : 'STATUT ACTIF'));
+                    updateLog(vesselNickname || 'MOI', statusLabel, currentPos);
                 }
                 return 60;
             }
@@ -514,13 +577,7 @@ export default function VesselTrackerPage() {
     }
   };
 
-  const saveVesselPrefs = async (newPrefs: typeof vesselPrefs) => {
-    if (!user || !firestore) return;
-    setVesselPrefs(newPrefs);
-    await updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs: newPrefs }).catch(() => {});
-  };
-
-  const handleSaveVessel = async () => {
+  const handleSaveVesselManual = async () => {
     if (!user || !firestore) return;
     const cleanId = (vesselIdToFollow || customSharingId).trim().toUpperCase();
     try {
@@ -536,7 +593,7 @@ export default function VesselTrackerPage() {
     }
   };
 
-  const handleRemoveSavedVessel = async (id: string) => {
+  const handleRemoveSavedVesselManual = async (id: string) => {
     if (!user || !firestore) return;
     try {
         await updateDoc(doc(firestore, 'users', user.uid), {
@@ -559,6 +616,12 @@ export default function VesselTrackerPage() {
         default: return { icon: Navigation, color: 'bg-slate-600', label: '???' };
     }
   };
+
+  const smsPreview = useMemo(() => {
+    const nicknamePrefix = vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : "";
+    const customText = (isCustomMessageEnabled && vesselSmsMessage) ? vesselSmsMessage : "Requiert assistance.";
+    return `${nicknamePrefix}${customText} [MAYDAY/PAN PAN] Position : https://www.google.com/maps?q=-22.27,166.45`;
+  }, [vesselSmsMessage, isCustomMessageEnabled, vesselNickname]);
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
@@ -694,6 +757,12 @@ export default function VesselTrackerPage() {
                             </div>
                             <Slider value={[mooringRadius]} min={10} max={200} step={5} onValueChange={v => setMooringRadius(v[0])} />
                         </div>
+                        
+                        <div className="pt-4 border-t border-dashed">
+                            <Button variant="ghost" className="w-full h-12 font-black uppercase text-[10px] text-destructive gap-2 border border-destructive/10 bg-red-50/10" onClick={handleResetIdentity}>
+                                <Eraser className="size-4" /> Réinitialiser mon identité (Vider IDs)
+                            </Button>
+                        </div>
                     </AccordionContent>
                 </AccordionItem>
 
@@ -719,6 +788,10 @@ export default function VesselTrackerPage() {
                                 <div className="space-y-1.5">
                                     <Label className="text-[10px] font-black uppercase opacity-60 ml-1">Message personnalisé</Label>
                                     <Textarea placeholder="Ex: Problème moteur, demande assistance." value={vesselSmsMessage} onChange={e => setVesselSmsMessage(e.target.value)} className="border-2 font-medium min-h-[80px]" />
+                                </div>
+                                <div className="space-y-2 pt-2 border-t border-dashed">
+                                    <p className="text-[9px] font-black uppercase text-primary flex items-center gap-2 ml-1"><Eye className="size-3" /> Aperçu du SMS envoyé :</p>
+                                    <div className="p-3 bg-muted/30 rounded-xl border-2 italic text-[10px] font-medium leading-relaxed text-slate-600">"{smsPreview}"</div>
                                 </div>
                             </div>
                             <Button onClick={handleSaveSmsSettings} className="w-full h-12 font-black uppercase text-[10px] tracking-widest gap-2 shadow-md">
@@ -829,7 +902,7 @@ export default function VesselTrackerPage() {
                             onChange={e => mode === 'receiver' ? setVesselIdToFollow(e.target.value.toUpperCase()) : setCustomFleetId(e.target.value.toUpperCase())} 
                             className="font-black text-center h-16 border-2 uppercase tracking-[0.2em] text-lg bg-muted/5 flex-1 shadow-inner" 
                         />
-                        <Button variant="outline" className="h-16 w-16 border-2 shrink-0 shadow-sm" onClick={handleSaveVessel}>
+                        <Button variant="outline" className="h-16 w-16 border-2 shrink-0 shadow-sm" onClick={handleSaveVesselManual}>
                             <Save className="size-6 text-slate-400" />
                         </Button>
                     </div>
@@ -865,7 +938,7 @@ export default function VesselTrackerPage() {
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <BatteryIconComp level={v?.batteryLevel} charging={v?.isCharging} />
-                                            {mode === 'receiver' && <Button variant="ghost" size="icon" className="size-10 text-destructive/20 hover:text-destructive rounded-xl" onClick={() => handleRemoveSavedVessel(id)}><Trash2 className="size-5" /></Button>}
+                                            {mode === 'receiver' && <Button variant="ghost" size="icon" className="size-10 text-destructive/20 hover:text-destructive rounded-xl" onClick={() => handleRemoveSavedVesselManual(id)}><Trash2 className="size-5" /></Button>}
                                         </div>
                                     </div>
                                     {v && v.isSharing && mode === 'receiver' && (
