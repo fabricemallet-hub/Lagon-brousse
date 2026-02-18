@@ -163,6 +163,12 @@ export default function VesselTrackerPage() {
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
+  const fleetVesselsQuery = useMemoFirebase(() => {
+    if (!firestore || !fleetId) return null;
+    return query(collection(firestore, 'vessels'), where('fleetId', '==', fleetId));
+  }, [firestore, fleetId]);
+  const { data: fleetVessels } = useCollection<VesselStatus>(fleetVesselsQuery);
+
   const soundsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
@@ -185,7 +191,6 @@ export default function VesselTrackerPage() {
   const playVesselSound = useCallback((soundId: string, eventKey?: string) => {
     if (!vesselPrefs.isNotifyEnabled) return;
     
-    // Stop previous audio for this event if it was looping
     if (eventKey && activeAudiosRef.current[eventKey]) {
         activeAudiosRef.current[eventKey].pause();
         delete activeAudiosRef.current[eventKey];
@@ -427,7 +432,6 @@ export default function VesselTrackerPage() {
     setCurrentPos(null);
     setAnchorPos(null);
     
-    // Stop all looping audios
     Object.values(activeAudiosRef.current).forEach(a => a.pause());
     activeAudiosRef.current = {};
     
@@ -458,10 +462,12 @@ export default function VesselTrackerPage() {
   const handleSaveVessel = async () => {
     if (!user || !firestore) return;
     const cleanId = (vesselIdToFollow || customSharingId).trim().toUpperCase();
+    const cleanFleetId = customFleetId.trim().toUpperCase();
     try {
         await updateDoc(doc(firestore, 'users', user.uid), {
             savedVesselIds: cleanId ? arrayUnion(cleanId) : savedVesselIds,
             lastVesselId: cleanId || customSharingId,
+            lastFleetId: cleanFleetId,
             vesselNickname: vesselNickname
         });
         if (vesselIdToFollow) setVesselIdToFollow('');
@@ -864,27 +870,91 @@ export default function VesselTrackerPage() {
           )}
 
           {mode === 'fleet' && (
-            <div className="space-y-4">
-                <p className="text-[9px] font-bold uppercase opacity-60 text-center py-4">Rejoignez un groupe en saisissant son ID dans l'onglet Émetteur (A).</p>
-                {fleetId && (
-                    <div className="space-y-3">
-                        <Label className="text-[9px] font-black uppercase ml-1 opacity-40">Membres de la Flotte : {fleetId}</Label>
-                        <div className="grid gap-2">
-                            {followedVessels?.filter(v => v.fleetId === fleetId && v.isSharing && (!v.isGhostMode || v.userId === user?.uid || v.status === 'emergency')).map(v => (
-                                <div key={v.id} className="flex items-center justify-between p-3 border-2 border-blue-100 rounded-xl bg-blue-50/10 shadow-sm">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-blue-600 text-white rounded-lg"><Navigation className="size-4" /></div>
-                                        <div className="flex flex-col">
-                                            <span className="font-black text-xs uppercase">{v.displayName || v.id}</span>
-                                            <span className="text-[8px] font-bold uppercase opacity-60">{v.status === 'stationary' ? 'Mouillage' : 'En route'}</span>
-                                        </div>
+            <div className="space-y-8 animate-in fade-in duration-300">
+              <div className="space-y-4">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">ID Groupe Flotte C</Label>
+                <div className="flex gap-2">
+                    <Input 
+                        placeholder="ID GROUPE EX: SUD-NC" 
+                        value={customFleetId} 
+                        onChange={e => setCustomFleetId(e.target.value.toUpperCase())} 
+                        className="font-black text-center h-16 border-2 uppercase tracking-[0.2em] text-lg bg-muted/5 flex-1" 
+                    />
+                    <Button 
+                        variant="outline" 
+                        className="h-16 w-16 border-2 shrink-0 shadow-sm" 
+                        onClick={handleSaveVessel} 
+                        disabled={!customFleetId.trim()}
+                    >
+                        <Save className="size-6 text-slate-400" />
+                    </Button>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">
+                    Membres du groupe ({fleetVessels?.filter(v => v.fleetId === fleetId && v.isSharing).length || 0})
+                </Label>
+                <div className="grid gap-3">
+                    {fleetVessels?.filter(v => v.fleetId === fleetId && v.isSharing && (!v.isGhostMode || v.userId === user?.uid || v.status === 'emergency')).map(v => {
+                        const isMe = v.userId === user?.uid;
+                        const isOffline = v.status === 'offline';
+                        return (
+                            <div key={v.id} className={cn("flex items-center justify-between p-4 border-2 rounded-2xl bg-white shadow-sm hover:border-primary/30 transition-all", isMe && "border-primary/20 bg-primary/5")}>
+                                <div className="flex items-center gap-4 min-w-0">
+                                    <div className={cn("size-12 rounded-xl flex items-center justify-center shrink-0 border-2", 
+                                        isOffline ? "bg-muted/10 border-muted text-muted-foreground" : "bg-primary/5 border-primary/20 text-primary")}>
+                                        <Navigation className="size-6" />
                                     </div>
-                                    <BatteryIconComp level={v.batteryLevel} charging={v.isCharging} />
+                                    <div className="flex flex-col min-w-0">
+                                        <span className="font-black text-sm uppercase tracking-tight truncate text-slate-800">{v.displayName || v.id}</span>
+                                        <span className={cn("text-[9px] font-black uppercase tracking-widest", 
+                                            isOffline ? "text-red-500" : "text-green-600")}>
+                                            {isOffline ? 'SIGNAL PERDU' : (v.status === 'stationary' ? 'AU MOUILLAGE' : 'EN MOUVEMENT')}
+                                        </span>
+                                    </div>
                                 </div>
-                            ))}
+                                <div className="flex items-center gap-2">
+                                    <BatteryIconComp level={v.batteryLevel} charging={v.isCharging} />
+                                    {isMe && <Badge variant="outline" className="text-[8px] font-black uppercase border-primary text-primary">MOI</Badge>}
+                                </div>
+                            </div>
+                        );
+                    })}
+                    {(!fleetVessels || fleetVessels.length === 0 || !fleetId) && (
+                        <div className="text-center py-10 border-2 border-dashed rounded-3xl opacity-30">
+                            <Users className="size-8 mx-auto mb-2" />
+                            <p className="text-[10px] font-black uppercase">Aucun membre actif</p>
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
+              </div>
+
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="fleet-sounds" className="border-none">
+                    <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/5 rounded-xl border-2">
+                        <Settings className="size-4 text-primary" />
+                        <span className="text-[10px] font-black uppercase text-slate-800">Notifications & Sons</span>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-4">
+                        <div className="space-y-6">
+                            <div className="flex items-center justify-between p-1 px-2">
+                                <div className="space-y-0.5">
+                                    <h4 className="text-xs font-black uppercase text-slate-800">Alertes Audio</h4>
+                                    <p className="text-[8px] font-bold text-muted-foreground uppercase">Activation globale</p>
+                                </div>
+                                <Switch checked={vesselPrefs.isNotifyEnabled} onCheckedChange={v => saveVesselPrefs({ ...vesselPrefs, isNotifyEnabled: v })} />
+                            </div>
+                            <div className="space-y-3 px-1">
+                                <Label className="text-[9px] font-black uppercase opacity-60 flex items-center gap-2">
+                                    <Volume2 className="size-3" /> Volume ({Math.round(vesselPrefs.vesselVolume * 100)}%)
+                                </Label>
+                                <Slider value={[vesselPrefs.vesselVolume * 100]} max={100} step={1} onValueChange={v => saveVesselPrefs({ ...vesselPrefs, vesselVolume: v[0] / 100 })} />
+                            </div>
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
+              </Accordion>
             </div>
           )}
         </CardContent>
@@ -900,9 +970,8 @@ export default function VesselTrackerPage() {
             onDragStart={() => setIsFollowing(false)}
             options={{ disableDefaultUI: true, zoomControl: false, mapTypeControl: false, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
           >
-                {followedVessels?.filter(v => v.isSharing && (mode === 'receiver' || mode === 'fleet' || v.id === sharingId)).map(vessel => {
+                {followedVessels?.filter(v => v.isSharing && (mode === 'receiver' || v.id === sharingId)).map(vessel => {
                     const isMe = vessel.id === sharingId;
-                    if (mode === 'fleet' && vessel.isGhostMode && !isMe && vessel.status !== 'emergency') return null;
                     return (
                         <React.Fragment key={vessel.id}>
                             {(vessel.status === 'stationary' || vessel.status === 'drifting') && vessel.anchorLocation && (
@@ -932,6 +1001,21 @@ export default function VesselTrackerPage() {
                         </React.Fragment>
                     );
                 })}
+                {mode === 'fleet' && fleetVessels?.filter(v => v.isSharing && (!v.isGhostMode || v.userId === user?.uid || v.status === 'emergency')).map(vessel => (
+                    <OverlayView key={vessel.id} position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                        <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1">
+                            <div className={cn("px-2 py-1 text-white rounded text-[10px] font-black shadow-lg border whitespace-nowrap flex items-center gap-2", 
+                                vessel.status === 'offline' ? "bg-red-600 animate-pulse" : "bg-slate-900/90")}>
+                                {vessel.displayName || vessel.id}
+                                <BatteryIconComp level={vessel.batteryLevel} charging={vessel.isCharging} className="size-2.5" />
+                            </div>
+                            <div className={cn("p-2 rounded-full border-2 border-white shadow-xl", 
+                                vessel.status === 'stationary' ? "bg-amber-600" : "bg-blue-600")}>
+                                {vessel.status === 'stationary' ? <Anchor className="size-5 text-white" /> : <Navigation className="size-5 text-white" />}
+                            </div>
+                        </div>
+                    </OverlayView>
+                ))}
                 {mode === 'sender' && currentPos && <OverlayView position={currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}><PulsingDot /></OverlayView>}
           </GoogleMap>
           
