@@ -5,6 +5,7 @@
  * Récupère le vent (vitesse/direction) et la houle.
  */
 export async function fetchWindyWeather(lat: number, lon: number) {
+  // CLÉ API WINDY
   const API_KEY = 'ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU';
   const url = 'https://api.windy.com/api/point-forecast/v2';
   
@@ -28,7 +29,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
     });
 
     if (response.status === 429) {
-        return { success: false, error: "Météo indisponible (Quota)" };
+        return { success: false, error: "Quota Windy atteint" };
     }
 
     if (!response.ok) {
@@ -37,9 +38,10 @@ export async function fetchWindyWeather(lat: number, lon: number) {
 
     const data = await response.json();
     
-    // Windy retourne des séries temporelles. On prend le premier index (le plus proche de maintenant).
+    // Windy retourne des séries temporelles. On prend le premier index (maintenant).
+    // Conversion m/s (Windy) vers Noeuds (nds) : * 1.94384
     return {
-      windSpeed: data.wind?.[0] !== undefined ? Math.round(data.wind[0] * 1.94384) : 0, // Conversion m/s vers Noeuds
+      windSpeed: data.wind?.[0] !== undefined ? Math.round(data.wind[0] * 1.94384) : 0,
       windDir: data.windDir?.[0] || 0,
       wavesHeight: data.waves?.[0] || 0,
       success: true

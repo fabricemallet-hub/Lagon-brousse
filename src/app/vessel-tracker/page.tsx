@@ -50,6 +50,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { format, differenceInMinutes } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { fetchWindyWeather } from '@/lib/windy-api';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -183,12 +184,8 @@ export default function VesselTrackerPage() {
     update();
   }, [user, firestore, isSharing, isGhostMode, sharingId, vesselNickname, mooringRadius, anchorPos, vesselStatus]);
 
-  const onLoad = useCallback((mapInstance: google.maps.Map) => {
+  const onLoad = useCallback(function callback(mapInstance: google.maps.Map) {
     setMap(mapInstance);
-  }, []);
-
-  const onUnmount = useCallback(() => {
-    setMap(null);
   }, []);
 
   const handleRecenter = useCallback(() => {
@@ -259,6 +256,33 @@ export default function VesselTrackerPage() {
     const body = `[LB-NC] ${type} : ${name}. ${vesselSmsMessage || "Assistance requise."}. Carte : ${posUrl}`;
     window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
+
+  // --- WINDY WEATHER UPDATE LOGIC ---
+  useEffect(() => {
+    if (!isSharing || mode !== 'sender' || !currentPos || !firestore) return;
+
+    const checkAndUpdateWeather = async () => {
+        const now = Date.now();
+        const lastUpdate = currentVesselData?.lastWeatherUpdate?.toMillis?.() || 0;
+        const cooldown = 3 * 60 * 60 * 1000; // 3 heures en ms
+
+        if (now - lastUpdate > cooldown) {
+            console.log("[Tracker] Quota Windy expiré (3h), tentative de mise à jour météo locale...");
+            const weather = await fetchWindyWeather(currentPos.lat, currentPos.lng);
+            if (weather.success) {
+                console.log("[Tracker] Météo Windy reçue :", weather);
+                updateVesselInFirestore({
+                    windSpeed: weather.windSpeed,
+                    windDir: weather.windDir,
+                    wavesHeight: weather.wavesHeight,
+                    lastWeatherUpdate: serverTimestamp()
+                });
+            }
+        }
+    };
+
+    checkAndUpdateWeather();
+  }, [currentPos, isSharing, mode, firestore, currentVesselData?.lastWeatherUpdate, updateVesselInFirestore]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
@@ -498,21 +522,43 @@ export default function VesselTrackerPage() {
           {(mode === 'receiver' || mode === 'fleet') && (
             <div className="space-y-4">
                 <p className="text-[10px] font-black uppercase text-muted-foreground ml-1">Navires actifs sur la carte</p>
-                <div className="grid gap-2">
+                <div className="grid gap-3">
                     {followedVessels?.filter(v => v.isSharing && v.location).map(v => (
-                        <div key={v.id} className="p-3 border-2 rounded-xl flex items-center justify-between bg-card shadow-sm">
-                            <div className="flex items-center gap-3">
-                                <div className={cn("p-2 rounded-lg", v.status === 'landed' ? "bg-green-600" : "bg-primary")}>
-                                    <Navigation className="size-4 text-white" />
+                        <div key={v.id} className="p-4 border-2 rounded-2xl flex flex-col gap-3 bg-card shadow-sm transition-all hover:border-primary/30">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className={cn("p-2 rounded-lg", v.status === 'landed' ? "bg-green-600" : "bg-primary")}>
+                                        <Navigation className="size-4 text-white" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="font-black uppercase text-xs">{v.displayName || v.id}</span>
+                                        <span className="text-[8px] font-black uppercase opacity-40">{v.status === 'moving' ? 'En mouvement' : 'Immobile'}</span>
+                                    </div>
                                 </div>
-                                <div className="flex flex-col">
-                                    <span className="font-black uppercase text-xs">{v.displayName || v.id}</span>
-                                    <span className="text-[8px] font-black uppercase opacity-40">{v.status === 'moving' ? 'En mouvement' : 'Immobile'}</span>
-                                </div>
+                                <Button variant="ghost" size="icon" className="h-10 w-10 text-primary border-2 rounded-xl" onClick={() => { if(v.location) { map?.panTo({ lat: v.location.latitude, lng: v.location.longitude }); map?.setZoom(15); } }}>
+                                    <MapPin className="size-5" />
+                                </Button>
                             </div>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => { if(v.location) { map?.panTo({ lat: v.location.latitude, lng: v.location.longitude }); map?.setZoom(15); } }}>
-                                <MapPin className="size-4" />
-                            </Button>
+                            
+                            {/* WEATHER INFO FOR RECEIVER */}
+                            {(v.windSpeed !== undefined || v.wavesHeight !== undefined) && (
+                                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-dashed">
+                                    <div className="flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-xl border border-blue-100">
+                                        <RefreshCw className="size-3 text-blue-600" />
+                                        <div className="flex flex-col">
+                                            <span className="text-[7px] font-black uppercase text-blue-800 opacity-60">Vent local</span>
+                                            <span className="text-[10px] font-black text-blue-900">{v.windSpeed} ND</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 bg-cyan-50 px-3 py-2 rounded-xl border border-cyan-100">
+                                        <Waves className="size-3 text-cyan-600" />
+                                        <div className="flex flex-col">
+                                            <span className="text-[7px] font-black uppercase text-cyan-800 opacity-60">Mer (Houle)</span>
+                                            <span className="text-[10px] font-black text-cyan-900">{v.wavesHeight?.toFixed(1)}m</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     ))}
                     {(!followedVessels || followedVessels.filter(v => v.isSharing).length === 0) && (
@@ -538,7 +584,6 @@ export default function VesselTrackerPage() {
               defaultCenter={INITIAL_CENTER} 
               defaultZoom={10} 
               onLoad={onLoad} 
-              onUnmount={onUnmount}
               onDragStart={() => setIsFollowing(false)} 
               options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
             >
