@@ -128,7 +128,7 @@ export default function VesselTrackerPage() {
   const { toast } = useToast();
   const { isLoaded, loadError } = useGoogleMaps();
 
-  const [mode, setMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
+  const [mode, setMode] = useState<'sender' | 'receiver' | 'fleet' | 'both'>('sender');
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
   
   const [isSharing, setIsSharing] = useState(false);
@@ -674,7 +674,6 @@ export default function VesselTrackerPage() {
         setCurrentPos(newPos);
         setUserAccuracy(roundedAccuracy);
 
-        // REPRISE DU SIGNAL : Reset de l'état offline si une position valide revient
         if (vesselStatus === 'offline') {
             setVesselStatus('moving');
             immobilityStartTime.current = null;
@@ -694,7 +693,6 @@ export default function VesselTrackerPage() {
         }
         
         if (vesselStatus !== 'returning' && vesselStatus !== 'landed' && vesselStatus !== 'emergency') {
-            // Logique de détection de mouillage améliorée pour éviter les faux-positifs
             if (!anchorPos) { 
               setAnchorPos(newPos); 
               immobilityStartTime.current = Date.now();
@@ -1317,7 +1315,7 @@ export default function VesselTrackerPage() {
                 <AccordionItem value="receiver-settings" className="border-none">
                   <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/5 rounded-xl">
                     <Settings className="size-4 text-primary" />
-                    <span className="text-[10px] font-black uppercase">Notifications & Sons</span>
+                    <span className="text-[10px) font-black uppercase">Notifications & Sons</span>
                   </AccordionTrigger>
                   <AccordionContent className="pt-4"><NotificationSettingsUI /></AccordionContent>
                 </AccordionItem>
@@ -1569,15 +1567,29 @@ export default function VesselTrackerPage() {
                         </h4>
                         <div className="space-y-3">
                             <div className="flex flex-col gap-0.5">
-                                <span className="text-[8px] font-bold text-muted-foreground uppercase leading-none">COSS NC (Mer)</span>
-                                <a href="tel:16" className="text-sm font-black flex items-center gap-2 text-slate-800 hover:text-primary transition-colors">
-                                    <Phone className="size-3.5 opacity-40" /> 16
-                                </a>
+                                <span className="text-[8px] font-bold text-muted-foreground uppercase leading-none">CROSS / COSS NC (Mer)</span>
+                                <div className="flex flex-col gap-1">
+                                    <a href="tel:16" className="text-sm font-black flex items-center gap-2 text-slate-800 hover:text-primary transition-colors">
+                                        <Phone className="size-3.5 opacity-40" /> 16 ou 196
+                                    </a>
+                                    <span className="text-[8px] font-black text-red-600 uppercase">VHF CANAL 16 | 112 (GSM)</span>
+                                </div>
                             </div>
-                            <div className="flex flex-col gap-0.5">
-                                <span className="text-[8px] font-bold text-muted-foreground uppercase leading-none">SAMU (Terre)</span>
-                                <a href="tel:15" className="text-sm font-black flex items-center gap-2 text-slate-800 hover:text-primary transition-colors">
-                                    <Phone className="size-3.5 opacity-40" /> 15
+                            <div className="flex flex-col gap-0.5 pt-1">
+                                <span className="text-[8px] font-bold text-muted-foreground uppercase leading-none">SAMU / SOS MÉDECINS</span>
+                                <div className="flex flex-col gap-1">
+                                    <a href="tel:15" className="text-sm font-black flex items-center gap-2 text-slate-800 hover:text-primary transition-colors">
+                                        <Phone className="size-3.5 opacity-40" /> 15
+                                    </a>
+                                    <a href="tel:+687787725" className="text-[10px] font-black flex items-center gap-2 text-slate-600 hover:text-primary transition-colors">
+                                        <Smartphone className="size-3 opacity-40" /> +687 78 77 25
+                                    </a>
+                                </div>
+                            </div>
+                            <div className="flex flex-col gap-0.5 pt-1">
+                                <span className="text-[8px] font-bold text-muted-foreground uppercase leading-none">POMPIERS (Terre)</span>
+                                <a href="tel:18" className="text-sm font-black flex items-center gap-2 text-slate-800 hover:text-primary transition-colors">
+                                    <Phone className="size-3.5 opacity-40" /> 18
                                 </a>
                             </div>
                         </div>
@@ -1585,11 +1597,23 @@ export default function VesselTrackerPage() {
 
                     <div className="space-y-3">
                         <h4 className="text-[10px] font-black uppercase text-blue-600 flex items-center gap-2 border-b border-blue-100 pb-1">
-                            <Waves className="size-3" /> Services
+                            <Waves className="size-3" /> Services & Surveillance
                         </h4>
                         <div className="space-y-3">
                             <div className="flex flex-col gap-0.5">
-                                <span className="text-[8px] font-bold text-muted-foreground uppercase leading-none">Météo Marine</span>
+                                <span className="text-[8px] font-bold text-muted-foreground uppercase leading-none">GENDARME MARITIME</span>
+                                <a href="tel:294036" className="text-sm font-black flex items-center gap-2 text-slate-800 hover:text-primary transition-colors">
+                                    <Phone className="size-3.5 opacity-40" /> 29 40 36
+                                </a>
+                            </div>
+                            <div className="flex flex-col gap-0.5">
+                                <span className="text-[8px] font-bold text-muted-foreground uppercase leading-none">PROTECTION LAGON</span>
+                                <a href="tel:243255" className="text-sm font-black flex items-center gap-2 text-slate-800 hover:text-primary transition-colors">
+                                    <Phone className="size-3.5 opacity-40" /> 24 32 55
+                                </a>
+                            </div>
+                            <div className="flex flex-col gap-0.5">
+                                <span className="text-[8px] font-bold text-muted-foreground uppercase leading-none">MÉTÉO MARINE</span>
                                 <a href="tel:366736" className="text-sm font-black flex items-center gap-2 text-slate-800 hover:text-primary transition-colors">
                                     <Phone className="size-3.5 opacity-40" /> 36 67 36
                                 </a>
@@ -1603,7 +1627,7 @@ export default function VesselTrackerPage() {
                         </h4>
                         <div className="space-y-3">
                             <div className="flex flex-col gap-0.5">
-                                <span className="text-[8px] font-bold text-muted-foreground uppercase leading-none">Port Autonome (VHF 12)</span>
+                                <span className="text-[8px] font-bold text-muted-foreground uppercase leading-none">PORT AUTONOME (VHF 12)</span>
                                 <a href="tel:255000" className="text-sm font-black flex items-center gap-2 text-slate-800 hover:text-primary transition-colors">
                                     <Phone className="size-3.5 opacity-40" /> 25 50 00
                                 </a>
