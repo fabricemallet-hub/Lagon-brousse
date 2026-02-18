@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -40,7 +41,12 @@ import {
   Waves,
   Camera,
   ChevronDown,
-  Bug
+  Bug,
+  Trash2,
+  History,
+  Phone,
+  Ship,
+  AlertTriangle
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -95,6 +101,9 @@ export default function VesselTrackerPage() {
   const [emergencyContact, setEmergencyContact] = useState('');
   const [vesselSmsMessage, setVesselSmsMessage] = useState('');
 
+  // Journaux
+  const [technicalLog, setTechnicalLog] = useState<{ vesselName: string, statusLabel: string, time: Date, pos: {lat: number, lng: number} }[]>([]);
+
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
   const watchIdRef = useRef<number | null>(null);
@@ -127,6 +136,11 @@ export default function VesselTrackerPage() {
     const mins = Math.max(0, differenceInMinutes(new Date(), start));
     return `ACTIF ${mins} MIN`;
   }, [currentVesselData]);
+
+  const tacticalMarkers = useMemo(() => {
+    if (mode === 'sender') return currentVesselData?.huntingMarkers || [];
+    return followedVessels?.flatMap(v => v.huntingMarkers || []) || [];
+  }, [mode, currentVesselData, followedVessels]);
 
   const soundsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -233,6 +247,15 @@ export default function VesselTrackerPage() {
     }
 
     updateVesselInFirestore(updates);
+    
+    // Add to technical log
+    setTechnicalLog(prev => [{
+        vesselName: vesselNickname || sharingId,
+        statusLabel: label,
+        time: new Date(),
+        pos: currentPos || INITIAL_CENTER
+    }, ...prev].slice(0, 50));
+
     toast({ title: label });
   };
 
@@ -247,6 +270,14 @@ export default function VesselTrackerPage() {
     };
     updateVesselInFirestore({ huntingMarkers: arrayUnion(marker) });
     toast({ title: `${type} signalé !`, description: "Point GPS enregistré." });
+  };
+
+  const handleClearTactical = async () => {
+    if (!firestore || !sharingId) return;
+    try {
+        await updateDoc(doc(firestore, 'vessels', sharingId), { huntingMarkers: [] });
+        toast({ title: "Journal tactique effacé" });
+    } catch (e) {}
   };
 
   const handleSendTestPoint = (lat: number, lng: number) => {
@@ -275,7 +306,6 @@ export default function VesselTrackerPage() {
     window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
 
-  // --- WINDY WEATHER UPDATE LOGIC ---
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !currentPos || !firestore) return;
 
@@ -403,7 +433,7 @@ export default function VesselTrackerPage() {
                         <div className="space-y-1 relative z-10 text-white">
                             <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2"><Zap className="size-3 fill-yellow-300 text-yellow-300" /> PARTAGE ACTIF</p>
                             <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">{sharingId}</h3>
-                            <p className="text-xs font-bold opacity-80 mt-1 italic">{vesselNickname || 'koolapik'}</p>
+                            <p className="text-xs font-bold opacity-80 mt-1 italic">{vesselNickname || 'Capitaine'}</p>
                         </div>
                         <div className="mt-8 flex items-center gap-2 relative z-10">
                             <Badge variant="outline" className="bg-green-500/30 border-white/30 text-white font-black text-[10px] px-3 h-6">EN LIGNE</Badge>
@@ -468,16 +498,6 @@ export default function VesselTrackerPage() {
                         </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <Button variant="destructive" className="w-full h-14 font-black uppercase shadow-lg gap-3 text-sm" onClick={() => sendEmergencySms('MAYDAY')}>
-                            <ShieldAlert className="size-6" /> DEMANDE D'ASSISTANCE
-                        </Button>
-
-                        <Button variant="destructive" className="w-full h-14 font-black uppercase opacity-90 gap-3 border-2 border-white/20 text-sm" onClick={handleStopSharing}>
-                            <X className="size-6" /> ARRÊTER LE PARTAGE / QUITTER
-                        </Button>
-                    </div>
-
                     <Accordion type="single" collapsible className="w-full space-y-2">
                         <AccordionItem value="identity" className="bg-muted/30 border rounded-lg">
                             <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 h-12">
@@ -532,7 +552,6 @@ export default function VesselTrackerPage() {
                             </AccordionContent>
                         </AccordionItem>
 
-                        {/* PONT DE TEST MANUEL */}
                         <AccordionItem value="test-bench" className="bg-purple-50/30 border-purple-100 border rounded-lg">
                             <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 h-12">
                                 <Bug className="size-4 text-purple-600" />
@@ -676,13 +695,122 @@ export default function VesselTrackerPage() {
         <div className="bg-card p-4 flex flex-col gap-4 border-t-2">
             <div className="grid grid-cols-2 gap-2">
                 <Button variant="destructive" className="h-14 font-black uppercase rounded-xl shadow-lg gap-3 text-xs" onClick={() => sendEmergencySms('MAYDAY')}>
-                    <ShieldAlert className="size-5" /> SOS / MAYDAY
+                    <ShieldAlert className="size-5" /> MAYDAY
                 </Button>
                 <Button variant="secondary" className="h-14 font-black uppercase rounded-xl shadow-lg gap-3 text-xs border-2 border-primary/20" onClick={() => sendEmergencySms('PAN PAN')}>
                     <RefreshCw className="size-5 text-primary" /> PAN PAN
                 </Button>
             </div>
+
+            <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="tech-log" className="border rounded-xl px-3 bg-muted/5 mb-2">
+                    <div className="flex items-center justify-between py-1">
+                        <AccordionTrigger className="flex-1 hover:no-underline py-3">
+                            <div className="flex items-center gap-2 font-black uppercase text-[10px]">
+                                <Settings className="size-3" /> JOURNAL TECHNIQUE
+                            </div>
+                        </AccordionTrigger>
+                        <Button variant="ghost" size="sm" className="h-7 text-[8px] font-black uppercase text-destructive" onClick={(e) => { e.stopPropagation(); setTechnicalLog([]); }}>
+                            <Trash2 className="size-3 mr-1" /> Effacer
+                        </Button>
+                    </div>
+                    <AccordionContent className="pb-4 space-y-2">
+                        {technicalLog.length > 0 ? technicalLog.map((log, i) => (
+                            <div key={i} className="p-2 bg-white border-2 rounded-lg text-[9px] flex justify-between items-center shadow-sm">
+                                <div className="flex flex-col">
+                                    <span className="font-black text-primary">{log.vesselName}</span>
+                                    <span className="font-bold uppercase opacity-60">{log.statusLabel}</span>
+                                </div>
+                                <span className="opacity-40">{format(log.time, 'HH:mm:ss')}</span>
+                            </div>
+                        )) : <p className="text-center py-4 text-[9px] font-bold uppercase opacity-30 italic">Aucun log technique</p>}
+                    </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="tactical-log" className="border rounded-xl px-3 bg-muted/5">
+                    <div className="flex items-center justify-between py-1">
+                        <AccordionTrigger className="flex-1 hover:no-underline py-3">
+                            <div className="flex items-center gap-2 font-black uppercase text-[10px]">
+                                <Compass className="size-3" /> JOURNAL TACTIQUE
+                            </div>
+                        </AccordionTrigger>
+                        <Button variant="ghost" size="sm" className="h-7 text-[8px] font-black uppercase text-destructive" onClick={(e) => { e.stopPropagation(); handleClearTactical(); }}>
+                            <Trash2 className="size-3 mr-1" /> Effacer
+                        </Button>
+                    </div>
+                    <AccordionContent className="pb-4 space-y-2">
+                        {tacticalMarkers.length > 0 ? [...tacticalMarkers].reverse().map((marker, i) => (
+                            <div key={i} className="p-2 bg-white border-2 rounded-lg text-[9px] flex justify-between items-center shadow-sm">
+                                <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="h-4 px-1.5 text-[8px] font-black uppercase bg-primary/5 text-primary border-primary/20">{marker.label}</Badge>
+                                    <span className="font-bold opacity-60">À {marker.time}</span>
+                                </div>
+                                <Button variant="ghost" size="icon" className="size-6 border rounded" onClick={() => { map?.panTo({lat: marker.lat, lng: marker.lng}); map?.setZoom(17); }}>
+                                    <MapPin className="size-3" />
+                                </Button>
+                            </div>
+                        )) : <p className="text-center py-4 text-[9px] font-bold uppercase opacity-30 italic">Aucun signalement tactique</p>}
+                    </AccordionContent>
+                </AccordionItem>
+            </Accordion>
         </div>
+      </Card>
+
+      <Card className="border-2 bg-muted/10 shadow-none rounded-2xl">
+        <CardHeader className="p-4 pb-2 border-b">
+          <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-primary">
+            <Phone className="size-4" /> Annuaire Maritime NC
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="space-y-3">
+            <h4 className="text-[10px] font-black uppercase text-red-600 flex items-center gap-2 border-b pb-1">
+              <ShieldAlert className="size-3" /> Urgences
+            </h4>
+            <div className="space-y-2">
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">COSS NC (Mer)</span>
+                <a href="tel:16" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                  <Phone className="size-3" /> 16
+                </a>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">SAMU (Terre)</span>
+                <a href="tel:15" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                  <Phone className="size-3" /> 15
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h4 className="text-[10px] font-black uppercase text-blue-600 flex items-center gap-2 border-b pb-1">
+              <Waves className="size-3" /> Services
+            </h4>
+            <div className="space-y-2">
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">Météo Marine</span>
+                <a href="tel:366736" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                  <Phone className="size-3" /> 36 67 36
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <h4 className="text-[10px] font-black uppercase text-indigo-600 flex items-center gap-2 border-b pb-1">
+              <Ship className="size-3" /> Ports & Marinas
+            </h4>
+            <div className="space-y-2">
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">Port Autonome (VHF 12)</span>
+                <a href="tel:255000" className="text-sm font-black hover:text-primary transition-colors flex items-center gap-2">
+                  <Phone className="size-3" /> 25 50 00
+                </a>
+              </div>
+            </div>
+          </div>
+        </CardContent>
       </Card>
     </div>
   );
