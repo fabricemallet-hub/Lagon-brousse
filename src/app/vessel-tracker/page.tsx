@@ -142,6 +142,7 @@ export default function VesselTrackerPage() {
   const [vesselNickname, setVesselNickname] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [mapZoom, setMapZoom] = useState<number>(10);
   const [wakeLock, setWakeLock] = useState<any>(null);
   const shouldPanOnNextFix = useRef(false);
 
@@ -149,10 +150,18 @@ export default function VesselTrackerPage() {
   const [userAccuracy, setUserAccuracy] = useState<number | null>(null);
   const [anchorPos, setAnchorPos] = useState<google.maps.LatLngLiteral | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
-  const vesselStatusRef = useRef<VesselStatus['status']>('moving');
   
+  // REFS FOR STABILITY (Avoiding useEffect loops)
+  const vesselStatusRef = useRef<VesselStatus['status']>('moving');
+  const anchorPosRef = useRef<google.maps.LatLngLiteral | null>(null);
+  const isSharingRef = useRef(false);
+  const isFollowingRef = useRef(false);
+  const sharingIdRef = useRef('');
+  const vesselNicknameRef = useRef('');
+  const customFleetIdRef = useRef('');
+  const isGhostModeRef = useRef(false);
+
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [mapZoom, setMapZoom] = useState<number>(10);
   const watchIdRef = useRef<number | null>(null);
   const immobilityStartTime = useRef<number | null>(null);
   const lastFixTimeRef = useRef<number>(Date.now());
@@ -179,6 +188,8 @@ export default function VesselTrackerPage() {
     mooringRadius: 20
   });
   
+  const vesselPrefsRef = useRef(vesselPrefs);
+
   const [techHistory, setTechHistory] = useState<TechEntry[]>([]);
   const [tacticalHistory, setTacticalHistory] = useState<TacticalEntry[]>([]);
   const [fullscreenImage, setFullscreenImage] = useState<{url: string, title: string} | null>(null);
@@ -206,6 +217,16 @@ export default function VesselTrackerPage() {
   const savedVesselIds = userProfile?.savedVesselIds || [];
   const vesselIdHistory = userProfile?.vesselIdHistory || [];
   const fleetIdHistory = userProfile?.fleetIdHistory || [];
+
+  // SYNC REFS
+  useEffect(() => { isSharingRef.current = isSharing; }, [isSharing]);
+  useEffect(() => { vesselStatusRef.current = vesselStatus; }, [vesselStatus]);
+  useEffect(() => { vesselPrefsRef.current = vesselPrefs; }, [vesselPrefs]);
+  useEffect(() => { isFollowingRef.current = isFollowing; }, [isFollowing]);
+  useEffect(() => { sharingIdRef.current = sharingId; }, [sharingId]);
+  useEffect(() => { vesselNicknameRef.current = vesselNickname; }, [vesselNickname]);
+  useEffect(() => { customFleetIdRef.current = customFleetId; }, [customFleetId]);
+  useEffect(() => { isGhostModeRef.current = isGhostMode; }, [isGhostMode]);
 
   const vesselsQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -269,7 +290,7 @@ export default function VesselTrackerPage() {
   }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, availableSounds]);
 
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
-    if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
+    if (!user || !firestore || (!isSharingRef.current && data.isSharing !== false)) return;
     
     const update = async () => {
         let batteryInfo: any = {};
@@ -283,15 +304,21 @@ export default function VesselTrackerPage() {
             }
         }
 
+        const currentId = sharingIdRef.current;
+        const currentNickname = vesselNicknameRef.current;
+        const currentFleetId = customFleetIdRef.current;
+        const currentGhostMode = isGhostModeRef.current;
+        const currentPrefs = vesselPrefsRef.current;
+
         const updatePayload: any = { 
-            id: sharingId,
+            id: currentId,
             userId: user.uid, 
-            displayName: vesselNickname || user.displayName || 'Capitaine', 
-            isSharing: data.isSharing !== undefined ? data.isSharing : isSharing, 
-            isGhostMode: data.isGhostMode !== undefined ? data.isGhostMode : isGhostMode,
+            displayName: currentNickname || user.displayName || 'Capitaine', 
+            isSharing: data.isSharing !== undefined ? data.isSharing : isSharingRef.current, 
+            isGhostMode: data.isGhostMode !== undefined ? data.isGhostMode : currentGhostMode,
             lastActive: serverTimestamp(),
-            mooringRadius: vesselPrefs.mooringRadius || 20,
-            fleetId: customFleetId.trim().toUpperCase() || null,
+            mooringRadius: currentPrefs.mooringRadius || 20,
+            fleetId: currentFleetId.trim().toUpperCase() || null,
             ...batteryInfo,
             ...data 
         };
@@ -304,17 +331,12 @@ export default function VesselTrackerPage() {
             Object.entries(updatePayload).filter(([_, v]) => v !== undefined)
         );
 
-        setDoc(doc(firestore, 'vessels', sharingId), cleanPayload, { merge: true }).catch((err) => {
+        setDoc(doc(firestore, 'vessels', currentId), cleanPayload, { merge: true }).catch((err) => {
             console.error("Firestore Update Error:", err);
         });
     };
     update();
-  }, [user, firestore, isSharing, isGhostMode, sharingId, vesselNickname, vesselPrefs.mooringRadius, customFleetId]);
-
-  // Synchronisation de la ref du statut pour l'utiliser dans les effets sans les relancer
-  useEffect(() => {
-    vesselStatusRef.current = vesselStatus;
-  }, [vesselStatus]);
+  }, [user, firestore]);
 
   const handleSaveId = async (idValue: string, type: 'vessel' | 'fleet') => {
     if (!user || !firestore || !idValue.trim()) return;
@@ -421,6 +443,7 @@ export default function VesselTrackerPage() {
 
     if (nextStatus === 'moving') {
         immobilityStartTime.current = null;
+        anchorPosRef.current = null;
         setAnchorPos(null);
     }
     
@@ -487,6 +510,7 @@ export default function VesselTrackerPage() {
         watchIdRef.current = null;
     }
     setCurrentPos(null);
+    anchorPosRef.current = null;
     setAnchorPos(null);
     lastSentStatusRef.current = null;
     toast({ title: "Partage arrêté" });
@@ -666,105 +690,112 @@ export default function VesselTrackerPage() {
     });
   }, [followedVessels, vesselPrefs, playVesselSound, sharingId, mode, labels]);
 
-  // STABILISATION DU GPS : L'effet ne dépend plus de vesselStatus pour éviter les cycles d'alternance
+  // STABILIZED GPS EFFECT
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
       if (watchIdRef.current) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
       return;
     }
     
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (position) => {
-        const { latitude, longitude, accuracy } = position.coords;
-        const newPos = { lat: latitude, lng: longitude };
-        const roundedAccuracy = Math.round(accuracy);
-        
-        lastFixTimeRef.current = Date.now();
-        setCurrentPos(newPos);
-        setUserAccuracy(roundedAccuracy);
+    // Stability Fix: Only start the watch once when sharing starts
+    if (watchIdRef.current === null) {
+        watchIdRef.current = navigator.geolocation.watchPosition(
+          (position) => {
+            const { latitude, longitude, accuracy } = position.coords;
+            const newPos = { lat: latitude, lng: longitude };
+            const roundedAccuracy = Math.round(accuracy);
+            
+            lastFixTimeRef.current = Date.now();
+            setCurrentPos(newPos);
+            setUserAccuracy(roundedAccuracy);
 
-        // Récupération du statut actuel via la ref pour éviter les dépendances changeantes
-        const currentStatus = vesselStatusRef.current;
+            const currentStatus = vesselStatusRef.current;
+            const prefs = vesselPrefsRef.current;
 
-        if (currentStatus === 'offline') {
-            setVesselStatus('moving');
-            immobilityStartTime.current = null;
-            updateVesselInFirestore({ 
-                status: 'moving', 
-                eventLabel: 'REPRISE DU SIGNAL',
-                location: { latitude, longitude }, 
-                accuracy: roundedAccuracy 
-            });
-            toast({ title: "Signal GPS rétabli", description: "Votre position est de nouveau partagée." });
-        }
+            // Handle signal recovery
+            if (currentStatus === 'offline') {
+                setVesselStatus('moving');
+                immobilityStartTime.current = null;
+                anchorPosRef.current = null;
+                setAnchorPos(null);
+                updateVesselInFirestore({ 
+                    status: 'moving', 
+                    eventLabel: 'REPRISE DU SIGNAL',
+                    location: { latitude, longitude }, 
+                    accuracy: roundedAccuracy 
+                });
+                return;
+            }
 
-        if ((isFollowing || shouldPanOnNextFix.current) && map) { 
-            map.panTo(newPos); 
-            if (shouldPanOnNextFix.current) map.setZoom(15);
-            shouldPanOnNextFix.current = false; 
-        }
-        
-        if (currentStatus !== 'returning' && currentStatus !== 'landed' && currentStatus !== 'emergency') {
-            if (!anchorPos) { 
-              setAnchorPos(newPos); 
-              immobilityStartTime.current = Date.now();
-              return; 
+            // Map Pan
+            if ((isFollowingRef.current || shouldPanOnNextFix.current) && map) { 
+                map.panTo(newPos); 
+                if (shouldPanOnNextFix.current) map.setZoom(15);
+                shouldPanOnNextFix.current = false; 
             }
             
-            const distFromAnchor = getDistance(newPos.lat, newPos.lng, anchorPos.lat, anchorPos.lng);
-            const hasMovedSignificantly = distFromAnchor > (vesselPrefs.mooringRadius || 20);
+            // Movement / Stationary Logic
+            if (currentStatus !== 'returning' && currentStatus !== 'landed' && currentStatus !== 'emergency') {
+                if (!anchorPosRef.current) { 
+                  anchorPosRef.current = newPos; 
+                  immobilityStartTime.current = Date.now();
+                  setAnchorPos(newPos); // For UI display
+                  updateVesselInFirestore({ location: { latitude, longitude }, accuracy: roundedAccuracy });
+                  return; 
+                }
+                
+                const distFromAnchor = getDistance(newPos.lat, newPos.lng, anchorPosRef.current.lat, anchorPosRef.current.lng);
+                const hasMovedSignificantly = distFromAnchor > (prefs.mooringRadius || 20);
 
-            if (hasMovedSignificantly) {
-              if (currentStatus !== 'moving') {
-                setVesselStatus('moving'); 
-                setAnchorPos(newPos); 
-                immobilityStartTime.current = Date.now();
-                updateVesselInFirestore({ 
-                    location: { latitude, longitude }, 
-                    status: 'moving', 
-                    isSharing: true, 
-                    eventLabel: null, 
-                    accuracy: roundedAccuracy, 
-                    anchorLocation: null 
-                });
-              } else {
-                updateVesselInFirestore({ location: { latitude, longitude }, accuracy: roundedAccuracy });
-              }
+                if (hasMovedSignificantly) {
+                  if (currentStatus !== 'moving') {
+                    setVesselStatus('moving'); 
+                    anchorPosRef.current = newPos; 
+                    setAnchorPos(newPos);
+                    immobilityStartTime.current = Date.now();
+                    updateVesselInFirestore({ 
+                        location: { latitude, longitude }, 
+                        status: 'moving', 
+                        eventLabel: null, 
+                        accuracy: roundedAccuracy, 
+                        anchorLocation: null 
+                    });
+                  } else {
+                    updateVesselInFirestore({ location: { latitude, longitude }, accuracy: roundedAccuracy });
+                  }
+                } else {
+                  if (!immobilityStartTime.current) immobilityStartTime.current = Date.now();
+                  const idleDuration = Date.now() - immobilityStartTime.current;
+                  if (idleDuration > 30000 && currentStatus !== 'stationary') {
+                    setVesselStatus('stationary'); 
+                    updateVesselInFirestore({ 
+                        status: 'stationary', 
+                        eventLabel: null, 
+                        accuracy: roundedAccuracy,
+                        anchorLocation: { latitude: anchorPosRef.current.lat, longitude: anchorPosRef.current.lng }
+                    });
+                  } else {
+                    updateVesselInFirestore({ location: { latitude, longitude }, accuracy: roundedAccuracy });
+                  }
+                }
             } else {
-              const idleDuration = Date.now() - (immobilityStartTime.current || Date.now());
-              if (idleDuration > 30000 && currentStatus !== 'stationary') {
-                setVesselStatus('stationary'); 
-                updateVesselInFirestore({ 
-                    status: 'stationary', 
-                    eventLabel: null, 
-                    accuracy: roundedAccuracy,
-                    anchorLocation: { latitude: anchorPos.lat, longitude: anchorPos.lng }
-                });
-              } else {
                 updateVesselInFirestore({ location: { latitude, longitude }, accuracy: roundedAccuracy });
-              }
             }
-        } else {
-            updateVesselInFirestore({ location: { latitude, longitude }, accuracy: roundedAccuracy });
-        }
-      },
-      () => {
-          if (vesselStatusRef.current !== 'offline') {
-              setVesselStatus('offline');
-              updateVesselInFirestore({ status: 'offline', eventLabel: 'ERREUR CAPTEUR GPS' });
-              toast({ variant: "destructive", title: "Erreur GPS", description: "Veuillez vérifier les autorisations de localisation." });
-          }
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
+          },
+          () => {
+              if (vesselStatusRef.current !== 'offline') {
+                  setVesselStatus('offline');
+                  updateVesselInFirestore({ status: 'offline', eventLabel: 'ERREUR CAPTEUR GPS' });
+              }
+          },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        );
+    }
     
     return () => { 
-        if (watchIdRef.current) {
-            navigator.geolocation.clearWatch(watchIdRef.current); 
-            watchIdRef.current = null;
-        }
+        // Component unmount logic or sharing stop logic handles clean up via refs
     };
-  }, [isSharing, mode, anchorPos, updateVesselInFirestore, map, toast, vesselPrefs.mooringRadius, isFollowing]);
+  }, [isSharing, mode, map, updateVesselInFirestore]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender') return;
@@ -783,7 +814,7 @@ export default function VesselTrackerPage() {
       }
     }, 30000);
     return () => clearInterval(interval);
-  }, [isSharing, mode, updateVesselInFirestore]);
+  }, [isSharing, mode, updateVesselInFirestore, toast]);
 
   useEffect(() => {
     if (isFollowing && map && mode !== 'sender') {
