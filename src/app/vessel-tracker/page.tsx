@@ -56,7 +56,8 @@ import {
   Ship,
   Timer,
   AlertCircle,
-  Eraser
+  Eraser,
+  Wind
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -304,6 +305,8 @@ export default function VesselTrackerPage() {
                     lastWeatherUpdate: serverTimestamp()
                 });
                 toast({ title: "Météo mise à jour", description: `Vent: ${weather.windSpeed}nd, Mer: ${weather.wavesHeight}m` });
+            } else if (weather.error) {
+                toast({ variant: "destructive", title: "Météo indisponible", description: weather.error });
             }
         }
     };

@@ -8,10 +8,16 @@ export async function fetchWindyWeather(lat: number, lon: number) {
   const API_KEY = 'ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU';
   const url = 'https://api.windy.com/api/point-forecast/v2';
   
+  // Utilisation du Referer correspondant à l'ID de projet Firebase Studio
+  const projectReferer = 'https://studio-2943478321-f746e.web.app';
+
   try {
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Referer': projectReferer
+      },
       body: JSON.stringify({
         lat,
         lon,
@@ -20,6 +26,10 @@ export async function fetchWindyWeather(lat: number, lon: number) {
         key: API_KEY
       })
     });
+
+    if (response.status === 429) {
+        return { success: false, error: "Météo indisponible (Quota)" };
+    }
 
     if (!response.ok) {
         throw new Error(`Windy API error: ${response.statusText}`);
@@ -36,6 +46,6 @@ export async function fetchWindyWeather(lat: number, lon: number) {
     };
   } catch (error) {
     console.error("Windy API Fetch failed:", error);
-    return { success: false, error: "Impossible de joindre Windy" };
+    return { success: false, error: "Erreur technique météo" };
   }
 }
