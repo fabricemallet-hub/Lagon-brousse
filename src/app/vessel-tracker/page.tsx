@@ -49,7 +49,8 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
-  History
+  History,
+  ChevronDown
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -59,17 +60,9 @@ import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
-
-const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
-  if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
-  const props = { className: cn("size-4", className) };
-  if (charging) return <BatteryCharging {...props} className={cn(props.className, "text-blue-500")} />;
-  if (level <= 10) return <BatteryLow {...props} className={cn(props.className, "text-red-600")} />;
-  if (level <= 40) return <BatteryMedium {...props} className={cn(props.className, "text-orange-500")} />;
-  return <BatteryFull {...props} className={cn(props.className, "text-green-600")} />;
-};
 
 const PulsingDot = () => (
     <div className="absolute" style={{ transform: 'translate(-50%, -50%)', zIndex: 50 }}>
@@ -124,6 +117,19 @@ export default function VesselTrackerPage() {
   }, [firestore, savedVesselIds, sharingId, isSharing]);
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
+
+  const soundsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
+  }, [firestore]);
+  const { data: dbSounds } = useCollection<SoundLibraryEntry>(soundsQuery);
+
+  const availableSounds = useMemo(() => {
+    if (!dbSounds) return [];
+    return dbSounds.filter(s => 
+      !s.categories || s.categories.includes('Vessel') || s.categories.includes('General')
+    ).map(s => ({ id: s.id, label: s.label, url: s.url }));
+  }, [dbSounds]);
 
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
@@ -186,7 +192,6 @@ export default function VesselTrackerPage() {
 
   const handleStopSharing = async () => {
     if (!user || !firestore) return;
-    console.log(`[Tracker] Arrêt du partage pour l'ID: ${sharingId}`);
     setIsSharing(false);
     await updateDoc(doc(firestore, 'vessels', sharingId), { isSharing: false, lastActive: serverTimestamp() });
     if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
@@ -195,7 +200,6 @@ export default function VesselTrackerPage() {
   };
 
   const handleManualStatusToggle = (st: VesselStatus['status'], label: string) => {
-    console.log(`[Tracker] Statut manuel activé : ${st} (${label})`);
     setVesselStatus(st);
     const updates: any = { status: st, eventLabel: label };
     if (st === 'emergency') updates.isGhostMode = false;
@@ -223,13 +227,11 @@ export default function VesselTrackerPage() {
         time: format(new Date(), 'HH:mm'),
         label: type
     };
-    console.log(`[Tracker] Signalement tactique ajouté : ${type}`, marker);
     updateVesselInFirestore({ huntingMarkers: arrayUnion(marker) });
     toast({ title: `${type} signalé !`, description: "Point GPS enregistré." });
   };
 
   const handleClearTactical = () => {
-    console.log(`[Tracker] Effacement du journal tactique`);
     updateVesselInFirestore({ huntingMarkers: [] });
     toast({ title: "Journal tactique effacé" });
   };
@@ -240,14 +242,12 @@ export default function VesselTrackerPage() {
     const posUrl = `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
     const name = vesselNickname || sharingId;
     const body = `[LB-NC] ${type} : ${name}. ${vesselSmsMessage || "Assistance requise."}. Carte : ${posUrl}`;
-    console.log(`[Tracker] Envoi SMS d'urgence : ${type}`);
     window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
   };
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
       if (watchIdRef.current !== null) { 
-        console.log("[Tracker] Nettoyage watchPosition");
         navigator.geolocation.clearWatch(watchIdRef.current); 
         watchIdRef.current = null; 
       }
@@ -263,13 +263,10 @@ export default function VesselTrackerPage() {
         
         console.log(`[Tracker] GPS Fix reçu : Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)} (Précision: ${accuracy.toFixed(1)}m)`);
 
-        // TOLÉRANCE ACCRUE : On accepte jusqu'à 500m pour ne pas bloquer l'émetteur en mer
         if (accuracy > 500) {
             console.warn("[Tracker] Précision GPS insuffisante (>500m), point ignoré.");
             return;
         }
-
-        console.log("[Tracker] Point GPS accepté. Mise à jour Firestore...");
 
         const lastSent = lastSentPosRef.current;
         const distMoved = lastSent ? getDistance(latitude, longitude, lastSent.lat, lastSent.lng) : 100;
@@ -310,6 +307,16 @@ export default function VesselTrackerPage() {
     }
   };
 
+  const handleSavePreferences = () => {
+    if (!user || !firestore) return;
+    updateDoc(doc(firestore, 'users', user.uid), {
+        vesselNickname,
+        emergencyContact,
+        vesselSmsMessage,
+        lastVesselId: customSharingId
+    }).then(() => toast({ title: "Réglages enregistrés" }));
+  };
+
   if (isProfileLoading) return <Skeleton className="h-96 w-full" />;
 
   return (
@@ -326,15 +333,16 @@ export default function VesselTrackerPage() {
             <div className="space-y-6">
               {!isSharing ? (
                 <div className="flex items-center justify-between p-4 border-2 rounded-2xl bg-primary/5 border-primary/10">
-                    <div className="space-y-0.5"><Label className="text-sm font-black uppercase">Lancer le partage</Label><p className="text-[9px] font-bold text-muted-foreground uppercase">Flux direct vers récepteur</p></div>
+                    <div className="space-y-0.5">
+                        <Label className="text-sm font-black uppercase">Lancer le partage</Label>
+                        <p className="text-[9px] font-bold text-muted-foreground uppercase">Flux direct vers récepteur</p>
+                    </div>
                     <Switch checked={isSharing} onCheckedChange={val => { if(val) setIsSharing(true); else handleStopSharing(); }} />
                 </div>
               ) : (
-                <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                    <div className={cn("p-6 rounded-2xl shadow-xl relative overflow-hidden border-2 text-white transition-colors duration-500", 
-                        vesselStatus === 'offline' ? "bg-red-600 animate-pulse" : 
-                        vesselStatus === 'emergency' ? "bg-red-600" :
-                        vesselStatus === 'landed' ? "bg-green-600" : "bg-primary")}>
+                <div className="space-y-6 animate-in fade-in slide-in-from-top-2">
+                    {/* STATUT HEADER */}
+                    <div className={cn("p-6 rounded-2xl shadow-xl relative overflow-hidden border-2 text-white", vesselStatus === 'landed' ? "bg-green-600" : "bg-primary")}>
                         <Navigation className="absolute -right-4 -bottom-4 size-32 opacity-10 rotate-12" />
                         <div className="space-y-1 relative z-10">
                             <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2"><Zap className="size-3 fill-yellow-300 text-yellow-300" /> Partage Actif</p>
@@ -343,33 +351,126 @@ export default function VesselTrackerPage() {
                         </div>
                         <div className="mt-8 flex items-center justify-between relative z-10">
                             <Badge variant="outline" className="bg-green-500/30 border-white/30 text-white font-black text-[10px] px-3 h-6">EN LIGNE</Badge>
-                            <Badge variant="outline" className="bg-white/10 text-white text-[9px] px-2 h-5 cursor-pointer">SYNC: {nextSyncSeconds}S</Badge>
+                            <Badge variant="outline" className="bg-white/10 text-white text-[9px] px-2 h-5">SYNC: {nextSyncSeconds}S</Badge>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                        <Button variant={vesselStatus === 'returning' ? 'default' : 'outline'} className="h-14 font-black uppercase text-[10px] border-2 gap-2" onClick={() => handleManualStatusToggle('returning', 'RETOUR MAISON')}>
-                            <Navigation className="size-4" /> RETOUR MAISON
-                        </Button>
-                        <Button variant={vesselStatus === 'landed' ? 'default' : 'outline'} className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatusToggle('landed', 'À TERRE (HOME)')}>
-                            <Home className="size-4" /> HOME (À TERRE)
-                        </Button>
+                    {/* SIGNALISATION MANUELLE */}
+                    <div className="space-y-3">
+                        <p className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest flex items-center gap-2">
+                            <Zap className="size-3" /> Signalisation Manuelle
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                            <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-slate-50 gap-2" onClick={() => handleManualStatusToggle('returning', 'RETOUR MAISON')}>
+                                <Navigation className="size-4 text-blue-600" /> RETOUR MAISON
+                            </Button>
+                            <Button variant="outline" className="h-14 font-black uppercase text-[10px] border-2 bg-slate-50 gap-2" onClick={() => handleManualStatusToggle('landed', 'HOME (À TERRE)')}>
+                                <Home className="size-4 text-green-600" /> HOME (À TERRE)
+                            </Button>
+                        </div>
                     </div>
 
-                    <div className="p-4 bg-muted/20 rounded-2xl border-2 border-dashed space-y-3">
-                        <p className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2 px-1"><Zap className="size-3" /> Signalement Tactique</p>
+                    {/* SIGNALEMENT TACTIQUE */}
+                    <div className="p-4 bg-muted/20 rounded-2xl border-2 border-dashed space-y-4">
+                        <p className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2 px-1">
+                            <Compass className="size-3" /> Signalement Tactique (Flotte)
+                        </p>
                         <div className="grid grid-cols-4 gap-2">
-                            <Button variant="outline" size="icon" className="h-12 w-full border-2 bg-white" onClick={() => handleAddTacticalMarker('OISEAUX')}><Bird className="size-5 text-sky-500" /></Button>
-                            <Button variant="outline" size="icon" className="h-12 w-full border-2 bg-white" onClick={() => handleAddTacticalMarker('MARLIN/THON')}><Fish className="size-5 text-blue-600" /></Button>
-                            <Button variant="outline" size="icon" className="h-12 w-full border-2 bg-white" onClick={() => handleAddTacticalMarker('SARDINES')}><Waves className="size-5 text-cyan-400" /></Button>
-                            <Button variant="outline" size="icon" className="h-12 w-full border-2 bg-white" onClick={() => handleAddTacticalMarker('PRISE')}><Camera className="size-5 text-orange-500" /></Button>
+                            <Button variant="outline" className="h-12 border-2 bg-white flex flex-col items-center justify-center p-0 gap-1 group" onClick={() => handleAddTacticalMarker('OISEAUX')}>
+                                <Bird className="size-4 text-blue-500" />
+                                <span className="text-[7px] font-black uppercase text-blue-600">Oiseaux</span>
+                            </Button>
+                            <Button variant="outline" className="h-12 border-2 bg-blue-900 flex flex-col items-center justify-center p-0 gap-1" onClick={() => handleAddTacticalMarker('MARLIN')}>
+                                <Fish className="size-4 text-white" />
+                                <span className="text-[7px] font-black uppercase text-white">Marlin</span>
+                            </Button>
+                            <Button variant="outline" className="h-12 border-2 bg-red-600 flex flex-col items-center justify-center p-0 gap-1" onClick={() => handleAddTacticalMarker('THON')}>
+                                <Fish className="size-4 text-white" />
+                                <span className="text-[7px] font-black uppercase text-white">Thon</span>
+                            </Button>
+                            <Button variant="outline" className="h-12 border-2 bg-slate-600 flex flex-col items-center justify-center p-0 gap-1" onClick={() => handleAddTacticalMarker('TAZARD')}>
+                                <Fish className="size-4 text-white" />
+                                <span className="text-[7px] font-black uppercase text-white">Tazard</span>
+                            </Button>
+                            <Button variant="outline" className="h-12 border-2 bg-cyan-600 flex flex-col items-center justify-center p-0 gap-1" onClick={() => handleAddTacticalMarker('WAHOO')}>
+                                <Fish className="size-4 text-white" />
+                                <span className="text-[7px] font-black uppercase text-white">Wahoo</span>
+                            </Button>
+                            <Button variant="outline" className="h-12 border-2 bg-yellow-500 flex flex-col items-center justify-center p-0 gap-1" onClick={() => handleAddTacticalMarker('BOSSU')}>
+                                <Fish className="size-4 text-white" />
+                                <span className="text-[7px] font-black uppercase text-white">Bossu</span>
+                            </Button>
+                            <Button variant="outline" className="h-12 border-2 bg-orange-500 flex flex-col items-center justify-center p-0 gap-1" onClick={() => handleAddTacticalMarker('BEC DE CANE')}>
+                                <Fish className="size-4 text-white" />
+                                <span className="text-[7px] font-black uppercase text-white leading-none text-center">Bec de cane</span>
+                            </Button>
                         </div>
                         <Button variant="ghost" className="w-full h-8 text-[8px] font-black uppercase text-destructive" onClick={handleClearTactical}>Effacer le journal tactique</Button>
                     </div>
 
-                    <Button variant="destructive" className="w-full h-14 font-black uppercase opacity-90 gap-3" onClick={handleStopSharing}>
+                    <Button variant="destructive" className="w-full h-14 font-black uppercase shadow-lg gap-3" onClick={() => sendEmergencySms('MAYDAY')}>
+                        <ShieldAlert className="size-6" /> DEMANDE D'ASSISTANCE
+                    </Button>
+
+                    <Button variant="destructive" className="w-full h-14 font-black uppercase opacity-80 gap-3 border-2 border-white/20" onClick={handleStopSharing}>
                         <X className="size-6" /> Arrêter le partage / Quitter
                     </Button>
+
+                    {/* ACCORDEONS REGLAGES */}
+                    <Accordion type="single" collapsible className="w-full space-y-2">
+                        <AccordionItem value="identity" className="border-none">
+                            <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl h-12">
+                                <Settings className="size-4 text-primary" />
+                                <span className="text-[10px] font-black uppercase text-slate-700">Identité & Ids</span>
+                            </AccordionTrigger>
+                            <AccordionContent className="p-4 space-y-4 border-2 rounded-xl mt-1 border-slate-100">
+                                <div className="space-y-1.5">
+                                    <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Mon Surnom</Label>
+                                    <Input value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} placeholder="Capitaine..." className="h-11 border-2 font-bold uppercase" />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-[9px] font-black uppercase opacity-60 ml-1">ID du navire</Label>
+                                    <Input value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} placeholder="BATEAU-1" className="h-11 border-2 font-mono uppercase" />
+                                </div>
+                                <Button className="w-full h-10 font-black uppercase text-[10px]" onClick={handleSavePreferences}>Sauvegarder</Button>
+                            </AccordionContent>
+                        </AccordionItem>
+
+                        <AccordionItem value="emergency" className="border-none">
+                            <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl h-12">
+                                <Smartphone className="size-4 text-orange-600" />
+                                <span className="text-[10px] font-black uppercase text-slate-700">Réglages d'Urgence (SMS)</span>
+                            </AccordionTrigger>
+                            <AccordionContent className="p-4 space-y-4 border-2 rounded-xl mt-1 border-slate-100">
+                                <div className="space-y-1.5">
+                                    <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Numéro du contact à terre</Label>
+                                    <Input value={emergencyContact} onChange={e => setEmergencyContact(e.target.value)} placeholder="77 12 34" className="h-11 border-2 font-black text-lg" />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Message personnalisé</Label>
+                                    <Textarea value={vesselSmsMessage} onChange={e => setVesselSmsMessage(e.target.value)} placeholder="SOS moteur en panne..." className="border-2 min-h-[80px]" />
+                                </div>
+                                <Button className="w-full h-10 font-black uppercase text-[10px]" onClick={handleSavePreferences}>Sauvegarder</Button>
+                            </AccordionContent>
+                        </AccordionItem>
+
+                        <AccordionItem value="sounds" className="border-none">
+                            <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl h-12">
+                                <Volume2 className="size-4 text-blue-600" />
+                                <span className="text-[10px] font-black uppercase text-slate-700">Notifications & Sons</span>
+                            </AccordionTrigger>
+                            <AccordionContent className="p-4 space-y-4 border-2 rounded-xl mt-1 border-slate-100">
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-xs font-black uppercase">Sons Actifs</Label>
+                                    <Switch checked={true} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase opacity-60">Volume</Label>
+                                    <Slider value={[80]} max={100} step={1} />
+                                </div>
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
                 </div>
               )}
             </div>
@@ -377,17 +478,30 @@ export default function VesselTrackerPage() {
 
           {(mode === 'receiver' || mode === 'fleet') && (
             <div className="space-y-4">
-                <p className="text-[10px] font-black uppercase text-muted-foreground ml-1">Navires suivis</p>
+                <p className="text-[10px] font-black uppercase text-muted-foreground ml-1">Navires actifs sur la carte</p>
                 <div className="grid gap-2">
                     {followedVessels?.filter(v => v.isSharing && v.location).map(v => (
-                        <div key={v.id} className="p-3 border-2 rounded-xl flex items-center justify-between bg-card">
+                        <div key={v.id} className="p-3 border-2 rounded-xl flex items-center justify-between bg-card shadow-sm">
                             <div className="flex items-center gap-3">
-                                <Navigation className="size-4 text-primary" />
-                                <span className="font-black uppercase text-xs">{v.displayName || v.id}</span>
+                                <div className={cn("p-2 rounded-lg", v.status === 'landed' ? "bg-green-600" : "bg-primary")}>
+                                    <Navigation className="size-4 text-white" />
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="font-black uppercase text-xs">{v.displayName || v.id}</span>
+                                    <span className="text-[8px] font-black uppercase opacity-40">{v.status === 'moving' ? 'En mouvement' : 'Immobile'}</span>
+                                </div>
                             </div>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { if(v.location) { map?.panTo({ lat: v.location.latitude, lng: v.location.longitude }); map?.setZoom(15); } }}><MapPin className="size-4 text-primary" /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => { if(v.location) { map?.panTo({ lat: v.location.latitude, lng: v.location.longitude }); map?.setZoom(15); } }}>
+                                <MapPin className="size-4" />
+                            </Button>
                         </div>
                     ))}
+                    {(!followedVessels || followedVessels.filter(v => v.isSharing).length === 0) && (
+                        <div className="text-center py-10 border-2 border-dashed rounded-xl opacity-30">
+                            <WifiOff className="size-8 mx-auto mb-2" />
+                            <p className="text-[9px] font-black uppercase">Aucun navire en ligne</p>
+                        </div>
+                    )}
                 </div>
             </div>
           )}
@@ -415,27 +529,6 @@ export default function VesselTrackerPage() {
                       
                       return (
                           <React.Fragment key={`group-${vessel.id}`}>
-                              {vessel.anchorLocation && (vessel.status === 'stationary' || vessel.status === 'drifting') && (
-                                  <>
-                                      <OverlayView position={{ lat: vessel.anchorLocation.latitude, lng: vessel.anchorLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                                          <div style={{ transform: 'translate(-50%, -50%)' }} className="p-1.5 rounded-full border-2 border-white bg-orange-500 shadow-xl z-10">
-                                              <Anchor className="size-4 text-white" />
-                                          </div>
-                                      </OverlayView>
-                                      <Circle
-                                          center={{ lat: vessel.anchorLocation.latitude, lng: vessel.anchorLocation.longitude }}
-                                          radius={vessel.mooringRadius || 20}
-                                          options={{
-                                              fillColor: '#3b82f6',
-                                              fillOpacity: 0.15,
-                                              strokeColor: '#3b82f6',
-                                              strokeWeight: 1,
-                                              clickable: false,
-                                              zIndex: 5
-                                          }}
-                                      />
-                                  </>
-                              )}
                               <OverlayView position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                   <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 z-20">
                                       <div className="px-2 py-1 bg-slate-900/80 backdrop-blur-sm text-white rounded text-[10px] font-black shadow-lg border border-white/20 whitespace-nowrap flex items-center gap-2">
@@ -467,7 +560,7 @@ export default function VesselTrackerPage() {
           ) : (
             <div className="flex flex-col items-center justify-center h-full bg-slate-100 text-muted-foreground gap-4">
                 <AlertCircle className="size-12 opacity-20" />
-                <p className="text-xs font-black uppercase text-center">Service Google Maps en attente...<br/>Vérifiez votre connexion.</p>
+                <p className="text-xs font-black uppercase text-center">Chargement de la carte...</p>
             </div>
           )}
           
