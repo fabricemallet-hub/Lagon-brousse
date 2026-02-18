@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -53,7 +52,8 @@ import {
   VolumeX,
   Camera,
   ImageIcon,
-  Maximize2
+  Maximize2,
+  Ghost
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -99,7 +99,7 @@ export default function VesselTrackerPage() {
   const { user } = useUserHook();
   const firestore = useFirestore();
   const { toast } = useToast();
-  const { isLoaded, loadError } = useJsApiLoader();
+  const { isLoaded, loadError } = useGoogleMaps();
 
   const [mode, setMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
   const [vesselIdToFollow, setVesselIdToFollow] = useState('');
@@ -199,6 +199,12 @@ export default function VesselTrackerPage() {
     ).map(s => ({ id: s.id, label: s.label, url: s.url }));
   }, [dbSounds]);
 
+  const toggleWakeLock = async () => {
+    if (!('wakeLock' in navigator)) return;
+    if (wakeLock) { try { await wakeLock.release(); setWakeLock(null); } catch (e) { setWakeLock(null); } }
+    else { try { const lock = await (navigator as any).wakeLock.request('screen'); setWakeLock(lock); lock.addEventListener('release', () => setWakeLock(null)); } catch (err) {} }
+  };
+
   const stopAllSounds = useCallback(() => {
     if (activeAudioRef.current) {
         activeAudioRef.current.pause();
@@ -231,12 +237,6 @@ export default function VesselTrackerPage() {
       audio.play().catch(e => console.warn("Audio play blocked or failed:", e));
     }
   }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, availableSounds]);
-
-  const toggleWakeLock = async () => {
-    if (!('wakeLock' in navigator)) return;
-    if (wakeLock) { try { await wakeLock.release(); setWakeLock(null); } catch (e) { setWakeLock(null); } }
-    else { try { const lock = await (navigator as any).wakeLock.request('screen'); setWakeLock(lock); lock.addEventListener('release', () => setWakeLock(null)); } catch (err) {} }
-  };
 
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || (!isSharingRef.current && data.isSharing !== false)) return;
@@ -330,7 +330,6 @@ export default function VesselTrackerPage() {
             const currentStatus = vesselStatusRef.current;
             const prefs = vesselPrefsRef.current;
 
-            // REPRISE DU SIGNAL : Exige < 20m de précision pour sortir du mode perdu
             if (currentStatus === 'offline') {
                 if (roundedAccuracy < 20) {
                     const recoveredStatus = lastActiveStatusRef.current || 'moving';
@@ -363,9 +362,7 @@ export default function VesselTrackerPage() {
                 
                 const distFromAnchor = getDistance(newPos.lat, newPos.lng, anchorPosRef.current.lat, anchorPosRef.current.lng);
                 
-                // LOGIQUE RAFFINÉE DU MOUILLAGE ET DE LA DÉRIVE
                 if (currentStatus === 'stationary' || currentStatus === 'drifting') {
-                    // 1. REPRISE MOUVEMENT : Si on dépasse 100m du point fixe
                     if (distFromAnchor > 100) {
                         setVesselStatus('moving');
                         anchorPosRef.current = newPos;
@@ -380,7 +377,6 @@ export default function VesselTrackerPage() {
                         });
                         toast({ title: "Reprise Navigation", description: "Distance > 100m : Ancre levée." });
                     } 
-                    // 2. DÉRIVE : Si on sort du rayon de sécurité (par défaut 20m)
                     else if (distFromAnchor > (prefs.mooringRadius || 20)) {
                         if (currentStatus !== 'drifting') {
                             setVesselStatus('drifting');
@@ -395,7 +391,6 @@ export default function VesselTrackerPage() {
                             updateVesselInFirestore({ location: { latitude, longitude }, accuracy: roundedAccuracy });
                         }
                     } 
-                    // 3. RETOUR DANS LE CERCLE : Stable
                     else {
                         if (currentStatus !== 'stationary') {
                             setVesselStatus('stationary');
@@ -410,7 +405,6 @@ export default function VesselTrackerPage() {
                         }
                     }
                 } else {
-                    // On était en mouvement : détection d'immobilité pour ancrage
                     const hasMovedSignificantly = distFromAnchor > (prefs.mooringRadius || 20);
 
                     if (hasMovedSignificantly) {
@@ -460,17 +454,14 @@ export default function VesselTrackerPage() {
       const currentStatus = vesselStatusRef.current;
       const currentAccuracy = userAccuracy || 0;
       
-      // LOGIQUE INTELLIGENTE DE PERTE DE SIGNAL
       if (currentStatus !== 'offline') {
           let shouldGoOffline = false;
           let reason = '';
 
-          // 1. Signal de mauvaise qualité : Tolérance 10s seulement
           if (currentAccuracy > 100 && elapsed > 10000) {
               shouldGoOffline = true;
               reason = 'SIGNAL IMPRÉCIS (>100m) + 10s D\'INACTIVITÉ';
           }
-          // 2. Signal perdu : Tolérance 60s
           else if (elapsed > 60000) {
               shouldGoOffline = true;
               reason = 'SIGNAL GPS PERDU (DÉLAI > 1 MIN)';
@@ -796,7 +787,6 @@ export default function VesselTrackerPage() {
           <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} onZoomChanged={() => map && setMapZoom(map.getZoom() || 10)} onDragStart={() => setIsFollowing(false)} options={{ disableDefaultUI: true, zoomControl: false, mapTypeControl: false, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
                 {followedVessels?.filter(v => v.isSharing && (mode === 'receiver' || !v.isGhostMode || v.status === 'emergency' || v.id === sharingId)).map(vessel => (
                     <React.Fragment key={`vessel-group-${vessel.id}`}>
-                        {/* 1. ANCRE FIXE ET CERCLE DE PROTECTION */}
                         {(vessel.status === 'stationary' || vessel.status === 'drifting') && vessel.anchorLocation && (
                             <React.Fragment>
                                 <Circle 
@@ -821,7 +811,6 @@ export default function VesselTrackerPage() {
                                 </div>
                             </OverlayView>
                         ))}
-                        {/* 2. POINT BLEU MOBILE (Vaisseau) */}
                         <OverlayView position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                             <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 relative">
                                 <div className={cn("px-2 py-1 text-white rounded text-[10px] font-black shadow-lg border whitespace-nowrap flex items-center gap-2", 
@@ -884,9 +873,4 @@ export default function VesselTrackerPage() {
       </Dialog>
     </div>
   );
-}
-
-function useJsApiLoader() {
-    const { isLoaded, loadError } = useGoogleMaps();
-    return { isLoaded, loadError };
 }
