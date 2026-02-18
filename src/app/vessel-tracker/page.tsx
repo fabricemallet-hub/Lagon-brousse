@@ -263,6 +263,7 @@ export default function VesselTrackerPage() {
             fleetId: fleetId || null,
             lastActive: serverTimestamp(),
             mooringRadius: mooringRadius,
+            anchorLocation: anchorPos ? { latitude: anchorPos.lat, longitude: anchorPos.lng } : null,
             ...batteryInfo,
             ...data 
         };
@@ -271,7 +272,7 @@ export default function VesselTrackerPage() {
         setNextSyncSeconds(60);
     };
     update();
-  }, [user, firestore, isSharing, isGhostMode, sharingId, vesselNickname, fleetId, mooringRadius]);
+  }, [user, firestore, isSharing, isGhostMode, sharingId, vesselNickname, fleetId, mooringRadius, anchorPos]);
 
   // --- 4. GPS TRACKING CORE ---
   useEffect(() => {
@@ -881,6 +882,15 @@ export default function VesselTrackerPage() {
             onDragStart={() => setIsFollowing(false)}
             options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
           >
+                {/* Local Mooring Circle */}
+                {(vesselStatus === 'stationary' || vesselStatus === 'drifting') && anchorPos && (
+                    <Circle 
+                        center={anchorPos} 
+                        radius={mooringRadius} 
+                        options={{ fillColor: '#3b82f6', fillOpacity: 0.15, strokeColor: '#3b82f6', strokeWidth: 1 }} 
+                    />
+                )}
+
                 {followedVessels?.filter(v => v.isSharing && v.location && v.id !== sharingId).map(vessel => {
                     const isOffline = (Date.now() - (vessel.lastActive?.toMillis() || 0) > 70000);
                     const isSOS = vessel.status === 'emergency';
@@ -897,6 +907,7 @@ export default function VesselTrackerPage() {
                     
                     return (
                         <React.Fragment key={vessel.id}>
+                            {/* Remote Mooring Circle */}
                             {(vessel.status === 'stationary' || vessel.status === 'drifting') && vessel.anchorLocation && (
                                 <Circle 
                                     center={{ lat: vessel.anchorLocation.latitude, lng: vessel.anchorLocation.longitude }} 
