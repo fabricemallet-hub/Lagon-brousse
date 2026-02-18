@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where, deleteField, Timestamp, getDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where, deleteField } from 'firebase/firestore';
 import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -41,7 +41,6 @@ import {
   BatteryMedium,
   BatteryFull,
   Users,
-  Search,
   Bird,
   Fish,
   Waves,
@@ -52,18 +51,18 @@ import {
   AlertCircle,
   Eraser
 } from 'lucide-react';
-import { cn, getDistance, getRegionalNow } from '@/lib/utils';
+import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { fetchWindyWeather } from '@/lib/windy-api';
 import { useLocation } from '@/context/location-context';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -128,8 +127,6 @@ export default function VesselTrackerPage() {
   const [nextSyncSeconds, setNextSyncSeconds] = useState(60);
 
   const [emergencyContact, setEmergencyContact] = useState('');
-  const [isEmergencyEnabled, setIsEmergencyEnabled] = useState(true);
-  const [isCustomMessageEnabled, setIsCustomMessageEnabled] = useState(true);
   const [vesselSmsMessage, setVesselSmsMessage] = useState('');
 
   const [vesselPrefs, setVesselPrefs] = useState<any>({
@@ -290,19 +287,6 @@ export default function VesselTrackerPage() {
     update();
   }, [user, firestore, isSharing, isGhostMode, sharingId, vesselNickname, fleetId, mooringRadius, anchorPos, vesselStatus, followedVessels]);
 
-  const getVesselIconInfo = (status: string) => {
-    switch (status) {
-        case 'moving': return { icon: Navigation, color: 'bg-blue-600', label: 'MOUV' };
-        case 'stationary': return { icon: Anchor, color: 'bg-orange-500', label: 'MOUIL' };
-        case 'drifting': return { icon: Anchor, color: 'bg-orange-500', label: 'DÉRIVE' };
-        case 'returning': return { icon: Ship, color: 'bg-indigo-600', label: 'RETOUR' };
-        case 'landed': return { icon: Home, color: 'bg-green-600', label: 'HOME' };
-        case 'emergency': return { icon: ShieldAlert, color: 'bg-red-600', label: 'SOS' };
-        case 'offline': return { icon: WifiOff, color: 'bg-red-600', label: 'OFF' };
-        default: return { icon: Navigation, color: 'bg-slate-600', label: '???' };
-    }
-  };
-
   const handleStopSharing = async () => {
     if (!user || !firestore) return;
     setIsSharing(false);
@@ -310,20 +294,6 @@ export default function VesselTrackerPage() {
     if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
     setCurrentPos(null); setAnchorPos(null);
     toast({ title: "Partage arrêté" });
-  };
-
-  const handleRemoveSavedVessel = async (id: string) => {
-    if (!user || !firestore) return;
-    await updateDoc(doc(firestore, 'users', user.uid), { savedVesselIds: arrayRemove(id) });
-    toast({ title: "Retiré" });
-  };
-
-  const handleResetIdentity = async () => {
-    if (!user || !firestore) return;
-    if (isSharing) await handleStopSharing();
-    await updateDoc(doc(firestore, 'users', user.uid), { vesselNickname: deleteField(), lastVesselId: deleteField(), lastFleetId: deleteField(), mooringRadius: 20 });
-    setVesselNickname(''); setCustomSharingId(''); setCustomFleetId(''); setMooringRadius(20);
-    toast({ title: "Identité réinitialisée" });
   };
 
   const handleManualStatusToggle = (st: VesselStatus['status'], label: string) => {
@@ -335,7 +305,7 @@ export default function VesselTrackerPage() {
     
     if (st === 'stationary' && currentPos) {
         setAnchorPos(currentPos);
-        updates.anchorLocation = { latitude: currentPos.lat, longitude: anchorPos?.lng || currentPos.lng };
+        updates.anchorLocation = { latitude: currentPos.lat, longitude: currentPos.lng };
     }
     
     if (st === 'moving') {
@@ -363,15 +333,6 @@ export default function VesselTrackerPage() {
     playVesselSound(vesselPrefs.notifySounds.tactical || 'sonar');
     toast({ title: `Signalement : ${typeId}` });
   };
-
-  const tacticalMarkers = useMemo(() => {
-    const all: (HuntingMarker & { vesselName: string })[] = [];
-    const sourceVessels = mode === 'fleet' ? (fleetVessels || []) : (followedVessels || []);
-    sourceVessels.forEach(v => {
-        if (v.huntingMarkers) v.huntingMarkers.forEach(m => all.push({ ...m, vesselName: v.displayName || v.id }));
-    });
-    return all.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
-  }, [followedVessels, fleetVessels, mode]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
@@ -410,56 +371,24 @@ export default function VesselTrackerPage() {
     return () => { if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current); };
   }, [isSharing, mode, isFollowing, map, updateVesselInFirestore]);
 
-  useEffect(() => {
-    if (!isSharing || mode !== 'sender') return;
-    const interval = setInterval(() => {
-        const timeSinceLastFix = Date.now() - lastFixTimestampRef.current;
-        if (timeSinceLastFix > 60000 && vesselStatus !== 'offline') {
-            setVesselStatus('offline');
-            updateVesselInFirestore({ status: 'offline' });
-            toast({ variant: 'destructive', title: 'SIGNAL PERDU' });
-        }
-        setNextSyncSeconds(prev => prev <= 1 ? 60 : prev - 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [isSharing, mode, vesselStatus, updateVesselInFirestore, toast]);
-
-  useEffect(() => {
-    if (!isSharing || mode !== 'sender') { isInitialisedRef.current = false; return; }
-    if (isInitialisedRef.current) return;
-
-    const startDetection = async () => {
-        isInitialisedRef.current = true;
-        setVesselStatus('stabilizing');
-        updateLog(vesselNickname || 'MOI', 'LANCEMENT EN COURS', currentPos || INITIAL_CENTER);
-        await new Promise(r => setTimeout(r, 30000));
-        if (!currentPos) { setVesselStatus('moving'); return; }
-        const initialStatus = 'stationary';
-        setAnchorPos(currentPos);
-        setVesselStatus(initialStatus);
-        updateVesselInFirestore({ status: initialStatus, anchorLocation: { latitude: currentPos.lat, longitude: currentPos.lng } });
-
-        const interval = setInterval(() => {
-            if (!currentPos || !anchorPos) return;
-            const d = getDistance(currentPos.lat, currentPos.lng, anchorPos.lat, anchorPos.lng);
-            setVesselStatus(curr => {
-                if (['returning', 'landed', 'emergency', 'offline'].includes(curr)) return curr;
-                if (d > 100) { setAnchorPos(null); driftConfirmationRef.current = false; updateVesselInFirestore({ status: 'moving', anchorLocation: null }); return 'moving'; }
-                if (d > mooringRadius) {
-                    if (driftConfirmationRef.current) { updateVesselInFirestore({ status: 'drifting' }); return 'drifting'; }
-                    else { driftConfirmationRef.current = true; return curr; }
-                }
-                driftConfirmationRef.current = false;
-                if (curr !== 'stationary') updateVesselInFirestore({ status: 'stationary' });
-                return 'stationary';
-            });
-        }, 60000);
-        return () => clearInterval(interval);
-    };
-    startDetection();
-  }, [isSharing, mode, currentPos, anchorPos, mooringRadius, vesselNickname, updateVesselInFirestore, updateLog]);
-
   if (isProfileLoading) return <Skeleton className="h-96 w-full" />;
+
+  const getVesselIconInfo = (status: string) => {
+    switch (status) {
+        case 'moving': return { icon: Navigation, color: 'bg-blue-600', label: 'MOUV' };
+        case 'stationary': return { icon: Anchor, color: 'bg-orange-500', label: 'MOUIL' };
+        case 'drifting': return { icon: Anchor, color: 'bg-orange-500', label: 'DÉRIVE' };
+        case 'returning': return { icon: Ship, color: 'bg-indigo-600', label: 'RETOUR' };
+        case 'landed': return { icon: Home, color: 'bg-green-600', label: 'HOME' };
+        case 'emergency': return { icon: ShieldAlert, color: 'bg-red-600', label: 'SOS' };
+        case 'offline': return { icon: WifiOff, color: 'bg-red-600', label: 'OFF' };
+        default: return { icon: Navigation, color: 'bg-slate-600', label: '???' };
+    }
+  };
+
+  const tacticalMarkers = mode === 'fleet' ? 
+    (fleetVessels?.flatMap(v => v.huntingMarkers?.map(m => ({ ...m, vesselName: v.displayName || v.id })) || []) || []) : 
+    (followedVessels?.flatMap(v => v.huntingMarkers?.map(m => ({ ...m, vesselName: v.displayName || v.id })) || []) || []);
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
@@ -493,18 +422,7 @@ export default function VesselTrackerPage() {
                         </div>
                         <div className="mt-8 flex items-center justify-between relative z-10">
                             <Badge variant="outline" className="bg-green-500/30 border-white/30 text-white font-black text-[10px] px-3 h-6">EN LIGNE</Badge>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-white/80">
-                                {vesselStatus === 'stabilizing' ? 'LANCEMENT EN COURS...' :
-                                 vesselStatus === 'moving' ? 'MOUVEMENT' : 
-                                 vesselStatus === 'stationary' ? 'AU MOUILLAGE' : 
-                                 vesselStatus === 'drifting' ? 'À LA DÉRIVE !' : 
-                                 vesselStatus === 'returning' ? 'RETOUR MAISON' :
-                                 vesselStatus === 'landed' ? 'À TERRE (HOME)' :
-                                 vesselStatus === 'offline' ? 'SIGNAL PERDU' : 'ATTENTE GPS...'}
-                            </span>
-                            <Badge variant="outline" className="bg-white/10 text-white text-[9px] px-2 h-5 cursor-pointer" onClick={() => { if(currentPos) updateVesselInFirestore({ location: { latitude: currentPos.lat, longitude: currentPos.lng } }); }}>
-                                SYNC: {nextSyncSeconds}S
-                            </Badge>
+                            <Badge variant="outline" className="bg-white/10 text-white text-[9px] px-2 h-5 cursor-pointer">SYNC: {nextSyncSeconds}S</Badge>
                         </div>
                     </div>
 
@@ -520,16 +438,6 @@ export default function VesselTrackerPage() {
                                 <Camera className="size-4 mb-0.5" />
                                 <span className="text-[7px] font-black">PRISE</span>
                             </Button>
-                            <input type="file" accept="image/*" capture="environment" ref={photoInputRef} className="hidden" onChange={async (e) => {
-                                const file = e.target.files?.[0]; if (!file || !currentPos) return;
-                                const reader = new FileReader();
-                                reader.onload = async (ev) => {
-                                    const marker: HuntingMarker = { id: Math.random().toString(36).substring(7), lat: currentPos.lat, lng: currentPos.lng, time: new Date().toISOString(), label: 'PRISE', photoUrl: ev.target?.result as string };
-                                    await updateDoc(doc(firestore!, 'vessels', sharingId), { huntingMarkers: arrayUnion(marker) });
-                                    playVesselSound('sonar'); toast({ title: "Photo partagée !" });
-                                };
-                                reader.readAsDataURL(file);
-                            }} />
                         </div>
                     </div>
 
@@ -542,186 +450,27 @@ export default function VesselTrackerPage() {
                         </Button>
                     </div>
 
-                    <Button variant={vesselStatus === 'emergency' ? 'destructive' : 'secondary'} className="w-full h-14 font-black uppercase tracking-widest gap-3 border-2" onClick={() => handleManualStatusToggle('emergency', 'DEMANDE D\'ASSISTANCE')}>
-                        <ShieldAlert className="size-6" /> DEMANDE D'ASSISTANCE
-                    </Button>
-
                     <Button variant="destructive" className="w-full h-14 font-black uppercase opacity-90 gap-3" onClick={handleStopSharing}>
                         <X className="size-6" /> Arrêter le partage / Quitter
                     </Button>
                 </div>
               )}
-
-              <Accordion type="single" collapsible className="w-full space-y-2">
-                <AccordionItem value="sender-prefs" className="border-none">
-                    <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/5 rounded-xl border">
-                        <Settings className="size-4 text-primary" />
-                        <span className="text-[10px] font-black uppercase">Identité & IDs</span>
-                    </AccordionTrigger>
-                    <AccordionContent className="pt-4 space-y-6">
-                        <div className="p-4 border-2 border-dashed rounded-2xl bg-slate-50 flex items-center justify-between">
-                            <div className="space-y-0.5">
-                                <Label className="text-xs font-black uppercase flex items-center gap-2"><Ghost className="size-4" /> Mode Fantôme</Label>
-                                <p className="text-[9px] font-bold text-muted-foreground uppercase">Masquer ma position pour la Flotte (C)</p>
-                            </div>
-                            <Switch checked={isGhostMode} onCheckedChange={setIsGhostMode} />
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label className="text-[10px] font-black uppercase ml-1 opacity-60">Surnom du navire</Label>
-                            <Input value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} className="font-black text-center h-12 border-2" />
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label className="text-[10px] font-black uppercase ml-1 opacity-60">ID Navire (Individuel)</Label>
-                            <Input value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest" />
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label className="text-[10px] font-black uppercase ml-1 opacity-60">ID Groupe Flotte C (Collectif)</Label>
-                            <Input value={customFleetId} onChange={e => setCustomFleetId(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest" />
-                        </div>
-                        <div className="space-y-4 pt-2">
-                            <div className="flex justify-between items-center px-1">
-                                <Label className="text-[9px] font-black uppercase opacity-60">Rayon de mouillage (M)</Label>
-                                <Badge variant="outline" className="font-black bg-white">{mooringRadius}m</Badge>
-                            </div>
-                            <Slider value={[mooringRadius]} min={10} max={200} step={5} onValueChange={v => setMooringRadius(v[0])} />
-                        </div>
-                        <div className="pt-4 border-t border-dashed">
-                            <Button variant="ghost" className="w-full h-12 font-black uppercase text-[10px] text-destructive gap-2 border border-destructive/10 bg-red-50/10" onClick={handleResetIdentity}>
-                                <Eraser className="size-4" /> RÉINITIALISER MON IDENTITÉ
-                            </Button>
-                        </div>
-                    </AccordionContent>
-                </AccordionItem>
-
-                {isSharing && (
-                    <AccordionItem value="debug-test" className="border-none mt-2">
-                        <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-slate-100/50 rounded-xl border border-slate-200">
-                            <Zap className="size-4 text-slate-600" />
-                            <span className="text-[10px] font-black uppercase text-slate-600">Pont de Test Manuel (Debug)</span>
-                        </AccordionTrigger>
-                        <AccordionContent className="pt-4 space-y-3 px-1">
-                            <div className="grid grid-cols-2 gap-2">
-                                <Button variant="outline" size="sm" className="h-10 text-[9px] font-black uppercase border-2" onClick={() => handleManualStatusToggle('stationary', 'DEBUG: FORCE MOUILLAGE')}>Force Mouillage</Button>
-                                <Button variant="outline" size="sm" className="h-10 text-[9px] font-black uppercase border-2" onClick={() => handleManualStatusToggle('drifting', 'DEBUG: FORCE DÉRIVE')}>Force Dérive</Button>
-                                <Button variant="outline" size="sm" className="h-10 text-[9px] font-black uppercase border-2" onClick={() => handleManualStatusToggle('offline', 'DEBUG: FORCE SIGNAL PERDU')}>Force Signal Perdu</Button>
-                                <Button variant="outline" size="sm" className="h-10 text-[9px] font-black uppercase border-2" onClick={() => handleManualStatusToggle('moving', 'DEBUG: FORCE MOUVEMENT')}>Force Mouvement</Button>
-                            </div>
-                            <p className="text-[8px] font-bold text-muted-foreground text-center uppercase italic px-4 leading-tight">Outils réservés aux tests de réaction de la carte et du récepteur sans déplacement réel.</p>
-                        </AccordionContent>
-                    </AccordionItem>
-                )}
-              </Accordion>
             </div>
           )}
 
-          {mode === 'receiver' && (
-            <div className="space-y-6">
-                <div className="space-y-1.5">
-                    <Label className="text-[10px] font-black uppercase ml-1 opacity-60 text-center block">Suivre le navire ID</Label>
-                    <div className="flex gap-2">
-                        <Input placeholder="ENTREZ L'ID..." value={vesselIdToFollow} onChange={e => setVesselIdToFollow(e.target.value)} className="font-black text-center h-14 border-2 uppercase tracking-[0.2em] flex-grow text-lg" />
-                        <Button variant="default" className="h-14 w-14 shrink-0 shadow-lg" onClick={() => { if(vesselIdToFollow.trim()) { updateDoc(doc(firestore!, 'users', user!.uid), { savedVesselIds: arrayUnion(vesselIdToFollow.trim().toUpperCase()) }); setVesselIdToFollow(''); toast({ title: "Navire ajouté" }); } }}>
-                            <Save className="size-6" />
-                        </Button>
-                    </div>
-                </div>
-
-                <div className="space-y-3">
-                    <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
-                        <Users className="size-3" /> Ma Flotte ({followedVessels?.filter(v => v.id !== sharingId).length || 0})
-                    </h3>
-                    <div className="grid gap-2">
-                        {savedVesselIds.map(id => {
-                            const vessel = followedVessels?.find(v => v.id === id);
-                            const isActive = vessel?.isSharing === true;
-                            const isOffline = (Date.now() - (vessel?.lastActive?.toMillis?.() || 0) > 70000);
-                            
-                            return (
-                                <div key={id} className={cn("p-4 border-2 rounded-2xl flex items-center justify-between transition-all shadow-sm", 
-                                    isActive ? (isOffline ? "border-red-200 bg-red-50/10 animate-pulse" : "border-primary/20 bg-primary/5") : "bg-muted/5 opacity-60")}>
-                                    <div className="flex items-center gap-4 min-w-0">
-                                        <div className={cn("p-2.5 rounded-xl shadow-sm", isActive ? (isOffline ? "bg-red-600 text-white" : "bg-primary text-white") : "bg-muted text-muted-foreground")}>
-                                            {isActive ? (isOffline ? <WifiOff className="size-5" /> : <Navigation className="size-5" />) : <WifiOff className="size-5" />}
-                                        </div>
-                                        <div className="flex flex-col min-w-0">
-                                            <span className="font-black text-sm uppercase tracking-tight truncate">{vessel?.displayName || id} {vessel?.isGhostMode && <span className="text-[8px] opacity-40 ml-1">(FANTÔME)</span>}</span>
-                                            <div className="flex items-center gap-2">
-                                                <span className={cn("text-[9px] font-black uppercase", isActive ? (isOffline ? "text-red-600" : "text-green-600") : "text-muted-foreground")}>
-                                                    {isActive ? (isOffline ? 'SIGNAL PERDU' : 'EN LIGNE') : 'DÉCONNECTÉ'}
-                                                </span>
-                                                {isActive && vessel?.batteryLevel !== undefined && (
-                                                    <div className="flex items-center gap-1 opacity-60 scale-75">
-                                                        <BatteryIconComp level={vessel.batteryLevel} charging={vessel.isCharging} />
-                                                        <span className="text-[10px] font-black">{vessel.batteryLevel}%</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-1 shrink-0">
-                                        {isActive && vessel && (
-                                            <div className="flex gap-1 mr-1">
-                                                <Button size="icon" variant="ghost" className="h-9 w-9 border-2 border-red-100 text-red-600" onClick={() => window.location.href = `tel:16`}><Phone className="size-4" /></Button>
-                                                <Button size="icon" variant="ghost" className="h-9 w-9 border-2 border-primary/20 text-primary" onClick={() => sendEmergencySms('MAYDAY', vessel)}><MessageSquare className="size-4" /></Button>
-                                            </div>
-                                        )}
-                                        <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive/40 hover:text-destructive border-2" onClick={() => handleRemoveSavedVessel(id)}>
-                                            <Trash2 className="size-4" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            </div>
-          )}
-
-          {mode === 'fleet' && (
-            <div className="space-y-6">
-                <div className="space-y-1.5">
-                    <Label className="text-[10px] font-black uppercase ml-1 opacity-60 text-center block">ID Groupe (Flotte C)</Label>
-                    <div className="flex gap-2">
-                        <Input placeholder="ID GROUPE SUD-NC" value={customFleetId} onChange={e => setCustomFleetId(e.target.value)} className="font-black text-center h-14 border-2 uppercase tracking-widest flex-grow" />
-                        <Button variant="default" className="h-14 w-14 shrink-0 shadow-lg" onClick={() => { updateDoc(doc(firestore!, 'users', user!.uid), { lastFleetId: customFleetId.trim().toUpperCase() }); toast({ title: "ID Groupe mis à jour" }); }}>
-                            <Save className="size-6" />
-                        </Button>
-                    </div>
-                </div>
-
-                <div className="space-y-3">
-                    <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
-                        <Users className="size-3" /> Membres du Groupe ({fleetVessels?.length || 0})
-                    </h3>
-                    <div className="grid gap-2">
-                        {fleetVessels?.map(v => {
-                            if (v.isGhostMode && v.id !== sharingId && v.status !== 'emergency') return null;
-                            const isOffline = (Date.now() - (v.lastActive?.toMillis?.() || 0) > 70000);
-                            const isMe = v.id === sharingId;
-                            return (
-                                <div key={v.id} className={cn("p-4 border-2 rounded-2xl flex items-center justify-between transition-all shadow-sm", 
-                                    isOffline ? "border-red-200 bg-red-50/10 opacity-60" : "border-primary/20 bg-primary/5",
-                                    isMe && "ring-2 ring-primary ring-offset-2")}>
-                                    <div className="flex items-center gap-4 min-w-0">
-                                        <div className={cn("p-2.5 rounded-xl text-white shadow-sm", isOffline ? "bg-red-600" : "bg-slate-900")}>
-                                            {isMe ? <Navigation className="size-5" /> : <Navigation className="size-5" />}
-                                        </div>
-                                        <div className="flex flex-col min-w-0">
-                                            <span className="font-black text-sm uppercase truncate">{v.displayName} {isMe && "(MOI)"}</span>
-                                            <span className={cn("text-[9px] font-black uppercase", isOffline ? "text-red-600" : "text-green-600")}>
-                                                {isOffline ? 'SIGNAL PERDU' : (v.status === 'emergency' ? 'SOS !' : 'EN LIGNE')}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    {v.location && (
-                                        <Button variant="ghost" size="icon" className="h-10 w-10 border-2" onClick={() => { map?.panTo({ lat: v.location!.latitude, lng: v.location!.longitude }); map?.setZoom(15); }}>
-                                            <MapPin className="size-4 text-primary" />
-                                        </Button>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
+          {(mode === 'receiver' || mode === 'fleet') && (
+            <div className="space-y-4">
+                <p className="text-[10px] font-black uppercase text-muted-foreground ml-1">Navires suivis</p>
+                <div className="grid gap-2">
+                    {(mode === 'receiver' ? followedVessels : fleetVessels)?.map(v => (
+                        <div key={v.id} className="p-3 border-2 rounded-xl flex items-center justify-between bg-card">
+                            <div className="flex items-center gap-3">
+                                <Navigation className="size-4 text-primary" />
+                                <span className="font-black uppercase text-xs">{v.displayName || v.id}</span>
+                            </div>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { map?.panTo({ lat: v.location!.latitude, lng: v.location!.longitude }); map?.setZoom(15); }}><MapPin className="size-4 text-primary" /></Button>
+                        </div>
+                    ))}
                 </div>
             </div>
           )}
@@ -732,7 +481,6 @@ export default function VesselTrackerPage() {
         <div className={cn("relative bg-muted/20", isFullscreen ? "flex-grow" : "h-[450px]")}>
           {isLoaded ? (
             <GoogleMap 
-              key={isFullscreen ? 'map-fullscreen' : 'map-standard'}
               mapContainerClassName="w-full h-full" 
               defaultCenter={INITIAL_CENTER} 
               defaultZoom={10} 
@@ -740,49 +488,17 @@ export default function VesselTrackerPage() {
               onDragStart={() => setIsFollowing(false)} 
               options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
             >
-                  {(mode === 'sender' || mode === 'receiver' || mode === 'fleet') && followedVessels?.filter(v => v.isSharing && v.anchorLocation && (v.status === 'stationary' || v.status === 'drifting')).map(v => {
-                      if (mode === 'fleet' && v.isGhostMode && v.status !== 'emergency' && v.id !== sharingId) return null;
-                      return (
-                          <React.Fragment key={`anchor-layer-${v.id}`}>
-                              <Circle 
-                                  center={{ lat: v.anchorLocation!.latitude, lng: v.anchorLocation!.longitude }} 
-                                  radius={v.mooringRadius || 20} 
-                                  options={{ fillColor: '#3b82f6', fillOpacity: 0.15, strokeColor: '#3b82f6', strokeWeight: 1, clickable: false }} 
-                              />
-                              <OverlayView position={{ lat: v.anchorLocation!.latitude, lng: v.anchorLocation!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                                  <div style={{ transform: 'translate(-50%, -50%)' }} className="p-1 bg-white/90 backdrop-blur-md rounded-full shadow-lg border border-orange-500 z-10">
-                                      <Anchor className="size-3 text-orange-500" />
-                                  </div>
-                              </OverlayView>
-                          </React.Fragment>
-                      );
-                  })}
-
-                  {followedVessels?.filter(v => v.isSharing && v.location && v.id !== sharingId).map(vessel => {
+                  {followedVessels?.filter(v => v.isSharing && v.location).map(vessel => {
                       const isOffline = (Date.now() - (vessel.lastActive?.toMillis?.() || 0) > 70000);
-                      if (mode === 'fleet' && vessel.isGhostMode && vessel.status !== 'emergency') return null;
                       const statusInfo = getVesselIconInfo(isOffline ? 'offline' : vessel.status);
                       
                       return (
                           <OverlayView key={`marker-${vessel.id}`} position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                               <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 z-20">
-                                  <div className={cn(
-                                      "px-2 py-1 text-white rounded text-[10px] font-black shadow-lg border whitespace-nowrap flex flex-col items-center transition-all backdrop-blur-sm", 
-                                      isOffline || vessel.status === 'emergency' || vessel.status === 'drifting' 
-                                          ? statusInfo.color + " animate-pulse" 
-                                          : "bg-slate-900/80 border-white/20"
-                                  )}>
-                                      <div className="flex items-center gap-2">
-                                          <span className="uppercase">{statusInfo.label}</span> | {vessel.displayName}
-                                      </div>
-                                      {vessel.windSpeed !== undefined && !isOffline && (
-                                          <div className="mt-0.5 border-t border-white/10 pt-0.5 flex items-center gap-2 text-[8px] font-bold text-blue-300">
-                                              <span className="flex items-center gap-0.5">💨 {vessel.windSpeed}nd</span>
-                                              <span className="flex items-center gap-0.5">🌊 {vessel.wavesHeight}m</span>
-                                          </div>
-                                      )}
+                                  <div className="px-2 py-1 bg-slate-900/80 backdrop-blur-sm text-white rounded text-[10px] font-black shadow-lg border border-white/20 whitespace-nowrap">
+                                      {vessel.displayName}
                                   </div>
-                                  <div className={cn("p-2 rounded-full border-2 border-white shadow-xl transition-all", vessel.status === 'emergency' ? "bg-red-600 scale-125" : statusInfo.color)}>
+                                  <div className={cn("p-2 rounded-full border-2 border-white shadow-xl", statusInfo.color)}>
                                       {React.createElement(statusInfo.icon, { className: "size-5 text-white" })}
                                   </div>
                               </div>
@@ -793,9 +509,8 @@ export default function VesselTrackerPage() {
                   {tacticalMarkers.map(m => (
                       <OverlayView key={`tactical-${m.id}`} position={{ lat: m.lat, lng: m.lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                           <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 z-10">
-                              <div className="px-2 py-1 bg-white/90 backdrop-blur-md text-slate-900 rounded-lg text-[9px] font-black shadow-lg border border-slate-200 uppercase tracking-tighter">{m.label}</div>
-                              <div className={cn("p-1.5 rounded-full shadow-lg border-2 border-white", m.label === 'SARDINES' ? "bg-emerald-500" : "bg-slate-900 text-white")}>
-                                  {m.label === 'SARDINES' ? <Waves className="size-3" /> : <Fish className="size-3" />}
+                              <div className="p-1.5 rounded-full shadow-lg border-2 border-white bg-slate-900 text-white">
+                                  <Fish className="size-3" />
                               </div>
                           </div>
                       </OverlayView>
@@ -810,7 +525,7 @@ export default function VesselTrackerPage() {
           ) : (
             <div className="flex flex-col items-center justify-center h-full bg-slate-100 text-muted-foreground gap-4">
                 <AlertCircle className="size-12 opacity-20" />
-                <p className="text-xs font-black uppercase">Vérification de la clé Maps...</p>
+                <p className="text-xs font-black uppercase">Service Google Maps en attente...</p>
             </div>
           )}
           
@@ -830,47 +545,42 @@ export default function VesselTrackerPage() {
                 </Button>
             </div>
 
-            <div className="grid grid-cols-1 gap-2">
-                <Accordion type="single" collapsible className="w-full border rounded-xl bg-muted/5 overflow-hidden">
-                    <AccordionItem value="history" className="border-none">
-                        <div className="flex items-center justify-between px-3 h-12">
-                            <AccordionTrigger className="flex-1 text-[10px] font-black uppercase hover:no-underline py-0">
-                                <div className="flex items-center gap-2"><History className="size-3"/> Journal Technique</div>
-                            </AccordionTrigger>
-                            <Button variant="ghost" size="sm" className="h-7 px-2 text-[8px] font-black text-destructive border border-destructive/20" onClick={(e) => { e.stopPropagation(); setHistory([]); }}>
-                                <Trash2 className="size-3 mr-1" /> Effacer
-                            </Button>
-                        </div>
-                        <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide">
-                            {history.length > 0 ? (
-                                <div className="space-y-2 px-3">
-                                    {history.map((h, i) => {
-                                        const isValidDate = h.time instanceof Date && !isNaN(h.time.getTime());
-                                        return (
-                                            <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm">
-                                                <div className="flex flex-col gap-0.5">
-                                                  <div className="flex items-center gap-2">
-                                                    <span className="font-black text-primary uppercase">{h.vesselName}</span>
-                                                    <span className={cn("font-black uppercase", h.statusLabel.includes('DÉRIVE') ? 'text-orange-600' : h.statusLabel.includes('MOUVEMENT') ? 'text-blue-600' : 'text-slate-600')}>{h.statusLabel}</span>
-                                                  </div>
-                                                  <span className="text-[9px] font-bold opacity-40 uppercase">
-                                                    {isValidDate ? format(h.time, 'HH:mm:ss') : '...'} • ACTIF {h.durationMinutes || 0} MIN
-                                                  </span>
-                                                </div>
-                                                <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase border-2 px-3 gap-2" onClick={() => { map?.panTo(h.pos); map?.setZoom(17); }}>
-                                                  <MapPin className="size-3 text-primary" /> GPS
-                                                </Button>
+            <Accordion type="single" collapsible className="w-full border rounded-xl bg-muted/5 overflow-hidden">
+                <AccordionItem value="history" className="border-none">
+                    <div className="flex items-center justify-between px-3 h-12">
+                        <AccordionTrigger className="flex-1 text-[10px] font-black uppercase hover:no-underline py-0">
+                            <div className="flex items-center gap-2"><History className="size-3"/> Journal Technique</div>
+                        </AccordionTrigger>
+                    </div>
+                    <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide">
+                        {history.length > 0 ? (
+                            <div className="space-y-2 px-3">
+                                {history.map((h, i) => {
+                                    const isValidDate = h.time instanceof Date && !isNaN(h.time.getTime());
+                                    return (
+                                        <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm">
+                                            <div className="flex flex-col gap-0.5">
+                                              <div className="flex items-center gap-2">
+                                                <span className="font-black text-primary uppercase">{h.vesselName}</span>
+                                                <span className="font-black uppercase">{h.statusLabel}</span>
+                                              </div>
+                                              <span className="text-[9px] font-bold opacity-40 uppercase">
+                                                {isValidDate ? format(h.time, 'HH:mm:ss') : '...'} • ACTIF {h.durationMinutes || 0} MIN
+                                              </span>
                                             </div>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                <div className="text-center py-8 opacity-30 uppercase font-black text-[10px] tracking-widest italic">Aucun log technique</div>
-                            )}
-                        </AccordionContent>
-                    </AccordionItem>
-                </Accordion>
-            </div>
+                                            <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase border-2 px-3 gap-2" onClick={() => { map?.panTo(h.pos); map?.setZoom(17); }}>
+                                              <MapPin className="size-3 text-primary" /> GPS
+                                            </Button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <div className="text-center py-8 opacity-30 uppercase font-black text-[10px] tracking-widest italic">Aucun log technique</div>
+                        )}
+                    </AccordionContent>
+                </AccordionItem>
+            </Accordion>
         </div>
       </Card>
     </div>

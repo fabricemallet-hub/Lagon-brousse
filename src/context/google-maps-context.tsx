@@ -16,7 +16,7 @@ const GoogleMapsContext = createContext<GoogleMapsContextType | undefined>(
 );
 
 export function GoogleMapsProvider({ children }: { children: ReactNode }) {
-  // CLÉ API CONFIRMÉE
+  // CLÉ API UTILISÉE POUR LE PROJET studio-2943478321-f746e
   const googleMapsApiKey = "AIzaSyDs6qQO274Ro2RD4lVkr8KztsZIecP-ZDk";
 
   const { isLoaded, loadError } = useJsApiLoader({
@@ -40,8 +40,11 @@ export function GoogleMapsProvider({ children }: { children: ReactNode }) {
             <AlertCircle className="size-4" />
             <AlertTitle className="font-black uppercase text-xs">Alerte Google Maps</AlertTitle>
             <AlertDescription className="text-[10px] font-medium leading-relaxed">
-              Le service Google Maps signale une erreur : <strong>{loadError.message}</strong>. 
-              Cela indique généralement que la clé API est expirée, désactivée ou que le compte de facturation (Billing) associé au projet <strong>studio-2943478321-f746e</strong> est inactif.
+              Le service Google Maps signale une erreur : <strong>{loadError.message}</strong>.<br /><br />
+              <strong>ExpiredKeyMapError</strong> signifie que votre clé API est rejetée par Google. 
+              Même si l'API est activée, vérifiez impérativement dans votre Console Google Cloud :<br />
+              1. Que votre <strong>Compte de Facturation (Billing)</strong> est bien rattaché au projet.<br />
+              2. Que la clé elle-même n'est pas marquée comme "Désactivée" dans l'onglet <strong>Identifiants</strong>.
             </AlertDescription>
           </Alert>
         </div>

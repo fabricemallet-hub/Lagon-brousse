@@ -9,15 +9,10 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: '/',
     scope: '/',
     display: 'standalone',
-    display_override: ['window-controls-overlay', 'standalone', 'fullscreen'],
     background_color: '#ffffff',
     theme_color: '#3498db',
     orientation: 'portrait',
     lang: 'fr-FR',
-    categories: ['weather', 'navigation', 'lifestyle', 'sports'],
-    iarc_rating_id: 'none',
-    related_applications: [],
-    prefer_related_applications: false,
     icons: [
       {
         src: '/icon-192x192.png',
@@ -32,21 +27,5 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: 'any',
       },
     ],
-    screenshots: [
-      {
-        src: 'https://picsum.photos/seed/lb-narrow/1080/1920',
-        sizes: '1080x1920',
-        type: 'image/png',
-        form_factor: 'narrow',
-        label: 'Accueil de l\'application'
-      },
-      {
-        src: 'https://picsum.photos/seed/lb-wide/1920/1080',
-        sizes: '1920x1080',
-        type: 'image/png',
-        form_factor: 'wide',
-        label: 'Tableau de bord Pêche'
-      }
-    ]
   }
 }
