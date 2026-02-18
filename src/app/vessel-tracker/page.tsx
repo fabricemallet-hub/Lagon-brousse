@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, where } from 'firebase/firestore';
 import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -240,24 +240,6 @@ export default function VesselTrackerPage() {
             } catch (e) {}
         }
 
-        const currentVesselDoc = followedVessels?.find(v => v.id === sharingId);
-        const lastWeatherUpdate = currentVesselDoc?.lastWeatherUpdate;
-        const nowTime = Date.now();
-        const threeHours = 3 * 60 * 60 * 1000;
-        
-        let weatherData = {};
-        if (data.location && (!lastWeatherUpdate || (nowTime - (lastWeatherUpdate.toMillis?.() || 0) > threeHours))) {
-            const windy = await fetchWindyWeather(data.location.latitude, data.location.longitude);
-            if (windy.success) {
-                weatherData = {
-                    windSpeed: windy.windSpeed,
-                    windDir: windy.windDir,
-                    wavesHeight: windy.wavesHeight,
-                    lastWeatherUpdate: serverTimestamp()
-                };
-            }
-        }
-
         const updatePayload: any = { 
             id: sharingId,
             userId: user.uid, 
@@ -268,7 +250,6 @@ export default function VesselTrackerPage() {
             lastActive: serverTimestamp(),
             mooringRadius: mooringRadius,
             ...batteryInfo,
-            ...weatherData,
             ...data 
         };
         
@@ -282,7 +263,7 @@ export default function VesselTrackerPage() {
         setNextSyncSeconds(60);
     };
     update();
-  }, [user, firestore, isSharing, isGhostMode, sharingId, vesselNickname, fleetId, mooringRadius, anchorPos, vesselStatus, followedVessels]);
+  }, [user, firestore, isSharing, isGhostMode, sharingId, vesselNickname, fleetId, mooringRadius, anchorPos, vesselStatus]);
 
   const handleStopSharing = async () => {
     if (!user || !firestore) return;
@@ -575,7 +556,7 @@ export default function VesselTrackerPage() {
 
         <div className="bg-card p-4 flex flex-col gap-4 border-t-2">
             <div className="grid grid-cols-2 gap-2">
-                <Button variant="destructive" className="h-14 font-black uppercase rounded-xl shadow-lg gap-3 text-xs" onClick={() => sendEmergencySms('SOS')}>
+                <Button variant="destructive" className="h-14 font-black uppercase rounded-xl shadow-lg gap-3 text-xs" onClick={() => sendEmergencySms('MAYDAY')}>
                     <ShieldAlert className="size-5" /> SOS / MAYDAY
                 </Button>
                 <Button variant="secondary" className="h-14 font-black uppercase rounded-xl shadow-lg gap-3 text-xs border-2 border-primary/20" onClick={() => sendEmergencySms('PAN PAN')}>
