@@ -86,7 +86,7 @@ const PulsingDot = () => (
 const TACTICAL_OPTIONS = [
     { id: 'OISEAUX', label: 'OISEAUX', icon: Bird, color: 'bg-white text-blue-600 border-blue-200' },
     { id: 'MARLIN', label: 'MARLIN', icon: Fish, color: 'bg-indigo-900 text-white border-indigo-800' },
-    { id: 'THON', label: 'THON', icon: Fish, color: 'bg-red-600 text-white border-red-500' },
+    { id: 'THON', label: 'THON', icon: Fish, color: 'bg-red-600 text-white border-red-50' },
     { id: 'TAZARD', label: 'TAZARD', icon: Fish, color: 'bg-slate-600 text-white border-slate-500' },
     { id: 'WAHOO', label: 'WAHOO', icon: Fish, color: 'bg-cyan-600 text-white border-cyan-500' },
     { id: 'BONITE', label: 'BONITE', icon: Fish, color: 'bg-blue-600 text-white border-blue-500' },
@@ -328,7 +328,7 @@ export default function VesselTrackerPage() {
         if (timeSinceLastFix > 60000 && vesselStatus !== 'offline') {
             setVesselStatus('offline');
             updateVesselInFirestore({ status: 'offline' });
-            toast({ variant: 'destructive', title: 'SIGNAL GPS PERDU' });
+            toast({ variant: 'destructive', title: 'SIGNAL PERDU' });
         }
         setNextSyncSeconds(prev => prev <= 1 ? 60 : prev - 1);
     }, 1000);
@@ -404,19 +404,24 @@ export default function VesselTrackerPage() {
   };
 
   const handleManualStatusToggle = (st: VesselStatus['status'], label: string) => {
-    if (vesselStatus === st) {
-        setVesselStatus('moving');
-        updateLog(vesselNickname || 'MOI', 'ERREUR INVOLONTAIRE', currentPos || INITIAL_CENTER);
-        updateVesselInFirestore({ status: 'moving', anchorLocation: null });
-        toast({ title: "Mode AUTO rétabli" });
-    } else {
-        setVesselStatus(st);
-        updateLog(vesselNickname || 'MOI', label, currentPos || INITIAL_CENTER);
-        const updates: any = { status: st };
-        if (st === 'emergency') updates.isGhostMode = false;
-        updateVesselInFirestore(updates);
-        toast({ title: label });
+    setVesselStatus(st);
+    updateLog(vesselNickname || 'MOI', label, currentPos || INITIAL_CENTER);
+    
+    const updates: any = { status: st, eventLabel: label };
+    if (st === 'emergency') updates.isGhostMode = false;
+    
+    if (st === 'stationary' && currentPos) {
+        setAnchorPos(currentPos);
+        updates.anchorLocation = { latitude: currentPos.lat, longitude: currentPos.lng };
     }
+    
+    if (st === 'moving') {
+        setAnchorPos(null);
+        updates.anchorLocation = null;
+    }
+
+    updateVesselInFirestore(updates);
+    toast({ title: label });
   };
 
   const handleTacticalSignal = async (typeId: string) => {
@@ -443,6 +448,12 @@ export default function VesselTrackerPage() {
     if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
     setCurrentPos(null); setAnchorPos(null);
     toast({ title: "Partage arrêté" });
+  };
+
+  const handleRemoveSavedVessel = async (id: string) => {
+    if (!user || !firestore) return;
+    await updateDoc(doc(firestore, 'users', user.uid), { savedVesselIds: arrayRemove(id) });
+    toast({ title: "Retiré" });
   };
 
   const handleResetIdentity = async () => {
@@ -593,6 +604,25 @@ export default function VesselTrackerPage() {
                         </div>
                     </AccordionContent>
                 </AccordionItem>
+
+                {/* PONT DE TEST MANUEL (DEBUG) */}
+                {isSharing && (
+                    <AccordionItem value="debug-test" className="border-none mt-2">
+                        <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-slate-100/50 rounded-xl border border-slate-200">
+                            <Zap className="size-4 text-slate-600" />
+                            <span className="text-[10px] font-black uppercase text-slate-600">Pont de Test Manuel (Debug)</span>
+                        </AccordionTrigger>
+                        <AccordionContent className="pt-4 space-y-3 px-1">
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button variant="outline" size="sm" className="h-10 text-[9px] font-black uppercase border-2" onClick={() => handleManualStatusToggle('stationary', 'DEBUG: FORCE MOUILLAGE')}>Force Mouillage</Button>
+                                <Button variant="outline" size="sm" className="h-10 text-[9px] font-black uppercase border-2" onClick={() => handleManualStatusToggle('drifting', 'DEBUG: FORCE DÉRIVE')}>Force Dérive</Button>
+                                <Button variant="outline" size="sm" className="h-10 text-[9px] font-black uppercase border-2" onClick={() => handleManualStatusToggle('offline', 'DEBUG: FORCE SIGNAL PERDU')}>Force Signal Perdu</Button>
+                                <Button variant="outline" size="sm" className="h-10 text-[9px] font-black uppercase border-2" onClick={() => handleManualStatusToggle('moving', 'DEBUG: FORCE MOUVEMENT')}>Force Mouvement</Button>
+                            </div>
+                            <p className="text-[8px] font-bold text-muted-foreground text-center uppercase italic px-4 leading-tight">Outils réservés aux tests de réaction de la carte et du récepteur sans déplacement réel.</p>
+                        </AccordionContent>
+                    </AccordionItem>
+                )}
               </Accordion>
             </div>
           )}
