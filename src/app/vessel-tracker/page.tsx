@@ -69,8 +69,8 @@ const PulsingDot = () => (
     </div>
 );
 
-const BatteryIcon = ({ level, charging }: { level: number; charging: boolean }) => {
-  const props = { className: 'w-4 h-4 inline-block' };
+const BatteryStatusIcon = ({ level, charging }: { level: number; charging: boolean }) => {
+  const props = { className: 'w-3 h-3' };
   if (charging) return <BatteryCharging {...props} className="text-blue-500" />;
   if (level < 20) return <BatteryLow {...props} className="text-red-500" />;
   if (level < 60) return <BatteryMedium {...props} className="text-amber-500" />;
@@ -192,13 +192,28 @@ export default function VesselTrackerPage() {
             updatePayload.anchorLocation = null;
         }
 
+        // Logic Windy Cooldown (3h)
+        const lastUpdate = currentVesselData?.lastWeatherUpdate?.toMillis?.() || 0;
+        const now = Date.now();
+        if (now - lastUpdate > 3 * 3600 * 1000 && currentPos) {
+            try {
+                const weather = await fetchWindyWeather(currentPos.lat, currentPos.lng);
+                if (weather.success) {
+                    updatePayload.windSpeed = weather.windSpeed;
+                    updatePayload.windDir = weather.windDir;
+                    updatePayload.wavesHeight = weather.wavesHeight;
+                    updatePayload.lastWeatherUpdate = serverTimestamp();
+                }
+            } catch (e) {}
+        }
+
         setDoc(doc(firestore, 'vessels', sharingId), updatePayload, { merge: true })
             .catch((err) => console.error(`[Tracker] Erreur Firestore:`, err));
         
         setNextSyncSeconds(60);
     };
     update();
-  }, [user, firestore, isSharing, isGhostMode, sharingId, vesselNickname, mooringRadius, anchorPos, vesselStatus]);
+  }, [user, firestore, isSharing, isGhostMode, sharingId, vesselNickname, mooringRadius, anchorPos, vesselStatus, currentVesselData, currentPos]);
 
   const addToTechnicalLog = useCallback((label: string, pos: {lat: number, lng: number}) => {
     setTechnicalLog(prev => {
@@ -215,6 +230,23 @@ export default function VesselTrackerPage() {
         }, ...prev].slice(0, 50);
     });
   }, [vesselNickname, sharingId]);
+
+  const handleClearTechnical = () => {
+    setTechnicalLog([]);
+    toast({ title: "Journal technique effacé" });
+  };
+
+  const handleClearTactical = async () => {
+    if (!user || !firestore) return;
+    try {
+        await updateDoc(doc(firestore, 'vessels', sharingId), {
+            huntingMarkers: []
+        });
+        toast({ title: "Journal tactique effacé" });
+    } catch (e) {
+        console.error(e);
+    }
+  };
 
   const onLoad = useCallback(function callback(mapInstance: google.maps.Map) {
     setMap(mapInstance);
@@ -288,23 +320,6 @@ export default function VesselTrackerPage() {
     }
   };
 
-  const handleClearTechnical = () => {
-    setTechnicalLog([]);
-    toast({ title: "Journal technique effacé" });
-  };
-
-  const handleClearTactical = async () => {
-    if (!user || !firestore) return;
-    try {
-        await updateDoc(doc(firestore, 'vessels', sharingId), {
-            huntingMarkers: []
-        });
-        toast({ title: "Journal tactique effacé" });
-    } catch (e) {
-        console.error(e);
-    }
-  };
-
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
       if (watchIdRef.current !== null) { 
@@ -314,23 +329,15 @@ export default function VesselTrackerPage() {
       return;
     }
 
-    console.log(`[Tracker] Lancement de watchPosition pour ${sharingId}`);
-
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude, accuracy } = position.coords;
         const newPos = { lat: latitude, lng: longitude };
         
-        console.log(`[Tracker] GPS Fix : Lat: ${latitude}, Lng: ${longitude} (Précision: ${accuracy}m)`);
-
-        if (accuracy > 500) {
-            console.warn(`[Tracker] Précision insuffisante (>500m), point ignoré.`);
-            return;
-        }
+        if (accuracy > 500) { return; }
 
         setCurrentPos(newPos);
 
-        // LOGIQUE D'ANCRE ET DÉRIVE
         if (vesselStatus !== 'returning' && vesselStatus !== 'landed' && vesselStatus !== 'emergency') {
             if (!anchorPos) {
                 setAnchorPos(newPos);
@@ -485,6 +492,10 @@ export default function VesselTrackerPage() {
                         </div>
                     </div>
 
+                    <Button variant="destructive" className="w-full h-16 text-xs font-black uppercase tracking-widest shadow-lg rounded-xl gap-3 border-2 border-white/20 touch-manipulation" onClick={() => handleManualStatusToggle('emergency', 'DEMANDE D\'ASSISTANCE (SOS)')}>
+                        <ShieldAlert className="size-6 animate-pulse" /> DEMANDE D'ASSISTANCE (SOS)
+                    </Button>
+
                     <Accordion type="single" collapsible className="w-full space-y-2">
                         <AccordionItem value="identity" className="bg-muted/30 border rounded-lg">
                             <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 h-12">
@@ -562,6 +573,8 @@ export default function VesselTrackerPage() {
                       const isOffline = (Date.now() - lastActiveMillis > 70000);
                       const statusInfo = getVesselIconInfo(isOffline ? 'offline' : vessel.status);
                       const isMe = vessel.id === sharingId;
+                      const battery = vessel.batteryLevel ?? 100;
+                      const isCharging = vessel.isCharging ?? false;
                       
                       return (
                           <React.Fragment key={`vessel-${vessel.id}`}>
@@ -573,27 +586,51 @@ export default function VesselTrackerPage() {
                                         options={{ fillColor: '#3b82f6', fillOpacity: 0.15, strokeColor: '#3b82f6', strokeOpacity: 0.5, strokeWeight: 1 }} 
                                     />
                                     <OverlayView position={{ lat: vessel.anchorLocation.latitude, lng: vessel.anchorLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                                        <div style={{ transform: 'translate(-50%, -50%)' }} className="z-10"><Anchor className="size-4 text-orange-500 drop-shadow-md" /></div>
+                                        <div style={{ transform: 'translate(-50%, -50%)' }} className="z-10"><Anchor className="size-8 text-orange-500 drop-shadow-md stroke-[2.5]" /></div>
                                     </OverlayView>
                                 </>
                               )}
                               <OverlayView position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                   <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 z-50">
-                                      <div className={cn("px-2 py-1 backdrop-blur-md rounded text-[9px] font-black shadow-lg border border-white/20 whitespace-nowrap flex items-center gap-2", isOffline ? "bg-red-600/90 text-white animate-pulse" : "bg-white/90 text-slate-900")}>
-                                          <span>{vessel.displayName}</span>
-                                          <span className="opacity-40">| {statusInfo.label}</span>
+                                      {/* LABEL PRINCIPAL : NOM | STATUT */}
+                                      <div className={cn(
+                                          "px-2.5 py-1.5 backdrop-blur-md rounded-lg text-[10px] font-black shadow-xl border-2 whitespace-nowrap flex items-center gap-2", 
+                                          isOffline ? "bg-red-600 text-white animate-pulse border-white/40" : "bg-white/95 text-slate-900 border-primary/20"
+                                      )}>
+                                          <span className="truncate max-w-[100px]">{vessel.displayName}</span>
+                                          <span className={cn("border-l-2 pl-2", isOffline ? "text-white/60" : "text-primary/60")}>{statusInfo.label}</span>
                                       </div>
+
+                                      {/* ICONES DE NAVIGATION / MOUVEMENT */}
                                       {isMe && mode === 'sender' ? <PulsingDot /> : (
-                                          <div className={cn("p-2 rounded-full border-2 border-white shadow-xl", statusInfo.color)}>
-                                              {React.createElement(statusInfo.icon, { className: "size-5 text-white" })}
+                                          <div className={cn("p-2.5 rounded-full border-2 border-white shadow-2xl scale-110", statusInfo.color)}>
+                                              {React.createElement(statusInfo.icon, { className: "size-6 text-white drop-shadow-sm" })}
                                           </div>
                                       )}
-                                      {(vessel.windSpeed !== undefined) && (
-                                          <div className="mt-1 bg-black/60 backdrop-blur-sm text-white px-1.5 py-0.5 rounded text-[7px] font-black flex items-center gap-1">
-                                              <span>💨 {vessel.windSpeed}ND</span>
-                                              {vessel.wavesHeight !== undefined && <span>🌊 {vessel.wavesHeight.toFixed(1)}m</span>}
-                                          </div>
-                                      )}
+
+                                      {/* BULLES D'ÉTAT (BATTERIE & MÉTÉO) */}
+                                      <div className="flex flex-col gap-1 mt-1">
+                                          {/* BATTERIE BULLE */}
+                                          {(isCharging || battery < 20) && (
+                                              <div className={cn(
+                                                  "px-2 py-0.5 rounded-full text-[8px] font-black uppercase flex items-center gap-1.5 shadow-lg border-2",
+                                                  isCharging ? "bg-blue-600 text-white border-blue-400" : "bg-red-600 text-white border-red-400 animate-pulse"
+                                              )}>
+                                                  <BatteryStatusIcon level={battery} charging={isCharging} />
+                                                  <span>{isCharging ? 'EN CHARGE' : 'BATTERIE FAIBLE'} ({battery}%)</span>
+                                              </div>
+                                          )}
+
+                                          {/* MÉTÉO WINDY BULLE */}
+                                          {vessel.windSpeed !== undefined && (
+                                              <div className="bg-slate-900/90 backdrop-blur-md text-white px-2 py-1 rounded-full text-[8px] font-black shadow-lg border border-white/20 flex items-center gap-2">
+                                                  <div className="flex items-center gap-1"><Waves className="size-3 text-blue-400" /> {vessel.windSpeed}ND</div>
+                                                  {vessel.wavesHeight !== undefined && (
+                                                      <div className="border-l border-white/20 pl-2 flex items-center gap-1"><Waves className="size-3 text-cyan-400" /> {vessel.wavesHeight.toFixed(1)}m</div>
+                                                  )}
+                                              </div>
+                                          )}
+                                      </div>
                                   </div>
                               </OverlayView>
                           </React.Fragment>
