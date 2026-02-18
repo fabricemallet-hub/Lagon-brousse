@@ -50,7 +50,7 @@ export function GoogleMapsProvider({ children }: { children: ReactNode }) {
                 </p>
                 <div className="bg-white/50 p-3 rounded-xl border border-red-200">
                   <p className="italic text-red-900 font-bold">
-                    Solution : Allez dans la Console Google Cloud &gt; Facturation et liez une carte bancaire au projet studio-2943478321-f746e.
+                    {"Solution : Allez dans la Console Google Cloud > Facturation et liez une carte bancaire. Sans cela, les cartes resteront grises."}
                   </p>
                 </div>
               </div>

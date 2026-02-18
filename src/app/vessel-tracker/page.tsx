@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, where } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, where, deleteDoc } from 'firebase/firestore';
 import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -23,7 +23,6 @@ import {
   Shrink, 
   Zap, 
   AlertTriangle,
-  History,
   MapPin,
   X,
   Play,
@@ -33,7 +32,6 @@ import {
   RefreshCw,
   Settings,
   Smartphone,
-  Ghost,
   Home,
   Compass,
   BatteryCharging,
@@ -50,17 +48,16 @@ import {
   Ship,
   AlertCircle,
   Eye,
-  EyeOff
+  EyeOff,
+  History
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
-import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
+import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
-import { useLocation } from '@/context/location-context';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -87,7 +84,6 @@ export default function VesselTrackerPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const { isLoaded, loadError } = useGoogleMaps();
-  const { selectedRegion } = useLocation();
 
   const [mode, setMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
   const [isSharing, setIsSharing] = useState(false);
@@ -220,6 +216,24 @@ export default function VesselTrackerPage() {
     toast({ title: label });
   };
 
+  const handleAddTacticalMarker = (type: string, icon: any) => {
+    if (!currentPos || !firestore) return;
+    const marker: HuntingMarker = {
+        id: Math.random().toString(36).substring(7),
+        lat: currentPos.lat,
+        lng: currentPos.lng,
+        time: format(new Date(), 'HH:mm'),
+        label: type
+    };
+    updateVesselInFirestore({ huntingMarkers: arrayUnion(marker) });
+    toast({ title: `${type} signalé !`, description: "Point GPS enregistré." });
+  };
+
+  const handleClearTactical = () => {
+    updateVesselInFirestore({ huntingMarkers: [] });
+    toast({ title: "Journal tactique effacé" });
+  };
+
   const sendEmergencySms = (type: 'MAYDAY' | 'PAN PAN') => {
     if (!emergencyContact) { toast({ variant: "destructive", title: "Contact requis" }); return; }
     const pos = currentPos || INITIAL_CENTER;
@@ -239,7 +253,7 @@ export default function VesselTrackerPage() {
       (position) => {
         const { latitude, longitude, accuracy } = position.coords;
         const newPos = { lat: latitude, lng: longitude };
-        if (accuracy > 15) return;
+        if (accuracy > 30) return;
 
         const lastSent = lastSentPosRef.current;
         const distMoved = lastSent ? getDistance(latitude, longitude, lastSent.lat, lastSent.lng) : 100;
@@ -269,7 +283,6 @@ export default function VesselTrackerPage() {
     switch (status) {
         case 'moving': return { icon: Navigation, color: 'bg-blue-600', label: 'MOUV' };
         case 'stationary': return { icon: Anchor, color: 'bg-orange-500', label: 'MOUIL' };
-        case 'drifting': return { icon: Anchor, color: 'bg-orange-500', label: 'DÉRIVE' };
         case 'returning': return { icon: Ship, color: 'bg-indigo-600', label: 'RETOUR' };
         case 'landed': return { icon: Home, color: 'bg-green-600', label: 'HOME' };
         case 'emergency': return { icon: ShieldAlert, color: 'bg-red-600', label: 'SOS' };
@@ -302,7 +315,6 @@ export default function VesselTrackerPage() {
                     <div className={cn("p-6 rounded-2xl shadow-xl relative overflow-hidden border-2 text-white transition-colors duration-500", 
                         vesselStatus === 'offline' ? "bg-red-600 animate-pulse" : 
                         vesselStatus === 'emergency' ? "bg-red-600" :
-                        vesselStatus === 'drifting' ? "bg-orange-500 border-orange-400" :
                         vesselStatus === 'landed' ? "bg-green-600" : "bg-primary")}>
                         <Navigation className="absolute -right-4 -bottom-4 size-32 opacity-10 rotate-12" />
                         <div className="space-y-1 relative z-10">
@@ -323,6 +335,17 @@ export default function VesselTrackerPage() {
                         <Button variant={vesselStatus === 'landed' ? 'default' : 'outline'} className="h-14 font-black uppercase text-[10px] border-2 bg-background gap-2" onClick={() => handleManualStatusToggle('landed', 'À TERRE (HOME)')}>
                             <Home className="size-4" /> HOME (À TERRE)
                         </Button>
+                    </div>
+
+                    <div className="p-4 bg-muted/20 rounded-2xl border-2 border-dashed space-y-3">
+                        <p className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2 px-1"><Zap className="size-3" /> Signalement Tactique</p>
+                        <div className="grid grid-cols-4 gap-2">
+                            <Button variant="outline" size="icon" className="h-12 w-full border-2 bg-white" onClick={() => handleAddTacticalMarker('OISEAUX', Bird)}><Bird className="size-5 text-sky-500" /></Button>
+                            <Button variant="outline" size="icon" className="h-12 w-full border-2 bg-white" onClick={() => handleAddTacticalMarker('MARLIN/THON', Fish)}><Fish className="size-5 text-blue-600" /></Button>
+                            <Button variant="outline" size="icon" className="h-12 w-full border-2 bg-white" onClick={() => handleAddTacticalMarker('SARDINES', Waves)}><Waves className="size-5 text-cyan-400" /></Button>
+                            <Button variant="outline" size="icon" className="h-12 w-full border-2 bg-white" onClick={() => handleAddTacticalMarker('PRISE', Camera)}><Camera className="size-5 text-orange-500" /></Button>
+                        </div>
+                        <Button variant="ghost" className="w-full h-8 text-[8px] font-black uppercase text-destructive" onClick={handleClearTactical}>Effacer le journal tactique</Button>
                     </div>
 
                     <Button variant="destructive" className="w-full h-14 font-black uppercase opacity-90 gap-3" onClick={handleStopSharing}>
@@ -356,7 +379,7 @@ export default function VesselTrackerPage() {
         <div className={cn("relative bg-muted/20", isFullscreen ? "flex-grow" : "h-[450px]")}>
           {isLoaded ? (
             <GoogleMap 
-              mapContainerClassName="w-full h-full" 
+              mapContainerStyle={{ width: '100%', height: '100%' }}
               defaultCenter={INITIAL_CENTER} 
               defaultZoom={10} 
               onLoad={setMap} 
@@ -400,6 +423,14 @@ export default function VesselTrackerPage() {
                                       </div>
                                   </div>
                               </OverlayView>
+                              {vessel.huntingMarkers?.map(m => (
+                                <OverlayView key={m.id} position={{ lat: m.lat, lng: m.lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                                    <div style={{ transform: 'translate(-50%, -50%)' }} className="flex flex-col items-center">
+                                        <div className="bg-white/90 border-2 rounded px-1.5 py-0.5 text-[7px] font-black shadow-lg mb-0.5 uppercase">{m.label}</div>
+                                        <div className="size-2 rounded-full bg-white ring-2 ring-primary animate-pulse" />
+                                    </div>
+                                </OverlayView>
+                              ))}
                           </React.Fragment>
                       );
                   })}
