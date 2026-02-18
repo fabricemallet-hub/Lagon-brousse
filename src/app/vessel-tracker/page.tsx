@@ -167,14 +167,6 @@ export default function VesselTrackerPage() {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
-  const labels = useMemo(() => ({
-    status1: 'AU MOUILLAGE',
-    status2: 'EN MOUVEMENT',
-    alertBtn: 'SIGNALER PRISE',
-    alertTitle: 'PRISE SIGNALÉE !',
-    alertDesc: 'Un poisson a été repéré !'
-  }), []);
-
   const [vesselPrefs, setVesselPrefs] = useState<NonNullable<UserAccount['vesselPrefs']>>({
     isNotifyEnabled: true,
     vesselVolume: 0.8,
@@ -285,6 +277,12 @@ export default function VesselTrackerPage() {
     }
   }, [vesselPrefs.isNotifyEnabled, vesselPrefs.vesselVolume, availableSounds]);
 
+  const toggleWakeLock = async () => {
+    if (!('wakeLock' in navigator)) return;
+    if (wakeLock) { try { await wakeLock.release(); setWakeLock(null); } catch (e) { setWakeLock(null); } }
+    else { try { const lock = await (navigator as any).wakeLock.request('screen'); setWakeLock(lock); lock.addEventListener('release', () => setWakeLock(null)); } catch (err) {} }
+  };
+
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || (!isSharingRef.current && data.isSharing !== false)) return;
     
@@ -334,7 +332,6 @@ export default function VesselTrackerPage() {
     update();
   }, [user, firestore]);
 
-  // GPS WATCH : VERSION STABILISÉE ET DÉCOUPLÉE DU RENDU
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
       if (watchIdRef.current !== null) { 
@@ -358,7 +355,6 @@ export default function VesselTrackerPage() {
             const currentStatus = vesselStatusRef.current;
             const prefs = vesselPrefsRef.current;
 
-            // LOGIQUE DE REPRISE DE SIGNAL (Précision < 20m)
             if (currentStatus === 'offline') {
                 if (roundedAccuracy < 20) {
                     const recoveredStatus = lastActiveStatusRef.current || 'moving';
@@ -443,7 +439,6 @@ export default function VesselTrackerPage() {
     }
   }, [isSharing, mode, map, updateVesselInFirestore, toast]);
 
-  // LOGIQUE SMART SIGNAL LOST (PRECISION VS TEMPS)
   useEffect(() => {
     if (!isSharing || mode !== 'sender') return;
     const interval = setInterval(() => {
@@ -456,12 +451,10 @@ export default function VesselTrackerPage() {
           let shouldGoOffline = false;
           let reason = '';
 
-          // CONDITION 1 : Signal Imprécis (>100m) et pas de fix depuis 10s
           if (currentAccuracy > 100 && elapsed > 10000) {
               shouldGoOffline = true;
               reason = 'SIGNAL IMPRÉCIS (>100m) + 10s D\'INACTIVITÉ';
           }
-          // CONDITION 2 : Temps d'inactivité > 60s
           else if (elapsed > 60000) {
               shouldGoOffline = true;
               reason = 'SIGNAL GPS PERDU (DÉLAI > 1 MIN)';
@@ -474,7 +467,7 @@ export default function VesselTrackerPage() {
               toast({ variant: "destructive", title: "Signal Perdu", description: reason });
           }
       }
-    }, 5000); // On vérifie toutes les 5 secondes
+    }, 5000);
     return () => clearInterval(interval);
   }, [isSharing, mode, updateVesselInFirestore, toast, userAccuracy]);
 
@@ -776,7 +769,7 @@ export default function VesselTrackerPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="space-y-1"><Label className="text-[9px] font-black uppercase ml-1 opacity-60">{mode === 'receiver' ? 'SUIVRE LE NAVIRE ID' : 'ID GROUPE FLOTTE C'}</Label><div className="flex gap-2"><Input value={vesselIdToFollow} onChange={e => setVesselIdToFollow(e.target.value)} className="font-black text-center h-12 border-2 uppercase flex-1" /><Button variant="outline" className="h-12 w-12 border-2 shrink-0" onClick={handleSaveVesselToList} disabled={!vesselIdToFollow.trim()}><Save className="size-4" /></Button></div></div>
+              <div className="space-y-1"><Label className="text-[9px] font-black uppercase ml-1 opacity-60">{mode === 'receiver' ? 'SUIVRE LE NAVIRE ID' : 'ID GROUPE FLOTTE C'}</Label><div className="flex gap-2"><Input value={vesselIdToFollow} onChange={e => setVesselIdToFollow(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest flex-1" /><Button variant="outline" className="h-12 w-12 border-2 shrink-0" onClick={handleSaveVesselToList} disabled={!vesselIdToFollow.trim()}><Save className="size-4" /></Button></div></div>
               <div className="space-y-3">
                 <Label className="text-[9px] font-black uppercase ml-1 opacity-40">{mode === 'fleet' ? 'Membres du Groupe' : 'Ma Flotte'}</Label>
                 <div className="grid gap-2">
@@ -807,7 +800,7 @@ export default function VesselTrackerPage() {
 
       <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all", isFullscreen && "fixed inset-0 z-[100] w-screen h-screen rounded-none")}>
         <div className={cn("relative bg-muted/20", isFullscreen ? "flex-grow" : "h-[300px]")}>
-          <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} onZoomChanged={() => map && setMapZoom(map.getZoom() || 10)} onDragStart={() => setIsFollowing(false)} options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
+          <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} onZoomChanged={() => map && setMapZoom(map.getZoom() || 10)} onDragStart={() => setIsFollowing(false)} options={{ disableDefaultUI: true, zoomControl: false, mapTypeControl: false, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
                 {followedVessels?.filter(v => v.isSharing && (mode === 'receiver' || !v.isGhostMode || v.status === 'emergency' || v.id === sharingId)).map(vessel => (
                     <React.Fragment key={`vessel-group-${vessel.id}`}>
                         {vessel.status === 'stationary' && vessel.anchorLocation && (
