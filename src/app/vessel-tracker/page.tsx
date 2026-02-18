@@ -526,8 +526,8 @@ export default function VesselTrackerPage() {
         };
 
         const lastActiveTime = getTimeMillis(vessel.lastActive);
-        // Detection de signal perdu (> 75s sans update)
-        const isSignalStale = isSharingActive && (Date.now() - lastActiveTime > 75000);
+        // Detection de signal perdu (> 65s sans update)
+        const isSignalStale = isSharingActive && (Date.now() - lastActiveTime > 65000);
         
         const currentStatus = (isSharingActive && !isSignalStale) ? (vessel.status || 'moving') : 'offline';
         const statusTime = vessel.statusChangedAt || vessel.lastActive;
@@ -595,7 +595,7 @@ export default function VesselTrackerPage() {
         const statusLabels: Record<string, string> = { 
             moving: 'EN MOUVEMENT', 
             stationary: 'AU MOUILLAGE', 
-            offline: isSignalStale ? 'SIGNAL PERDU' : 'SIGNAL COUPÉ',
+            offline: isSignalStale ? 'SIGNAL PERDU' : (vessel.eventLabel || 'SIGNAL COUPÉ'),
             returning: 'RETOUR MAISON',
             landed: 'À TERRE (HOME)',
             emergency: 'DEMANDE D\'ASSISTANCE'
@@ -611,6 +611,9 @@ export default function VesselTrackerPage() {
             let label = statusLabels[currentStatus] || currentStatus;
             if (mode === 'fleet' && isGhost && currentStatus === 'emergency') {
                 label = "DEMANDE D'ASSISTANCE (REPRISE VISIBILITÉ)";
+            }
+            if (vessel.eventLabel && !isSignalStale) {
+                label = vessel.eventLabel;
             }
 
             setTechHistory(prev => {
@@ -719,7 +722,13 @@ export default function VesselTrackerPage() {
             updateVesselInFirestore({ location: { latitude, longitude }, accuracy: roundedAccuracy });
         }
       },
-      () => toast({ variant: "destructive", title: "Erreur GPS", description: "Veuillez vérifier les autorisations de localisation." }),
+      () => {
+          if (vesselStatus !== 'offline') {
+              setVesselStatus('offline');
+              updateVesselInFirestore({ status: 'offline', eventLabel: 'ERREUR CAPTEUR GPS' });
+              toast({ variant: "destructive", title: "Erreur GPS", description: "Veuillez vérifier les autorisations de localisation." });
+          }
+      },
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
@@ -729,13 +738,16 @@ export default function VesselTrackerPage() {
     if (!isSharing || mode !== 'sender') return;
     const interval = setInterval(() => {
       // Détection locale de signal perdu pour le capitaine
-      if (Date.now() - lastFixTimeRef.current > 60000) {
+      const fixAge = Date.now() - lastFixTimeRef.current;
+      if (fixAge > 60000) {
           if (vesselStatus !== 'offline') {
               setVesselStatus('offline');
+              // On force l'état offline dans Firestore et on arrête de heartbeater lastActive
               updateVesselInFirestore({ status: 'offline', eventLabel: 'SIGNAL GPS PERDU' });
               toast({ variant: "destructive", title: "Signal GPS perdu", description: "Aucune position reçue depuis 1 minute." });
           }
-      } else {
+      } else if (vesselStatus !== 'offline') {
+          // Heartbeat normal seulement si on a un fix récent
           updateVesselInFirestore({}); 
       }
     }, 30000);
@@ -1211,7 +1223,7 @@ export default function VesselTrackerPage() {
                     {mode === 'fleet' ? 'Membres du Groupe' : 'Ma Flotte'} ({followedVessels?.filter(v => {
                         const isSharingActive = v.isSharing === true;
                         const lastActiveTime = v.lastActive ? (v.lastActive.toMillis ? v.lastActive.toMillis() : v.lastActive.seconds * 1000) : 0;
-                        const isSignalStale = isSharingActive && (Date.now() - lastActiveTime > 75000);
+                        const isSignalStale = isSharingActive && (Date.now() - lastActiveTime > 65000);
                         const isFollowed = mode === 'receiver' || !v.isGhostMode || v.status === 'emergency' || v.id === sharingId;
                         return isSharingActive && isFollowed;
                     }).length || 0})
@@ -1222,7 +1234,7 @@ export default function VesselTrackerPage() {
                             {followedVessels?.filter(v => !v.isGhostMode || v.status === 'emergency' || v.id === sharingId).map(vessel => {
                                 const isSharingActive = vessel.isSharing === true;
                                 const lastActiveTime = vessel.lastActive ? (vessel.lastActive.toMillis ? vessel.lastActive.toMillis() : vessel.lastActive.seconds * 1000) : 0;
-                                const isSignalStale = isSharingActive && (Date.now() - lastActiveTime > 75000);
+                                const isSignalStale = isSharingActive && (Date.now() - lastActiveTime > 65000);
                                 const isTrulyActive = isSharingActive && !isSignalStale;
 
                                 return (
@@ -1257,7 +1269,7 @@ export default function VesselTrackerPage() {
                                 const vessel = followedVessels?.find(v => v.id === id);
                                 const isSharingActive = vessel?.isSharing === true;
                                 const lastActiveTime = vessel?.lastActive ? (vessel.lastActive.toMillis ? vessel.lastActive.toMillis() : vessel.lastActive.seconds * 1000) : 0;
-                                const isSignalStale = isSharingActive && (Date.now() - lastActiveTime > 75000);
+                                const isSignalStale = isSharingActive && (Date.now() - lastActiveTime > 65000);
                                 const isTrulyActive = isSharingActive && !isSignalStale;
                                 
                                 const isGhost = vessel?.isGhostMode === true;
@@ -1315,7 +1327,7 @@ export default function VesselTrackerPage() {
           >
                 {followedVessels?.filter(v => v.isSharing && (mode === 'receiver' || !v.isGhostMode || v.status === 'emergency' || v.id === sharingId)).map(vessel => {
                     const lastActiveTime = vessel.lastActive ? (vessel.lastActive.toMillis ? vessel.lastActive.toMillis() : vessel.lastActive.seconds * 1000) : 0;
-                    const isSignalStale = (Date.now() - lastActiveTime > 75000);
+                    const isSignalStale = (Date.now() - lastActiveTime > 65000);
                     const currentStatus = isSignalStale ? 'offline' : (vessel.status || 'moving');
 
                     return (
