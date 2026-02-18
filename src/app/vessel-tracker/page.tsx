@@ -526,8 +526,7 @@ export default function VesselTrackerPage() {
         };
 
         const lastActiveTime = getTimeMillis(vessel.lastActive);
-        // Detection de signal perdu (> 65s sans update)
-        const isSignalStale = isSharingActive && (Date.now() - lastActiveTime > 65000);
+        const isSignalStale = isSharingActive && (Date.now() - lastActiveTime > 75000);
         
         const currentStatus = (isSharingActive && !isSignalStale) ? (vessel.status || 'moving') : 'offline';
         const statusTime = vessel.statusChangedAt || vessel.lastActive;
@@ -671,13 +670,14 @@ export default function VesselTrackerPage() {
         const newPos = { lat: latitude, lng: longitude };
         const roundedAccuracy = Math.round(accuracy);
         
+        lastFixTimeRef.current = Date.now();
         setCurrentPos(newPos);
         setUserAccuracy(roundedAccuracy);
-        lastFixTimeRef.current = Date.now();
 
         // REPRISE DU SIGNAL : Reset de l'état offline si une position valide revient
         if (vesselStatus === 'offline') {
             setVesselStatus('moving');
+            immobilityStartTime.current = null;
             updateVesselInFirestore({ 
                 status: 'moving', 
                 eventLabel: 'REPRISE DU SIGNAL',
@@ -694,26 +694,31 @@ export default function VesselTrackerPage() {
         }
         
         if (vesselStatus !== 'returning' && vesselStatus !== 'landed' && vesselStatus !== 'emergency') {
+            // Logique de détection de mouillage améliorée pour éviter les faux-positifs
             if (!anchorPos) { 
               setAnchorPos(newPos); 
-              updateVesselInFirestore({ location: { latitude, longitude }, status: 'moving', isSharing: true, accuracy: roundedAccuracy }); 
+              immobilityStartTime.current = Date.now();
               return; 
             }
             
             const distFromAnchor = getDistance(newPos.lat, newPos.lng, anchorPos.lat, anchorPos.lng);
-            const isMoving = distFromAnchor > (vesselPrefs.mooringRadius || 20) && distFromAnchor > accuracy * 0.8;
+            const hasMovedSignificantly = distFromAnchor > (vesselPrefs.mooringRadius || 20);
 
-            if (isMoving) {
+            if (hasMovedSignificantly) {
               setVesselStatus('moving'); 
               setAnchorPos(newPos); 
-              immobilityStartTime.current = null;
-              updateVesselInFirestore({ location: { latitude, longitude }, status: 'moving', isSharing: true, eventLabel: null, accuracy: roundedAccuracy, anchorLocation: null });
+              immobilityStartTime.current = Date.now();
+              updateVesselInFirestore({ 
+                  location: { latitude, longitude }, 
+                  status: 'moving', 
+                  isSharing: true, 
+                  eventLabel: null, 
+                  accuracy: roundedAccuracy, 
+                  anchorLocation: null 
+              });
             } else {
-              if (!immobilityStartTime.current) {
-                  immobilityStartTime.current = Date.now();
-                  updateVesselInFirestore({ eventLabel: 'ANALYSE IMMOBILITÉ...', accuracy: roundedAccuracy });
-              }
-              if (Date.now() - immobilityStartTime.current > 15000 && vesselStatus !== 'stationary') {
+              const idleDuration = Date.now() - (immobilityStartTime.current || Date.now());
+              if (idleDuration > 30000 && vesselStatus !== 'stationary') {
                 setVesselStatus('stationary'); 
                 updateVesselInFirestore({ 
                     status: 'stationary', 
@@ -722,7 +727,11 @@ export default function VesselTrackerPage() {
                     anchorLocation: { latitude: anchorPos.lat, longitude: anchorPos.lng }
                 });
               } else {
-                updateVesselInFirestore({ location: { latitude, longitude }, accuracy: roundedAccuracy });
+                if (idleDuration > 10000) {
+                    updateVesselInFirestore({ location: { latitude, longitude }, eventLabel: 'ANALYSE IMMOBILITÉ...', accuracy: roundedAccuracy });
+                } else {
+                    updateVesselInFirestore({ location: { latitude, longitude }, accuracy: roundedAccuracy });
+                }
               }
             }
         } else {
@@ -736,7 +745,7 @@ export default function VesselTrackerPage() {
               toast({ variant: "destructive", title: "Erreur GPS", description: "Veuillez vérifier les autorisations de localisation." });
           }
       },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
   }, [isSharing, mode, anchorPos, updateVesselInFirestore, map, toast, vesselStatus, vesselPrefs.mooringRadius, isFollowing]);
@@ -744,17 +753,14 @@ export default function VesselTrackerPage() {
   useEffect(() => {
     if (!isSharing || mode !== 'sender') return;
     const interval = setInterval(() => {
-      // Détection locale de signal perdu pour le capitaine
       const fixAge = Date.now() - lastFixTimeRef.current;
       if (fixAge > 60000) {
           if (vesselStatus !== 'offline') {
               setVesselStatus('offline');
-              // On force l'état offline dans Firestore et on arrête de heartbeater lastActive
               updateVesselInFirestore({ status: 'offline', eventLabel: 'SIGNAL GPS PERDU' });
               toast({ variant: "destructive", title: "Signal GPS perdu", description: "Aucune position reçue depuis 1 minute." });
           }
       } else if (vesselStatus !== 'offline') {
-          // Heartbeat normal seulement si on a un fix récent
           updateVesselInFirestore({}); 
       }
     }, 30000);
@@ -1230,7 +1236,7 @@ export default function VesselTrackerPage() {
                     {mode === 'fleet' ? 'Membres du Groupe' : 'Ma Flotte'} ({followedVessels?.filter(v => {
                         const isSharingActive = v.isSharing === true;
                         const lastActiveTime = v.lastActive ? (v.lastActive.toMillis ? v.lastActive.toMillis() : v.lastActive.seconds * 1000) : 0;
-                        const isSignalStale = isSharingActive && (Date.now() - lastActiveTime > 65000);
+                        const isSignalStale = isSharingActive && (Date.now() - lastActiveTime > 75000);
                         const isFollowed = mode === 'receiver' || !v.isGhostMode || v.status === 'emergency' || v.id === sharingId;
                         return isSharingActive && isFollowed;
                     }).length || 0})
@@ -1241,7 +1247,7 @@ export default function VesselTrackerPage() {
                             {followedVessels?.filter(v => !v.isGhostMode || v.status === 'emergency' || v.id === sharingId).map(vessel => {
                                 const isSharingActive = vessel.isSharing === true;
                                 const lastActiveTime = vessel.lastActive ? (vessel.lastActive.toMillis ? vessel.lastActive.toMillis() : vessel.lastActive.seconds * 1000) : 0;
-                                const isSignalStale = isSharingActive && (Date.now() - lastActiveTime > 65000);
+                                const isSignalStale = isSharingActive && (Date.now() - lastActiveTime > 75000);
                                 const isTrulyActive = isSharingActive && !isSignalStale;
 
                                 return (
@@ -1276,7 +1282,7 @@ export default function VesselTrackerPage() {
                                 const vessel = followedVessels?.find(v => v.id === id);
                                 const isSharingActive = vessel?.isSharing === true;
                                 const lastActiveTime = vessel?.lastActive ? (vessel.lastActive.toMillis ? vessel.lastActive.toMillis() : vessel.lastActive.seconds * 1000) : 0;
-                                const isSignalStale = isSharingActive && (Date.now() - lastActiveTime > 65000);
+                                const isSignalStale = isSharingActive && (Date.now() - lastActiveTime > 75000);
                                 const isTrulyActive = isSharingActive && !isSignalStale;
                                 
                                 const isGhost = vessel?.isGhostMode === true;
@@ -1334,7 +1340,7 @@ export default function VesselTrackerPage() {
           >
                 {followedVessels?.filter(v => v.isSharing && (mode === 'receiver' || !v.isGhostMode || v.status === 'emergency' || v.id === sharingId)).map(vessel => {
                     const lastActiveTime = vessel.lastActive ? (vessel.lastActive.toMillis ? vessel.lastActive.toMillis() : vessel.lastActive.seconds * 1000) : 0;
-                    const isSignalStale = (Date.now() - lastActiveTime > 65000);
+                    const isSignalStale = (Date.now() - lastActiveTime > 75000);
                     const currentStatus = isSignalStale ? 'offline' : (vessel.status || 'moving');
 
                     return (
