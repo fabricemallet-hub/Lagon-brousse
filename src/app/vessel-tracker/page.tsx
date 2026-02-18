@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where, deleteField, Timestamp, getDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where, deleteField, Timestamp, getDoc, deleteDoc, writeBatch, collectionGroup } from 'firebase/firestore';
 import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -100,6 +100,16 @@ const TACTICAL_OPTIONS = [
     { id: 'SARDINES', label: 'SARDINES', icon: Waves, color: 'bg-emerald-500 text-white border-emerald-400' },
 ];
 
+type HistoryEntry = {
+  vesselName: string;
+  statusLabel: string;
+  time: Date;
+  pos: google.maps.LatLngLiteral;
+  durationMinutes: number;
+  batteryLevel?: number;
+  isCharging?: boolean;
+};
+
 export default function VesselTrackerPage() {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -124,7 +134,7 @@ export default function VesselTrackerPage() {
   const [anchorPos, setAnchorPos] = useState<google.maps.LatLngLiteral | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status'] | 'stabilizing' | 'offline'>('moving');
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [history, setHistory] = useState<{ vesselName: string, statusLabel: string, startTime: Date, lastUpdateTime: Date, pos: google.maps.LatLngLiteral, durationMinutes: number }[]>([]);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [tacticalHistory, setTacticalHistory] = useState<{ id: string, vesselName: string, label: string, time: string, lat: number, lng: number }[]>([]);
   const [nextSyncSeconds, setNextSyncSeconds] = useState(60);
 
@@ -243,10 +253,10 @@ export default function VesselTrackerPage() {
         const lastEntry = prev[0];
         
         if (lastEntry && lastEntry.vesselName === vName && lastEntry.statusLabel === label) {
-            const duration = Math.floor(Math.abs(now.getTime() - lastEntry.startTime.getTime()) / 60000);
+            const duration = Math.floor(Math.abs(now.getTime() - lastEntry.time.getTime()) / 60000);
             return [{
                 ...lastEntry,
-                lastUpdateTime: now,
+                time: now,
                 pos: pos,
                 durationMinutes: duration
             }, ...prev.slice(1)];
@@ -254,8 +264,7 @@ export default function VesselTrackerPage() {
             return [{
                 vesselName: vName,
                 statusLabel: label,
-                startTime: now,
-                lastUpdateTime: now,
+                time: now,
                 pos: pos,
                 durationMinutes: 0
             }, ...prev].slice(0, 50);
@@ -551,6 +560,31 @@ export default function VesselTrackerPage() {
     }
   };
 
+  const handleRemoveSavedVessel = async (id: string) => {
+    if (!user || !firestore) return;
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            savedVesselIds: arrayRemove(id)
+        });
+        toast({ title: "Navire retiré" });
+    } catch (e) {
+        console.error(e);
+    }
+  };
+
+  const handleSavePreferences = async () => {
+    if (!user || !firestore) return;
+    setIsSavingPrefs(true);
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), { vesselPrefs });
+        toast({ title: "Préférences sauvegardées" });
+    } catch (e) {
+        toast({ variant: 'destructive', title: "Erreur sauvegarde" });
+    } finally {
+        setIsSavingPrefs(false);
+    }
+  };
+
   const getVesselIcon = (status: string) => {
     switch (status) {
         case 'moving': return { icon: Navigation, color: 'bg-blue-600', label: 'MOUV' };
@@ -563,6 +597,8 @@ export default function VesselTrackerPage() {
         default: return { icon: Navigation, color: 'bg-slate-600', label: '???' };
     }
   };
+
+  const [isSavingPrefs, setIsSavingPrefs] = useState(false);
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
@@ -997,7 +1033,9 @@ export default function VesselTrackerPage() {
                                                 <span className="font-black text-primary uppercase">{h.vesselName}</span>
                                                 <span className={cn("font-black uppercase", h.statusLabel.includes('DÉRIVE') ? 'text-orange-600' : h.statusLabel.includes('MOUVEMENT') ? 'text-blue-600' : 'text-slate-600')}>{h.statusLabel}</span>
                                               </div>
-                                              <span className="text-[9px] font-bold opacity-40 uppercase">{format(h.time, 'HH:mm:ss')} • ACTIF {h.durationMinutes || 0} MIN</span>
+                                              <span className="text-[9px] font-bold opacity-40 uppercase">
+                                                {h.time instanceof Date && !isNaN(h.time.getTime()) ? format(h.time, 'HH:mm:ss') : '...'} • ACTIF {h.durationMinutes || 0} MIN
+                                              </span>
                                             </div>
                                             <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase border-2 px-3 gap-2" onClick={() => { map?.panTo(h.pos); map?.setZoom(17); }}>
                                               <MapPin className="size-3 text-primary" /> GPS
@@ -1032,7 +1070,9 @@ export default function VesselTrackerPage() {
                                                 <Badge variant="outline" className="font-black text-[8px] uppercase border-blue-200 text-blue-600">{h.label}</Badge>
                                                 <span className="font-black text-slate-800 uppercase">{h.vesselName}</span>
                                               </div>
-                                              <span className="text-[9px] font-bold opacity-40 uppercase">{format(new Date(h.time), 'HH:mm:ss')}</span>
+                                              <span className="text-[9px] font-bold opacity-40 uppercase">
+                                                {new Date(h.time) instanceof Date && !isNaN(new Date(h.time).getTime()) ? format(new Date(h.time), 'HH:mm:ss') : '...'}
+                                              </span>
                                             </div>
                                             <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase border-2 px-3 gap-2" onClick={() => { map?.panTo({ lat: h.lat, lng: h.lng }); map?.setZoom(17); }}>
                                               <MapPin className="size-3 text-primary" /> GPS
