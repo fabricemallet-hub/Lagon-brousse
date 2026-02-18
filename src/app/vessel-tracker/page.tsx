@@ -341,6 +341,7 @@ export default function VesselTrackerPage() {
         setIsStabilizing(true);
         stabilizationRef.current = { p1: null, start: Date.now() };
         nextCheckTimeRef.current = 0;
+        lastFixTimeRef.current = Date.now(); // Réinitialisation immédiate du minuteur de signal
 
         watchIdRef.current = navigator.geolocation.watchPosition(
           (position) => {
@@ -348,7 +349,10 @@ export default function VesselTrackerPage() {
             const newPos = { lat: latitude, lng: longitude };
             const roundedAccuracy = Math.round(accuracy);
             
+            // On met à jour le minuteur de fraîcheur dès qu'on reçoit N'IMPORTE QUEL signal
+            // même s'il est imprécis, pour dire au Watchdog que le capteur répond.
             lastFixTimeRef.current = Date.now();
+            
             setCurrentPos(newPos);
             setUserAccuracy(roundedAccuracy);
 
@@ -444,7 +448,6 @@ export default function VesselTrackerPage() {
                             anchorLocation: anchorPosRef.current ? { latitude: anchorPosRef.current.lat, longitude: anchorPosRef.current.lng } : null
                         });
                     } else {
-                        // On met à jour seulement la position sans changer le statut
                         updateVesselInFirestore({ location: { latitude, longitude }, accuracy: roundedAccuracy });
                     }
                 } else {
@@ -452,8 +455,6 @@ export default function VesselTrackerPage() {
                 }
                 nextCheckTimeRef.current = Date.now() + 30000;
             } else {
-                // Entre les checks de 30s, on peut mettre à jour Firestore pour la fluidité si le mouvement est important
-                // mais sans réévaluer le statut système pour éviter le clignotement
                 updateVesselInFirestore({ location: { latitude, longitude }, accuracy: roundedAccuracy });
             }
           },
@@ -463,23 +464,32 @@ export default function VesselTrackerPage() {
     }
   }, [isSharing, mode, map, updateVesselInFirestore, toast]);
 
-  // Watchdog : Surveillance de la fraîcheur du signal
+  // Watchdog : Surveillance de la fraîcheur du signal (AMÉLIORÉ)
   useEffect(() => {
     if (!isSharing || mode !== 'sender') return;
+    
+    const startTime = Date.now();
+    lastFixTimeRef.current = Date.now(); // Reset initial
+
     const interval = setInterval(() => {
       const now = Date.now();
       const elapsed = now - lastFixTimeRef.current;
+      const totalElapsed = now - startTime;
       const currentStatus = vesselStatusRef.current;
       const currentAccuracy = userAccuracy || 0;
       
-      if (currentStatus !== 'offline' && !isStabilizing) {
+      // On ignore la surveillance pendant les 15 premières secondes de session
+      // ou si on est explicitement en cours de stabilisation (isStabilizing = true)
+      if (currentStatus !== 'offline' && !isStabilizing && totalElapsed > 15000) {
           let shouldGoOffline = false;
           let reason = '';
 
+          // Règle 1: Signal imprécis (>100m) + délai de 10s sans MAJ
           if (currentAccuracy > 100 && elapsed > 10000) {
               shouldGoOffline = true;
               reason = 'SIGNAL IMPRÉCIS (>100m) + 10s D\'INACTIVITÉ';
           }
+          // Règle 2: Perte totale de communication pendant 1 min
           else if (elapsed > 60000) {
               shouldGoOffline = true;
               reason = 'SIGNAL GPS PERDU (DÉLAI > 1 MIN)';
@@ -623,7 +633,6 @@ export default function VesselTrackerPage() {
             
             if (mode === 'receiver' || !vessel.isGhostMode || currentStatus === 'emergency' || isSelf) {
                 setTechHistory(prev => {
-                    // Logique de fusion : si même statut et même navire, on met à jour la ligne existante
                     if (prev.length > 0 && prev[0].statusLabel === label && prev[0].vesselId === vessel.id) {
                         const updatedEntry: TechHistoryEntry = {
                             ...prev[0],
@@ -635,7 +644,6 @@ export default function VesselTrackerPage() {
                         };
                         return [updatedEntry, ...prev.slice(1)];
                     }
-                    // Nouveau statut : nouvelle ligne
                     const newEntry: TechHistoryEntry = {
                         vesselId: vessel.id,
                         vesselName: vessel.displayName || vessel.id,
@@ -849,7 +857,7 @@ export default function VesselTrackerPage() {
           <GoogleMap 
             mapContainerClassName="w-full h-full" 
             defaultCenter={INITIAL_CENTER} 
-            defaultZoom={10} 
+            defaultZoom={mapZoom} 
             onLoad={setMap} 
             onZoomChanged={() => map && setMapZoom(map.getZoom() || 10)} 
             onDragStart={() => setIsFollowing(false)} 
