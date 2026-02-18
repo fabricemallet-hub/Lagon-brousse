@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -54,7 +55,8 @@ import {
   ImageIcon,
   Maximize2,
   Users,
-  Ghost
+  Ghost,
+  Compass
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -139,6 +141,7 @@ export default function VesselTrackerPage() {
   const [customFleetId, setCustomFleetId] = useState('');
   const [vesselNickname, setVesselNickname] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
   const [wakeLock, setWakeLock] = useState<any>(null);
   const shouldPanOnNextFix = useRef(false);
 
@@ -660,7 +663,11 @@ export default function VesselTrackerPage() {
         setCurrentPos(newPos);
         setUserAccuracy(roundedAccuracy);
 
-        if (shouldPanOnNextFix.current && map) { map.panTo(newPos); map.setZoom(15); shouldPanOnNextFix.current = false; }
+        if ((isFollowing || shouldPanOnNextFix.current) && map) { 
+            map.panTo(newPos); 
+            if (shouldPanOnNextFix.current) map.setZoom(15);
+            shouldPanOnNextFix.current = false; 
+        }
         
         if (vesselStatus !== 'returning' && vesselStatus !== 'landed' && vesselStatus !== 'emergency') {
             if (!anchorPos) { 
@@ -702,7 +709,7 @@ export default function VesselTrackerPage() {
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
-  }, [isSharing, mode, anchorPos, updateVesselInFirestore, map, toast, vesselStatus, vesselPrefs.mooringRadius]);
+  }, [isSharing, mode, anchorPos, updateVesselInFirestore, map, toast, vesselStatus, vesselPrefs.mooringRadius, isFollowing]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender') return;
@@ -711,6 +718,16 @@ export default function VesselTrackerPage() {
     }, 60000);
     return () => clearInterval(interval);
   }, [isSharing, mode, updateVesselInFirestore]);
+
+  // Suivi automatique en mode Récepteur ou Flotte
+  useEffect(() => {
+    if (isFollowing && map && mode !== 'sender') {
+        const activeVessel = followedVessels?.find(v => v.isSharing && (mode === 'receiver' || !v.isGhostMode || v.status === 'emergency' || v.id === sharingId));
+        if (activeVessel?.location) {
+            map.panTo({ lat: activeVessel.location.latitude, lng: activeVessel.location.longitude });
+        }
+    }
+  }, [isFollowing, followedVessels, map, mode, sharingId]);
 
   const toggleWakeLock = async () => {
     if (!('wakeLock' in navigator)) return;
@@ -1218,7 +1235,7 @@ export default function VesselTrackerPage() {
                                         </div>
                                         <div className="flex items-center gap-2">
                                             {isActive && <BatteryIconComp level={vessel?.batteryLevel} charging={vessel?.isCharging} />}
-                                            <Button variant="ghost" size="icon" onClick={() => handleRemoveSavedVessel(id)} className="size-8 text-destructive/40 hover:text-destructive border-2"><Trash2 className="size-3" /></Button>
+                                            <Button variant="ghost" size="icon" className="size-8 text-destructive/40 hover:text-destructive border-2"><Trash2 className="size-3" /></Button>
                                         </div>
                                     </div>
                                 );
@@ -1244,7 +1261,15 @@ export default function VesselTrackerPage() {
 
       <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all", isFullscreen && "fixed inset-0 z-[100] w-screen h-screen rounded-none")}>
         <div className={cn("relative bg-muted/20", isFullscreen ? "flex-grow" : "h-[300px]")}>
-          <GoogleMap mapContainerClassName="w-full h-full" defaultCenter={INITIAL_CENTER} defaultZoom={10} onLoad={setMap} onZoomChanged={() => map && setMapZoom(map.getZoom() || 10)} options={{ disableDefaultUI: true, zoomControl: false, mapTypeControl: false, mapTypeId: 'satellite', gestureHandling: 'greedy' }}>
+          <GoogleMap 
+            mapContainerClassName="w-full h-full" 
+            defaultCenter={INITIAL_CENTER} 
+            defaultZoom={10} 
+            onLoad={setMap} 
+            onZoomChanged={() => map && setMapZoom(map.getZoom() || 10)} 
+            onDragStart={() => setIsFollowing(false)}
+            options={{ disableDefaultUI: true, zoomControl: false, mapTypeControl: false, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
+          >
                 {followedVessels?.filter(v => v.isSharing && (mode === 'receiver' || !v.isGhostMode || v.status === 'emergency' || v.id === sharingId)).map(vessel => (
                     <React.Fragment key={`vessel-group-${vessel.id}`}>
                         {vessel.status === 'stationary' && vessel.anchorLocation && (
@@ -1336,8 +1361,18 @@ export default function VesselTrackerPage() {
                 {mode === 'sender' && currentPos && <OverlayView position={currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}><PulsingDot /></OverlayView>}
           </GoogleMap>
           <div className="absolute top-3 right-3 flex flex-col gap-2">
-            <Button onClick={handleRecenter} className="shadow-lg h-10 w-10 bg-background/90 backdrop-blur-md border-2 p-0"><LocateFixed className="size-5 text-primary" /></Button>
-            <Button size="icon" className="shadow-lg h-10 w-10 bg-background/90 backdrop-blur-md border-2" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}</Button>
+            <Button 
+                onClick={() => setIsFollowing(!isFollowing)} 
+                className={cn(
+                    "shadow-lg h-10 w-10 border-2 p-0 transition-all", 
+                    isFollowing ? "bg-primary text-white border-primary animate-pulse" : "bg-background/90 backdrop-blur-md text-primary border-primary/20"
+                )}
+                title={isFollowing ? "Arrêter le suivi" : "Suivre ma position"}
+            >
+                <Navigation className={cn("size-5", isFollowing && "fill-white")} />
+            </Button>
+            <Button onClick={handleRecenter} className="shadow-lg h-10 w-10 bg-background/90 backdrop-blur-md border-2 border-primary/20 p-0"><LocateFixed className="size-5 text-primary" /></Button>
+            <Button size="icon" className="shadow-lg h-10 w-10 bg-background/90 backdrop-blur-md border-2 border-primary/20" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}</Button>
           </div>
         </div>
 
