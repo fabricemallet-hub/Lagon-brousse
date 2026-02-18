@@ -48,7 +48,9 @@ import {
   MessageSquare,
   Phone,
   Ship,
-  AlertCircle
+  AlertCircle,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -57,7 +59,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
-import { fetchWindyWeather } from '@/lib/windy-api';
 import { useLocation } from '@/context/location-context';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { format } from 'date-fns';
@@ -106,6 +107,7 @@ export default function VesselTrackerPage() {
   const { isLoaded, loadError } = useGoogleMaps();
   const { selectedRegion } = useLocation();
 
+  // --- UI STATES ---
   const [mode, setMode] = useState<'sender' | 'receiver' | 'fleet'>('sender');
   const [isSharing, setIsSharing] = useState(false);
   const [isGhostMode, setIsGhostMode] = useState(false);
@@ -118,6 +120,7 @@ export default function VesselTrackerPage() {
   const [customFleetId, setCustomFleetId] = useState('');
   const [mooringRadius, setMooringRadius] = useState(20);
 
+  // --- POSITION & STATUS STATES ---
   const [currentPos, setCurrentPos] = useState<google.maps.LatLngLiteral | null>(null);
   const [anchorPos, setAnchorPos] = useState<google.maps.LatLngLiteral | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status'] | 'stabilizing' | 'offline'>('moving');
@@ -125,9 +128,11 @@ export default function VesselTrackerPage() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [nextSyncSeconds, setNextSyncSeconds] = useState(60);
 
+  // --- EMERGENCY STATES ---
   const [emergencyContact, setEmergencyContact] = useState('');
   const [vesselSmsMessage, setVesselSmsMessage] = useState('');
 
+  // --- PREFERENCES STATES ---
   const [vesselPrefs, setVesselPrefs] = useState<any>({
     isNotifyEnabled: true,
     vesselVolume: 0.8,
@@ -141,12 +146,14 @@ export default function VesselTrackerPage() {
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
   const fleetId = useMemo(() => customFleetId.trim().toUpperCase(), [customFleetId]);
 
+  // --- REFS FOR TRACKING & AUDIO ---
   const watchIdRef = useRef<number | null>(null);
   const lastFixTimestampRef = useRef<number>(Date.now());
   const lastSentPosRef = useRef<google.maps.LatLngLiteral | null>(null);
   const activeAudiosRef = useRef<Record<string, HTMLAudioElement>>({});
   const shouldPanOnNextFix = useRef<boolean>(false);
 
+  // --- FIRESTORE HOOKS ---
   const userDocRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return doc(firestore, 'users', user.uid);
@@ -163,12 +170,6 @@ export default function VesselTrackerPage() {
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
-  const fleetVesselsQuery = useMemoFirebase(() => {
-    if (!firestore || !fleetId) return null;
-    return query(collection(firestore, 'vessels'), where('fleetId', '==', fleetId));
-  }, [firestore, fleetId]);
-  const { data: fleetVessels } = useCollection<VesselStatus>(fleetVesselsQuery);
-
   const soundsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'sound_library'), orderBy('label', 'asc'));
@@ -180,6 +181,7 @@ export default function VesselTrackerPage() {
     return dbSounds.map(s => ({ id: s.id, label: s.label, url: s.url }));
   }, [dbSounds]);
 
+  // --- ACTIONS ---
   const playVesselSound = useCallback((soundId: string, eventKey?: string) => {
     if (!vesselPrefs.isNotifyEnabled) return;
     if (eventKey && activeAudiosRef.current[eventKey]) {
@@ -215,18 +217,6 @@ export default function VesselTrackerPage() {
       if (mode === 'sender' && !isSharing) setIsSharing(true);
     }
   }, [mode, currentPos, followedVessels, map, isSharing]);
-
-  const updateLog = useCallback((vName: string, label: string, pos: google.maps.LatLngLiteral) => {
-    setHistory(prev => {
-        const now = new Date();
-        const lastEntry = prev[0];
-        if (lastEntry && lastEntry.vesselName === vName && lastEntry.statusLabel === label) {
-            const duration = Math.floor(Math.abs(now.getTime() - lastEntry.time.getTime()) / 60000);
-            return [{ ...lastEntry, pos, durationMinutes: duration }, ...prev.slice(1)];
-        }
-        return [{ vesselName: vName, statusLabel: label, time: now, pos, durationMinutes: 0 }, ...prev].slice(0, 50);
-    });
-  }, []);
 
   const updateVesselInFirestore = useCallback((data: Partial<VesselStatus>) => {
     if (!user || !firestore || (!isSharing && data.isSharing !== false)) return;
@@ -276,8 +266,6 @@ export default function VesselTrackerPage() {
 
   const handleManualStatusToggle = (st: VesselStatus['status'], label: string) => {
     setVesselStatus(st);
-    updateLog(vesselNickname || 'MOI', label, currentPos || INITIAL_CENTER);
-    
     const updates: any = { status: st, eventLabel: label };
     if (st === 'emergency') updates.isGhostMode = false;
     
@@ -298,7 +286,7 @@ export default function VesselTrackerPage() {
   const sendEmergencySms = (type: 'MAYDAY' | 'PAN PAN') => {
     if (!emergencyContact) { toast({ variant: "destructive", title: "Contact requis" }); return; }
     const pos = currentPos || INITIAL_CENTER;
-    const posUrl = `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
+    const posUrl = `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.gap(6)}`;
     const name = vesselNickname || sharingId;
     const body = `[LB-NC] ${type} : ${name}. ${vesselSmsMessage || "Assistance requise."}. Carte : ${posUrl}`;
     window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
@@ -312,6 +300,7 @@ export default function VesselTrackerPage() {
     toast({ title: `Signalement : ${typeId}` });
   };
 
+  // --- GPS WATCHER ---
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
       if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
@@ -361,10 +350,6 @@ export default function VesselTrackerPage() {
         default: return { icon: Navigation, color: 'bg-slate-600', label: '???' };
     }
   };
-
-  const tacticalMarkers = mode === 'fleet' ? 
-    (fleetVessels?.flatMap(v => v.huntingMarkers?.map(m => ({ ...m, vesselName: v.displayName || v.id })) || []) || []) : 
-    (followedVessels?.flatMap(v => v.huntingMarkers?.map(m => ({ ...m, vesselName: v.displayName || v.id })) || []) || []);
 
   if (isProfileLoading) return <Skeleton className="h-96 w-full" />;
 
@@ -455,7 +440,7 @@ export default function VesselTrackerPage() {
             <div className="space-y-4">
                 <p className="text-[10px] font-black uppercase text-muted-foreground ml-1">Navires suivis</p>
                 <div className="grid gap-2">
-                    {(mode === 'receiver' ? followedVessels : fleetVessels)?.map(v => (
+                    {followedVessels?.filter(v => v.isSharing && v.id !== sharingId).map(v => (
                         <div key={v.id} className="p-3 border-2 rounded-xl flex items-center justify-between bg-card">
                             <div className="flex items-center gap-3">
                                 <Navigation className="size-4 text-primary" />
@@ -512,9 +497,6 @@ export default function VesselTrackerPage() {
                                   <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 z-20">
                                       <div className="px-2 py-1 bg-slate-900/80 backdrop-blur-sm text-white rounded text-[10px] font-black shadow-lg border border-white/20 whitespace-nowrap flex flex-col items-center">
                                           <span>{vessel.displayName}</span>
-                                          {vessel.windSpeed !== undefined && (
-                                              <span className="text-[8px] text-blue-300 font-bold mt-0.5">💨 {vessel.windSpeed}kt | 🌊 {vessel.wavesHeight}m</span>
-                                          )}
                                       </div>
                                       <div className={cn("p-2 rounded-full border-2 border-white shadow-xl", statusInfo.color)}>
                                           {React.createElement(statusInfo.icon, { className: "size-5 text-white" })}
@@ -524,16 +506,6 @@ export default function VesselTrackerPage() {
                           </React.Fragment>
                       );
                   })}
-
-                  {tacticalMarkers.map(m => (
-                      <OverlayView key={`tactical-${m.id}`} position={{ lat: m.lat, lng: m.lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                          <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 z-10">
-                              <div className="p-1.5 rounded-full shadow-lg border-2 border-white bg-slate-900 text-white">
-                                  <Fish className="size-3" />
-                              </div>
-                          </div>
-                      </OverlayView>
-                  ))}
 
                   {mode === 'sender' && currentPos && (
                       <OverlayView position={currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
@@ -563,46 +535,6 @@ export default function VesselTrackerPage() {
                     <AlertTriangle className="size-5 text-primary" /> PAN PAN
                 </Button>
             </div>
-
-            <Accordion type="single" collapsible className="w-full border rounded-xl bg-muted/5 overflow-hidden">
-                <AccordionItem value="history" className="border-none">
-                    <div className="flex items-center justify-between px-3 h-12">
-                        <AccordionTrigger className="flex-1 text-[10px] font-black uppercase hover:no-underline py-0">
-                            <div className="flex items-center gap-2"><History className="size-3"/> Journal de bord unifié</div>
-                        </AccordionTrigger>
-                    </div>
-                    <AccordionContent className="space-y-2 pt-2 pb-4 overflow-y-auto max-h-64 scrollbar-hide">
-                        {history.length > 0 ? (
-                            <div className="space-y-2 px-3">
-                                {history.map((h, i) => {
-                                    const isValidDate = h.time instanceof Date && !isNaN(h.time.getTime());
-                                    return (
-                                        <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl border-2 text-[10px] shadow-sm">
-                                            <div className="flex flex-col gap-0.5">
-                                              <div className="flex items-center gap-2">
-                                                <span className="font-black text-primary uppercase">{h.vesselName}</span>
-                                                <span className={cn("font-black uppercase", 
-                                                    h.statusLabel.includes('DÉRIVE') ? 'text-orange-600' :
-                                                    h.statusLabel.includes('MOUVEMENT') ? 'text-blue-600' : 
-                                                    'text-slate-600')}>{h.statusLabel}</span>
-                                              </div>
-                                              <span className="text-[9px] font-bold opacity-40 uppercase">
-                                                {isValidDate ? format(h.time, 'HH:mm:ss') : '...'} • ACTIF {h.durationMinutes || 0} MIN
-                                              </span>
-                                            </div>
-                                            <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase border-2 px-3 gap-2" onClick={() => { map?.panTo(h.pos); map?.setZoom(17); }}>
-                                              <MapPin className="size-3 text-primary" /> GPS
-                                            </Button>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        ) : (
-                            <div className="text-center py-8 opacity-30 uppercase font-black text-[10px] tracking-widest italic">Aucun log technique</div>
-                        )}
-                    </AccordionContent>
-                </AccordionItem>
-            </Accordion>
         </div>
       </Card>
     </div>
