@@ -123,6 +123,7 @@ export default function VesselTrackerPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [wakeLock, setWakeLock] = useState<any>(null);
+  const [mapZoom, setMapZoom] = useState<number>(10);
   const shouldPanOnNextFix = useRef(false);
 
   const [currentPos, setCurrentPos] = useState<google.maps.LatLngLiteral | null>(null);
@@ -130,7 +131,6 @@ export default function VesselTrackerPage() {
   const [anchorPos, setAnchorPos] = useState<google.maps.LatLngLiteral | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [mapZoom, setMapZoom] = useState<number>(10);
   
   const watchIdRef = useRef<number | null>(null);
   const vesselStatusRef = useRef<VesselStatus['status']>('moving');
@@ -328,6 +328,7 @@ export default function VesselTrackerPage() {
             const newPos = { lat: latitude, lng: longitude };
             const roundedAccuracy = Math.round(accuracy);
             
+            // Mise à jour SYSTEMATIQUE de l'heure du fix pour calmer le watchdog
             lastFixTimeRef.current = Date.now();
             setCurrentPos(newPos);
             setUserAccuracy(roundedAccuracy);
@@ -335,6 +336,7 @@ export default function VesselTrackerPage() {
             const currentStatus = vesselStatusRef.current;
             const prefs = vesselPrefsRef.current;
 
+            // Logique de reprise si hors-ligne
             if (currentStatus === 'offline') {
                 if (roundedAccuracy < 20) {
                     const recoveredStatus = lastActiveStatusRef.current || 'moving';
@@ -347,6 +349,7 @@ export default function VesselTrackerPage() {
                     });
                     toast({ title: "Signal Rétabli", description: "Précision haute fidélité détectée." });
                 }
+                // Même si on ne reprend pas encore, on a mis à jour lastFixTimeRef, donc le watchdog ne clignotera pas
                 return;
             }
 
@@ -365,6 +368,7 @@ export default function VesselTrackerPage() {
                   return; 
                 }
                 
+                // On utilise l'ancrage fixe (anchorPosRef) pour calculer la dérive
                 const distFromAnchor = getDistance(newPos.lat, newPos.lng, anchorPosRef.current.lat, anchorPosRef.current.lng);
                 
                 if (currentStatus === 'stationary' || currentStatus === 'drifting') {
@@ -380,7 +384,7 @@ export default function VesselTrackerPage() {
                             accuracy: roundedAccuracy, 
                             anchorLocation: null 
                         });
-                        toast({ title: "Reprise Navigation", description: "Distance > 100m : Ancre levée." });
+                        toast({ title: "Ancre levée", description: "Distance > 100m : Reprise Navigation." });
                     } 
                     else if (distFromAnchor > (prefs.mooringRadius || 20)) {
                         if (currentStatus !== 'drifting') {
@@ -393,10 +397,12 @@ export default function VesselTrackerPage() {
                             });
                             toast({ variant: "destructive", title: "ALERTE DÉRIVE", description: "Sortie du cercle de mouillage." });
                         } else {
+                            // On reste en dérive, on met à jour la position du point bleu
                             updateVesselInFirestore({ location: { latitude, longitude }, accuracy: roundedAccuracy });
                         }
                     } 
                     else {
+                        // On est dans le cercle, on reste stationnaire
                         if (currentStatus !== 'stationary') {
                             setVesselStatus('stationary');
                             updateVesselInFirestore({ 
@@ -406,18 +412,22 @@ export default function VesselTrackerPage() {
                                 accuracy: roundedAccuracy 
                             });
                         } else {
+                            // On met juste à jour la position actuelle (le point bleu bouge, l'ancre non)
                             updateVesselInFirestore({ location: { latitude, longitude }, accuracy: roundedAccuracy });
                         }
                     }
                 } else {
+                    // Mode 'moving' : on cherche l'immobilité
                     const hasMovedSignificantly = distFromAnchor > (prefs.mooringRadius || 20);
 
                     if (hasMovedSignificantly) {
+                        // On suit le bateau, on réinitialise le point de pivot d'immobilité
                         anchorPosRef.current = newPos; 
                         setAnchorPos(newPos);
                         immobilityStartTime.current = null;
                         updateVesselInFirestore({ location: { latitude, longitude }, accuracy: roundedAccuracy });
                     } else {
+                        // On est stable dans un petit rayon
                         if (!immobilityStartTime.current) immobilityStartTime.current = Date.now();
                         const idleDuration = Date.now() - immobilityStartTime.current;
                         
@@ -436,21 +446,21 @@ export default function VesselTrackerPage() {
                     }
                 }
             } else {
+                // Modes manuels (Retour, Terre, Urgence)
                 updateVesselInFirestore({ location: { latitude, longitude }, accuracy: roundedAccuracy });
             }
           },
           (err) => {
-              if (vesselStatusRef.current !== 'offline') {
-                  lastActiveStatusRef.current = vesselStatusRef.current;
-                  setVesselStatus('offline');
-                  updateVesselInFirestore({ status: 'offline', eventLabel: 'ERREUR CAPTEUR GPS' });
-              }
+              // On n'active plus le offline immédiatement sur erreur capteur
+              // On laisse le watchdog s'en charger s'il n'y a plus de success pendant 1 min
+              console.warn("GPS Sensor Error:", err.message);
           },
           { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
     }
   }, [isSharing, mode, map, updateVesselInFirestore, toast]);
 
+  // Watchdog : Surveillance de la fraîcheur du signal
   useEffect(() => {
     if (!isSharing || mode !== 'sender') return;
     const interval = setInterval(() => {
@@ -463,17 +473,21 @@ export default function VesselTrackerPage() {
           let shouldGoOffline = false;
           let reason = '';
 
+          // 1. Cas : Précision médiocre + 10s d'inactivité
           if (currentAccuracy > 100 && elapsed > 10000) {
               shouldGoOffline = true;
               reason = 'SIGNAL IMPRÉCIS (>100m) + 10s D\'INACTIVITÉ';
           }
+          // 2. Cas : Silence radio total > 1 minute
           else if (elapsed > 60000) {
               shouldGoOffline = true;
               reason = 'SIGNAL GPS PERDU (DÉLAI > 1 MIN)';
           }
 
           if (shouldGoOffline) {
-              lastActiveStatusRef.current = currentStatus;
+              if (vesselStatusRef.current !== 'offline') {
+                  lastActiveStatusRef.current = vesselStatusRef.current;
+              }
               setVesselStatus('offline');
               updateVesselInFirestore({ status: 'offline', eventLabel: reason });
               toast({ variant: "destructive", title: "Signal Perdu", description: reason });
@@ -873,14 +887,14 @@ export default function VesselTrackerPage() {
           <div className="relative w-full h-[80vh] flex flex-col">
             <button onClick={() => setFullscreenImage(null)} className="absolute top-4 right-4 z-[210] p-2 bg-white/10 hover:bg-white/20 rounded-full text-white backdrop-blur-md shadow-lg"><X className="size-6" /></button>
             <div className="flex-1 w-full relative flex items-center justify-center">
-              {fullscreenImage && <img src={fullscreenImage.url} className="max-w-full max-h-full object-contain animate-in zoom-in-95 duration-300" />}
+              {fullscreenImage && <img src={fullscreenImage.url} className="max-w-full max-h-full object-contain animate-in zoom-in-95 duration-300" alt="" />}
             </div>
-            <div className="p-6 bg-gradient-to-t from-black/90 to-transparent shrink-0">
+            <div className="p-6 bg-gradient-to-t from-black/90 to-transparent shrink-0 text-center">
               <DialogHeader className="sr-only">
                 <DialogTitle>{fullscreenImage?.title}</DialogTitle>
                 <DialogDescription>Vue détaillée de la prise</DialogDescription>
               </DialogHeader>
-              <p className="text-white font-black uppercase tracking-tighter text-xl text-center">{fullscreenImage?.title}</p>
+              <p className="text-white font-black uppercase tracking-tighter text-xl">{fullscreenImage?.title}</p>
             </div>
           </div>
         </DialogContent>
