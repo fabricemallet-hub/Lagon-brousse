@@ -149,6 +149,8 @@ export default function VesselTrackerPage() {
   const [userAccuracy, setUserAccuracy] = useState<number | null>(null);
   const [anchorPos, setAnchorPos] = useState<google.maps.LatLngLiteral | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
+  const vesselStatusRef = useRef<VesselStatus['status']>('moving');
+  
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [mapZoom, setMapZoom] = useState<number>(10);
   const watchIdRef = useRef<number | null>(null);
@@ -308,6 +310,11 @@ export default function VesselTrackerPage() {
     };
     update();
   }, [user, firestore, isSharing, isGhostMode, sharingId, vesselNickname, vesselPrefs.mooringRadius, customFleetId]);
+
+  // Synchronisation de la ref du statut pour l'utiliser dans les effets sans les relancer
+  useEffect(() => {
+    vesselStatusRef.current = vesselStatus;
+  }, [vesselStatus]);
 
   const handleSaveId = async (idValue: string, type: 'vessel' | 'fleet') => {
     if (!user || !firestore || !idValue.trim()) return;
@@ -526,7 +533,6 @@ export default function VesselTrackerPage() {
         };
 
         const lastActiveTime = getTimeMillis(vessel.lastActive);
-        // Tolérance augmentée à 130s pour les zones à faible réseau
         const isSignalStale = isSharingActive && (Date.now() - lastActiveTime > 130000);
         
         const currentStatus = (isSharingActive && !isSignalStale) ? (vessel.status || 'moving') : 'offline';
@@ -660,11 +666,13 @@ export default function VesselTrackerPage() {
     });
   }, [followedVessels, vesselPrefs, playVesselSound, sharingId, mode, labels]);
 
+  // STABILISATION DU GPS : L'effet ne dépend plus de vesselStatus pour éviter les cycles d'alternance
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
       if (watchIdRef.current) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
       return;
     }
+    
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude, accuracy } = position.coords;
@@ -675,7 +683,10 @@ export default function VesselTrackerPage() {
         setCurrentPos(newPos);
         setUserAccuracy(roundedAccuracy);
 
-        if (vesselStatus === 'offline') {
+        // Récupération du statut actuel via la ref pour éviter les dépendances changeantes
+        const currentStatus = vesselStatusRef.current;
+
+        if (currentStatus === 'offline') {
             setVesselStatus('moving');
             immobilityStartTime.current = null;
             updateVesselInFirestore({ 
@@ -693,7 +704,7 @@ export default function VesselTrackerPage() {
             shouldPanOnNextFix.current = false; 
         }
         
-        if (vesselStatus !== 'returning' && vesselStatus !== 'landed' && vesselStatus !== 'emergency') {
+        if (currentStatus !== 'returning' && currentStatus !== 'landed' && currentStatus !== 'emergency') {
             if (!anchorPos) { 
               setAnchorPos(newPos); 
               immobilityStartTime.current = Date.now();
@@ -704,20 +715,24 @@ export default function VesselTrackerPage() {
             const hasMovedSignificantly = distFromAnchor > (vesselPrefs.mooringRadius || 20);
 
             if (hasMovedSignificantly) {
-              setVesselStatus('moving'); 
-              setAnchorPos(newPos); 
-              immobilityStartTime.current = Date.now();
-              updateVesselInFirestore({ 
-                  location: { latitude, longitude }, 
-                  status: 'moving', 
-                  isSharing: true, 
-                  eventLabel: null, 
-                  accuracy: roundedAccuracy, 
-                  anchorLocation: null 
-              });
+              if (currentStatus !== 'moving') {
+                setVesselStatus('moving'); 
+                setAnchorPos(newPos); 
+                immobilityStartTime.current = Date.now();
+                updateVesselInFirestore({ 
+                    location: { latitude, longitude }, 
+                    status: 'moving', 
+                    isSharing: true, 
+                    eventLabel: null, 
+                    accuracy: roundedAccuracy, 
+                    anchorLocation: null 
+                });
+              } else {
+                updateVesselInFirestore({ location: { latitude, longitude }, accuracy: roundedAccuracy });
+              }
             } else {
               const idleDuration = Date.now() - (immobilityStartTime.current || Date.now());
-              if (idleDuration > 30000 && vesselStatus !== 'stationary') {
+              if (idleDuration > 30000 && currentStatus !== 'stationary') {
                 setVesselStatus('stationary'); 
                 updateVesselInFirestore({ 
                     status: 'stationary', 
@@ -734,7 +749,7 @@ export default function VesselTrackerPage() {
         }
       },
       () => {
-          if (vesselStatus !== 'offline') {
+          if (vesselStatusRef.current !== 'offline') {
               setVesselStatus('offline');
               updateVesselInFirestore({ status: 'offline', eventLabel: 'ERREUR CAPTEUR GPS' });
               toast({ variant: "destructive", title: "Erreur GPS", description: "Veuillez vérifier les autorisations de localisation." });
@@ -742,26 +757,33 @@ export default function VesselTrackerPage() {
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
-    return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
-  }, [isSharing, mode, anchorPos, updateVesselInFirestore, map, toast, vesselStatus, vesselPrefs.mooringRadius, isFollowing]);
+    
+    return () => { 
+        if (watchIdRef.current) {
+            navigator.geolocation.clearWatch(watchIdRef.current); 
+            watchIdRef.current = null;
+        }
+    };
+  }, [isSharing, mode, anchorPos, updateVesselInFirestore, map, toast, vesselPrefs.mooringRadius, isFollowing]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender') return;
     const interval = setInterval(() => {
       const fixAge = Date.now() - lastFixTimeRef.current;
-      // Délai de perte de signal porté à 120s pour l'émetteur
+      const currentStatus = vesselStatusRef.current;
+      
       if (fixAge > 120000) {
-          if (vesselStatus !== 'offline') {
+          if (currentStatus !== 'offline') {
               setVesselStatus('offline');
               updateVesselInFirestore({ status: 'offline', eventLabel: 'SIGNAL GPS PERDU' });
               toast({ variant: "destructive", title: "Signal GPS perdu", description: "Aucune position reçue depuis 2 minutes." });
           }
-      } else if (vesselStatus !== 'offline') {
+      } else if (currentStatus !== 'offline') {
           updateVesselInFirestore({}); 
       }
     }, 30000);
     return () => clearInterval(interval);
-  }, [isSharing, mode, updateVesselInFirestore, vesselStatus]);
+  }, [isSharing, mode, updateVesselInFirestore]);
 
   useEffect(() => {
     if (isFollowing && map && mode !== 'sender') {
@@ -1313,7 +1335,7 @@ export default function VesselTrackerPage() {
                 <AccordionItem value="receiver-settings" className="border-none">
                   <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/5 rounded-xl">
                     <Settings className="size-4 text-primary" />
-                    <span className="text-[10px) font-black uppercase">Notifications & Sons</span>
+                    <span className="text-[10px] font-black uppercase">Notifications & Sons</span>
                   </AccordionTrigger>
                   <AccordionContent className="pt-4"><NotificationSettingsUI /></AccordionContent>
                 </AccordionItem>
@@ -1330,7 +1352,12 @@ export default function VesselTrackerPage() {
             defaultCenter={INITIAL_CENTER} 
             defaultZoom={10} 
             onLoad={setMap} 
-            onZoomChanged={() => map && setMapZoom(map.getZoom() || 10)} 
+            onZoomChanged={() => {
+                if (map) {
+                    const z = map.getZoom();
+                    if (typeof z === 'number') setMapZoom(z);
+                }
+            }} 
             onDragStart={() => setIsFollowing(false)}
             options={{ disableDefaultUI: true, zoomControl: false, mapTypeControl: false, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
           >
