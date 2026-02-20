@@ -70,7 +70,7 @@ import { fetchWindyWeather } from '@/lib/windy-api';
 import { getDataForDate } from '@/lib/data';
 import { locations } from '@/lib/locations';
 
-// CLÉ "PRÉVISIONS CARTOGRAPHIQUES" (image_c551c5)
+// CLÉ "PRÉVISIONS CARTOGRAPHIQUES" (Validée sur Windy.com)
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -143,31 +143,29 @@ export default function VesselTrackerPage() {
   const [mapClickResult, setMapClickResult] = useState<any>(null);
   const [pointTides, setPointTides] = useState<any[] | null>(null);
   const [isQueryingWindy, setIsQueryingWindy] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
+  const [hasLaunched, setHasLaunched] = useState(false);
   
   const mapRef = useRef<any>(null);
-  const isInitializingRef = useRef<boolean>(false);
   const pickerTimerRef = useRef<any>(null);
 
-  // AJOUT DE LA REFERRER POLICY MOBILE/DEV (UNSAFE-URL)
+  // 1. FORCER LE REFERRER COMPLET AU DÉMARRAGE
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const meta = document.createElement('meta');
-    meta.name = "referrer";
-    meta.content = "unsafe-url";
-    document.head.appendChild(meta);
-    return () => {
-      if (document.head.contains(meta)) document.head.removeChild(meta);
-    };
+    // Manipulation directe pour garantir l'envoi de l'URL du cluster
+    let meta = document.querySelector('meta[name="referrer"]') as HTMLMetaElement;
+    if (!meta) {
+        meta = document.createElement('meta');
+        meta.name = "referrer";
+        document.head.appendChild(meta);
+    }
+    meta.setAttribute("content", "no-referrer-when-downgrade");
   }, []);
 
-  const initWindy = useCallback(() => {
-    if (typeof window === 'undefined' || isInitializingRef.current) return;
-    isInitializingRef.current = true;
-
-    // FORCE REFERRER DANS LE DOCUMENT POUR CLOUD WORKSTATIONS
-    try {
-        (document as any).referrerPolicy = "no-referrer-when-downgrade";
-    } catch (e) {}
+  // 2. FONCTION DE LANCEMENT MANUEL (SANS BOUCLE)
+  const manualWindyLaunch = useCallback(() => {
+    if (typeof window === 'undefined' || isInitializing || hasLaunched) return;
+    setIsInitializing(true);
 
     const loadScript = (id: string, src: string): Promise<void> => {
         return new Promise((resolve, reject) => {
@@ -185,84 +183,83 @@ export default function VesselTrackerPage() {
 
     const attemptInit = async () => {
         try {
+            // Chargement de Leaflet
             await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
             
+            // Attente courte stabilisée
             let retries = 0;
-            while (!(window as any).L && retries < 20) { 
+            while (!(window as any).L && retries < 15) { 
                 await new Promise(r => setTimeout(r, 500)); 
                 retries++; 
             }
             
-            if (!(window as any).L) throw new Error("Leaflet (L) non trouvé.");
+            if (!(window as any).L) throw new Error("Leaflet non détecté.");
 
+            // Chargement de Windy
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
             
             const key = MAP_FORECAST_KEY.trim();
-            const hostname = window.location.hostname;
-
-            // SÉCURITÉ : DÉCLENCHE L'INITIALISATION UNIQUEMENT SI LE DOMAINE EST COHÉRENT
-            // Autorise localhost et le domaine du cluster validé dans Windy
-            if (!hostname.includes('cloudworkstations.dev') && !hostname.includes('localhost') && !hostname.includes('web.app')) {
-                console.warn("Domaine non autorisé pour l'initialisation Windy.");
-                return;
-            }
-
-            console.log("Initialisation Windy avec clé Carte:", key);
-
             const options = {
                 key: key,
                 lat: INITIAL_CENTER.lat,
                 lon: INITIAL_CENTER.lng,
                 zoom: 10,
-                verbose: true, // Diagnostic actif
+                verbose: true,
                 overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell'],
                 product: 'ecmwf',
             };
 
-            try {
-                (window as any).windyInit(options, (windyAPI: any) => {
-                    if (!windyAPI) return;
-                    const { map, store, broadcast, picker } = windyAPI;
-                    mapRef.current = map;
-                    store.set('overlay', 'wind');
-                    store.set('product', 'ecmwf');
-
-                    broadcast.on('pickerMoved', (latLon: any) => {
-                        if (pickerTimerRef.current) clearTimeout(pickerTimerRef.current);
-                        pickerTimerRef.current = setTimeout(async () => {
-                            const { lat, lon } = latLon;
-                            setMapClickResult({ lat, lon });
-                            setIsQueryingWindy(true);
-                            try {
-                                const weather = await fetchWindyWeather(lat, lon);
-                                setMapClickResult((prev: any) => ({ ...prev, ...weather }));
-                                const commune = getClosestCommune(lat, lon);
-                                const tideData = getDataForDate(commune, new Date());
-                                setPointTides(tideData.tides);
-                            } catch (err) {} finally { setIsQueryingWindy(false); }
-                        }, 500);
-                    });
-
-                    map.on('click', (e: any) => { picker.open({ lat: e.latlng.lat, lon: e.latlng.lng }); });
-                    setTimeout(() => { if(map) map.invalidateSize(); }, 1500);
-                });
-            } catch (authE) {
-                console.error("Windy Exception:", authE);
+            // Injection directe de secours
+            if ((window as any).W) {
+                (window as any).W.key = key;
             }
+
+            (window as any).windyInit(options, (windyAPI: any) => {
+                if (!windyAPI) {
+                    setIsInitializing(false);
+                    return;
+                }
+                const { map, store, broadcast, picker } = windyAPI;
+                mapRef.current = map;
+                setHasLaunched(true);
+                setIsInitializing(false);
+
+                store.set('overlay', 'wind');
+                store.set('product', 'ecmwf');
+
+                broadcast.on('pickerMoved', (latLon: any) => {
+                    if (pickerTimerRef.current) clearTimeout(pickerTimerRef.current);
+                    pickerTimerRef.current = setTimeout(async () => {
+                        const { lat, lon } = latLon;
+                        setMapClickResult({ lat, lon });
+                        setIsQueryingWindy(true);
+                        try {
+                            const weather = await fetchWindyWeather(lat, lon);
+                            setMapClickResult((prev: any) => ({ ...prev, ...weather }));
+                            const commune = getClosestCommune(lat, lon);
+                            const tideData = getDataForDate(commune, new Date());
+                            setPointTides(tideData.tides);
+                        } catch (err) {} finally { setIsQueryingWindy(false); }
+                    }, 500);
+                });
+
+                map.on('click', (e: any) => { picker.open({ lat: e.latlng.lat, lon: e.latlng.lng }); });
+                setTimeout(() => { if(map) map.invalidateSize(); }, 1000);
+            });
         } catch (e: any) {
-            console.error("Windy init error:", e);
-            isInitializingRef.current = false;
+            console.error("Windy Critical Error:", e);
+            setIsInitializing(false);
         }
     };
 
     attemptInit();
-  }, []);
+  }, [isInitializing, hasLaunched]);
 
+  // Lancement automatique après 3 secondes (une seule fois)
   useEffect(() => {
-    // DÉLAI DE GRÂCE ÉTENDU À 5 SECONDES
-    const timer = setTimeout(initWindy, 5000);
-    return () => { clearTimeout(timer); };
-  }, [initWindy]);
+    const timer = setTimeout(manualWindyLaunch, 3000);
+    return () => clearTimeout(timer);
+  }, [manualWindyLaunch]);
 
   const handleRecenter = () => {
     if (mapRef.current) {
@@ -273,6 +270,22 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
+      {/* TEST SUR DOMAINE DE SECOURS WEBAPP */}
+      {!hasLaunched && !isInitializing && (
+          <Alert className="bg-primary/5 border-primary/20 animate-in fade-in">
+              <Zap className="size-4 text-primary" />
+              <AlertTitle className="text-xs font-black uppercase">Erreur d'authentification ?</AlertTitle>
+              <AlertDescription className="flex flex-col gap-3">
+                  <p className="text-[10px] font-medium leading-relaxed">Si la carte reste grise sur Cloud Workstations, utilisez le domaine de secours déjà validé par Windy.</p>
+                  <Button asChild variant="outline" className="h-10 font-black uppercase text-[10px] border-2 bg-white gap-2">
+                      <a href="https://studio-2943478321-f746e.web.app/vessel-tracker" target="_blank" rel="noopener noreferrer">
+                          <RefreshCw className="size-3" /> Ouvrir sur L&B WebApp
+                      </a>
+                  </Button>
+              </AlertDescription>
+          </Alert>
+      )}
+
       <Card className="border-2 shadow-sm overflow-hidden">
         <CardContent className="p-4 space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -306,6 +319,24 @@ export default function VesselTrackerPage() {
 
       <div className={cn("overflow-hidden border-2 shadow-2xl flex flex-col transition-all relative bg-slate-100 rounded-[2rem]", isFullscreen ? "fixed inset-0 z-[150] w-screen h-screen rounded-none" : "min-h-[550px]")}>
         <div id="windy" className="absolute inset-0 w-full h-full z-10">
+          {!hasLaunched && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 gap-4 p-8 text-center">
+                  {isInitializing ? (
+                      <>
+                        <RefreshCw className="size-12 text-primary animate-spin" />
+                        <p className="font-black uppercase text-[10px] tracking-widest text-slate-400">Initialisation Windy...</p>
+                      </>
+                  ) : (
+                      <>
+                        <AlertTriangle className="size-12 text-amber-500" />
+                        <p className="font-black uppercase text-xs text-slate-600">La carte n'a pas pu démarrer</p>
+                        <Button onClick={manualWindyLaunch} className="font-black uppercase text-[10px] h-12 gap-2 shadow-lg">
+                            <Play className="size-4" /> Relancer manuellement
+                        </Button>
+                      </>
+                  )}
+              </div>
+          )}
           <MeteoDataPanel data={mapClickResult} tides={pointTides} onClose={() => setMapClickResult(null)} isLoading={isQueryingWindy} />
           <div className="absolute top-4 right-4 flex flex-col gap-3 z-20">
             <Button size="icon" className="shadow-2xl h-12 w-12 bg-background/90 backdrop-blur-md border-2 border-primary/20 rounded-2xl" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-6 text-primary" /> : <Expand className="size-6 text-primary" />}</Button>
