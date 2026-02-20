@@ -70,6 +70,7 @@ export default function VesselTrackerPage() {
   const lastUpdateTimestampRef = useRef<number>(0);
   const isMapInitializedRef = useRef<boolean>(false);
   const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const watchIdRef = useRef<number | null>(null);
 
   const sharingId = useMemo(() => (user?.uid || '').toUpperCase(), [user]);
 
@@ -110,8 +111,6 @@ export default function VesselTrackerPage() {
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || !window.L || !window.windyInit || isMapInitializedRef.current) return;
 
-    console.log("%c[Windy Auth] Current Origin:", "color: #3b82f6; font-weight: bold;", window.location.origin);
-
     const options = {
       key: '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4',
       lat: INITIAL_CENTER.lat,
@@ -138,16 +137,13 @@ export default function VesselTrackerPage() {
           mapRef.current = map;
           isMapInitializedRef.current = true;
 
-          // Performance : Rendu Canvas pour les marqueurs
           map.options.preferCanvas = true;
 
-          // Nettoyage des overlays d'erreurs natifs
           setTimeout(() => {
             document.querySelectorAll('.windy-error-msg, .error-boundary').forEach(el => el.remove());
             map.invalidateSize();
           }, 500);
 
-          // Synchronisation UI
           broadcast.on('redrawFinished', () => {
             setActiveOverlay(store.get('overlay'));
           });
@@ -175,7 +171,7 @@ export default function VesselTrackerPage() {
         console.error("Windy Init Crash:", e);
         setIsFallbackMode(true);
     }
-  }, [labels]);
+  }, []);
 
   useEffect(() => {
     fallbackTimerRef.current = setTimeout(() => {
