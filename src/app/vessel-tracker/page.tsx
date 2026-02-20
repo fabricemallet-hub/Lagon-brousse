@@ -185,7 +185,7 @@ export default function VesselTrackerPage() {
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
             
             const options = {
-                key: MAP_FORECAST_KEY,
+                key: MAP_FORECAST_KEY.trim(),
                 lat: INITIAL_CENTER.lat,
                 lon: INITIAL_CENTER.lng,
                 zoom: 10,
@@ -194,6 +194,7 @@ export default function VesselTrackerPage() {
                 product: 'ecmwf',
             };
 
+            console.log("Hôte (Referer) envoyé:", window.location.host);
             console.log("Clé utilisée pour windyInit:", options.key);
 
             try {
