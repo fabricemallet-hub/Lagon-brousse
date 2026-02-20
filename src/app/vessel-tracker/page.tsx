@@ -149,17 +149,18 @@ export default function VesselTrackerPage() {
   const mapRef = useRef<any>(null);
   const pickerTimerRef = useRef<any>(null);
 
-  // Configuration de la Referrer Policy pour l'authentification Windy
+  // CONFIGURATION CRITIQUE : REFERRER POLICY
+  // On force le passage de l'hôte complet à l'authentification Windy
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    // Forçage Referrer Policy au niveau du DOM
+    // 1. Balise Meta
     const meta = document.querySelector('meta[name="referrer"]') || document.createElement('meta');
     meta.setAttribute('name', 'referrer');
     meta.setAttribute('content', 'no-referrer-when-downgrade');
     if (!document.head.contains(meta)) document.head.appendChild(meta);
     
-    // Configuration directe de l'objet document pour certains navigateurs
+    // 2. Propriété document (Navigateurs modernes)
     try {
         (document as any).referrerPolicy = "no-referrer-when-downgrade";
     } catch(e) {}
@@ -195,7 +196,7 @@ export default function VesselTrackerPage() {
             
             if (!(window as any).L) throw new Error("Leaflet non détecté.");
 
-            // Injection de la clé dans l'objet global
+            // Injection de la clé dans l'objet global AVANT libBoot
             (window as any).W = { apiKey: MAP_FORECAST_KEY.trim() };
 
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
@@ -317,7 +318,7 @@ export default function VesselTrackerPage() {
                   {isInitializing ? (
                       <>
                         <RefreshCw className="size-12 text-primary animate-spin" />
-                        <p className="font-black uppercase text-[10px] tracking-widest text-slate-400">Initialisation Windy...</p>
+                        <p className="font-black uppercase text-[10px] tracking-widest text-slate-400">Authentification Windy...</p>
                       </>
                   ) : (
                       <>
