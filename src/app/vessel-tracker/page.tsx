@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -108,11 +109,11 @@ export default function VesselTrackerPage() {
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
 
-  const userDocRef = useMemoFirebase(() => {
+  const userProfileRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return doc(firestore, 'users', user.uid);
   }, [user, firestore]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userDocRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserAccount>(userProfileRef);
 
   const savedVesselIds = userProfile?.savedVesselIds || [];
   const vesselsQuery = useMemoFirebase(() => {
@@ -422,18 +423,18 @@ export default function VesselTrackerPage() {
                 <div className="space-y-6 animate-in fade-in slide-in-from-top-2">
                     <div className={cn("p-6 rounded-2xl shadow-xl relative overflow-hidden text-white transition-all", vesselStatus === 'landed' ? "bg-green-600" : "bg-primary")}>
                         <Navigation className="absolute -right-4 -bottom-4 size-32 opacity-10 rotate-12" />
-                        <div className="space-y-1 relative z-10">
+                        <div className="space-y-1 relative z-10 text-white">
                             <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2"><Zap className="size-3 fill-yellow-300 text-yellow-300" /> PARTAGE ACTIF</p>
                             <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">{sharingId}</h3>
                             <p className="text-xs font-bold opacity-80 mt-1 italic">{vesselNickname || 'Capitaine'}</p>
                         </div>
                         <div className="mt-8 flex items-center gap-2 relative z-10">
                             <Badge variant="outline" className="bg-green-500/30 border-white/30 text-white font-black text-[10px] px-3 h-6">EN LIGNE</Badge>
-                            <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest ml-2">
+                            <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest ml-2 text-white">
                                 {vesselStatus === 'moving' ? <Move className="size-3" /> : vesselStatus === 'stationary' ? <Anchor className="size-3" /> : <Home className="size-3" />}
                                 {vesselStatus === 'moving' ? 'EN MOUVEMENT' : vesselStatus === 'stationary' ? 'AU MOUILLAGE' : 'À TERRE'}
                             </div>
-                            <span className="text-[9px] font-black uppercase opacity-60 ml-auto">{activeDuration}</span>
+                            <span className="text-[9px] font-black uppercase opacity-60 ml-auto text-white">{activeDuration}</span>
                         </div>
                     </div>
 
@@ -613,10 +614,10 @@ export default function VesselTrackerPage() {
 
                                       {/* CENTER ICON: CENTERED ON GPS POINT */}
                                       <div className="relative size-24 flex items-center justify-center">
-                                          {isMe && mode === 'sender' && <PulsingDot />}
                                           <div className={cn("p-5 rounded-full border-4 border-white shadow-2xl opacity-85 transition-opacity", statusInfo.color)}>
                                               {React.createElement(statusInfo.icon, { className: "size-10 text-white drop-shadow-md" })}
                                           </div>
+                                          {isMe && mode === 'sender' && <PulsingDot />}
                                       </div>
 
                                       {/* BOTTOM STACK */}

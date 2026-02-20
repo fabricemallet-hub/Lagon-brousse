@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -13,14 +14,23 @@ export async function fetchWindyWeather(lat: number, lon: number) {
   const projectReferer = 'https://studio.firebase.google.com/project/studio-2943478321-f746e';
 
   try {
-    const cleanLat = Number(lat);
-    const cleanLon = Number(lon);
+    const cleanLat = Number(parseFloat(lat.toString()).toFixed(6));
+    const cleanLon = Number(parseFloat(lon.toString()).toFixed(6));
 
     if (isNaN(cleanLat) || isNaN(cleanLon)) {
         throw new Error("Coordonnées GPS invalides");
     }
 
-    console.log(`[Windy] Appel API pour ${cleanLat}, ${cleanLon}`);
+    const requestBody = {
+      lat: cleanLat,
+      lon: cleanLon,
+      model: 'gfs',
+      parameters: ['wind', 'windDir', 'waves'],
+      levels: ['surface']
+    };
+
+    console.log(`[Windy API] Envoi requête pour ${cleanLat}, ${cleanLon}`);
+    console.log(`[Windy API] Payload:`, JSON.stringify(requestBody));
     
     const response = await fetch(url, {
       method: 'POST',
@@ -30,25 +40,22 @@ export async function fetchWindyWeather(lat: number, lon: number) {
         'Referer': projectReferer,
         'Origin': 'https://studio.firebase.google.com'
       },
-      body: JSON.stringify({
-        lat: cleanLat,
-        lon: cleanLon,
-        model: 'gfs',
-        parameters: ['wind', 'windDir', 'waves']
-      })
+      body: JSON.stringify(requestBody)
     });
 
     if (response.status === 429) {
+        console.error("[Windy API] Erreur 429: Quota dépassé");
         return { success: false, error: "Quota Windy atteint" };
     }
 
     if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[Windy] Erreur API ${response.status}:`, errorText);
+        console.error(`[Windy API] Erreur ${response.status}:`, errorText);
         return { success: false, error: `Erreur Windy ${response.status}` };
     }
 
     const data = await response.json();
+    console.log("[Windy API] Données reçues avec succès");
     
     // Extraction des données (index 0 pour le temps présent)
     return {
@@ -58,7 +65,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
       success: true
     };
   } catch (error: any) {
-    console.error("[Windy] Échec critique fetch:", error);
+    console.error("[Windy API] Échec critique fetch:", error);
     return { success: false, error: error.message || "Erreur technique météo" };
   }
 }
