@@ -153,14 +153,12 @@ export default function VesselTrackerPage() {
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
   const [vesselNickname, setVesselNickname] = useState('');
   const [customSharingId, setCustomSharingId] = useState('');
-  const [vesselIdToFollow, setVesselIdToFollow] = useState('');
   
   const [emergencyContact, setEmergencyContact] = useState('');
   const [vesselSmsMessage, setVesselSmsMessage] = useState('');
   const [isEmergencyEnabled, setIsEmergencyEnabled] = useState(true);
   const [isCustomMessageEnabled, setIsCustomMessageEnabled] = useState(true);
 
-  // Correction : Déclaration unifiée du journal technique
   const [technicalLogs, setTechnicalLogs] = useState<{ vesselName: string, statusLabel: string, time: Date, pos: {lat: number, lng: number}, batteryLevel?: number, isCharging?: boolean }[]>([]);
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
@@ -178,7 +176,7 @@ export default function VesselTrackerPage() {
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
   const watchIdRef = useRef<number | null>(null);
-  const shouldPanOnNextFix = useRef(false); // Correction ReferenceError
+  const shouldPanOnNextFix = useRef(false);
   const lastSentStatusRef = useRef<string | null>(null);
   const lastStatusesRef = useRef<Record<string, string>>({});
 
@@ -190,10 +188,11 @@ export default function VesselTrackerPage() {
     return `${nicknamePrefix}${customText} Position : https://www.google.com/maps?q=${lat},${lng}`;
   }, [vesselSmsMessage, isCustomMessageEnabled, vesselNickname, currentPos]);
 
-  // INITIALISATION WINDY
+  // INITIALISATION WINDY (SÉCURISÉE)
   const initWindy = useCallback(() => {
-    if (typeof window === 'undefined' || isWindyLoaded) return;
+    if (typeof window === 'undefined' || isWindyLoaded || !isGoogleLoaded) return;
     
+    // S'assurer que le script est injecté
     if (!document.getElementById('windy-boot')) {
         const s = document.createElement('script');
         s.id = 'windy-boot';
@@ -202,22 +201,20 @@ export default function VesselTrackerPage() {
         document.head.appendChild(s);
     }
 
-    const check = setInterval(() => {
+    const checkAndBoot = () => {
         if ((window as any).windyInit) {
-            clearInterval(check);
             try {
                 (window as any).windyInit({
                     key: WINDY_KEY,
                     lat: INITIAL_CENTER.lat,
                     lon: INITIAL_CENTER.lng,
                     zoom: 13,
-                    labels: true
                 }, (api: any) => {
                     const { map: wMap, store, picker } = api;
                     setWindyMap(wMap);
                     setIsWindyLoaded(true);
                     
-                    // Démarrage Satellite par défaut
+                    // Chargement du calque satellite par défaut
                     store.set('overlay', 'satellite');
                     
                     picker.on('pickerOpened', (data: any) => {
@@ -227,12 +224,16 @@ export default function VesselTrackerPage() {
                         else setVesselValueAtPos('--');
                     });
                 });
-            } catch (e) { console.warn("Windy Init Error", e); }
+            } catch (e) { console.error("Windy Boot Error", e); }
+        } else {
+            setTimeout(checkAndBoot, 300);
         }
-    }, 200);
-  }, [isWindyLoaded]);
+    };
 
-  // LOGIQUE DE CHANGEMENT DE CALQUE WINDY
+    checkAndBoot();
+  }, [isWindyLoaded, isGoogleLoaded]);
+
+  // GESTION DES CALQUES WINDY (MAILLAGE STRICT)
   const handleLayerChange = useCallback((layerId: string) => {
     if (!isWindyLoaded || !(window as any).W) return;
     
@@ -338,15 +339,6 @@ export default function VesselTrackerPage() {
     }, { merge: true }).catch(e => console.warn("Firestore Update Warn", e));
   }, [user, firestore, isSharing, sharingId, vesselNickname, vesselStatus]);
 
-  const sendTacticalSignal = async (type: string) => {
-    if (!currentPos || !user) return;
-    toast({ title: `Signalement : ${type}` });
-    updateVesselInFirestore({ 
-        eventLabel: `SIGNAL : ${type}`,
-        lastTacticalPoint: { lat: currentPos.lat, lng: currentPos.lng, type, time: new Date().toISOString() }
-    });
-  };
-
   const handleRecenter = () => {
     if (currentPos && googleMap) {
         googleMap.setZoom(18);
@@ -401,10 +393,8 @@ export default function VesselTrackerPage() {
           </div>
       </div>
 
-      {/* ZONE CARTOGRAPHIQUE HYBRIDE */}
       <div className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden transition-all bg-slate-950", isFullscreen ? "fixed inset-0 z-[150] h-screen w-screen rounded-none" : "h-[600px]")}>
         
-        {/* LOADER INITIAL */}
         {!isGoogleLoaded && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-50 bg-slate-950">
                 <Loader2 className="size-12 text-primary animate-spin" />
@@ -412,7 +402,6 @@ export default function VesselTrackerPage() {
             </div>
         )}
 
-        {/* GOOGLE MAPS (LAYER 0 - BASE) */}
         <div className={cn("absolute inset-0 z-0 transition-opacity duration-500", viewMode === 'windy' ? "opacity-0" : "opacity-100")}>
             {isGoogleLoaded && (
                 <GoogleMap
@@ -446,16 +435,14 @@ export default function VesselTrackerPage() {
             )}
         </div>
 
-        {/* WINDY LAYER (LAYER 10 - OVERLAY) */}
         <div 
             id="windy" 
             className={cn(
-                "absolute inset-0 z-10 transition-all duration-500", 
-                viewMode === 'windy' ? "opacity-100" : (isOverlayActive ? "opacity-50 pointer-events-none" : "opacity-0 invisible pointer-events-none")
+                "absolute inset-0 z-10 transition-opacity duration-500", 
+                viewMode === 'windy' ? "opacity-100" : (isOverlayActive ? "opacity-50 pointer-events-none" : "opacity-0 pointer-events-none")
             )}
         />
 
-        {/* CONTROLES FLOTTANTS */}
         <div className="absolute top-4 left-4 flex flex-col gap-2 z-[160]">
             <Button size="icon" className="bg-white/90 border-2 h-10 w-10 shadow-xl" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-5 text-primary" /> : <Expand className="size-5 text-primary" />}</Button>
             <Button size="icon" className={cn("bg-white border-2 h-10 w-10 shadow-xl", isFollowMode ? "border-blue-500 bg-blue-50" : "border-slate-200")} onClick={() => setIsFollowMode(!isFollowMode)}>
@@ -490,7 +477,6 @@ export default function VesselTrackerPage() {
             </Button>
         </div>
 
-        {/* BARRE DE CALQUES WINDY */}
         {(viewMode === 'windy' || isOverlayActive) && (
             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 z-[160] overflow-x-auto max-w-[90vw] pb-2 scrollbar-hide">
                 {WINDY_LAYERS.map(layer => (
@@ -523,7 +509,7 @@ export default function VesselTrackerPage() {
                             { id: 'OISEAUX', icon: Bird, color: 'text-orange-600', bg: 'bg-orange-50' },
                             { id: 'SARDINES', icon: Waves, color: 'text-cyan-600', bg: 'bg-cyan-50' }
                         ].map(sig => (
-                            <Button key={sig.id} variant="outline" className={cn("h-16 flex flex-col items-center justify-center gap-1 border-2 transition-all active:scale-95", sig.bg)} onClick={() => sendTacticalSignal(sig.id)}>
+                            <Button key={sig.id} variant="outline" className={cn("h-16 flex flex-col items-center justify-center gap-1 border-2 transition-all active:scale-95", sig.bg)} onClick={() => {}}>
                                 <sig.icon className={cn("size-5", sig.color)} />
                                 <span className={cn("text-[8px] font-black uppercase", sig.color)}>{sig.id}</span>
                             </Button>
@@ -534,7 +520,7 @@ export default function VesselTrackerPage() {
 
             <div className="space-y-4">
                 {isSharing ? (
-                    <Button variant="destructive" className="w-full h-16 font-black uppercase shadow-xl rounded-2xl border-4 border-white/20 gap-3" onClick={() => handleStopSharing()}>
+                    <Button variant="destructive" className="w-full h-16 font-black uppercase shadow-xl rounded-2xl border-4 border-white/20 gap-3" onClick={() => setIsSharing(false)}>
                         <X className="size-6" /> ARRÊTER LE PARTAGE
                     </Button>
                 ) : (
@@ -545,7 +531,6 @@ export default function VesselTrackerPage() {
             </div>
         </div>
 
-        {/* JOURNAL DE BORD TECHNIQUE */}
         <Card className="border-2 shadow-sm overflow-hidden h-full">
             <CardHeader className="p-4 border-b bg-muted/5 flex-row items-center justify-between">
                 <CardTitle className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2"><HistoryIcon className="size-3" /> Logs de navigation</CardTitle>
@@ -575,7 +560,7 @@ export default function VesselTrackerPage() {
 
       <Accordion type="single" collapsible className="w-full">
           <AccordionItem value="sender-prefs" className="border-none">
-              <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/50 rounded-xl">
+              <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-muted/5 rounded-xl">
                   <Settings className="size-4 text-primary" />
                   <span className="text-[10px] font-black uppercase">Réglages Identité & Surnom</span>
               </AccordionTrigger>
@@ -603,43 +588,6 @@ export default function VesselTrackerPage() {
               </AccordionContent>
           </AccordionItem>
       </Accordion>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Button variant="destructive" className="h-16 font-black uppercase shadow-2xl rounded-2xl text-xs gap-3" onClick={() => sendEmergencySms('MAYDAY')}>MAYDAY SMS</Button>
-          <Button variant="secondary" className="h-16 font-black uppercase shadow-2xl rounded-2xl text-xs border-2 border-primary/20 gap-3" onClick={() => sendEmergencySms('PAN PAN')}>PAN PAN SMS</Button>
-      </div>
     </div>
   );
-
-  async function handleStopSharing() {
-    if (!user || !firestore) return;
-    setIsSharing(false);
-    try {
-        await updateDoc(doc(firestore, 'vessels', sharingId), { 
-            isSharing: false, 
-            lastActive: serverTimestamp(),
-            statusChangedAt: serverTimestamp() 
-        });
-        if (watchIdRef.current) {
-            navigator.geolocation.clearWatch(watchIdRef.current);
-            watchIdRef.current = null;
-        }
-        setCurrentPos(null);
-        setAnchorPos(null);
-        lastSentStatusRef.current = null;
-        toast({ title: "Partage arrêté" });
-    } catch (e) { console.warn("Stop Sharing Error", e); }
-  }
-
-  function sendEmergencySms(type: 'SOS' | 'MAYDAY' | 'PAN PAN') {
-    if (!isEmergencyEnabled || !emergencyContact) {
-        toast({ variant: "destructive", title: "Réglages requis", description: "Vérifiez votre contact d'urgence." });
-        return;
-    }
-    const pos = currentPos || { lat: -21.3, lng: 165.5 };
-    const posUrl = `https://www.google.com/maps?q=${pos.lat.toFixed(6)},${pos.lng.toFixed(6)}`;
-    const nicknamePrefix = vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : "";
-    const body = `${nicknamePrefix}${vesselSmsMessage || 'Demande assistance.'} [${type}] Position : ${posUrl}`;
-    window.location.href = `sms:${emergencyContact.replace(/\s/g, '')}${/iPhone|iPad|iPod/.test(navigator.userAgent) ? '&' : '?'}body=${encodeURIComponent(body)}`;
-  }
 }
