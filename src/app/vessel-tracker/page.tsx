@@ -154,8 +154,8 @@ export default function VesselTrackerPage() {
         try {
             await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
             let retries = 0;
-            while (!window.L && retries < 30) { await new Promise(r => setTimeout(r, 100)); retries++; }
-            if (!window.L) throw new Error("Leaflet L not found");
+            while (!(window as any).L && retries < 30) { await new Promise(r => setTimeout(r, 100)); retries++; }
+            if (!(window as any).L) throw new Error("Leaflet L not found");
 
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
             
@@ -170,7 +170,7 @@ export default function VesselTrackerPage() {
                 product: 'ecmwf',
             };
 
-            window.windyInit(options, (windyAPI: any) => {
+            (window as any).windyInit(options, (windyAPI: any) => {
                 if (!windyAPI) { 
                     setAuthError(window.location.host); 
                     return; 
