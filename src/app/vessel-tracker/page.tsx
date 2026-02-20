@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -65,6 +64,22 @@ const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
 export default function VesselTrackerPage() {
+  /**
+   * ACTIONS DE SURVIE PRODUCTION (v17.6)
+   * Définition prioritaire pour éviter ReferenceError
+   */
+  const handleRecenter = useCallback(() => {
+    if (mapRef.current) {
+        mapRef.current.panTo([INITIAL_CENTER.lat, INITIAL_CENTER.lng]);
+        mapRef.current.setZoom(10);
+    } else {
+        console.log("Recenter triggered - Map not ready");
+    }
+  }, []);
+
+  const handleSearch = () => console.log('Search placeholder');
+  const handleFilter = () => console.log('Filter placeholder');
+
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -79,24 +94,11 @@ export default function VesselTrackerPage() {
   const mapRef = useRef<any>(null);
   const [hasLaunched, setHasLaunched] = useState(false);
 
-  /**
-   * FONCTION DE RECENTRAGE (handleRecenter)
-   * Résout l'erreur ReferenceError identifiée en production.
-   */
-  const handleRecenter = useCallback(() => {
-    if (mapRef.current) {
-        mapRef.current.panTo([INITIAL_CENTER.lat, INITIAL_CENTER.lng]);
-        mapRef.current.setZoom(10);
-    } else {
-        console.log("Windy Map non initialisée pour le recentrage");
-    }
-  }, []);
-
   useEffect(() => {
     if (typeof window === 'undefined') return;
     setCurrentHost(window.location.host);
     
-    // Forçage de la Referrer Policy pour l'authentification Windy sur Cluster Cloud
+    // Forçage de la Referrer Policy pour l'authentification Windy
     document.referrerPolicy = "no-referrer-when-downgrade";
     const meta = document.createElement('meta');
     meta.name = "referrer";
@@ -127,7 +129,6 @@ export default function VesselTrackerPage() {
             let retries = 0;
             while (!(window as any).L && retries < 10) { await new Promise(r => setTimeout(r, 500)); retries++; }
             
-            // Injection directe de la clé dans l'objet global
             (window as any).W = { apiKey: MAP_FORECAST_KEY };
             
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
@@ -169,6 +170,8 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
+      <meta name="referrer" content="no-referrer-when-downgrade" />
+      
       {authError && (
           <Alert variant="destructive" className="border-2 shadow-lg animate-in slide-in-from-top-2 bg-white">
               <ShieldAlert className="size-5" />

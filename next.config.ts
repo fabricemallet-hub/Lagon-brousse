@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  trailingSlash: true,
+  trailingSlash: false,
   experimental: {
     serverActions: {
       bodySizeLimit: '5mb',
@@ -49,6 +49,10 @@ const nextConfig: NextConfig = {
           {
             key: 'Permissions-Policy',
             value: 'screen-wake-lock=(self)',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'no-referrer-when-downgrade',
           },
         ],
       },
