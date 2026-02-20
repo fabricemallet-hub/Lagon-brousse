@@ -584,27 +584,20 @@ export default function VesselTrackerPage() {
                               )}
 
                               <OverlayView position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                                  <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 z-50">
-                                      {/* TOP BADGE: NAME | STATUS */}
-                                      <div className={cn(
-                                          "px-3 py-2 backdrop-blur-md rounded-lg text-[11px] font-black shadow-2xl border-2 flex items-center gap-2 mb-1", 
-                                          isOffline ? "bg-red-600 text-white border-white/40" : "bg-white/95 text-slate-900 border-primary/20"
-                                      )}>
-                                          <span className="truncate max-w-[120px]">{vessel.displayName}</span>
-                                          <span className={cn("border-l-2 pl-2", isOffline ? "text-white/60" : "text-primary/60")}>{statusInfo.label}</span>
-                                      </div>
-
-                                      {/* CENTER ICON: MASSIVE & TRANSPARENT */}
-                                      <div className="relative size-24 flex items-center justify-center">
-                                          {isMe && mode === 'sender' && <PulsingDot />}
-                                          <div className={cn("p-5 rounded-full border-4 border-white shadow-2xl opacity-85 transition-opacity", statusInfo.color)}>
-                                              {React.createElement(statusInfo.icon, { className: "size-10 text-white drop-shadow-md" })}
+                                  <div style={{ transform: 'translate(-50%, -50%)' }} className="flex flex-col items-center pointer-events-none relative">
+                                      
+                                      {/* TOP STACK */}
+                                      <div className="absolute bottom-12 flex flex-col items-center gap-1">
+                                          {/* Badge Name | Status */}
+                                          <div className={cn(
+                                              "px-3 py-2 backdrop-blur-md rounded-lg text-[11px] font-black shadow-2xl border-2 flex items-center gap-2", 
+                                              isOffline ? "bg-red-600 text-white border-white/40" : "bg-white/95 text-slate-900 border-primary/20"
+                                          )}>
+                                              <span className="truncate max-w-[120px]">{vessel.displayName}</span>
+                                              <span className={cn("border-l-2 pl-2", isOffline ? "text-white/60" : "text-primary/60")}>{statusInfo.label}</span>
                                           </div>
-                                      </div>
 
-                                      {/* BOTTOM BADGES STACK */}
-                                      <div className="flex flex-col items-center gap-1 mt-2">
-                                          {/* BATTERY LEVEL */}
+                                          {/* Battery Badge */}
                                           <div className={cn(
                                               "px-2.5 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-2 shadow-xl border-2 bg-white",
                                               battery < 20 ? "text-red-600 border-red-200" : (battery < 60 ? "text-orange-600 border-orange-100" : "text-green-600 border-green-100")
@@ -613,13 +606,24 @@ export default function VesselTrackerPage() {
                                               <span>{battery}%</span>
                                           </div>
 
-                                          {/* CHARGING / LOW ALERT */}
+                                          {/* Charging / Low Alert */}
                                           {isCharging && <Badge className="bg-blue-600 text-white text-[9px] font-black shadow-lg border-2 border-white/30 px-3">⚡ EN CHARGE</Badge>}
                                           {battery < 20 && !isCharging && <Badge className="bg-red-600 text-white text-[9px] font-black shadow-lg animate-pulse border-2 border-white/30 px-3">⚠️ BATTERIE FAIBLE</Badge>}
+                                      </div>
 
-                                          {/* WINDY METEO */}
+                                      {/* CENTER ICON: CENTERED ON GPS POINT */}
+                                      <div className="relative size-24 flex items-center justify-center">
+                                          {isMe && mode === 'sender' && <PulsingDot />}
+                                          <div className={cn("p-5 rounded-full border-4 border-white shadow-2xl opacity-85 transition-opacity", statusInfo.color)}>
+                                              {React.createElement(statusInfo.icon, { className: "size-10 text-white drop-shadow-md" })}
+                                          </div>
+                                      </div>
+
+                                      {/* BOTTOM STACK */}
+                                      <div className="absolute top-12 flex flex-col items-center mt-2">
+                                          {/* Windy Meteo */}
                                           {vessel.windSpeed !== undefined && (
-                                              <div className="bg-slate-900 text-white px-3 py-2 rounded-2xl text-[10px] font-black shadow-2xl border-2 border-white/20 flex items-center gap-3 mt-1">
+                                              <div className="bg-slate-900 text-white px-3 py-2 rounded-2xl text-[10px] font-black shadow-2xl border-2 border-white/20 flex items-center gap-3">
                                                   <div className="flex items-center gap-1.5"><Wind className="size-4 text-blue-400" /> {vessel.windSpeed} ND</div>
                                                   <div className="border-l border-white/20 pl-2 flex items-center gap-1.5"><Waves className="size-4 text-cyan-400" /> {vessel.wavesHeight?.toFixed(1)}m</div>
                                               </div>

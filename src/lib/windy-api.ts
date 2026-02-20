@@ -13,7 +13,14 @@ export async function fetchWindyWeather(lat: number, lon: number) {
   const projectReferer = 'https://studio.firebase.google.com/project/studio-2943478321-f746e';
 
   try {
-    console.log(`[Windy] Appel API pour ${lat}, ${lon} avec Referer: ${projectReferer}`);
+    const cleanLat = Number(lat);
+    const cleanLon = Number(lon);
+
+    if (isNaN(cleanLat) || isNaN(cleanLon)) {
+        throw new Error("Coordonnées GPS invalides");
+    }
+
+    console.log(`[Windy] Appel API pour ${cleanLat}, ${cleanLon}`);
     
     const response = await fetch(url, {
       method: 'POST',
@@ -24,16 +31,14 @@ export async function fetchWindyWeather(lat: number, lon: number) {
         'Origin': 'https://studio.firebase.google.com'
       },
       body: JSON.stringify({
-        lat,
-        lon,
+        lat: cleanLat,
+        lon: cleanLon,
         model: 'gfs',
-        parameters: ['wind', 'windDir', 'waves'],
-        key: API_KEY // On le laisse aussi dans le body au cas où
+        parameters: ['wind', 'windDir', 'waves']
       })
     });
 
     if (response.status === 429) {
-        console.warn("[Windy] Quota atteint");
         return { success: false, error: "Quota Windy atteint" };
     }
 
@@ -45,15 +50,15 @@ export async function fetchWindyWeather(lat: number, lon: number) {
 
     const data = await response.json();
     
-    // Windy retourne des séries temporelles. On prend le premier index (maintenant).
+    // Extraction des données (index 0 pour le temps présent)
     return {
       windSpeed: data.wind?.[0] !== undefined ? Math.round(data.wind[0] * 1.94384) : 0,
       windDir: data.windDir?.[0] || 0,
       wavesHeight: data.waves?.[0] || 0,
       success: true
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("[Windy] Échec critique fetch:", error);
-    return { success: false, error: "Erreur technique météo" };
+    return { success: false, error: error.message || "Erreur technique météo" };
   }
 }
