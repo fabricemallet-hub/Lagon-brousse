@@ -61,7 +61,13 @@ import {
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import { Badge } from '@/components/ui/badge';
+import { Slider } from '@/components/ui/slider';
+import { Textarea } from '@/components/ui/textarea';
 import { fetchWindyWeather } from '@/lib/windy-api';
 import { getDataForDate } from '@/lib/data';
 import { locations } from '@/lib/locations';
@@ -77,6 +83,15 @@ const getClosestCommune = (lat: number, lng: number) => {
         if (dist < minDistance) { closestName = name; minDistance = dist; }
     });
     return closestName;
+};
+
+const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
+  if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
+  const props = { className: cn("size-4", className) };
+  if (charging) return <BatteryCharging {...props} className={cn(props.className, "text-blue-500")} />;
+  if (level <= 10) return <BatteryLow {...props} className={cn(props.className, "text-red-600")} />;
+  if (level <= 40) return <BatteryMedium {...props} className={cn(props.className, "text-orange-500")} />;
+  return <BatteryFull {...props} className={cn(props.className, "text-green-600")} />;
 };
 
 const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClose: () => void, isLoading: boolean, tides: any[] | null }) => {
