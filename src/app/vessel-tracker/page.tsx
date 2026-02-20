@@ -151,6 +151,7 @@ export default function VesselTrackerPage() {
   const pickerTimerRef = useRef<any>(null);
 
   useEffect(() => {
+    // FORCE REFERRER POLICY FOR CLOUD ENVIRONMENTS
     if (typeof window === 'undefined') return;
     try {
         const meta = document.createElement('meta');
@@ -172,7 +173,7 @@ export default function VesselTrackerPage() {
             script.id = id;
             script.src = src;
             script.async = true;
-            script.setAttribute('referrerpolicy', 'no-referrer-when-downgrade');
+            script.referrerPolicy = 'no-referrer-when-downgrade';
             script.onload = () => resolve();
             script.onerror = () => reject(new Error(`Failed to load ${src}`));
             document.head.appendChild(script);
@@ -246,6 +247,7 @@ export default function VesselTrackerPage() {
     return () => clearTimeout(timer);
   }, [initWindyMap]);
 
+  // CRITICAL FIX: handleRecenter must be defined inside the component
   const handleRecenter = () => {
     if (mapRef.current) {
         mapRef.current.panTo([INITIAL_CENTER.lat, INITIAL_CENTER.lng]);

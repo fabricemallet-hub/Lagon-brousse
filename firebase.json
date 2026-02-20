@@ -12,7 +12,7 @@
     ],
     "rewrites": [
       {
-        "source": "**",
+        "source": "!/@(manifest.json|sw.js|icon-192x192.png|icon-512x512.png|favicon.ico)/**",
         "destination": "/index.html"
       }
     ]
