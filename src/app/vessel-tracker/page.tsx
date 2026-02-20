@@ -164,10 +164,8 @@ export default function VesselTrackerPage() {
 
     const attemptInit = async () => {
         try {
-            // STEP 1: Load Leaflet 1.4.0 (Required by Windy)
             await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
             
-            // Wait for L to be globally available
             let retries = 0;
             while (!(window as any).L && retries < 50) { 
                 await new Promise(r => setTimeout(r, 100)); 
@@ -176,21 +174,18 @@ export default function VesselTrackerPage() {
             
             if (!(window as any).L) throw new Error("Leaflet non trouvé après attente.");
 
-            // STEP 2: Load Windy API (libBoot.js)
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
             
             const options = {
                 key: MAP_FORECAST_KEY,
                 lat: INITIAL_CENTER.lat,
-                lon: INITIAL_CENTER.lng, // Use 'lon' as per documentation
+                lon: INITIAL_CENTER.lng,
                 zoom: 10,
                 verbose: false,
-                externalAllowedOrigins: [window.location.host, window.location.hostname, window.location.origin],
                 overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell'],
                 product: 'ecmwf',
             };
 
-            // STEP 3: Initialize Windy
             (window as any).windyInit(options, (windyAPI: any) => {
                 if (!windyAPI) { 
                     setAuthError(window.location.host); 
@@ -201,7 +196,6 @@ export default function VesselTrackerPage() {
                 store.set('overlay', 'wind');
                 store.set('product', 'ecmwf');
 
-                // Listener for picker
                 broadcast.on('pickerMoved', (latLon: any) => {
                     if (pickerTimerRef.current) clearTimeout(pickerTimerRef.current);
                     pickerTimerRef.current = setTimeout(async () => {
@@ -233,7 +227,6 @@ export default function VesselTrackerPage() {
 
   useEffect(() => {
     const timer = setTimeout(initWindy, 1000);
-    // Safety check: if no map after 6s, show diag
     const diagTimer = setTimeout(() => {
         if (!mapRef.current) setAuthError(window.location.host);
     }, 6000);
@@ -264,7 +257,7 @@ export default function VesselTrackerPage() {
             <AlertTitle className="font-black uppercase text-sm mb-2">DIAGNOSTIC WINDY (401)</AlertTitle>
             <AlertDescription className="space-y-4">
                 <div className="p-4 bg-white/80 rounded-xl border border-red-200">
-                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Copiez cette valeur exacte :</p>
+                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Copiez cette valeur exacte (Hôte JavaScript) :</p>
                     <div className="flex items-center gap-2">
                         <code className="flex-1 p-2 bg-red-100 rounded font-mono text-[10px] select-all break-all">{authError}</code>
                         <Button size="icon" variant="ghost" onClick={copyOrigin} className="h-10 w-10 hover:bg-red-200">
@@ -275,8 +268,8 @@ export default function VesselTrackerPage() {
                 <div className="bg-red-100/50 p-3 rounded-lg text-[9px] font-bold text-red-900 space-y-2">
                     <p>1. Allez sur <strong>api.windy.com/keys</strong></p>
                     <p>2. Modifiez la clé Map Forecast (1gGm...)</p>
-                    <p>3. Dans "Restrictions de domaine", utilisez des <strong>VIRGULES</strong>.</p>
-                    <p className="font-black text-xs text-red-600">⚠️ Pas d'espaces entre les domaines.</p>
+                    <p>3. Supprimez les espaces et utilisez des <strong>VIRGULES</strong>.</p>
+                    <p className="font-black text-xs text-red-600">Exemple: domaine1.dev,domaine2.app,localhost</p>
                 </div>
             </AlertDescription>
         </Alert>
