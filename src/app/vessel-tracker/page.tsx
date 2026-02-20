@@ -190,11 +190,10 @@ export default function VesselTrackerPage() {
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || isWindyLoaded) return;
 
-    const loadLeaflet = () => {
+    const loadLeafletAssets = () => {
         return new Promise<void>((resolve) => {
             if ((window as any).L) return resolve();
             
-            // CSS Leaflet
             if (!document.getElementById('leaflet-css')) {
                 const link = document.createElement('link');
                 link.id = 'leaflet-css';
@@ -203,7 +202,6 @@ export default function VesselTrackerPage() {
                 document.head.appendChild(link);
             }
 
-            // JS Leaflet
             const script = document.createElement('script');
             script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
             script.onload = () => resolve();
@@ -225,43 +223,47 @@ export default function VesselTrackerPage() {
 
     const bootSequentially = async () => {
         try {
-            await loadLeaflet();
+            await loadLeafletAssets();
             await loadWindyScript();
 
             const checkDependencies = () => {
                 if ((window as any).windyInit && (window as any).L) {
-                    (window as any).windyInit({
-                        key: WINDY_KEY,
-                        lat: INITIAL_CENTER.lat,
-                        lon: INITIAL_CENTER.lng,
-                        zoom: 13,
-                    }, (api: any) => {
-                        const { map: wMap, store, picker } = api;
-                        setWindyMap(wMap);
-                        setIsWindyLoaded(true);
-                        store.set('overlay', 'wind');
-                        
-                        picker.on('pickerOpened', (data: any) => {
-                            if (data.overlay === 'wind') setVesselValueAtPos(`${Math.round(data.wind * 1.94384)} kts`);
-                            else if (data.overlay === 'waves') setVesselValueAtPos(`${data.waves.toFixed(1)}m`);
-                            else if (data.overlay === 'temp') setVesselValueAtPos(`${Math.round(data.temp - 273.15)}°C`);
-                            else setVesselValueAtPos('--');
+                    try {
+                        (window as any).windyInit({
+                            key: WINDY_KEY,
+                            lat: INITIAL_CENTER.lat,
+                            lon: INITIAL_CENTER.lng,
+                            zoom: 13,
+                        }, (api: any) => {
+                            const { map: wMap, store, picker } = api;
+                            setWindyMap(wMap);
+                            setIsWindyLoaded(true);
+                            store.set('overlay', 'wind');
+                            
+                            picker.on('pickerOpened', (data: any) => {
+                                if (data.overlay === 'wind') setVesselValueAtPos(`${Math.round(data.wind * 1.94384)} kts`);
+                                else if (data.overlay === 'waves') setVesselValueAtPos(`${data.waves.toFixed(1)}m`);
+                                else if (data.overlay === 'temp') setVesselValueAtPos(`${Math.round(data.temp - 273.15)}°C`);
+                                else setVesselValueAtPos('--');
+                            });
                         });
-                    });
+                    } catch (e) {
+                        console.warn("Windy Init Execution Error", e);
+                    }
                 } else {
                     setTimeout(checkDependencies, 300);
                 }
             };
             checkDependencies();
         } catch (e) {
-            console.warn("Windy/Leaflet Boot Error", e);
+            console.warn("Windy/Leaflet Sequential Boot Error", e);
         }
     };
 
     bootSequentially();
   }, [isWindyLoaded]);
 
-  // GESTION DES CALQUES WINDY (MAILLAGE STRICT)
+  // GESTION DES CALQUES WINDY
   const handleLayerChange = useCallback((layerId: string) => {
     if (!isWindyLoaded || !(window as any).W) return;
     
@@ -380,6 +382,26 @@ export default function VesselTrackerPage() {
     }
   };
 
+  const handleStopSharing = async () => {
+    if (!user || !firestore) return;
+    setIsSharing(false);
+    try {
+        await updateDoc(doc(firestore, 'vessels', sharingId), { 
+            isSharing: false, 
+            lastActive: serverTimestamp(),
+            statusChangedAt: serverTimestamp() 
+        });
+    } catch (e) { console.warn("Stop Sharing Error", e); }
+
+    if (watchIdRef.current) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+    }
+    setCurrentPos(null);
+    setAnchorPos(null);
+    toast({ title: "Partage arrêté" });
+  };
+
   const handleSaveSmsSettings = async () => {
     if (!user || !firestore) return;
     try {
@@ -393,6 +415,18 @@ export default function VesselTrackerPage() {
     } catch (e) { toast({ variant: 'destructive', title: "Erreur sauvegarde" }); }
   };
 
+  const handleSaveVessel = async () => {
+    if (!user || !firestore) return;
+    const cleanId = customSharingId.trim().toUpperCase();
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            lastVesselId: cleanId,
+            vesselNickname: vesselNickname
+        });
+        toast({ title: "ID enregistré" });
+    } catch (e) { toast({ variant: 'destructive', title: "Erreur sauvegarde" }); }
+  };
+
   const sendEmergencySms = (type: string) => {
     if (!emergencyContact) {
         toast({ variant: 'destructive', title: "Numéro manquant", description: "Renseignez un contact d'urgence dans les réglages." });
@@ -400,6 +434,12 @@ export default function VesselTrackerPage() {
     }
     const body = `${type} - ${smsPreview}`;
     window.location.href = `sms:${emergencyContact}?body=${encodeURIComponent(body)}`;
+  };
+
+  const toggleWakeLock = async () => {
+    if (!('wakeLock' in navigator)) return;
+    if (wakeLock) { try { await wakeLock.release(); setWakeLock(null); } catch (e) { setWakeLock(null); } }
+    else { try { const lock = await (navigator as any).wakeLock.request('screen'); setWakeLock(lock); lock.addEventListener('release', () => setWakeLock(null)); } catch (err) {} }
   };
 
   return (
@@ -462,7 +502,7 @@ export default function VesselTrackerPage() {
                         </OverlayView>
                     ))}
                 </GoogleMap>
-            ) : <Skeleton className="h-full w-full" />}
+            ) : <div className="flex h-full w-full items-center justify-center text-white font-black uppercase text-xs animate-pulse">Initialisation des systèmes...</div>}
         </div>
 
         <div 
@@ -484,9 +524,12 @@ export default function VesselTrackerPage() {
         <div className="absolute top-4 right-4 flex flex-col gap-2 z-[160]">
             <Button 
                 onClick={() => {
-                    setIsOverlayActive(!isOverlayActive);
-                    if (!isWindyLoaded) initWindy();
-                    setViewMode('google');
+                    const nextStatus = !isOverlayActive;
+                    setIsOverlayActive(nextStatus);
+                    if (nextStatus) {
+                        if (!isWindyLoaded) initWindy();
+                        setViewMode('google');
+                    }
                 }}
                 className={cn("h-12 px-4 border-2 font-black uppercase text-[10px] shadow-2xl rounded-xl gap-2 backdrop-blur-md", isOverlayActive ? "bg-primary text-white border-white" : "bg-slate-900/80 text-white border-white/20")}
             >
@@ -498,12 +541,7 @@ export default function VesselTrackerPage() {
                     const nextMode = viewMode === 'google' ? 'windy' : 'google';
                     setViewMode(nextMode);
                     setIsOverlayActive(false);
-                    if (nextMode === 'windy') {
-                        setGoogleMap(null); // Nettoyage partiel
-                        if (!isWindyLoaded) initWindy();
-                    } else {
-                        setWindyMap(null); // Nettoyage partiel
-                    }
+                    if (nextMode === 'windy' && !isWindyLoaded) initWindy();
                 }}
                 className={cn("h-12 px-4 border-2 font-black uppercase text-[10px] shadow-2xl rounded-xl gap-2 backdrop-blur-md", viewMode === 'windy' ? "bg-blue-600 text-white border-white" : "bg-slate-900/80 text-white border-white/20")}
             >
@@ -568,7 +606,7 @@ export default function VesselTrackerPage() {
 
         <Card className="border-2 shadow-sm overflow-hidden h-full">
             <CardHeader className="p-4 border-b bg-muted/5 flex-row items-center justify-between">
-                <CardTitle className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2"><HistoryIcon className="size-3" /> Logs de navigation</CardTitle>
+                <CardTitle className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2"><HistoryIcon className="size-3" /> Journal de bord technique</CardTitle>
                 <Button variant="ghost" size="sm" className="h-7 px-2 text-[8px] font-black text-destructive" onClick={() => setTechnicalLogs([])}><Trash2 className="size-3 mr-1" /> Effacer</Button>
             </CardHeader>
             <CardContent className="p-0">
@@ -608,6 +646,7 @@ export default function VesselTrackerPage() {
                       <Label className="text-[9px] font-black uppercase ml-1 opacity-60">ID Partage personnalisé</Label>
                       <Input value={customSharingId} onChange={e => setCustomSharingId(e.target.value)} placeholder="BATEAU-1" className="font-black h-12 border-2 uppercase" />
                   </div>
+                  <Button onClick={handleSaveVessel} className="w-full h-10 font-black uppercase text-[10px] border-2">Mémoriser mon identité</Button>
               </AccordionContent>
           </AccordionItem>
 
@@ -615,7 +654,7 @@ export default function VesselTrackerPage() {
               <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-orange-50 border-2 border-orange-100 rounded-xl"><Smartphone className="size-4 text-orange-600" /><span className="text-[10px] font-black uppercase text-orange-800">Configuration SMS d'Urgence</span></AccordionTrigger>
               <AccordionContent className="pt-4 space-y-4">
                   <div className="p-4 bg-white border-2 rounded-2xl space-y-4 shadow-inner">
-                      <div className="space-y-1.5"><Label className="text-[9px] font-black uppercase opacity-60 ml-1">Contact Terre</Label><Input placeholder="Ex: 77 12 34" value={emergencyContact} onChange={e => setEmergencyContact(e.target.value)} className="h-12 border-2 font-black text-lg" /></div>
+                      <div className="space-y-1.5"><Label className="text-[9px] font-black uppercase ml-1 opacity-60">Contact Terre</Label><Input placeholder="Ex: 77 12 34" value={emergencyContact} onChange={e => setEmergencyContact(e.target.value)} className="h-12 border-2 font-black text-lg" /></div>
                       <div className="space-y-1.5"><Label className="text-[9px] font-black uppercase opacity-60 ml-1">Message SOS personnalisé</Label><Textarea value={vesselSmsMessage} onChange={e => setVesselSmsMessage(e.target.value)} className="min-h-[80px] border-2" /></div>
                       <div className="p-3 bg-muted/30 rounded-xl border-2 border-dashed text-[10px] italic">Aperçu : {smsPreview}</div>
                       <Button onClick={handleSaveSmsSettings} className="w-full h-12 font-black uppercase text-[10px] gap-2 shadow-lg"><Save className="size-4" /> Enregistrer réglages SMS</Button>
