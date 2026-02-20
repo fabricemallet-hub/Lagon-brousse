@@ -85,7 +85,9 @@ import {
   Plus,
   Minus,
   Thermometer,
-  CloudRain
+  CloudRain,
+  Lock,
+  Unlock
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
@@ -93,7 +95,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
-// CONFIGURATION WINDY COCKPIT (CLÉ DE PRODUCTION DÉDIÉE)
+// CONFIGURATION WINDY (CLÉ DE PRODUCTION UNIQUE)
 const MAP_KEY = 'VFcQ4k9H3wFrrJ1h6jfS4U3gODXADyyn';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -193,24 +195,33 @@ export default function VesselTrackerPage() {
   const mapMarkersRef = useRef<Record<string, { marker: any, circle?: any }>>({});
   const lastSentStatusRef = useRef<string | null>(null);
   const lastStatusesRef = useRef<Record<string, string>>({});
+  const mapContainerRef = useRef<HTMLDivElement>(null);
 
-  const handleLayerChange = (layerId: string) => {
+  // GESTION DU CALQUE AVEC OPTIMISATION PRODUCT (RAFALES)
+  const handleLayerChange = useCallback((layerId: string) => {
     if (!(window as any).W) return;
     const store = (window as any).W.store;
-    store.set('overlay', layerId);
+    
+    if (layerId === 'gust') {
+        store.set('overlay', 'wind');
+        store.set('product', 'gust');
+    } else {
+        store.set('overlay', layerId);
+        // Si on quitte les rafales, Windy gère généralement le reset du produit, 
+        // mais on peut forcer le produit par défaut si nécessaire
+    }
+    
     setActiveOverlay(layerId);
     setIsLayersOpen(false);
     toast({ title: `Calque : ${layerId.toUpperCase()}` });
-  };
+  }, [toast]);
 
   const toggleSatellite = () => {
     if (!(window as any).W) return;
     const store = (window as any).W.store;
     const current = store.get('overlay');
     const next = current === 'radar' ? 'wind' : 'radar';
-    store.set('overlay', next);
-    setActiveOverlay(next);
-    toast({ title: `Vue : ${next === 'radar' ? 'RADAR' : 'VENT'}` });
+    handleLayerChange(next);
   };
 
   const handleRecenter = useCallback(() => {
@@ -318,35 +329,57 @@ export default function VesselTrackerPage() {
         const check = setInterval(() => {
           if ((window as any).windyInit) {
             clearInterval(check);
-            (window as any).windyInit({ 
-              key: MAP_KEY, 
-              lat: INITIAL_CENTER.lat, 
-              lon: INITIAL_CENTER.lng, 
-              zoom: 13,
-              labels: true 
-            }, (api: any) => {
-              const { map, store } = api;
-              setMap(map);
-              map.setMaxZoom(18);
-              store.set('overlay', 'wind');
-              setActiveOverlay('wind');
-              setIsInitialized(true);
+            try {
+                (window as any).windyInit({ 
+                  key: MAP_KEY, 
+                  lat: INITIAL_CENTER.lat, 
+                  lon: INITIAL_CENTER.lng, 
+                  zoom: 13,
+                  labels: true 
+                }, (api: any) => {
+                  const { map, store } = api;
+                  setMap(map);
+                  map.setMaxZoom(18);
+                  store.set('overlay', 'wind');
+                  setActiveOverlay('wind');
+                  setIsInitialized(true);
 
-              const picker = (window as any).W.picker;
-              picker.on('pickerOpened', (data: any) => {
-                  setPickerData(data);
-                  if (data.overlay === 'wind') setVesselValueAtPos(`${Math.round(data.wind * 1.94384)} kts`);
-                  else if (data.overlay === 'waves') setVesselValueAtPos(`${data.waves.toFixed(1)}m`);
-                  else setVesselValueAtPos('--');
-              });
-              picker.on('pickerClosed', () => setPickerData(null));
-            });
+                  const picker = (window as any).W.picker;
+                  picker.on('pickerOpened', (data: any) => {
+                      setPickerData(data);
+                      if (data.overlay === 'wind') setVesselValueAtPos(`${Math.round(data.wind * 1.94384)} kts`);
+                      else if (data.overlay === 'waves') setVesselValueAtPos(`${data.waves.toFixed(1)}m`);
+                      else setVesselValueAtPos('--');
+                  });
+                  picker.on('pickerClosed', () => setPickerData(null));
+                });
+            } catch (initErr) {
+                console.error("Windy Critical Init Error:", initErr);
+                toast({ variant: 'destructive', title: "Erreur Carte", description: "Impossible d'initialiser Windy." });
+            }
           }
         }, 200);
       } catch (e) {}
     };
     initMap();
-  }, []);
+  }, [toast]);
+
+  // OPTIMISATION : Ecouteurs d'événements passifs sur le conteneur de la carte
+  useEffect(() => {
+    const el = mapContainerRef.current;
+    if (!el) return;
+    
+    const options = { passive: true };
+    const noop = () => {};
+    
+    el.addEventListener('wheel', noop, options);
+    el.addEventListener('touchstart', noop, options);
+    
+    return () => {
+        el.removeEventListener('wheel', noop);
+        el.removeEventListener('touchstart', noop);
+    };
+  }, [isInitialized]);
 
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) return;
@@ -479,7 +512,7 @@ export default function VesselTrackerPage() {
       <header className="flex items-center justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-black uppercase tracking-tighter flex items-center gap-2"><Globe className="text-primary" /> Cockpit Navigation</h1>
-          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Pilot Interface v22.1</p>
+          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Pilot Interface v22.2</p>
         </div>
         <div className="flex bg-slate-900/10 p-1 rounded-xl border-2">
           <Button variant={mode === 'sender' ? 'default' : 'ghost'} size="sm" className="font-black uppercase text-[9px] h-8 px-3" onClick={() => setMode('sender')}>Émetteur (A)</Button>
@@ -513,7 +546,7 @@ export default function VesselTrackerPage() {
           </div>
       </div>
 
-      <div className={cn("relative w-full transition-all bg-slate-950 rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden", isFullscreen ? "fixed inset-0 z-[150] h-screen w-screen rounded-none" : "h-[600px]")}>
+      <div ref={mapContainerRef} className={cn("relative w-full transition-all bg-slate-950 rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden", isFullscreen ? "fixed inset-0 z-[150] h-screen w-screen rounded-none" : "h-[600px]")}>
         <div id="windy" className="w-full h-full"></div>
         <div className={cn("absolute inset-0 flex flex-col items-center justify-center gap-4 text-slate-400 bg-slate-950 transition-opacity z-10", isInitialized ? "opacity-0 invisible pointer-events-none" : "opacity-100 visible")}>
             <RefreshCw className="size-10 animate-spin text-primary/40" />
@@ -672,6 +705,3 @@ export default function VesselTrackerPage() {
     </div>
   );
 }
-
-function Lock({ className, ...props }: any) { return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>; }
-function Unlock({ className, ...props }: any) { return <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>; }
