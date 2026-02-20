@@ -191,7 +191,7 @@ export default function VesselTrackerPage() {
                 lon: INITIAL_CENTER.lng,
                 zoom: 10,
                 verbose: false,
-                externalAllowedOrigins: [window.location.host, window.location.hostname],
+                externalAllowedOrigins: [window.location.host, window.location.hostname, window.location.origin],
                 overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell'],
                 product: 'ecmwf',
             };
