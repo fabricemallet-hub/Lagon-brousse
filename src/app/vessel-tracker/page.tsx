@@ -155,6 +155,8 @@ export default function VesselTrackerPage() {
   const [technicalLogs, setTechnicalLogs] = useState<{ vesselName: string, statusLabel: string, time: Date, pos: {lat: number, lng: number}, batteryLevel?: number, isCharging?: boolean }[]>([]);
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
+  const shouldPanOnNextFix = useRef(false);
+  const watchIdRef = useRef<number | null>(null);
 
   const userDocRef = useMemoFirebase(() => (user && firestore) ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
   const { data: profile } = useDoc<UserAccount>(userDocRef);
@@ -168,10 +170,6 @@ export default function VesselTrackerPage() {
   }, [firestore, savedVesselIds, sharingId, isSharing]);
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
-  const watchIdRef = useRef<number | null>(null);
-  const shouldPanOnNextFix = useRef(false);
-  const lastStatusesRef = useRef<Record<string, string>>({});
-
   const smsPreview = useMemo(() => {
     const nicknamePrefix = vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : "";
     const customText = (isCustomMessageEnabled && vesselSmsMessage) ? vesselSmsMessage : "Requiert assistance immédiate.";
@@ -180,198 +178,8 @@ export default function VesselTrackerPage() {
     return `${nicknamePrefix}${customText} Position : https://www.google.com/maps?q=${lat},${lng}`;
   }, [vesselSmsMessage, isCustomMessageEnabled, vesselNickname, currentPos]);
 
-  const loadLeafletAssets = useCallback(() => {
-    return new Promise<void>((resolve) => {
-        if ((window as any).L) return resolve();
-        
-        if (!document.getElementById('leaflet-css')) {
-            const link = document.createElement('link');
-            link.id = 'leaflet-css';
-            link.rel = 'stylesheet';
-            link.href = 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.css'; // Version 1.4.0 requise par Windy
-            document.head.appendChild(link);
-        }
-
-        const script = document.createElement('script');
-        script.src = 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js';
-        script.onload = () => resolve();
-        document.head.appendChild(script);
-    });
-  }, []);
-
-  const initWindy = useCallback(() => {
-    if (typeof window === 'undefined' || isWindyLoaded) return;
-
-    const loadWindyScript = () => {
-        return new Promise<void>((resolve) => {
-            if (document.getElementById('windy-boot')) return resolve();
-            const s = document.createElement('script');
-            s.id = 'windy-boot';
-            s.src = 'https://api.windy.com/assets/map-forecast/libBoot.js';
-            s.async = true;
-            s.onload = () => resolve();
-            document.head.appendChild(s);
-        });
-    };
-
-    const bootSequentially = async () => {
-        try {
-            await loadLeafletAssets();
-            await loadWindyScript();
-
-            const checkDependencies = () => {
-                if ((window as any).windyInit && (window as any).L) {
-                    try {
-                        (window as any).windyInit({
-                            key: WINDY_KEY,
-                            lat: INITIAL_CENTER.lat,
-                            lon: INITIAL_CENTER.lng,
-                            zoom: 13,
-                        }, (api: any) => {
-                            const { map: wMap, store, picker } = api;
-                            setWindyMap(wMap);
-                            setIsWindyLoaded(true);
-                            store.set('overlay', 'wind');
-                            
-                            picker.on('pickerOpened', (data: any) => {
-                                if (data.overlay === 'wind') setVesselValueAtPos(`${Math.round(data.wind * 1.94384)} kts`);
-                                else if (data.overlay === 'waves') setVesselValueAtPos(`${data.waves.toFixed(1)}m`);
-                                else if (data.overlay === 'temp') setVesselValueAtPos(`${Math.round(data.temp - 273.15)}°C`);
-                                else setVesselValueAtPos('--');
-                            });
-                        });
-                    } catch (e) {
-                        console.warn("Windy Init Error", e);
-                    }
-                } else {
-                    setTimeout(checkDependencies, 300);
-                }
-            };
-            checkDependencies();
-        } catch (e) {
-            console.warn("Boot Sequence Error", e);
-        }
-    };
-
-    bootSequentially();
-  }, [isWindyLoaded, loadLeafletAssets]);
-
-  const handleLayerChange = useCallback((layerId: string) => {
-    if (!isWindyLoaded || !(window as any).W) return;
-    
-    requestAnimationFrame(() => {
-        try {
-            const store = (window as any).W.store;
-            if (!store) return;
-
-            if (layerId === 'gust') {
-                store.set('overlay', 'wind'); 
-                store.set('product', 'gust'); 
-            } else {
-                store.set('overlay', layerId);
-            }
-            setActiveOverlay(layerId);
-        } catch (e) { console.warn("Layer Change Error", e); }
-    });
-  }, [isWindyLoaded]);
-
-  useEffect(() => {
-    if (!googleMap || !windyMap || (!isOverlayActive && viewMode !== 'windy')) return;
-
-    const syncMaps = () => {
-        try {
-            const center = googleMap.getCenter();
-            const zoom = googleMap.getZoom();
-            if (center && zoom) {
-                windyMap.setView([center.lat(), center.lng()], zoom, { animate: false });
-            }
-        } catch (e) { console.warn("Sync Maps Error", e); }
-    };
-
-    const listener = googleMap.addListener('bounds_changed', syncMaps);
-    return () => google.maps.event.removeListener(listener);
-  }, [googleMap, windyMap, isOverlayActive, viewMode]);
-
-  const updateVesselInFirestore = useCallback((data: any) => {
-    if (!user || !firestore || !isSharing) return;
-    const vesselRef = doc(firestore, 'vessels', sharingId);
-    setDoc(vesselRef, {
-        id: sharingId,
-        userId: user.uid,
-        displayName: vesselNickname || user.displayName || 'Capitaine',
-        isSharing: true,
-        lastActive: serverTimestamp(),
-        status: vesselStatus,
-        ...data
-    }, { merge: true }).catch(e => console.warn("Firestore Update Warn", e));
-  }, [user, firestore, isSharing, sharingId, vesselNickname, vesselStatus]);
-
-  useEffect(() => {
-    if (!isSharing || mode !== 'sender' || !navigator.geolocation) return;
-
-    watchIdRef.current = navigator.geolocation.watchPosition(
-        (pos) => {
-            const { latitude, longitude, speed } = pos.coords;
-            const newPos = { lat: latitude, lng: longitude };
-            setCurrentPos(newPos);
-            setCurrentSpeed(Math.max(0, Math.round((speed || 0) * 1.94384)));
-
-            if (isFollowMode && googleMap) googleMap.panTo(newPos);
-            if (!anchorPos) setAnchorPos(newPos);
-            
-            updateVesselInFirestore({ location: { latitude, longitude } });
-        },
-        () => toast({ variant: 'destructive', title: "Signal GPS perdu" }),
-        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-    );
-
-    const interval = setInterval(() => {
-        setSyncCountdown(prev => {
-            if (prev <= 1) { updateVesselInFirestore({ eventLabel: 'SYNC AUTO' }); return 60; }
-            return prev - 1;
-        });
-    }, 1000);
-
-    return () => {
-        clearInterval(interval);
-        if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
-    };
-  }, [isSharing, mode, googleMap, isFollowMode, anchorPos, updateVesselInFirestore, toast]);
-
-  useEffect(() => {
-    if (!followedVessels) return;
-    followedVessels.forEach(v => {
-        const isOffline = (Date.now() - (v.lastActive?.toMillis() || 0)) > 75000;
-        const currentLabel = isOffline ? 'OFFLINE' : (v.status === 'emergency' ? 'SOS' : v.status === 'stationary' ? 'MOUIL' : 'MOUV');
-        
-        if (lastStatusesRef.current[v.id] && lastStatusesRef.current[v.id] !== currentLabel) {
-            setTechnicalLogs(prev => [{
-                vesselName: v.displayName || v.id,
-                statusLabel: currentLabel,
-                time: new Date(),
-                pos: v.location ? { lat: v.location.latitude, lng: v.location.longitude } : INITIAL_CENTER,
-                batteryLevel: v.batteryLevel,
-                isCharging: v.isCharging
-            }, ...prev].slice(0, 50));
-        }
-        lastStatusesRef.current[v.id] = currentLabel;
-    });
-  }, [followedVessels]);
-
-  const handleRecenter = () => {
-    if (currentPos && googleMap) {
-        googleMap.setZoom(18);
-        googleMap.panTo(currentPos);
-    } else {
-        shouldPanOnNextFix.current = true;
-        if (!isSharing) {
-            setIsSharing(true);
-            toast({ title: "GPS Activé", description: "Recherche de votre position..." });
-        }
-    }
-  };
-
-  const handleStopSharing = async () => {
+  // --- HANDLERS ---
+  const handleStopSharing = useCallback(async () => {
     if (!user || !firestore) return;
     setIsSharing(false);
     try {
@@ -389,9 +197,9 @@ export default function VesselTrackerPage() {
     setCurrentPos(null);
     setAnchorPos(null);
     toast({ title: "Partage arrêté" });
-  };
+  }, [user, firestore, sharingId, toast]);
 
-  const handleSaveSmsSettings = async () => {
+  const handleSaveSmsSettings = useCallback(async () => {
     if (!user || !firestore) return;
     try {
         await updateDoc(doc(firestore, 'users', user.uid), {
@@ -402,33 +210,164 @@ export default function VesselTrackerPage() {
         });
         toast({ title: "Paramètres SMS sauvegardés" });
     } catch (e) { toast({ variant: 'destructive', title: "Erreur sauvegarde" }); }
+  }, [user, firestore, emergencyContact, vesselSmsMessage, isEmergencyEnabled, isCustomMessageEnabled, toast]);
+
+  const updateVesselInFirestore = useCallback((data: any) => {
+    if (!user || !firestore || !isSharing) return;
+    const vesselRef = doc(firestore, 'vessels', sharingId);
+    setDoc(vesselRef, {
+        id: sharingId,
+        userId: user.uid,
+        displayName: vesselNickname || user.displayName || 'Capitaine',
+        isSharing: true,
+        lastActive: serverTimestamp(),
+        status: vesselStatus,
+        ...data
+    }, { merge: true }).catch(e => console.warn("Firestore Update Warn", e));
+  }, [user, firestore, isSharing, sharingId, vesselNickname, vesselStatus]);
+
+  const loadLeafletAssets = useCallback(() => {
+    return new Promise<void>((resolve) => {
+        if ((window as any).L) return resolve();
+        if (!document.getElementById('leaflet-css')) {
+            const link = document.createElement('link');
+            link.id = 'leaflet-css';
+            link.rel = 'stylesheet';
+            link.href = 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.css';
+            document.head.appendChild(link);
+        }
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js';
+        script.onload = () => resolve();
+        document.head.appendChild(script);
+    });
+  }, []);
+
+  const initWindy = useCallback(() => {
+    if (typeof window === 'undefined' || isWindyLoaded) return;
+
+    const bootSequentially = async () => {
+        try {
+            await loadLeafletAssets();
+            if (document.getElementById('windy-boot')) return;
+            const s = document.createElement('script');
+            s.id = 'windy-boot';
+            s.src = 'https://api.windy.com/assets/map-forecast/libBoot.js';
+            s.async = true;
+            s.onload = () => {
+                const check = () => {
+                    if ((window as any).windyInit && (window as any).L) {
+                        try {
+                            (window as any).windyInit({
+                                key: WINDY_KEY,
+                                lat: INITIAL_CENTER.lat,
+                                lon: INITIAL_CENTER.lng,
+                                zoom: 13,
+                            }, (api: any) => {
+                                const { map: wMap, store, picker } = api;
+                                setWindyMap(wMap);
+                                setIsWindyLoaded(true);
+                                store.set('overlay', 'wind');
+                                picker.on('pickerOpened', (data: any) => {
+                                    if (data.overlay === 'wind') setVesselValueAtPos(`${Math.round(data.wind * 1.94384)} kts`);
+                                    else if (data.overlay === 'waves') setVesselValueAtPos(`${data.waves.toFixed(1)}m`);
+                                    else if (data.overlay === 'temp') setVesselValueAtPos(`${Math.round(data.temp - 273.15)}°C`);
+                                    else setVesselValueAtPos('--');
+                                });
+                            });
+                        } catch (e) { console.warn("Windy Init Error", e); }
+                    } else { setTimeout(check, 300); }
+                };
+                check();
+            };
+            document.head.appendChild(s);
+        } catch (e) { console.warn("Boot Sequence Error", e); }
+    };
+    bootSequentially();
+  }, [isWindyLoaded, loadLeafletAssets]);
+
+  const handleLayerChange = useCallback((layerId: string) => {
+    if (!isWindyLoaded || !(window as any).W) return;
+    requestAnimationFrame(() => {
+        try {
+            const store = (window as any).W.store;
+            if (!store) return;
+            if (layerId === 'gust') { store.set('overlay', 'wind'); store.set('product', 'gust'); }
+            else { store.set('overlay', layerId); }
+            setActiveOverlay(layerId);
+        } catch (e) { console.warn("Layer Change Error", e); }
+    });
+  }, [isWindyLoaded]);
+
+  // --- EFFECTS ---
+  useEffect(() => {
+    if (!googleMap || !windyMap || (!isOverlayActive && viewMode !== 'windy')) return;
+    const syncMaps = () => {
+        const center = googleMap.getCenter();
+        const zoom = googleMap.getZoom();
+        if (center && zoom) { windyMap.setView([center.lat(), center.lng()], zoom, { animate: false }); }
+    };
+    const listener = googleMap.addListener('bounds_changed', syncMaps);
+    return () => google.maps.event.removeListener(listener);
+  }, [googleMap, windyMap, isOverlayActive, viewMode]);
+
+  useEffect(() => {
+    if (!isSharing || mode !== 'sender' || !navigator.geolocation) return;
+    watchIdRef.current = navigator.geolocation.watchPosition(
+        (pos) => {
+            const { latitude, longitude, speed } = pos.coords;
+            const newPos = { lat: latitude, lng: longitude };
+            setCurrentPos(newPos);
+            setCurrentSpeed(Math.max(0, Math.round((speed || 0) * 1.94384)));
+            if (isFollowMode && googleMap) googleMap.panTo(newPos);
+            if (!anchorPos) setAnchorPos(newPos);
+            updateVesselInFirestore({ location: { latitude, longitude } });
+        },
+        () => toast({ variant: 'destructive', title: "Signal GPS perdu" }),
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    );
+    const interval = setInterval(() => {
+        setSyncCountdown(prev => {
+            if (prev <= 1) { updateVesselInFirestore({ eventLabel: 'SYNC AUTO' }); return 60; }
+            return prev - 1;
+        });
+    }, 1000);
+    return () => { clearInterval(interval); if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
+  }, [isSharing, mode, googleMap, isFollowMode, anchorPos, updateVesselInFirestore, toast]);
+
+  const handleRecenter = () => {
+    if (currentPos && googleMap) {
+        googleMap.setZoom(18);
+        googleMap.panTo(currentPos);
+    } else {
+        shouldPanOnNextFix.current = true;
+        if (!isSharing) { setIsSharing(true); toast({ title: "GPS Activé", description: "Recherche..." }); }
+    }
+  };
+
+  const sendEmergencySms = (type: string) => {
+    if (!emergencyContact) { toast({ variant: 'destructive', title: "Numéro manquant" }); return; }
+    const body = `${type} - ${smsPreview}`;
+    window.location.href = `sms:${emergencyContact}?body=${encodeURIComponent(body)}`;
   };
 
   const handleSaveVessel = async () => {
     if (!user || !firestore) return;
-    const cleanId = customSharingId.trim().toUpperCase();
     try {
-        await updateDoc(doc(firestore, 'users', user.uid), {
-            lastVesselId: cleanId,
-            vesselNickname: vesselNickname
-        });
-        toast({ title: "ID enregistré" });
-    } catch (e) { toast({ variant: 'destructive', title: "Erreur sauvegarde" }); }
+        await updateDoc(doc(firestore, 'users', user.uid), { lastVesselId: customSharingId.trim().toUpperCase(), vesselNickname });
+        toast({ title: "Profil navire mémorisé" });
+    } catch (e) { toast({ variant: 'destructive', title: "Erreur" }); }
   };
 
-  const sendEmergencySms = (type: string) => {
-    if (!emergencyContact) {
-        toast({ variant: 'destructive', title: "Numéro manquant", description: "Renseignez un contact d'urgence dans les réglages." });
-        return;
-    }
-    const body = `${type} - ${smsPreview}`;
-    window.location.href = `sms:${emergencyContact}?body=${encodeURIComponent(body)}`;
+  const handleRemoveSavedVessel = async (id: string) => {
+    if (!user || !firestore) return;
+    try { await updateDoc(doc(firestore, 'users', user.uid), { savedVesselIds: arrayRemove(id) }); } catch (e) {}
   };
 
   const toggleWakeLock = async () => {
     if (!('wakeLock' in navigator)) return;
     if (wakeLock) { try { await wakeLock.release(); setWakeLock(null); } catch (e) { setWakeLock(null); } }
-    else { try { const lock = await (navigator as any).wakeLock.request('screen'); setWakeLock(lock); lock.addEventListener('release', () => setWakeLock(null)); } catch (err) {} }
+    else { try { const lock = await (navigator as any).wakeLock.request('screen'); setWakeLock(lock); } catch (err) {} }
   };
 
   return (
@@ -460,7 +399,6 @@ export default function VesselTrackerPage() {
       </div>
 
       <div className={cn("relative w-full rounded-[2.5rem] border-4 border-slate-900 shadow-2xl overflow-hidden transition-all bg-slate-950", isFullscreen ? "fixed inset-0 z-[150] h-screen w-screen rounded-none" : "h-[600px]")}>
-        
         <div className={cn("absolute inset-0 z-0 transition-opacity duration-500", viewMode === 'windy' ? "opacity-0 pointer-events-none" : "opacity-100")}>
             {isGoogleLoaded ? (
                 <GoogleMap
@@ -468,12 +406,7 @@ export default function VesselTrackerPage() {
                     defaultCenter={INITIAL_CENTER}
                     defaultZoom={12}
                     onLoad={setGoogleMap}
-                    options={{ 
-                        disableDefaultUI: true, 
-                        mapTypeId: 'hybrid', 
-                        gestureHandling: 'greedy',
-                        backgroundColor: '#020617'
-                    }}
+                    options={{ disableDefaultUI: true, mapTypeId: 'hybrid', gestureHandling: 'greedy', backgroundColor: '#020617' }}
                 >
                     {currentPos && (
                         <OverlayView position={currentPos} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
@@ -496,6 +429,7 @@ export default function VesselTrackerPage() {
 
         <div 
             id="windy" 
+            style={{ width: '100%', height: '100%' }}
             className={cn(
                 "absolute inset-0 z-10 transition-opacity duration-500", 
                 viewMode === 'windy' ? "opacity-100" : (isOverlayActive ? "opacity-50 pointer-events-none" : "opacity-0 pointer-events-none")
@@ -515,10 +449,7 @@ export default function VesselTrackerPage() {
                 onClick={() => {
                     const nextStatus = !isOverlayActive;
                     setIsOverlayActive(nextStatus);
-                    if (nextStatus) {
-                        if (!isWindyLoaded) initWindy();
-                        setViewMode('google');
-                    }
+                    if (nextStatus) { if (!isWindyLoaded) initWindy(); setViewMode('google'); }
                 }}
                 className={cn("h-12 px-4 border-2 font-black uppercase text-[10px] shadow-2xl rounded-xl gap-2 backdrop-blur-md", isOverlayActive ? "bg-primary text-white border-white" : "bg-slate-900/80 text-white border-white/20")}
             >
@@ -530,7 +461,9 @@ export default function VesselTrackerPage() {
                     const nextMode = viewMode === 'google' ? 'windy' : 'google';
                     setViewMode(nextMode);
                     setIsOverlayActive(false);
-                    if (nextMode === 'windy' && !isWindyLoaded) initWindy();
+                    if (nextMode === 'windy' && !isWindyLoaded) { 
+                        requestAnimationFrame(() => initWindy());
+                    }
                 }}
                 className={cn("h-12 px-4 border-2 font-black uppercase text-[10px] shadow-2xl rounded-xl gap-2 backdrop-blur-md", viewMode === 'windy' ? "bg-blue-600 text-white border-white" : "bg-slate-900/80 text-white border-white/20")}
             >
