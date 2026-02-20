@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -47,7 +46,8 @@ import {
   Phone,
   Ship,
   AlertTriangle,
-  Move
+  Move,
+  Wind
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -194,7 +194,8 @@ export default function VesselTrackerPage() {
 
         const lastUpdate = currentVesselData?.lastWeatherUpdate?.toMillis?.() || 0;
         const now = Date.now();
-        if (now - lastUpdate > 3 * 3600 * 1000 && currentPos) {
+        if ((now - lastUpdate > 3 * 3600 * 1000 || lastUpdate === 0) && currentPos) {
+            console.log("[Tracker] Tentative de mise à jour météo Windy...");
             try {
                 const weather = await fetchWindyWeather(currentPos.lat, currentPos.lng);
                 if (weather.success) {
@@ -202,6 +203,7 @@ export default function VesselTrackerPage() {
                     updatePayload.windDir = weather.windDir;
                     updatePayload.wavesHeight = weather.wavesHeight;
                     updatePayload.lastWeatherUpdate = serverTimestamp();
+                    console.log("[Tracker] Météo Windy reçue et enregistrée.");
                 }
             } catch (e) {}
         }
@@ -328,13 +330,21 @@ export default function VesselTrackerPage() {
       return;
     }
 
+    console.log(`[Tracker] Lancement de watchPosition pour l'émetteur: ${sharingId}`);
+
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude, accuracy } = position.coords;
         const newPos = { lat: latitude, lng: longitude };
         
-        if (accuracy > 500) { return; }
+        console.log(`[Tracker] GPS Fix reçu : Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)} (Précision: ${accuracy.toFixed(1)}m)`);
 
+        if (accuracy > 500) { 
+            console.log(`[Tracker] Précision GPS insuffisante (>500m), point ignoré.`);
+            return; 
+        }
+
+        console.log(`[Tracker] Point GPS accepté.`);
         setCurrentPos(newPos);
 
         if (vesselStatus !== 'returning' && vesselStatus !== 'landed' && vesselStatus !== 'emergency') {
@@ -586,7 +596,7 @@ export default function VesselTrackerPage() {
                                     />
                                     <OverlayView position={{ lat: vessel.anchorLocation.latitude, lng: vessel.anchorLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                         <div style={{ transform: 'translate(-50%, -50%)' }} className="z-10">
-                                            <Anchor className="size-10 text-orange-500 drop-shadow-2xl stroke-[3] scale-125" />
+                                            <Anchor className="size-12 text-orange-500 drop-shadow-2xl stroke-[3] scale-150" />
                                         </div>
                                     </OverlayView>
                                 </>
@@ -603,15 +613,16 @@ export default function VesselTrackerPage() {
                                       </div>
 
                                       {/* ICONES DE NAVIGATION / MOUVEMENT */}
-                                      {isMe && mode === 'sender' ? <PulsingDot /> : (
-                                          <div className={cn("p-3 rounded-full border-4 border-white shadow-2xl scale-125", statusInfo.color)}>
-                                              {React.createElement(statusInfo.icon, { className: "size-7 text-white drop-shadow-sm" })}
+                                      <div className="relative">
+                                          {isMe && mode === 'sender' && <PulsingDot />}
+                                          <div className={cn("p-4 rounded-full border-4 border-white shadow-2xl", statusInfo.color)}>
+                                              {React.createElement(statusInfo.icon, { className: "size-9 text-white drop-shadow-sm" })}
                                           </div>
-                                      )}
+                                      </div>
 
                                       {/* ÉTAGES DE BULLES D'ÉTAT (BATTERIE & MÉTÉO) */}
                                       <div className="flex flex-col items-center gap-1.5 mt-2">
-                                          {/* BATTERIE BULLE - TOUJOURS VISIBLE SI DATA */}
+                                          {/* BATTERIE BULLE */}
                                           <div className={cn(
                                               "px-2.5 py-1 rounded-full text-[9px] font-black uppercase flex items-center gap-2 shadow-xl border-2 bg-white",
                                               battery < 20 ? "text-red-600 border-red-200" : battery < 60 ? "text-orange-600 border-orange-100" : "text-green-600 border-green-100"
@@ -620,9 +631,9 @@ export default function VesselTrackerPage() {
                                               <span>{battery}%</span>
                                           </div>
 
-                                          {/* BULLES ALERTE / CHARGE SUPPLÉMENTAIRES */}
+                                          {/* BULLES ALERTE / CHARGE */}
                                           {isCharging && (
-                                              <div className="px-3 py-1 rounded-full bg-blue-600 text-white text-[8px] font-black uppercase shadow-lg border-2 border-blue-400 flex items-center gap-1 animate-in zoom-in-95">
+                                              <div className="px-3 py-1 rounded-full bg-blue-600 text-white text-[8px] font-black uppercase shadow-lg border-2 border-blue-400 flex items-center gap-1">
                                                   <Zap className="size-3 fill-white" /> EN CHARGE
                                               </div>
                                           )}
@@ -633,11 +644,11 @@ export default function VesselTrackerPage() {
                                               </div>
                                           )}
 
-                                          {/* MÉTÉO WINDY BULLE - VISIBILITÉ FORCÉE */}
+                                          {/* MÉTÉO WINDY BULLE */}
                                           {vessel.windSpeed !== undefined && (
-                                              <div className="bg-slate-900/90 backdrop-blur-md text-white px-3 py-1.5 rounded-2xl text-[9px] font-black shadow-2xl border-2 border-white/20 flex flex-col items-center gap-1 animate-in slide-in-from-bottom-2">
+                                              <div className="bg-slate-900/90 backdrop-blur-md text-white px-3 py-1.5 rounded-2xl text-[9px] font-black shadow-2xl border-2 border-white/20 flex flex-col items-center gap-1">
                                                   <div className="flex items-center gap-3">
-                                                      <div className="flex items-center gap-1.5"><Waves className="size-3 text-blue-400" /> {vessel.windSpeed} ND</div>
+                                                      <div className="flex items-center gap-1.5"><Wind className="size-3 text-blue-400" /> {vessel.windSpeed} ND</div>
                                                       {vessel.wavesHeight !== undefined && (
                                                           <div className="border-l border-white/20 pl-2 flex items-center gap-1.5"><Waves className="size-3 text-cyan-400" /> {vessel.wavesHeight.toFixed(1)}m</div>
                                                       )}
