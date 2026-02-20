@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, collection, query, where, orderBy, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, query, where, orderBy, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -174,7 +174,7 @@ export default function VesselTrackerPage() {
           lon: INITIAL_CENTER.lng,
           zoom: 10,
           verbose: true,
-          externalAllowedOrigins: ["cloudworkstations.dev", "web.app"],
+          externalAllowedOrigins: [window.location.host, "*.cloudworkstations.dev", "web.app"],
           overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell'],
           product: 'ecmwf',
         };
@@ -272,6 +272,16 @@ export default function VesselTrackerPage() {
     const frame = requestAnimationFrame(renderFleet);
     return () => cancelAnimationFrame(frame);
   }, [followedVessels]);
+
+  const handleRecenter = () => {
+    const activeVessel = followedVessels?.find(v => v.isSharing);
+    if (activeVessel?.location && mapRef.current) {
+        mapRef.current.panTo([activeVessel.location.latitude, activeVessel.location.longitude]);
+        mapRef.current.setZoom(15);
+    } else {
+        toast({ description: "Aucun navire actif à centrer." });
+    }
+  };
 
   const handleSetModel = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const m = e.target.value;
