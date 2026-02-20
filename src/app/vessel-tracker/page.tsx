@@ -47,7 +47,6 @@ import { fetchWindyWeather } from '@/lib/windy-api';
 import { getDataForDate } from '@/lib/data';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
-const CLOUD_WORKSTATION_ORIGIN = "6000-firebase-studio-1769852895244.cluster-bqwaigqtxbeautecnatk4o6ynk.cloudworkstations.dev";
 
 // --- COMPOSANT : PANNEAU DE DONNÉES MÉTÉO TACTIQUES ---
 const MeteoDataPanel = ({ data, onClose, isLoading }: { data: any, onClose: () => void, isLoading: boolean }) => {
@@ -112,6 +111,7 @@ export default function VesselTrackerPage() {
   const [isLeafletLoaded, setIsLeafletLoaded] = useState(false);
   const [isWindyLoaded, setIsWindyLoaded] = useState(false);
   const [authError, setAuthError] = useState(false);
+  const [currentHost, setCurrentHost] = useState('');
   
   const [mode, setMode] = useState<'sender' | 'receiver'>('sender');
   const [isSharing, setIsSharing] = useState(false);
@@ -133,6 +133,17 @@ export default function VesselTrackerPage() {
   const scriptBust = useMemo(() => Date.now(), []);
   const sharingId = useMemo(() => (user?.uid || '').toUpperCase(), [user]);
 
+  // FIX: Labels definition
+  const labels = useMemo(() => ({
+    status1: "Au Mouillage",
+    status2: "En Dérive",
+    alertBtn: "DEMANDE D'ASSISTANCE",
+    alertTitle: "URGENCE SIGNALÉE !",
+    alertDesc: "Navire en détresse !",
+    icon1: Anchor,
+    icon2: RefreshCw
+  }), []);
+
   const userProfileRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return doc(firestore, 'users', user.uid);
@@ -148,6 +159,10 @@ export default function VesselTrackerPage() {
   }, [firestore, savedVesselIds, sharingId, isSharing]);
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') setCurrentHost(window.location.host);
+  }, []);
 
   const getTideInfoForPoint = (lat: number, lng: number) => {
     const { allCommuneNames, locations } = require('@/lib/locations');
@@ -166,7 +181,6 @@ export default function VesselTrackerPage() {
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || !window.L || !window.windyInit || isMapInitializedRef.current) return;
 
-    // PERFORMANCE: setTimeout pour laisser respirer le thread principal
     setTimeout(() => {
         const options = {
           key: '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4',
@@ -190,18 +204,15 @@ export default function VesselTrackerPage() {
               mapRef.current = map;
               isMapInitializedRef.current = true;
 
-              // Configuration par défaut via le Store
               store.set('overlay', 'wind');
               store.set('product', 'ecmwf');
 
-              // Correctif de rendu initial
               setTimeout(() => {
                 document.querySelectorAll('.windy-error-msg, .error-boundary').forEach(el => el.remove());
                 map.invalidateSize();
                 window.dispatchEvent(new Event('resize'));
               }, 500);
 
-              // Listener du Sélecteur (Picker)
               broadcast.on('pickerMoved', async (latLon: any) => {
                 const { lat, lon } = latLon;
                 const tideData = getTideInfoForPoint(lat, lon);
@@ -219,7 +230,6 @@ export default function VesselTrackerPage() {
                 }
               });
 
-              // Ouverture sélecteur au clic
               map.on('click', (e: any) => {
                 picker.open({ lat: e.latlng.lat, lon: e.latlng.lng });
               });
@@ -239,7 +249,6 @@ export default function VesselTrackerPage() {
     if (!mapRef.current || !followedVessels || !window.L) return;
     const L = window.L;
 
-    // PERFORMANCE: Utilisation de requestAnimationFrame pour le rendu des marqueurs
     requestAnimationFrame(() => {
         followedVessels.forEach(v => {
           if (!v.location || !v.isSharing) {
@@ -343,7 +352,6 @@ export default function VesselTrackerPage() {
 
       <meta name="referrer" content="no-referrer-when-downgrade" />
 
-      {/* PANNEAU DE DIAGNOSTIC AUTH 401 */}
       {authError && (
         <Card className="border-red-600 bg-red-50 border-2 animate-in slide-in-from-top-4 duration-500 shadow-2xl">
             <CardHeader className="p-4 pb-2">
@@ -353,11 +361,11 @@ export default function VesselTrackerPage() {
             </CardHeader>
             <CardContent className="p-4 pt-0 space-y-4">
                 <p className="text-[10px] font-bold leading-relaxed text-red-900">
-                    Votre environnement de développement n'est pas autorisé. Veuillez ajouter l'origine suivante dans votre console <a href="https://api.windy.com/keys" target="_blank" className="underline font-black">api.windy.com/keys</a> :
+                    Veuillez ajouter l'origine suivante dans votre console <a href="https://api.windy.com/keys" target="_blank" className="underline font-black">api.windy.com/keys</a> :
                 </p>
                 <div className="bg-white border-2 border-red-200 p-3 rounded-xl flex items-center justify-between gap-3 shadow-inner">
-                    <code className="text-[9px] font-black break-all select-all text-slate-800">{CLOUD_WORKSTATION_ORIGIN}</code>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 hover:bg-red-100" onClick={() => { navigator.clipboard.writeText(CLOUD_WORKSTATION_ORIGIN); toast({ title: "Origine copiée !" }); }}>
+                    <code className="text-[9px] font-black break-all select-all text-slate-800">{currentHost}</code>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 hover:bg-red-100" onClick={() => { navigator.clipboard.writeText(currentHost); toast({ title: "Origine copiée !" }); }}>
                         <Copy className="size-3.5 text-red-600" />
                     </Button>
                 </div>
@@ -383,7 +391,7 @@ export default function VesselTrackerPage() {
               <div className="space-y-1">
                   <Label className="text-[8px] font-black uppercase ml-1 opacity-40">Modèle Météo</Label>
                   <Select value={currentModel} onValueChange={handleSetModel}>
-                      <SelectTrigger className="h-10 border-2 bg-white font-black uppercase text-[10px]">
+                      <SelectTrigger className="h-10 border-2 font-black uppercase text-[10px]">
                           <Database className="size-3 mr-1 text-primary" />
                           <SelectValue />
                       </SelectTrigger>
@@ -397,7 +405,7 @@ export default function VesselTrackerPage() {
               <div className="space-y-1">
                   <Label className="text-[8px] font-black uppercase ml-1 opacity-40">Calque Actif</Label>
                   <Select onValueChange={handleSetOverlay} defaultValue="wind">
-                      <SelectTrigger className="h-10 border-2 bg-white font-black uppercase text-[10px]">
+                      <SelectTrigger className="h-10 border-2 font-black uppercase text-[10px]">
                           <Layers className="size-3 mr-1 text-primary" />
                           <SelectValue />
                       </SelectTrigger>
@@ -440,7 +448,7 @@ export default function VesselTrackerPage() {
       <div className="p-4 bg-primary/5 border-2 border-dashed rounded-xl flex gap-3 opacity-60">
           <Info className="size-5 text-primary shrink-0" />
           <p className="text-[10px] font-medium leading-relaxed">
-            <strong>Météo Marine Full Stack v9 :</strong> Rendu optimisé via requestAnimationFrame. Cliquez sur n'importe quel point pour obtenir l'analyse barométrique, la température de l'eau (SST) et les marées locales.
+            <strong>Météo Marine Full Stack v9.1 :</strong> Diagnostic d'origine dynamique activé. Si la carte reste grise, vérifiez l'hôte affiché dans l'alerte d'authentification ci-dessus.
           </p>
       </div>
     </div>
