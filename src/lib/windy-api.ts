@@ -2,7 +2,7 @@
 
 /**
  * Service de récupération météo via Windy Point Forecast API v2.
- * Version 4.9 : Support multi-paramètres (Vent/Temp) et formatage strict.
+ * Version 5.0 : Support Vent, Vagues, Température avec typage strict.
  */
 export async function fetchWindyWeather(lat: number, lon: number) {
   const API_KEY = 'ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU';
@@ -10,7 +10,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
   const PRODUCTION_URL = 'https://studio-2943478321-f746e.web.app/'; 
   
   try {
-    // 1. DATA INTEGRITY : Conversion forcée en Number pur (Windy rejette les strings)
+    // 1. DATA INTEGRITY : Conversion en Number pur (Windy rejette les strings)
     const cleanLat = Number(parseFloat(lat.toString()).toFixed(6));
     const cleanLon = Number(parseFloat(lon.toString()).toFixed(6));
 
@@ -19,17 +19,16 @@ export async function fetchWindyWeather(lat: number, lon: number) {
     }
 
     // 2. STRUCTURE JSON V2 STRICTE
-    // La doc Point Forecast v2 exige la clé dans le body JSON.
     const requestBody = {
       lat: cleanLat,
-      lon: cleanLon, // Utilise lon et non lng
+      lon: cleanLon,
       model: 'gfs',
-      parameters: ['wind', 'temp'],
+      parameters: ['wind', 'temp', 'waves'],
       levels: ['surface'],
       key: API_KEY
     };
 
-    console.log("[Windy API v4.9] Payload JSON :", JSON.stringify(requestBody));
+    console.log("[Windy API v5.0] Payload JSON :", JSON.stringify(requestBody));
     
     const response = await fetch(url, {
       method: 'POST',
@@ -41,15 +40,13 @@ export async function fetchWindyWeather(lat: number, lon: number) {
       body: JSON.stringify(requestBody)
     });
 
-    // 3. GESTION DES RÉPONSES
     if (response.status === 400) {
         const errorText = await response.text();
-        console.error("[Windy 400] Rejet structurel. Vérifier le JSON envoyé :", errorText);
+        console.error("[Windy 400] Rejet structurel. JSON :", errorText);
         return { success: false, error: "Requête mal formée (400)", status: 400 };
     }
 
     if (response.status === 204) {
-        console.warn("[Windy 204] Aucune donnée disponible pour ces paramètres.");
         return { success: false, error: "Aucune donnée (204)", status: 204 };
     }
 
@@ -60,16 +57,17 @@ export async function fetchWindyWeather(lat: number, lon: number) {
     const data = await response.json();
     
     // Windy renvoie des tableaux de prévisions horaires. Index 0 = actuel.
-    // Conversion m/s en Noeuds (nds) : 1 m/s = 1.94384 nds
-    // Conversion Kelvin en Celsius : K - 273.15
     const windRaw = data.wind?.[0] ?? 0;
     const tempK = data.temp?.[0] ?? 273.15;
+    const wavesM = data.waves?.[0] ?? 0;
 
     return {
-      windSpeed: Math.round(windRaw * 1.94384),
-      temperature: Math.round(tempK - 273.15),
+      windSpeed: Math.round(windRaw * 1.94384), // m/s to knots
+      temperature: Math.round(tempK - 273.15), // K to Celsius
+      waves: parseFloat(wavesM.toFixed(1)),
       success: true,
-      status: 200
+      status: 200,
+      units: data.units
     };
   } catch (error: any) {
     console.error("[Windy Critical] Failure:", error);
