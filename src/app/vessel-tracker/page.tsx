@@ -29,9 +29,12 @@ import {
   Thermometer,
   Droplets,
   Gauge,
-  Clock
+  Clock,
+  Compass,
+  ArrowUp,
+  Activity
 } from 'lucide-react';
-import { cn, getDistance, degreesToCardinal } from '@/lib/utils';
+import { cn, getDistance, degreesToCardinal, translateWindDirection } from '@/lib/utils';
 import type { VesselStatus, UserAccount, WindDirection } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -89,7 +92,6 @@ export default function VesselTrackerPage() {
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
   const getTideInfoForPoint = (lat: number, lng: number) => {
-    // On cherche la commune la plus proche
     const commune = require('@/lib/locations').allCommuneNames.sort((a: string, b: string) => {
         const coordsA = require('@/lib/locations').locations[a];
         const coordsB = require('@/lib/locations').locations[b];
@@ -104,11 +106,17 @@ export default function VesselTrackerPage() {
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || !window.L || !window.windyInit || isMapInitializedRef.current) return;
 
+    // Diagnostic d'origine pour l'utilisateur
+    console.log("%c[Vessel Tracker] Current Origin:", "color: blue; font-weight: bold;", window.location.origin);
+
     const options = {
       key: '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4',
       lat: INITIAL_CENTER.lat,
       lon: INITIAL_CENTER.lng,
       zoom: 10,
+      verbose: true,
+      overlays: ['wind', 'gust', 'temp', 'sst', 'pressure', 'rh', 'waves', 'currents'],
+      product: 'gfs'
     };
 
     try {
@@ -116,7 +124,7 @@ export default function VesselTrackerPage() {
           if (!windyAPI) {
               const origin = window.location.origin;
               setAuthError(origin);
-              console.error('%c[Windy Auth] ORIGINE À AUTORISER :', 'color: red; font-weight: bold;', origin);
+              setIsFallbackMode(true);
               return;
           }
 
@@ -124,11 +132,18 @@ export default function VesselTrackerPage() {
           setAuthError(null);
           setIsFallbackMode(false);
 
-          const { map, picker } = windyAPI;
+          const { map, picker, store, broadcast } = windyAPI;
           mapRef.current = map;
           isMapInitializedRef.current = true;
 
-          setTimeout(() => { if (mapRef.current) mapRef.current.invalidateSize(); }, 500);
+          // Forçage du rendu Canvas pour la performance des marqueurs
+          map.options.preferCanvas = true;
+
+          // Patch pour supprimer les messages d'erreurs natifs Windy si présents
+          setTimeout(() => {
+            document.querySelectorAll('.windy-error-msg, .error-boundary').forEach(el => el.remove());
+            map.invalidateSize();
+          }, 500);
 
           map.on('click', async (e: any) => {
             const now = Date.now();
@@ -140,19 +155,22 @@ export default function VesselTrackerPage() {
             
             setMapClickResult({ lat, lon: lng, tideData });
             setIsQueryingWindy(true);
+            
+            // Ouvrir le picker natif de Windy
             picker.open({ lat, lon: lng });
 
             try {
               const weather = await fetchWindyWeather(lat, lng);
               setMapClickResult((prev: any) => ({ ...prev, ...weather }));
             } catch (err) {
-              // error handled by UI
+              console.error("Point Forecast failed:", err);
             } finally {
               setIsQueryingWindy(false);
             }
           });
         });
     } catch (e) {
+        console.error("Windy Init Error:", e);
         setIsFallbackMode(true);
     }
   }, []);
@@ -175,7 +193,7 @@ export default function VesselTrackerPage() {
   useEffect(() => {
     if (isFallbackMode && isLeafletLoaded && !isMapInitializedRef.current && typeof window !== 'undefined' && window.L) {
         const L = window.L;
-        const fallbackMap = L.map('windy').setView([INITIAL_CENTER.lat, INITIAL_CENTER.lng], 8);
+        const fallbackMap = L.map('windy', { preferCanvas: true }).setView([INITIAL_CENTER.lat, INITIAL_CENTER.lng], 8);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(fallbackMap);
         mapRef.current = fallbackMap;
         isMapInitializedRef.current = true;
@@ -227,7 +245,7 @@ export default function VesselTrackerPage() {
 
   const handleGpsUpdate = useCallback(async (pos: GeolocationPosition) => {
     const now = Date.now();
-    if (now - lastUpdateTimestampRef.current < 5000) return;
+    if (now - lastUpdateTimestampRef.current < 5000) return; // Throttling 5s pour performance
     lastUpdateTimestampRef.current = now;
 
     const { latitude, longitude } = pos.coords;
@@ -290,14 +308,17 @@ export default function VesselTrackerPage() {
         onLoad={() => setIsWindyLoaded(true)}
       />
 
+      <meta name="referrer" content="no-referrer-when-downgrade" />
+
       {authError && (
         <Alert variant="destructive" className="bg-red-50 border-red-200">
             <AlertCircle className="size-5" />
             <AlertTitle className="font-black uppercase text-xs">Erreur d'autorisation Windy</AlertTitle>
             <AlertDescription className="space-y-3 pt-2">
-                <p className="text-[10px] font-bold">Domaine à autoriser : <code className="bg-white/50 px-1">{authError}</code></p>
+                <p className="text-[10px] font-bold">Origine actuelle détectée : <code className="bg-white/50 px-1">{authError}</code></p>
+                <p className="text-[9px] italic">Veuillez ajouter cette URL dans la console Windy (api.windy.com).</p>
                 <Button onClick={handleReloadKey} variant="destructive" className="w-full h-10 font-black uppercase text-[10px] gap-2">
-                    <RefreshCw className="size-3" /> Réinitialiser la clé
+                    <RefreshCw className="size-3" /> Réinitialiser la clé (Cache-Bust)
                 </Button>
             </AlertDescription>
         </Alert>
@@ -326,12 +347,12 @@ export default function VesselTrackerPage() {
       </Card>
 
       <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all relative bg-slate-100", isFullscreen ? "fixed inset-0 z-[150] w-screen h-screen rounded-none" : "min-h-[500px]")}>
-        <div id="windy" className="absolute inset-0 w-full h-full z-10" style={{ minHeight: isFullscreen ? '100vh' : '500px' }}>
+        <div id="windy" className="absolute inset-0 w-full h-full z-10" style={{ minHeight: isFullscreen ? '100vh' : '500px', position: 'relative' }}>
           {mapClickResult && (
             <div className="absolute z-[110] bg-slate-900/90 backdrop-blur-md text-white rounded-2xl p-4 shadow-2xl border-2 border-white/20 min-w-[220px] animate-in zoom-in-95" style={{ top: '50%', left: '50%', transform: 'translate(-50%, -110%)' }}>
               <div className="flex items-center justify-between mb-3 border-b border-white/10 pb-2">
                 <span className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
-                    <Navigation className="size-3" /> Analyse de Point
+                    <Activity className="size-3" /> Analyse Tactique
                 </span>
                 {isQueryingWindy && <RefreshCw className="size-3 animate-spin" />}
               </div>
@@ -378,8 +399,8 @@ export default function VesselTrackerPage() {
             </div>
           )}
           <div className="absolute top-3 right-3 flex flex-col gap-2 z-20">
-            <Button size="icon" className="shadow-lg h-10 w-10 bg-background/90 border-2" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}</Button>
-            <Button onClick={handleRecenter} className="shadow-lg h-10 w-10 bg-background/90 border-2 p-0"><LocateFixed className="size-5" /></Button>
+            <Button size="icon" className="shadow-lg h-10 w-10 bg-background/90 backdrop-blur-md border-2" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}</Button>
+            <Button onClick={handleRecenter} className="shadow-lg h-10 w-10 bg-background/90 backdrop-blur-md border-2 p-0"><LocateFixed className="size-5" /></Button>
           </div>
         </div>
       </Card>
