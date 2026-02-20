@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
@@ -101,7 +100,7 @@ import {
   CloudRain
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
-import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
+import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, differenceInMinutes } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -229,19 +228,6 @@ export default function VesselTrackerPage() {
     ).map(s => ({ id: s.id, label: s.label, url: s.url }));
   }, [dbSounds]);
 
-  // --- INITIALIZATION ---
-  useEffect(() => {
-    if (profile) {
-        if (profile.vesselNickname) setVesselNickname(profile.vesselNickname);
-        if (profile.lastVesselId) setCustomSharingId(profile.lastVesselId);
-        if (profile.lastFleetId) setCustomFleetId(profile.lastFleetId);
-        if (profile.isGhostMode !== undefined) setIsGhostMode(profile.isGhostMode);
-        if (profile.vesselPrefs) setVesselPrefs(prev => ({ ...prev, ...profile.vesselPrefs }));
-        if (profile.emergencyContact) setEmergencyContact(profile.emergencyContact);
-        if (profile.vesselSmsMessage) setVesselSmsMessage(profile.vesselSmsMessage);
-    }
-  }, [profile]);
-
   // --- HANDLERS ---
   const stopAllAudio = () => {
     if (activeAudioRef.current) {
@@ -358,13 +344,11 @@ export default function VesselTrackerPage() {
     };
 
     try {
-        // Log Firestore
         await addDoc(collection(firestore, 'vessels', sharingId, 'logs_tactique'), {
             ...logEntry,
             time: serverTimestamp()
         });
 
-        // Update real-time markers for map
         await updateDoc(doc(firestore, 'vessels', sharingId), { 
             huntingMarkers: arrayUnion({
                 id: logEntry.id,
@@ -503,7 +487,6 @@ export default function VesselTrackerPage() {
                 }
             }
 
-            // AUTO-LOGGING EVERY 60S OR STATUS CHANGE
             if (nextStatus !== vesselStatus || eventLabel || timeDiff >= 60) {
                 const durationMinutes = startTime ? differenceInMinutes(new Date(), startTime) : 0;
                 const logEntry = {
@@ -519,7 +502,6 @@ export default function VesselTrackerPage() {
 
                 setTechnicalLogs(prev => [logEntry, ...prev].slice(0, 50));
                 
-                // Firestore technical log
                 if (firestore && sharingId) {
                     addDoc(collection(firestore, 'vessels', sharingId, 'logs_technique'), {
                         ...logEntry,
@@ -666,7 +648,7 @@ export default function VesselTrackerPage() {
                             {marker.label === 'OISEAUX' ? <Bird className="size-3 text-orange-600" /> : <Fish className="size-3 text-primary" />}
                         </div>
                         <Badge variant="outline" className="bg-slate-900/80 text-white text-[7px] border-none font-black h-3 px-1 mt-0.5 opacity-0 group-hover:opacity-100 whitespace-nowrap">
-                            {marker.label} {marker.time ? format(new Date(marker.time), 'HH:mm') : '--:--'}
+                            {marker.label} {marker.time && !isNaN(new Date(marker.time).getTime()) ? format(new Date(marker.time), 'HH:mm') : '--:--'}
                         </Badge>
                     </div>
                 </OverlayView>
@@ -817,7 +799,7 @@ export default function VesselTrackerPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="space-y-1.5">
                               <Label className="text-[9px] font-black uppercase opacity-60 ml-1">Surnom du navire</Label>
-                              <Input value={vesselNickname} onChange={e => setNickname(e.target.value)} placeholder="KOOLAPIK" className="font-black h-12 border-2 uppercase" />
+                              <Input value={vesselNickname} onChange={e => setVesselNickname(e.target.value)} placeholder="KOOLAPIK" className="font-black h-12 border-2 uppercase" />
                           </div>
                           <div className="space-y-1.5">
                               <Label className="text-[9px] font-black uppercase opacity-60 ml-1">ID Navire (Récepteur B)</Label>

@@ -8,7 +8,11 @@ import { DateProvider } from '@/context/date-context';
 import { LocationProvider } from '@/context/location-context';
 import { CgvConsentGuard } from '@/components/cgv-consent-guard';
 import { AppShell } from '@/components/app-shell';
+import { Toaster } from '@/components/ui/toaster';
 
+/**
+ * Root Providers - Centralise Toaster et tous les contextes pour éviter les ChunkLoadErrors.
+ */
 export function RootProviders({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
@@ -28,6 +32,7 @@ export function RootProviders({ children }: { children: ReactNode }) {
             <LocationProvider>
               <CgvConsentGuard>
                 <AppShell>{children}</AppShell>
+                <Toaster />
               </CgvConsentGuard>
             </LocationProvider>
           </DateProvider>
