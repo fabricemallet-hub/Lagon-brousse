@@ -33,6 +33,7 @@ export default function VesselTrackerPage() {
   const { toast } = useToast();
 
   // --- ÉTAPE 1 : DÉFINITIONS STABLES (Fix ReferenceError) ---
+  // On utilise des fonctions classiques pour bénéficier du hoisting et garantir la visibilité en prod
   function handleRecenter() {
     console.log('Action: Recenter triggered');
     toast({ title: "Recentrer", description: "Recentrage sur votre position..." });
@@ -58,6 +59,7 @@ export default function VesselTrackerPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
+    // Capturer les infos de diagnostic pour le panneau 401
     setHost(window.location.host);
     setOrigin(window.location.origin);
     setReferrer(document.referrer || 'Aucun (Direct)');
@@ -72,6 +74,7 @@ export default function VesselTrackerPage() {
         script.id = id;
         script.src = src;
         script.async = true;
+        // Politique de referrer pour autoriser Windy à voir notre domaine
         script.referrerPolicy = 'no-referrer-when-downgrade';
         script.onload = () => resolve();
         script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
@@ -81,7 +84,7 @@ export default function VesselTrackerPage() {
 
     const init = async () => {
       try {
-        // Interception console.error Windy pour éviter le crash fatal de Next.js
+        // Interception de console.error pour éviter le crash Overlay de Next.js
         const originalConsoleError = console.error;
         console.error = (...args) => {
           if (args[0] && typeof args[0] === 'string' && (args[0].includes('Windy API key') || args[0].includes('authorize'))) {
@@ -91,10 +94,16 @@ export default function VesselTrackerPage() {
           originalConsoleError.apply(console, args);
         };
 
+        // Chargement Leaflet
         await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
+        
+        // Config Windy
         (window as any).W = { apiKey: MAP_KEY };
+        
+        // Chargement Windy Boot
         await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
 
+        // Attente de l'objet windyInit
         let attempts = 0;
         const checkInit = setInterval(() => {
             attempts++;
@@ -126,6 +135,7 @@ export default function VesselTrackerPage() {
       }
     };
 
+    // Délai pour laisser le temps au DOM de se stabiliser
     const timer = setTimeout(init, 1000);
     return () => clearTimeout(timer);
   }, []);
@@ -137,6 +147,9 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto pb-32">
+      {/* Meta tag pour forcer le Referrer dans l'Iframe Studio */}
+      <meta name="referrer" content="no-referrer-when-downgrade" />
+
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-black uppercase tracking-tighter flex items-center gap-2">
@@ -205,6 +218,7 @@ export default function VesselTrackerPage() {
       )}
 
       {/* ISOLATION DU DOM (Fix removeChild) */}
+      {/* On utilise un conteneur qui ne change pas de structure pour React */}
       <div className="relative w-full h-[500px] rounded-[2.5rem] border-4 shadow-2xl overflow-hidden group bg-slate-100">
         {/* Windy Container : React ne touchera jamais aux enfants de ce div */}
         <div 
@@ -217,12 +231,14 @@ export default function VesselTrackerPage() {
         ></div>
         
         {/* LOADER OVERLAY : Sibling du div windy pour éviter les conflits DOM */}
-        {!isInitialized && !error && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-slate-400 z-10 bg-slate-50">
-                <RefreshCw className="size-10 animate-spin text-primary/40" />
-                <p className="font-black uppercase text-[10px] tracking-widest animate-pulse">Initialisation tactique...</p>
-            </div>
-        )}
+        {/* On utilise CSS pour cacher au lieu de supprimer du DOM (Fix crash React) */}
+        <div className={cn(
+            "absolute inset-0 flex flex-col items-center justify-center gap-4 text-slate-400 z-10 bg-slate-50 transition-opacity duration-500",
+            (isInitialized || error) ? "opacity-0 pointer-events-none" : "opacity-100"
+        )}>
+            <RefreshCw className="size-10 animate-spin text-primary/40" />
+            <p className="font-black uppercase text-[10px] tracking-widest animate-pulse">Initialisation tactique...</p>
+        </div>
       </div>
     </div>
   );
