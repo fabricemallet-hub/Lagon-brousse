@@ -153,14 +153,33 @@ export default function VesselTrackerPage() {
   const isMapInitializedRef = useRef<boolean>(false);
   const pickerTimerRef = useRef<any>(null);
 
-  const userProfileRef = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return doc(firestore, 'users', user.uid);
-  }, [user, firestore]);
-  const { data: profile } = useDoc<UserAccount>(userProfileRef);
-
   const initWindy = useCallback(() => {
-    if (typeof window === 'undefined' || !window.L || !window.windyInit || isMapInitializedRef.current) return;
+    if (typeof window === 'undefined' || isMapInitializedRef.current) return;
+
+    // Check if Windy script is loaded, if not, wait or inject
+    if (!window.windyInit) {
+        if (!document.getElementById('windy-lib-boot')) {
+            const script = document.createElement('script');
+            script.id = 'windy-lib-boot';
+            script.src = 'https://api.windy.com/assets/map-forecast/libBoot.js';
+            script.async = true;
+            document.head.appendChild(script);
+        }
+        setTimeout(initWindy, 500);
+        return;
+    }
+
+    if (!window.L) {
+        if (!document.getElementById('leaflet-js')) {
+            const script = document.createElement('script');
+            script.id = 'leaflet-js';
+            script.src = 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js';
+            script.async = true;
+            document.head.appendChild(script);
+        }
+        setTimeout(initWindy, 500);
+        return;
+    }
 
     isMapInitializedRef.current = true;
 
@@ -170,7 +189,7 @@ export default function VesselTrackerPage() {
           lat: INITIAL_CENTER.lat,
           lon: INITIAL_CENTER.lng,
           zoom: 10,
-          verbose: true,
+          verbose: false,
           externalAllowedOrigins: [window.location.host],
           overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell'],
           product: 'ecmwf',
@@ -252,7 +271,7 @@ export default function VesselTrackerPage() {
             <AlertTitle className="font-black uppercase text-sm mb-2">ERREUR AUTHENTIFICATION WINDY (401)</AlertTitle>
             <AlertDescription className="space-y-4">
                 <div className="p-4 bg-white/80 rounded-xl border border-red-200">
-                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Copiez cet hôte exact (Utilisez des VIRGULES entre chaque domaine) :</p>
+                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Copiez cet hôte exact (SÉPAREZ PAR UNE VIRGULE) :</p>
                     <div className="flex items-center gap-2">
                         <code className="flex-1 p-2 bg-red-100 rounded font-mono text-[10px] select-all break-all">{authError}</code>
                         <Button size="icon" variant="ghost" onClick={copyOrigin} className="h-10 w-10">
@@ -263,8 +282,8 @@ export default function VesselTrackerPage() {
                 <div className="bg-red-100/50 p-3 rounded-lg text-[9px] font-bold text-red-900 space-y-2">
                     <p>1. Allez sur api.windy.com/keys</p>
                     <p>2. Modifiez la clé Map Forecast (1gGm...)</p>
-                    <p>3. Saisissez les hôtes séparés par une **VIRGULE** (pas d'espace).</p>
-                    <p>4. Exemple : <code>*.cloudworkstations.dev, studio-2943478321-f746e.web.app, localhost</code></p>
+                    <p>3. Dans "Restrictions de domaine", mettez : <code>*.cloudworkstations.dev, studio-2943478321-f746e.web.app, localhost</code></p>
+                    <p className="font-black text-xs">⚠️ IMPORTANT : Utilisez une VIRGULE entre chaque domaine, pas d'espaces seuls.</p>
                 </div>
             </AlertDescription>
         </Alert>
