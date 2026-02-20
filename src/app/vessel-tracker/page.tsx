@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -11,7 +12,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
   Navigation, 
   Anchor, 
@@ -69,6 +69,7 @@ import { fr } from 'date-fns/locale';
 import { fetchWindyWeather } from '@/lib/windy-api';
 import { getDataForDate } from '@/lib/data';
 import { locations } from '@/lib/locations';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
@@ -133,7 +134,7 @@ const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClos
 
 export default function VesselTrackerPage() {
   const firestore = useFirestore();
-  const { user } = useUser();
+  const { user } = useUserHook();
   const { toast } = useToast();
 
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -149,6 +150,17 @@ export default function VesselTrackerPage() {
   
   const mapRef = useRef<any>(null);
   const pickerTimerRef = useRef<any>(null);
+
+  /**
+   * RECENTER FUNCTION - DEFINED AT TOP TO AVOID REFERENCE ERRORS
+   */
+  const handleRecenter = useCallback(() => {
+    if (mapRef.current) {
+        // Windy/Leaflet usually take [lat, lng] or {lat, lng}
+        mapRef.current.panTo([INITIAL_CENTER.lat, INITIAL_CENTER.lng]);
+        mapRef.current.setZoom(10);
+    }
+  }, []);
 
   useEffect(() => {
     // FORCE REFERRER POLICY FOR CLOUD ENVIRONMENTS
@@ -247,14 +259,6 @@ export default function VesselTrackerPage() {
     return () => clearTimeout(timer);
   }, [initWindyMap]);
 
-  // CRITICAL FIX: handleRecenter must be defined inside the component
-  const handleRecenter = () => {
-    if (mapRef.current) {
-        mapRef.current.panTo([INITIAL_CENTER.lat, INITIAL_CENTER.lng]);
-        mapRef.current.setZoom(10);
-    }
-  };
-
   const copyHost = () => {
     const host = window.location.hostname;
     navigator.clipboard.writeText(host);
@@ -324,7 +328,7 @@ export default function VesselTrackerPage() {
                       <AlertTitle className="font-black uppercase text-sm mb-2">Erreur Authentification Windy (401)</AlertTitle>
                       <AlertDescription className="space-y-4">
                           <p className="text-xs font-medium leading-relaxed">
-                              Le serveur Windy rejette la connexion. Votre domaine Cloud n'est pas autorisé pour la clé <strong>1gGm...</strong>.
+                              Le serveur Windy rejette la connexion. Votre domaine n'est pas autorisé pour la clé <strong>1gGm...</strong>.
                           </p>
                           <div className="p-4 bg-red-50 rounded-2xl border-2 border-red-100 space-y-3">
                               <p className="text-[10px] font-black uppercase text-red-800">Action : Copier l'hôte ci-dessous</p>
