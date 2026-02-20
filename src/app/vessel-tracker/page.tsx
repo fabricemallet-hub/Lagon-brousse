@@ -1,8 +1,9 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where } from 'firebase/firestore';
+import { collection, doc, query, where, orderBy, setDoc, serverTimestamp } from 'firebase/firestore';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -13,51 +14,18 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Navigation, 
-  Anchor, 
   LocateFixed, 
   ShieldAlert, 
-  Save, 
-  WifiOff, 
-  Move, 
   Expand, 
   Shrink, 
   Zap, 
-  AlertTriangle,
-  Bell,
-  BatteryFull,
-  BatteryMedium,
-  BatteryLow,
-  BatteryCharging,
-  History as HistoryIcon,
-  MapPin,
-  ChevronDown,
-  X,
-  Play,
-  Volume2,
-  Check,
-  Trash2,
-  Ship,
-  Home,
   RefreshCw,
-  Settings,
-  Battery,
-  MessageSquare,
-  Eye,
-  Smartphone,
-  Phone,
-  Waves,
+  ChevronDown,
   Info
 } from 'lucide-react';
-import { cn, getDistance } from '@/lib/utils';
-import type { VesselStatus, SoundLibraryEntry, UserAccount } from '@/lib/types';
+import { cn } from '@/lib/utils';
+import type { VesselStatus, WindDirection } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
-import { Badge } from '@/components/ui/badge';
-import { Slider } from '@/components/ui/slider';
-import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
@@ -65,20 +33,20 @@ const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
 export default function VesselTrackerPage() {
   /**
-   * ACTIONS DE SURVIE PRODUCTION (v17.6)
-   * Définition prioritaire pour éviter ReferenceError
+   * ACTIONS DE SURVIE PRODUCTION (v17.7)
+   * Utilisation de function pour garantir le hoisting dans le scope
    */
-  const handleRecenter = useCallback(() => {
+  function handleRecenter() {
     if (mapRef.current) {
         mapRef.current.panTo([INITIAL_CENTER.lat, INITIAL_CENTER.lng]);
         mapRef.current.setZoom(10);
     } else {
         console.log("Recenter triggered - Map not ready");
     }
-  }, []);
+  }
 
-  const handleSearch = () => console.log('Search placeholder');
-  const handleFilter = () => console.log('Filter placeholder');
+  function handleSearch() { console.log('Search placeholder'); }
+  function handleFilter() { console.log('Filter placeholder'); }
 
   const { user } = useUser();
   const firestore = useFirestore();
@@ -99,7 +67,6 @@ export default function VesselTrackerPage() {
     setCurrentHost(window.location.host);
     
     // Forçage de la Referrer Policy pour l'authentification Windy
-    document.referrerPolicy = "no-referrer-when-downgrade";
     const meta = document.createElement('meta');
     meta.name = "referrer";
     meta.content = "no-referrer-when-downgrade";
@@ -170,15 +137,13 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
-      <meta name="referrer" content="no-referrer-when-downgrade" />
-      
       {authError && (
           <Alert variant="destructive" className="border-2 shadow-lg animate-in slide-in-from-top-2 bg-white">
               <ShieldAlert className="size-5" />
               <AlertTitle className="font-black uppercase text-xs">Authentification Windy échouée (401)</AlertTitle>
               <AlertDescription className="space-y-3">
                   <p className="text-[10px] font-medium leading-relaxed">
-                      L'hôte actuel n'est pas autorisé. Copiez l'hôte ci-dessous et ajoutez-le à votre clé sur Windy.com.
+                      L'hôte actuel n'est pas autorisé. Ajoutez cet hôte à votre clé sur Windy.com :
                   </p>
                   <div className="flex gap-2">
                       <Input value={currentHost} readOnly className="h-9 bg-slate-50 text-[9px] font-mono border-2" />
@@ -255,7 +220,7 @@ export default function VesselTrackerPage() {
 
       <div className="space-y-4">
           <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
-              <HistoryIcon className="size-4" /> Analyse Tactique
+              <Zap className="size-4 text-primary" /> Analyse Tactique
           </h3>
           <Alert className="bg-muted/10 border-dashed border-2">
               <Info className="size-4 text-primary" />
