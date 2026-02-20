@@ -13,13 +13,14 @@ export async function fetchWindyWeather(lat: number, lon: number) {
   const url = 'https://api.windy.com/api/point-forecast/v2';
   
   // DOMAINE DE PRODUCTION AUTORISÉ (Referer & Origin)
-  const prodDomain = 'https://studio-2943478321-f746e.web.app';
+  // Utilisation exacte de l'URL de production configurée dans la console Windy
+  const prodDomain = 'https://studio-2943478321-f746e.web.app/';
 
   try {
     // FORMATAGE CRITIQUE : Windy exige des types Number (pas de String)
-    // On force la précision à 6 décimales pour la conformité GPS
-    const cleanLat = Number(lat.toFixed(6));
-    const cleanLon = Number(lon.toFixed(6));
+    // On force la conversion en Number et on limite à 6 décimales
+    const cleanLat = Number(Number(lat).toFixed(6));
+    const cleanLon = Number(Number(lon).toFixed(6));
 
     if (isNaN(cleanLat) || isNaN(cleanLon)) {
         throw new Error("Coordonnées GPS invalides");
@@ -34,7 +35,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
       levels: ['surface']
     };
 
-    console.log(`[Windy Diagnostic] Envoi vers ${url}`);
+    console.log(`[Windy Diagnostic] Envoi vers ${url} avec Referer: ${prodDomain}`);
     
     const response = await fetch(url, {
       method: 'POST',
