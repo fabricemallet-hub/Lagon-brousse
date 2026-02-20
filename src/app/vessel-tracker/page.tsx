@@ -37,7 +37,8 @@ import {
   Copy,
   Info,
   Droplets,
-  ArrowUp
+  ArrowUp,
+  ChevronDown
 } from 'lucide-react';
 import { cn, getDistance, degreesToCardinal } from '@/lib/utils';
 import type { VesselStatus, UserAccount, Tide } from '@/lib/types';
@@ -51,9 +52,6 @@ import { getDataForDate } from '@/lib/data';
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
-/**
- * Panneau d'analyse météo marine au point cliqué.
- */
 const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClose: () => void, isLoading: boolean, tides: Tide[] | null }) => {
     if (!data) return null;
     return (
@@ -208,7 +206,6 @@ export default function VesselTrackerPage() {
                   const weather = await fetchWindyWeather(lat, lon);
                   setMapClickResult((prev: any) => ({ ...prev, ...weather }));
 
-                  // Récupération des marées locales pour le point
                   const commune = getClosestCommune(lat, lon);
                   const tideData = getDataForDate(commune, new Date());
                   setPointTides(tideData.tides);
@@ -414,7 +411,6 @@ export default function VesselTrackerPage() {
   );
 }
 
-// Helper local pour marée station proche
 const getClosestCommune = (lat: number, lng: number) => {
     let closestName = 'Nouméa';
     let minDistance = Infinity;
@@ -428,7 +424,6 @@ const getClosestCommune = (lat: number, lng: number) => {
     return closestName;
 };
 
-// --- DATA & LOCATIONS IMPORT ---
 const locations: Record<string, { lat: number, lon: number }> = {
     'Bélep': { lat: -19.70, lon: 163.66 }, 'Boulouparis': { lat: -21.86, lon: 165.99 },
     'Bourail': { lat: -21.56, lon: 165.48 }, 'Canala': { lat: -21.52, lon: 165.96 },
