@@ -63,9 +63,9 @@ import { fetchWindyWeather } from '@/lib/windy-api';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
 const PulsingDot = () => (
-    <div className="absolute z-[100]" style={{ transform: 'translate(-50%, -50%)' }}>
-      <div className="size-6 rounded-full bg-blue-500 opacity-75 animate-ping absolute"></div>
-      <div className="size-6 rounded-full bg-blue-500 border-4 border-white relative shadow-2xl"></div>
+    <div className="absolute inset-0 flex items-center justify-center z-[100]">
+      <div className="size-5 rounded-full bg-blue-500 opacity-75 animate-ping absolute"></div>
+      <div className="size-5 rounded-full bg-blue-500 border-2 border-white relative shadow-2xl"></div>
     </div>
 );
 
@@ -101,9 +101,8 @@ export default function VesselTrackerPage() {
   const anchorPosRef = useRef<google.maps.LatLngLiteral | null>(null);
   const statusRef = useRef<VesselStatus['status'] | 'offline'>('moving');
   const watchIdRef = useRef<number | null>(null);
-  const immobilityStartTime = useRef<number | null>(null);
-  const driftStartTime = useRef<number | null>(null);
   const lastWeatherUpdateRef = useRef<number>(0);
+  const [isForcingWindy, setIsForcingWindy] = useState(false);
 
   const [technicalLog, setTechnicalLog] = useState<{ label: string, startTime: Date, lastUpdate: Date, duration: number }[]>([]);
 
@@ -201,14 +200,43 @@ export default function VesselTrackerPage() {
     });
   }, [user, firestore, sharingId, vesselNickname, isSharing, mooringRadius]);
 
+  const handleForceWindyUpdate = async () => {
+    const pos = currentPosRef.current;
+    if (!pos) {
+        toast({ variant: "destructive", title: "Diagnostic Windy", description: "GPS requis pour l'appel API." });
+        return;
+    }
+    setIsForcingWindy(true);
+    toast({ title: "Diagnostic Windy", description: "Requête API en cours..." });
+    
+    try {
+        const weather = await fetchWindyWeather(pos.lat, pos.lng);
+        if (weather.success) {
+            await updateVesselInFirestore({
+                windSpeed: weather.windSpeed,
+                windDir: weather.windDir,
+                wavesHeight: weather.wavesHeight,
+                lastWeatherUpdate: serverTimestamp()
+            });
+            lastWeatherUpdateRef.current = Date.now();
+            toast({ title: "Diagnostic OK", description: `Vent: ${weather.windSpeed}nd | Mer: ${weather.wavesHeight}m` });
+        } else {
+            toast({ variant: "destructive", title: "Erreur Windy", description: weather.error || "Réponse invalide." });
+        }
+    } catch (e) {
+        toast({ variant: "destructive", title: "Échec critique", description: "Vérifiez votre clé API ou Referer." });
+    } finally {
+        setIsForcingWindy(false);
+    }
+  };
+
   const addToTechnicalLog = useCallback((label: string) => {
     setTechnicalLog(prev => {
         if (prev.length > 0 && prev[0].label === label) {
             const last = prev[0];
             const now = new Date();
             const duration = differenceInMinutes(now, last.startTime);
-            const updated = { ...last, lastUpdate: now, duration };
-            return [updated, ...prev.slice(1)];
+            return [{ ...last, lastUpdate: now, duration }, ...prev.slice(1)];
         }
         return [{ label, startTime: new Date(), lastUpdate: new Date(), duration: 0 }, ...prev].slice(0, 50);
     });
@@ -222,21 +250,6 @@ export default function VesselTrackerPage() {
     } catch (e) {
         console.error(e);
     }
-  };
-
-  const handleResetIdentity = async () => {
-    if (!user || !firestore) return;
-    try {
-        await updateDoc(doc(firestore, 'users', user.uid), {
-            vesselNickname: null,
-            lastVesselId: null,
-            mooringRadius: 20
-        });
-        setVesselNickname('');
-        setCustomSharingId('');
-        setMooringRadius(20);
-        toast({ title: "Identité réinitialisée" });
-    } catch (e) {}
   };
 
   const handleRecenter = useCallback(() => {
@@ -282,8 +295,6 @@ export default function VesselTrackerPage() {
     if (st === 'moving') {
         setAnchorPos(null);
         anchorPosRef.current = null;
-        immobilityStartTime.current = null;
-        driftStartTime.current = null;
     }
 
     updateVesselInFirestore(updates);
@@ -306,14 +317,12 @@ export default function VesselTrackerPage() {
       (position) => {
         const { latitude, longitude, accuracy } = position.coords;
         const newPos = { lat: latitude, lng: longitude };
-        
         if (accuracy > 500) return;
 
         currentPosRef.current = newPos;
         setCurrentPos(newPos);
 
         const currentStatus = statusRef.current;
-
         if (currentStatus !== 'returning' && currentStatus !== 'landed' && currentStatus !== 'emergency') {
             if (!anchorPosRef.current) {
                 anchorPosRef.current = newPos;
@@ -322,7 +331,6 @@ export default function VesselTrackerPage() {
                 addToTechnicalLog("EN MOUVEMENT");
             } else {
                 const distFromAnchor = getDistance(latitude, longitude, anchorPosRef.current.lat, anchorPosRef.current.lng);
-                
                 if (distFromAnchor > 100) {
                     statusRef.current = 'moving';
                     setVesselStatus('moving');
@@ -331,17 +339,14 @@ export default function VesselTrackerPage() {
                     updateVesselInFirestore({ location: { latitude, longitude }, status: 'moving', eventLabel: null, accuracy: Math.round(accuracy) });
                     addToTechnicalLog("EN MOUVEMENT");
                 } else if (distFromAnchor > mooringRadius) {
-                    if (!driftStartTime.current) driftStartTime.current = Date.now();
-                    if (Date.now() - driftStartTime.current > 60000 && statusRef.current !== 'drifting') {
+                    if (statusRef.current !== 'drifting') {
                         statusRef.current = 'drifting';
                         setVesselStatus('drifting');
                         updateVesselInFirestore({ location: { latitude, longitude }, status: 'drifting', eventLabel: 'À LA DÉRIVE !' });
                         addToTechnicalLog("À LA DÉRIVE !");
                     }
                 } else {
-                    driftStartTime.current = null;
-                    if (!immobilityStartTime.current) immobilityStartTime.current = Date.now();
-                    if (Date.now() - immobilityStartTime.current > 30000 && statusRef.current !== 'stationary') {
+                    if (statusRef.current !== 'stationary') {
                         statusRef.current = 'stationary';
                         setVesselStatus('stationary');
                         updateVesselInFirestore({ location: { latitude, longitude }, status: 'stationary', eventLabel: 'AU MOUILLAGE' });
@@ -487,7 +492,7 @@ export default function VesselTrackerPage() {
                             </div>
                             <Slider value={[mooringRadius]} min={10} max={200} step={10} onValueChange={v => setMooringRadius(v[0])} />
                         </div>
-                        <Button variant="ghost" className="w-full h-10 text-[9px] font-black uppercase text-destructive border-2 border-destructive/10" onClick={handleResetIdentity}>
+                        <Button variant="ghost" className="w-full h-10 text-[9px] font-black uppercase text-destructive border-2 border-destructive/10" onClick={() => { setVesselNickname(''); setCustomSharingId(''); setMooringRadius(20); toast({ title: "Identité réinitialisée" }); }}>
                             <Trash2 className="size-3 mr-2" /> Réinitialiser mon identité
                         </Button>
                     </AccordionContent>
@@ -505,6 +510,16 @@ export default function VesselTrackerPage() {
                             <Button variant="outline" size="sm" className="h-10 text-[8px] font-black uppercase" onClick={() => handleManualStatusToggle('returning', 'SIMUL RETOUR')}>RETOUR</Button>
                             <Button variant="outline" size="sm" className="h-10 text-[8px] font-black uppercase" onClick={() => handleManualStatusToggle('landed', 'SIMUL HOME')}>HOME</Button>
                         </div>
+                        <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            className="w-full h-12 font-black uppercase text-[10px] gap-2 border-2" 
+                            onClick={handleForceWindyUpdate}
+                            disabled={isForcingWindy}
+                        >
+                            {isForcingWindy ? <RefreshCw className="size-4 animate-spin" /> : <Wind className="size-4" />}
+                            FORCER APPEL API WINDY (DIAGNOSTIC)
+                        </Button>
                         <Button variant="outline" size="sm" className="w-full h-10 text-[8px] font-black uppercase border-dashed" onClick={() => updateVesselInFirestore({})}>Forcer Sync Firestore</Button>
                     </AccordionContent>
                 </AccordionItem>
@@ -561,7 +576,7 @@ export default function VesselTrackerPage() {
                                         options={{ fillColor: '#3b82f6', fillOpacity: 0.15, strokeColor: '#3b82f6', strokeOpacity: 0.5, strokeWeight: 1 }} 
                                     />
                                     <OverlayView position={{ lat: vessel.anchorLocation.latitude, lng: vessel.anchorLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
-                                        <div style={{ transform: 'translate(-50%, -50%)' }} className="z-10">
+                                        <div style={{ transform: 'translate(-50%, -50%)' }} className="z-10 opacity-60">
                                             <Anchor className="size-20 text-orange-500 drop-shadow-2xl stroke-[4] scale-125" />
                                         </div>
                                     </OverlayView>
@@ -570,6 +585,7 @@ export default function VesselTrackerPage() {
 
                               <OverlayView position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                   <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 z-50">
+                                      {/* TOP BADGE: NAME | STATUS */}
                                       <div className={cn(
                                           "px-3 py-2 backdrop-blur-md rounded-lg text-[11px] font-black shadow-2xl border-2 flex items-center gap-2 mb-1", 
                                           isOffline ? "bg-red-600 text-white border-white/40" : "bg-white/95 text-slate-900 border-primary/20"
@@ -578,14 +594,17 @@ export default function VesselTrackerPage() {
                                           <span className={cn("border-l-2 pl-2", isOffline ? "text-white/60" : "text-primary/60")}>{statusInfo.label}</span>
                                       </div>
 
-                                      <div className="relative">
+                                      {/* CENTER ICON: MASSIVE & TRANSPARENT */}
+                                      <div className="relative size-24 flex items-center justify-center">
                                           {isMe && mode === 'sender' && <PulsingDot />}
-                                          <div className={cn("p-5 rounded-full border-4 border-white shadow-2xl", statusInfo.color)}>
+                                          <div className={cn("p-5 rounded-full border-4 border-white shadow-2xl opacity-85 transition-opacity", statusInfo.color)}>
                                               {React.createElement(statusInfo.icon, { className: "size-10 text-white drop-shadow-md" })}
                                           </div>
                                       </div>
 
+                                      {/* BOTTOM BADGES STACK */}
                                       <div className="flex flex-col items-center gap-1 mt-2">
+                                          {/* BATTERY LEVEL */}
                                           <div className={cn(
                                               "px-2.5 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-2 shadow-xl border-2 bg-white",
                                               battery < 20 ? "text-red-600 border-red-200" : (battery < 60 ? "text-orange-600 border-orange-100" : "text-green-600 border-green-100")
@@ -594,9 +613,11 @@ export default function VesselTrackerPage() {
                                               <span>{battery}%</span>
                                           </div>
 
+                                          {/* CHARGING / LOW ALERT */}
                                           {isCharging && <Badge className="bg-blue-600 text-white text-[9px] font-black shadow-lg border-2 border-white/30 px-3">⚡ EN CHARGE</Badge>}
                                           {battery < 20 && !isCharging && <Badge className="bg-red-600 text-white text-[9px] font-black shadow-lg animate-pulse border-2 border-white/30 px-3">⚠️ BATTERIE FAIBLE</Badge>}
 
+                                          {/* WINDY METEO */}
                                           {vessel.windSpeed !== undefined && (
                                               <div className="bg-slate-900 text-white px-3 py-2 rounded-2xl text-[10px] font-black shadow-2xl border-2 border-white/20 flex items-center gap-3 mt-1">
                                                   <div className="flex items-center gap-1.5"><Wind className="size-4 text-blue-400" /> {vessel.windSpeed} ND</div>
