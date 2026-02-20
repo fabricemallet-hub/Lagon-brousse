@@ -84,15 +84,6 @@ const getClosestCommune = (lat: number, lon: number) => {
     return closestName;
 };
 
-const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
-  if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
-  const props = { className: cn("size-4", className) };
-  if (charging) return <BatteryCharging {...props} className={cn(props.className, "text-blue-500")} />;
-  if (level <= 10) return <BatteryLow {...props} className={cn(props.className, "text-red-600")} />;
-  if (level <= 40) return <BatteryMedium {...props} className={cn(props.className, "text-orange-500")} />;
-  return <BatteryFull {...props} className={cn(props.className, "text-green-600")} />;
-};
-
 const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClose: () => void, isLoading: boolean, tides: any[] | null }) => {
     if (!data) return null;
     return (
@@ -183,7 +174,7 @@ export default function VesselTrackerPage() {
             
             let retries = 0;
             while (!(window as any).L && retries < 30) { 
-                await new Promise(r => setTimeout(r, 300)); 
+                await new Promise(r => setTimeout(r, 500)); 
                 retries++; 
             }
             
@@ -201,12 +192,13 @@ export default function VesselTrackerPage() {
                 product: 'ecmwf',
             };
 
+            // LOG TECHNIQUE REQUIS
             console.log("Clé utilisée pour windyInit:", options.key);
 
             try {
                 (window as any).windyInit(options, (windyAPI: any) => {
                     if (!windyAPI) { 
-                        setAuthError(window.location.host); 
+                        setAuthError(window.location.origin); 
                         return; 
                     }
                     const { map, store, broadcast, picker } = windyAPI;
@@ -235,11 +227,11 @@ export default function VesselTrackerPage() {
                 });
             } catch (authE) {
                 console.error("Windy Auth Exception:", authE);
-                setAuthError(window.location.host);
+                setAuthError(window.location.origin);
             }
         } catch (e: any) {
             console.error("Windy init error:", e);
-            setAuthError(window.location.host);
+            setAuthError(window.location.origin);
             isInitializingRef.current = false;
         }
     };
@@ -248,9 +240,10 @@ export default function VesselTrackerPage() {
   }, []);
 
   useEffect(() => {
+    // Délai augmenté à 3000ms pour Cloud Workstations
     const timer = setTimeout(initWindy, 3000);
     const diagTimer = setTimeout(() => {
-        if (!mapRef.current) setAuthError(window.location.host);
+        if (!mapRef.current) setAuthError(window.location.origin);
     }, 8000);
     return () => { clearTimeout(timer); clearTimeout(diagTimer); };
   }, [initWindy]);
@@ -264,6 +257,7 @@ export default function VesselTrackerPage() {
 
   const copyOrigin = () => {
     if (typeof window !== 'undefined') {
+        const origin = window.location.origin;
         const host = window.location.host;
         navigator.clipboard.writeText(host);
         toast({ title: "HÔTE COPIÉ !", description: `Copié : ${host}` });
@@ -280,9 +274,9 @@ export default function VesselTrackerPage() {
             <AlertTitle className="font-black uppercase text-sm mb-2">DIAGNOSTIC WINDY (401)</AlertTitle>
             <AlertDescription className="space-y-4">
                 <div className="p-4 bg-white/80 rounded-xl border border-red-200">
-                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Hôte détecté (Copiez cette valeur) :</p>
+                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Hôte détecté (Referer) :</p>
                     <div className="flex items-center gap-2">
-                        <code className="flex-1 p-2 bg-red-100 rounded font-mono text-[10px] select-all break-all">{authError}</code>
+                        <code className="flex-1 p-2 bg-red-100 rounded font-mono text-[10px] select-all break-all">{window.location.host}</code>
                         <Button size="icon" variant="ghost" onClick={copyOrigin} className="h-10 w-10 hover:bg-red-200">
                             <Copy className="size-4" />
                         </Button>
@@ -291,8 +285,8 @@ export default function VesselTrackerPage() {
                 <div className="bg-red-100/50 p-3 rounded-lg text-[9px] font-bold text-red-900 space-y-2">
                     <p>1. Allez sur <strong>api.windy.com/keys</strong></p>
                     <p>2. Modifiez la clé Map Forecast (<strong>1gGm...</strong>)</p>
-                    <p>3. Assurez-vous qu'il n'y a <strong>AUCUN ESPACE</strong> entre les virgules.</p>
-                    <p className="font-black text-xs text-red-600">Exemple: *.cloudworkstations.dev,*.web.app,localhost</p>
+                    <p>3. Assurez-vous d'avoir exactement <code>*.cloudworkstations.dev,*.web.app,localhost</code></p>
+                    <p className="font-black text-xs text-red-600">AUCUN ESPACE entre les virgules.</p>
                 </div>
             </AlertDescription>
         </Alert>
