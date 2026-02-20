@@ -73,7 +73,7 @@ export default function VesselTrackerPage() {
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
-  // --- INITIALISATION WINDY MAP (SÉQUENCE STRICTE) ---
+  // --- INITIALISATION WINDY MAP (FIX ÉCRAN GRIS) ---
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || !(window as any).windyInit || mapRef.current) return;
 
@@ -88,6 +88,11 @@ export default function VesselTrackerPage() {
         (window as any).windyInit(options, (windyAPI: any) => {
           const { map, picker } = windyAPI;
           mapRef.current = map;
+
+          // Forçage du redessin pour éviter l'écran gris (InvalidateSize)
+          setTimeout(() => {
+            map.invalidateSize();
+          }, 250);
 
           map.on('click', async (e: any) => {
             const now = Date.now();
@@ -106,7 +111,7 @@ export default function VesselTrackerPage() {
                   wind: weather.windSpeed, 
                   temp: weather.temperature, 
                   waves: weather.waves,
-                  status: weather.status
+                  success: weather.success
               }));
             } finally {
               setIsQueryingWindy(false);
@@ -138,25 +143,25 @@ export default function VesselTrackerPage() {
           className: 'vessel-marker',
           html: `<div class="relative flex items-center justify-center" style="transform: translate(-50%, -50%)">
                   <!-- BADGE NOM (HAUT) -->
-                  <div class="absolute bottom-16 px-2 py-1 bg-slate-900/90 text-white rounded text-[10px] font-black shadow-lg border border-white/20 whitespace-nowrap z-50">
+                  <div class="absolute bottom-12 px-2 py-1 bg-slate-900/90 text-white rounded text-[9px] font-black shadow-lg border border-white/20 whitespace-nowrap z-50">
                     ${v.displayName || v.id}
                   </div>
 
                   <!-- ICÔNE TACTIQUE (OPACITÉ 85%) -->
-                  <div class="size-14 rounded-full border-4 border-white shadow-2xl flex items-center justify-center" 
+                  <div class="size-12 rounded-full border-2 border-white shadow-2xl flex items-center justify-center" 
                        style="background-color: ${statusColor}; opacity: 0.85">
-                    <svg class="size-7 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                    <svg class="size-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
                         ${v.status === 'stationary' ? '<path d="M12 2v18M5 12h14M12 20c-3.3 0-6-2.7-6-6M12 20c3.3 0 6-2.7 6-6"></path>' : '<path d="M3 11l19-9-9 19-2-8-8-2z"></path>'}
                     </svg>
                   </div>
 
                   <!-- POINT BLEU GPS (CENTRE - PRIORITÉ Z-INDEX) -->
-                  <div class="absolute size-4 bg-blue-500 rounded-full border-2 border-white shadow-[0_0_10px_rgba(59,130,246,1)] z-[100] animate-pulse"></div>
+                  <div class="absolute size-3 bg-blue-500 rounded-full border-2 border-white shadow-[0_0_10px_rgba(59,130,246,1)] z-[100] animate-pulse"></div>
 
                   <!-- BADGE ÉTAT (BAS) -->
-                  <div class="absolute top-12 flex flex-col items-center gap-1 z-50">
-                    <div class="flex items-center gap-1 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded-full border shadow-sm">
-                        <span class="text-[9px] font-black text-slate-700">${v.batteryLevel ?? '--'}%</span>
+                  <div class="absolute top-10 flex flex-col items-center gap-1 z-50">
+                    <div class="flex items-center gap-1 bg-white/90 backdrop-blur-sm px-1.5 py-0.5 rounded-full border shadow-sm">
+                        <span class="text-[8px] font-black text-slate-700">${v.batteryLevel ?? '--'}%</span>
                     </div>
                   </div>
                 </div>`,
@@ -168,7 +173,7 @@ export default function VesselTrackerPage() {
         markersRef.current[v.id].setLatLng(pos);
       }
     });
-  }, [followedVessels]);
+  }, [followedVessels, labels.status1, labels.status2]);
 
   // --- MOTEUR GPS AVEC THROTTLING 5S (FIX VIOLATION) ---
   const handleGpsUpdate = useCallback(async (pos: GeolocationPosition) => {
@@ -192,7 +197,8 @@ export default function VesselTrackerPage() {
             displayName: vesselNickname || profile?.displayName || 'Capitaine', 
             location: { latitude, longitude },
             isSharing: true, 
-            lastActive: serverTimestamp()
+            lastActive: serverTimestamp(),
+            ...batteryInfo
         }, { merge: true }).catch(() => {});
     }
   }, [user, firestore, isSharing, sharingId, vesselNickname, profile?.displayName]);
@@ -203,14 +209,18 @@ export default function VesselTrackerPage() {
         return;
     }
     
-    watchIdRef.current = navigator.geolocation.watchPosition(handleGpsUpdate, null, { enableHighAccuracy: true, timeout: 10000 });
+    watchIdRef.current = navigator.geolocation.watchPosition(handleGpsUpdate, null, { 
+        enableHighAccuracy: true, 
+        timeout: 10000,
+        maximumAge: 0 
+    });
 
     return () => { if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current); };
   }, [isSharing, mode, handleGpsUpdate]);
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
-      {/* SCRIPTS WINDY (ORDRE CRITIQUE) */}
+      {/* SCRIPTS WINDY (SÉQUENCE DE CHARGEMENT STRICTE) */}
       <Script src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js" strategy="afterInteractive" crossOrigin="anonymous" />
       <Script 
         src="https://api.windy.com/assets/lib/libBoot.js" 
@@ -218,7 +228,6 @@ export default function VesselTrackerPage() {
         crossOrigin="anonymous" 
         onLoad={initWindy} 
       />
-      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.4.0/dist/leaflet.css" />
 
       <Card className="border-2 shadow-sm overflow-hidden">
         <div className="flex bg-muted/30 p-1">
@@ -236,11 +245,12 @@ export default function VesselTrackerPage() {
         </CardContent>
       </Card>
 
-      {/* CONTENEUR CARTE MANDATAIRE ID="WINDY" */}
-      <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all", isFullscreen && "fixed inset-0 z-[150] w-screen h-screen rounded-none")}>
+      {/* CONTENEUR CARTE WINDY (ID="WINDY" + CSS EXPLICITE POUR ÉVITER ÉCRAN GRIS) */}
+      <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all relative", isFullscreen ? "fixed inset-0 z-[150] w-screen h-screen rounded-none" : "min-h-[500px]")}>
         <div 
             id="windy" 
-            className={cn("relative w-full bg-muted/20 z-10", isFullscreen ? "flex-grow" : "h-[500px]")}
+            className="absolute inset-0 w-full h-full bg-slate-100 z-10"
+            style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
         >
           {/* LABEL MÉTÉO TACTIQUE (85% OPACITÉ) */}
           {mapClickResult && (
@@ -262,7 +272,17 @@ export default function VesselTrackerPage() {
           )}
 
           <div className="absolute top-3 right-3 flex flex-col gap-2 z-20">
-            <Button size="icon" className="shadow-lg h-10 w-10 bg-background/90 border-2" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}</Button>
+            <Button 
+                size="icon" 
+                className="shadow-lg h-10 w-10 bg-background/90 border-2" 
+                onClick={() => {
+                    setIsFullscreen(!isFullscreen);
+                    // Forçage du redessin après bascule plein écran
+                    setTimeout(() => { mapRef.current?.invalidateSize(); }, 300);
+                }}
+            >
+                {isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}
+            </Button>
           </div>
         </div>
       </Card>

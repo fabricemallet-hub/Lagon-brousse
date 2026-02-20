@@ -2,7 +2,7 @@
 
 /**
  * Service de récupération météo via Windy Point Forecast API v2.
- * Résolution Erreur 400 : Mise en conformité aux 4 piliers de la documentation Windy.
+ * Résolution Erreur 400 : Mise en conformité stricte au protocole JSON v2.
  */
 export async function fetchWindyWeather(lat: number, lon: number) {
   const API_KEY = 'ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU';
@@ -10,7 +10,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
   const PRODUCTION_URL = 'https://studio-2943478321-f746e.web.app/'; 
   
   try {
-    // PILIER 1 : TYPAGE NUMÉRIQUE STRICT
+    // PILIER 1 : TYPAGE NUMÉRIQUE STRICT (AUCUN GUILLEMET DANS LE JSON)
     const cleanLat = Number(Number(lat).toFixed(6));
     const cleanLon = Number(Number(lon).toFixed(6));
 
@@ -18,14 +18,15 @@ export async function fetchWindyWeather(lat: number, lon: number) {
         throw new Error("Coordonnées GPS invalides");
     }
 
-    // PILIER 2 & 3 : STRUCTURE JSON V2 & CLÉ DANS LE BODY
+    // PILIER 2 : STRUCTURE JSON V2 CONFORME
+    // Windy exige que la clé soit dans le corps pour Point Forecast v2
     const requestBody = {
       lat: cleanLat,
-      lon: cleanLon, // lon et non lng
+      lon: cleanLon,
       model: 'gfs',
       parameters: ['wind', 'temp', 'waves'],
       levels: ['surface'],
-      key: API_KEY // La clé DOIT être dans le corps du JSON en v2
+      key: API_KEY
     };
 
     const response = await fetch(url, {
@@ -40,7 +41,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
 
     if (response.status === 400) {
         const errorText = await response.text();
-        console.error("[Windy 400] Échec structure JSON :", errorText);
+        console.error("[Windy 400] Payload rejeté :", JSON.stringify(requestBody));
         return { success: false, error: "Requête mal formée (400)", status: 400 };
     }
 
@@ -50,7 +51,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
 
     const data = await response.json();
     
-    // Extraction des données temps réel (index 0)
+    // Extraction des données (index 0 correspondant au temps réel)
     const windRaw = data.wind?.[0] ?? 0;
     const tempK = data.temp?.[0] ?? 273.15;
     const wavesM = data.waves?.[0] ?? 0;
@@ -63,7 +64,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
       status: 200
     };
   } catch (error: any) {
-    console.error("[Windy API] Critical Failure:", error);
+    console.error("[Windy API] Échec critique :", error);
     return { success: false, error: error.message || "Network Error", status: 500 };
   }
 }
