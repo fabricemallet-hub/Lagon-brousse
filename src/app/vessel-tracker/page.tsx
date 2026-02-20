@@ -674,6 +674,8 @@ export default function VesselTrackerPage() {
             <RefreshCw className="size-10 animate-spin text-primary/40" />
             <p className="font-black uppercase text-[10px] tracking-widest animate-pulse">Initialisation Windy API...</p>
         </div>
+        
+        {/* BOUTONS DE CONTRÔLE À GAUCHE */}
         <div className="absolute top-4 left-4 flex flex-col gap-2 z-[160]">
             <Button size="icon" className="bg-white/90 backdrop-blur-md border-2 h-10 w-10 shadow-xl" onClick={() => setIsFullscreen(!isFullscreen)}>
                 {isFullscreen ? <Shrink className="size-5 text-primary" /> : <Expand className="size-5 text-primary" />}
@@ -681,10 +683,12 @@ export default function VesselTrackerPage() {
             <Button size="icon" className={cn("bg-white/90 backdrop-blur-md border-2 h-10 w-10 shadow-xl", isFollowMode && "bg-blue-50 border-blue-500 animate-pulse")} onClick={() => setIsFollowMode(!isFollowMode)}>
                 <Navigation className={cn("size-5", isFollowMode ? "text-blue-600" : "text-primary")} />
             </Button>
+            
+            {/* BOUTON RECENTRER DÉPLACÉ À GAUCHE */}
+            <Button onClick={handleRecenter} className="h-10 bg-white/90 backdrop-blur-md border-2 px-3 gap-2 shadow-xl font-black uppercase text-[9px] text-primary whitespace-nowrap">
+                RECENTRER <LocateFixed className="size-4" />
+            </Button>
         </div>
-        <Button onClick={handleRecenter} className="absolute top-4 right-4 h-10 bg-white/90 backdrop-blur-md border-2 px-3 gap-2 shadow-xl z-[160] font-black uppercase text-[9px] text-primary">
-            RECENTRER <LocateFixed className="size-4" />
-        </Button>
       </div>
 
       {/* ACCORDIONS PREFS */}
