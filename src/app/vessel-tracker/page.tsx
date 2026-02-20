@@ -46,9 +46,7 @@ import {
   AlertTriangle,
   Move,
   Wind,
-  WifiOff,
-  Eye,
-  EyeOff
+  WifiOff
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -105,6 +103,7 @@ export default function VesselTrackerPage() {
   const lastWeatherUpdateRef = useRef<number>(0);
   const [isForcingWindy, setIsForcingWindy] = useState(false);
 
+  // Journal technique fusionné
   const [technicalLog, setTechnicalLog] = useState<{ label: string, startTime: Date, lastUpdate: Date, duration: number }[]>([]);
 
   const sharingId = useMemo(() => (customSharingId.trim() || user?.uid || '').toUpperCase(), [customSharingId, user?.uid]);
@@ -178,6 +177,7 @@ export default function VesselTrackerPage() {
         updatePayload.anchorLocation = null;
     }
 
+    // Auto-update Windy every 3h
     const now = Date.now();
     if ((now - lastWeatherUpdateRef.current > 3 * 3600 * 1000) && pos) {
         try {
@@ -208,7 +208,6 @@ export default function VesselTrackerPage() {
         return;
     }
     setIsForcingWindy(true);
-    toast({ title: "Diagnostic Windy", description: "Requête API en cours..." });
     
     try {
         const weather = await fetchWindyWeather(pos.lat, pos.lng);
@@ -220,12 +219,12 @@ export default function VesselTrackerPage() {
                 lastWeatherUpdate: serverTimestamp()
             });
             lastWeatherUpdateRef.current = Date.now();
-            toast({ title: "Diagnostic OK", description: `Vent: ${weather.windSpeed}nd | Mer: ${weather.wavesHeight}m` });
+            toast({ title: "Diagnostic OK (200)", description: `Vent: ${weather.windSpeed}nd | Mer: ${weather.wavesHeight}m` });
         } else {
-            toast({ variant: "destructive", title: "Erreur Windy", description: weather.error || "Réponse invalide." });
+            toast({ variant: "destructive", title: "Erreur Diagnostic", description: `${weather.error} (Status: ${weather.status})` });
         }
     } catch (e) {
-        toast({ variant: "destructive", title: "Échec critique", description: "Vérifiez votre clé API ou Referer." });
+        toast({ variant: "destructive", title: "Échec critique", description: "Vérifiez Referer & restrictions." });
     } finally {
         setIsForcingWindy(false);
     }
@@ -376,7 +375,6 @@ export default function VesselTrackerPage() {
         case 'returning': return { icon: Ship, color: 'bg-indigo-600', label: 'RETOUR' };
         case 'landed': return { icon: Home, color: 'bg-green-600', label: 'HOME' };
         case 'emergency': return { icon: ShieldAlert, color: 'bg-red-600 animate-pulse', label: 'SOS' };
-        case 'offline': return { icon: WifiOff, color: 'bg-red-600', label: 'OFF' };
         default: return { icon: Navigation, color: 'bg-blue-600', label: 'MOUV' };
     }
   };
@@ -521,7 +519,6 @@ export default function VesselTrackerPage() {
                             {isForcingWindy ? <RefreshCw className="size-4 animate-spin" /> : <Wind className="size-4" />}
                             FORCER APPEL API WINDY (DIAGNOSTIC)
                         </Button>
-                        <Button variant="outline" size="sm" className="w-full h-10 text-[8px] font-black uppercase border-dashed" onClick={() => updateVesselInFirestore({})}>Forcer Sync Firestore</Button>
                     </AccordionContent>
                 </AccordionItem>
               </Accordion>
@@ -560,9 +557,7 @@ export default function VesselTrackerPage() {
               options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
             >
                   {followedVessels?.filter(v => v.isSharing && v.location).map(vessel => {
-                      const lastActiveMillis = vessel.lastActive?.toMillis?.() || Date.now();
-                      const isOffline = (Date.now() - lastActiveMillis > 75000);
-                      const statusInfo = getVesselIconInfo(isOffline ? 'offline' : vessel.status);
+                      const statusInfo = getVesselIconInfo(vessel.status);
                       const isMe = vessel.id === sharingId;
                       const battery = vessel.batteryLevel ?? 100;
                       const isCharging = vessel.isCharging ?? false;
@@ -587,46 +582,42 @@ export default function VesselTrackerPage() {
                               <OverlayView position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                   <div style={{ transform: 'translate(-50%, -50%)' }} className="flex flex-col items-center pointer-events-none relative">
                                       
-                                      {/* TOP STACK */}
-                                      <div className="absolute bottom-12 flex flex-col items-center gap-1">
-                                          {/* Badge Name | Status */}
-                                          <div className={cn(
-                                              "px-3 py-2 backdrop-blur-md rounded-lg text-[11px] font-black shadow-2xl border-2 flex items-center gap-2", 
-                                              isOffline ? "bg-red-600 text-white border-white/40" : "bg-white/95 text-slate-900 border-primary/20"
-                                          )}>
+                                      {/* TOP STACK: NAME & STATUS ONLY */}
+                                      <div className="absolute bottom-20 flex flex-col items-center">
+                                          <div className="px-3 py-2 bg-white/95 backdrop-blur-md rounded-lg text-[11px] font-black shadow-2xl border-2 border-primary/20 text-slate-900 flex items-center gap-2">
                                               <span className="truncate max-w-[120px]">{vessel.displayName}</span>
-                                              <span className={cn("border-l-2 pl-2", isOffline ? "text-white/60" : "text-primary/60")}>{statusInfo.label}</span>
+                                              <span className="border-l-2 pl-2 text-primary/60">{statusInfo.label}</span>
                                           </div>
+                                      </div>
 
-                                          {/* Battery Badge */}
+                                      {/* CENTER ICON: TRANSPARENT WITH BLUE DOT OVERLAY */}
+                                      <div className="relative size-32 flex items-center justify-center">
+                                          <div className={cn("size-24 rounded-full border-8 border-white shadow-2xl transition-opacity flex items-center justify-center opacity-60", statusInfo.color)}>
+                                              {React.createElement(statusInfo.icon, { className: "size-12 text-white drop-shadow-md" })}
+                                          </div>
+                                          {isMe && mode === 'sender' && <PulsingDot />}
+                                      </div>
+
+                                      {/* BOTTOM STACK: BATTERY, ALERTS, WINDY */}
+                                      <div className="absolute top-14 flex flex-col items-center gap-1.5 mt-2">
+                                          {/* 1. Battery Badge */}
                                           <div className={cn(
-                                              "px-2.5 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-2 shadow-xl border-2 bg-white",
+                                              "px-3 py-1.5 rounded-full text-[10px] font-black uppercase flex items-center gap-2 shadow-xl border-2 bg-white",
                                               battery < 20 ? "text-red-600 border-red-200" : (battery < 60 ? "text-orange-600 border-orange-100" : "text-green-600 border-green-100")
                                           )}>
                                               <BatteryStatusIcon level={battery} charging={isCharging} />
                                               <span>{battery}%</span>
                                           </div>
 
-                                          {/* Charging / Low Alert */}
-                                          {isCharging && <Badge className="bg-blue-600 text-white text-[9px] font-black shadow-lg border-2 border-white/30 px-3">⚡ EN CHARGE</Badge>}
-                                          {battery < 20 && !isCharging && <Badge className="bg-red-600 text-white text-[9px] font-black shadow-lg animate-pulse border-2 border-white/30 px-3">⚠️ BATTERIE FAIBLE</Badge>}
-                                      </div>
+                                          {/* 2. Dynamic Alerts (Stacked) */}
+                                          {isCharging && <Badge className="bg-blue-600 text-white text-[9px] font-black shadow-lg border-2 border-white/30 px-3 py-1">⚡ EN CHARGE</Badge>}
+                                          {battery < 20 && !isCharging && <Badge className="bg-red-600 text-white text-[9px] font-black shadow-lg animate-pulse border-2 border-white/30 px-3 py-1">⚠️ BATTERIE FAIBLE</Badge>}
 
-                                      {/* CENTER ICON: CENTERED ON GPS POINT */}
-                                      <div className="relative size-24 flex items-center justify-center">
-                                          <div className={cn("p-5 rounded-full border-4 border-white shadow-2xl opacity-85 transition-opacity", statusInfo.color)}>
-                                              {React.createElement(statusInfo.icon, { className: "size-10 text-white drop-shadow-md" })}
-                                          </div>
-                                          {isMe && mode === 'sender' && <PulsingDot />}
-                                      </div>
-
-                                      {/* BOTTOM STACK */}
-                                      <div className="absolute top-12 flex flex-col items-center mt-2">
-                                          {/* Windy Meteo */}
+                                          {/* 3. Windy Meteo Badge */}
                                           {vessel.windSpeed !== undefined && (
-                                              <div className="bg-slate-900 text-white px-3 py-2 rounded-2xl text-[10px] font-black shadow-2xl border-2 border-white/20 flex items-center gap-3">
-                                                  <div className="flex items-center gap-1.5"><Wind className="size-4 text-blue-400" /> {vessel.windSpeed} ND</div>
-                                                  <div className="border-l border-white/20 pl-2 flex items-center gap-1.5"><Waves className="size-4 text-cyan-400" /> {vessel.wavesHeight?.toFixed(1)}m</div>
+                                              <div className="bg-slate-900/95 text-white px-4 py-2 rounded-2xl text-[10px] font-black shadow-2xl border-2 border-white/20 flex items-center gap-4 mt-1">
+                                                  <div className="flex items-center gap-2"><Wind className="size-4 text-blue-400" /> {vessel.windSpeed} ND</div>
+                                                  <div className="border-l border-white/20 pl-3 flex items-center gap-2"><Waves className="size-4 text-cyan-400" /> {vessel.wavesHeight?.toFixed(1)}m</div>
                                               </div>
                                           )}
                                       </div>
