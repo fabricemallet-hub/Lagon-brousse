@@ -1,7 +1,8 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useUser as useUserHook, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
 import { doc, setDoc, serverTimestamp, updateDoc, collection, query, orderBy, arrayUnion, arrayRemove, where } from 'firebase/firestore';
 import { GoogleMap, OverlayView } from '@react-google-maps/api';
 import { useGoogleMaps } from '@/context/google-maps-context';
@@ -28,7 +29,7 @@ import {
   BatteryMedium,
   BatteryLow,
   BatteryCharging,
-  History,
+  History as HistoryIcon,
   MapPin,
   ChevronDown,
   X,
@@ -78,7 +79,7 @@ const PulsingDot = () => (
 );
 
 export function VesselTracker() {
-  const { user } = useUserHook();
+  const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
   const { isLoaded, loadError } = useGoogleMaps();
@@ -883,7 +884,7 @@ export function VesselTracker() {
                     <AccordionItem value="history" className="border-none">
                         <div className="flex items-center justify-between px-3 h-12">
                             <AccordionTrigger className="flex-1 text-[10px] font-black uppercase hover:no-underline py-0">
-                                <div className="flex items-center gap-2"><History className="size-3"/> Journal de bord unifié</div>
+                                <div className="flex items-center gap-2"><HistoryIcon className="size-3"/> Journal de bord unifié</div>
                             </AccordionTrigger>
                             <Button 
                                 variant="ghost" 
@@ -942,7 +943,6 @@ export function VesselTracker() {
         </div>
       </Card>
 
-      {/* Directory Section */}
       <Card className="border-2 bg-muted/10 shadow-none">
         <CardHeader className="p-4 pb-2 border-b">
           <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">

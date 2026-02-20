@@ -64,22 +64,12 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
-const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
-  if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
-  const props = { className: cn("size-4", className) };
-  if (charging) return <BatteryCharging {...props} className={cn(props.className, "text-blue-500")} />;
-  if (level <= 10) return <BatteryLow {...props} className={cn(props.className, "text-red-600")} />;
-  if (level <= 40) return <BatteryMedium {...props} className={cn(props.className, "text-orange-500")} />;
-  return <BatteryFull {...props} className={cn(props.className, "text-green-600")} />;
-};
-
 export default function VesselTrackerPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
   const { isLoaded, loadError } = useGoogleMaps();
 
-  // Navigation & UI States
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentModel, setCurrentModel] = useState('ecmwf');
   const [currentOverlay, setCurrentOverlay] = useState('wind');
@@ -89,25 +79,23 @@ export default function VesselTrackerPage() {
   const mapRef = useRef<any>(null);
   const [hasLaunched, setHasLaunched] = useState(false);
 
-  // RECENTER FUNCTION - DEFINED AT TOP FOR STABILITY
-  const handleRecenter = useCallback(() => {
+  // RECENTER FUNCTION - STABILIZED FOR PRODUCTION
+  const onMapRecenterClick = useCallback(() => {
     if (mapRef.current) {
         mapRef.current.panTo([INITIAL_CENTER.lat, INITIAL_CENTER.lng]);
         mapRef.current.setZoom(10);
     }
   }, []);
 
-  // REFERRER POLICY FIX
   useEffect(() => {
     if (typeof window === 'undefined') return;
     setCurrentHost(window.location.host);
+    document.referrerPolicy = "no-referrer-when-downgrade";
     
-    // Inject Referrer Policy
     const meta = document.createElement('meta');
     meta.name = "referrer";
     meta.content = "no-referrer-when-downgrade";
     document.head.appendChild(meta);
-    document.referrerPolicy = "no-referrer-when-downgrade";
   }, []);
 
   const initWindyMap = useCallback(() => {
@@ -171,7 +159,7 @@ export default function VesselTrackerPage() {
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
       {authError && (
-          <Alert variant="destructive" className="border-2 shadow-lg animate-in slide-in-from-top-2">
+          <Alert variant="destructive" className="border-2 shadow-lg animate-in slide-in-from-top-2 bg-white">
               <ShieldAlert className="size-5" />
               <AlertTitle className="font-black uppercase text-xs">Authentification Windy échouée (401)</AlertTitle>
               <AlertDescription className="space-y-3">
@@ -179,7 +167,7 @@ export default function VesselTrackerPage() {
                       L'hôte actuel n'est pas autorisé. Copiez l'hôte ci-dessous et ajoutez-le à votre clé sur Windy.com.
                   </p>
                   <div className="flex gap-2">
-                      <Input value={currentHost} readOnly className="h-9 bg-white text-[9px] font-mono border-2" />
+                      <Input value={currentHost} readOnly className="h-9 bg-slate-50 text-[9px] font-mono border-2" />
                       <Button size="sm" className="h-9 font-black uppercase text-[9px]" onClick={() => { navigator.clipboard.writeText(currentHost); toast({ title: "Copié !" }); }}>Copier</Button>
                   </div>
               </AlertDescription>
@@ -241,8 +229,12 @@ export default function VesselTrackerPage() {
           )}
           
           <div className="absolute top-4 right-4 flex flex-col gap-3 z-20">
-            <Button size="icon" className="shadow-2xl h-12 w-12 bg-background/90 backdrop-blur-md border-2 border-primary/20 rounded-2xl" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-6 text-primary" /> : <Expand className="size-6 text-primary" />}</Button>
-            <Button onClick={handleRecenter} className="shadow-2xl h-12 w-12 bg-background/90 backdrop-blur-md border-2 border-primary/20 rounded-2xl p-0"><LocateFixed className="size-6 text-primary" /></Button>
+            <Button size="icon" onClick={() => setIsFullscreen(!isFullscreen)} className="shadow-2xl h-12 w-12 bg-background/90 backdrop-blur-md border-2 border-primary/20 rounded-2xl">
+                {isFullscreen ? <Shrink className="size-6 text-primary" /> : <Expand className="size-6 text-primary" />}
+            </Button>
+            <Button onClick={onMapRecenterClick} className="shadow-2xl h-12 w-12 bg-background/90 backdrop-blur-md border-2 border-primary/20 rounded-2xl p-0">
+                <LocateFixed className="size-6 text-primary" />
+            </Button>
           </div>
         </div>
       </div>
@@ -253,7 +245,7 @@ export default function VesselTrackerPage() {
           </h3>
           <Alert className="bg-muted/10 border-dashed border-2">
               <Info className="size-4 text-primary" />
-              <AlertDescription className="text-[10px] font-bold uppercase leading-relaxed">
+              <AlertDescription className="text-[10px] font-bold uppercase leading-relaxed text-slate-600">
                   Consultez les conditions météo globales sur la carte. Les navires actifs s'affichent automatiquement dès leur mise en ligne.
               </AlertDescription>
           </Alert>

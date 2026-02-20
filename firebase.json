@@ -3,27 +3,5 @@
   "firestore": {
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
-  },
-  "hosting": {
-    "public": "public",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
-    "rewrites": [
-      {
-        "source": "/manifest.json",
-        "destination": "/manifest.json"
-      },
-      {
-        "source": "/sw.js",
-        "destination": "/sw.js"
-      },
-      {
-        "source": "/icon-*.png",
-        "destination": "/icon-*.png"
-      }
-    ]
   }
 }
