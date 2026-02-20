@@ -70,6 +70,7 @@ import { fetchWindyWeather } from '@/lib/windy-api';
 import { getDataForDate } from '@/lib/data';
 import { locations } from '@/lib/locations';
 
+// CLÉ CARTOGRAPHIQUE STRICTE (MAP FORECAST)
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -169,6 +170,8 @@ export default function VesselTrackerPage() {
             script.id = id;
             script.src = src;
             script.async = true;
+            // GESTION DU REFERRER : On s'assure que l'hôte cloudworkstations est transmis
+            script.referrerPolicy = 'no-referrer-when-downgrade';
             script.onload = () => resolve();
             script.onerror = () => reject(new Error(`Failed to load ${src}`));
             document.head.appendChild(script);
@@ -180,8 +183,9 @@ export default function VesselTrackerPage() {
             await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
             
             let retries = 0;
-            while (!(window as any).L && retries < 50) { 
-                await new Promise(r => setTimeout(r, 100)); 
+            // OPTIMISATION : Ralentissement de la boucle pour éviter les violations
+            while (!(window as any).L && retries < 30) { 
+                await new Promise(r => setTimeout(r, 300)); 
                 retries++; 
             }
             
@@ -194,12 +198,14 @@ export default function VesselTrackerPage() {
                 lat: INITIAL_CENTER.lat,
                 lon: INITIAL_CENTER.lng,
                 zoom: 10,
-                verbose: false,
+                verbose: true, // MODE VERBOSE ACTIVÉ POUR DIAGNOSTIC 401
                 overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell'],
                 product: 'ecmwf',
             };
 
-            // TRY/CATCH POUR CAPTURER L'ERREUR 401
+            // LOG TECHNIQUE DE LA CLÉ UTILISÉE
+            console.log("Clé utilisée pour windyInit:", options.key);
+
             try {
                 (window as any).windyInit(options, (windyAPI: any) => {
                     if (!windyAPI) { 
@@ -245,8 +251,8 @@ export default function VesselTrackerPage() {
   }, [toast]);
 
   useEffect(() => {
-    // DÉLAI AUGMENTÉ À 2000ms POUR L'AUTORISATION
-    const timer = setTimeout(initWindy, 2000);
+    // DÉLAI PORTÉ À 3000ms POUR LA STABILITÉ
+    const timer = setTimeout(initWindy, 3000);
     const diagTimer = setTimeout(() => {
         if (!mapRef.current) setAuthError(window.location.host);
     }, 8000);
@@ -270,6 +276,7 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
+      {/* Balise Referrer explicite */}
       <meta name="referrer" content="no-referrer-when-downgrade" />
 
       {authError && (
@@ -278,7 +285,7 @@ export default function VesselTrackerPage() {
             <AlertTitle className="font-black uppercase text-sm mb-2">DIAGNOSTIC WINDY (401)</AlertTitle>
             <AlertDescription className="space-y-4">
                 <div className="p-4 bg-white/80 rounded-xl border border-red-200">
-                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Copiez cette valeur exacte (Hôte JavaScript) :</p>
+                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Hôte détecté (Copiez cette valeur) :</p>
                     <div className="flex items-center gap-2">
                         <code className="flex-1 p-2 bg-red-100 rounded font-mono text-[10px] select-all break-all">{authError}</code>
                         <Button size="icon" variant="ghost" onClick={copyOrigin} className="h-10 w-10 hover:bg-red-200">
@@ -289,7 +296,7 @@ export default function VesselTrackerPage() {
                 <div className="bg-red-100/50 p-3 rounded-lg text-[9px] font-bold text-red-900 space-y-2">
                     <p>1. Allez sur <strong>api.windy.com/keys</strong></p>
                     <p>2. Modifiez la clé Map Forecast (<strong>1gGm...</strong>)</p>
-                    <p>3. Utilisez des <strong>VIRGULES</strong> sans espaces.</p>
+                    <p>3. Assurez-vous qu'il n'y a <strong>AUCUN ESPACE</strong> entre les virgules.</p>
                     <p className="font-black text-xs text-red-600">Exemple: *.cloudworkstations.dev,*.web.app,localhost</p>
                 </div>
             </AlertDescription>
