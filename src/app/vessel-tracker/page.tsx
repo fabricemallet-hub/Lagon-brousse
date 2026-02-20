@@ -40,7 +40,9 @@ import {
   ChevronDown,
   Database,
   Layers,
-  Search
+  Search,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, Tide } from '@/lib/types';
@@ -322,27 +324,33 @@ export default function VesselTrackerPage() {
         <CardContent className="p-4 space-y-4">
           <div className="flex items-center justify-between p-4 border-2 rounded-2xl bg-primary/5 border-primary/10">
               <div className="space-y-0.5"><Label className="text-sm font-black uppercase">Partage GPS</Label><p className="text-[9px] font-bold text-muted-foreground uppercase">{isSharing ? 'En cours' : 'Inactif'}</p></div>
-              <Switch checked={isSharing} onCheckedChange={setIsSharing} />
+              <Switch checked={isSharing} onCheckedChange={setIsSharing} className="touch-manipulation" />
           </div>
           
           <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                   <Label className="text-[9px] font-black uppercase ml-1 opacity-40">Modèle</Label>
-                  <select value={currentModel} onChange={handleSetModel} className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none">
-                      <option value="ecmwf">ECMWF (9km)</option>
-                      <option value="gfs">GFS (22km)</option>
-                      <option value="icon">ICON (7km)</option>
-                  </select>
+                  <div className="relative">
+                      <select value={currentModel} onChange={handleSetModel} className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none">
+                          <option value="ecmwf">ECMWF (9km)</option>
+                          <option value="gfs">GFS (22km)</option>
+                          <option value="icon">ICON (7km)</option>
+                      </select>
+                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 size-3 opacity-30 pointer-events-none" />
+                  </div>
               </div>
               <div className="space-y-1.5">
                   <Label className="text-[9px] font-black uppercase ml-1 opacity-40">Calque Tactique</Label>
-                  <select value={currentOverlay} onChange={handleSetOverlay} className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none">
-                      <option value="wind">Vent & Rafales</option>
-                      <option value="waves">Mer & Vagues</option>
-                      <option value="sst">Eau (SST)</option>
-                      <option value="pressure">Pression</option>
-                      <option value="rh">Humidité</option>
-                  </select>
+                  <div className="relative">
+                      <select value={currentOverlay} onChange={handleSetOverlay} className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none">
+                          <option value="wind">Vent & Rafales</option>
+                          <option value="waves">Mer & Vagues</option>
+                          <option value="sst">Eau (SST)</option>
+                          <option value="pressure">Pression</option>
+                          <option value="rh">Humidité</option>
+                      </select>
+                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 size-3 opacity-30 pointer-events-none" />
+                  </div>
               </div>
           </div>
         </CardContent>
@@ -396,7 +404,7 @@ const locations: Record<string, { lat: number, lon: number }> = {
     'Koné': { lat: -21.05, lon: 164.86 }, 'Kouaoua': { lat: -21.39, lon: 165.82 },
     'Koumac': { lat: -20.56, lon: 164.28 }, 'La Foa': { lat: -21.71, lon: 165.82 },
     'Lifou': { lat: -20.91, lon: 167.24 }, 'Maré': { lat: -21.48, lon: 167.98 },
-    'Moindou': { lat: -21.69, lon: 165.68 }, 'Mont-Dore': { lat: -22.21, lon: 166.57 },
+    'Moindou': { lat: -21.69, lon: 165.68 }, 'Le Mont-Dore': { lat: -22.21, lon: 166.57 },
     'Nouméa': { lat: -22.27, lon: 166.45 }, 'Ouégoa': { lat: -20.35, lon: 164.43 },
     'Ouvéa': { lat: -20.45, lon: 166.56 }, 'Païta': { lat: -22.13, lon: 166.35 },
     'Poindimié': { lat: -20.94, lon: 165.33 }, 'Ponérihouen': { lat: -21.09, lon: 165.40 },
