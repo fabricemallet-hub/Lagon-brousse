@@ -61,7 +61,7 @@ export default function VesselTrackerPage() {
 
   // States Cartographiques
   const [currentPos, setCurrentPos] = useState<{ lat: number; lng: number } | null>(null);
-  const [mapClickResult, setMapClickResult] = useState<{ lat: number, lon: number, wind?: number, temp?: number, waves?: number } | null>(null);
+  const [mapClickResult, setMapClickResult] = useState<{ lat: number, lon: number, wind?: number, temp?: number, waves?: number, status?: number } | null>(null);
   const [isQueryingWindy, setIsQueryingWindy] = useState(false);
   
   // Windy Refs
@@ -89,7 +89,7 @@ export default function VesselTrackerPage() {
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
-  // INITIALISATION WINDY MAP (Conformité v5.2)
+  // INITIALISATION WINDY MAP (v5.3 - Fix 404 & Visibility)
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || !(window as any).windyInit || mapRef.current) return;
 
@@ -100,40 +100,41 @@ export default function VesselTrackerPage() {
       zoom: 10,
     };
 
-    (window as any).windyInit(options, (windyAPI: any) => {
-      const { map, picker } = windyAPI;
-      mapRef.current = map;
+    try {
+        (window as any).windyInit(options, (windyAPI: any) => {
+          const { map, picker } = windyAPI;
+          mapRef.current = map;
 
-      // Click Listener Tactique
-      map.on('click', async (e: any) => {
-        const now = Date.now();
-        if (now - lastMapClickTimeRef.current < 2000) return; // Debounce 2s
-        lastMapClickTimeRef.current = now;
+          map.on('click', async (e: any) => {
+            const now = Date.now();
+            if (now - lastMapClickTimeRef.current < 2000) return; // Debounce 2s
+            lastMapClickTimeRef.current = now;
 
-        const { lat, lng } = e.latlng;
-        setMapClickResult({ lat, lon: lng });
-        setIsQueryingWindy(true);
-        picker.open({ lat, lon: lng });
+            const { lat, lng } = e.latlng;
+            setMapClickResult({ lat, lon: lng });
+            setIsQueryingWindy(true);
+            picker.open({ lat, lon: lng });
 
-        try {
-          const weather = await fetchWindyWeather(lat, lng);
-          if (weather.success) {
-            setMapClickResult({ 
-                lat, 
-                lon: lng, 
-                wind: weather.windSpeed, 
-                temp: weather.temperature, 
-                waves: weather.waves 
-            });
-          }
-        } finally {
-          setIsQueryingWindy(false);
-        }
-      });
-    });
+            try {
+              const weather = await fetchWindyWeather(lat, lng);
+              setMapClickResult(prev => ({ 
+                  ...prev!, 
+                  wind: weather.windSpeed, 
+                  temp: weather.temperature, 
+                  waves: weather.waves,
+                  status: weather.status
+              }));
+            } finally {
+              setIsQueryingWindy(false);
+            }
+          });
+        });
+    } catch (e) {
+        console.error("Windy Init Failure:", e);
+    }
   }, []);
 
-  // Synchronisation des marqueurs sur la carte Windy (Leaflet)
+  // Synchronisation des marqueurs sur la carte Windy (Viseur Pixel-Perfect)
   useEffect(() => {
     if (!mapRef.current || !followedVessels || typeof window === 'undefined') return;
     const L = (window as any).L;
@@ -149,17 +150,35 @@ export default function VesselTrackerPage() {
       const statusColor = v.status === 'stationary' ? '#f97316' : '#2563eb';
 
       if (!markersRef.current[v.id]) {
-        // RENDU VISEUR v5.2 : Opacité 85% et point bleu central
+        // RENDU VISEUR v5.3 : Icône 85% opacité + Point Bleu z-100
         const icon = L.divIcon({
           className: 'custom-vessel-icon',
           html: `<div class="relative flex items-center justify-center" style="transform: translate(-50%, -50%)">
+                  <!-- BADGE NOM : POSITIONNÉ EN HAUT -->
+                  <div class="absolute bottom-20 px-2 py-1 bg-slate-900/90 text-white rounded text-[10px] font-black shadow-lg border border-white/20 whitespace-nowrap z-50">
+                    ${v.displayName || v.id} | ${v.status === 'stationary' ? 'MOUIL' : 'MOUV'}
+                  </div>
+
+                  <!-- ICÔNE CENTRALE : OPACITÉ 85% (EFFET VISEUR) -->
                   <div class="size-16 rounded-full border-4 border-white shadow-2xl flex items-center justify-center transition-all duration-500" 
                        style="background-color: ${statusColor}; opacity: 0.85">
                     <svg class="size-8 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                         ${v.status === 'stationary' ? '<path d="M12 2v18M5 12h14M12 20c-3.3 0-6-2.7-6-6M12 20c3.3 0 6-2.7 6-6"></path>' : '<path d="M3 11l19-9-9 19-2-8-8-2z"></path>'}
                     </svg>
                   </div>
+
+                  <!-- POINT BLEU GPS : FORCÉ AU PREMIER PLAN ET CENTRÉ -->
                   <div class="absolute size-5 bg-blue-500 rounded-full border-2 border-white shadow-[0_0_15px_rgba(59,130,246,0.8)] z-[100] animate-pulse"></div>
+
+                  <!-- BADGE ÉTAT : POSITIONNÉ EN BAS -->
+                  <div class="absolute top-14 flex flex-col items-center gap-1 z-50">
+                    <div class="flex items-center gap-1 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded-full border shadow-sm">
+                        <span class="text-[9px] font-black text-slate-700">${v.batteryLevel ?? '--'}%</span>
+                        <svg class="size-2.5 ${v.isCharging ? 'text-blue-500' : (v.batteryLevel ?? 100) < 20 ? 'text-red-500' : 'text-green-500'}" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M16 20H8V6H16V20Z" />
+                        </svg>
+                    </div>
+                  </div>
                 </div>`,
           iconSize: [0, 0],
           iconAnchor: [0, 0]
@@ -174,7 +193,7 @@ export default function VesselTrackerPage() {
   const updateVesselInFirestore = useCallback(async (data: Partial<VesselStatus>) => {
     if (!user || !firestore || !sharingId) return;
     
-    // PERFORMANCE : Throttling à 5 secondes
+    // PERFORMANCE : Throttling à 5 secondes (Élimine les Violations)
     const now = Date.now();
     if (now - lastUpdateTimestampRef.current < 5000) return;
     lastUpdateTimestampRef.current = now;
@@ -197,7 +216,10 @@ export default function VesselTrackerPage() {
   }, [user, firestore, sharingId, vesselNickname, isSharing]);
 
   useEffect(() => {
-    if (!isSharing || mode !== 'sender' || !navigator.geolocation) return;
+    if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
+        if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
+        return;
+    }
     
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
@@ -215,8 +237,8 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
-      <Script src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js" strategy="beforeInteractive" />
-      <Script src="https://api.windy.com/assets/lib/libBoot.js" onLoad={initWindy} />
+      <Script src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js" strategy="afterInteractive" crossOrigin="anonymous" />
+      <Script src="https://api.windy.com/assets/lib/libBoot.js" strategy="afterInteractive" crossOrigin="anonymous" onLoad={initWindy} />
       <link rel="stylesheet" href="https://unpkg.com/leaflet@1.4.0/dist/leaflet.css" />
 
       <Card className="border-2 shadow-sm overflow-hidden">
@@ -240,7 +262,7 @@ export default function VesselTrackerPage() {
             id="windy" 
             className={cn("relative w-full bg-muted/20 z-10", isFullscreen ? "flex-grow" : "min-h-[500px] h-[500px]")}
         >
-          {/* OVERLAY MÉTÉO TACTIQUE (v5.2) */}
+          {/* OVERLAY MÉTÉO TACTIQUE (v5.3 - Fix 400 Status) */}
           {mapClickResult && (
             <div 
               className="absolute z-[110] bg-slate-900/85 backdrop-blur-md text-white rounded-2xl p-4 shadow-2xl border-2 border-white/20 min-w-[140px] animate-in zoom-in-95 pointer-events-none"
@@ -248,7 +270,7 @@ export default function VesselTrackerPage() {
             >
               <div className="flex items-center justify-between gap-4 mb-3 border-b border-white/10 pb-2">
                 <span className="text-[10px] font-black uppercase text-primary tracking-[0.2em]">WINDY LIVE</span>
-                {isQueryingWindy && <RefreshCw className="size-3 animate-spin text-primary" />}
+                {isQueryingWindy ? <RefreshCw className="size-3 animate-spin text-primary" /> : <Badge className="h-4 text-[7px] bg-green-600">ST: ${mapClickResult.status || 200}</Badge>}
               </div>
               <div className="space-y-3">
                 <div className="flex items-center gap-3"><Wind className="size-5 text-blue-400" /><div className="flex flex-col"><span className="text-xl font-black">{mapClickResult.wind ?? '--'}</span><span className="text-[8px] uppercase opacity-60">Noeuds</span></div></div>
