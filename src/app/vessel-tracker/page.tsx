@@ -21,7 +21,9 @@ import {
   Zap, 
   RefreshCw,
   ChevronDown,
-  Info
+  Info,
+  Copy,
+  Check
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { VesselStatus, WindDirection } from '@/lib/types';
@@ -32,22 +34,6 @@ const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
 export default function VesselTrackerPage() {
-  /**
-   * ACTIONS DE SURVIE PRODUCTION (v17.7)
-   * Utilisation de function pour garantir le hoisting dans le scope
-   */
-  function handleRecenter() {
-    if (mapRef.current) {
-        mapRef.current.panTo([INITIAL_CENTER.lat, INITIAL_CENTER.lng]);
-        mapRef.current.setZoom(10);
-    } else {
-        console.log("Recenter triggered - Map not ready");
-    }
-  }
-
-  function handleSearch() { console.log('Search placeholder'); }
-  function handleFilter() { console.log('Filter placeholder'); }
-
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -58,15 +44,38 @@ export default function VesselTrackerPage() {
   const [currentOverlay, setCurrentOverlay] = useState('wind');
   const [authError, setAuthError] = useState<boolean>(false);
   const [currentHost, setCurrentHost] = useState('');
+  const [hasCopied, setHasCopied] = useState(false);
   
   const mapRef = useRef<any>(null);
   const [hasLaunched, setHasLaunched] = useState(false);
+
+  /**
+   * RÉSOLUTION DU CRASH ReferenceError
+   * Fonctions déclarées avec useCallback pour garantir la disponibilité en production
+   */
+  const handleRecenter = useCallback(() => {
+    if (mapRef.current) {
+        // Windy API use setCenter([lat, lon]) or setView([lat, lon], zoom)
+        try {
+            mapRef.current.setView([INITIAL_CENTER.lat, INITIAL_CENTER.lng], 10);
+        } catch (e) {
+            console.log("Recenter using panTo fallback");
+            if (mapRef.current.panTo) mapRef.current.panTo([INITIAL_CENTER.lat, INITIAL_CENTER.lng]);
+        }
+    } else {
+        toast({ description: "Carte non initialisée" });
+    }
+  }, [toast]);
+
+  const handleSearch = useCallback(() => { console.log('Search placeholder'); }, []);
+  const handleFilter = useCallback(() => { console.log('Filter placeholder'); }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     setCurrentHost(window.location.host);
     
     // Forçage de la Referrer Policy pour l'authentification Windy
+    // Essentiel pour studio.firebase.google.com
     const meta = document.createElement('meta');
     meta.name = "referrer";
     meta.content = "no-referrer-when-downgrade";
@@ -92,10 +101,17 @@ export default function VesselTrackerPage() {
 
     const attemptInit = async () => {
         try {
+            // Windy nécessite Leaflet en premier
             await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
-            let retries = 0;
-            while (!(window as any).L && retries < 10) { await new Promise(r => setTimeout(r, 500)); retries++; }
             
+            // Attendre que L soit dispo
+            let retries = 0;
+            while (!(window as any).L && retries < 10) { 
+                await new Promise(r => setTimeout(r, 500)); 
+                retries++; 
+            }
+            
+            // Initialisation de la clé globale Windy
             (window as any).W = { apiKey: MAP_FORECAST_KEY };
             
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
@@ -119,10 +135,13 @@ export default function VesselTrackerPage() {
                 mapRef.current = windyAPI.map;
                 setHasLaunched(true);
                 setAuthError(false);
-                setTimeout(() => { if(windyAPI.map) windyAPI.map.invalidateSize(); }, 1000);
+                // Rafraîchir la taille après chargement
+                setTimeout(() => { 
+                    if(windyAPI.map) windyAPI.map.invalidateSize(); 
+                }, 1000);
             });
         } catch (e) {
-            console.error("Windy Error:", e);
+            console.error("Windy Initialization Error:", e);
             setAuthError(true);
         }
     };
@@ -137,17 +156,37 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
+      {/* PANNEAU DE DIAGNOSTIC 401 - S'affiche uniquement en cas d'erreur auth */}
       {authError && (
           <Alert variant="destructive" className="border-2 shadow-lg animate-in slide-in-from-top-2 bg-white">
               <ShieldAlert className="size-5" />
               <AlertTitle className="font-black uppercase text-xs">Authentification Windy échouée (401)</AlertTitle>
               <AlertDescription className="space-y-3">
                   <p className="text-[10px] font-medium leading-relaxed">
-                      L'hôte actuel n'est pas autorisé. Ajoutez cet hôte à votre clé sur Windy.com :
+                      L'hôte actuel n'est pas autorisé pour votre clé API. Ajoutez cet hôte exact à votre console Windy.com :
                   </p>
                   <div className="flex gap-2">
-                      <Input value={currentHost} readOnly className="h-9 bg-slate-50 text-[9px] font-mono border-2" />
-                      <Button size="sm" className="h-9 font-black uppercase text-[9px]" onClick={() => { navigator.clipboard.writeText(currentHost); toast({ title: "Copié !" }); }}>Copier</Button>
+                      <div className="flex-1 relative">
+                        <Input value={currentHost} readOnly className="h-10 bg-slate-50 text-[10px] font-mono border-2 pl-3" />
+                      </div>
+                      <Button 
+                        size="sm" 
+                        className="h-10 font-black uppercase text-[9px] gap-2 px-4" 
+                        onClick={() => { 
+                            navigator.clipboard.writeText(currentHost); 
+                            setHasCopied(true);
+                            setTimeout(() => setHasCopied(false), 2000);
+                            toast({ title: "Hôte copié !" }); 
+                        }}
+                      >
+                        {hasCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
+                        {hasCopied ? "Copié" : "Copier l'hôte"}
+                      </Button>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-xl border border-dashed text-[9px] font-bold leading-relaxed text-slate-600">
+                    <p>1. Allez sur <a href="https://api.windy.com/keys" target="_blank" className="underline text-primary">api.windy.com/keys</a></p>
+                    <p>2. Modifiez la clé <strong>1gGm...</strong></p>
+                    <p>3. Collez l'hôte ci-dessus dans "Domain restrictions"</p>
                   </div>
               </AlertDescription>
           </Alert>
@@ -203,7 +242,7 @@ export default function VesselTrackerPage() {
           {!hasLaunched && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 gap-4 p-8 text-center">
                   <RefreshCw className="size-12 text-primary animate-spin" />
-                  <p className="font-black uppercase text-[10px] tracking-widest text-slate-400">Chargement carte maritime...</p>
+                  <p className="font-black uppercase text-[10px] tracking-widest text-slate-400">Initialisation de la carte maritime...</p>
               </div>
           )}
           
@@ -225,7 +264,7 @@ export default function VesselTrackerPage() {
           <Alert className="bg-muted/10 border-dashed border-2">
               <Info className="size-4 text-primary" />
               <AlertDescription className="text-[10px] font-bold uppercase leading-relaxed text-slate-600">
-                  Consultez les conditions météo globales sur la carte. Les navires actifs s'affichent automatiquement dès leur mise en ligne.
+                  Visualisez les courants, les vents et l'état de la mer en temps réel. Cette vue est synchronisée avec les données de sécurité du Boat Tracker.
               </AlertDescription>
           </Alert>
       </div>

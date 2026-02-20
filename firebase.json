@@ -10,6 +10,12 @@
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "!/@(manifest.json|sw.js|icon-*.png|favicon.ico|robots.txt|sitemap.xml|*.js|*.css)",
+        "destination": "/index.html"
+      }
     ]
   }
 }
