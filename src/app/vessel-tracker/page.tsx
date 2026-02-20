@@ -199,35 +199,41 @@ export default function VesselTrackerPage() {
                 product: 'ecmwf',
             };
 
-            (window as any).windyInit(options, (windyAPI: any) => {
-                if (!windyAPI) { 
-                    setAuthError(window.location.host); 
-                    return; 
-                }
-                const { map, store, broadcast, picker } = windyAPI;
-                mapRef.current = map;
-                store.set('overlay', 'wind');
-                store.set('product', 'ecmwf');
+            // TRY/CATCH POUR CAPTURER L'ERREUR 401
+            try {
+                (window as any).windyInit(options, (windyAPI: any) => {
+                    if (!windyAPI) { 
+                        setAuthError(window.location.host); 
+                        return; 
+                    }
+                    const { map, store, broadcast, picker } = windyAPI;
+                    mapRef.current = map;
+                    store.set('overlay', 'wind');
+                    store.set('product', 'ecmwf');
 
-                broadcast.on('pickerMoved', (latLon: any) => {
-                    if (pickerTimerRef.current) clearTimeout(pickerTimerRef.current);
-                    pickerTimerRef.current = setTimeout(async () => {
-                        const { lat, lon } = latLon;
-                        setMapClickResult({ lat, lon });
-                        setIsQueryingWindy(true);
-                        try {
-                            const weather = await fetchWindyWeather(lat, lon);
-                            setMapClickResult((prev: any) => ({ ...prev, ...weather }));
-                            const commune = getClosestCommune(lat, lon);
-                            const tideData = getDataForDate(commune, new Date());
-                            setPointTides(tideData.tides);
-                        } catch (err) {} finally { setIsQueryingWindy(false); }
-                    }, 500);
+                    broadcast.on('pickerMoved', (latLon: any) => {
+                        if (pickerTimerRef.current) clearTimeout(pickerTimerRef.current);
+                        pickerTimerRef.current = setTimeout(async () => {
+                            const { lat, lon } = latLon;
+                            setMapClickResult({ lat, lon });
+                            setIsQueryingWindy(true);
+                            try {
+                                const weather = await fetchWindyWeather(lat, lon);
+                                setMapClickResult((prev: any) => ({ ...prev, ...weather }));
+                                const commune = getClosestCommune(lat, lon);
+                                const tideData = getDataForDate(commune, new Date());
+                                setPointTides(tideData.tides);
+                            } catch (err) {} finally { setIsQueryingWindy(false); }
+                        }, 500);
+                    });
+
+                    map.on('click', (e: any) => { picker.open({ lat: e.latlng.lat, lon: e.latlng.lng }); });
+                    setTimeout(() => { if(map) map.invalidateSize(); }, 1500);
                 });
-
-                map.on('click', (e: any) => { picker.open({ lat: e.latlng.lat, lon: e.latlng.lng }); });
-                setTimeout(() => { if(map) map.invalidateSize(); }, 1500);
-            });
+            } catch (authE) {
+                console.error("Windy Auth Exception:", authE);
+                setAuthError(window.location.host);
+            }
         } catch (e: any) {
             console.error("Windy init error:", e);
             setAuthError(window.location.host);
@@ -239,10 +245,11 @@ export default function VesselTrackerPage() {
   }, [toast]);
 
   useEffect(() => {
-    const timer = setTimeout(initWindy, 1000);
+    // DÉLAI AUGMENTÉ À 2000ms POUR L'AUTORISATION
+    const timer = setTimeout(initWindy, 2000);
     const diagTimer = setTimeout(() => {
         if (!mapRef.current) setAuthError(window.location.host);
-    }, 6000);
+    }, 8000);
     return () => { clearTimeout(timer); clearTimeout(diagTimer); };
   }, [initWindy]);
 
