@@ -55,7 +55,6 @@ import { getDataForDate } from '@/lib/data';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
-// --- COMPOSANT : PANNEAU DE DONNÉES MÉTÉO TACTIQUES ---
 const MeteoDataPanel = ({ data, onClose, isLoading }: { data: any, onClose: () => void, isLoading: boolean }) => {
     if (!data) return null;
     return (
@@ -129,7 +128,6 @@ export default function VesselTrackerPage() {
   const [currentPos, setCurrentPos] = useState<{ lat: number; lng: number } | null>(null);
   const [mapClickResult, setMapClickResult] = useState<any>(null);
   const [isQueryingWindy, setIsQueryingWindy] = useState(false);
-  const [wakeLock, setWakeLock] = useState<any>(null);
   
   const mapRef = useRef<any>(null);
   const markersRef = useRef<Record<string, any>>({});
@@ -167,29 +165,30 @@ export default function VesselTrackerPage() {
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') setCurrentHost(window.location.host);
+    if (typeof window !== 'undefined') {
+        setCurrentHost(window.location.host);
+        // Force l'affichage de l'origine pour configurer api.windy.com
+        console.error(`%c[Windy Auth] ORIGINE À AUTORISER : ${window.location.host}`, "color: red; font-weight: bold; font-size: 14px;");
+    }
   }, []);
 
   const getTideInfoForPoint = (lat: number, lng: number) => {
-    const { allCommuneNames, locations } = require('@/lib/locations');
-    const sortedCommunes = [...allCommuneNames].sort((a: string, b: string) => {
-        const coordsA = locations[a];
-        const coordsB = locations[b];
-        return getDistance(lat, lng, coordsA.lat, coordsA.lon) - getDistance(lat, lng, coordsB.lat, coordsB.lon);
+    const { locations, allCommuneNames } = require('@/lib/locations');
+    const sorted = [...allCommuneNames].sort((a: string, b: string) => {
+        const cA = locations[a];
+        const cB = locations[b];
+        return getDistance(lat, lng, cA.lat, cA.lon) - getDistance(lat, lng, cB.lat, cB.lon);
     });
-    const commune = sortedCommunes[0];
-
+    const commune = sorted[0];
     if (!commune) return null;
     const data = getDataForDate(commune, new Date());
-    return { commune, station: data.tideStation, tides: data.tides };
+    return { station: data.tideStation, tides: data.tides };
   };
 
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || !window.L || !window.windyInit || isMapInitializedRef.current) return;
 
-    // Diagnostic console rouge pour le 401
-    console.error(`%c[Windy Auth] ORIGINE À AUTORISER : ${window.location.host}`, "color: red; font-weight: bold; font-size: 14px;");
-
+    // Protection anti-violation : différer l'initialisation
     setTimeout(() => {
         const options = {
           key: '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4',
@@ -216,7 +215,7 @@ export default function VesselTrackerPage() {
               store.set('overlay', 'wind');
               store.set('product', 'ecmwf');
 
-              // Performance : Différer le reflow
+              // Performance : InvalidateSize différé
               setTimeout(() => {
                 map.invalidateSize();
                 window.dispatchEvent(new Event('resize'));
@@ -233,7 +232,7 @@ export default function VesselTrackerPage() {
                   const weather = await fetchWindyWeather(lat, lon);
                   setMapClickResult((prev: any) => ({ ...prev, ...weather }));
                 } catch (err) {
-                  // Erreur silencieuse pour préserver les perfs
+                  // Erreur silencieuse
                 } finally {
                   setIsQueryingWindy(false);
                 }
@@ -246,7 +245,7 @@ export default function VesselTrackerPage() {
         } catch (e) {
             setAuthError(true);
         }
-    }, 200);
+    }, 100);
   }, []);
 
   useEffect(() => {
@@ -257,44 +256,48 @@ export default function VesselTrackerPage() {
     if (!mapRef.current || !followedVessels || !window.L) return;
     const L = window.L;
 
-    followedVessels.forEach(v => {
-      if (!v.location || !v.isSharing) {
-        if (markersRef.current[v.id]) { markersRef.current[v.id].remove(); delete markersRef.current[v.id]; }
-        return;
-      }
+    // Rendu synchronisé via requestAnimationFrame pour éviter les violations de thread
+    requestAnimationFrame(() => {
+        followedVessels.forEach(v => {
+          if (!v.location || !v.isSharing) {
+            if (markersRef.current[v.id]) { markersRef.current[v.id].remove(); delete markersRef.current[v.id]; }
+            return;
+          }
 
-      const pos = [v.location.latitude, v.location.longitude];
-      const statusColor = v.status === 'stationary' ? '#f97316' : '#2563eb';
+          const pos = [v.location.latitude, v.location.longitude];
+          const statusColor = v.status === 'stationary' ? '#f97316' : '#2563eb';
 
-      if (!markersRef.current[v.id]) {
-        const icon = L.divIcon({
-          className: 'vessel-marker',
-          html: `<div class="relative flex flex-col items-center" style="transform: translate(-50%, -100%)">
-                  <div class="px-2 py-1 bg-slate-900/90 text-white rounded text-[10px] font-black shadow-lg border border-white/20 whitespace-nowrap mb-1">
-                    ${v.displayName || v.id}
-                  </div>
-                  <div class="relative size-12 flex items-center justify-center">
-                    <div class="absolute inset-0 rounded-full border-2 border-white shadow-xl flex items-center justify-center" 
-                         style="background-color: ${statusColor}; opacity: 0.85">
-                      <svg class="size-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                          ${v.status === 'stationary' ? '<path d="M12 2v18M5 12h14M12 20c-3.3 0-6-2.7-6-6M12 20c3.3 0 6-2.7 6-6"></path>' : '<path d="M3 11l19-9-9 19-2-8-8-2z"></path>'}
-                      </svg>
-                    </div>
-                    <div class="absolute size-3 bg-blue-500 rounded-full border-2 border-white shadow-[0_0_10px_rgba(59,130,246,1)] z-[100] animate-pulse"></div>
-                  </div>
-                </div>`,
-          iconSize: [0, 0],
-          iconAnchor: [0, 0]
+          if (!markersRef.current[v.id]) {
+            const icon = L.divIcon({
+              className: 'vessel-marker',
+              html: `<div class="relative flex flex-col items-center" style="transform: translate(-50%, -100%)">
+                      <div class="px-2 py-1 bg-slate-900/90 text-white rounded text-[10px] font-black shadow-lg border border-white/20 whitespace-nowrap mb-1">
+                        ${v.displayName || v.id}
+                      </div>
+                      <div class="relative size-12 flex items-center justify-center">
+                        <div class="absolute inset-0 rounded-full border-2 border-white shadow-xl flex items-center justify-center" 
+                             style="background-color: ${statusColor}; opacity: 0.85">
+                          <svg class="size-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                              ${v.status === 'stationary' ? '<path d="M12 2v18M5 12h14M12 20c-3.3 0-6-2.7-6-6M12 20c3.3 0 6-2.7 6-6"></path>' : '<path d="M3 11l19-9-9 19-2-8-8-2z"></path>'}
+                          </svg>
+                        </div>
+                        <div class="absolute size-3 bg-blue-500 rounded-full border-2 border-white shadow-[0_0_10px_rgba(59,130,246,1)] z-[100] animate-pulse"></div>
+                      </div>
+                    </div>`,
+              iconSize: [0, 0],
+              iconAnchor: [0, 0]
+            });
+            markersRef.current[v.id] = L.marker(pos, { icon }).addTo(mapRef.current);
+          } else {
+            markersRef.current[v.id].setLatLng(pos);
+          }
         });
-        markersRef.current[v.id] = L.marker(pos, { icon }).addTo(mapRef.current);
-      } else {
-        markersRef.current[v.id].setLatLng(pos);
-      }
     });
   }, [followedVessels]);
 
   const handleGpsUpdate = useCallback(async (pos: GeolocationPosition) => {
     const now = Date.now();
+    // Throttling GPS 5s
     if (now - lastUpdateTimestampRef.current < 5000) return; 
     lastUpdateTimestampRef.current = now;
 
