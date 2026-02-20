@@ -28,7 +28,7 @@ import {
   BatteryMedium,
   BatteryLow,
   BatteryCharging,
-  History,
+  History as HistoryIcon,
   MapPin,
   ChevronDown,
   X,
@@ -165,7 +165,7 @@ export default function VesselTrackerPage() {
                 lon: INITIAL_CENTER.lng,
                 zoom: 10,
                 verbose: false,
-                externalAllowedOrigins: [window.location.host],
+                externalAllowedOrigins: [window.location.host, window.location.hostname],
                 overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell'],
                 product: 'ecmwf',
             };
@@ -211,7 +211,6 @@ export default function VesselTrackerPage() {
 
   useEffect(() => {
     const timer = setTimeout(initWindy, 1000);
-    // Délai de sécurité : si la carte n'est pas là après 5s, on force l'affichage du diagnostic
     const diagTimer = setTimeout(() => {
         if (!mapRef.current) setAuthError(window.location.host);
     }, 5000);
@@ -303,7 +302,7 @@ export default function VesselTrackerPage() {
 
       <div className="space-y-4">
           <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
-              <History className="size-4" /> Analyse Tactique
+              <HistoryIcon className="size-4" /> Analyse Tactique
           </h3>
           <Alert className="bg-muted/10 border-dashed border-2">
               <Info className="size-4 text-primary" />
