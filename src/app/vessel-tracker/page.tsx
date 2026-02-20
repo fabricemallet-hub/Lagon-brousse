@@ -60,22 +60,12 @@ import {
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { fetchWindyWeather } from '@/lib/windy-api';
 import { getDataForDate } from '@/lib/data';
 
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
-
-const BatteryIconComp = ({ level, charging, className }: { level?: number, charging?: boolean, className?: string }) => {
-  if (level === undefined) return <WifiOff className={cn("size-4 opacity-40", className)} />;
-  const props = { className: cn("size-4", className) };
-  if (charging) return <BatteryCharging {...props} className={cn(props.className, "text-blue-500")} />;
-  if (level <= 10) return <BatteryLow {...props} className={cn(props.className, "text-red-600")} />;
-  if (level <= 40) return <BatteryMedium {...props} className={cn(props.className, "text-orange-500")} />;
-  return <BatteryFull {...props} className={cn(props.className, "text-green-600")} />;
-};
 
 const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClose: () => void, isLoading: boolean, tides: any[] | null }) => {
     if (!data) return null;
@@ -181,7 +171,10 @@ export default function VesselTrackerPage() {
             };
 
             window.windyInit(options, (windyAPI: any) => {
-                if (!windyAPI) { setAuthError(window.location.host); return; }
+                if (!windyAPI) { 
+                    setAuthError(window.location.host); 
+                    return; 
+                }
                 const { map, store, broadcast, picker } = windyAPI;
                 mapRef.current = map;
                 store.set('overlay', 'wind');
@@ -218,7 +211,11 @@ export default function VesselTrackerPage() {
 
   useEffect(() => {
     const timer = setTimeout(initWindy, 1000);
-    return () => clearTimeout(timer);
+    // Délai de sécurité : si la carte n'est pas là après 5s, on force l'affichage du diagnostic
+    const diagTimer = setTimeout(() => {
+        if (!mapRef.current) setAuthError(window.location.host);
+    }, 5000);
+    return () => { clearTimeout(timer); clearTimeout(diagTimer); };
   }, [initWindy]);
 
   const handleRecenter = () => {
@@ -231,7 +228,7 @@ export default function VesselTrackerPage() {
   const copyOrigin = () => {
     if (typeof window !== 'undefined') {
         navigator.clipboard.writeText(window.location.host);
-        toast({ title: "Hôte copié !", description: "Collez-le avec une VIRGULE dans Windy." });
+        toast({ title: "HÔTE COPIÉ !", description: "Utilisez des VIRGULES dans Windy." });
     }
   };
 
@@ -248,13 +245,13 @@ export default function VesselTrackerPage() {
                     <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Copiez cet hôte exact :</p>
                     <div className="flex items-center gap-2">
                         <code className="flex-1 p-2 bg-red-100 rounded font-mono text-[10px] select-all break-all">{authError}</code>
-                        <Button size="icon" variant="ghost" onClick={copyOrigin} className="h-10 w-10">
+                        <Button size="icon" variant="ghost" onClick={copyOrigin} className="h-10 w-10 hover:bg-red-200">
                             <Copy className="size-4" />
                         </Button>
                     </div>
                 </div>
                 <div className="bg-red-100/50 p-3 rounded-lg text-[9px] font-bold text-red-900 space-y-2">
-                    <p>1. Allez sur api.windy.com/keys</p>
+                    <p>1. Allez sur <strong>api.windy.com/keys</strong></p>
                     <p>2. Modifiez la clé Map Forecast (1gGm...)</p>
                     <p>3. Séparez vos domaines par une <strong>VIRGULE</strong> (pas d'espace).</p>
                     <p className="font-black text-xs text-red-600 animate-pulse">⚠️ ATTENTION : VIRGULE OBLIGATOIRE</p>
