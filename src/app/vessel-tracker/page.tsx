@@ -96,7 +96,6 @@ export default function VesselTrackerPage() {
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
-  // --- INITIALISATION WINDY AVEC GESTION 401 ET FALLBACK ---
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || !window.L || !window.windyInit || isMapInitializedRef.current) return;
 
@@ -105,7 +104,6 @@ export default function VesselTrackerPage() {
       lat: INITIAL_CENTER.lat,
       lon: INITIAL_CENTER.lng,
       zoom: 10,
-      // Tentative de forçage d'origine pour les environnements de dev
       externalAllowedOrigins: ["cloudworkstations.dev"]
     };
 
@@ -113,8 +111,6 @@ export default function VesselTrackerPage() {
         window.windyInit(options, (windyAPI: any) => {
           if (!windyAPI) {
               const origin = window.location.origin;
-              console.error("%c[Windy Auth] ERREUR 401 - ACCÈS REFUSÉ", "color: red; font-weight: bold; font-size: 14px;");
-              console.error(`%c[Windy Auth] ORIGINE À AUTORISER : ${origin}`, "color: white; background: red; padding: 4px; border-radius: 4px;");
               setAuthError(origin);
               return;
           }
@@ -143,7 +139,7 @@ export default function VesselTrackerPage() {
               const weather = await fetchWindyWeather(lat, lng);
               setMapClickResult((prev: any) => ({ ...prev, ...weather }));
             } catch (err) {
-              // Silenced for performance
+              // Silenced
             } finally {
               setIsQueryingWindy(false);
             }
@@ -155,16 +151,13 @@ export default function VesselTrackerPage() {
   }, []);
 
   useEffect(() => {
-    // Timer de secours : si Windy ne répond pas après 5s
     fallbackTimerRef.current = setTimeout(() => {
         if (!isMapInitializedRef.current) {
             setIsFallbackMode(true);
-            toast({ title: "Mode Dégradé", description: "En attente de l'autorisation Windy..." });
         }
     }, 5000);
-
     return () => { if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current); };
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
     if (isLeafletLoaded && isWindyLoaded) {
@@ -172,7 +165,6 @@ export default function VesselTrackerPage() {
     }
   }, [isLeafletLoaded, isWindyLoaded, initWindy]);
 
-  // Initialisation Fallback Leaflet (Carte vide si 401 ou timeout)
   useEffect(() => {
     if (isFallbackMode && isLeafletLoaded && !isMapInitializedRef.current && typeof window !== 'undefined' && window.L) {
         const L = window.L;
@@ -183,7 +175,6 @@ export default function VesselTrackerPage() {
     }
   }, [isFallbackMode, isLeafletLoaded]);
 
-  // Synchronisation des marqueurs Leaflet
   useEffect(() => {
     if (!mapRef.current || !followedVessels || typeof window === 'undefined' || !window.L) return;
     const L = window.L;
@@ -225,7 +216,7 @@ export default function VesselTrackerPage() {
         markersRef.current[v.id].setLatLng(pos);
       }
     });
-  }, [followedVessels, labels]);
+  }, [followedVessels]);
 
   const handleGpsUpdate = useCallback(async (pos: GeolocationPosition) => {
     const now = Date.now();
@@ -267,8 +258,23 @@ export default function VesselTrackerPage() {
     setScriptTimestamp(Date.now());
     isMapInitializedRef.current = false;
     setAuthError(null);
-    toast({ title: "Rechargement...", description: "Tentative de reconnexion au serveur Windy." });
+    toast({ title: "Rechargement..." });
   };
+
+  const toggleWakeLock = async () => {
+    if (!('wakeLock' in navigator)) return;
+    if (wakeLock) { try { await wakeLock.release(); setWakeLock(null); } catch (e) { setWakeLock(null); } }
+    else { try { const lock = await (navigator as any).wakeLock.request('screen'); setWakeLock(lock); lock.addEventListener('release', () => setWakeLock(null)); } catch (err) {} }
+  };
+
+  const handleRecenter = () => {
+    if (userLocation && mapRef.current) {
+        mapRef.current.panTo([userLocation.latitude, userLocation.longitude]);
+        mapRef.current.setZoom(15);
+    }
+  };
+
+  const userLocation = currentPos ? { latitude: currentPos.lat, longitude: currentPos.lng } : null;
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
@@ -292,11 +298,11 @@ export default function VesselTrackerPage() {
                     <AlertCircle className="size-5 shrink-0" />
                     <div className="flex flex-col">
                         <span className="text-xs font-black uppercase tracking-tighter">Erreur d'autorisation (401)</span>
-                        <span className="text-[9px] font-bold opacity-70">Votre domaine n'est pas autorisé par Windy.</span>
+                        <span className="text-[9px] font-bold opacity-70">Ajoutez ce domaine dans votre console Windy.</span>
                     </div>
                 </div>
                 <div className="bg-white/50 p-2 rounded-lg border border-red-100 font-mono text-[8px] break-all">
-                    URL à copier : {authError}
+                    URL : {authError}
                 </div>
                 <Button onClick={handleReloadKey} variant="destructive" className="w-full h-10 font-black uppercase text-[10px] gap-2 shadow-sm">
                     <RefreshCw className="size-3" /> Forcer le rechargement de la clé
@@ -315,6 +321,12 @@ export default function VesselTrackerPage() {
               <div className="space-y-0.5"><Label className="text-sm font-black uppercase">Partage GPS</Label><p className="text-[9px] font-bold text-muted-foreground uppercase">{isSharing ? 'En cours' : 'Inactif'}</p></div>
               <Switch checked={isSharing} onCheckedChange={setIsSharing} />
           </div>
+          {isSharing && mode === 'sender' && (
+              <Button variant={wakeLock ? "secondary" : "outline"} className="w-full h-12 font-black uppercase text-[10px] tracking-widest border-2 gap-2" onClick={toggleWakeLock}>
+                  <Zap className={cn("size-4", wakeLock && "fill-primary")} />
+                  {wakeLock ? "MODE ÉVEIL ACTIF" : "ACTIVER MODE ÉVEIL"}
+              </Button>
+          )}
         </CardContent>
       </Card>
 
@@ -323,7 +335,7 @@ export default function VesselTrackerPage() {
           {mapClickResult && (
             <div className="absolute z-[110] bg-slate-900/85 backdrop-blur-md text-white rounded-2xl p-4 shadow-2xl border-2 border-white/20 min-w-[140px] animate-in zoom-in-95" style={{ top: '50%', left: '50%', transform: 'translate(-50%, -130%)' }}>
               <div className="flex items-center justify-between mb-3 border-b border-white/10 pb-2">
-                <span className="text-[10px] font-black uppercase text-primary tracking-widest">WINDY DATA</span>
+                <span className="text-[10px] font-black uppercase text-primary tracking-widest">DATA</span>
                 {isQueryingWindy && <RefreshCw className="size-3 animate-spin" />}
               </div>
               <div className="space-y-3">
@@ -335,13 +347,14 @@ export default function VesselTrackerPage() {
           )}
           <div className="absolute top-3 right-3 flex flex-col gap-2 z-20">
             <Button size="icon" className="shadow-lg h-10 w-10 bg-background/90 border-2" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}</Button>
+            <Button onClick={handleRecenter} className="shadow-lg h-10 w-10 bg-background/90 border-2 p-0"><LocateFixed className="size-5" /></Button>
           </div>
         </div>
       </Card>
 
       <div className="p-4 bg-primary/5 border-2 border-dashed rounded-xl flex gap-3 opacity-60">
           <Info className="size-5 text-primary shrink-0" />
-          <p className="text-[10px] leading-relaxed font-medium">Cliquez n'importe où sur la carte pour interroger les stations météo Windy.</p>
+          <p className="text-[10px] leading-relaxed font-medium">Cliquez sur la carte pour interroger les stations météo. En cas d'écran gris, rechargez la clé ci-dessus.</p>
       </div>
     </div>
   );

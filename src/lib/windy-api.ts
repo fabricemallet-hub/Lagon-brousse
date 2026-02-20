@@ -3,7 +3,7 @@
 
 /**
  * Service de récupération météo via Windy Point Forecast API v2.
- * Version 6.2 : Conformité Point Forecast v2 (Typage Strict + Body Key + Referer Strict).
+ * Version 6.3 : Conformité Point Forecast v2 (Typage Strict + Body Key + Referer Strict).
  */
 
 export async function fetchWindyWeather(lat: number, lon: number) {
@@ -14,7 +14,6 @@ export async function fetchWindyWeather(lat: number, lon: number) {
   const PRODUCTION_URL = 'https://studio-2943478321-f746e.web.app/'; 
   
   try {
-    // 4 PILIERS DE CONFORMITÉ
     const cleanLat = Number(Number(lat).toFixed(6));
     const cleanLon = Number(Number(lon).toFixed(6));
 
@@ -28,7 +27,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
       model: 'gfs',
       parameters: ['wind', 'temp', 'waves'],
       levels: ['surface'],
-      key: API_KEY // La clé DOIT être dans le corps pour la v2
+      key: API_KEY 
     };
 
     const response = await fetch(url, {
@@ -47,7 +46,6 @@ export async function fetchWindyWeather(lat: number, lon: number) {
 
     const data = await response.json();
     
-    // Windy v2 renvoie des tableaux pour chaque paramètre
     const windRaw = data.wind?.[0] ?? 0;
     const tempK = data.temp?.[0] ?? 273.15;
     const wavesM = data.waves?.[0] ?? 0;
