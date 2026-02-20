@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -69,6 +70,7 @@ import { fetchWindyWeather } from '@/lib/windy-api';
 import { getDataForDate } from '@/lib/data';
 import { locations } from '@/lib/locations';
 
+// CLÉ "PRÉVISIONS CARTOGRAPHIQUES" (image_c551c5)
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -131,7 +133,6 @@ const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClos
 };
 
 export default function VesselTrackerPage() {
-  const { user } = useUserHook();
   const firestore = useFirestore();
   const { toast } = useToast();
 
@@ -147,16 +148,26 @@ export default function VesselTrackerPage() {
   const isInitializingRef = useRef<boolean>(false);
   const pickerTimerRef = useRef<any>(null);
 
+  // AJOUT DE LA REFERRER POLICY MOBILE/DEV (UNSAFE-URL)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const meta = document.createElement('meta');
+    meta.name = "referrer";
+    meta.content = "unsafe-url";
+    document.head.appendChild(meta);
+    return () => {
+      if (document.head.contains(meta)) document.head.removeChild(meta);
+    };
+  }, []);
+
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || isInitializingRef.current) return;
     isInitializingRef.current = true;
 
-    // FORCER LA POLITIQUE DE REFERRER POUR L'URL LONGUE DU CLUSTER
+    // FORCE REFERRER DANS LE DOCUMENT POUR CLOUD WORKSTATIONS
     try {
         (document as any).referrerPolicy = "no-referrer-when-downgrade";
-    } catch (e) {
-        console.warn("Could not set Referrer Policy manually:", e);
-    }
+    } catch (e) {}
 
     const loadScript = (id: string, src: string): Promise<void> => {
         return new Promise((resolve, reject) => {
@@ -186,23 +197,31 @@ export default function VesselTrackerPage() {
 
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
             
-            const cleanKey = MAP_FORECAST_KEY.trim();
+            const key = MAP_FORECAST_KEY.trim();
+            const hostname = window.location.hostname;
+
+            // SÉCURITÉ : DÉCLENCHE L'INITIALISATION UNIQUEMENT SI LE DOMAINE EST COHÉRENT
+            // Autorise localhost et le domaine du cluster validé dans Windy
+            if (!hostname.includes('cloudworkstations.dev') && !hostname.includes('localhost') && !hostname.includes('web.app')) {
+                console.warn("Domaine non autorisé pour l'initialisation Windy.");
+                return;
+            }
+
+            console.log("Initialisation Windy avec clé Carte:", key);
+
             const options = {
-                key: cleanKey,
+                key: key,
                 lat: INITIAL_CENTER.lat,
                 lon: INITIAL_CENTER.lng,
                 zoom: 10,
-                verbose: true,
+                verbose: true, // Diagnostic actif
                 overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell'],
                 product: 'ecmwf',
             };
 
             try {
                 (window as any).windyInit(options, (windyAPI: any) => {
-                    if (!windyAPI) { 
-                        console.error("Échec de l'initialisation de l'API Windy");
-                        return; 
-                    }
+                    if (!windyAPI) return;
                     const { map, store, broadcast, picker } = windyAPI;
                     mapRef.current = map;
                     store.set('overlay', 'wind');
@@ -228,7 +247,7 @@ export default function VesselTrackerPage() {
                     setTimeout(() => { if(map) map.invalidateSize(); }, 1500);
                 });
             } catch (authE) {
-                console.error("Windy Auth Exception:", authE);
+                console.error("Windy Exception:", authE);
             }
         } catch (e: any) {
             console.error("Windy init error:", e);
@@ -240,7 +259,8 @@ export default function VesselTrackerPage() {
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(initWindy, 2000);
+    // DÉLAI DE GRÂCE ÉTENDU À 5 SECONDES
+    const timer = setTimeout(initWindy, 5000);
     return () => { clearTimeout(timer); };
   }, [initWindy]);
 
@@ -253,8 +273,6 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
-      <meta name="referrer" content="no-referrer-when-downgrade" />
-
       <Card className="border-2 shadow-sm overflow-hidden">
         <CardContent className="p-4 space-y-4">
           <div className="grid grid-cols-2 gap-3">
