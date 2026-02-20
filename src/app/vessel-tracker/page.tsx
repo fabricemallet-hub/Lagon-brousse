@@ -47,7 +47,9 @@ import {
   Wind,
   WifiOff,
   Eye,
-  EyeOff
+  EyeOff,
+  Thermometer,
+  Target
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, HuntingMarker } from '@/lib/types';
@@ -61,7 +63,6 @@ import { fetchWindyWeather } from '@/lib/windy-api';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
-// Point bleu GPS local parfaitement centré
 const PulsingDot = () => (
     <div className="absolute z-[100]" style={{ transform: 'translate(-50%, -50%)' }}>
       <div className="size-5 rounded-full bg-blue-500 opacity-75 animate-ping absolute"></div>
@@ -92,17 +93,22 @@ export default function VesselTrackerPage() {
   const [customSharingId, setCustomSharingId] = useState('');
   const [mooringRadius, setMooringRadius] = useState(20);
 
+  // States pour la carte et GPS
   const [currentPos, setCurrentPos] = useState<{ lat: number; lng: number } | null>(null);
   const [anchorPos, setAnchorPos] = useState<{ lat: number; lng: number } | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status'] | 'offline'>('moving');
   const [map, setMap] = useState<google.maps.Map | null>(null);
+
+  // Météo interactive (Clic sur carte)
+  const [mapClickResult, setMapClickResult] = useState<{ lat: number, lng: number, wind?: number, temp?: number } | null>(null);
+  const [isQueryingWindy, setIsQueryingWindy] = useState(false);
+  const lastMapClickTimeRef = useRef<number>(0);
 
   const currentPosRef = useRef<google.maps.LatLngLiteral | null>(null);
   const anchorPosRef = useRef<google.maps.LatLngLiteral | null>(null);
   const statusRef = useRef<VesselStatus['status'] | 'offline'>('moving');
   const watchIdRef = useRef<number | null>(null);
   const lastUpdateTimestampRef = useRef<number>(0);
-  const lastMapClickTimeRef = useRef<number>(0);
   const [isForcingWindy, setIsForcingWindy] = useState(false);
 
   const [technicalLog, setTechnicalLog] = useState<{ label: string, startTime: Date, lastUpdate: Date, duration: number }[]>([]);
@@ -148,6 +154,7 @@ export default function VesselTrackerPage() {
     if (!user || !firestore || !sharingId) return;
     
     const now = Date.now();
+    // THROTTLING 5 SECONDES OBLIGATOIRE
     if (!force && (now - lastUpdateTimestampRef.current < 5000)) return;
     lastUpdateTimestampRef.current = now;
 
@@ -205,6 +212,40 @@ export default function VesselTrackerPage() {
   const addToLogRef = useRef(addToTechnicalLog);
   useEffect(() => { addToLogRef.current = addToTechnicalLog; }, [addToTechnicalLog]);
 
+  /**
+   * Gestion du clic sur la carte pour la météo Windy interactive
+   */
+  const handleMapClick = async (e: google.maps.MapMouseEvent) => {
+    if (!e.latLng || isQueryingWindy) return;
+    
+    const now = Date.now();
+    // Debounce de 2 secondes pour protéger la clé API
+    if (now - lastMapClickTimeRef.current < 2000) return;
+    lastMapClickTimeRef.current = now;
+
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+
+    // Marqueur temporaire immédiat (chargement)
+    setMapClickResult({ lat, lng });
+    setIsQueryingWindy(true);
+    
+    try {
+        const weather = await fetchWindyWeather(lat, lng);
+        if (weather.success) {
+            setMapClickResult({ lat, lng, wind: weather.windSpeed, temp: weather.temperature });
+        } else {
+            setMapClickResult(null);
+            toast({ variant: "destructive", title: "Erreur Windy", description: weather.error });
+        }
+    } catch (err) {
+        setMapClickResult(null);
+        toast({ variant: "destructive", title: "Erreur", description: "Impossible de contacter Windy." });
+    } finally {
+        setIsQueryingWindy(false);
+    }
+  };
+
   const handleForceWindyUpdate = async () => {
     const pos = currentPosRef.current;
     if (!pos) {
@@ -217,49 +258,16 @@ export default function VesselTrackerPage() {
         if (weather.success) {
             await updateVesselRef.current({
                 windSpeed: weather.windSpeed,
-                windDir: weather.windDir,
-                wavesHeight: weather.wavesHeight,
                 lastWeatherUpdate: serverTimestamp()
             }, true);
-            toast({ title: `Diagnostic Windy : Succès (200)`, description: `Vent: ${weather.windSpeed}nd | Vagues: ${weather.wavesHeight}m` });
+            toast({ title: `Diagnostic Windy : Succès`, description: `Vent: ${weather.windSpeed}nd` });
         } else {
-            toast({ variant: "destructive", title: `Diagnostic Windy : Échec`, description: `Code: ${weather.status}` });
+            toast({ variant: "destructive", title: `Diagnostic Windy : Échec`, description: `Status: ${weather.status}` });
         }
     } catch (e) {
         toast({ variant: "destructive", title: "Échec API", description: "Communication impossible." });
     } finally {
         setIsForcingWindy(false);
-    }
-  };
-
-  /**
-   * Consultation météo au clic sur la carte (Debounce 2s)
-   */
-  const handleMapClick = async (e: google.maps.MapMouseEvent) => {
-    if (!e.latLng) return;
-    
-    const now = Date.now();
-    if (now - lastMapClickTimeRef.current < 2000) return; // Debounce 2s
-    lastMapClickTimeRef.current = now;
-
-    const lat = e.latLng.lat();
-    const lon = e.latLng.lng();
-
-    toast({ description: "Interrogation Windy..." });
-    
-    try {
-        const weather = await fetchWindyWeather(lat, lon);
-        if (weather.success) {
-            toast({ 
-                title: "Météo au point cliqué", 
-                description: `Vent : ${weather.windSpeed} ND`,
-                duration: 5000
-            });
-        } else {
-            toast({ variant: "destructive", title: "Erreur Windy", description: weather.error });
-        }
-    } catch (err) {
-        toast({ variant: "destructive", title: "Erreur", description: "Impossible de contacter Windy." });
     }
   };
 
@@ -311,6 +319,7 @@ export default function VesselTrackerPage() {
         const { latitude, longitude, accuracy } = position.coords;
         const newPos = { lat: latitude, lng: longitude };
         
+        // THROTTLING MATÉRIEL : BLOQUE SI < 5S
         const now = Date.now();
         if (now - lastUpdateTimestampRef.current < 5000) return;
 
@@ -514,7 +523,7 @@ export default function VesselTrackerPage() {
                             </div>
                             <Slider value={[mooringRadius]} min={10} max={200} step={10} onValueChange={v => setMooringRadius(v[0])} />
                         </div>
-                        <Button variant="ghost" className="w-full h-10 font-black uppercase text-[8px] text-destructive/40 hover:text-destructive hover:bg-red-50" onClick={() => { setVesselNickname(''); setCustomSharingId(''); setMooringRadius(20); toast({ title: "Identité reset" }); }}>
+                        <Button variant="ghost" className="w-full h-10 font-black uppercase text-[8px] text-destructive/40 hover:text-destructive hover:bg-red-50" onClick={() => { setVesselNickname(''); setCustomSharingId(''); setMooringRadius(20); toast({ title: "Identité réinitialisée" }); }}>
                             <RefreshCw className="size-3 mr-2" /> RÉINITIALISER MON IDENTITÉ
                         </Button>
                     </AccordionContent>
@@ -523,7 +532,7 @@ export default function VesselTrackerPage() {
                 <AccordionItem value="diag" className="border-none mt-2">
                     <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-slate-100 rounded-xl">
                         <Zap className="size-4 text-slate-600" />
-                        <span className="text-[10px] font-black uppercase">Diagnostic Windy</span>
+                        <span className="text-[10px] font-black uppercase">Pont de Test (Admin)</span>
                     </AccordionTrigger>
                     <AccordionContent className="pt-4 space-y-3">
                         <Button 
@@ -574,6 +583,38 @@ export default function VesselTrackerPage() {
               onClick={handleMapClick}
               options={{ disableDefaultUI: true, mapTypeId: 'satellite', gestureHandling: 'greedy' }}
             >
+                  {/* Marqueur de clic météo (Temporary) */}
+                  {mapClickResult && (
+                      <OverlayView position={{ lat: mapClickResult.lat, lng: mapClickResult.lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
+                          <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center pointer-events-none">
+                              <div className="bg-slate-900/85 backdrop-blur-md text-white rounded-xl p-3 shadow-2xl border border-white/20 mb-2 min-w-[100px] animate-in zoom-in-95">
+                                  <div className="flex items-center justify-between gap-4 mb-1">
+                                      <span className="text-[8px] font-black uppercase text-primary tracking-widest">WINDY LIVE</span>
+                                      <button onClick={(e) => { e.stopPropagation(); setMapClickResult(null); }} className="pointer-events-auto"><X className="size-3 text-white/40 hover:text-white" /></button>
+                                  </div>
+                                  {isQueryingWindy ? (
+                                      <div className="flex items-center gap-2 py-1">
+                                          <RefreshCw className="size-3 animate-spin text-primary" />
+                                          <span className="text-[9px] font-bold uppercase animate-pulse">Calcul...</span>
+                                      </div>
+                                  ) : (
+                                      <div className="space-y-1">
+                                          <div className="flex items-center gap-2">
+                                              <Wind className="size-4 text-blue-400" />
+                                              <span className="text-base font-black">{mapClickResult.wind ?? '--'} <span className="text-[10px] opacity-60">ND</span></span>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                              <Thermometer className="size-4 text-orange-400" />
+                                              <span className="text-xs font-black">{mapClickResult.temp ?? '--'} <span className="text-[10px] opacity-60">°C</span></span>
+                                          </div>
+                                      </div>
+                                  )}
+                              </div>
+                              <div className="size-3 bg-primary rounded-full border-2 border-white shadow-lg" />
+                          </div>
+                      </OverlayView>
+                  )}
+
                   {followedVessels?.filter(v => v.isSharing && v.location).map(vessel => {
                       const statusInfo = getVesselIconInfo(vessel.status);
                       const isMe = vessel.id === sharingId;
@@ -600,17 +641,17 @@ export default function VesselTrackerPage() {
                               <OverlayView position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                   <div style={{ transform: 'translate(-50%, -50%)' }} className="flex flex-col items-center pointer-events-none relative">
                                       
-                                      {/* ÉTAGE HAUT : NOM ET STATUT */}
-                                      <div className="absolute bottom-20 flex flex-col items-center">
-                                          <div className="px-3 py-2 bg-white/95 backdrop-blur-md rounded-lg text-[11px] font-black shadow-2xl border-2 border-primary/20 text-slate-900 flex items-center gap-2">
+                                      {/* HAUT : NOM ET STATUT */}
+                                      <div className="absolute bottom-20">
+                                          <div className="px-3 py-2 bg-white/95 backdrop-blur-md rounded-lg text-[11px] font-black shadow-2xl border-2 border-primary/20 text-slate-900 flex items-center gap-2 whitespace-nowrap">
                                               <span className="truncate max-w-[120px]">{vessel.displayName}</span>
                                               <span className="border-l-2 pl-2 text-primary/60">{statusInfo.label}</span>
                                           </div>
                                       </div>
 
-                                      {/* ÉTAGE CENTRE : ICÔNE STATUT (OPACITÉ 85%) + POINT BLEU */}
+                                      {/* MILIEU : ICONE SEMI-TRANSPARENTE (85%) + POINT BLEU AU CENTRE */}
                                       <div className="relative size-32 flex items-center justify-center">
-                                          <div className={cn("size-24 rounded-full border-8 border-white shadow-2xl flex items-center justify-center opacity-85 transition-all", statusInfo.color)}>
+                                          <div className={cn("size-24 rounded-full border-8 border-white shadow-2xl flex items-center justify-center opacity-85", statusInfo.color)}>
                                               {React.createElement(statusInfo.icon, { className: "size-12 text-white drop-shadow-md" })}
                                           </div>
                                           {isMe && mode === 'sender' && (
@@ -620,7 +661,7 @@ export default function VesselTrackerPage() {
                                           )}
                                       </div>
 
-                                      {/* ÉTAGE BAS : BULLES D'ÉTAT EMPILEES */}
+                                      {/* BAS : BULLES D'ÉTAT EMPILEES */}
                                       <div className="absolute top-14 flex flex-col items-center gap-1.5 mt-2">
                                           <div className={cn(
                                               "px-3 py-1.5 rounded-full text-[10px] font-black uppercase flex items-center gap-2 shadow-xl border-2 bg-white",
@@ -631,12 +672,10 @@ export default function VesselTrackerPage() {
                                           </div>
 
                                           {isCharging && <Badge className="bg-blue-600 text-white text-[9px] font-black shadow-lg border-2 border-white/30 px-3 py-1">⚡ EN CHARGE</Badge>}
-                                          {battery < 20 && !isCharging && <Badge className="bg-red-600 text-white text-[9px] font-black shadow-lg animate-pulse border-2 border-white/30 px-3 py-1">⚠️ BATTERIE FAIBLE</Badge>}
-
+                                          
                                           {vessel.windSpeed !== undefined && (
-                                              <div className="bg-slate-900 text-white px-4 py-2 rounded-2xl text-[10px] font-black shadow-2xl border-2 border-white/20 flex items-center gap-4 mt-1">
-                                                  <div className="flex items-center gap-2"><Wind className="size-4 text-blue-400" /> {vessel.windSpeed} ND</div>
-                                                  <div className="border-l border-white/20 pl-3 flex items-center gap-2"><Waves className="size-4 text-cyan-400" /> {vessel.wavesHeight?.toFixed(1)}m</div>
+                                              <div className="bg-slate-900/85 backdrop-blur-md text-white px-4 py-2 rounded-2xl text-[10px] font-black shadow-2xl border-2 border-white/20 flex items-center gap-2 mt-1">
+                                                  <Wind className="size-4 text-blue-400" /> {vessel.windSpeed} ND
                                               </div>
                                           )}
                                       </div>
@@ -660,9 +699,16 @@ export default function VesselTrackerPage() {
                   })}
             </GoogleMap>
           ) : <Skeleton className="h-full w-full" />}
+          
           <div className="absolute top-3 right-3 flex flex-col gap-2">
             <Button onClick={handleRecenter} className={cn("shadow-lg h-10 w-10 p-0 border-2", isFollowing ? "bg-primary text-white" : "bg-background/90 text-primary")}><Compass className="size-5" /></Button>
             <Button size="icon" className="shadow-lg h-10 w-10 bg-background/90 border-2" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-5" /> : <Expand className="size-5" />}</Button>
+          </div>
+
+          <div className="absolute top-3 left-3 flex flex-col gap-2">
+             <div className="bg-black/60 backdrop-blur-md text-white px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest border border-white/10 shadow-xl">
+                CLIQUEZ SUR CARTE POUR MÉTÉO
+             </div>
           </div>
         </div>
 
@@ -686,20 +732,6 @@ export default function VesselTrackerPage() {
                                     <span className="text-[8px] font-bold opacity-40 uppercase">{format(l.startTime, 'HH:mm')} • {l.duration > 0 ? `${l.duration} min` : 'Début'}</span>
                                 </div>
                                 <Badge variant="outline" className="text-[9px] font-black uppercase bg-primary/5 text-primary border-primary/10">LOG</Badge>
-                            </div>
-                        ))}
-                    </AccordionContent>
-                </AccordionItem>
-                <AccordionItem value="tactical-log" className="border rounded-xl px-3 bg-muted/5">
-                    <div className="flex items-center justify-between">
-                        <AccordionTrigger className="flex-1 text-[10px] font-black uppercase hover:no-underline py-3">JOURNAL TACTIQUE</AccordionTrigger>
-                        <Button variant="ghost" size="sm" onClick={handleClearTactical} className="h-7 text-destructive text-[8px] font-black uppercase">Effacer</Button>
-                    </div>
-                    <AccordionContent className="pb-4 space-y-2">
-                        {currentVesselData?.huntingMarkers?.map((m, i) => (
-                            <div key={i} className="p-2 bg-white border-2 rounded-lg text-[9px] flex justify-between items-center shadow-sm">
-                                <Badge variant="outline" className="text-[8px] font-black uppercase border-primary/30 text-primary">{m.label}</Badge>
-                                <span className="font-bold opacity-60">{m.time}</span>
                             </div>
                         ))}
                     </AccordionContent>

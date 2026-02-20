@@ -2,7 +2,7 @@
 
 /**
  * Service de récupération météo via Windy Point Forecast API v2.
- * Version 4.8 : Résolution de l'Erreur 400 par conformité JSON stricte.
+ * Version 4.9 : Support multi-paramètres (Vent/Temp) et formatage strict.
  */
 export async function fetchWindyWeather(lat: number, lon: number) {
   const API_KEY = 'ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU';
@@ -10,7 +10,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
   const PRODUCTION_URL = 'https://studio-2943478321-f746e.web.app/'; 
   
   try {
-    // 1. DATA INTEGRITY : Conversion forcée en Number pur
+    // 1. DATA INTEGRITY : Conversion forcée en Number pur (Windy rejette les strings)
     const cleanLat = Number(parseFloat(lat.toString()).toFixed(6));
     const cleanLon = Number(parseFloat(lon.toString()).toFixed(6));
 
@@ -18,18 +18,18 @@ export async function fetchWindyWeather(lat: number, lon: number) {
         throw new Error("Coordonnées GPS invalides");
     }
 
-    // 2. STRUCTURE JSON V2 : La clé API doit être dans le corps du JSON
+    // 2. STRUCTURE JSON V2 STRICTE
+    // La doc Point Forecast v2 exige la clé dans le body JSON.
     const requestBody = {
       lat: cleanLat,
-      lon: cleanLon,
+      lon: cleanLon, // Utilise lon et non lng
       model: 'gfs',
-      parameters: ['wind'],
+      parameters: ['wind', 'temp'],
       levels: ['surface'],
       key: API_KEY
     };
 
-    // LOG DE DIAGNOSTIC : Visualisation de la structure exacte envoyée
-    console.log("[Windy API v4.8] Payload JSON :", JSON.stringify(requestBody));
+    console.log("[Windy API v4.9] Payload JSON :", JSON.stringify(requestBody));
     
     const response = await fetch(url, {
       method: 'POST',
@@ -44,26 +44,30 @@ export async function fetchWindyWeather(lat: number, lon: number) {
     // 3. GESTION DES RÉPONSES
     if (response.status === 400) {
         const errorText = await response.text();
-        console.error("[Windy 400] Rejet structurelle :", errorText);
+        console.error("[Windy 400] Rejet structurel. Vérifier le JSON envoyé :", errorText);
         return { success: false, error: "Requête mal formée (400)", status: 400 };
     }
 
     if (response.status === 204) {
-        return { success: false, error: "Aucune donnée pour ce point (204)", status: 204 };
+        console.warn("[Windy 204] Aucune donnée disponible pour ces paramètres.");
+        return { success: false, error: "Aucune donnée (204)", status: 204 };
     }
 
     if (!response.ok) {
-        return { success: false, error: `Erreur ${response.status}`, status: response.status };
+        return { success: false, error: `Erreur HTTP ${response.status}`, status: response.status };
     }
 
     const data = await response.json();
     
-    // Windy renvoie des tableaux de prévisions horaires, on prend l'index 0 (actuel)
+    // Windy renvoie des tableaux de prévisions horaires. Index 0 = actuel.
     // Conversion m/s en Noeuds (nds) : 1 m/s = 1.94384 nds
+    // Conversion Kelvin en Celsius : K - 273.15
+    const windRaw = data.wind?.[0] ?? 0;
+    const tempK = data.temp?.[0] ?? 273.15;
+
     return {
-      windSpeed: data.wind?.[0] !== undefined ? Math.round(data.wind[0] * 1.94384) : 0,
-      windDir: data['wind-dir']?.[0] || 0,
-      wavesHeight: data.waves?.[0] || 0,
+      windSpeed: Math.round(windRaw * 1.94384),
+      temperature: Math.round(tempK - 273.15),
       success: true,
       status: 200
     };
