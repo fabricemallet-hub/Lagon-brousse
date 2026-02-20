@@ -177,7 +177,6 @@ export default function VesselTrackerPage() {
 
     const attemptInit = async () => {
         try {
-            // ÉTAPE 1 : Charger Leaflet 1.4.0 (Requis par Windy)
             await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
             
             let retries = 0;
@@ -188,7 +187,6 @@ export default function VesselTrackerPage() {
             
             if (!(window as any).L) throw new Error("Leaflet (L) non trouvé.");
 
-            // ÉTAPE 2 : Charger libBoot de Windy
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
             
             const options = {
@@ -201,7 +199,6 @@ export default function VesselTrackerPage() {
                 product: 'ecmwf',
             };
 
-            // ÉTAPE 3 : Lancement Windy
             (window as any).windyInit(options, (windyAPI: any) => {
                 if (!windyAPI) { 
                     setAuthError(window.location.host); 
@@ -258,8 +255,9 @@ export default function VesselTrackerPage() {
 
   const copyOrigin = () => {
     if (typeof window !== 'undefined') {
-        navigator.clipboard.writeText(window.location.host);
-        toast({ title: "HÔTE COPIÉ !", description: "Collez-le dans votre console Windy." });
+        const host = window.location.host;
+        navigator.clipboard.writeText(host);
+        toast({ title: "HÔTE COPIÉ !", description: `Copié : ${host}` });
     }
   };
 
