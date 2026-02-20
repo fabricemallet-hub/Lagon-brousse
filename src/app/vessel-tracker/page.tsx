@@ -26,7 +26,6 @@ import {
   BatteryLow,
   Wind,
   Waves,
-  Thermometer,
   Eye,
   EyeOff,
   Info,
@@ -37,6 +36,7 @@ import type { VesselStatus, UserAccount } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { fetchWindyWeather } from '@/lib/windy-api';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -112,6 +112,7 @@ export default function VesselTrackerPage() {
           if (!windyAPI) {
               const origin = window.location.origin;
               setAuthError(origin);
+              console.error('%c[Windy Auth] ORIGINE À AUTORISER :', 'color: red; font-weight: bold;', origin);
               return;
           }
 
@@ -154,6 +155,7 @@ export default function VesselTrackerPage() {
     fallbackTimerRef.current = setTimeout(() => {
         if (!isMapInitializedRef.current) {
             setIsFallbackMode(true);
+            console.warn('[Windy Auth] Timeout 5s atteint. Passage en mode de secours.');
         }
     }, 5000);
     return () => { if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current); };
@@ -286,7 +288,7 @@ export default function VesselTrackerPage() {
       />
       <Script 
         src={`https://api.windy.com/assets/map-forecast/libBoot.js?t=${scriptTimestamp}`} 
-        strategy="afterInteractive" 
+        strategy="lazyOnload" 
         crossOrigin="anonymous"
         onLoad={() => setIsWindyLoaded(true)}
       />
@@ -297,15 +299,15 @@ export default function VesselTrackerPage() {
                 <div className="flex items-center gap-3 text-red-800">
                     <AlertCircle className="size-5 shrink-0" />
                     <div className="flex flex-col">
-                        <span className="text-xs font-black uppercase tracking-tighter">Erreur d'autorisation (401)</span>
-                        <span className="text-[9px] font-bold opacity-70">Ajoutez ce domaine dans votre console Windy.</span>
+                        <span className="text-xs font-black uppercase tracking-tighter">Erreur d'autorisation Windy</span>
+                        <span className="text-[9px] font-bold opacity-70">Ajoutez votre domaine dans la console Windy.</span>
                     </div>
                 </div>
                 <div className="bg-white/50 p-2 rounded-lg border border-red-100 font-mono text-[8px] break-all">
-                    URL : {authError}
+                    ORIGINE : {authError}
                 </div>
                 <Button onClick={handleReloadKey} variant="destructive" className="w-full h-10 font-black uppercase text-[10px] gap-2 shadow-sm">
-                    <RefreshCw className="size-3" /> Forcer le rechargement de la clé
+                    <RefreshCw className="size-3" /> Réinitialiser la clé (Casser cache)
                 </Button>
             </div>
         </div>

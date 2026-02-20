@@ -3,14 +3,14 @@
 
 /**
  * Service de récupération météo via Windy Point Forecast API v2.
- * Version 6.3 : Conformité Point Forecast v2 (Typage Strict + Body Key + Referer Strict).
+ * Version 6.4 : Conformité Point Forecast v2 (Typage Strict + Body Key + Referer Strict).
  */
 
 export async function fetchWindyWeather(lat: number, lon: number) {
   const API_KEY = 'ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU';
   const url = 'https://api.windy.com/api/point-forecast/v2';
   
-  // URL EXACTE DE PRODUCTION
+  // URL EXACTE DE PRODUCTION POUR LE REFERER
   const PRODUCTION_URL = 'https://studio-2943478321-f746e.web.app/'; 
   
   try {
@@ -46,13 +46,12 @@ export async function fetchWindyWeather(lat: number, lon: number) {
 
     const data = await response.json();
     
+    // Extraction sécurisée des données selon le format v2
     const windRaw = data.wind?.[0] ?? 0;
-    const tempK = data.temp?.[0] ?? 273.15;
     const wavesM = data.waves?.[0] ?? 0;
 
     return {
       windSpeed: Math.round(windRaw * 1.94384), // m/s -> knots
-      temperature: Math.round(tempK - 273.15), // K -> Celsius
       waves: parseFloat(wavesM.toFixed(1)),
       success: true,
       status: 200
