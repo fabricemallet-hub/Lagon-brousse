@@ -262,11 +262,11 @@ export default function VesselTrackerPage() {
     } catch (e) { toast({ variant: 'destructive', title: "Erreur sauvegarde" }); }
   }, [user, firestore, emergencyContact, vesselSmsMessage, isEmergencyEnabled, isCustomMessageEnabled, toast]);
 
-  const handleSaveVesselIdentity = async (field: 'vessel' | 'fleet') => {
+  const handleSaveVesselIdentity = async (field: 'vessel' | 'fleet' | 'all') => {
     if (!user || !firestore) return;
     const updates: any = {};
-    if (field === 'vessel') updates.lastVesselId = customSharingId.trim().toUpperCase();
-    if (field === 'fleet') updates.lastFleetId = customFleetId.trim().toUpperCase();
+    if (field === 'vessel' || field === 'all') updates.lastVesselId = customSharingId.trim().toUpperCase();
+    if (field === 'fleet' || field === 'all') updates.lastFleetId = customFleetId.trim().toUpperCase();
     updates.vesselNickname = vesselNickname;
     updates.isGhostMode = isGhostMode;
     updates.vesselPrefs = { ...(profile?.vesselPrefs || {}), mooringRadius };
