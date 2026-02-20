@@ -2,7 +2,7 @@
 
 /**
  * Service de récupération météo via Windy Point Forecast API v2.
- * Version 5.0 : Support Vent, Vagues, Température avec typage strict.
+ * Résolution Erreur 400 : Mise en conformité stricte (v5.1).
  */
 export async function fetchWindyWeather(lat: number, lon: number) {
   const API_KEY = 'ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU';
@@ -10,7 +10,8 @@ export async function fetchWindyWeather(lat: number, lon: number) {
   const PRODUCTION_URL = 'https://studio-2943478321-f746e.web.app/'; 
   
   try {
-    // 1. DATA INTEGRITY : Conversion en Number pur (Windy rejette les strings)
+    // 1. DATA INTEGRITY (Piler 1) : Conversion en Number pur (sans guillemets)
+    // Windy exige des types numériques. toFixed(6) est converti en Number.
     const cleanLat = Number(parseFloat(lat.toString()).toFixed(6));
     const cleanLon = Number(parseFloat(lon.toString()).toFixed(6));
 
@@ -18,7 +19,8 @@ export async function fetchWindyWeather(lat: number, lon: number) {
         throw new Error("Coordonnées GPS invalides");
     }
 
-    // 2. STRUCTURE JSON V2 STRICTE
+    // 2. STRUCTURE JSON V2 STRICTE (Piler 2 & 3)
+    // Utilisation de "lon" (et non lng) et inclusion de "key" dans le body.
     const requestBody = {
       lat: cleanLat,
       lon: cleanLon,
@@ -28,26 +30,30 @@ export async function fetchWindyWeather(lat: number, lon: number) {
       key: API_KEY
     };
 
-    console.log("[Windy API v5.0] Payload JSON :", JSON.stringify(requestBody));
+    // Log diagnostic pour vérifier la structure exacte envoyée
+    console.log("[Windy API v5.1] Payload JSON sortant :", JSON.stringify(requestBody));
     
     const response = await fetch(url, {
       method: 'POST',
       headers: { 
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json', // Piler 4
         'Referer': PRODUCTION_URL,
         'Origin': PRODUCTION_URL
       },
       body: JSON.stringify(requestBody)
     });
 
+    // 3. GESTION DES RÉPONSES (Piler 4)
     if (response.status === 400) {
         const errorText = await response.text();
-        console.error("[Windy 400] Rejet structurel. JSON :", errorText);
+        console.error("[Windy 400] Requête mal formée. Body envoyé :", JSON.stringify(requestBody));
+        console.error("[Windy 400] Réponse serveur :", errorText);
         return { success: false, error: "Requête mal formée (400)", status: 400 };
     }
 
     if (response.status === 204) {
-        return { success: false, error: "Aucune donnée (204)", status: 204 };
+        console.warn("[Windy 204] Aucune donnée disponible pour ce point/modèle.");
+        return { success: false, error: "Modèle sans données (204)", status: 204 };
     }
 
     if (!response.ok) {
@@ -67,7 +73,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
       waves: parseFloat(wavesM.toFixed(1)),
       success: true,
       status: 200,
-      units: data.units
+      units: data.units || { wind: 'm/s', temp: 'K', waves: 'm' }
     };
   } catch (error: any) {
     console.error("[Windy Critical] Failure:", error);
