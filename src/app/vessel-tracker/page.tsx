@@ -57,7 +57,8 @@ import {
   Thermometer,
   Gauge,
   ArrowUp,
-  Wind
+  Wind,
+  ExternalLink
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, SoundLibraryEntry, UserAccount } from '@/lib/types';
@@ -71,6 +72,7 @@ import { getDataForDate } from '@/lib/data';
 import { locations } from '@/lib/locations';
 
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
+const PRODUCTION_DOMAIN = 'https://studio-2943478321-f746e.web.app/vessel-tracker';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
 const getClosestCommune = (lat: number, lon: number) => {
@@ -145,16 +147,20 @@ export default function VesselTrackerPage() {
   const [isQueryingWindy, setIsQueryingWindy] = useState(false);
   const [isInitializing, setIsInitializing] = useState(false);
   const [hasLaunched, setHasLaunched] = useState(false);
+  const [isCloudWorkstation, setIsCloudWorkstation] = useState(false);
   
   const mapRef = useRef<any>(null);
   const pickerTimerRef = useRef<any>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const meta = document.createElement('meta');
-    meta.name = "referrer";
-    meta.content = "no-referrer-when-downgrade";
-    document.head.appendChild(meta);
+    setIsCloudWorkstation(window.location.host.includes('cloudworkstations.dev'));
+    
+    // Forçage Referrer Policy au niveau du DOM
+    const meta = document.querySelector('meta[name="referrer"]') || document.createElement('meta');
+    meta.setAttribute('name', 'referrer');
+    meta.setAttribute('content', 'no-referrer-when-downgrade');
+    if (!document.head.contains(meta)) document.head.appendChild(meta);
   }, []);
 
   const initWindyMap = useCallback(() => {
@@ -180,12 +186,15 @@ export default function VesselTrackerPage() {
             await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
             
             let retries = 0;
-            while (!(window as any).L && retries < 15) { 
+            while (!(window as any).L && retries < 10) { 
                 await new Promise(r => setTimeout(r, 500)); 
                 retries++; 
             }
             
             if (!(window as any).L) throw new Error("Leaflet non détecté.");
+
+            // INJECTION DIRECTE DE LA CLÉ DANS L'OBJET GLOBAL WINDY
+            (window as any).W = { apiKey: MAP_FORECAST_KEY.trim() };
 
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
             
@@ -194,7 +203,7 @@ export default function VesselTrackerPage() {
                 lat: INITIAL_CENTER.lat,
                 lon: INITIAL_CENTER.lng,
                 zoom: 10,
-                verbose: false,
+                verbose: true,
                 overlays: ['wind', 'waves', 'pressure', 'temp', 'sst', 'rh', 'swell'],
                 product: 'ecmwf',
             };
@@ -254,6 +263,22 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
+      {isCloudWorkstation && !hasLaunched && (
+          <Alert variant="destructive" className="bg-amber-50 border-amber-200 text-amber-900">
+              <AlertTriangle className="size-4 text-amber-600" />
+              <AlertTitle className="text-xs font-black uppercase">Environnement Cloud Détecté</AlertTitle>
+              <AlertDescription className="text-[10px] font-bold leading-relaxed">
+                  L'authentification Windy peut être bloquée par la sécurité du cluster. 
+                  Si la carte ne s'affiche pas, testez sur le domaine de production validé.
+                  <Button asChild variant="outline" size="sm" className="w-full mt-3 h-10 border-2 gap-2 bg-white text-primary">
+                      <a href={PRODUCTION_DOMAIN} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="size-3" /> Ouvrir sur L&B WebApp
+                      </a>
+                  </Button>
+              </AlertDescription>
+          </Alert>
+      )}
+
       <Card className="border-2 shadow-sm overflow-hidden">
         <CardContent className="p-4 space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -310,10 +335,10 @@ export default function VesselTrackerPage() {
                       </>
                   ) : (
                       <>
-                        <AlertTriangle className="size-12 text-amber-500" />
-                        <p className="font-black uppercase text-xs text-slate-600">Problème d'authentification ou réseau</p>
+                        <ShieldAlert className="size-12 text-destructive" />
+                        <p className="font-black uppercase text-xs text-slate-600">Erreur d'authentification domaine</p>
                         <Button onClick={initWindyMap} className="font-black uppercase text-[10px] h-12 gap-2 shadow-lg mt-2">
-                            <Play className="size-4" /> Relancer la carte
+                            <Play className="size-4" /> Lancer manuellement
                         </Button>
                       </>
                   )}
