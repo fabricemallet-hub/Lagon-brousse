@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -74,7 +73,7 @@ export default function VesselTrackerPage() {
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
-  // --- INITIALISATION WINDY MAP (FIX ÉCRAN GRIS) ---
+  // --- INITIALISATION WINDY MAP ---
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || !(window as any).windyInit || mapRef.current) return;
 
@@ -90,7 +89,7 @@ export default function VesselTrackerPage() {
           const { map, picker } = windyAPI;
           mapRef.current = map;
 
-          // Forçage du redessin pour éviter l'écran gris (InvalidateSize)
+          // Forçage du redessin pour éviter l'écran gris
           setTimeout(() => {
             map.invalidateSize();
           }, 250);
@@ -126,7 +125,7 @@ export default function VesselTrackerPage() {
     }
   }, []);
 
-  // Synchronisation des marqueurs Leaflet (Rendu Viseur 85%)
+  // Synchronisation des marqueurs Leaflet
   useEffect(() => {
     if (!mapRef.current || !followedVessels || typeof window === 'undefined') return;
     const L = (window as any).L;
@@ -145,12 +144,12 @@ export default function VesselTrackerPage() {
         const icon = L.divIcon({
           className: 'vessel-marker',
           html: `<div class="relative flex items-center justify-center" style="transform: translate(-50%, -50%)">
-                  <!-- BADGE NOM (HAUT) -->
+                  <!-- BADGE NOM -->
                   <div class="absolute bottom-12 px-2 py-1 bg-slate-900/90 text-white rounded text-[9px] font-black shadow-lg border border-white/20 whitespace-nowrap z-50">
                     ${v.displayName || v.id}
                   </div>
 
-                  <!-- ICÔNE TACTIQUE (OPACITÉ 85%) -->
+                  <!-- ICÔNE TACTIQUE (OPACITÉ 85% POUR VISEUR) -->
                   <div class="size-12 rounded-full border-2 border-white shadow-2xl flex items-center justify-center" 
                        style="background-color: ${statusColor}; opacity: 0.85">
                     <svg class="size-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
@@ -158,10 +157,10 @@ export default function VesselTrackerPage() {
                     </svg>
                   </div>
 
-                  <!-- POINT BLEU GPS (CENTRE - PRIORITÉ Z-INDEX) -->
+                  <!-- POINT BLEU GPS (CENTRE EXACT) -->
                   <div class="absolute size-3 bg-blue-500 rounded-full border-2 border-white shadow-[0_0_10px_rgba(59,130,246,1)] z-[100] animate-pulse"></div>
 
-                  <!-- BADGE ÉTAT (BAS) -->
+                  <!-- BADGE ÉTAT -->
                   <div class="absolute top-10 flex flex-col items-center gap-1 z-50">
                     <div class="flex items-center gap-1 bg-white/90 backdrop-blur-sm px-1.5 py-0.5 rounded-full border shadow-sm">
                         <span class="text-[8px] font-black text-slate-700">${v.batteryLevel ?? '--'}%</span>
@@ -178,7 +177,7 @@ export default function VesselTrackerPage() {
     });
   }, [followedVessels]);
 
-  // --- MOTEUR GPS AVEC THROTTLING 5S (FIX VIOLATION) ---
+  // --- MOTEUR GPS AVEC THROTTLING 5S ---
   const handleGpsUpdate = useCallback(async (pos: GeolocationPosition) => {
     const now = Date.now();
     if (now - lastUpdateTimestampRef.current < 5000) return;
@@ -223,10 +222,10 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
-      {/* SCRIPTS WINDY (SÉQUENCE DE CHARGEMENT STRICTE) */}
+      {/* SCRIPTS WINDY (FIX CORS & URL) */}
       <Script src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js" strategy="afterInteractive" crossOrigin="anonymous" />
       <Script 
-        src="https://api.windy.com/assets/lib/libBoot.js" 
+        src="https://api.windy.com/assets/map-forecast/libBoot.js" 
         strategy="afterInteractive" 
         crossOrigin="anonymous" 
         onLoad={initWindy} 
@@ -248,14 +247,12 @@ export default function VesselTrackerPage() {
         </CardContent>
       </Card>
 
-      {/* CONTENEUR CARTE WINDY (ID="WINDY" + CSS EXPLICITE POUR ÉVITER ÉCRAN GRIS) */}
       <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all relative", isFullscreen ? "fixed inset-0 z-[150] w-screen h-screen rounded-none" : "min-h-[500px]")}>
         <div 
             id="windy" 
             className="absolute inset-0 w-full h-full bg-slate-100 z-10"
             style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
         >
-          {/* LABEL MÉTÉO TACTIQUE (85% OPACITÉ) */}
           {mapClickResult && (
             <div 
               className="absolute z-[110] bg-slate-900/85 backdrop-blur-md text-white rounded-2xl p-4 shadow-2xl border-2 border-white/20 min-w-[140px] animate-in zoom-in-95 pointer-events-none"
@@ -280,7 +277,6 @@ export default function VesselTrackerPage() {
                 className="shadow-lg h-10 w-10 bg-background/90 border-2" 
                 onClick={() => {
                     setIsFullscreen(!isFullscreen);
-                    // Forçage du redessin après bascule plein écran
                     setTimeout(() => { mapRef.current?.invalidateSize(); }, 300);
                 }}
             >

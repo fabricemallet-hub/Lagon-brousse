@@ -19,7 +19,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
     }
 
     // PILIER 2 : STRUCTURE JSON V2 CONFORME
-    // Windy exige que la clé soit dans le corps pour Point Forecast v2
+    // La clé doit être dans le corps pour Point Forecast v2
     const requestBody = {
       lat: cleanLat,
       lon: cleanLon,
@@ -28,6 +28,8 @@ export async function fetchWindyWeather(lat: number, lon: number) {
       levels: ['surface'],
       key: API_KEY
     };
+
+    console.log("[Windy API] Payload sortant :", JSON.stringify(requestBody));
 
     const response = await fetch(url, {
       method: 'POST',
@@ -41,7 +43,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
 
     if (response.status === 400) {
         const errorText = await response.text();
-        console.error("[Windy 400] Payload rejeté :", JSON.stringify(requestBody));
+        console.error("[Windy 400] Détails rejet :", errorText);
         return { success: false, error: "Requête mal formée (400)", status: 400 };
     }
 
