@@ -18,7 +18,10 @@ import {
   XCircle,
   CheckCircle2,
   Copy,
-  RefreshCw
+  RefreshCw,
+  ShieldAlert,
+  Send,
+  AlertTriangle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -29,21 +32,21 @@ const MAP_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 export default function VesselTrackerPage() {
   const { toast } = useToast();
 
-  // --- 1. FONCTIONS DE NAVIGATION (STABLES) ---
-  const handleRecenter = useCallback(() => {
+  // --- 1. FONCTIONS DE NAVIGATION (HOISTED) ---
+  function handleRecenter() {
     console.log('Action: Recenter triggered');
     toast({ title: "Recentrer", description: "Recentrage sur votre position..." });
-  }, [toast]);
+  }
 
-  const handleSearch = useCallback(() => {
+  function handleSearch() {
     console.log('Action: Search triggered');
     toast({ title: "Recherche", description: "Outil de recherche actif." });
-  }, [toast]);
+  }
 
-  const handleFilter = useCallback(() => {
+  function handleFilter() {
     console.log('Action: Filter triggered');
     toast({ title: "Filtres", description: "Filtres de flotte actifs." });
-  }, [toast]);
+  }
 
   // --- 2. ÉTATS DE DIAGNOSTIC & INITIALISATION ---
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +55,10 @@ export default function VesselTrackerPage() {
   const [referrer, setReferrer] = useState('');
   const [isInitialized, setIsInitialized] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  // États de Test API
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ status: number, ok: boolean, msg: string } | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -61,7 +68,7 @@ export default function VesselTrackerPage() {
     setOrigin(window.location.origin);
     setReferrer(document.referrer || 'Aucun (Direct)');
 
-    // Forcer la politique de Referrer pour Windy
+    // Forcer la politique de Referrer pour Windy (Crucial pour Iframe)
     const meta = document.createElement('meta');
     meta.name = "referrer";
     meta.content = "no-referrer-when-downgrade";
@@ -145,6 +152,33 @@ export default function VesselTrackerPage() {
     };
   }, []);
 
+  const handleApiTest = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    try {
+        // Test manuel du endpoint d'auth avec la clé
+        const res = await fetch('https://api.windy.com/api/map-forecast/v2/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: MAP_KEY })
+        });
+        
+        if (res.status === 200) {
+            setTestResult({ status: 200, ok: true, msg: "Authentification RÉUSSIE ! La carte devrait s'afficher." });
+            toast({ title: "Test API OK ✅", description: "Communication Windy rétablie." });
+        } else if (res.status === 401) {
+            setTestResult({ status: 401, ok: false, msg: "ÉCHEC 401 : Le domaine n'est toujours pas autorisé." });
+            toast({ variant: "destructive", title: "Test API Échoué ❌", description: "Vérifiez vos restrictions Windy." });
+        } else {
+            setTestResult({ status: res.status, ok: false, msg: `Erreur inattendue : Statut ${res.status}` });
+        }
+    } catch (e: any) {
+        setTestResult({ status: 0, ok: false, msg: `Erreur réseau : ${e.message}` });
+    } finally {
+        setIsTesting(false);
+    }
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({ title: "Copié !" });
@@ -160,11 +194,11 @@ export default function VesselTrackerPage() {
           <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Surveillance Maritime NC</p>
         </div>
         {isInitialized ? (
-          <Badge className="bg-green-600 text-white font-black px-3 py-1">AUTH OK</Badge>
+          <Badge className="bg-green-600 text-white font-black px-3 py-1 shadow-sm">AUTH OK</Badge>
         ) : error ? (
-          <Badge variant="destructive" className="font-black px-3 py-1">AUTH 401</Badge>
+          <Badge variant="destructive" className="font-black px-3 py-1 shadow-sm animate-pulse">AUTH 401</Badge>
         ) : (
-          <Badge variant="outline" className="font-black px-3 py-1 animate-pulse">AUTH...</Badge>
+          <Badge variant="outline" className="font-black px-3 py-1 animate-pulse border-2">INITIALISATION...</Badge>
         )}
       </div>
 
@@ -182,42 +216,68 @@ export default function VesselTrackerPage() {
 
       {error && (
         <div className="animate-in slide-in-from-top-4 duration-500">
-          <Alert variant="destructive" className="border-2 shadow-xl bg-white text-destructive rounded-2xl overflow-hidden">
-            <XCircle className="size-5" />
-            <AlertTitle className="font-black uppercase text-sm mb-4">Échec Authentification (401)</AlertTitle>
-            <AlertDescription className="space-y-4 text-foreground">
-              <p className="text-xs font-medium text-slate-700 leading-relaxed italic">
-                Windy rejette la clé pour votre domaine actuel. Veuillez ajouter ces **valeurs exactes** dans votre console Windy (api.windy.com/keys) :
+          <Alert variant="destructive" className="border-2 shadow-xl bg-white text-destructive rounded-3xl overflow-hidden p-6">
+            <ShieldAlert className="size-6 mb-2" />
+            <AlertTitle className="font-black uppercase text-base mb-4 tracking-tighter">Échec Authentification (401)</AlertTitle>
+            <AlertDescription className="space-y-6 text-foreground">
+              <p className="text-xs font-medium text-slate-700 leading-relaxed italic border-l-4 border-red-200 pl-3">
+                Windy rejette la clé. Copiez-collez les **3 valeurs exactes** ci-dessous dans votre console [api.windy.com/keys](https://api.windy.com/keys) :
               </p>
               
               <div className="grid gap-3">
-                <div className="p-3 bg-red-50 rounded-xl border border-red-100 flex items-center justify-between">
+                <div className="p-4 bg-red-50 rounded-2xl border-2 border-red-100 flex items-center justify-between shadow-inner">
                   <div className="flex flex-col min-w-0">
-                    <span className="text-[8px] font-black uppercase opacity-60">1. Referrer (Parent Studio)</span>
-                    <code className="text-[10px] font-black truncate">{referrer}</code>
+                    <span className="text-[8px] font-black uppercase text-red-800 opacity-60 tracking-widest">1. Referrer (Parent / Iframe)</span>
+                    <code className="text-[10px] font-black truncate text-red-950 mt-1">{referrer}</code>
                   </div>
-                  <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-red-100" onClick={() => copyToClipboard(referrer)}><Copy className="size-3" /></Button>
+                  <Button size="icon" variant="ghost" className="h-10 w-10 hover:bg-red-100 rounded-xl" onClick={() => copyToClipboard(referrer)}><Copy className="size-4" /></Button>
                 </div>
-                <div className="p-3 bg-red-50 rounded-xl border border-red-100 flex items-center justify-between">
+                <div className="p-4 bg-red-50 rounded-2xl border-2 border-red-100 flex items-center justify-between shadow-inner">
                   <div className="flex flex-col min-w-0">
-                    <span className="text-[8px] font-black uppercase opacity-60">2. Origin (Navigateur)</span>
-                    <code className="text-[10px] font-black truncate">{origin}</code>
+                    <span className="text-[8px] font-black uppercase text-red-800 opacity-60 tracking-widest">2. Origin (Navigateur)</span>
+                    <code className="text-[10px] font-black truncate text-red-950 mt-1">{origin}</code>
                   </div>
-                  <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-red-100" onClick={() => copyToClipboard(origin)}><Copy className="size-3" /></Button>
+                  <Button size="icon" variant="ghost" className="h-10 w-10 hover:bg-red-100 rounded-xl" onClick={() => copyToClipboard(origin)}><Copy className="size-4" /></Button>
                 </div>
-                <div className="p-3 bg-red-50 rounded-xl border border-red-100 flex items-center justify-between">
+                <div className="p-4 bg-red-50 rounded-2xl border-2 border-red-100 flex items-center justify-between shadow-inner">
                   <div className="flex flex-col min-w-0">
-                    <span className="text-[8px] font-black uppercase opacity-60">3. Host (Hébergement)</span>
-                    <code className="text-[10px] font-black truncate">{host}</code>
+                    <span className="text-[8px] font-black uppercase text-red-800 opacity-60 tracking-widest">3. Host (Hébergement)</span>
+                    <code className="text-[10px] font-black truncate text-red-950 mt-1">{host}</code>
                   </div>
-                  <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-red-100" onClick={() => copyToClipboard(host)}><Copy className="size-3" /></Button>
+                  <Button size="icon" variant="ghost" className="h-10 w-10 hover:bg-red-100 rounded-xl" onClick={() => copyToClipboard(host)}><Copy className="size-4" /></Button>
                 </div>
               </div>
 
-              <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 flex items-start gap-3">
-                <CheckCircle2 className="size-4 text-blue-600 mt-0.5" />
-                <p className="text-[11px] leading-relaxed text-slate-700 font-bold">
-                  Note : Dans Studio, `studio.firebase.google.com` est souvent le Referrer requis.
+              <div className="space-y-4 pt-4 border-t border-red-100">
+                <h4 className="text-[10px] font-black uppercase text-red-800 tracking-widest flex items-center gap-2">
+                    <Zap className="size-3 fill-red-600" /> Test de communication
+                </h4>
+                
+                <Button 
+                    variant="outline" 
+                    className="w-full h-14 border-2 font-black uppercase tracking-widest text-xs gap-3 shadow-md active:scale-95 transition-all bg-white"
+                    onClick={handleApiTest}
+                    disabled={isTesting}
+                >
+                    {isTesting ? <RefreshCw className="size-5 animate-spin" /> : <Send className="size-5" />}
+                    {isTesting ? "Test en cours..." : "Lancer un Test de Connexion"}
+                </Button>
+
+                {testResult && (
+                    <div className={cn(
+                        "p-4 rounded-2xl border-2 text-center animate-in zoom-in-95",
+                        testResult.ok ? "bg-green-50 border-green-200 text-green-800" : "bg-red-50 border-red-200 text-red-800"
+                    )}>
+                        <p className="text-xs font-black uppercase">{testResult.msg}</p>
+                        <p className="text-[10px] font-bold opacity-60 mt-1">HTTP STATUS: {testResult.status}</p>
+                    </div>
+                )}
+              </div>
+
+              <div className="p-4 bg-blue-50 rounded-2xl border-2 border-blue-100 flex items-start gap-3 shadow-sm">
+                <AlertTriangle className="size-5 text-blue-600 mt-0.5 shrink-0" />
+                <p className="text-[10px] leading-relaxed text-blue-900 font-bold">
+                  Note Studio : Le domaine `studio.firebase.google.com` est indispensable car l'app s'affiche dans une Iframe.
                 </p>
               </div>
             </AlertDescription>
@@ -227,7 +287,7 @@ export default function VesselTrackerPage() {
 
       {/* ISOLATION DOM (Fix removeChild) */}
       <div className={cn(
-          "relative w-full transition-all duration-500 bg-slate-100 rounded-[2.5rem] border-4 shadow-2xl overflow-hidden",
+          "relative w-full transition-all duration-500 bg-slate-900 rounded-[2.5rem] border-4 border-slate-800 shadow-2xl overflow-hidden",
           isFullscreen ? "fixed inset-0 z-[200] h-screen w-screen rounded-none" : "h-[500px]"
       )}>
         {/* Calque de la carte : React ne doit jamais modifier ses enfants directs */}
@@ -240,10 +300,10 @@ export default function VesselTrackerPage() {
           )}
         ></div>
         
-        {/* Calque du Loader : Positionné au-dessus mais indépendant du nœud #windy */}
+        {/* Calque du Loader : Géré par opacité pour éviter removeChild Error */}
         <div className={cn(
-            "absolute inset-0 flex flex-col items-center justify-center gap-4 text-slate-400 bg-slate-50 transition-all duration-700",
-            (isInitialized || error) ? "opacity-0 pointer-events-none" : "opacity-100"
+            "absolute inset-0 flex flex-col items-center justify-center gap-4 text-slate-400 bg-slate-900 transition-all duration-700 pointer-events-none",
+            (isInitialized || error) ? "opacity-0" : "opacity-100"
         )}>
             <RefreshCw className="size-10 animate-spin text-primary/40" />
             <p className="font-black uppercase text-[10px] tracking-widest animate-pulse">Initialisation tactique...</p>
@@ -253,7 +313,7 @@ export default function VesselTrackerPage() {
             size="icon" 
             variant="secondary"
             onClick={() => setIsFullscreen(!isFullscreen)} 
-            className="absolute top-4 left-4 shadow-2xl h-10 w-10 z-10 bg-white/90 backdrop-blur-md border-2"
+            className="absolute top-4 left-4 shadow-2xl h-10 w-10 z-[210] bg-white/90 backdrop-blur-md border-2 hover:bg-white"
         >
             {isFullscreen ? <Shrink className="size-5 text-primary" /> : <Expand className="size-5 text-primary" />}
         </Button>
