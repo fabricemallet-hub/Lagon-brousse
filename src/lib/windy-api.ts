@@ -8,26 +8,24 @@ import { headers } from 'next/headers';
  * @param lon Longitude du point (doit être un nombre)
  */
 export async function fetchWindyWeather(lat: number, lon: number) {
-  // CLÉ API WINDY VÉRIFIÉE
   const API_KEY = 'ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU';
   const url = 'https://api.windy.com/api/point-forecast/v2';
   
   try {
     const headersList = await headers();
-    // On priorise l'URL de production configurée par l'utilisateur pour le referer
     const PRODUCTION_URL = 'https://studio-2943478321-f746e.web.app';
     const currentReferer = headersList.get('referer') || `${PRODUCTION_URL}/`;
 
-    // FORMATAGE CRITIQUE : Windy exige des types Number (pas de String)
-    const cleanLat = Number(Number(lat).toFixed(6));
-    const cleanLon = Number(Number(lon).toFixed(6));
+    // FORMATAGE CRITIQUE : Windy exige des types Number purs avec précision fixe
+    const cleanLat = parseFloat(Number(lat).toFixed(6));
+    const cleanLon = parseFloat(Number(lon).toFixed(6));
 
     if (isNaN(cleanLat) || isNaN(cleanLon)) {
-        throw new Error("Coordonnées GPS invalides (NaN)");
+        throw new Error("Coordonnées GPS invalides");
     }
 
     // Payload STRICT pour Windy V2 Point Forecast
-    // Note: 'windDir' et 'waves' sont supportés par le modèle GFS
+    // Note: Windy rejette les propriétés inconnues. On n'envoie que le nécessaire.
     const requestBody = {
       lat: cleanLat,
       lon: cleanLon,
@@ -36,14 +34,15 @@ export async function fetchWindyWeather(lat: number, lon: number) {
       levels: ['surface']
     };
 
-    console.log(`[Windy V2] Envoi vers ${url} avec Referer: ${PRODUCTION_URL}`);
+    // LOG DE DIAGNOSTIC (Visible dans les logs serveurs Firebase)
+    console.log("[Windy API] Envoi du payload:", JSON.stringify(requestBody));
     
     const response = await fetch(url, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
         'x-windy-api-key': API_KEY,
-        'Referer': `${PRODUCTION_URL}/`,
+        'Referer': PRODUCTION_URL,
         'Origin': PRODUCTION_URL
       },
       body: JSON.stringify(requestBody)
@@ -54,9 +53,8 @@ export async function fetchWindyWeather(lat: number, lon: number) {
         console.error(`[Windy Error] Status: ${response.status}`, errorText);
         return { 
             success: false, 
-            error: `Windy ${response.status}`, 
-            status: response.status,
-            details: errorText 
+            error: `Erreur ${response.status}`, 
+            status: response.status
         };
     }
 

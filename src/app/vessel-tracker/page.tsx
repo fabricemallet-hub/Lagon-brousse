@@ -61,8 +61,9 @@ import { fetchWindyWeather } from '@/lib/windy-api';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
+// Point bleu GPS local parfaitement centré
 const PulsingDot = () => (
-    <div className="absolute inset-0 flex items-center justify-center z-[100]">
+    <div className="absolute z-[100]" style={{ transform: 'translate(-50%, -50%)' }}>
       <div className="size-5 rounded-full bg-blue-500 opacity-75 animate-ping absolute"></div>
       <div className="size-5 rounded-full bg-blue-500 border-2 border-white relative shadow-2xl"></div>
     </div>
@@ -101,8 +102,8 @@ export default function VesselTrackerPage() {
   const statusRef = useRef<VesselStatus['status'] | 'offline'>('moving');
   const watchIdRef = useRef<number | null>(null);
   const lastUpdateTimestampRef = useRef<number>(0);
-  const lastWeatherUpdateRef = useRef<number>(0);
   const [isForcingWindy, setIsForcingWindy] = useState(false);
+  const immobilityStartTime = useRef<number | null>(null);
 
   // Journal technique fusionné
   const [technicalLog, setTechnicalLog] = useState<{ label: string, startTime: Date, lastUpdate: Date, duration: number }[]>([]);
@@ -148,7 +149,7 @@ export default function VesselTrackerPage() {
     if (!user || !firestore || !sharingId) return;
     
     const now = Date.now();
-    // Throttling 5s
+    // THROTTLING CRITIQUE : 5 secondes minimum entre deux écritures
     if (!force && (now - lastUpdateTimestampRef.current < 5000)) return;
     lastUpdateTimestampRef.current = now;
 
@@ -223,9 +224,9 @@ export default function VesselTrackerPage() {
                 wavesHeight: weather.wavesHeight,
                 lastWeatherUpdate: serverTimestamp()
             }, true);
-            toast({ title: "Météo Windy OK", description: `Vent: ${weather.windSpeed}nd | Vagues: ${weather.wavesHeight}m` });
+            toast({ title: `Windy ${weather.status}`, description: `Vent: ${weather.windSpeed}nd | Vagues: ${weather.wavesHeight}m` });
         } else {
-            toast({ variant: "destructive", title: `Windy ${weather.status}`, description: "Vérifiez vos domaines autorisés." });
+            toast({ variant: "destructive", title: `Windy ${weather.status}`, description: "Vérifiez vos restrictions de domaine." });
         }
     } catch (e) {
         toast({ variant: "destructive", title: "Échec API", description: "Communication impossible." });
@@ -266,6 +267,23 @@ export default function VesselTrackerPage() {
     toast({ title: label });
   };
 
+  const handleResetIdentity = async () => {
+    if (!user || !firestore) return;
+    try {
+        await updateDoc(doc(firestore, 'users', user.uid), {
+            vesselNickname: "",
+            lastVesselId: "",
+            mooringRadius: 20
+        });
+        setVesselNickname("");
+        setCustomSharingId("");
+        setMooringRadius(20);
+        toast({ title: "Identité réinitialisée" });
+    } catch (e) {
+        toast({ variant: "destructive", title: "Erreur Reset" });
+    }
+  };
+
   useEffect(() => {
     if (!isSharing || mode !== 'sender' || !navigator.geolocation) {
       if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
@@ -281,8 +299,6 @@ export default function VesselTrackerPage() {
         
         const now = Date.now();
         if (now - lastUpdateTimestampRef.current < 5000) return;
-
-        if (accuracy > 500) return;
 
         currentPosRef.current = newPos;
         setCurrentPos(newPos);
@@ -484,6 +500,9 @@ export default function VesselTrackerPage() {
                             </div>
                             <Slider value={[mooringRadius]} min={10} max={200} step={10} onValueChange={v => setMooringRadius(v[0])} />
                         </div>
+                        <Button variant="ghost" className="w-full h-10 font-black uppercase text-[8px] text-destructive/40 hover:text-destructive hover:bg-red-50" onClick={handleResetIdentity}>
+                            <RefreshCw className="size-3 mr-2" /> RÉINITIALISER MON IDENTITÉ
+                        </Button>
                     </AccordionContent>
                 </AccordionItem>
 
@@ -570,6 +589,7 @@ export default function VesselTrackerPage() {
                               <OverlayView position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                   <div style={{ transform: 'translate(-50%, -50%)' }} className="flex flex-col items-center pointer-events-none relative">
                                       
+                                      {/* ÉTAGE HAUT : NOM ET STATUT */}
                                       <div className="absolute bottom-20 flex flex-col items-center">
                                           <div className="px-3 py-2 bg-white/95 backdrop-blur-md rounded-lg text-[11px] font-black shadow-2xl border-2 border-primary/20 text-slate-900 flex items-center gap-2">
                                               <span className="truncate max-w-[120px]">{vessel.displayName}</span>
@@ -577,6 +597,7 @@ export default function VesselTrackerPage() {
                                           </div>
                                       </div>
 
+                                      {/* ÉTAGE CENTRE : ICÔNE STATUT (OPACITÉ 85%) + POINT BLEU */}
                                       <div className="relative size-32 flex items-center justify-center">
                                           <div className={cn("size-24 rounded-full border-8 border-white shadow-2xl flex items-center justify-center opacity-85 transition-all", statusInfo.color)}>
                                               {React.createElement(statusInfo.icon, { className: "size-12 text-white drop-shadow-md" })}
@@ -588,6 +609,7 @@ export default function VesselTrackerPage() {
                                           )}
                                       </div>
 
+                                      {/* ÉTAGE BAS : BULLES D'ÉTAT EMPILEES */}
                                       <div className="absolute top-14 flex flex-col items-center gap-1.5 mt-2">
                                           <div className={cn(
                                               "px-3 py-1.5 rounded-full text-[10px] font-black uppercase flex items-center gap-2 shadow-xl border-2 bg-white",
