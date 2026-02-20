@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
@@ -92,7 +93,6 @@ import {
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry } from '@/lib/types';
-import { Skeleton } from '@/components/ui/skeleton';
 import { format, differenceInMinutes } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { GoogleMap, OverlayView, Circle } from '@react-google-maps/api';
@@ -129,7 +129,7 @@ export default function VesselTrackerPage() {
   const [anchorPos, setAnchorPos] = useState<{ lat: number, lng: number } | null>(null);
   const [vesselStatus, setVesselStatus] = useState<VesselStatus['status']>('moving');
   
-  // REFS POUR ÉVITER LES BOUCLES INFINIES (v26.4 Stabilisation)
+  // REFS POUR ÉVITER LES BOUCLES INFINIES
   const vesselStatusRef = useRef<VesselStatus['status']>('moving');
   const isSharingRef = useRef(false);
   const anchorPosRef = useRef<{ lat: number, lng: number } | null>(null);
@@ -138,6 +138,7 @@ export default function VesselTrackerPage() {
   const fleetIdRef = useRef('');
   const isGhostModeRef = useRef(false);
   const mooringRadiusRef = useRef(100);
+  const startTimeRef = useRef<Date | null>(null);
 
   // IDENTIFICATION & IDS
   const [vesselNickname, setVesselNickname] = useState('');
@@ -153,7 +154,6 @@ export default function VesselTrackerPage() {
 
   // JOURNAUX
   const [technicalLogs, setTechnicalLogs] = useState<any[]>([]);
-  const [startTime, setStartTime] = useState<Date | null>(null);
   const [selectedMarkerPhoto, setSelectedMarkerPhoto] = useState<string | null>(null);
   
   // AUDIO
@@ -171,7 +171,7 @@ export default function VesselTrackerPage() {
   const activeAudioRef = useRef<HTMLAudioElement | null>(null);
   const [isAnyAudioPlaying, setIsAnyAudioPlaying] = useState(false);
 
-  // Mise à jour des refs quand le state change pour les callbacks statiques
+  // Mise à jour des refs quand le state change
   useEffect(() => { vesselNicknameRef.current = vesselNickname; }, [vesselNickname]);
   useEffect(() => { isGhostModeRef.current = isGhostMode; }, [isGhostMode]);
   useEffect(() => { mooringRadiusRef.current = mooringRadius; }, [mooringRadius]);
@@ -244,7 +244,7 @@ export default function VesselTrackerPage() {
     setIsSharing(false);
     isSharingRef.current = false;
     setIsInitializing(false);
-    setStartTime(null);
+    startTimeRef.current = null;
     stopAllAudio();
     
     try {
@@ -445,12 +445,12 @@ export default function VesselTrackerPage() {
     } catch (e) {}
   };
 
-  // --- TRACKING CORE (v26.4 Stabilisé) ---
+  // --- TRACKING CORE (v26.5 Stabilisé - Fix Infinite Loop) ---
   useEffect(() => {
     if (!isSharing || !navigator.geolocation) return;
     
     setIsInitializing(true);
-    setStartTime(new Date());
+    startTimeRef.current = new Date();
     lastUpdateTimeRef.current = Date.now();
 
     const startTrackingAfterDelay = setTimeout(() => {
@@ -476,7 +476,6 @@ export default function VesselTrackerPage() {
             let nextStatus: VesselStatus['status'] = vesselStatusRef.current;
             let eventLabel: string | null = null;
 
-            // Algorithme de détection de dérive intelligente
             if (knotSpeed > 2 || distMoved > 100) {
                 if (vesselStatusRef.current !== 'moving') {
                     nextStatus = 'moving';
@@ -498,7 +497,7 @@ export default function VesselTrackerPage() {
             }
 
             if (nextStatus !== vesselStatusRef.current || eventLabel || timeDiff >= 60) {
-                const durationMinutes = startTime ? differenceInMinutes(new Date(), startTime) : 0;
+                const durationMinutes = startTimeRef.current ? differenceInMinutes(new Date(), startTimeRef.current) : 0;
                 const logEntry = {
                     vesselName: vesselNicknameRef.current || 'Mon Navire',
                     statusLabel: eventLabel || nextStatus.toUpperCase(),
@@ -533,7 +532,7 @@ export default function VesselTrackerPage() {
         clearTimeout(startTrackingAfterDelay);
         if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
     };
-  }, [isSharing, playVesselSound, loopEnabled, toast, updateVesselInFirestore, startTime]);
+  }, [isSharing, playVesselSound, loopEnabled, toast, updateVesselInFirestore]);
 
   const handleMooringToggle = () => {
     if (anchorPos) {
@@ -886,7 +885,7 @@ export default function VesselTrackerPage() {
 
       <Dialog open={!!selectedMarkerPhoto} onOpenChange={(o) => !o && setSelectedMarkerPhoto(null)}>
         <DialogContent className="max-w-md rounded-3xl p-0 overflow-hidden border-none shadow-2xl">
-            <div className="aspect-square w-full bg-black flex items-center justify-center">{selectedMarkerPhoto && <img src={selectedMarkerPhoto} className="w-full h-full object-contain" alt="" />}</div>
+            <div className="aspect-square w-full bg-black flex items-center justify-center">{selectedMarkerPhoto && <img src={selectedMarkerPhoto} className="w-full h-full object-cover" alt="" />}</div>
             <div className="p-4 bg-slate-50 flex justify-center border-t"><Button variant="outline" className="font-black uppercase text-[10px] border-2" onClick={() => setSelectedMarkerPhoto(null)}>Fermer</Button></div>
         </DialogContent>
       </Dialog>
