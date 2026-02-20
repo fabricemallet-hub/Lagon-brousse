@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -29,7 +28,7 @@ import {
   BatteryMedium,
   BatteryLow,
   BatteryCharging,
-  History as HistoryIcon,
+  History,
   MapPin,
   ChevronDown,
   X,
@@ -46,7 +45,6 @@ import {
   Eye,
   Smartphone,
   Phone,
-  Mail,
   Waves,
   Info,
   Search,
@@ -67,7 +65,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { fetchWindyWeather } from '@/lib/windy-api';
 import { getDataForDate } from '@/lib/data';
 
-// CLÉ "MAP FORECAST" POUR L'AFFICHAGE DE LA CARTE
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -90,17 +87,12 @@ const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClos
                 </span>
                 {isLoading && <RefreshCw className="size-3 animate-spin text-primary" />}
             </div>
-            
             <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                 <div className="flex flex-col">
                     <span className="text-[8px] font-black uppercase opacity-50 flex items-center gap-1"><Wind className="size-2" /> Vent</span>
                     <div className="flex items-center gap-2">
-                        <span className="text-sm font-black text-blue-400">
-                            {data.windSpeed ?? '--'} <span className="text-[8px] opacity-60">ND</span>
-                        </span>
-                        {data.windDir !== undefined && (
-                            <ArrowUp className="size-3 text-white/40" style={{ transform: `rotate(${data.windDir}deg)` }} />
-                        )}
+                        <span className="text-sm font-black text-blue-400">{data.windSpeed ?? '--'} <span className="text-[8px] opacity-60">ND</span></span>
+                        {data.windDir !== undefined && <ArrowUp className="size-3 text-white/40" style={{ transform: `rotate(${data.windDir}deg)` }} />}
                     </div>
                 </div>
                 <div className="flex flex-col">
@@ -116,7 +108,6 @@ const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClos
                     <span className="text-sm font-black">{data.pressure ?? '--'} <span className="text-[8px] opacity-60">hPa</span></span>
                 </div>
             </div>
-
             {tides && (
                 <div className="mt-3 pt-3 border-t border-white/10">
                     <div className="grid grid-cols-2 gap-2">
@@ -129,7 +120,6 @@ const MeteoDataPanel = ({ data, onClose, isLoading, tides }: { data: any, onClos
                     </div>
                 </div>
             )}
-
             <button onClick={onClose} className="absolute -top-2 -right-2 bg-red-600 rounded-full p-1.5 shadow-lg border-2 border-white/20"><X className="size-3" /></button>
         </div>
     );
@@ -150,19 +140,16 @@ export default function VesselTrackerPage() {
   const [isQueryingWindy, setIsQueryingWindy] = useState(false);
   
   const mapRef = useRef<any>(null);
-  const isMapInitializedRef = useRef<boolean>(false);
+  const isInitializingRef = useRef<boolean>(false);
   const pickerTimerRef = useRef<any>(null);
 
-  // CHARGEMENT ROBUSTE ET SÉQUENTIEL DES SCRIPTS
   const initWindy = useCallback(() => {
-    if (typeof window === 'undefined' || isMapInitializedRef.current) return;
+    if (typeof window === 'undefined' || isInitializingRef.current) return;
+    isInitializingRef.current = true;
 
     const loadScript = (id: string, src: string): Promise<void> => {
         return new Promise((resolve, reject) => {
-            if (document.getElementById(id)) {
-                resolve();
-                return;
-            }
+            if (document.getElementById(id)) { resolve(); return; }
             const script = document.createElement('script');
             script.id = id;
             script.src = src;
@@ -175,22 +162,13 @@ export default function VesselTrackerPage() {
 
     const attemptInit = async () => {
         try {
-            // 1. Charger Leaflet d'abord (L est requis par Windy)
             await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
-            
-            // 2. Attendre que L soit globalement disponible
             let retries = 0;
-            while (!window.L && retries < 20) {
-                await new Promise(r => setTimeout(r, 100));
-                retries++;
-            }
+            while (!window.L && retries < 30) { await new Promise(r => setTimeout(r, 100)); retries++; }
+            if (!window.L) throw new Error("Leaflet L not found");
 
-            if (!window.L) throw new Error("Leaflet 'L' could not be initialized");
-
-            // 3. Charger Windy API (libBoot)
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
-
-            // 4. Initialiser avec les options
+            
             const options = {
                 key: MAP_FORECAST_KEY,
                 lat: INITIAL_CENTER.lat,
@@ -203,15 +181,9 @@ export default function VesselTrackerPage() {
             };
 
             window.windyInit(options, (windyAPI: any) => {
-                if (!windyAPI) {
-                    setAuthError(window.location.host);
-                    return;
-                }
-
-                isMapInitializedRef.current = true;
-                const { map, store, picker, broadcast } = windyAPI;
+                if (!windyAPI) { setAuthError(window.location.host); return; }
+                const { map, store, broadcast, picker } = windyAPI;
                 mapRef.current = map;
-
                 store.set('overlay', 'wind');
                 store.set('product', 'ecmwf');
 
@@ -221,29 +193,23 @@ export default function VesselTrackerPage() {
                         const { lat, lon } = latLon;
                         setMapClickResult({ lat, lon });
                         setIsQueryingWindy(true);
-                        setPointTides(null);
-
                         try {
                             const weather = await fetchWindyWeather(lat, lon);
                             setMapClickResult((prev: any) => ({ ...prev, ...weather }));
                             const commune = getClosestCommune(lat, lon);
                             const tideData = getDataForDate(commune, new Date());
                             setPointTides(tideData.tides);
-                        } catch (err) {} finally {
-                            setIsQueryingWindy(false);
-                        }
-                    }, 400);
+                        } catch (err) {} finally { setIsQueryingWindy(false); }
+                    }, 500);
                 });
 
-                map.on('click', (e: any) => {
-                    picker.open({ lat: e.latlng.lat, lon: e.latlng.lng });
-                });
-
+                map.on('click', (e: any) => { picker.open({ lat: e.latlng.lat, lon: e.latlng.lng }); });
                 setTimeout(() => { if(map) map.invalidateSize(); }, 1500);
             });
         } catch (e: any) {
-            console.error("Windy load error:", e);
+            console.error("Windy init failed:", e);
             setAuthError(window.location.host);
+            isInitializingRef.current = false;
         }
     };
 
@@ -291,7 +257,7 @@ export default function VesselTrackerPage() {
                     <p>1. Allez sur api.windy.com/keys</p>
                     <p>2. Modifiez la clé Map Forecast (1gGm...)</p>
                     <p>3. Séparez vos domaines par une <strong>VIRGULE</strong> (pas d'espace).</p>
-                    <p className="font-black text-xs">⚠️ EXEMPLE : <code>*.cloudworkstations.dev, localhost</code></p>
+                    <p className="font-black text-xs text-red-600 animate-pulse">⚠️ ATTENTION : VIRGULE OBLIGATOIRE</p>
                 </div>
             </AlertDescription>
         </Alert>
@@ -303,7 +269,7 @@ export default function VesselTrackerPage() {
               <div className="space-y-1.5">
                   <Label className="text-[9px] font-black uppercase ml-1 opacity-40">Modèle Météo</Label>
                   <div className="relative">
-                      <select value={currentModel} onChange={(e) => setCurrentModel(e.target.value)} className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none">
+                      <select value={currentModel} onChange={(e) => { setCurrentModel(e.target.value); if(mapRef.current) mapRef.current.fire('changeModel', e.target.value); }} className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none">
                           <option value="ecmwf">ECMWF (9km)</option>
                           <option value="gfs">GFS (22km)</option>
                           <option value="icon">ICON (7km)</option>
@@ -314,7 +280,7 @@ export default function VesselTrackerPage() {
               <div className="space-y-1.5">
                   <Label className="text-[9px] font-black uppercase ml-1 opacity-40">Calque Tactique</Label>
                   <div className="relative">
-                      <select value={currentOverlay} onChange={(e) => setCurrentOverlay(e.target.value)} className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none">
+                      <select value={currentOverlay} onChange={(e) => { setCurrentOverlay(e.target.value); if(mapRef.current) mapRef.current.fire('changeOverlay', e.target.value); }} className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none">
                           <option value="wind">Vent & Rafales</option>
                           <option value="waves">Mer & Vagues</option>
                           <option value="sst">Temp. Eau (SST)</option>
@@ -329,9 +295,8 @@ export default function VesselTrackerPage() {
       </Card>
 
       <div className={cn("overflow-hidden border-2 shadow-2xl flex flex-col transition-all relative bg-slate-100 rounded-[2rem]", isFullscreen ? "fixed inset-0 z-[150] w-screen h-screen rounded-none" : "min-h-[550px]")}>
-        <div id="windy" className="absolute inset-0 w-full h-full z-10" style={{ minHeight: isFullscreen ? '100vh' : '550px', position: 'relative' }}>
+        <div id="windy" className="absolute inset-0 w-full h-full z-10">
           <MeteoDataPanel data={mapClickResult} tides={pointTides} onClose={() => setMapClickResult(null)} isLoading={isQueryingWindy} />
-          
           <div className="absolute top-4 right-4 flex flex-col gap-3 z-20">
             <Button size="icon" className="shadow-2xl h-12 w-12 bg-background/90 backdrop-blur-md border-2 border-primary/20 rounded-2xl" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-6 text-primary" /> : <Expand className="size-6 text-primary" />}</Button>
             <Button onClick={handleRecenter} className="shadow-2xl h-12 w-12 bg-background/90 backdrop-blur-md border-2 border-primary/20 rounded-2xl p-0"><LocateFixed className="size-6 text-primary" /></Button>
@@ -341,7 +306,7 @@ export default function VesselTrackerPage() {
 
       <div className="space-y-4">
           <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
-              <HistoryIcon className="size-4" /> Analyse Tactique
+              <History className="size-4" /> Analyse Tactique
           </h3>
           <Alert className="bg-muted/10 border-dashed border-2">
               <Info className="size-4 text-primary" />
@@ -359,10 +324,7 @@ const getClosestCommune = (lat: number, lng: number) => {
     let minDistance = Infinity;
     Object.entries(locations).forEach(([name, coords]) => {
         const dist = getDistance(lat, lng, coords.lat, coords.lon);
-        if (dist < minDistance) {
-            minDistance = dist;
-            closestName = name;
-        }
+        if (dist < minDistance) { closestName = name; minDistance = dist; }
     });
     return closestName;
 };
