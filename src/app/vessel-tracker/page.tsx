@@ -69,8 +69,8 @@ const PulsingDot = () => (
     </div>
 );
 
-const BatteryStatusIcon = ({ level, charging, size = 4 }: { level: number; charging: boolean, size?: number | string }) => {
-  const props = { className: `size-${size}` };
+const BatteryStatusIcon = ({ level, charging, className }: { level: number; charging: boolean, className?: string }) => {
+  const props = { className: cn("size-4", className) };
   if (charging) return <BatteryCharging {...props} className="text-blue-500" />;
   if (level < 20) return <BatteryLow {...props} className="text-red-600" />;
   if (level < 60) return <BatteryMedium {...props} className="text-orange-500" />;
@@ -214,6 +214,16 @@ export default function VesselTrackerPage() {
     });
   }, []);
 
+  const handleClearTactical = async () => {
+    if (!user || !firestore) return;
+    try {
+        await updateDoc(doc(firestore, 'vessels', sharingId), { huntingMarkers: [] });
+        toast({ title: "Journal tactique effacé" });
+    } catch (e) {
+        console.error(e);
+    }
+  };
+
   const handleResetIdentity = async () => {
     if (!user || !firestore) return;
     try {
@@ -227,16 +237,6 @@ export default function VesselTrackerPage() {
         setMooringRadius(20);
         toast({ title: "Identité réinitialisée" });
     } catch (e) {}
-  };
-
-  const handleClearTactical = async () => {
-    if (!user || !firestore) return;
-    try {
-        await updateDoc(doc(firestore, 'vessels', sharingId), { huntingMarkers: [] });
-        toast({ title: "Journal tactique effacé" });
-    } catch (e) {
-        console.error(e);
-    }
   };
 
   const handleRecenter = useCallback(() => {
@@ -302,8 +302,6 @@ export default function VesselTrackerPage() {
       return;
     }
 
-    console.log("[Tracker] Lancement de watchPosition pour l'émetteur:", sharingId);
-
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude, accuracy } = position.coords;
@@ -357,7 +355,7 @@ export default function VesselTrackerPage() {
             updateVesselInFirestore({ location: { latitude, longitude }, accuracy: Math.round(accuracy) });
         }
       },
-      (err) => console.error(`[Tracker] Erreur GPS:`, err),
+      (err) => console.error(err),
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
 
@@ -524,7 +522,7 @@ export default function VesselTrackerPage() {
                                 <div className="flex flex-col"><span className="font-black uppercase text-xs">{v.displayName || v.id}</span><span className="text-[8px] font-black uppercase opacity-40">{v.status}</span></div>
                             </div>
                             <div className="flex items-center gap-2">
-                                <BatteryStatusIcon level={v.batteryLevel || 100} charging={v.isCharging || false} size={4} />
+                                <BatteryStatusIcon level={v.batteryLevel || 100} charging={v.isCharging || false} />
                                 <Button variant="ghost" size="icon" className="h-10 w-10 text-primary border-2 rounded-xl" onClick={() => { if(v.location) { map?.panTo({ lat: v.location.latitude, lng: v.location.longitude }); map?.setZoom(15); } }}><MapPin className="size-5" /></Button>
                             </div>
                         </div>
@@ -555,7 +553,6 @@ export default function VesselTrackerPage() {
                       
                       return (
                           <React.Fragment key={`vessel-${vessel.id}`}>
-                              {/* ANCRE FIXE ET CERCLE */}
                               {(vessel.status === 'stationary' || vessel.status === 'drifting') && vessel.anchorLocation && (
                                 <>
                                     <Circle 
@@ -565,16 +562,14 @@ export default function VesselTrackerPage() {
                                     />
                                     <OverlayView position={{ lat: vessel.anchorLocation.latitude, lng: vessel.anchorLocation.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                         <div style={{ transform: 'translate(-50%, -50%)' }} className="z-10">
-                                            <Anchor className="size-14 text-orange-500 drop-shadow-2xl stroke-[3] scale-150" />
+                                            <Anchor className="size-20 text-orange-500 drop-shadow-2xl stroke-[4] scale-125" />
                                         </div>
                                     </OverlayView>
                                 </>
                               )}
 
-                              {/* NAVIRE MOBILE */}
                               <OverlayView position={{ lat: vessel.location!.latitude, lng: vessel.location!.longitude }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                   <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center gap-1 z-50">
-                                      {/* BADGE NOM | STATUT (HAUT) */}
                                       <div className={cn(
                                           "px-3 py-2 backdrop-blur-md rounded-lg text-[11px] font-black shadow-2xl border-2 flex items-center gap-2 mb-1", 
                                           isOffline ? "bg-red-600 text-white border-white/40" : "bg-white/95 text-slate-900 border-primary/20"
@@ -583,41 +578,35 @@ export default function VesselTrackerPage() {
                                           <span className={cn("border-l-2 pl-2", isOffline ? "text-white/60" : "text-primary/60")}>{statusInfo.label}</span>
                                       </div>
 
-                                      {/* ICÔNE CENTRALE MASSIVE (MILIEU) */}
                                       <div className="relative">
                                           {isMe && mode === 'sender' && <PulsingDot />}
-                                          <div className={cn("p-4 rounded-full border-4 border-white shadow-2xl", statusInfo.color)}>
-                                              {React.createElement(statusInfo.icon, { className: "size-9 text-white drop-shadow-sm" })}
+                                          <div className={cn("p-5 rounded-full border-4 border-white shadow-2xl", statusInfo.color)}>
+                                              {React.createElement(statusInfo.icon, { className: "size-10 text-white drop-shadow-md" })}
                                           </div>
                                       </div>
 
-                                      {/* ÉTAGES DE BULLES D'ÉTAT (BAS) */}
                                       <div className="flex flex-col items-center gap-1 mt-2">
-                                          {/* BULLE BATTERIE */}
                                           <div className={cn(
-                                              "px-2.5 py-1 rounded-full text-[9px] font-black uppercase flex items-center gap-2 shadow-xl border-2 bg-white",
+                                              "px-2.5 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-2 shadow-xl border-2 bg-white",
                                               battery < 20 ? "text-red-600 border-red-200" : (battery < 60 ? "text-orange-600 border-orange-100" : "text-green-600 border-green-100")
                                           )}>
-                                              <BatteryStatusIcon level={battery} charging={isCharging} size={3.5} />
+                                              <BatteryStatusIcon level={battery} charging={isCharging} />
                                               <span>{battery}%</span>
                                           </div>
 
-                                          {/* BULLES D'ALERTE DYNAMIQUE */}
-                                          {isCharging && <Badge className="bg-blue-600 text-white text-[8px] font-black shadow-lg border-2 border-white/30">⚡ EN CHARGE</Badge>}
-                                          {battery < 20 && !isCharging && <Badge className="bg-red-600 text-white text-[8px] font-black shadow-lg animate-pulse border-2 border-white/30">⚠️ BATTERIE FAIBLE</Badge>}
+                                          {isCharging && <Badge className="bg-blue-600 text-white text-[9px] font-black shadow-lg border-2 border-white/30 px-3">⚡ EN CHARGE</Badge>}
+                                          {battery < 20 && !isCharging && <Badge className="bg-red-600 text-white text-[9px] font-black shadow-lg animate-pulse border-2 border-white/30 px-3">⚠️ BATTERIE FAIBLE</Badge>}
 
-                                          {/* BULLE MÉTÉO WINDY (LIGNES CONTRASTÉES) */}
                                           {vessel.windSpeed !== undefined && (
-                                              <div className="bg-slate-900 text-white px-3 py-1.5 rounded-2xl text-[9px] font-black shadow-2xl border border-white/20 flex items-center gap-3">
-                                                  <div className="flex items-center gap-1.5"><Wind className="size-3 text-blue-400" /> {vessel.windSpeed} ND</div>
-                                                  <div className="border-l border-white/20 pl-2 flex items-center gap-1.5"><Waves className="size-3 text-cyan-400" /> {vessel.wavesHeight?.toFixed(1)}m</div>
+                                              <div className="bg-slate-900 text-white px-3 py-2 rounded-2xl text-[10px] font-black shadow-2xl border-2 border-white/20 flex items-center gap-3 mt-1">
+                                                  <div className="flex items-center gap-1.5"><Wind className="size-4 text-blue-400" /> {vessel.windSpeed} ND</div>
+                                                  <div className="border-l border-white/20 pl-2 flex items-center gap-1.5"><Waves className="size-4 text-cyan-400" /> {vessel.wavesHeight?.toFixed(1)}m</div>
                                               </div>
                                           )}
                                       </div>
                                   </div>
                               </OverlayView>
 
-                              {/* MARQUEURS TACTIQUES */}
                               {vessel.huntingMarkers?.map(m => (
                                 <OverlayView key={m.id} position={{ lat: m.lat, lng: m.lng }} mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}>
                                     <div style={{ transform: 'translate(-50%, -100%)' }} className="flex flex-col items-center">

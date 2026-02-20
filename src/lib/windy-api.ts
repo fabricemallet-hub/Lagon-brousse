@@ -19,6 +19,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
+        'x-windy-api-key': API_KEY,
         'Referer': projectReferer,
         'Origin': 'https://studio.firebase.google.com'
       },
@@ -27,7 +28,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
         lon,
         model: 'gfs',
         parameters: ['wind', 'windDir', 'waves'],
-        key: API_KEY
+        key: API_KEY // On le laisse aussi dans le body au cas où
       })
     });
 
