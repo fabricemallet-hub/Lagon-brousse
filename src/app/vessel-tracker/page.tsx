@@ -75,9 +75,6 @@ import {
   ChevronDown,
   Repeat,
   Target,
-  Copy,
-  Info,
-  Clock,
   Compass,
   Fish,
   Radio,
@@ -85,7 +82,7 @@ import {
   Activity,
   Lock,
   Unlock,
-  ChevronRight,
+  LayoutGrid,
   Wind
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
@@ -195,9 +192,11 @@ export default function VesselTrackerPage() {
   , [dbSounds]);
 
   const smsPreview = useMemo(() => {
-    const nicknamePrefix = vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : "";
+    const nicknamePrefix = vesselNickname ? `[${vesselNickname}] ` : "";
     const customText = (isCustomMessageEnabled && vesselSmsMessage) ? vesselSmsMessage : "Requiert assistance immédiate.";
-    return `${nicknamePrefix}${customText} [MAYDAY/PAN PAN] Position : https://www.google.com/maps?q=${currentPos?.lat.toFixed(6) || '-22.27'},${currentPos?.lng.toFixed(6) || '166.45'}`;
+    const lat = currentPos?.lat.toFixed(6) || '-21.3';
+    const lng = currentPos?.lng.toFixed(6) || '165.5';
+    return `${nicknamePrefix}${customText} [PAN PAN] Position : https://www.google.com/maps?q=${lat},${lng}`;
   }, [vesselSmsMessage, isCustomMessageEnabled, vesselNickname, currentPos]);
 
   const watchIdRef = useRef<number | null>(null);
@@ -222,6 +221,30 @@ export default function VesselTrackerPage() {
         map.setZoom(15);
     }
   }, [map, mode, currentPos, followedVessels, sharingId]);
+
+  const handleSaveVessel = async () => {
+    if (!user || !firestore) return;
+    updateDoc(doc(firestore, 'users', user.uid), {
+        savedVesselIds: arrayUnion(sharingId)
+    }).then(() => toast({ title: "ID enregistré" }));
+  };
+
+  const handleRemoveSavedVessel = async (id: string) => {
+    if (!user || !firestore) return;
+    updateDoc(doc(firestore, 'users', user.uid), {
+        savedVesselIds: arrayRemove(id)
+    });
+  };
+
+  const handleSaveSmsSettings = async () => {
+    if (!user || !firestore) return;
+    updateDoc(doc(firestore, 'users', user.uid), {
+        emergencyContact,
+        vesselSmsMessage,
+        isEmergencyEnabled,
+        isCustomMessageEnabled
+    }).then(() => toast({ title: "SMS réglés" }));
+  };
 
   const playVesselSound = useCallback((soundId: string, shouldLoop: boolean = false, eventLabel: string = "Alerte") => {
     if (!vesselPrefs.isNotifyEnabled) return;
@@ -298,30 +321,6 @@ export default function VesselTrackerPage() {
     } catch (e) {}
   };
 
-  const handleSaveVessel = async () => {
-    if (!user || !firestore) return;
-    updateDoc(doc(firestore, 'users', user.uid), {
-        savedVesselIds: arrayUnion(sharingId)
-    }).then(() => toast({ title: "ID enregistré" }));
-  };
-
-  const handleRemoveSavedVessel = async (id: string) => {
-    if (!user || !firestore) return;
-    updateDoc(doc(firestore, 'users', user.uid), {
-        savedVesselIds: arrayRemove(id)
-    });
-  };
-
-  const handleSaveSmsSettings = async () => {
-    if (!user || !firestore) return;
-    updateDoc(doc(firestore, 'users', user.uid), {
-        emergencyContact,
-        vesselSmsMessage,
-        isEmergencyEnabled,
-        isCustomMessageEnabled
-    }).then(() => toast({ title: "SMS réglés" }));
-  };
-
   // --- WINDY INITIALIZATION ---
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -369,7 +368,7 @@ export default function VesselTrackerPage() {
             const { latitude, longitude, accuracy, speed } = pos.coords;
             const newPos = { lat: latitude, lng: longitude };
             setCurrentPos(newPos);
-            setUserAccuracy(Math.round(accuracy));
+            setVesselAccuracy(Math.round(accuracy));
             setCurrentSpeed(Math.max(0, Math.round((speed || 0) * 1.94384)));
 
             if (isFollowMode && map) map.panTo(newPos);
@@ -485,7 +484,7 @@ export default function VesselTrackerPage() {
       <header className="flex items-center justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-black uppercase tracking-tighter flex items-center gap-2"><Globe className="text-primary" /> Cockpit Navigation</h1>
-          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Tactical Interface v21.1</p>
+          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Tactical Interface v21.2</p>
         </div>
         <div className="flex bg-slate-900/10 p-1 rounded-xl border-2">
           <Button variant={mode === 'sender' ? 'default' : 'ghost'} size="sm" className="font-black uppercase text-[9px] h-8 px-3" onClick={() => setMode('sender')}>Capitaine (A)</Button>
@@ -493,7 +492,6 @@ export default function VesselTrackerPage() {
         </div>
       </header>
 
-      {/* --- BANDEAU "MON BATEAU" --- */}
       <div className="w-full bg-slate-900 text-white rounded-2xl p-4 shadow-xl border border-white/10 relative overflow-hidden group">
           <div className="absolute right-0 top-0 opacity-10 -translate-y-4 translate-x-4">
               <Navigation className="size-32" />
@@ -514,7 +512,6 @@ export default function VesselTrackerPage() {
                       </div>
                   </div>
               </div>
-              
               <div className="flex items-center gap-6 border-l border-white/10 pl-6 h-full">
                   <div className="flex flex-col items-end">
                       <span className="text-[8px] font-black uppercase text-slate-500">Météo Position</span>
@@ -532,28 +529,15 @@ export default function VesselTrackerPage() {
             <p className="font-black uppercase text-[10px] tracking-widest animate-pulse">Initialisation Windy Engine...</p>
         </div>
         
-        {/* --- MENU DES CALQUES (GAUCHE) --- */}
         <div className="absolute top-4 left-4 flex flex-col gap-2 z-[160]">
-            <Button 
-                size="icon" 
-                className={cn("bg-slate-900/90 text-white backdrop-blur-md border-2 h-12 w-12 shadow-2xl transition-all", isLayersOpen ? "border-primary" : "border-white/10")} 
-                onClick={() => setIsLayersOpen(!isLayersOpen)}
-            >
+            <Button size="icon" className={cn("bg-slate-900/90 text-white backdrop-blur-md border-2 h-12 w-12 shadow-2xl transition-all", isLayersOpen ? "border-primary" : "border-white/10")} onClick={() => setIsLayersOpen(!isLayersOpen)}>
                 <LayoutGrid className="size-6" />
             </Button>
             
             {isLayersOpen && (
                 <div className="flex flex-col gap-2 animate-in slide-in-from-left-4 duration-300">
                     {WINDY_LAYERS.map(layer => (
-                        <Button 
-                            key={layer.id} 
-                            size="icon" 
-                            className={cn(
-                                "size-12 rounded-full shadow-xl border-2 transition-all backdrop-blur-lg",
-                                activeOverlay === layer.id ? "bg-primary border-white scale-110" : "bg-slate-900/80 border-white/10 hover:bg-slate-800"
-                            )}
-                            onClick={() => handleLayerChange(layer.id)}
-                        >
+                        <Button key={layer.id} size="icon" className={cn("size-12 rounded-full shadow-xl border-2 transition-all backdrop-blur-lg", activeOverlay === layer.id ? "bg-primary border-white scale-110" : "bg-slate-900/80 border-white/10")} onClick={() => handleLayerChange(layer.id)}>
                             <layer.icon className="size-5 text-white" />
                         </Button>
                     ))}
@@ -562,18 +546,13 @@ export default function VesselTrackerPage() {
 
             <div className="mt-4 flex flex-col gap-2">
                 <Button size="icon" className="bg-white/90 border-2 h-10 w-10 shadow-xl" onClick={() => setIsFullscreen(!isFullscreen)}>{isFullscreen ? <Shrink className="size-5 text-primary" /> : <Expand className="size-5 text-primary" />}</Button>
-                <Button 
-                    size="icon" 
-                    className={cn("bg-white border-2 h-10 w-10 shadow-xl transition-all", isFollowMode ? "border-blue-500 bg-blue-50" : "border-slate-200")} 
-                    onClick={() => setIsFollowMode(!isFollowMode)}
-                >
+                <Button size="icon" className={cn("bg-white border-2 h-10 w-10 shadow-xl", isFollowMode ? "border-blue-500 bg-blue-50" : "border-slate-200")} onClick={() => setIsFollowMode(!isFollowMode)}>
                     {isFollowMode ? <Lock className="size-5 text-blue-600" /> : <Unlock className="size-5 text-slate-400" />}
                 </Button>
                 <Button onClick={handleRecenter} className="h-10 bg-primary text-white border-2 border-white/20 px-3 gap-2 shadow-xl font-black uppercase text-[9px]">RECENTRER <LocateFixed className="size-4" /></Button>
             </div>
         </div>
 
-        {/* --- MODULE INFO POINT (PICKER) --- */}
         {pickerData && (
             <div className="absolute bottom-6 left-6 right-6 z-[160] animate-in slide-in-from-bottom-4 duration-300">
                 <Card className="bg-slate-900/95 backdrop-blur-xl border-2 border-primary/30 text-white shadow-2xl overflow-hidden rounded-3xl">
@@ -634,6 +613,7 @@ export default function VesselTrackerPage() {
                         { label: 'MARLIN', icon: Fish, color: 'bg-indigo-900 text-white border-indigo-900' },
                         { label: 'THON', icon: Fish, color: 'bg-red-600 text-white border-red-600' },
                         { label: 'TAZARD', icon: Fish, color: 'bg-slate-600 text-white border-slate-600' },
+                        { label: 'WAHOO', icon: Fish, color: 'bg-cyan-600 text-white border-cyan-600' },
                         { label: 'SARDINES', icon: Waves, color: 'bg-emerald-500 text-white border-emerald-500' },
                         { label: 'PRISE', icon: Camera, color: 'bg-teal-600 text-white border-teal-600' }
                     ].map(sig => (
@@ -688,7 +668,6 @@ export default function VesselTrackerPage() {
         </div>
       )}
 
-      {/* --- REGLAGES & SMS (EMETTEUR A) --- */}
       {mode === 'sender' && !isSharing && (
         <Accordion type="single" collapsible className="w-full">
             <AccordionItem value="sms-config" className="border-none">
@@ -713,7 +692,11 @@ export default function VesselTrackerPage() {
       )}
 
       <Card className="border-2 bg-muted/10 shadow-none rounded-2xl overflow-hidden mt-4">
-        <CardHeader className="p-4 pb-2 border-b bg-muted/5"><CardTitle className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2 text-muted-foreground"><Phone className="size-4 text-primary" /> Annuaire Maritime NC</CardTitle></header>
+        <CardHeader className="p-4 pb-2 border-b bg-muted/5">
+          <CardTitle className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2 text-muted-foreground">
+            <Phone className="size-4 text-primary" /> Annuaire Maritime NC
+          </CardTitle>
+        </CardHeader>
         <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div className="space-y-3"><h4 className="text-[10px] font-black uppercase text-red-600 flex items-center gap-2 border-b pb-1"><ShieldAlert className="size-3" /> Urgences</h4><div className="space-y-2"><a href="tel:16" className="flex flex-col group"><span className="text-[9px] font-bold text-muted-foreground uppercase">COSS NC (Mer)</span><span className="text-sm font-black group-hover:text-red-600 transition-colors">16</span></a><a href="tel:15" className="flex flex-col group"><span className="text-[9px] font-bold text-muted-foreground uppercase">SAMU (Terre)</span><span className="text-sm font-black group-hover:text-red-600 transition-colors">15</span></a></div></div>
           <div className="space-y-3"><h4 className="text-[10px] font-black uppercase text-blue-600 flex items-center gap-2 border-b pb-1"><Waves className="size-3" /> Services</h4><div className="space-y-2"><a href="tel:366736" className="flex flex-col group"><span className="text-[9px] font-bold text-muted-foreground uppercase">Météo Marine</span><span className="text-sm font-black group-hover:text-blue-600 transition-colors">36 67 36</span></a></div></div>
