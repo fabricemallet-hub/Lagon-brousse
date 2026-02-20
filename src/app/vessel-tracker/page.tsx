@@ -3,10 +3,9 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, collection, query, where, orderBy, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, query, where, orderBy, updateDoc, arrayUnion } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
@@ -25,24 +24,15 @@ import {
   Activity,
   Thermometer,
   Gauge,
-  WifiOff,
-  BatteryCharging,
-  BatteryLow,
-  BatteryMedium,
-  BatteryFull,
   ShieldAlert,
-  History,
-  MapPin,
-  AlertCircle,
-  Copy,
-  Info,
-  ArrowUp,
   ChevronDown,
+  ArrowUp,
   Database,
   Layers,
   Search,
-  Eye,
-  EyeOff
+  Copy,
+  Info,
+  Check
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, Tide } from '@/lib/types';
@@ -52,6 +42,7 @@ import { fetchWindyWeather } from '@/lib/windy-api';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getDataForDate } from '@/lib/data';
 
+// CLÉ "MAP FORECAST" POUR L'AFFICHAGE DE LA CARTE
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -122,6 +113,7 @@ export default function VesselTrackerPage() {
   const [isWindyLoaded, setIsWindyLoaded] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [currentOrigin, setCurrentOrigin] = useState('');
+  const [hasCopiedOrigin, setHasCopiedOrigin] = useState(false);
   
   const [isSharing, setIsSharing] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -136,7 +128,6 @@ export default function VesselTrackerPage() {
   const windyMapInstance = useRef<any>(null);
   const markersRef = useRef<Record<string, any>>({});
   const isMapInitializedRef = useRef<boolean>(false);
-  const watchIdRef = useRef<number | null>(null);
   const pickerTimerRef = useRef<any>(null);
 
   useEffect(() => {
@@ -166,7 +157,7 @@ export default function VesselTrackerPage() {
 
     isMapInitializedRef.current = true;
 
-    // Délai prolongé pour Cloud Workstations
+    // Délai prolongé pour Cloud Workstations (laisser React finir le rendu)
     setTimeout(() => {
         const options = {
           key: MAP_FORECAST_KEY,
@@ -220,13 +211,13 @@ export default function VesselTrackerPage() {
                 picker.open({ lat: e.latlng.lat, lon: e.latlng.lng });
               });
 
-              setTimeout(() => { map.invalidateSize(); }, 1000);
+              setTimeout(() => { if(map) map.invalidateSize(); }, 1000);
             });
         } catch (e: any) {
             setAuthError(window.location.host);
             isMapInitializedRef.current = false;
         }
-    }, 800);
+    }, 1000);
   }, []);
 
   useEffect(() => {
@@ -295,9 +286,11 @@ export default function VesselTrackerPage() {
     if (window.windyStore) window.windyStore.set('overlay', o);
   };
 
-  const copyHost = () => {
+  const copyOrigin = () => {
     navigator.clipboard.writeText(currentOrigin);
+    setHasCopiedOrigin(true);
     toast({ title: "Hôte copié !" });
+    setTimeout(() => setHasCopiedOrigin(false), 2000);
   };
 
   return (
@@ -310,17 +303,22 @@ export default function VesselTrackerPage() {
       {authError && (
         <Alert variant="destructive" className="bg-red-50 border-red-600 rounded-2xl border-2 shadow-xl animate-in slide-in-from-top-4">
             <ShieldAlert className="size-6" />
-            <AlertTitle className="font-black uppercase text-sm mb-2">ERREUR 401 : CONFIGURATION REQUISE</AlertTitle>
+            <AlertTitle className="font-black uppercase text-sm mb-2">ERREUR AUTHENTIFICATION WINDY (401)</AlertTitle>
             <AlertDescription className="space-y-4">
                 <div className="p-4 bg-white/80 rounded-xl border border-red-200">
-                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Copiez cet hôte dans vos restrictions Windy (Clé 1gGm...) :</p>
+                    <p className="text-[10px] font-black uppercase text-slate-500 mb-2">Copiez cet hôte exact dans vos restrictions Windy (Clé 1gGm...) :</p>
                     <div className="flex items-center gap-2">
                         <code className="flex-1 p-2 bg-red-100 rounded font-mono text-[10px] select-all break-all">{currentOrigin}</code>
-                        <Button size="icon" variant="ghost" onClick={copyHost}><Copy className="size-4" /></Button>
+                        <Button size="icon" variant="ghost" onClick={copyOrigin} className="h-10 w-10">
+                            {hasCopiedOrigin ? <Check className="size-4 text-green-600" /> : <Copy className="size-4" />}
+                        </Button>
                     </div>
                 </div>
-                <div className="bg-white/50 p-3 rounded-lg text-[9px] font-bold text-red-900 italic">
-                    {"Assurez-vous d'avoir également *.cloudworkstations.dev dans votre console Windy."}
+                <div className="bg-red-100/50 p-3 rounded-lg text-[9px] font-bold text-red-900 space-y-2">
+                    <p>1. Allez sur api.windy.com/keys</p>
+                    <p>2. Modifiez la clé Map Forecast (1gGm...)</p>
+                    <p>3. Saisissez l'hôte ci-dessus séparé par une VIRGULE.</p>
+                    <p>4. N'oubliez pas d'ajouter également : <code className="bg-white/50 px-1">*.cloudworkstations.dev</code></p>
                 </div>
             </AlertDescription>
         </Alert>
@@ -380,7 +378,7 @@ export default function VesselTrackerPage() {
           <Alert className="bg-muted/10 border-dashed border-2">
               <Info className="size-4 text-primary" />
               <AlertDescription className="text-[10px] font-bold uppercase leading-relaxed">
-                  Cliquez n'importe où sur la mer pour ouvrir l'analyseur Windy et obtenir un rapport complet incluant les marées et la température de l'eau.
+                  Cliquez n'importe où sur la mer pour obtenir un rapport complet incluant les marées et la température de l'eau.
               </AlertDescription>
           </Alert>
       </div>

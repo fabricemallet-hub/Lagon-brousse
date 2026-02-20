@@ -3,7 +3,7 @@
 
 /**
  * Service de récupération météo via Windy Point Forecast API v2.
- * Utilise la clé "Prévision ponctuelle" (Point Forecast).
+ * CLÉ POINT FORECAST : ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU (Documentation jointe)
  */
 
 export async function fetchWindyWeather(lat: number, lon: number) {
@@ -11,7 +11,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
   const API_KEY = 'ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU';
   const url = 'https://api.windy.com/api/point-forecast/v2';
   
-  // URL D'IDENTIFICATION DU PROJET
+  // URL D'IDENTIFICATION DU PROJET POUR VOTRE CLÉ
   const PRODUCTION_URL = 'https://studio-2943478321-f746e.web.app/'; 
   
   try {
@@ -47,6 +47,7 @@ export async function fetchWindyWeather(lat: number, lon: number) {
 
     const data = await response.json();
     
+    // Windy renvoie des tableaux pour chaque paramètre
     return {
       windSpeed: Math.round((data.wind?.[0] || 0) * 1.94384), // m/s -> knots
       gustSpeed: Math.round((data.gust?.[0] || 0) * 1.94384),
