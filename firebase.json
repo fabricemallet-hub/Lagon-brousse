@@ -23,10 +23,6 @@
       {
         "source": "/icon-*.png",
         "destination": "/icon-*.png"
-      },
-      {
-        "source": "**",
-        "destination": "/index.html"
       }
     ]
   }
