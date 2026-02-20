@@ -20,7 +20,8 @@ import {
   XCircle,
   CheckCircle2,
   Copy,
-  RefreshCw
+  RefreshCw,
+  AlertTriangle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -31,21 +32,21 @@ const MAP_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 export default function VesselTrackerPage() {
   const { toast } = useToast();
 
-  // --- ÉTAPE 1 : DÉFINITION PRIORITAIRE DES FONCTIONS (Fix ReferenceError) ---
-  const handleRecenter = useCallback(() => {
+  // --- ÉTAPE 1 : DÉFINITIONS STABLES (Fix ReferenceError) ---
+  function handleRecenter() {
     console.log('Action: Recenter triggered');
-    toast({ title: "Recentrer", description: "Fonctionnalité en cours de déploiement." });
-  }, [toast]);
+    toast({ title: "Recentrer", description: "Recentrage sur votre position..." });
+  }
 
-  const handleSearch = useCallback(() => {
+  function handleSearch() {
     console.log('Action: Search triggered');
-    toast({ title: "Recherche", description: "Fonctionnalité en cours de déploiement." });
-  }, [toast]);
+    toast({ title: "Recherche", description: "Outil de recherche actif." });
+  }
 
-  const handleFilter = useCallback(() => {
+  function handleFilter() {
     console.log('Action: Filter triggered');
-    toast({ title: "Filtres", description: "Fonctionnalité en cours de déploiement." });
-  }, [toast]);
+    toast({ title: "Filtres", description: "Filtres de flotte actifs." });
+  }
 
   // --- ÉTAPE 2 : ÉTATS ET INITIALISATION ---
   const [error, setError] = useState<string | null>(null);
@@ -57,10 +58,9 @@ export default function VesselTrackerPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    // Capturer les informations de domaine pour le diagnostic
     setHost(window.location.host);
     setOrigin(window.location.origin);
-    setReferrer(document.referrer || 'Aucun (Top level)');
+    setReferrer(document.referrer || 'Aucun (Direct)');
 
     const loadScript = (id: string, src: string) => {
       return new Promise<void>((resolve, reject) => {
@@ -72,7 +72,6 @@ export default function VesselTrackerPage() {
         script.id = id;
         script.src = src;
         script.async = true;
-        // Politique de referrer pour autoriser Studio
         script.referrerPolicy = 'no-referrer-when-downgrade';
         script.onload = () => resolve();
         script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
@@ -92,12 +91,10 @@ export default function VesselTrackerPage() {
           originalConsoleError.apply(console, args);
         };
 
-        // Chargement séquentiel des dépendances Windy
         await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
         (window as any).W = { apiKey: MAP_KEY };
         await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
 
-        // Attendre que l'objet windyInit soit injecté par libBoot
         let attempts = 0;
         const checkInit = setInterval(() => {
             attempts++;
@@ -116,12 +113,11 @@ export default function VesselTrackerPage() {
                         return;
                     }
                     setIsInitialized(true);
-                    console.log("Windy Map OK !");
                 });
             }
             if (attempts > 50) {
                 clearInterval(checkInit);
-                setError("Délai d'attente dépassé pour window.windyInit");
+                setError("Délai d'attente dépassé (windyInit)");
             }
         }, 100);
 
@@ -130,7 +126,6 @@ export default function VesselTrackerPage() {
       }
     };
 
-    // Petit délai de sécurité pour l'environnement Cloud
     const timer = setTimeout(init, 1000);
     return () => clearTimeout(timer);
   }, []);
@@ -142,24 +137,22 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto pb-32">
-      {/* HEADER DIAGNOSTIC */}
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-black uppercase tracking-tighter flex items-center gap-2">
-            <Globe className="text-primary" /> Boat Tracker v18.3
+            <Globe className="text-primary" /> Boat Tracker
           </h1>
-          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Surveillance & Diagnostic Referrer</p>
+          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Surveillance Maritime NC</p>
         </div>
         {isInitialized ? (
-          <Badge className="bg-green-600 text-white font-black px-3 py-1">AUTH VALIDÉE</Badge>
+          <Badge className="bg-green-600 text-white font-black px-3 py-1">AUTH OK</Badge>
         ) : error ? (
-          <Badge variant="destructive" className="font-black px-3 py-1">ÉCHEC AUTH</Badge>
+          <Badge variant="destructive" className="font-black px-3 py-1">ERREUR 401</Badge>
         ) : (
-          <Badge variant="outline" className="font-black px-3 py-1 animate-pulse">INITIALISATION...</Badge>
+          <Badge variant="outline" className="font-black px-3 py-1 animate-pulse">CHARGEMENT...</Badge>
         )}
       </div>
 
-      {/* BOUTONS DE NAVIGATION */}
       <div className="flex gap-2">
         <Button variant="outline" size="sm" className="h-8 text-[9px] font-black uppercase border-2 gap-2" onClick={handleRecenter}>
             <LocateFixed className="size-3" /> Recentrer
@@ -172,41 +165,38 @@ export default function VesselTrackerPage() {
         </Button>
       </div>
 
-      {/* PANNEAU DE DIAGNOSTIC 401 */}
       {error && (
         <div className="animate-in slide-in-from-top-4 duration-500">
-          <Alert variant="destructive" className="border-2 shadow-xl bg-white text-destructive">
+          <Alert variant="destructive" className="border-2 shadow-xl bg-white text-destructive rounded-2xl overflow-hidden">
             <XCircle className="size-5" />
-            <AlertTitle className="font-black uppercase text-sm mb-4">Erreur d'accès à la carte (401)</AlertTitle>
+            <AlertTitle className="font-black uppercase text-sm mb-4">Échec Authentification Windy (401)</AlertTitle>
             <AlertDescription className="space-y-4 text-foreground">
-              <p className="text-xs font-medium text-slate-700 leading-relaxed">
-                Windy rejette la clé car l'URL parente ou l'hôte de l'application n'est pas autorisé. 
-                Veuillez ajouter ces valeurs exactes dans votre console Windy :
+              <p className="text-xs font-medium text-slate-700 leading-relaxed italic">
+                Windy rejette la clé car il ne reconnaît pas l'un de ces domaines. 
+                Veuillez les ajouter exactement comme affichés sur [api.windy.com/keys](https://api.windy.com/keys) :
               </p>
               
-              <div className="grid gap-3">
+              <div className="grid gap-2">
                 <div className="p-3 bg-red-50 rounded-xl border border-red-100 flex items-center justify-between">
                   <div className="flex flex-col min-w-0">
-                    <span className="text-[8px] font-black uppercase opacity-60">Referrer (Studio Iframe)</span>
-                    <code className="text-[10px] font-black truncate select-all">{referrer}</code>
+                    <span className="text-[8px] font-black uppercase opacity-60">Referrer (Studio Parent)</span>
+                    <code className="text-[10px] font-black truncate">{referrer}</code>
                   </div>
                   <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => copyToClipboard(referrer)}><Copy className="size-3" /></Button>
                 </div>
                 <div className="p-3 bg-red-50 rounded-xl border border-red-100 flex items-center justify-between">
                   <div className="flex flex-col min-w-0">
-                    <span className="text-[8px] font-black uppercase opacity-60">Hôte de l'app (Hosted)</span>
-                    <code className="text-[10px] font-black truncate select-all">{host}</code>
+                    <span className="text-[8px] font-black uppercase opacity-60">Host (App Hosted)</span>
+                    <code className="text-[10px] font-black truncate">{host}</code>
                   </div>
                   <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => copyToClipboard(host)}><Copy className="size-3" /></Button>
                 </div>
               </div>
 
-              <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 space-y-3">
-                <p className="text-[10px] font-black uppercase text-blue-800 flex items-center gap-2">
-                  <CheckCircle2 className="size-3" /> Solution :
-                </p>
-                <p className="text-[11px] leading-relaxed text-slate-700">
-                  Allez sur <a href="https://api.windy.com/keys" target="_blank" className="underline font-black text-blue-600">api.windy.com/keys</a> et ajoutez <strong>les deux valeurs ci-dessus</strong> dans les restrictions de votre clé.
+              <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 flex items-start gap-3">
+                <CheckCircle2 className="size-4 text-blue-600 mt-0.5" />
+                <p className="text-[11px] leading-relaxed text-slate-700 font-bold">
+                  Astuce : Si vous utilisez **Firebase Studio**, Windy bloque souvent l'URL parente. Autorisez `studio.firebase.google.com` dans vos restrictions.
                 </p>
               </div>
             </AlertDescription>
@@ -214,21 +204,23 @@ export default function VesselTrackerPage() {
         </div>
       )}
 
-      {/* CONTENEUR DE CARTE ISOLÉ (Fix removeChild) */}
+      {/* ISOLATION DU DOM (Fix removeChild) */}
       <div className="relative w-full h-[500px] rounded-[2.5rem] border-4 shadow-2xl overflow-hidden group bg-slate-100">
+        {/* Windy Container : React ne touchera jamais aux enfants de ce div */}
         <div 
           id="windy" 
+          key="windy-map-root"
           className={cn(
               "w-full h-full transition-opacity duration-1000",
               isInitialized ? "opacity-100" : "opacity-0"
           )}
         ></div>
         
-        {/* LOADER INDÉPENDANT (Sibling du div windy pour éviter le crash NotFoundError) */}
+        {/* LOADER OVERLAY : Sibling du div windy pour éviter les conflits DOM */}
         {!isInitialized && !error && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-slate-400 z-10">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-slate-400 z-10 bg-slate-50">
                 <RefreshCw className="size-10 animate-spin text-primary/40" />
-                <p className="font-black uppercase text-[10px] tracking-widest animate-pulse">Initialisation de la carte...</p>
+                <p className="font-black uppercase text-[10px] tracking-widest animate-pulse">Initialisation tactique...</p>
             </div>
         )}
       </div>

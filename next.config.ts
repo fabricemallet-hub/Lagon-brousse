@@ -1,3 +1,4 @@
+
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
@@ -47,12 +48,12 @@ const nextConfig: NextConfig = {
         source: '/(.*)',
         headers: [
           {
-            key: 'Permissions-Policy',
-            value: 'screen-wake-lock=(self)',
-          },
-          {
             key: 'Referrer-Policy',
             value: 'no-referrer-when-downgrade',
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'screen-wake-lock=(self)',
           },
         ],
       },
