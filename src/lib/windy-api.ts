@@ -1,8 +1,9 @@
+
 'use server';
 
 /**
  * Service de récupération météo via Windy Point Forecast API v2.
- * Version 6.0 : Conformité totale au protocole JSON v2 (Typage Strict + Body Key + Referer Strict).
+ * Version 6.1 : Conformité totale au protocole JSON v2 (Typage Strict + Body Key + Referer Strict).
  */
 
 export async function fetchWindyWeather(lat: number, lon: number) {

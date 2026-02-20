@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -92,14 +93,14 @@ export default function VesselTrackerPage() {
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
-  // --- 3. INITIALISATION WINDY MAP (Fix L is not defined) ---
+  // --- 3. INITIALISATION WINDY MAP ---
   const initWindy = useCallback(() => {
-    // SÉCURITÉ CRITIQUE : Vérifier que Leaflet (window.L) et Windy (window.windyInit) sont prêts
+    // SÉCURITÉ : Vérifier que Leaflet et Windy sont prêts
     if (typeof window === 'undefined' || !window.L || !window.windyInit || isMapInitializedRef.current) {
         return;
     }
 
-    console.log("[Windy Init] Authentification origine :", window.location.origin);
+    console.log("[Windy Init] Tentative d'authentification pour :", window.location.origin);
 
     const options = {
       key: '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4',
@@ -110,11 +111,17 @@ export default function VesselTrackerPage() {
 
     try {
         window.windyInit(options, (windyAPI: any) => {
+          if (!windyAPI) {
+              console.error("%c[Windy Auth Error] Échec d'autorisation.", "color: red; font-weight: bold;");
+              console.error("%c[Windy Auth] AJOUTEZ CE DOMAINE À VOTRE CLÉ :", "color: orange; font-weight: bold;", window.location.origin);
+              return;
+          }
+
           const { map, picker } = windyAPI;
           mapRef.current = map;
           isMapInitializedRef.current = true;
 
-          // Forced Reflow Optimization : Redessin différé pour ne pas bloquer le thread
+          // Forced Reflow Optimization : Redessin différé
           setTimeout(() => {
             if (mapRef.current) mapRef.current.invalidateSize();
           }, 500);
@@ -146,19 +153,17 @@ export default function VesselTrackerPage() {
           });
         });
     } catch (e) {
-        console.error("[Windy Auth Error] Échec authentification");
-        console.error("[Windy Auth] ORIGINE À AUTORISER :", window.location.origin);
+        console.error("[Windy Critical Error] Échec chargement API");
     }
   }, []);
 
-  // Déclencher l'init quand les deux scripts sont prêts
   useEffect(() => {
     if (isLeafletLoaded && isWindyLoaded) {
         initWindy();
     }
   }, [isLeafletLoaded, isWindyLoaded, initWindy]);
 
-  // Synchronisation des marqueurs Leaflet
+  // Synchronisation des marqueurs
   useEffect(() => {
     if (!mapRef.current || !followedVessels || typeof window === 'undefined' || !window.L) return;
     const L = window.L;
@@ -207,7 +212,7 @@ export default function VesselTrackerPage() {
     });
   }, [followedVessels, labels]);
 
-  // --- 4. MOTEUR GPS AVEC THROTTLING 5S (Fix Violations) ---
+  // --- 4. MOTEUR GPS AVEC THROTTLING 5S ---
   const handleGpsUpdate = useCallback(async (pos: GeolocationPosition) => {
     const now = Date.now();
     if (now - lastUpdateTimestampRef.current < 5000) return;
@@ -283,14 +288,13 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
-      {/* CHARGEMENT SÉQUENTIEL DES DÉPENDANCES */}
       <Script 
         src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js" 
         id="leaflet-src"
         strategy="afterInteractive" 
         crossOrigin="anonymous" 
         onLoad={() => {
-            console.log("[Script] Leaflet v1.4.0 chargé.");
+            console.log("[Script] Leaflet chargé.");
             setIsLeafletLoaded(true);
         }}
       />
@@ -299,7 +303,7 @@ export default function VesselTrackerPage() {
         strategy="lazyOnload" 
         crossOrigin="anonymous" 
         onLoad={() => {
-            console.log("[Script] Windy libBoot chargé.");
+            console.log("[Script] Windy chargé.");
             setIsWindyLoaded(true);
         }}
       />
@@ -383,7 +387,7 @@ export default function VesselTrackerPage() {
           <div className="space-y-1">
               <h4 className="text-xs font-black uppercase text-primary leading-none">Conseil Tactique</h4>
               <p className="text-[10px] leading-relaxed font-medium text-slate-600">
-                  Cliquez n'importe où sur la carte pour interroger les stations météo Windy en temps réel (Vent, Houle, Air).
+                  Cliquez n'importe où sur la carte pour interroger les stations météo Windy en temps réel.
               </p>
           </div>
       </div>
