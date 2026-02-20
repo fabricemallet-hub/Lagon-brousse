@@ -80,12 +80,12 @@ import {
   Radio,
   Sun,
   Activity,
-  Lock,
-  Unlock,
   LayoutGrid,
   Wind,
   Plus,
-  Minus
+  Minus,
+  Thermometer,
+  CloudRain
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, SoundLibraryEntry, WindDirection } from '@/lib/types';
@@ -107,8 +107,10 @@ const BatteryIconComp = ({ level, charging, className }: { level?: number, charg
 
 const WINDY_LAYERS = [
     { id: 'wind', icon: Wind, label: 'Vent' },
-    { id: 'radar', icon: Radio, label: 'Radar' },
-    { id: 'waves', icon: Waves, label: 'Vagues' },
+    { id: 'gust', icon: Wind, label: 'Rafales' },
+    { id: 'temp', icon: Thermometer, label: 'Temp.' },
+    { id: 'rain', icon: CloudRain, label: 'Pluie' },
+    { id: 'waves', icon: Waves, label: 'Houle' },
     { id: 'uv', icon: Sun, label: 'UV' },
     { id: 'pressure', icon: Activity, label: 'Pression' },
 ];
@@ -219,7 +221,6 @@ export default function VesselTrackerPage() {
     const activeVessel = followedVessels?.find(v => v.id === sharingId);
     const pos = mode === 'sender' ? currentPos : (activeVessel?.location ? { lat: activeVessel.location.latitude, lng: activeVessel.location.longitude } : null);
     if (pos) {
-        // Commande atomique Leaflet pour forcer position ET zoom 18
         map.setView([pos.lat, pos.lng], 18, { animate: true });
         toast({ title: "Recentrage", description: "Zoom maximal (Niveau 18)" });
     }
@@ -349,12 +350,10 @@ export default function VesselTrackerPage() {
               setMap(api.map);
               setIsInitialized(true);
 
-              // Setup Picker
               const picker = (window as any).W.picker;
               picker.on('pickerOpened', (data: any) => setPickerData(data));
               picker.on('pickerClosed', () => setPickerData(null));
 
-              // Store listener
               const store = (window as any).W.store;
               store.on('overlay', (ov: string) => setActiveOverlay(ov));
             });
@@ -378,7 +377,6 @@ export default function VesselTrackerPage() {
             setCurrentSpeed(Math.max(0, Math.round((speed || 0) * 1.94384)));
 
             if (isFollowMode && map) {
-                // En mode suivi, on garde le zoom actuel mais on centre
                 map.panTo(newPos);
             }
 
@@ -411,12 +409,6 @@ export default function VesselTrackerPage() {
         if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
     };
   }, [isSharing, mode, updateVesselInFirestore, map, isFollowMode, mooringRadius, anchorPos, vesselStatus]);
-
-  const toggleWakeLock = async () => {
-    if (!('wakeLock' in navigator)) return;
-    if (wakeLock) { try { await wakeLock.release(); setWakeLock(null); } catch (e) { setWakeLock(null); } }
-    else { try { const lock = await (navigator as any).wakeLock.request('screen'); setWakeLock(lock); lock.addEventListener('release', () => setWakeLock(null)); } catch (err) {} }
-  };
 
   const handleManualStatus = (st: VesselStatus['status'], label: string) => {
     setVesselStatus(st);
@@ -493,7 +485,7 @@ export default function VesselTrackerPage() {
       <header className="flex items-center justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-black uppercase tracking-tighter flex items-center gap-2"><Globe className="text-primary" /> Cockpit Navigation</h1>
-          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Tactical Interface v21.3</p>
+          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Tactical Interface v21.5</p>
         </div>
         <div className="flex bg-slate-900/10 p-1 rounded-xl border-2">
           <Button variant={mode === 'sender' ? 'default' : 'ghost'} size="sm" className="font-black uppercase text-[9px] h-8 px-3" onClick={() => setMode('sender')}>Capitaine (A)</Button>
@@ -606,8 +598,8 @@ export default function VesselTrackerPage() {
                     <p className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2"><Zap className="size-3 fill-yellow-300 text-yellow-300" /> Partage Actif</p>
                     <Badge onClick={() => updateVesselInFirestore({ eventLabel: 'MAJ FORCÉE' })} className="bg-white/20 border-white/20 text-white font-black text-[10px] h-6 px-3 cursor-pointer active:scale-95">SYNC {syncCountdown}S</Badge>
                   </div>
-                  <h3 className="text-3xl font-black uppercase mt-2">{sharingId}</h3>
-                  <p className="text-xs font-bold opacity-80 mt-1">{vesselNickname || 'Capitaine'}</p>
+                  <h3 className="text-3xl font-black mt-2">{vesselNickname || sharingId}</h3>
+                  <p className="text-xs font-bold opacity-80 mt-1">{vesselNickname ? sharingId : 'Capitaine'}</p>
                 </CardHeader>
                 <CardFooter className="p-5 pt-0 flex flex-wrap gap-3">
                     <Badge variant="outline" className="bg-green-500/30 border-green-200 text-white font-black text-[10px] h-6 px-3">EN LIGNE</Badge>
