@@ -28,8 +28,6 @@ import {
   Layers,
   Smartphone,
   ShieldAlert,
-  Copy,
-  Check,
   Database,
   History,
   MapPin,
@@ -37,14 +35,17 @@ import {
   BatteryCharging,
   BatteryLow,
   BatteryMedium,
-  BatteryFull
+  BatteryFull,
+  AlertCircle,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { fetchWindyWeather } from '@/lib/windy-api';
-import { getDataForDate } from '@/lib/data';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -104,7 +105,8 @@ export default function VesselTrackerPage() {
 
   const [isLeafletLoaded, setIsLeafletLoaded] = useState(false);
   const [isWindyLoaded, setIsWindyLoaded] = useState(false);
-  const [authError, setAuthError] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [detectedOrigin, setDetectedOrigin] = useState('');
   
   const [mode, setMode] = useState<'sender' | 'receiver'>('sender');
   const [isSharing, setIsSharing] = useState(false);
@@ -118,6 +120,7 @@ export default function VesselTrackerPage() {
   const [history, setHistory] = useState<any[]>([]);
   
   const mapRef = useRef<any>(null);
+  const windyMapInstance = useRef<any>(null);
   const markersRef = useRef<Record<string, any>>({});
   const isMapInitializedRef = useRef<boolean>(false);
   const watchIdRef = useRef<number | null>(null);
@@ -143,55 +146,63 @@ export default function VesselTrackerPage() {
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || !window.L || !window.windyInit || isMapInitializedRef.current) return;
 
-    const options = {
-      key: '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4',
-      lat: INITIAL_CENTER.lat,
-      lon: INITIAL_CENTER.lng,
-      zoom: 10,
-      overlays: ['wind', 'waves', 'pressure', 'temp', 'sst'],
-      product: 'ecmwf',
-    };
+    setDetectedOrigin(window.location.origin);
 
-    try {
-        window.windyInit(options, (windyAPI: any) => {
-          if (!windyAPI) {
-              setAuthError(true);
-              return;
-          }
+    // DÉLAI DE PROTECTION DU THREAD PRINCIPAL (Fix Violations)
+    setTimeout(() => {
+        const options = {
+          key: '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4',
+          lat: INITIAL_CENTER.lat,
+          lon: INITIAL_CENTER.lng,
+          zoom: 10,
+          verbose: true, // Mode debug pour l'auth
+          overlays: ['wind', 'waves', 'pressure', 'temp', 'sst'],
+          product: 'ecmwf',
+        };
 
-          const { map, store, picker, broadcast } = windyAPI;
-          mapRef.current = map;
-          isMapInitializedRef.current = true;
+        try {
+            window.windyInit(options, (windyAPI: any) => {
+              if (!windyAPI) {
+                  setAuthError("Échec de l'initialisation de l'API Windy.");
+                  return;
+              }
 
-          // Activation par défaut : Vent et Vagues
-          store.set('overlay', 'wind');
-          store.set('product', 'ecmwf');
+              const { map, store, picker, broadcast } = windyAPI;
+              mapRef.current = map;
+              windyMapInstance.current = windyAPI;
+              isMapInitializedRef.current = true;
 
-          setTimeout(() => {
-            map.invalidateSize();
-            window.dispatchEvent(new Event('resize'));
-          }, 1000);
+              // Activation par défaut : Vent et Vagues
+              store.set('overlay', 'wind');
+              store.set('product', 'ecmwf');
 
-          broadcast.on('pickerMoved', async (latLon: any) => {
-            const { lat, lon } = latLon;
-            setMapClickResult({ lat, lon });
-            setIsQueryingWindy(true);
-            try {
-              const weather = await fetchWindyWeather(lat, lon);
-              setMapClickResult((prev: any) => ({ ...prev, ...weather }));
-            } catch (err) {
-            } finally {
-              setIsQueryingWindy(false);
-            }
-          });
+              // Forcer le redessin pour éviter l'écran gris
+              setTimeout(() => {
+                map.invalidateSize();
+                window.dispatchEvent(new Event('resize'));
+              }, 500);
 
-          map.on('click', (e: any) => {
-            picker.open({ lat: e.latlng.lat, lon: e.latlng.lng });
-          });
-        });
-    } catch (e) {
-        setAuthError(true);
-    }
+              broadcast.on('pickerMoved', async (latLon: any) => {
+                const { lat, lon } = latLon;
+                setMapClickResult({ lat, lon });
+                setIsQueryingWindy(true);
+                try {
+                  const weather = await fetchWindyWeather(lat, lon);
+                  setMapClickResult((prev: any) => ({ ...prev, ...weather }));
+                } catch (err) {
+                } finally {
+                  setIsQueryingWindy(false);
+                }
+              });
+
+              map.on('click', (e: any) => {
+                picker.open({ lat: e.latlng.lat, lon: e.latlng.lng });
+              });
+            });
+        } catch (e: any) {
+            setAuthError(e.message || "Erreur critique d'authentification.");
+        }
+    }, 500);
   }, []);
 
   useEffect(() => {
@@ -286,9 +297,15 @@ export default function VesselTrackerPage() {
       {authError && (
         <Alert variant="destructive" className="bg-red-50 border-red-600 rounded-2xl border-2">
             <ShieldAlert className="size-5" />
-            <AlertTitle className="font-black uppercase text-xs">Erreur d'autorisation Windy</AlertTitle>
-            <AlertDescription className="text-[10px] font-bold">
-                Veuillez vérifier vos restrictions de domaine sur api.windy.com.
+            <AlertTitle className="font-black uppercase text-xs">Accès Windy Refusé (401)</AlertTitle>
+            <AlertDescription className="text-[10px] font-bold space-y-2">
+                <p>L'API Windy rejette votre origine de connexion. Veuillez autoriser le domaine suivant sur <a href="https://api.windy.com/keys" target="_blank" className="underline">api.windy.com</a> :</p>
+                <div className="p-2 bg-white rounded border font-mono text-[9px] select-all uppercase">
+                    {detectedOrigin.replace('https://', '').replace('http://', '')}
+                </div>
+                {detectedOrigin.includes('cloudworkstations.dev') && (
+                    <p className="text-red-800 italic">Astuce : Pour Cloud Workstations, l'origine change souvent. Autorisez le domaine wildcard <strong>*.cloudworkstations.dev</strong> si possible.</p>
+                )}
             </AlertDescription>
         </Alert>
       )}
