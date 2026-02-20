@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -23,23 +22,23 @@ import {
   Wind,
   Waves,
   Eye,
-  EyeOff,
   Info,
   AlertCircle,
   Thermometer,
   Droplets,
   Gauge,
-  Clock,
+  Activity,
   Compass,
   ArrowUp,
-  Activity
+  Clock,
+  Layers,
+  Ship
 } from 'lucide-react';
 import { cn, getDistance, degreesToCardinal, translateWindDirection } from '@/lib/utils';
 import type { VesselStatus, UserAccount, WindDirection } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { fetchWindyWeather } from '@/lib/windy-api';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getDataForDate } from '@/lib/data';
 
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
@@ -51,7 +50,7 @@ export default function VesselTrackerPage() {
 
   const [isLeafletLoaded, setIsLeafletLoaded] = useState(false);
   const [isWindyLoaded, setIsWindyLoaded] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
+  const [authErrorOrigin, setAuthErrorOrigin] = useState<string | null>(null);
   const [isFallbackMode, setIsFallbackMode] = useState(false);
   const [scriptTimestamp, setScriptTimestamp] = useState(Date.now());
 
@@ -63,13 +62,12 @@ export default function VesselTrackerPage() {
   const [currentPos, setCurrentPos] = useState<{ lat: number; lng: number } | null>(null);
   const [mapClickResult, setMapClickResult] = useState<any>(null);
   const [isQueryingWindy, setIsQueryingWindy] = useState(false);
+  const [activeOverlay, setActiveOverlay] = useState('wind');
   const [wakeLock, setWakeLock] = useState<any>(null);
   
   const mapRef = useRef<any>(null);
   const markersRef = useRef<Record<string, any>>({});
   const lastUpdateTimestampRef = useRef<number>(0);
-  const lastMapClickTimeRef = useRef<number>(0);
-  const watchIdRef = useRef<number | null>(null);
   const isMapInitializedRef = useRef<boolean>(false);
   const fallbackTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -79,7 +77,7 @@ export default function VesselTrackerPage() {
     if (!user || !firestore) return null;
     return doc(firestore, 'users', user.uid);
   }, [user, firestore]);
-  const { data: profile, isLoading: isProfileLoading } = useDoc<UserAccount>(userProfileRef);
+  const { data: profile } = useDoc<UserAccount>(userProfileRef);
 
   const savedVesselIds = profile?.savedVesselIds || [];
   const vesselsQuery = useMemoFirebase(() => {
@@ -91,10 +89,16 @@ export default function VesselTrackerPage() {
   
   const { data: followedVessels } = useCollection<VesselStatus>(vesselsQuery);
 
+  const labels = useMemo(() => ({
+    status1: "Au Mouillage",
+    status2: "En Route"
+  }), []);
+
   const getTideInfoForPoint = (lat: number, lng: number) => {
-    const commune = require('@/lib/locations').allCommuneNames.sort((a: string, b: string) => {
-        const coordsA = require('@/lib/locations').locations[a];
-        const coordsB = require('@/lib/locations').locations[b];
+    const { allCommuneNames, locations } = require('@/lib/locations');
+    const commune = allCommuneNames.sort((a: string, b: string) => {
+        const coordsA = locations[a];
+        const coordsB = locations[b];
         return getDistance(lat, lng, coordsA.lat, coordsA.lon) - getDistance(lat, lng, coordsB.lat, coordsB.lon);
     })[0];
 
@@ -106,8 +110,7 @@ export default function VesselTrackerPage() {
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || !window.L || !window.windyInit || isMapInitializedRef.current) return;
 
-    // Diagnostic d'origine pour l'utilisateur
-    console.log("%c[Vessel Tracker] Current Origin:", "color: blue; font-weight: bold;", window.location.origin);
+    console.log("%c[Windy Auth] Current Origin:", "color: #3b82f6; font-weight: bold;", window.location.origin);
 
     const options = {
       key: '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4',
@@ -115,48 +118,47 @@ export default function VesselTrackerPage() {
       lon: INITIAL_CENTER.lng,
       zoom: 10,
       verbose: true,
-      overlays: ['wind', 'gust', 'temp', 'sst', 'pressure', 'rh', 'waves', 'currents'],
+      overlays: ['wind', 'gust', 'temp', 'sst', 'pressure', 'rh', 'waves', 'swell', 'currents'],
       product: 'gfs'
     };
 
     try {
         window.windyInit(options, (windyAPI: any) => {
           if (!windyAPI) {
-              const origin = window.location.origin;
-              setAuthError(origin);
+              setAuthErrorOrigin(window.location.origin);
               setIsFallbackMode(true);
               return;
           }
 
           if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current);
-          setAuthError(null);
+          setAuthErrorOrigin(null);
           setIsFallbackMode(false);
 
           const { map, picker, store, broadcast } = windyAPI;
           mapRef.current = map;
           isMapInitializedRef.current = true;
 
-          // Forçage du rendu Canvas pour la performance des marqueurs
+          // Performance : Rendu Canvas pour les marqueurs
           map.options.preferCanvas = true;
 
-          // Patch pour supprimer les messages d'erreurs natifs Windy si présents
+          // Nettoyage des overlays d'erreurs natifs
           setTimeout(() => {
             document.querySelectorAll('.windy-error-msg, .error-boundary').forEach(el => el.remove());
             map.invalidateSize();
           }, 500);
 
-          map.on('click', async (e: any) => {
-            const now = Date.now();
-            if (now - lastMapClickTimeRef.current < 2000) return; 
-            lastMapClickTimeRef.current = now;
+          // Synchronisation UI
+          broadcast.on('redrawFinished', () => {
+            setActiveOverlay(store.get('overlay'));
+          });
 
+          map.on('click', async (e: any) => {
             const { lat, lng } = e.latlng;
             const tideData = getTideInfoForPoint(lat, lng);
             
             setMapClickResult({ lat, lon: lng, tideData });
             setIsQueryingWindy(true);
             
-            // Ouvrir le picker natif de Windy
             picker.open({ lat, lon: lng });
 
             try {
@@ -170,28 +172,24 @@ export default function VesselTrackerPage() {
           });
         });
     } catch (e) {
-        console.error("Windy Init Error:", e);
+        console.error("Windy Init Crash:", e);
         setIsFallbackMode(true);
     }
-  }, []);
+  }, [labels]);
 
   useEffect(() => {
     fallbackTimerRef.current = setTimeout(() => {
-        if (!isMapInitializedRef.current) {
-            setIsFallbackMode(true);
-        }
+        if (!isMapInitializedRef.current) setIsFallbackMode(true);
     }, 5000);
     return () => { if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current); };
   }, []);
 
   useEffect(() => {
-    if (isLeafletLoaded && isWindyLoaded) {
-        initWindy();
-    }
+    if (isLeafletLoaded && isWindyLoaded) initWindy();
   }, [isLeafletLoaded, isWindyLoaded, initWindy]);
 
   useEffect(() => {
-    if (isFallbackMode && isLeafletLoaded && !isMapInitializedRef.current && typeof window !== 'undefined' && window.L) {
+    if (isFallbackMode && isLeafletLoaded && !isMapInitializedRef.current && window.L) {
         const L = window.L;
         const fallbackMap = L.map('windy', { preferCanvas: true }).setView([INITIAL_CENTER.lat, INITIAL_CENTER.lng], 8);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(fallbackMap);
@@ -201,7 +199,7 @@ export default function VesselTrackerPage() {
   }, [isFallbackMode, isLeafletLoaded]);
 
   useEffect(() => {
-    if (!mapRef.current || !followedVessels || typeof window === 'undefined' || !window.L) return;
+    if (!mapRef.current || !followedVessels || !window.L) return;
     const L = window.L;
 
     followedVessels.forEach(v => {
@@ -245,7 +243,7 @@ export default function VesselTrackerPage() {
 
   const handleGpsUpdate = useCallback(async (pos: GeolocationPosition) => {
     const now = Date.now();
-    if (now - lastUpdateTimestampRef.current < 5000) return; // Throttling 5s pour performance
+    if (now - lastUpdateTimestampRef.current < 5000) return; 
     lastUpdateTimestampRef.current = now;
 
     const { latitude, longitude } = pos.coords;
@@ -282,7 +280,7 @@ export default function VesselTrackerPage() {
   const handleReloadKey = () => {
     setScriptTimestamp(Date.now());
     isMapInitializedRef.current = false;
-    setAuthError(null);
+    setAuthErrorOrigin(null);
     toast({ title: "Rechargement..." });
   };
 
@@ -295,33 +293,22 @@ export default function VesselTrackerPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-full overflow-x-hidden px-1 pb-32">
-      <Script 
-        src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js" 
-        id="leaflet-src"
-        strategy="afterInteractive" 
-        onLoad={() => setIsLeafletLoaded(true)}
-      />
-      <Script 
-        src={`https://api.windy.com/assets/map-forecast/libBoot.js?t=${scriptTimestamp}`} 
-        strategy="lazyOnload" 
-        crossOrigin="anonymous"
-        onLoad={() => setIsWindyLoaded(true)}
-      />
+      <Script src="https://unpkg.com/leaflet@1.4.0/dist/leaflet.js" strategy="afterInteractive" onLoad={() => setIsLeafletLoaded(true)} />
+      <Script src={`https://api.windy.com/assets/map-forecast/libBoot.js?t=${scriptTimestamp}`} strategy="lazyOnload" crossOrigin="anonymous" onLoad={() => setIsWindyLoaded(true)} />
 
       <meta name="referrer" content="no-referrer-when-downgrade" />
 
-      {authError && (
-        <Alert variant="destructive" className="bg-red-50 border-red-200">
-            <AlertCircle className="size-5" />
-            <AlertTitle className="font-black uppercase text-xs">Erreur d'autorisation Windy</AlertTitle>
-            <AlertDescription className="space-y-3 pt-2">
-                <p className="text-[10px] font-bold">Origine actuelle détectée : <code className="bg-white/50 px-1">{authError}</code></p>
-                <p className="text-[9px] italic">Veuillez ajouter cette URL dans la console Windy (api.windy.com).</p>
-                <Button onClick={handleReloadKey} variant="destructive" className="w-full h-10 font-black uppercase text-[10px] gap-2">
-                    <RefreshCw className="size-3" /> Réinitialiser la clé (Cache-Bust)
-                </Button>
-            </AlertDescription>
-        </Alert>
+      {authErrorOrigin && (
+        <div className="bg-red-600 text-white p-4 rounded-xl shadow-2xl space-y-3 border-4 border-white/20 animate-in zoom-in-95">
+            <div className="flex items-center gap-3"><ShieldAlert className="size-6" /><h3 className="font-black uppercase text-sm">ERREUR AUTH 401 WINDY</h3></div>
+            <p className="text-[10px] font-bold leading-relaxed">Votre origine de développement n'est pas autorisée sur api.windy.com.</p>
+            <div className="p-3 bg-black/20 rounded-lg border border-white/10 font-mono text-[9px] break-all select-all">
+                ORIGINE À AUTORISER : {authErrorOrigin}
+            </div>
+            <Button onClick={handleReloadKey} variant="outline" className="w-full h-10 font-black uppercase text-[10px] bg-white/10 border-white/20 hover:bg-white/20">
+                <RefreshCw className="size-3 mr-2" /> Réinitialiser la clé (Cache-Bust)
+            </Button>
+        </div>
       )}
 
       <Card className="border-2 shadow-sm overflow-hidden">
@@ -349,7 +336,7 @@ export default function VesselTrackerPage() {
       <Card className={cn("overflow-hidden border-2 shadow-xl flex flex-col transition-all relative bg-slate-100", isFullscreen ? "fixed inset-0 z-[150] w-screen h-screen rounded-none" : "min-h-[500px]")}>
         <div id="windy" className="absolute inset-0 w-full h-full z-10" style={{ minHeight: isFullscreen ? '100vh' : '500px', position: 'relative' }}>
           {mapClickResult && (
-            <div className="absolute z-[110] bg-slate-900/90 backdrop-blur-md text-white rounded-2xl p-4 shadow-2xl border-2 border-white/20 min-w-[220px] animate-in zoom-in-95" style={{ top: '50%', left: '50%', transform: 'translate(-50%, -110%)' }}>
+            <div className="absolute z-[110] bg-slate-900/90 backdrop-blur-md text-white rounded-2xl p-4 shadow-2xl border-2 border-white/20 min-w-[240px] animate-in zoom-in-95" style={{ top: '50%', left: '50%', transform: 'translate(-50%, -110%)' }}>
               <div className="flex items-center justify-between mb-3 border-b border-white/10 pb-2">
                 <span className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2">
                     <Activity className="size-3" /> Analyse Tactique
@@ -408,7 +395,7 @@ export default function VesselTrackerPage() {
       <div className="p-4 bg-primary/5 border-2 border-dashed rounded-xl flex gap-3 opacity-60">
           <Info className="size-5 text-primary shrink-0" />
           <p className="text-[10px] font-medium leading-relaxed">
-            <strong>Analyse Tactique :</strong> Cliquez n'importe où sur la mer pour obtenir le vent, les rafales, la température de l'eau (SST), la pression et les marées prévisionnelles du point.
+            <strong>Full Marine Config :</strong> Utilisez le picker Windy pour extraire les données marines (SST, Courants, Houle) à la position exacte de votre flotte.
           </p>
       </div>
     </div>

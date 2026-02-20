@@ -1,16 +1,16 @@
-
 'use server';
 
 /**
  * Service de récupération météo via Windy Point Forecast API v2.
- * Version 6.5 : Support multi-paramètres (Vent, Rafales, Eau, Pression, Humidité).
+ * Version 6.7 : Support total des paramètres marins et thermiques.
  */
 
 export async function fetchWindyWeather(lat: number, lon: number) {
-  const API_KEY = 'ggM4kZBn2QoBp91yLUHBvv5wAYfbxJuU';
+  // Clé fournie par l'utilisateur pour l'ensemble du projet
+  const API_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
   const url = 'https://api.windy.com/api/point-forecast/v2';
   
-  // URL EXACTE DE PRODUCTION POUR LE REFERER
+  // URL DE PRODUCTION POUR LA VALIDATION DU REFERER
   const PRODUCTION_URL = 'https://studio-2943478321-f746e.web.app/'; 
   
   try {
@@ -41,19 +41,19 @@ export async function fetchWindyWeather(lat: number, lon: number) {
     });
 
     if (!response.ok) {
-        return { success: false, error: `Erreur HTTP ${response.status}`, status: response.status };
+        return { success: false, error: `Erreur Windy: ${response.status}`, status: response.status };
     }
 
     const data = await response.json();
     
-    // Extraction sécurisée des données selon le format v2 (Windy renvoie des tableaux)
+    // Extraction des données (Windy renvoie des tableaux de prévisions)
     return {
       windSpeed: Math.round((data.wind?.[0] || 0) * 1.94384), // m/s -> knots
       gustSpeed: Math.round((data.gust?.[0] || 0) * 1.94384),
       windDir: data.windDir?.[0] || 0,
       temp: Math.round(data.temp?.[0] - 273.15), // Kelvin -> Celsius
       pressure: Math.round((data.pressure?.[0] || 0) / 100), // Pa -> hPa
-      rh: data.rh?.[0] || 0, // Humidité %
+      rh: Math.round(data.rh?.[0] || 0), // Humidité %
       waves: parseFloat((data.waves?.[0] || 0).toFixed(1)),
       sst: data.sst ? Math.round(data.sst[0] - 273.15) : null, // Water Temp
       success: true,
