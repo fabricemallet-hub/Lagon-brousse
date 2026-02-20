@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
@@ -27,7 +26,8 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-const MAP_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
+// MISE À JOUR DE LA CLÉ API DEMANDÉE
+const MAP_KEY = 'VFcQ4k9H3wFrrJ1h6jfS4U3gODXADyyn';
 
 export default function VesselTrackerPage() {
   const { toast } = useToast();
