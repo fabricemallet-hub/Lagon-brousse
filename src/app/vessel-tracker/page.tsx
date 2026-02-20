@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -24,7 +25,6 @@ import {
   Activity,
   Thermometer,
   Gauge,
-  Database,
   WifiOff,
   BatteryCharging,
   BatteryLow,
@@ -36,11 +36,10 @@ import {
   AlertCircle,
   Copy,
   Info,
-  Droplets,
   ArrowUp,
   ChevronDown
 } from 'lucide-react';
-import { cn, getDistance, degreesToCardinal } from '@/lib/utils';
+import { cn, getDistance } from '@/lib/utils';
 import type { VesselStatus, UserAccount, Tide } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -48,7 +47,7 @@ import { fetchWindyWeather } from '@/lib/windy-api';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getDataForDate } from '@/lib/data';
 
-// CLÉ "PRÉVISIONS CARTOGRAPHIQUES" (1gGm...)
+// CLÉ "PRÉVISIONS CARTOGRAPHIQUES" (Map Forecast)
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -144,7 +143,7 @@ export default function VesselTrackerPage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-        setCurrentOrigin(window.location.host);
+        setCurrentOrigin(window.location.origin);
     }
   }, []);
 
@@ -184,7 +183,7 @@ export default function VesselTrackerPage() {
         try {
             window.windyInit(options, (windyAPI: any) => {
               if (!windyAPI) {
-                  setAuthError(`Échec Auth 401. Origine à autoriser : ${window.location.host}`);
+                  setAuthError(`Échec Auth 401. Origine détectée : ${window.location.origin}`);
                   return;
               }
 
@@ -219,7 +218,11 @@ export default function VesselTrackerPage() {
                 picker.open({ lat: e.latlng.lat, lon: e.latlng.lng });
               });
 
-              setTimeout(() => { map.invalidateSize(); window.dispatchEvent(new Event('resize')); }, 1000);
+              // Correction du redessin pour éviter l'écran gris
+              setTimeout(() => { 
+                map.invalidateSize(); 
+                window.dispatchEvent(new Event('resize')); 
+              }, 1000);
             });
         } catch (e: any) {
             setAuthError(e.message || "Erreur critique Windy.");
@@ -231,40 +234,46 @@ export default function VesselTrackerPage() {
     if (isLeafletLoaded && isWindyLoaded) initWindy();
   }, [isLeafletLoaded, isWindyLoaded, initWindy]);
 
+  // OPTIMISATION : Rendu des marqueurs via requestAnimationFrame pour éviter les violations de thread
   useEffect(() => {
     if (!mapRef.current || !followedVessels || !window.L) return;
     const L = window.L;
 
-    followedVessels.forEach(v => {
-      if (!v.location || !v.isSharing) {
-        if (markersRef.current[v.id]) { markersRef.current[v.id].remove(); delete markersRef.current[v.id]; }
-        return;
-      }
+    const updateMarkers = () => {
+        followedVessels.forEach(v => {
+          if (!v.location || !v.isSharing) {
+            if (markersRef.current[v.id]) { markersRef.current[v.id].remove(); delete markersRef.current[v.id]; }
+            return;
+          }
 
-      const pos = [v.location.latitude, v.location.longitude];
-      const statusColor = v.status === 'stationary' ? '#f97316' : '#2563eb';
+          const pos = [v.location.latitude, v.location.longitude];
+          const statusColor = v.status === 'stationary' ? '#f97316' : '#2563eb';
 
-      if (!markersRef.current[v.id]) {
-        const icon = L.divIcon({
-          className: 'vessel-marker',
-          html: `<div class="relative flex flex-col items-center" style="transform: translate(-50%, -100%)">
-                  <div class="px-2 py-1 bg-slate-900/90 text-white rounded text-[10px] font-black shadow-lg border border-white/20 whitespace-nowrap mb-1">
-                    ${v.displayName || v.id}
-                  </div>
-                  <div class="p-1.5 rounded-full border-2 border-white shadow-xl" style="background-color: ${statusColor}">
-                    <svg class="size-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                        <path d="M12 2v18M5 12h14M12 20c-3.3 0-6-2.7-6-6M12 20c3.3 0 6-2.7 6-6"></path>
-                    </svg>
-                  </div>
-                </div>`,
-          iconSize: [0, 0],
-          iconAnchor: [0, 0]
+          if (!markersRef.current[v.id]) {
+            const icon = L.divIcon({
+              className: 'vessel-marker',
+              html: `<div class="relative flex flex-col items-center" style="transform: translate(-50%, -100%)">
+                      <div class="px-2 py-1 bg-slate-900/90 text-white rounded text-[10px] font-black shadow-lg border border-white/20 whitespace-nowrap mb-1">
+                        ${v.displayName || v.id}
+                      </div>
+                      <div class="p-1.5 rounded-full border-2 border-white shadow-xl" style="background-color: ${statusColor}">
+                        <svg class="size-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                            <path d="M12 2v18M5 12h14M12 20c-3.3 0-6-2.7-6-6M12 20c3.3 0 6-2.7 6-6"></path>
+                        </svg>
+                      </div>
+                    </div>`,
+              iconSize: [0, 0],
+              iconAnchor: [0, 0]
+            });
+            markersRef.current[v.id] = L.marker(pos, { icon }).addTo(mapRef.current);
+          } else {
+            markersRef.current[v.id].setLatLng(pos);
+          }
         });
-        markersRef.current[v.id] = L.marker(pos, { icon }).addTo(mapRef.current);
-      } else {
-        markersRef.current[v.id].setLatLng(pos);
-      }
-    });
+    };
+
+    const animFrame = requestAnimationFrame(updateMarkers);
+    return () => cancelAnimationFrame(animFrame);
   }, [followedVessels]);
 
   const handleGpsUpdate = useCallback(async (pos: GeolocationPosition) => {
@@ -330,8 +339,8 @@ export default function VesselTrackerPage() {
                         <Button size="icon" variant="ghost" onClick={() => { navigator.clipboard.writeText(currentOrigin); toast({ title: "Copié !" }); }}><Copy className="size-4" /></Button>
                     </div>
                 </div>
-                <div className="bg-white/50 p-3 rounded-lg text-[9px] font-bold leading-relaxed italic">
-                    {"Note : Les restrictions de domaine Windy sont sensibles au hash dynamique de Cloud Workstations. L'URL ci-dessus doit figurer dans votre liste de clés."}
+                <div className="bg-white/50 p-3 rounded-lg text-[9px] font-bold leading-relaxed italic text-red-900">
+                    {"Attention : Windy détecte une origine dynamique différente de celle configurée. Veuillez autoriser l'URL ci-dessus."}
                 </div>
             </AlertDescription>
         </Alert>
@@ -355,7 +364,7 @@ export default function VesselTrackerPage() {
                       <select 
                         value={currentModel}
                         onChange={handleSetModel}
-                        className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm"
+                        className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none focus:border-primary"
                       >
                           <option value="ecmwf">ECMWF (9km)</option>
                           <option value="gfs">GFS (22km)</option>
@@ -370,7 +379,7 @@ export default function VesselTrackerPage() {
                       <select 
                         value={currentOverlay}
                         onChange={handleSetOverlay}
-                        className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm"
+                        className="w-full h-11 border-2 rounded-xl bg-white font-black uppercase text-[10px] px-3 appearance-none shadow-sm outline-none focus:border-primary"
                       >
                           <option value="wind">Vent & Rafales</option>
                           <option value="waves">Mer & Vagues</option>
@@ -398,12 +407,12 @@ export default function VesselTrackerPage() {
 
       <div className="space-y-4">
           <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 px-1">
-              <History className="size-4" /> Analyse au Point
+              <History className="size-4" /> Analyse Tactique au Point
           </h3>
           <Alert className="bg-muted/10 border-dashed border-2">
               <Info className="size-4 text-primary" />
               <AlertDescription className="text-[10px] font-bold uppercase leading-relaxed">
-                  Cliquez n'importe où sur la carte ou sur un navire pour obtenir un rapport météo et marée détaillé.
+                  Cliquez n'importe où sur la mer pour ouvrir le sélecteur Windy et obtenir un rapport complet incluant les marées et la température de l'eau.
               </AlertDescription>
           </Alert>
       </div>
