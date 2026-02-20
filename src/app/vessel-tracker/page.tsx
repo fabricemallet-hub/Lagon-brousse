@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -106,13 +107,15 @@ export default function VesselTrackerPage() {
 
             try {
               const weather = await fetchWindyWeather(lat, lng);
-              setMapClickResult(prev => ({ 
+              setMapClickResult((prev: any) => ({ 
                   ...prev, 
                   wind: weather.windSpeed, 
                   temp: weather.temperature, 
                   waves: weather.waves,
                   success: weather.success
               }));
+            } catch (err) {
+              console.error("Windy Point Forecast failed:", err);
             } finally {
               setIsQueryingWindy(false);
             }
@@ -173,7 +176,7 @@ export default function VesselTrackerPage() {
         markersRef.current[v.id].setLatLng(pos);
       }
     });
-  }, [followedVessels, labels.status1, labels.status2]);
+  }, [followedVessels]);
 
   // --- MOTEUR GPS AVEC THROTTLING 5S (FIX VIOLATION) ---
   const handleGpsUpdate = useCallback(async (pos: GeolocationPosition) => {
