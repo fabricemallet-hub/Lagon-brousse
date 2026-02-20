@@ -192,7 +192,7 @@ export default function VesselTrackerPage() {
   , [dbSounds]);
 
   const smsPreview = useMemo(() => {
-    const nicknamePrefix = vesselNickname ? `[${vesselNickname}] ` : "";
+    const nicknamePrefix = vesselNickname ? `[${vesselNickname.toUpperCase()}] ` : "";
     const customText = (isCustomMessageEnabled && vesselSmsMessage) ? vesselSmsMessage : "Requiert assistance immédiate.";
     const lat = currentPos?.lat.toFixed(6) || '-21.3';
     const lng = currentPos?.lng.toFixed(6) || '165.5';
@@ -218,7 +218,7 @@ export default function VesselTrackerPage() {
     const pos = mode === 'sender' ? currentPos : (activeVessel?.location ? { lat: activeVessel.location.latitude, lng: activeVessel.location.longitude } : null);
     if (pos) {
         map.panTo(pos);
-        map.setZoom(15);
+        map.setZoom(18); // Zoom maximal pour une vue rapprochée
     }
   }, [map, mode, currentPos, followedVessels, sharingId]);
 
@@ -371,7 +371,11 @@ export default function VesselTrackerPage() {
             setVesselAccuracy(Math.round(accuracy));
             setCurrentSpeed(Math.max(0, Math.round((speed || 0) * 1.94384)));
 
-            if (isFollowMode && map) map.panTo(newPos);
+            if (isFollowMode && map) {
+                map.panTo(newPos);
+                // On laisse l'utilisateur gérer son propre niveau de zoom s'il explore,
+                // mais pour le recentrage automatique on se rapproche.
+            }
 
             if (!anchorPos) setAnchorPos(newPos);
             else {
@@ -484,7 +488,7 @@ export default function VesselTrackerPage() {
       <header className="flex items-center justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-black uppercase tracking-tighter flex items-center gap-2"><Globe className="text-primary" /> Cockpit Navigation</h1>
-          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Tactical Interface v21.2</p>
+          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Tactical Interface v21.3</p>
         </div>
         <div className="flex bg-slate-900/10 p-1 rounded-xl border-2">
           <Button variant={mode === 'sender' ? 'default' : 'ghost'} size="sm" className="font-black uppercase text-[9px] h-8 px-3" onClick={() => setMode('sender')}>Capitaine (A)</Button>
@@ -549,7 +553,7 @@ export default function VesselTrackerPage() {
                 <Button size="icon" className={cn("bg-white border-2 h-10 w-10 shadow-xl", isFollowMode ? "border-blue-500 bg-blue-50" : "border-slate-200")} onClick={() => setIsFollowMode(!isFollowMode)}>
                     {isFollowMode ? <Lock className="size-5 text-blue-600" /> : <Unlock className="size-5 text-slate-400" />}
                 </Button>
-                <Button onClick={handleRecenter} className="h-10 bg-primary text-white border-2 border-white/20 px-3 gap-2 shadow-xl font-black uppercase text-[9px]">RECENTRER <LocateFixed className="size-4" /></Button>
+                <Button onClick={handleRecenter} className="h-10 bg-primary text-white border-2 border-white/20 px-3 gap-2 shadow-xl font-black uppercase text-[9px]">RECENTRER (Z+18) <LocateFixed className="size-4" /></Button>
             </div>
         </div>
 
@@ -648,8 +652,8 @@ export default function VesselTrackerPage() {
             <div className="space-y-1">
                 <Label className="text-[9px] font-black uppercase ml-1 opacity-60">Suivre le navire ID</Label>
                 <div className="flex gap-2">
-                    <Input placeholder="ENTREZ L'ID..." className="font-black text-center h-12 border-2 uppercase tracking-widest" />
-                    <Button variant="default" className="h-12 px-4 font-black uppercase text-[10px] shrink-0" onClick={handleSaveVessel}><Check className="size-4" /></Button>
+                    <Input placeholder="ENTREZ L'ID..." value={vesselIdToFollow} onChange={e => setVesselIdToFollow(e.target.value)} className="font-black text-center h-12 border-2 uppercase tracking-widest" />
+                    <Button variant="default" className="h-12 px-4 font-black uppercase text-[10px] shrink-0" onClick={handleSaveVessel} disabled={!vesselIdToFollow.trim()}><Check className="size-4" /></Button>
                 </div>
             </div>
             {savedVesselIds.length > 0 && (
@@ -668,7 +672,7 @@ export default function VesselTrackerPage() {
         </div>
       )}
 
-      {mode === 'sender' && !isSharing && (
+      {mode === 'sender' && (
         <Accordion type="single" collapsible className="w-full">
             <AccordionItem value="sms-config" className="border-none">
                 <AccordionTrigger className="flex items-center gap-2 hover:no-underline py-3 px-4 bg-orange-50 border-2 border-orange-100 rounded-xl">
