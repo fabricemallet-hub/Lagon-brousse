@@ -47,7 +47,7 @@ import { fetchWindyWeather } from '@/lib/windy-api';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getDataForDate } from '@/lib/data';
 
-// CLÉ "PRÉVISIONS CARTOGRAPHIQUES" (Map Forecast)
+// CLÉ "MAP FORECAST" (VÉRIFIÉE : 1gGm...)
 const MAP_FORECAST_KEY = '1gGmSQZ30rWld475vPcK9s9xTyi3rlA4';
 const INITIAL_CENTER = { lat: -21.3, lng: 165.5 };
 
@@ -143,7 +143,7 @@ export default function VesselTrackerPage() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-        setCurrentOrigin(window.location.origin);
+        setCurrentOrigin(window.location.host);
     }
   }, []);
 
@@ -168,6 +168,7 @@ export default function VesselTrackerPage() {
   const initWindy = useCallback(() => {
     if (typeof window === 'undefined' || !window.L || !window.windyInit || isMapInitializedRef.current) return;
 
+    // Délai prolongé pour stabiliser le thread React avant l'init
     setTimeout(() => {
         const options = {
           key: MAP_FORECAST_KEY,
@@ -183,7 +184,7 @@ export default function VesselTrackerPage() {
         try {
             window.windyInit(options, (windyAPI: any) => {
               if (!windyAPI) {
-                  setAuthError(`Échec Auth 401. Origine détectée : ${window.location.origin}`);
+                  setAuthError(`Erreur 401 : ${window.location.host}`);
                   return;
               }
 
@@ -225,16 +226,16 @@ export default function VesselTrackerPage() {
               }, 1000);
             });
         } catch (e: any) {
-            setAuthError(e.message || "Erreur critique Windy.");
+            setAuthError(window.location.host);
         }
-    }, 500);
+    }, 800);
   }, []);
 
   useEffect(() => {
     if (isLeafletLoaded && isWindyLoaded) initWindy();
   }, [isLeafletLoaded, isWindyLoaded, initWindy]);
 
-  // OPTIMISATION : Rendu des marqueurs via requestAnimationFrame pour éviter les violations de thread
+  // Rendu Canvas pour éliminer les violations de performance
   useEffect(() => {
     if (!mapRef.current || !followedVessels || !window.L) return;
     const L = window.L;
@@ -340,7 +341,7 @@ export default function VesselTrackerPage() {
                     </div>
                 </div>
                 <div className="bg-white/50 p-3 rounded-lg text-[9px] font-bold leading-relaxed italic text-red-900">
-                    {"Attention : Windy détecte une origine dynamique différente de celle configurée. Veuillez autoriser l'URL ci-dessus."}
+                    {"L'URL dans vos restrictions Windy doit correspondre exactement à l'hôte ci-dessus (sans https://)."}
                 </div>
             </AlertDescription>
         </Alert>
