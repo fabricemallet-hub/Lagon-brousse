@@ -164,6 +164,7 @@ export default function VesselTrackerPage() {
 
     const attemptInit = async () => {
         try {
+            // STEP 1: Load Leaflet 1.4.0 (Required by Windy)
             await loadScript('leaflet-js', 'https://unpkg.com/leaflet@1.4.0/dist/leaflet.js');
             
             let retries = 0;
@@ -174,6 +175,7 @@ export default function VesselTrackerPage() {
             
             if (!(window as any).L) throw new Error("Leaflet non trouvé après attente.");
 
+            // STEP 2: Load Windy Boot Library
             await loadScript('windy-lib-boot', 'https://api.windy.com/assets/map-forecast/libBoot.js');
             
             const options = {
@@ -186,6 +188,7 @@ export default function VesselTrackerPage() {
                 product: 'ecmwf',
             };
 
+            // STEP 3: Initialize Windy
             (window as any).windyInit(options, (windyAPI: any) => {
                 if (!windyAPI) { 
                     setAuthError(window.location.host); 
